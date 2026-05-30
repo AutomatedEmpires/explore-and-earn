@@ -1,0 +1,12 @@
+{
+  "name": "explore-and-earn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Explore & Earn development workspace",
+  "scripts": {
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0"
+  }
+}
