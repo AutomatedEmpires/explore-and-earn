@@ -26,14 +26,23 @@ export interface IconProps {
 export function Icon({ name, size = 24, title, ...rest }: IconProps) {
 	const entry = getIcon(name)
 	const label = title ?? entry.label
+	const hidden = rest["aria-hidden"]
 	return (
 		<span
 			role="img"
-			aria-label={rest["aria-hidden"] ? undefined : label}
-			aria-hidden={rest["aria-hidden"]}
+			aria-label={hidden ? undefined : label}
+			aria-hidden={hidden}
 			data-icon={name}
 			data-streamline={entry.streamline}
-			style= fontSize: size, lineHeight: 1, display: "inline-flex" 
+			style=
+				display: "inline-flex",
+				alignItems: "center",
+				justifyContent: "center",
+				width: size,
+				height: size,
+				fontSize: size,
+				lineHeight: 1,
+			
 		>
 			{/* TODO(A-ICON-LICENSE): swap placeholder for licensed Streamline Freehand asset */}
 			{entry.placeholder}
