@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.4
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile=false
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: Run guardrail checks
+        run: pnpm guardrails
+
+  design-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: G30 — single icon system
+        shell: bash
+        run: |
+          set -euo pipefail
+          pattern='from "(lucide-react|@heroicons|react-icons|@fortawesome|@mui/icons-material)"'
+          if grep -REn "$pattern" apps packages 2>/dev/null | grep -v 'packages/ui/src/icons'; then
+            echo "::error::G30 violation — use the Streamline Freehand icon registry only."
+            exit 1
+          fi
+      - name: G22 — verified host qualifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -REl 'VerifiedHostBadge' packages apps 2>/dev/null | grep -q .; then
+            if ! grep -REq 'Self-Declared' packages apps 2>/dev/null; then
+              echo "::error::G22 violation — Verified Host badge must include the 'Self-Declared by Host' qualifier."
+              exit 1
+            fi
+          fi
