@@ -1,0 +1,7 @@
+{
+  "name": "@explore-and-earn/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared types and API contracts (placeholder — not implemented yet)",
+  "type": "module"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@explore-and-earn/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Explore&Earn design system: tokens, icons, primitives, components (scaffold)",
+  "type": "module",
+  "exports": {
+    "./icons": "./src/icons/index.ts"
+  }
+}

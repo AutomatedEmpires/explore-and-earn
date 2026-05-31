@@ -1,0 +1,7 @@
+# Proposed package manager: pnpm workspaces (DECISION PENDING — A-PKGMGR).
+# The repo currently has an npm package-lock.json; do NOT delete it without
+# founder approval. This file documents the proposed workspace layout so the
+# monorepo structure is legible. See docs/sprint-zero/repo-scaffold-plan.md.
+packages:
+  - "apps/*"
+  - "packages/*"

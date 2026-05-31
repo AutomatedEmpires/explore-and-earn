@@ -1,0 +1,10 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "//": "Proposed task runner: Turborepo (DECISION PENDING — A-PKGMGR). Placeholder pipeline; real tasks land once tooling is locked. See docs/sprint-zero/repo-scaffold-plan.md.",
+  "tasks": {
+    "build": { "dependsOn": ["^build"], "outputs": [] },
+    "lint": {},
+    "typecheck": { "dependsOn": ["^build"] },
+    "test": { "dependsOn": ["^build"] }
+  }
+}

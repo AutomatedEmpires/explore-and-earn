@@ -1,0 +1,7 @@
+{
+  "name": "@explore-and-earn/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DB access layer + generated types (placeholder — no schema yet)",
+  "type": "module"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@explore-and-earn/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Explore&Earn web app (placeholder — not implemented yet)",
+  "scripts": {
+    "dev": "echo \"TODO: scaffold Next.js app (see docs/sprint-zero/repo-scaffold-plan.md)\""
+  }
+}
