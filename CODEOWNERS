@@ -1,0 +1,23 @@
+# CODEOWNERS — Explore&Earn
+#
+# The founder (@AutomatedEmpires) owns the control plane and all
+# founder-approval-gated areas by default. Refine as the team/agents grow.
+# See docs/agents/founder-approval-gates.md.
+
+# Default owner
+*                               @AutomatedEmpires
+
+# Control plane — agent context + source of truth (high sensitivity)
+/AGENTS.md                      @AutomatedEmpires
+/CLAUDE.md                      @AutomatedEmpires
+/docs/agents/                   @AutomatedEmpires
+/docs/source-of-truth/          @AutomatedEmpires
+
+# Design system canon — protect against drift
+/docs/design/                   @AutomatedEmpires
+/packages/ui/                   @AutomatedEmpires
+
+# Gated areas — require founder approval before merge
+/supabase/                      @AutomatedEmpires
+/packages/db/                   @AutomatedEmpires
+/CODEOWNERS                      @AutomatedEmpires
