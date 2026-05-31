@@ -1,0 +1,14 @@
+{
+  "name": "@explore-and-earn/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./icons": "./src/icons/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

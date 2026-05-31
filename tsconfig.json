@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./apps/web" },
+    { "path": "./apps/jobs" },
+    { "path": "./packages/contracts" },
+    { "path": "./packages/db" },
+    { "path": "./packages/ui" },
+    { "path": "./packages/stripe-seed" },
+    { "path": "./packages/test-utils" },
+    { "path": "./packages/mailer" }
+  ]
+}

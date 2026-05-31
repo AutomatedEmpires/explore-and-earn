@@ -1,0 +1,10 @@
+:root {
+  /* TODO: Replace placeholder values once design tokens are canonically locked. */
+  --surface-default: #ffffff;
+  --surface-raised: #f7f7f5;
+  --text-primary: #171717;
+  --text-secondary: #525252;
+  --border-default: #d4d4d4;
+  --radius-md: 16px;
+  --space-md: 16px;
+}

@@ -1,0 +1,10 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "TODO: Wire release automation after Sprint Zero approvals."

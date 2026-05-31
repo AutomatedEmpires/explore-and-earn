@@ -1,0 +1,5 @@
+# TODO: Populate local Supabase configuration after the team approves Docker and
+# local environment conventions for Sprint Zero.
+
+[project]
+id = "explore-and-earn-local"

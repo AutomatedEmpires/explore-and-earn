@@ -1,0 +1,6 @@
+{
+  "name": "@explore-and-earn/eslint-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module"
+}
