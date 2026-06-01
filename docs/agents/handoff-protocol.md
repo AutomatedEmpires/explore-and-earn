@@ -4,7 +4,7 @@ The mechanism that makes the relay continuous. Each step ends by leaving a **dur
 
 Under CLAOS Lite the durable signal is always a GitHub artifact — an issue, a draft PR, a label change, a review, or a **handoff comment** — never a private chat message and never the founder copying text between agents. See [`claos-lite-handoff-relay.md`](./claos-lite-handoff-relay.md) and [`closed-loop-workflow.md`](./closed-loop-workflow.md).
 
-All labels referenced below use the canonical CLAOS Lite set in [`label-system.md`](./label-system.md). Deprecated names (`status:ready-for-engineering`, `status:in-review`, `status:changes-requested`, `status:done`, `agent:copilot`) must not be applied as active labels.
+All labels referenced below use the canonical CLAOS Lite set in [`label-system.md`](./label-system.md). Deprecated/ambiguous names (`status:ready-for-engineering`, `status:in-review`, `status:changes-requested`, `status:done`, and bare `agent:copilot` — which must be disambiguated to `agent:vscode` for local WSL verification or `agent:copilot-cloud` for the GitHub cloud agent) must not be applied as active labels.
 
 ## Steps
 
@@ -22,6 +22,8 @@ Whenever an agent passes the baton, it posts **one structured comment** on the i
 swaps the `status:*` and `agent:*` labels. Use the same field order as the reusable Agent
 Handoff block in [`github-artifacts-to-apply.md`](./github-artifacts-to-apply.md) §5. The
 comment — not chat — is the message to the next agent.
+
+> **Mentions matter:** writing `@copilot` in a handoff comment may start or route work to the GitHub **cloud** Copilot agent (`agent:copilot-cloud`). If you mean the local WSL verifier, say "VS Code / `agent:vscode`" and do **not** type `@copilot`.
 
 ```markdown
 ### 🤝 Handoff

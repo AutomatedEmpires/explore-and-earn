@@ -12,16 +12,37 @@ meaningless without a shared definition of each agent's job. This file is that d
 | Agent | Label | Primary role | Can do | Must NOT do |
 | --- | --- | --- | --- | --- |
 | Opus (Notion) | `agent:opus` | Architect / orchestrator / reviewer | Write specs & Build Packs, file build tasks, review PRs, reconcile canon, route the baton | Merge gated work without founder; write `.github/workflows/*` (lacks scope) |
-| VS Code / Copilot | `agent:vscode` | Local implementer + verifier (WSL) | Implement on branches, run typecheck/lint/build/test locally, apply `.github/workflows/*`, seed labels | Approve own gated work; merge without review |
+| VS Code (local) | `agent:vscode` | **Local** implementer + verifier on Jackson's WSL laptop | `gh pr checkout`, run typecheck/lint/build/test in WSL, implement on branches, apply `.github/workflows/*`, seed labels | Be conflated with the cloud bot; approve own gated work; merge without review |
+| GitHub Copilot (cloud) | `agent:copilot-cloud` | GitHub-hosted Copilot coding agent (started by `@copilot`) | Pick up `@copilot`-directed work from PR/issue comments; push commits and open/iterate PRs from GitHub's servers | Verify Jackson's local WSL env; stand in for `status:verified-local`; merge gated work |
 | Codex | `agent:codex` | Implementer / reviewer | Implement, review, propose diffs | Merge gated work; bypass verification |
 | Cursor | `agent:cursor` | Implementer / reviewer | Implement, review, refactor | Merge gated work; bypass verification |
 | Claude | `agent:claude` | Implementer / reviewer | Implement, review, write docs | Merge gated work; bypass verification |
 | Review | `agent:review` | Review-queue marker | Signals "a reviewer must act" | n/a (state marker, not a person) |
 | Founder | `agent:founder` | Human decision-maker | Open/close gates, set taste & business direction, authorize merges past gates | Hand-carry status between agents (the relay does that now) |
 
+## Two Copilots — never conflate them
+
+"Copilot" is **two different actors** with different powers. Routing breaks if they are treated as one.
+
+| | `agent:vscode` | `agent:copilot-cloud` |
+| --- | --- | --- |
+| What it is | VS Code / Copilot running **locally** in Jackson's WSL | GitHub-hosted Copilot **cloud** coding agent |
+| Where it runs | Jackson's laptop (WSL) | GitHub's servers |
+| How it starts | A human drives it in the editor; carries the `agent:vscode` label / verification issue form | An `@copilot` mention in a PR or issue comment may start or route work to it |
+| Can it verify local WSL? | **Yes — that is its entire job** | **No — it cannot see or run Jackson's laptop/WSL** |
+| Typical output | Local typecheck/lint/build/test results + pushed fixes | Cloud commits + PR edits |
+
+### Trigger rules
+
+- **`@copilot` in a PR/issue comment** may start or route work to the **GitHub cloud Copilot coding agent** (`agent:copilot-cloud`). Mention it only when you actually want cloud work — stray `@copilot` mentions can auto-start it.
+- **`agent:vscode`** means **local WSL verification** by VS Code/Copilot on Jackson's laptop. It is an environment/role, not the cloud bot.
+- **The cloud Copilot agent cannot be assumed to have verified Jackson's local WSL environment.** A green cloud run is **not** local verification.
+- **Local verification still requires `gh pr checkout` + `pnpm` checks on the laptop** (`pnpm install && pnpm typecheck && pnpm lint`, plus build/test as applicable). Only after that may an artifact carry `status:verified-local`.
+
 ## Capability boundaries (hard rules)
 
 - **Workflow files (`.github/workflows/*`):** only an actor with the GitHub `workflows` scope can write these. Opus's integration cannot; route such writes to `agent:vscode` or a human. See [`github-artifacts-to-apply.md`](./github-artifacts-to-apply.md).
+- **Local-verification authority:** only `agent:vscode` (WSL on Jackson's laptop) can produce `status:verified-local`. `agent:copilot-cloud` runs in the cloud and **cannot** verify the local environment; its output never satisfies a local-verification gate.
 - **Label creation:** seeded once via `gh` ([`github-artifacts-to-apply.md`](./github-artifacts-to-apply.md) §4). Any agent may *apply* existing labels; introducing a new label type is a governance change (route to `agent:opus` + `area:agent-governance`).
 - **Canon:** product truth lives in Notion. Code may not silently diverge; divergence becomes `blocked:drift` (see [`relay-state-machine.md`](./relay-state-machine.md)).
 
