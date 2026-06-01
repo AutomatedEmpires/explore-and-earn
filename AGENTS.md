@@ -69,7 +69,7 @@ The founder's biggest concern is **visual quality**. Do not ship generic, ugly, 
 - Use **one unified component system** across all lifestyle categories (Farm, Maritime, Remote, Seasonal). Vary imagery + accent color, never the component system.
 - **One icon system only: Streamline Freehand**, via the `<Icon name="domain.name"/>` registry in `packages/ui`. No Lucide / Heroicons / Font Awesome / Material / react-icons / ad-hoc inline SVG in feature code (CI guardrail **G30**).
 - **Never commit paid/proprietary Streamline asset files** to this public repo. Use placeholder icon components with stable names + TODO comments. See [`docs/design/icon-system.md`](./docs/design/icon-system.md).
-- Photos get a **hand-drawn frame + paper mat around them** — never filters/overlays *on* host photos. See [`docs/design/photo-language.md`](./docs/design/photo-language.md).
+- Photos get a **hand-drawn frame + paper mat around them** — never filters/overlays *on* host photos. See [`docs/design/photo-language.md`](./docs/design/photo-language.md) and [`docs/design/media-buckets.md`](./docs/design/media-buckets.md).
 
 ## 7. Setup & commands
 
@@ -86,6 +86,20 @@ Canonical environment: **Windows 11 ARM64 → WSL2 Ubuntu 24.04 → VS Code → 
 - UI primitives live in `packages/ui` — features compose them, they do not re-implement them.
 - Small, reviewable PRs. No unrelated drive-by changes.
 - Cite the Notion canon page (or repo doc) in any PR that encodes a product decision.
+
+## 8.5 Shared contracts & UI primitives (check here BEFORE adding a type or component)
+
+Sprint Zero ships **typed contracts** and **placeholder primitives** so feature agents compose rather than redefine. Before introducing a new type or component, check these first:
+
+- [`packages/contracts/src/categories.ts`](./packages/contracts/src/categories.ts) — opportunity categories (canonical tuple in `enums.ts`) + curated-photo category subset.
+- [`packages/contracts/src/benefits.ts`](./packages/contracts/src/benefits.ts) — the **Housing / Meals / Pay** triad shape.
+- [`packages/contracts/src/trust.ts`](./packages/contracts/src/trust.ts) — Verified Host contract + locked "Self-Declared by Host" qualifier.
+- [`packages/contracts/src/media.ts`](./packages/contracts/src/media.ts) — `MediaBucketType`, `CuratedPhotoScope`, `ListingMedia`, responsive image + selection types.
+- [`packages/contracts/src/discovery-card.ts`](./packages/contracts/src/discovery-card.ts) — `DiscoveryCardProps`, card surfaces, the 8 zones, states, and canonical analytics events.
+- `packages/ui/src/` — `Card`, `Modal`, `Badge`, `Chip`, `Button`, `Meter`, `Skeleton`, `VerifiedHostBadge` placeholder primitives.
+- [`packages/ui/src/icons/registry.ts`](./packages/ui/src/icons/registry.ts) — the `data-icon` registry (placeholder glyphs until licensed Streamline Freehand assets land).
+
+These encode **locked canon only**; anything unconfirmed is a `// TODO(?):` and must be escalated (see §9). Media/photo strategy for Figma-generated assets: [`docs/design/media-buckets.md`](./docs/design/media-buckets.md). Do **not** add real enum values, schema, pricing math, or icon binaries here.
 
 ## 9. When in doubt
 
