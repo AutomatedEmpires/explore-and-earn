@@ -45,6 +45,7 @@ Ranking is the **ordering of candidates or opportunities for display**, derived 
 | `match-signal-registry-v1.md` | Every candidate signal + visibility/weight/privacy/fairness/V1 status |
 | `match-explanation-v1.md` | Explanation structure and copy rules |
 | `match-edge-cases-v1.md` | Determinism: tie-breaking, stacking caps, rounding/boundary, missing-data, empty-pool |
+| `match-aggregation-examples-v1.md` | Golden aggregation-layer fixtures (caps/band/confidence/clamp/tie-break) |
 | `match-tuning-v1-decisions.md` | Locked tuning values + full justification (ADR-0001 mirror) |
 | `prohibited-signals-v1.md` | Signals that must never be used or inferred |
 | `seeker-recommendations-v1.md` | Seeker-side discovery recommendation architecture |
@@ -57,6 +58,7 @@ Ranking is the **ordering of candidates or opportunities for display**, derived 
 | `../analytics/matching-hiring-events-v1.md` | PostHog event taxonomy (per-event tables) |
 | `../security/matching-fairness-approval-gates.md` | Founder approval gates + proposed guardrails |
 | `../security/matching-guardrail-tests-v1.md` | Given/When/Then acceptance tests for G8/G11/G16/G31-G34 |
+| `../security/matching-fairness-monitoring-v1.md` | Post-launch disparate-impact monitoring metrics + pre-launch gate |
 | `../architecture/matching-service-boundaries.md` | Service roles + import boundaries |
 
 ## End-to-end flow (architecture, not implementation)
