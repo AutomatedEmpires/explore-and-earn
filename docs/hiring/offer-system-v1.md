@@ -1,6 +1,6 @@
 # Offer System V1
 
-> DRAFT — architecture only. Canonical from "Application, Invite & Offer State Machines", "Lifecycle Registry", "Canonical Enum Registry". Legal employment-contract logic is NOT created.
+> DRAFT — architecture only. Canonical from "Application, Invite & Offer State Machines", "Lifecycle Registry", "Canonical Enum Registry". **Expiry ratified + reminder policy LOCKED 2026-05-31** (ADR-0001 §9-§10). Legal employment-contract logic is NOT created.
 
 ## Canonical states (Enum Registry: `OfferStatus`)
 
@@ -37,11 +37,11 @@ stateDiagram-v2
 - terms summary, pay summary, HOUSING/MEALS confirmation (triad — never "perks").
 - `extended_at`, expiration, audit trail.
 
-## Expiry & rules (canon)
+## Expiry & rules (LOCKED)
 
-- **Expires 7 days after `extended_at`** (canon).
+- **Expires 7 days after `extended_at`** (canon, ratified; `LIFECYCLE_EXPIRY_DAYS_V1.offer_expire`). Rationale (ADR-0001 §10): long enough for a real relocation/housing decision, short enough to keep marketplace velocity.
+- Reminder policy: `offer_expires_soon` at **T-3 days and T-1 day** before expiry (ADR-0001 §9). Sending deferred to the Notification build pack.
 - Withdraw-before-accept is allowed. Post-accept changes require dispute/admin (not self-serve).
-- Offer expiration policy is a **founder approval gate** for any change.
 
 ## Legally binding vs informational
 

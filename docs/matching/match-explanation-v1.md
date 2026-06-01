@@ -1,6 +1,6 @@
 # Match Explanation V1
 
-> DRAFT — architecture only. **Storage decision LOCKED 2026-05-31:** derive on read; do NOT store explanation text (ADR-0001 §13). Copy LOCKED 2026-05-31 (§12).
+> DRAFT — architecture only. **Storage decision LOCKED 2026-05-31:** derive on read; do NOT store explanation text (ADR-0001 §13). Copy LOCKED 2026-05-31 (ADR-0001 §12). See [`match-tuning-v1-decisions.md`](./match-tuning-v1-decisions.md).
 
 Every host-facing match score MUST be explainable in plain language (Critical Rule: explainability required; guardrail: no score display without explanation contract).
 
@@ -18,7 +18,7 @@ A `MatchExplanation` is **derived from** the stored `MatchResult.reasons` (the e
 ## Storage (LOCKED — ADR-0001 §13)
 
 - Persist only the structured `reasons[]` on `MatchResult`. Do **not** store rendered explanation text.
-- Rationale: minimizes retention/privacy scope (G28), avoids stale/drifting text, cheap to regenerate. Because no explanation text is stored, the `A-MATCH-EXPL-STORE` gate is satisfied by **not crossing it**. Proposed CI check **G34** enforces this.
+- Rationale: minimizes retention/privacy scope (G28), avoids stale/drifting text, and is cheap to regenerate from canonical reasons. Because no explanation text is stored, the `A-MATCH-EXPL-STORE` gate is satisfied by **not crossing it**. Proposed CI check **G34** enforces this.
 
 ## Copy (LOCKED — ADR-0001 §12)
 
@@ -36,4 +36,23 @@ Why this fits:
 - Your farm-equipment experience matches the host requirements.
 Add this to improve your match:
 - Your profile has no references yet.
-Not considered
+Not considered:
+- Demographic, health, or other protected attributes. Boost/featured status.
+```
+
+## Symmetry: seeker view vs host view
+
+| Section | Seeker view | Host view |
+| --- | --- | --- |
+| Top positive signals | "why this fits you" | "why this candidate fits the listing" |
+| Missing information | what to add to your profile | what the candidate has not provided yet |
+| Concerns | requirements you may not meet (with how to resolve) | factual hard-modifier concerns |
+| Freshness | last updated | last updated |
+| Not considered | protected attributes, boost | protected attributes, boost |
+
+## Rules
+
+- **No false/generated explanations**: every line maps to a real signal contribution in `MatchResult.reasons`. No LLM free-text rationalization in V1 (ADR-0001 §14: no AI/ML in V1).
+- **No hidden disqualifying logic**: if a signal meaningfully changed rank or applied a cap, it must appear here.
+- **Plain language**: human-readable; no raw subscores in host/seeker views (G11).
+- **Confidence-gated**: when confidence < 40 the explanation is replaced by a "Building match — complete your profile" prompt rather than a misleadingly confident rationale (ADR-0001 §7).
