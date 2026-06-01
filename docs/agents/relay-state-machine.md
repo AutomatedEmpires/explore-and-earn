@@ -32,6 +32,7 @@ stateDiagram-v2
 ### Transition rules
 
 - Exactly one `status:*` and one `agent:*` at all times. Swapping the baton = remove the old label and add the new one in the same action.
+- `status:blocked` is the baton state for ordinary work stoppage. `blocked:*` and `freeze:*` labels are additive gates; they do not remove or replace the current `status:*` or `agent:*` labels.
 - Every transition is announced with an **Agent Handoff** comment (template in [`github-artifacts-to-apply.md`](./github-artifacts-to-apply.md) §5). No silent transitions.
 - A draft PR is required from `status:needs-local-verification` onward; it leaves draft only at `status:ready-for-review`.
 
@@ -39,24 +40,24 @@ stateDiagram-v2
 
 **Definition:** the implementation diverges from Notion canon (wrong behavior, renamed concepts, uncited decisions).
 
-1. Whoever notices applies `blocked:drift` + `agent:opus` and posts a handoff block citing canon vs. the divergence.
+1. Whoever notices applies `blocked:drift`, swaps ownership to `agent:opus`, keeps the current `status:*` in place, and posts a handoff block citing canon vs. the divergence.
 2. Opus decides: (a) fix the code to match canon, or (b) if canon itself is wrong, open a `founder-approval-gate` with gate `product-philosophy` to change canon.
-3. Resolution removes `blocked:drift`, restores the prior `status:*`, and — if canon changed — requires `canon:cited` on the follow-up PR.
+3. Resolution removes `blocked:drift`, keeps or advances the same `status:*` according to the normal baton flow, and — if canon changed — requires `canon:cited` on the follow-up PR.
 
 ## Stall protocol 2 — Conflict (`blocked:conflict`)
 
 **Definition:** two agents touch the same files/area, or two PRs claim the same task.
 
 1. First-claim wins: the PR/issue that reached `status:claimed` first keeps ownership.
-2. The later actor applies `blocked:conflict` to their own work, rebases onto the winner, and re-opens as a follow-up.
-3. If ownership is genuinely ambiguous, route to `agent:opus` to arbitrate — Opus is the orchestrator, not a merge bypass.
+2. The later actor applies `blocked:conflict` to their own work, keeps its current `status:*`, rebases onto the winner, and re-opens as a follow-up.
+3. If ownership is genuinely ambiguous, route to `agent:opus` to arbitrate while keeping exactly one `agent:*` label on the blocked artifact — Opus is the orchestrator, not a merge bypass.
 
 ## Stall protocol 3 — Freeze (`freeze:all`)
 
 **Definition:** a global hold (incident, canon rewrite, founder call).
 
 1. Only the founder (or Opus on explicit founder instruction) applies `freeze:all`.
-2. While present: no merges anywhere, regardless of other labels. Work may continue on branches but cannot reach `status:complete`.
+2. While present: no merges anywhere, regardless of other labels. Work may continue on branches but existing artifacts keep their current `status:*` + `agent:*`; nothing may advance to `status:complete`.
 3. Lifting `freeze:all` is a founder action; agents then resume from their last `status:*`.
 
 ## Escalation ladder

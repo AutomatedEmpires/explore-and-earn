@@ -18,12 +18,13 @@ here as the canonical source.
 > PR template, and issue forms are already on the branch. The workflow write limitation
 > still explains why the helper was committed locally instead of via the connected app.
 
-The PR template (§1) and issue form (§2) below are reproduced verbatim so the VS Code agent
-can recreate them if needed; they already exist on the branch.
+The PR template (§1) and issue form (§2) below are summarized so the VS Code agent can
+recreate the canonical fields if needed. For the exact committed contents, read the files on
+the branch; they already exist there.
 
 ---
 
-## 1. `.github/pull_request_template.md` (already applied)
+## 1. `.github/pull_request_template.md` (canonical summary; already applied)
 
 `````markdown
 <!--
@@ -104,12 +105,12 @@ pnpm lint
 - [ ]
 `````
 
-> The version committed to the branch also carries a UI design-drift checklist; the
-> required CLAOS Lite sections above are the canonical core.
+> The exact committed file also carries a UI design-drift checklist; the required
+> CLAOS Lite sections above are the canonical core.
 
 ---
 
-## 2. `.github/ISSUE_TEMPLATE/agent-verification-task.yml` (already applied)
+## 2. `.github/ISSUE_TEMPLATE/agent-verification-task.yml` (canonical summary; already applied)
 
 GitHub issue **form** that collects PR number, source branch, requesting agent, next
 agent, required verification commands, acceptance criteria, founder-approval flag, risk
@@ -117,7 +118,7 @@ level, expected output, and blocking status.
 
 `````yaml
 name: Agent Verification Task
-description: Dispatch a local verification task to the next agent (e.g. VS Code/Copilot) from a GitHub artifact — not chat.
+description: Dispatch a local verification task to the next agent (e.g. VS Code / agent:vscode) from a GitHub artifact — not chat.
 title: "[verify] PR #<number>: <short summary>"
 labels:
   - "agent:vscode"
@@ -235,7 +236,7 @@ jobs:
               '### Local verification requested',
               '',
               'This PR is labeled `status:needs-local-verification`. The next agent',
-              '(VS Code / Copilot on WSL) should run:',
+              '(VS Code on WSL) should run:',
               '',
               '```bash',
               'pnpm install',
@@ -281,7 +282,7 @@ Labels are the relay **baton + routing**. Seed the canonical CLAOS Lite set with
 ```bash
 # --- agent (whose turn it is; one at a time) ---
 gh label create "agent:opus"    -c 5319E7 -d "Notion/Opus — architect, reviewer, orchestrator" --force
-gh label create "agent:vscode"  -c 1D76DB -d "VS Code/Copilot — local implementation + WSL verification" --force
+gh label create "agent:vscode"  -c 1D76DB -d "VS Code — local WSL verification environment (Copilot is the assistant inside it; the durable relay destination is the environment/role: VS Code)" --force
 gh label create "agent:codex"   -c 0E8A16 -d "Codex — implementation/review" --force
 gh label create "agent:cursor"  -c 0E8A16 -d "Cursor — implementation/review" --force
 gh label create "agent:claude"  -c 0E8A16 -d "Claude — implementation/review" --force
