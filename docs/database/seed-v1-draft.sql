@@ -1,0 +1,72 @@
+-- Seed Data Strategy — V1 (DRAFT, review-only)
+-- NOT a migration and NOT executed. Defines the deterministic, canon-derived seed sets that
+-- the migration author will translate into supabase/seed.sql. Values trace to Notion canon.
+
+-- ============================================================================
+-- 1. LIFECYCLE TRANSITIONS  (drives assert_lifecycle_transition trigger, DR-B10 / G16)
+--    Seeded from the Lifecycle Registry. One row per legal (entity, from, to) edge.
+-- ============================================================================
+-- INSERT INTO lifecycle_transitions (entity, from_status, to_status) VALUES
+--   ('listing','draft','under_review'), ('listing','under_review','live'),
+--   ('listing','live','paused'), ('listing','paused','live'),
+--   ('listing','live','closed'), ('listing','closed','archived'),
+--   ('application','submitted','withdrawn'), ('application','submitted','not_selected'),
+--   ('application','submitted','offered'), ('application','offered','accepted'),
+--   ('application','accepted','active'), ('application','active','completed'),
+--   ('application','submitted','expired'),
+--   ('invite','sent','applied'), ('invite','sent','ignored'), ('invite','sent','expired'),
+--   ('invite','sent','withdrawn'),
+--   ('offer','sent','accepted'), ('offer','sent','declined'), ('offer','sent','expired'),
+--   ('offer','sent','withdrawn');
+-- NOTE: ApplicationStatus has NO 'declined' value (canon). Offers decline; applications do not.
+-- TODO(verify): confirm full edge set against Lifecycle Registry before authoring real seed.
+
+-- ============================================================================
+-- 2. PLAN ENTITLEMENTS  (G14 server enforcement source; G21 forbids featured default)
+--    plan_tier in (starter, professional, enterprise). Prices in cents (DR-B3, G1).
+-- ============================================================================
+-- INSERT INTO plans (tier, monthly_cents, annual_cents) VALUES
+--   ('starter',      19900, 199000),
+--   ('professional', 39900, 399000),
+--   ('enterprise',   74900, 749000);
+-- Entitlement rows (illustrative keys; real keys come from Permission/RLS Registry):
+--   active_listings, monthly_invite_credits, team_seats_included, matched_bucket_view.
+-- HARD ASSERTION (G21): NO row may grant 'featured_employer' to any plan tier.
+--   Featured Employer + Boost are add-on purchases only.
+-- HARD ASSERTION (G4): NO plan/add-on may target audience='seeker' (seekers free forever).
+
+-- ============================================================================
+-- 3. ADD-ON PRICING REFERENCE  (G23; cents)  -- read by Stripe SKU seed, not duplicated
+-- ============================================================================
+--   boost:        d7=20000, d14=35000, d28=50000
+--   team_seat:    4900 / seat / month
+--   invite_packs: 25000, 50000, 75000  (non-refundable)
+--   founding:     14900, 29900, 59900  (TODO(verify) vs ADR-028 before seeding)
+-- All of the above MUST be read from packages/contracts/pricing.ts at seed time, never inlined.
+
+-- ============================================================================
+-- 4. ATTESTATION POLICY  (G2/G3; powers set_host_attestation RPC + policy_version check)
+-- ============================================================================
+-- INSERT INTO attestation_policy (version, current_version, body_md, effective_at) VALUES
+--   ('v1', true, '<canon attestation copy>', now());
+-- Verified Host badge copy is fixed: VERIFIED_HOST_QUALIFIER = 'Self-Declared by Host' (G22).
+
+-- ============================================================================
+-- 5. FOUNDING PROGRAM STATE  (G24 cap-race integrity; increment-only)
+-- ============================================================================
+-- INSERT INTO founding_program_state (id, seats_total, seats_taken) VALUES (1, <CANON_CAP>, 0);
+-- TODO(founder?): seats_total cap value is founder-locked; pull from Founding Host Program page.
+-- claim_founding_seat() only ever increments seats_taken; there is no decrement path.
+
+-- ============================================================================
+-- 6. DEMO FIXTURES  (G19 isolation)
+-- ============================================================================
+-- All demo content lives in demo_* shadow tables, reseeded nightly from a deterministic fixture
+-- set. Demo seed MUST NOT write to any production table. demo_viewer role is denied on prod RLS.
+
+-- ============================================================================
+-- 7. ENUM LOOKUPS
+-- ============================================================================
+-- Enums are text + CHECK (DR-B1) generated from the Canonical Enum Registry; no separate lookup
+-- tables are seeded unless a display label/order is needed. If labels are required, a single
+-- enum_labels(domain, value, label, sort_order) table is preferred over per-enum tables.

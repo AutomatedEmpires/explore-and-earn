@@ -1,19 +1,29 @@
 # Founder Approval Queue
 
-Decisions that have hit a **founder approval gate** (see [`../agents/founder-approval-gates.md`](../agents/founder-approval-gates.md)) and are waiting on the founder. Agents must **not** implement past these lines. Add a row, then leave the related task in `backlog`.
+> Items that require **Caveman (founder)** ratification before they can leave DRAFT and influence real migrations, pricing, auth, or enforcement. Anything here is also tagged with the `needs-founder` label on the relevant PR. Backend architect proposes with justification; founder decides.
 
-| ID | Decision needed | Gate | Options / tradeoffs | Recommendation | Status |
-| --- | --- | --- | --- | --- | --- |
-| A-ICON-LICENSE | Purchase Streamline **Extended Vector License**? | Paid-asset licensing | Standard license caps usage at ~100 distinct icons/project. Extended lifts the cap. | Defer until the V1 distinct-icon inventory is counted; revisit before exceeding 100. | Waiting |
-| A-PKGMGR | Confirm **pnpm + Turborepo** as the workspace toolchain (remove npm lockfile)? | (Process / not destructive to product) | pnpm+turbo is canon and better for a monorepo; npm lockfile previously created drift. | Approved and applied in Sprint Zero substrate reconciliation. | Approved 2026-05-31 |
-| A-NODE | Pin **Node 24.16.0** as canonical (override the Node 20 LTS canon)? | (Process) | 24 matches the machine; 20 LTS is broader-compat. | Approved and pinned in `.nvmrc` + CI. | Approved 2026-05-31 |
-| A-ARCHIVE-V2 | Archive the old `exploreandearnv2` repo? | (Process) | Two repos cause agent confusion. | Archive after confirming nothing needed remains. | Waiting |
+## How to use
+- Each item: ID, what is proposed, why, default-if-unanswered, and blast radius.
+- “Default-if-unanswered” is the conservative behavior the build assumes until ratified, chosen to be reversible.
 
-## Process
+## Open items (from Backend Build Pack v1 / DR-B series)
 
-1. **Stop at the boundary** — never write code that crosses a gate.
-2. Fill a row with: the decision, the gate, options + tradeoffs, and your recommendation.
-3. The founder resolves it; the decision is recorded in Notion canon **first**.
-4. Only then does the task become `ready-for-engineering`.
+| ID | Proposal | Why it needs founder | Default until ratified | Blast radius |
+|---|---|---|---|---|
+| FQ-1 (DR-B5) | Team roles = `owner/admin/hiring_manager/analyst/billing/viewer`; retire legacy `recruiter/listing_manager/marketing` | Permission model is canon; renaming roles touches every RLS policy | Map legacy->new at the seam; do not delete legacy labels yet | RLS, seed, UI role pickers |
+| FQ-2 (DR-B6) | Add `listings.mix_domains text[]`; `mix` = category-only match, no multi-category score bonus | New persisted field + ranking semantics; could be gamed | mix capped at category-only tier; field proposed, not created | schema, matching, discovery |
+| FQ-3 (DR-B9) | Production auth = Supabase email + magic link first; OAuth deferred; roles read by RLS not JWT | Auth wiring is a security decision; affects every protected route | keep auth in draft; no prod auth wired | auth, RLS, all routes |
+| FQ-4 | First-listing publish goes `under_review`; subsequent listings `live` immediately | Moderation posture / trust tradeoff | first listing under_review, rest live | publish route, moderation queue |
+| FQ-5 | `match_score` exposure to logged-out users on `GET /api/listings` | Privacy + scraping surface | login required to see score | listings route, discovery |
+| FQ-6 | Founding `seats_total` cap value + founding price points (14900/29900/59900) vs ADR-028 | Money + scarcity are founder-locked | do not seed; leave TODO | founding program, Stripe seed |
+| FQ-7 | Observability vendors (PostHog + Sentry) | Cost + data-processing agreement | proposal only; no SDK wired | analytics, error reporting |
 
-> Nothing in this queue authorizes implementation. It records what is *blocked on a human* and why.
+## Standing gates (always require founder/ops sign-off)
+- Executing any migration against a real database.
+- Enabling RLS on a live project.
+- Adding Stripe **live** keys or creating live products/prices.
+- Versioning or changing the host attestation policy copy.
+- Changing any Founder Locked Pricing or add-on price constant.
+
+## Resolved (moved out of queue)
+- _none yet — all DR-B decisions are recorded in `docs/architecture/backend-decisions-v1.md`; the rows above are the subset still needing an explicit founder yes/no._
