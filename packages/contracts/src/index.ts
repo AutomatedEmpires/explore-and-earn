@@ -3,3 +3,8 @@ export * from "./events";
 export * from "./lifecycles";
 export * from "./permissions";
 export * from "./pricing";
+export * from "./categories";
+export * from "./media";
+export * from "./benefits";
+export * from "./trust";
+export * from "./discovery-card";
