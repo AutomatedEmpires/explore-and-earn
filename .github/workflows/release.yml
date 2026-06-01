@@ -7,4 +7,4 @@ jobs:
   placeholder:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "TODO: Wire release automation after Sprint Zero approvals."
+      - run: 'echo "TODO: Wire release automation after Sprint Zero approvals."'

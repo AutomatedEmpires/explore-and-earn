@@ -23,6 +23,8 @@ jobs:
         run: pnpm typecheck
       - name: Lint
         run: pnpm lint
+      - name: Lint workflows
+        run: pnpm lint:workflows
       - name: Run guardrail checks
         run: pnpm guardrails
 

@@ -8,6 +8,7 @@
     "build": "turbo run build",
     "dev": "corepack pnpm --filter @explore-and-earn/web dev",
     "lint": "eslint .",
+    "lint:workflows": "npx --yes github-actionlint@1.7.12",
     "typecheck": "tsc -b",
     "test": "corepack pnpm -r --if-present test",
     "test:e2e": "corepack pnpm --filter @explore-and-earn/web test:e2e",
