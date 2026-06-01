@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
-// Demo route-group shell — PLACEHOLDER (app-shell readiness only).
-// Source of truth: docs/ux/app-shell-and-navigation.md (Notion: Canonical Page Registry — Demo Surfaces).
-// SCOPE: chrome only. ISOLATED: no production side effects, isolated telemetry, no live data.
-// Next agents: mirror host chrome visually but watermark as demo + persistent convert-to-signup CTA.
+import { AppShell } from "../../components/shell/AppShell";
 
+// Demo route group — isolated showcase surfaces
+// (/demo, /demo/design-system, /demo/discovery-card, /demo/listing-detail,
+//  /demo/seeker-dashboard, /demo/host-dashboard). Isolation marker is now
+// data-scope="demo" on the shell root. Chrome only; not part of the product nav.
 export default function DemoLayout({ children }: { children: ReactNode }) {
-  return <div data-shell="demo" data-demo="true">{children}</div>;
+	return <AppShell scope="demo">{children}</AppShell>;
 }

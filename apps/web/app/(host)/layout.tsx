@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 
-// Host route-group shell — PLACEHOLDER (app-shell readiness only).
-// Source of truth: docs/ux/app-shell-and-navigation.md (Notion: Navigation Architecture Doctrine).
-// SCOPE: chrome only. No auth guards, no data fetching, no dashboard/billing logic.
-// Next agents: compose <AppHeader scope="host" /> + <BottomNav scope="host" /> (Home/Listings/Applicants/Analytics/More) + <ModalHost />.
+import { AppShell } from "../../components/shell/AppShell";
 
+// Host route group — authenticated host surfaces
+// (/host, /host/listings, /host/applicants, /host/offers, /host/profile, /host/analytics).
+// Primary navigation is the mobile bottom nav (Home / Listings / Applicants / Analytics / More).
 export default function HostLayout({ children }: { children: ReactNode }) {
-  return <div data-shell="host">{children}</div>;
+	return <AppShell scope="host">{children}</AppShell>;
 }

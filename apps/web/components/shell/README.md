@@ -1,19 +1,64 @@
-# apps/web/components/shell
+# App shell (`apps/web/components/shell`)
 
-App-shell chrome — **app-specific** composition (header, primary nav, overlay host). Reusable primitives live in `packages/ui`, not here.
+The shared chrome that wraps every route group. **Chrome only** — no feature
+surfaces, data fetching, auth/session, or services live here.
 
-Source of truth: [`docs/ux/app-shell-and-navigation.md`](../../../../docs/ux/app-shell-and-navigation.md), [`docs/ux/modal-sheet-system.md`](../../../../docs/ux/modal-sheet-system.md).
+Source of truth (Notion canon, mirrored in `docs/`):
 
-> **All current files are PLACEHOLDERS / typed config.** No data, no auth, no routing logic, no icons, no overlay behavior. Behavior is added per-surface only after a founder-approved Build Pack.
+- Navigation — `docs/ux/app-shell-and-navigation.md`
+- Overlays — `docs/ux/modal-sheet-system.md`
+- Routes / page inventory — `docs/ux/route-map.md`, `docs/ux/surface-inventory.md`
+- Architecture — `docs/architecture/frontend-architecture-v1.md`
 
-## Modules
+## Composition
 
-| File | Role | State |
-| --- | --- | --- |
-| `AppHeader.tsx` | top header chrome; exports `AppShellScope` | placeholder (renders empty header) |
-| `BottomNav.tsx` | mobile primary nav; seeker order LOCKED | placeholder (renders empty nav) |
-| `ModalHost.tsx` | root overlay router | placeholder (returns `null`) |
-| `nav.config.ts` | typed navigation models per audience | config only |
-| `overlays.ts` | typed overlay registry: keys, families, form-factors | config only |
+Each `app/(group)/layout.tsx` renders exactly one `AppShell`:
 
-Route paths are imported from [`apps/web/lib/routes.ts`](../../lib/routes.ts) — never hardcode path strings.
+```tsx
+import { AppShell } from "../../components/shell/AppShell";
+
+export default function SeekerLayout({ children }: { children: React.ReactNode }) {
+	return <AppShell scope="seeker">{children}</AppShell>;
+}
+```
+
+`AppShell` provides: a skip-to-content link, the sticky `AppHeader`, the `main`
+landmark, an optional mobile `BottomNav` (seeker/host only), and the overlay
+`ModalHost`. The `scope` is one of the seven route groups (`RouteGroup` in
+`lib/routes.ts`).
+
+## Files
+
+| File | Role |
+| --- | --- |
+| `AppShell.tsx` | Composition root; wraps everything in `OverlayProvider`. |
+| `AppHeader.tsx` | Sticky top chrome; brand + optional top nav (marketing/public). Exports `AppShellScope` + `isActivePath`. |
+| `BottomNav.tsx` | Mobile-first primary nav (seeker/host). `More` opens an overlay. |
+| `nav.config.ts` | Typed nav source: `seekerBottomNav`, `hostBottomNav`, `publicGlobalNav`, `headerNavByGroup`, `bottomNavByGroup`. |
+| `overlays.ts` | Typed overlay registry (`OverlayKey`, form factors, families, escalation). |
+| `OverlayProvider.tsx` | Overlay state + `useOverlay()` (`open` / `close` / `closeAll`). |
+| `ModalHost.tsx` | Portal outlet; scrim, focus trap, Esc, scroll lock, Interaction Preservation. |
+| `useFocusTrap.ts` | Focus containment + restore for the active overlay. |
+| `useScrollLock.ts` | Body scroll lock + scroll restore (Interaction Preservation). |
+
+Styling: `apps/web/styles/shell.css`, driven by Design System V1 token CSS
+variables (`styles/tokens.css`) with safe fallbacks until PR #5 merges.
+
+## Guardrails
+
+- **G30** — no inline SVG or icon assets. Nav items render text labels; icons
+  arrive via the `packages/ui` Streamline registry in a follow-up.
+- No `services/`, `db`, or contracts data reads from the shell.
+- No Stripe / matching / messaging / notifications.
+- The shell registers **no** feature overlays; surfaces call `useOverlay().open()`
+  with their own content and a registered `OverlayKey`.
+
+## How to open an overlay (for downstream surfaces)
+
+```tsx
+const { open } = useOverlay();
+open("listingDetail", ({ close }) => <ListingDetail onClose={close} />);
+```
+
+Form factor (modal / sheet / drawer / popover / fullscreen) and family are
+resolved automatically from `overlays.ts` per `OverlayKey`.

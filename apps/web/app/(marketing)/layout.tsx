@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 
-// Marketing route-group shell — PLACEHOLDER (app-shell readiness only).
-// Source of truth: docs/ux/app-shell-and-navigation.md (Notion: Navigation Architecture Doctrine).
-// SCOPE: chrome only. Do NOT add data fetching, auth, or feature logic here.
-// Next agents: compose <AppHeader scope="marketing" /> + global footer per canon.
+import { AppShell } from "../../components/shell/AppShell";
 
+// Marketing route group — logged-out brand surfaces (/, /about, /how-it-works, /pricing).
+// Chrome only; the AppShell renders the global top navigation for this scope.
 export default function MarketingLayout({ children }: { children: ReactNode }) {
-  return <div data-shell="marketing">{children}</div>;
+	return <AppShell scope="marketing">{children}</AppShell>;
 }

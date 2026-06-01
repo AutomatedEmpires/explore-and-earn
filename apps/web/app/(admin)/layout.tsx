@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
 
-// Admin route-group shell — PLACEHOLDER (app-shell readiness only).
-// Source of truth: docs/ux/app-shell-and-navigation.md (Notion: Navigation Architecture Doctrine).
-// SCOPE: chrome only. No auth/role gating, no data fetching, no moderation logic.
-// Next agents: compose admin queue nav (Critical/Reports/Moderation/Verification/Refunds/Disputes/Users/Billing/Content/Analytics/Management) + <ModalHost />.
+import { AppShell } from "../../components/shell/AppShell";
 
+// Admin route group — internal console (/admin). Brand-only header in V1;
+// sub-queues are deferred (registered, no V1 slug). Chrome only.
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return <div data-shell="admin">{children}</div>;
+	return <AppShell scope="admin">{children}</AppShell>;
 }

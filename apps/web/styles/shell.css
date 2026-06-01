@@ -1,0 +1,274 @@
+/* App-shell chrome styles (WI-FE-01).
+ * Source of truth: docs/ux/app-shell-and-navigation.md, docs/ux/modal-sheet-system.md.
+ *
+ * Driven entirely by Design System V1 token CSS variables (apps/web/styles/tokens.css).
+ * Each var() carries a conservative fallback so the shell stays usable until the
+ * full token set (PR #5: design-system/v1-token-foundation) is merged. No brand
+ * colors are hardcoded beyond those fallbacks, and no icon assets are referenced
+ * (guardrail G30: iconography comes from the packages/ui Streamline registry).
+ */
+
+/* Skip link ----------------------------------------------------------------- */
+.ee-skip-link {
+	position: absolute;
+	left: -9999px;
+	top: 0;
+	z-index: 1000;
+	padding: 8px 12px;
+	background: var(--surface-raised, #f7f7f5);
+	color: var(--text-primary, #171717);
+	border-radius: var(--radius-md, 12px);
+	text-decoration: none;
+}
+.ee-skip-link:focus {
+	left: 8px;
+	top: 8px;
+}
+
+/* Shell frame --------------------------------------------------------------- */
+.ee-app-shell {
+	display: flex;
+	flex-direction: column;
+	min-height: 100dvh;
+	background: var(--surface-default, #ffffff);
+	color: var(--text-primary, #171717);
+}
+.ee-app-shell__main {
+	flex: 1 1 auto;
+	width: 100%;
+	outline: none;
+}
+.ee-app-shell[data-has-bottom-nav="true"] .ee-app-shell__main {
+	/* Clear the fixed bottom nav on mobile. */
+	padding-bottom: 72px;
+}
+
+/* Header -------------------------------------------------------------------- */
+.ee-app-header {
+	position: sticky;
+	top: 0;
+	z-index: 30;
+	background: var(--surface-default, #ffffff);
+	border-bottom: 1px solid var(--border-default, #d4d4d4);
+}
+.ee-app-header__inner {
+	display: flex;
+	align-items: center;
+	gap: var(--space-md, 16px);
+	height: 56px;
+	padding: 0 var(--space-md, 16px);
+	max-width: 1200px;
+	margin: 0 auto;
+}
+.ee-app-header__brand {
+	font-weight: 700;
+	color: var(--text-primary, #171717);
+	text-decoration: none;
+}
+.ee-app-header__nav {
+	margin-left: auto;
+}
+.ee-app-header__list {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ee-app-header__link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
+	padding: 0 12px;
+	border-radius: var(--radius-md, 12px);
+	color: var(--text-secondary, #525252);
+	text-decoration: none;
+}
+.ee-app-header__link[data-active="true"] {
+	color: var(--text-primary, #171717);
+	background: var(--surface-raised, #f7f7f5);
+}
+
+/* Bottom nav (mobile-first primary) ---------------------------------------- */
+.ee-bottom-nav {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 40;
+	background: var(--surface-default, #ffffff);
+	border-top: 1px solid var(--border-default, #d4d4d4);
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.ee-bottom-nav__list {
+	display: flex;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ee-bottom-nav__item {
+	flex: 1 1 0;
+}
+.ee-bottom-nav__link {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	min-height: 56px;
+	padding: 6px 4px;
+	border: 0;
+	background: transparent;
+	font: inherit;
+	color: var(--text-secondary, #525252);
+	text-decoration: none;
+	cursor: pointer;
+}
+.ee-bottom-nav__link[data-active="true"] {
+	color: var(--text-primary, #171717);
+}
+
+/* Desktop: promote header nav, retire bottom nav. */
+@media (min-width: 1024px) {
+	.ee-bottom-nav {
+		display: none;
+	}
+	.ee-app-shell[data-has-bottom-nav="true"] .ee-app-shell__main {
+		padding-bottom: 0;
+	}
+}
+
+/* Overlay system ------------------------------------------------------------ */
+.ee-overlay-root {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+}
+.ee-overlay {
+	position: fixed;
+	inset: 0;
+	display: flex;
+}
+.ee-overlay__scrim {
+	position: absolute;
+	inset: 0;
+	border: 0;
+	padding: 0;
+	background: rgba(0, 0, 0, 0.4);
+	cursor: pointer;
+}
+.ee-overlay__container {
+	position: relative;
+	background: var(--surface-default, #ffffff);
+	color: var(--text-primary, #171717);
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+	overflow: auto;
+	outline: none;
+}
+
+/* Mobile form factors. */
+.ee-overlay[data-form-mobile="sheet"] {
+	align-items: flex-end;
+}
+.ee-overlay[data-form-mobile="sheet"] .ee-overlay__container {
+	width: 100%;
+	max-height: 90dvh;
+	border-radius: var(--radius-md, 12px) var(--radius-md, 12px) 0 0;
+}
+.ee-overlay[data-form-mobile="popover"] {
+	align-items: flex-end;
+}
+.ee-overlay[data-form-mobile="popover"] .ee-overlay__container {
+	width: 100%;
+	max-height: 60dvh;
+	border-radius: var(--radius-md, 12px) var(--radius-md, 12px) 0 0;
+}
+.ee-overlay[data-form-mobile="modal"] {
+	align-items: center;
+	justify-content: center;
+}
+.ee-overlay[data-form-mobile="modal"] .ee-overlay__container {
+	width: calc(100% - 32px);
+	max-width: 480px;
+	max-height: 85dvh;
+	border-radius: var(--radius-md, 12px);
+}
+.ee-overlay[data-form-mobile="drawer"] {
+	justify-content: flex-end;
+}
+.ee-overlay[data-form-mobile="drawer"] .ee-overlay__container {
+	width: min(420px, 90vw);
+	height: 100dvh;
+}
+.ee-overlay[data-form-mobile="fullscreen"] .ee-overlay__container {
+	width: 100%;
+	height: 100dvh;
+}
+
+/* Desktop form factors. */
+@media (min-width: 1024px) {
+	.ee-overlay[data-form-desktop="modal"] {
+		align-items: center;
+		justify-content: center;
+	}
+	.ee-overlay[data-form-desktop="modal"] .ee-overlay__container {
+		width: 560px;
+		max-width: 90vw;
+		max-height: 85dvh;
+		border-radius: var(--radius-md, 12px);
+	}
+	.ee-overlay[data-form-desktop="drawer"] {
+		justify-content: flex-end;
+		align-items: stretch;
+	}
+	.ee-overlay[data-form-desktop="drawer"] .ee-overlay__container {
+		width: 480px;
+		height: 100dvh;
+		border-radius: 0;
+	}
+	.ee-overlay[data-form-desktop="popover"] {
+		align-items: center;
+		justify-content: center;
+	}
+	.ee-overlay[data-form-desktop="popover"] .ee-overlay__container {
+		width: 360px;
+		max-height: 70dvh;
+		border-radius: var(--radius-md, 12px);
+	}
+	.ee-overlay[data-form-desktop="fullscreen"] .ee-overlay__container {
+		width: 100vw;
+		height: 100dvh;
+	}
+}
+
+/* Overlay placeholder panel chrome (used by shell affordances; not a feature). */
+.ee-overlay-panel {
+	display: flex;
+	flex-direction: column;
+}
+.ee-overlay-panel__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	padding: var(--space-md, 16px);
+	border-bottom: 1px solid var(--border-default, #d4d4d4);
+}
+.ee-overlay-panel__title {
+	margin: 0;
+	font-size: 18px;
+}
+.ee-overlay-panel__close {
+	min-height: 44px;
+	padding: 0 12px;
+	border: 1px solid var(--border-default, #d4d4d4);
+	border-radius: var(--radius-md, 12px);
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+}
+.ee-overlay-panel__placeholder {
+	padding: var(--space-md, 16px);
+	color: var(--text-secondary, #525252);
+}
