@@ -43,9 +43,9 @@ Implemented as **6 forever, fixed-amount coupons** (not separate plans):
 | `addon_invite_pack_5` / `_10` / `_25` | $250 / $400 / $750 | one-time | **NO** | see `invite-packs-v1.md` |
 | `addon_team_seat` | $49/seat/mo | recurring | prorated | Enterprise-only (ADR-032) |
 
-## Drift flag
+## Resolved: pricing unit normalization (Q-BILL-1)
 
-**Q-BILL-1:** `pricing.ts` holds these amounts in **dollars**; guardrails **G1/G23** expect **integer cents**. Normalization is founder-gated (Gate P-UNIT). Do not change silently.
+**Resolved 2026-05-31 (founder-approved, Gate P-UNIT).** `packages/contracts/src/pricing.ts` now stores all amounts in **integer USD cents** (e.g. Starter monthly `19900`), matching guardrails **G1 / G23**, and `check-pricing-units.mjs` is **green**. The dollar figures in the tables above are display values for reviewers; the cent values in `pricing.ts` and the Notion canon are authoritative. Any future change to plan names, amounts, intervals, add-on pricing, or the founding program is still founder-gated — do not change silently.
 
 ## Founder gate
 

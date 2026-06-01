@@ -3,9 +3,14 @@ import { join } from "node:path";
 
 // G5: only the refund-review service may call refunds.create(). Comments/contracts
 // (which write "create (G5)" with a space) are not matched by the call pattern.
+// This guard scans tools/ as well, so it must skip its OWN file: it necessarily
+// names the refunds.create() sentinel in this header and would otherwise flag
+// itself (false positive), since its path does not contain "refund-review".
+// See SELF_FILE below.
 const roots = ["apps", "packages", "supabase", "tools"];
 const filePattern = /\.(ts|tsx|js|mjs|cjs)$/;
 const callPattern = /\brefunds\.create\(/;
+const SELF_FILE = "check-refund-isolation.mjs";
 
 function walk(directory, files = []) {
   let entries;
@@ -29,6 +34,7 @@ function walk(directory, files = []) {
 let hasFailure = false;
 for (const root of roots) {
   for (const file of walk(root)) {
+    if (file.endsWith(SELF_FILE)) continue;
     const content = readFileSync(file, "utf8");
     if (callPattern.test(content) && !file.includes("refund-review")) {
       hasFailure = true;
