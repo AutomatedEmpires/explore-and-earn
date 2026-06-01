@@ -62,7 +62,8 @@ pnpm lint
 
 ## Next Agent Handoff
 
-- **Next agent:** `agent:opus | agent:vscode | agent:codex | agent:cursor | agent:claude | agent:review | agent:founder`
+<!-- agent:vscode = LOCAL WSL verification on the laptop. agent:copilot-cloud = GitHub-hosted cloud coding agent, started by an @copilot mention; it CANNOT verify local WSL. Do not type @copilot here unless you intend to invoke the cloud agent. -->
+- **Next agent:** `agent:opus | agent:vscode | agent:copilot-cloud | agent:codex | agent:cursor | agent:claude | agent:review | agent:founder`
 - **Required action:**
 - **Commands to run:**
   ```bash

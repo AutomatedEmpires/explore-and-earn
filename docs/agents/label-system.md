@@ -20,7 +20,8 @@ at an issue/PR's labels must answer:
 | Label | Color | Who / what |
 | --- | --- | --- |
 | `agent:opus` | `#5319E7` | Notion/Opus — architect, reviewer, orchestrator |
-| `agent:vscode` | `#1D76DB` | VS Code — local WSL verification environment (Copilot is the assistant inside it; the durable relay destination is the environment/role: VS Code) |
+| `agent:vscode` | `#1D76DB` | VS Code — **local WSL verification** on Jackson's laptop (Copilot-in-editor; the durable relay destination is the environment/role: VS Code). **NOT** the cloud bot. |
+| `agent:copilot-cloud` | `#8957E5` | GitHub-hosted Copilot **cloud** coding agent — started/routed by an `@copilot` mention in a PR/issue comment. Runs on GitHub's servers; **cannot** verify local WSL. |
 | `agent:codex` | `#0E8A16` | Codex — implementation/review |
 | `agent:cursor` | `#0E8A16` | Cursor — implementation/review |
 | `agent:claude` | `#0E8A16` | Claude — implementation/review |
@@ -28,6 +29,8 @@ at an issue/PR's labels must answer:
 | `agent:founder` | `#B60205` | Human — approval gates / taste / business calls only |
 
 **Collision rule:** never leave two `agent:*` labels on one artifact. One agent, one task, one branch.
+
+> **Two Copilots — not interchangeable:** `agent:vscode` (local WSL verifier on Jackson's laptop) and `agent:copilot-cloud` (GitHub-hosted cloud coding agent, started by an `@copilot` mention) are **distinct actors**. A cloud run never counts as local verification, and only `agent:vscode` can set `status:verified-local`. Bare `agent:copilot` is ambiguous and banned — always disambiguate. See [`agent-roster-and-routing.md`](./agent-roster-and-routing.md) → “Two Copilots” for the full trigger rules.
 
 ## Status labels (the baton — one at a time)
 
@@ -119,4 +122,4 @@ never create or apply them as active labels. Translate as:
 | `status:in-review` | `status:needs-review` / `status:ready-for-review` |
 | `status:changes-requested` | `status:needs-opus-fix` |
 | `status:done` | `status:complete` |
-| `agent:copilot` | `agent:vscode` |
+| `agent:copilot` (ambiguous — banned) | Disambiguate: `agent:vscode` (local WSL verifier) **or** `agent:copilot-cloud` (GitHub cloud coding agent). Never apply bare `agent:copilot`. |

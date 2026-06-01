@@ -10,6 +10,11 @@ body:
       value: |
         Use this form to hand a verification task to the next agent. Everything the
         next agent needs must live here — CLAOS Lite forbids relying on private chat.
+
+        `agent:vscode` = LOCAL WSL verification on Jackson's laptop (`gh pr checkout` + pnpm).
+        `agent:copilot-cloud` = GitHub-hosted cloud coding agent (started by an `@copilot`
+        mention) — it CANNOT verify the local WSL environment, so it can never satisfy a
+        local-verification task.
   - type: input
     id: pr-number
     attributes:
@@ -32,6 +37,7 @@ body:
       options:
         - "agent:opus"
         - "agent:vscode"
+        - "agent:copilot-cloud"
         - "agent:codex"
         - "agent:cursor"
         - "agent:claude"
@@ -46,6 +52,7 @@ body:
       options:
         - "agent:vscode"
         - "agent:opus"
+        - "agent:copilot-cloud"
         - "agent:codex"
         - "agent:cursor"
         - "agent:claude"
