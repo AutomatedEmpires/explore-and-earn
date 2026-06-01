@@ -9,6 +9,10 @@
  * Naming convention: "{domain}.{name}" (matches data-icon="{domain}.{name}").
  * Domains: category, benefit, mappin, trust, status, action, nav, analytics, system.
  *
+ * INVARIANT: the category.* keys MUST mirror MARKETPLACE_CATEGORIES
+ * (packages/contracts/src/enums.ts) exactly — farm | maritime | remote |
+ * seasonal | mix. "lodge" is intentionally NOT a category (see note below).
+ *
  * IMPORTANT (public repo + licensing): do NOT commit paid/proprietary
  * Streamline asset files here. We map to Streamline Freehand icon *names* only.
  * Until licensed assets are wired in (see docs/design/icon-system.md and
@@ -20,9 +24,8 @@
  */
 
 export type IconKey =
-	// category (visual lanes)
+	// category (visual lanes) — MUST match MARKETPLACE_CATEGORIES exactly.
 	| "category.farm"
-	| "category.lodge"
 	| "category.maritime"
 	| "category.remote"
 	| "category.seasonal"
@@ -119,88 +122,92 @@ export interface IconEntry {
 }
 
 export const ICON_REGISTRY: Record<IconKey, IconEntry> = {
-	"category.farm": { key: "category.farm", streamline: "barn / wheat / plant", placeholder: "\\u{1F33E}", label: "Farm / Orchard / Greenhouse" },
-	// TODO(?): DRIFT — "category.lodge" is not in the canonical category enum
-	// (farm/maritime/remote/seasonal/mix). Reconcile vs Canonical Enum Registry
-	// (founder gate). Kept for now to avoid breaking consumers.
-	"category.lodge": { key: "category.lodge", streamline: "cabin / mountain", placeholder: "\\u{1F3D4}", label: "Seasonal Lodge / Outdoor" },
-	"category.maritime": { key: "category.maritime", streamline: "anchor / boat / rope", placeholder: "\\u{2693}", label: "Maritime" },
-	"category.remote": { key: "category.remote", streamline: "laptop / desk", placeholder: "\\u{1F4BB}", label: "Remote" },
-	"category.seasonal": { key: "category.seasonal", streamline: "leaf / sun / calendar", placeholder: "\\u{1F342}", label: "Seasonal" },
-	"category.mix": { key: "category.mix", streamline: "compass / mixed", placeholder: "\\u{1F9ED}", label: "Mixed" },
+	// category.* MUST mirror MARKETPLACE_CATEGORIES (packages/contracts/src/enums.ts)
+	// exactly: farm | maritime | remote | seasonal | mix.
+	// "category.lodge" was REMOVED (founder-approved Option 1, 2026-05-31): lodge is
+	// a setting/environment under Seasonal, NOT a top-level category. Do NOT re-add
+	// lodge to category.*; a future lodge-specific visual must use a separate
+	// namespace (e.g. environment.lodge / visual_lane.lodge), never category.*.
+	// TODO(CI drift check): fail the build if the set of category.* icon keys
+	// diverges from MARKETPLACE_CATEGORIES. Tracked as a PR #4 follow-up.
+	"category.farm": { key: "category.farm", streamline: "barn / wheat / plant", placeholder: "🌾", label: "Farm / Orchard / Greenhouse" },
+	"category.maritime": { key: "category.maritime", streamline: "anchor / boat / rope", placeholder: "⚓", label: "Maritime" },
+	"category.remote": { key: "category.remote", streamline: "laptop / desk", placeholder: "💻", label: "Remote" },
+	"category.seasonal": { key: "category.seasonal", streamline: "leaf / sun / calendar", placeholder: "🍂", label: "Seasonal" },
+	"category.mix": { key: "category.mix", streamline: "compass / mixed", placeholder: "🧭", label: "Mixed" },
 
-	"benefit.housing": { key: "benefit.housing", streamline: "home / cabin / house", placeholder: "\\u{1F3E0}", label: "Housing — where will I sleep?" },
-	"benefit.meals": { key: "benefit.meals", streamline: "fork-knife / food / meal", placeholder: "\\u{1F374}", label: "Meals — what will I eat?" },
-	"benefit.pay": { key: "benefit.pay", streamline: "dollar / money / compensation", placeholder: "\\u{1F4B5}", label: "Pay — what will I earn?" },
-	"benefit.transport": { key: "benefit.transport", streamline: "van / shuttle", placeholder: "\\u{1F690}", label: "Transport" },
-	"benefit.wifi": { key: "benefit.wifi", streamline: "wifi / signal", placeholder: "\\u{1F4F6}", label: "Wi-Fi / Connectivity" },
+	"benefit.housing": { key: "benefit.housing", streamline: "home / cabin / house", placeholder: "🏠", label: "Housing — where will I sleep?" },
+	"benefit.meals": { key: "benefit.meals", streamline: "fork-knife / food / meal", placeholder: "🍴", label: "Meals — what will I eat?" },
+	"benefit.pay": { key: "benefit.pay", streamline: "dollar / money / compensation", placeholder: "💵", label: "Pay — what will I earn?" },
+	"benefit.transport": { key: "benefit.transport", streamline: "van / shuttle", placeholder: "🚐", label: "Transport" },
+	"benefit.wifi": { key: "benefit.wifi", streamline: "wifi / signal", placeholder: "📶", label: "Wi-Fi / Connectivity" },
 
-	"trust.verified_host": { key: "trust.verified_host", streamline: "check-badge / verification", placeholder: "\\u{2705}", label: "Verified Host (Self-Declared by Host)" },
-	"trust.founding_host": { key: "trust.founding_host", streamline: "crown / founder", placeholder: "\\u{1F451}", label: "Founding Host" },
-	"trust.featured_employer": { key: "trust.featured_employer", streamline: "medal / ribbon", placeholder: "\\u{1F3C5}", label: "Featured Employer" },
+	"trust.verified_host": { key: "trust.verified_host", streamline: "check-badge / verification", placeholder: "✅", label: "Verified Host (Self-Declared by Host)" },
+	"trust.founding_host": { key: "trust.founding_host", streamline: "crown / founder", placeholder: "👑", label: "Founding Host" },
+	"trust.featured_employer": { key: "trust.featured_employer", streamline: "medal / ribbon", placeholder: "🏅", label: "Featured Employer" },
 
-	"status.featured": { key: "status.featured", streamline: "star", placeholder: "\\u{2B50}", label: "Featured" },
-	"status.seasonal": { key: "status.seasonal", streamline: "leaf / sun / calendar", placeholder: "\\u{1F343}", label: "Seasonal" },
-	"status.boosted": { key: "status.boosted", streamline: "rocket / arrow-up", placeholder: "\\u{1F680}", label: "Boosted" },
-	"status.match": { key: "status.match", streamline: "target / sparkle", placeholder: "\\u{1F3AF}", label: "Match" },
-	"status.success": { key: "status.success", streamline: "check", placeholder: "\\u{2714}", label: "Success" },
-	"status.warning": { key: "status.warning", streamline: "triangle-alert", placeholder: "\\u{26A0}", label: "Warning" },
-	"status.error": { key: "status.error", streamline: "no-entry / x-circle", placeholder: "\\u{26D4}", label: "Error" },
-	"status.info": { key: "status.info", streamline: "info-circle", placeholder: "\\u{2139}", label: "Info" },
-	"status.pending": { key: "status.pending", streamline: "hourglass", placeholder: "\\u{23F3}", label: "Pending" },
-	"status.locked": { key: "status.locked", streamline: "lock", placeholder: "\\u{1F512}", label: "Locked" },
+	"status.featured": { key: "status.featured", streamline: "star", placeholder: "⭐", label: "Featured" },
+	"status.seasonal": { key: "status.seasonal", streamline: "leaf / sun / calendar", placeholder: "🍃", label: "Seasonal" },
+	"status.boosted": { key: "status.boosted", streamline: "rocket / arrow-up", placeholder: "🚀", label: "Boosted" },
+	"status.match": { key: "status.match", streamline: "target / sparkle", placeholder: "🎯", label: "Match" },
+	"status.success": { key: "status.success", streamline: "check", placeholder: "✔️", label: "Success" },
+	"status.warning": { key: "status.warning", streamline: "triangle-alert", placeholder: "⚠️", label: "Warning" },
+	"status.error": { key: "status.error", streamline: "no-entry / x-circle", placeholder: "⛔", label: "Error" },
+	"status.info": { key: "status.info", streamline: "info-circle", placeholder: "ℹ️", label: "Info" },
+	"status.pending": { key: "status.pending", streamline: "hourglass", placeholder: "⏳", label: "Pending" },
+	"status.locked": { key: "status.locked", streamline: "lock", placeholder: "🔒", label: "Locked" },
 
-	"action.apply": { key: "action.apply", streamline: "arrow / send", placeholder: "\\u{27A4}", label: "Apply" },
-	"action.save": { key: "action.save", streamline: "heart", placeholder: "\\u{2764}", label: "Save" },
-	"action.saved": { key: "action.saved", streamline: "bookmark-filled", placeholder: "\\u{1F516}", label: "Saved" },
-	"action.message": { key: "action.message", streamline: "chat / message", placeholder: "\\u{1F4AC}", label: "Messages" },
-	"action.share": { key: "action.share", streamline: "share", placeholder: "\\u{1F517}", label: "Share" },
-	"action.like": { key: "action.like", streamline: "thumbs-up", placeholder: "\\u{1F44D}", label: "Like" },
-	"action.filter": { key: "action.filter", streamline: "filter / funnel", placeholder: "\\u{1F5C2}", label: "Filter" },
-	"action.sort": { key: "action.sort", streamline: "sort / arrows", placeholder: "\\u{2195}", label: "Sort" },
-	"action.search": { key: "action.search", streamline: "magnifier", placeholder: "\\u{1F50D}", label: "Search" },
-	"action.more": { key: "action.more", streamline: "ellipsis", placeholder: "\\u{2026}", label: "More" },
-	"action.close": { key: "action.close", streamline: "x / close", placeholder: "\\u{2715}", label: "Close" },
-	"action.back": { key: "action.back", streamline: "arrow-left", placeholder: "\\u{2190}", label: "Back" },
-	"action.edit": { key: "action.edit", streamline: "pencil", placeholder: "\\u{270F}", label: "Edit" },
-	"action.add": { key: "action.add", streamline: "plus", placeholder: "\\u{2795}", label: "Add" },
-	"action.check": { key: "action.check", streamline: "check", placeholder: "\\u{2713}", label: "Check" },
+	"action.apply": { key: "action.apply", streamline: "arrow / send", placeholder: "➤", label: "Apply" },
+	"action.save": { key: "action.save", streamline: "heart", placeholder: "❤️", label: "Save" },
+	"action.saved": { key: "action.saved", streamline: "bookmark-filled", placeholder: "🔖", label: "Saved" },
+	"action.message": { key: "action.message", streamline: "chat / message", placeholder: "💬", label: "Messages" },
+	"action.share": { key: "action.share", streamline: "share", placeholder: "🔗", label: "Share" },
+	"action.like": { key: "action.like", streamline: "thumbs-up", placeholder: "👍", label: "Like" },
+	"action.filter": { key: "action.filter", streamline: "filter / funnel", placeholder: "🗂️", label: "Filter" },
+	"action.sort": { key: "action.sort", streamline: "sort / arrows", placeholder: "↕️", label: "Sort" },
+	"action.search": { key: "action.search", streamline: "magnifier", placeholder: "🔍", label: "Search" },
+	"action.more": { key: "action.more", streamline: "ellipsis", placeholder: "…", label: "More" },
+	"action.close": { key: "action.close", streamline: "x / close", placeholder: "✕", label: "Close" },
+	"action.back": { key: "action.back", streamline: "arrow-left", placeholder: "←", label: "Back" },
+	"action.edit": { key: "action.edit", streamline: "pencil", placeholder: "✏️", label: "Edit" },
+	"action.add": { key: "action.add", streamline: "plus", placeholder: "➕", label: "Add" },
+	"action.check": { key: "action.check", streamline: "check", placeholder: "✓", label: "Check" },
 
-	"nav.discover": { key: "nav.discover", streamline: "compass / explore", placeholder: "\\u{1F9ED}", label: "Discover" },
-	"nav.search": { key: "nav.search", streamline: "magnifier", placeholder: "\\u{1F50D}", label: "Search" },
-	"nav.saved": { key: "nav.saved", streamline: "bookmark", placeholder: "\\u{1F516}", label: "Saved" },
-	"nav.applications": { key: "nav.applications", streamline: "clipboard / list", placeholder: "\\u{1F4CB}", label: "Applications" },
-	"nav.messages": { key: "nav.messages", streamline: "chat", placeholder: "\\u{1F4AC}", label: "Messages" },
-	"nav.profile": { key: "nav.profile", streamline: "user / profile", placeholder: "\\u{1F464}", label: "Profile" },
-	"nav.notifications": { key: "nav.notifications", streamline: "bell", placeholder: "\\u{1F514}", label: "Notifications" },
-	"nav.settings": { key: "nav.settings", streamline: "gear", placeholder: "\\u{2699}", label: "Settings" },
-	"nav.map": { key: "nav.map", streamline: "map / navigation", placeholder: "\\u{1F5FA}", label: "Map" },
-	"nav.host": { key: "nav.host", streamline: "user / profile", placeholder: "\\u{1F464}", label: "Host" },
+	"nav.discover": { key: "nav.discover", streamline: "compass / explore", placeholder: "🧭", label: "Discover" },
+	"nav.search": { key: "nav.search", streamline: "magnifier", placeholder: "🔍", label: "Search" },
+	"nav.saved": { key: "nav.saved", streamline: "bookmark", placeholder: "🔖", label: "Saved" },
+	"nav.applications": { key: "nav.applications", streamline: "clipboard / list", placeholder: "📋", label: "Applications" },
+	"nav.messages": { key: "nav.messages", streamline: "chat", placeholder: "💬", label: "Messages" },
+	"nav.profile": { key: "nav.profile", streamline: "user / profile", placeholder: "👤", label: "Profile" },
+	"nav.notifications": { key: "nav.notifications", streamline: "bell", placeholder: "🔔", label: "Notifications" },
+	"nav.settings": { key: "nav.settings", streamline: "gear", placeholder: "⚙️", label: "Settings" },
+	"nav.map": { key: "nav.map", streamline: "map / navigation", placeholder: "🗺️", label: "Map" },
+	"nav.host": { key: "nav.host", streamline: "user / profile", placeholder: "👤", label: "Host" },
 
-	"mappin.location": { key: "mappin.location", streamline: "map-pin", placeholder: "\\u{1F4CD}", label: "Location" },
-	"mappin.cluster": { key: "mappin.cluster", streamline: "map-pins / cluster", placeholder: "\\u{1F4CC}", label: "Map cluster" },
-	"mappin.selected": { key: "mappin.selected", streamline: "map-pin-selected", placeholder: "\\u{1F4CD}", label: "Selected pin" },
-	"mappin.user": { key: "mappin.user", streamline: "user-location", placeholder: "\\u{1F535}", label: "Your location" },
+	"mappin.location": { key: "mappin.location", streamline: "map-pin", placeholder: "📍", label: "Location" },
+	"mappin.cluster": { key: "mappin.cluster", streamline: "map-pins / cluster", placeholder: "📌", label: "Map cluster" },
+	"mappin.selected": { key: "mappin.selected", streamline: "map-pin-selected", placeholder: "📍", label: "Selected pin" },
+	"mappin.user": { key: "mappin.user", streamline: "user-location", placeholder: "🔵", label: "Your location" },
 
-	"analytics.views": { key: "analytics.views", streamline: "eye / views", placeholder: "\\u{1F441}", label: "Views" },
-	"analytics.applications": { key: "analytics.applications", streamline: "inbox / applications", placeholder: "\\u{1F4E5}", label: "Applications received" },
-	"analytics.conversion": { key: "analytics.conversion", streamline: "bar-chart", placeholder: "\\u{1F4CA}", label: "Conversion" },
-	"analytics.trending": { key: "analytics.trending", streamline: "line-chart-up", placeholder: "\\u{1F4C8}", label: "Trending" },
-	"analytics.meter": { key: "analytics.meter", streamline: "gauge / meter", placeholder: "\\u{1F39A}", label: "Meter" },
+	"analytics.views": { key: "analytics.views", streamline: "eye / views", placeholder: "👁️", label: "Views" },
+	"analytics.applications": { key: "analytics.applications", streamline: "inbox / applications", placeholder: "📥", label: "Applications received" },
+	"analytics.conversion": { key: "analytics.conversion", streamline: "bar-chart", placeholder: "📊", label: "Conversion" },
+	"analytics.trending": { key: "analytics.trending", streamline: "line-chart-up", placeholder: "📈", label: "Trending" },
+	"analytics.meter": { key: "analytics.meter", streamline: "gauge / meter", placeholder: "🎚️", label: "Meter" },
 
-	"system.chevron": { key: "system.chevron", streamline: "chevron-right", placeholder: "\\u{203A}", label: "Chevron" },
-	"system.external": { key: "system.external", streamline: "external-link", placeholder: "\\u{2197}", label: "External link" },
-	"system.eye": { key: "system.eye", streamline: "eye", placeholder: "\\u{1F441}", label: "Show" },
-	"system.eye_off": { key: "system.eye_off", streamline: "eye-off", placeholder: "\\u{1F648}", label: "Hide" },
-	"system.camera": { key: "system.camera", streamline: "camera", placeholder: "\\u{1F4F7}", label: "Camera" },
-	"system.upload": { key: "system.upload", streamline: "upload", placeholder: "\\u{2B06}", label: "Upload" },
-	"system.calendar": { key: "system.calendar", streamline: "calendar", placeholder: "\\u{1F4C5}", label: "Calendar" },
-	"system.clock": { key: "system.clock", streamline: "clock", placeholder: "\\u{1F550}", label: "Time" },
-	"system.phone": { key: "system.phone", streamline: "phone", placeholder: "\\u{1F4DE}", label: "Phone" },
-	"system.email": { key: "system.email", streamline: "envelope", placeholder: "\\u{2709}", label: "Email" },
-	"system.link": { key: "system.link", streamline: "link", placeholder: "\\u{1F517}", label: "Link" },
-	"system.lock": { key: "system.lock", streamline: "lock", placeholder: "\\u{1F512}", label: "Lock" },
-	"system.empty": { key: "system.empty", streamline: "empty-box", placeholder: "\\u{1F4ED}", label: "Empty" },
+	"system.chevron": { key: "system.chevron", streamline: "chevron-right", placeholder: "›", label: "Chevron" },
+	"system.external": { key: "system.external", streamline: "external-link", placeholder: "↗️", label: "External link" },
+	"system.eye": { key: "system.eye", streamline: "eye", placeholder: "👁️", label: "Show" },
+	"system.eye_off": { key: "system.eye_off", streamline: "eye-off", placeholder: "🙈", label: "Hide" },
+	"system.camera": { key: "system.camera", streamline: "camera", placeholder: "📷", label: "Camera" },
+	"system.upload": { key: "system.upload", streamline: "upload", placeholder: "⬆️", label: "Upload" },
+	"system.calendar": { key: "system.calendar", streamline: "calendar", placeholder: "📅", label: "Calendar" },
+	"system.clock": { key: "system.clock", streamline: "clock", placeholder: "🕐", label: "Time" },
+	"system.phone": { key: "system.phone", streamline: "phone", placeholder: "📞", label: "Phone" },
+	"system.email": { key: "system.email", streamline: "envelope", placeholder: "✉️", label: "Email" },
+	"system.link": { key: "system.link", streamline: "link", placeholder: "🔗", label: "Link" },
+	"system.lock": { key: "system.lock", streamline: "lock", placeholder: "🔒", label: "Lock" },
+	"system.empty": { key: "system.empty", streamline: "empty-box", placeholder: "📭", label: "Empty" },
 }
 
 export function getIcon(key: IconKey): IconEntry {

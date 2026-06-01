@@ -20,7 +20,10 @@ export const CURATED_PHOTO_CATEGORIES = MARKETPLACE_CATEGORIES.filter(
 	(c): c is CuratedPhotoCategory => c !== "mix",
 );
 
-// TODO(?): DRIFT — the icon registry (packages/ui/src/icons/registry.ts)
-// currently ships "category.lodge" while the canonical category enum uses
-// "seasonal" + "mix". Do NOT resolve unilaterally; this is a founder approval
-// gate (canon reconciliation). Tracked in docs/source-of-truth/open-questions.md.
+// RESOLVED (founder-approved Option 1, 2026-05-31): "category.lodge" was removed
+// from the icon registry so its category.* keys mirror MARKETPLACE_CATEGORIES
+// exactly (farm/maritime/remote/seasonal/mix). Lodge is a setting/environment
+// under Seasonal, NOT a top-level category; any future lodge-specific visual
+// must use a separate namespace (e.g. environment.lodge), never category.*.
+// TODO(CI drift check): fail the build if the icon registry's category.* keys
+// diverge from MARKETPLACE_CATEGORIES. Tracked as a PR #4 follow-up.
