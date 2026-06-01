@@ -21,9 +21,38 @@ export type HostTeamRole =
 	| "billing"
 	| "viewer"
 
+/**
+ * Fields visible to a host in MATCHED-BUCKET context (Permission/Visibility/RLS
+ * Registry). Full contact / raw resume / private notes are NOT here — they require
+ * an application/invite context. Enforced server-side + RLS; this is documentation
+ * of the allowed projection, type-only.
+ */
+export type HostVisibleCandidateField =
+	| "match_score"
+	| "match_confidence"
+	| "match_reasons"
+	| "match_band"
+	| "desired_categories"
+	| "desired_roles"
+	| "relative_location"
+	| "availability_summary"
+	| "skills_tags"
+	| "profile_completeness"
+	| "trust_markers"
+
+/** Host-facing candidate review row (projection). IDs + allowed fields only. */
+export interface CandidateReviewRow {
+	seekerProfileId: string
+	listingId: string
+	rank: number
+	band?: string
+	disposition?: HostSeekerDisposition
+	// Populated only with HostVisibleCandidateField-allowed data.
+}
+
 /** A single hiring-pipeline event (audit). Names mirror Canonical Event Registry. */
 export interface HiringEvent {
-	type: string // TODO(?) narrow to matching-events union once Event Registry is mirrored in contracts
+	type: string // TODO(?) narrow to MatchingHiringEventType once Event Registry is mirrored in contracts
 	actor: "seeker" | "host" | "system"
 	occurredAt: string
 	/** IDs only — never protected attributes or raw resume content. */

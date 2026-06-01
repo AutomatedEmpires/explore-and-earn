@@ -29,10 +29,19 @@ Not considered:
 - Demographic, health, or other protected attributes. Boost/featured status.
 ```
 
+## Symmetry: seeker view vs host view
+
+| Section | Seeker view | Host view |
+| --- | --- | --- |
+| Top positive signals | "why this fits you" | "why this candidate fits the listing" |
+| Missing information | what to add to your profile | what the candidate has not provided yet |
+| Concerns | requirements you may not meet (with how to resolve) | factual hard-modifier concerns |
+| Freshness | last updated | last updated |
+| Not considered | protected attributes, boost | protected attributes, boost |
+
 ## Rules
 
 - **No false/generated explanations**: every line maps to a real signal contribution in `MatchResult.reasons`. No LLM free-text rationalization in V1.
 - **No hidden disqualifying logic**: if a signal meaningfully changed rank or applied a cap, it must appear here.
 - **Plain language**: human-readable; no raw subscores in host/seeker views (G11).
-- **Both sides**: seekers see "why this fits / what to improve"; hosts see positives + concerns + freshness.
 - Storage of explanation text (vs deriving on read) is a **founder approval gate**.

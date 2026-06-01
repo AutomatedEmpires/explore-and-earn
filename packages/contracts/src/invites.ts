@@ -12,8 +12,24 @@ export type InviteState =
 	| "expired"
 	| "withdrawn"
 
+export type InviteTerminalState = "applied" | "ignored" | "expired" | "withdrawn"
+
+/** Type-level adjacency mirroring canon. Runtime authority: lifecycles.ts (G16). TODO(?) beyond this. */
+export type InviteTransitions = {
+	created: "delivered" | "withdrawn"
+	delivered: "viewed" | "ignored" | "expired" | "withdrawn"
+	viewed: "applied" | "ignored" | "expired" | "withdrawn"
+	applied: never
+	ignored: never
+	expired: never
+	withdrawn: never
+}
+
 /** Expires 14 days after send (canon). */
 export const INVITE_EXPIRE_DAYS = 14 // canon — Lifecycle Registry
+
+/** Host tier → included invite credits (canon: Host Dashboard Spec). */
+export type HostTier = "starter" | "professional" | "enterprise"
 
 export interface Invite {
 	id: string
@@ -29,3 +45,5 @@ export interface Invite {
 }
 
 // TODO(?) anti-spam per-host/per-seeker invite caps — needs canon/founder.
+// TODO(?) reminder offsets (proposed T-3, T-1 days) — founder-gated.
+// TODO(?) invite_credit_restored conditions — needs canon.

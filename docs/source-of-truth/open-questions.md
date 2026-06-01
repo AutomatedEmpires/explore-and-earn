@@ -10,6 +10,14 @@ Unresolved questions and known drift between canon, machine, and repo. Agents ad
 | Q-AGENTS-DIR | Repo has a `.agents/` role-file convention (empty stubs) alongside the new root `AGENTS.md` standard. | Decide whether `.agents/*.md` role files are kept (and populated) or folded into `docs/agents/`. Root `AGENTS.md` is the agents.md standard and takes precedence for coding agents. | Architect | Open |
 | Q-ICON-CAP | Streamline standard license caps usage at ~100 distinct icons / project. | If V1 UI needs >100 distinct icons, an Extended Vector License must be purchased (founder/legal). Track distinct-icon inventory against the cap. | Founder | Open |
 | Q-OLD-REPO | Older `exploreandearnv2` repo still exists alongside this clean `explore-and-earn`. | Confirm `explore-and-earn` is canonical; archive the old repo to avoid confusion. | Founder | Open |
+| Q-MATCH-EVENT-SHORTLIST | Directive analytics event `candidate_shortlisted` uses prohibited "shortlisted" term. | Canon save-state is `saved_by_host`. Propose event `candidate_saved`; confirm name + add to Event Registry. | Architect / Founder | Open |
+| Q-MATCH-EVENT-ADDS | Directive UI events `candidate_card_opened`, `candidate_profile_popup_opened`, `quick_apply_clicked` are not in the Canonical Event Registry. | Decide whether to add them (with actor/surface/properties) or drop. Reconciliation table in `docs/analytics/matching-hiring-events-v1.md`. | Architect | Open |
+| Q-MATCH-BANDS | Match band labels + numeric thresholds undefined. | G11 mandates categorical host-visible bands. Proposed Strong / Developing / Needs attention; cutoffs need founder. | Founder | Open |
+| Q-INVITE-SPAM | Anti-spam invite caps (per-host / per-seeker) undefined. | Needed to prevent invite spam; no canon value. | Founder | Open |
+| Q-MATCH-STALE-DISPLAY | Display rule for stale-but-shown match results + minimum confidence display threshold undefined. | Affects when a score/band is shown vs withheld. | Founder / Architect | Open |
+| Q-HOST-NOTES | Whether host private notes ship in V1 candidate review. | Affects review surface + RLS. | Founder | Open |
+| Q-INACTIVITY-CURVE | Inactivity cold-start window + recovery curve undefined. | Must not over-penalize early users; recoverable. | Founder | Open |
+| Q-ROLE-ACTIONS | Exact host team-role → review-action permissions. | Indicative mapping proposed in `host-candidate-review-v1.md`; confirm against Permission/Visibility/RLS Registry. | Architect | Open |
 
 ## How to use this file
 

@@ -6,7 +6,30 @@
 
 `created`, `delivered`, `viewed`, `accepted`, `declined`, `expired`, `withdrawn`.
 
-Happy path (Lifecycle Registry): `created → delivered → viewed → accepted`. Terminals: `declined`, `expired`, `withdrawn`.
+## State diagram
+
+```mermaid
+stateDiagram-v2
+	[*] --> created
+	created --> delivered
+	delivered --> viewed
+	viewed --> accepted
+	accepted --> [*]
+
+	created --> withdrawn
+	delivered --> withdrawn
+	viewed --> withdrawn
+
+	delivered --> declined
+	viewed --> declined
+
+	delivered --> expired
+	viewed --> expired
+
+	declined --> [*]
+	expired --> [*]
+	withdrawn --> [*]
+```
 
 ## Core fields
 
@@ -24,9 +47,19 @@ Happy path (Lifecycle Registry): `created → delivered → viewed → accepted`
 
 - V1 offers are **informational marketplace offers**, not legally binding employment contracts. Any binding/contractual semantics are a **founder + legal approval gate** and out of scope here.
 
-## Audit trail
+## Audit trail (event mapping)
 
-- All offer transitions emit `offer_*` events (see analytics doc) for an immutable audit history.
+| Transition | Event |
+| --- | --- |
+| create | `offer_created` |
+| deliver | `offer_delivered` (+ `offer_sent` on send) |
+| view | `offer_viewed` |
+| accept | `offer_accepted` |
+| decline | `offer_declined` |
+| expire | `offer_expired` |
+| withdraw | `offer_withdrawn` |
+
+All offer transitions emit `offer_*` events (see analytics doc) for an immutable audit history.
 
 ## Not implemented here
 

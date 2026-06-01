@@ -1,4 +1,7 @@
-// Matching contracts — TYPE-ONLY. No runtime values, no algorithm, no DB/AI calls.
+// Matching contracts — TYPE-ONLY. No runtime values, no scoring weights, no
+// algorithm, no DB/AI calls. Final match weights are a FOUNDER APPROVAL GATE and
+// are intentionally NOT encoded here (see docs/matching/match-score-model-v1.md).
+//
 // Source of truth: Notion "Exact Ranking, Matching & Boost Formula",
 // "Matching Pipeline / Scoring / Refresh". Unlocked values are marked TODO(?).
 // Status/enum unions mirror the Canonical Enum Registry; when enums.ts is
@@ -17,7 +20,32 @@ export type MatchConfidence = number
 /** Host-visible categorical band. Numeric cutoffs are founder-gated (TODO?). */
 export type MatchBand = "strong" | "developing" | "needs_attention" // TODO(?) confirm labels/thresholds
 
-/** Canonical scoring component kinds (mirror weight table; weights NOT encoded here). */
+/** Canonical scoring component keys (mirror weight table; WEIGHTS NOT encoded). */
+export type MatchScoreComponentKey =
+	| "timeline_availability"
+	| "skills_certifications"
+	| "role_category"
+	| "housing_meals_pay"
+	| "location_travel"
+	| "goals_open_to"
+	| "completeness_confidence"
+	| "behavioral_reliability"
+
+/** Canonical hard-modifier kinds (caps applied after raw score). Cap VALUES not encoded. */
+export type MatchHardModifierKind =
+	| "required_cert_missing"
+	| "timeline_conflict"
+	| "housing_required_not_included"
+	| "visa_unavailable"
+	| "trust_concern"
+
+/** Canonical exclusion reasons (candidate not scored / not surfaced at all). */
+export type MatchExclusionReason =
+	| "listing_not_live"
+	| "seeker_blocked_or_restricted"
+	| "account_banned_or_suspended"
+	| "listing_closed_or_archived"
+
 export type MatchSignalKind =
 	| "availability_fit"
 	| "category_role_fit"
@@ -44,7 +72,7 @@ export interface MatchSignal {
 
 /** A surfaced concern (e.g., hard-modifier condition). Must be explainable, never hidden. */
 export interface MatchConcern {
-	kind: "required_cert_missing" | "timeline_conflict" | "housing_required_not_included" | "visa_unavailable" | "trust_concern" // mirrors canonical hard modifiers
+	kind: MatchHardModifierKind
 	message: string
 }
 
@@ -57,6 +85,48 @@ export interface MatchExplanation {
 	staleAt?: string
 	/** Always present: attributes/inputs explicitly NOT considered. */
 	notConsidered: string[]
+}
+
+/**
+ * Inputs allowed into scoring. By construction this type contains NO monetization
+ * fields (pricing/entitlements/boost/featured) — guardrail G8 — and NO protected/
+ * sensitive attributes (see prohibited-signals-v1.md). Adding such a field is a
+ * guardrail violation. Shapes are placeholders/handles to future read models.
+ */
+export interface MatchInput {
+	seekerProfileId: string
+	listingId: string
+	// Structured, requirement-tied inputs only — NO free demographic inference.
+	availability?: unknown // TODO(?) shape from Seeker Profile canon
+	structuredSkills?: string[]
+	requiredCertifications?: string[]
+	category?: string
+	housingNeeded?: boolean
+	mealsPreferred?: boolean
+	payMinimum?: number
+	// NOTE: deliberately NO `boost`, `tier`, `price`, `featured`, or any protected field.
+}
+
+/** Hybrid refresh trigger classes (canon). */
+export type MatchRefreshTrigger = "immediate" | "queued_bulk" | "scheduled_stale"
+
+/** Staleness bookkeeping (internal). */
+export interface MatchStaleness {
+	generatedAt: string
+	staleAt: string
+	version: string
+	lastTrigger?: MatchRefreshTrigger
+}
+
+/** Criteria used to assemble an eligible candidate pool (canon). */
+export interface CandidatePoolCriteria {
+	category?: string
+	timelineWindow?: { start: string; end: string }
+	location?: unknown // relative/region handle — TODO(?)
+	preferences?: unknown // TODO(?)
+	eligibilityOnly: boolean
+	/** Boosted membership affects pool/placement only — NEVER score (G8). */
+	includeBoosted?: boolean
 }
 
 /** Persisted match result. Stored, not computed on read (canon). */

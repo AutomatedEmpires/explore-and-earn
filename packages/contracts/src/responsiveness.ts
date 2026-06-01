@@ -12,6 +12,13 @@ export type ResponsivenessSignalKind =
 	| "accepted_offer_completion_history"
 	| "notification_delivery_state"
 
+/**
+ * Seeker posture. `not_interested` is an explicit, recoverable choice and is
+ * SEPARATE from inactivity (canon). Posture must never be a black-box suppressor.
+ * Labels are proposed and founder-gated (TODO?).
+ */
+export type ResponsivenessPosture = "active" | "recovering" | "dormant" | "not_interested"
+
 /** Internal-only. Host transparency, if any, is aggregate + explainable. */
 export interface ResponsivenessSignal {
 	kind: ResponsivenessSignalKind

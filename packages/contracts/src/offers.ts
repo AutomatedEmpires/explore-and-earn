@@ -13,6 +13,19 @@ export type OfferState =
 	| "expired"
 	| "withdrawn"
 
+export type OfferTerminalState = "accepted" | "declined" | "expired" | "withdrawn"
+
+/** Type-level adjacency mirroring canon. Runtime authority: lifecycles.ts (G16). */
+export type OfferTransitions = {
+	created: "delivered" | "withdrawn"
+	delivered: "viewed" | "declined" | "expired" | "withdrawn"
+	viewed: "accepted" | "declined" | "expired" | "withdrawn"
+	accepted: never
+	declined: never
+	expired: never
+	withdrawn: never
+}
+
 /** Expires 7 days after extended_at (canon). Change is a founder gate. */
 export const OFFER_EXPIRE_DAYS = 7 // canon — Lifecycle Registry
 
@@ -35,4 +48,6 @@ export interface Offer {
 	expiresAt?: string
 	createdAt: string
 	updatedAt: string
+	/** V1 offers are informational, not legally binding (founder + legal gate). */
+	binding?: false
 }

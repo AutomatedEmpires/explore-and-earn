@@ -2,27 +2,68 @@
 
 > DRAFT — taxonomy only. No PostHog sending implemented. Canonical event names come from the "Canonical Event Registry" — **the registry wins** over the directive's draft names. Conflicts and additions are flagged for founder/Event-Registry update.
 
-Convention (canon): snake_case, past-tense.
+Convention (canon): snake_case, past-tense. **Properties are IDs only** — never protected attributes, raw resume content, precise location, or private contact.
 
-## Canonical events (use these — already in Event Registry)
+## Matching events
 
-### Matching
-`match_generated`, `match_marked_stale`, `match_refreshed`, `matched_bucket_viewed`, `match_reason_opened`, `match_score_clicked`, `empty_match_bucket_shown`, `match_pool_building_prompt_shown`.
+| Event | Actor | Surface | Properties (ids only) | Privacy | Do NOT track |
+| --- | --- | --- | --- | --- | --- |
+| `match_generated` | system | server | `seeker_profile_id`, `listing_id`, `match_result_version` | internal | subscores, protected attrs |
+| `match_marked_stale` | system | server | `match_result_id`, `reason` | internal | — |
+| `match_refreshed` | system | server | `match_result_id`, `trigger` | internal | — |
+| `matched_bucket_viewed` | seeker/host | feed/dashboard | `bucket_id`, `count` | standard | individual seeker ids in bulk |
+| `match_reason_opened` | seeker/host | card/review | `match_result_id` | standard | explanation free-text |
+| `match_score_clicked` | seeker/host | card/review | `match_result_id` | standard | raw numeric subscores |
+| `empty_match_bucket_shown` | seeker/host | feed | `bucket_id` | standard | — |
+| `match_pool_building_prompt_shown` | seeker | feed | `bucket_id` | standard | — |
 
-### Invite
-`invite_created`, `invite_sent`, `invite_delivered`, `invite_viewed`, `invite_applied`, `invite_ignored`, `invite_expired`, `invite_withdrawn`, `invite_credit_consumed`, `invite_credit_restored`.
+## Invite events
 
-### Offer
-`offer_created`, `offer_sent`, `offer_delivered`, `offer_viewed`, `offer_accepted`, `offer_declined`, `offer_expired`, `offer_withdrawn`.
+| Event | Actor | Surface | Properties (ids only) | Privacy | Do NOT track |
+| --- | --- | --- | --- | --- | --- |
+| `invite_created` | host | review/dashboard | `invite_id`, `listing_id`, `seeker_profile_id`, `match_result_id` | standard | resume content |
+| `invite_sent` | host/system | server | `invite_id` | standard | — |
+| `invite_delivered` | system | server | `invite_id` | standard | — |
+| `invite_viewed` | seeker | invite surface | `invite_id` | standard | — |
+| `invite_applied` | seeker | invite surface | `invite_id`, `application_id` | standard | — |
+| `invite_ignored` | system | server | `invite_id` | internal | — |
+| `invite_expired` | system | server | `invite_id` | internal | — |
+| `invite_withdrawn` | host | dashboard | `invite_id` | standard | — |
+| `invite_credit_consumed` | system | server | `host_id`, `invite_id` | billing-internal | — |
+| `invite_credit_restored` | system | server | `host_id`, `invite_id`, `reason` | billing-internal | — |
 
-### Application
-`application_started`, `application_submitted`, `application_viewed_by_host`, `application_status_changed`, `application_withdrawn`, `application_not_selected`, `application_expired`, `application_accepted`, `application_completed`.
+## Offer events
+
+| Event | Actor | Surface | Properties (ids only) | Privacy | Do NOT track |
+| --- | --- | --- | --- | --- | --- |
+| `offer_created` | host | review/dashboard | `offer_id`, `listing_id`, `seeker_profile_id` | standard | pay terms as free-text |
+| `offer_sent` | host/system | server | `offer_id` | standard | — |
+| `offer_delivered` | system | server | `offer_id` | standard | — |
+| `offer_viewed` | seeker | offer surface | `offer_id` | standard | — |
+| `offer_accepted` | seeker | offer surface | `offer_id` | standard | — |
+| `offer_declined` | seeker | offer surface | `offer_id` | standard | decline reason free-text |
+| `offer_expired` | system | server | `offer_id` | internal | — |
+| `offer_withdrawn` | host | dashboard | `offer_id` | standard | — |
+
+## Application events
+
+| Event | Actor | Surface | Properties (ids only) | Privacy | Do NOT track |
+| --- | --- | --- | --- | --- | --- |
+| `application_started` | seeker | listing/apply | `listing_id` | standard | — |
+| `application_submitted` | seeker | apply | `application_id`, `listing_id` | standard | resume content |
+| `application_viewed_by_host` | host | review | `application_id` | standard | — |
+| `application_status_changed` | host/system | server | `application_id`, `from`, `to` | standard | — |
+| `application_withdrawn` | seeker | dashboard | `application_id` | standard | — |
+| `application_not_selected` | host/system | review | `application_id` | standard | reason free-text |
+| `application_expired` | system | server | `application_id` | internal | — |
+| `application_accepted` | seeker/system | server | `application_id` | standard | — |
+| `application_completed` | host/system | server | `application_id` | standard | — |
 
 ## Directive → canon reconciliation
 
 | Directive event | Resolution |
 | --- | --- |
-| `match_score_viewed` | Use `match_score_clicked` (registry). `*_viewed` for score → TODO(?) if a passive impression event is wanted. |
+| `match_score_viewed` | Use `match_score_clicked` (registry). A passive impression event is **TODO(?)**. |
 | `match_explanation_opened` | Use `match_reason_opened` (registry). |
 | `application_viewed_by_host` | Matches registry ✓. |
 | `invite_sent` / `invite_viewed` / `invite_expired` | Match registry ✓. |
@@ -30,17 +71,13 @@ Convention (canon): snake_case, past-tense.
 | `application_submitted` | Matches registry ✓. |
 | `candidate_card_opened` | Not in registry → **TODO(?)** propose add. |
 | `candidate_profile_popup_opened` | Not in registry → **TODO(?)** propose add. |
-| `candidate_invited` | Likely duplicate of `invite_created`/`invite_sent` → reconcile; **TODO(?)**. |
-| `invite_responded` | Split into `invite_applied` / `invite_ignored` (registry) → prefer registry. |
+| `candidate_invited` | Likely duplicate of `invite_created`/`invite_sent` → prefer canonical. |
+| `invite_responded` | Split into `invite_applied` / `invite_ignored` (registry). |
 | `quick_apply_clicked` | Not in registry → **TODO(?)** propose add. |
-| `candidate_shortlisted` | **CONFLICT** — "shortlisted" terminology is prohibited by canon. Use `candidate_saved` / save-by-host event → **TODO(?)** confirm event name. |
-| `candidate_not_selected` | Maps to `application_not_selected` (registry) → prefer registry. |
+| `candidate_shortlisted` | **CONFLICT** — "shortlisted" is prohibited by canon. Propose `candidate_saved` → **TODO(?)**. |
+| `candidate_not_selected` | Maps to `application_not_selected` (registry). |
 
-## Per-event metadata (template)
-
-For each event define: **actor** (seeker/host/system), **surface** (card / review list / popup / dashboard), **properties** (ids only — `match_result_id`, `listing_id`, `application_id`, etc.), **privacy rules**, and **what NOT to track**.
-
-## Privacy / what NOT to track
+## Privacy / what NOT to track (global)
 
 - Never log protected/sensitive attributes (see `../matching/prohibited-signals-v1.md`).
 - Never log raw resume content, precise location, or private contact in event properties — IDs only.
@@ -48,4 +85,4 @@ For each event define: **actor** (seeker/host/system), **surface** (card / revie
 
 ## Not implemented here
 
-No capture calls, no PostHog client. Type-only `HiringEvent` union in `packages/contracts/src/matching-events.ts`.
+No capture calls, no PostHog client. Type-only `MatchingHiringEventType` union in `packages/contracts/src/matching-events.ts`.

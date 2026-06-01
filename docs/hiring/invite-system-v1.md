@@ -8,7 +8,32 @@ Invites are **host-initiated** (host → seeker for a listing), distinct from se
 
 `created`, `delivered`, `viewed`, `applied`, `ignored`, `expired`, `withdrawn`.
 
-Happy path (Lifecycle Registry): `created → delivered → viewed → applied`. Terminals: `withdrawn`, `expired`, `ignored`.
+## State diagram
+
+```mermaid
+stateDiagram-v2
+	[*] --> created
+	created --> delivered
+	delivered --> viewed
+	viewed --> applied
+	applied --> [*]
+
+	created --> withdrawn
+	delivered --> withdrawn
+	viewed --> withdrawn
+
+	delivered --> ignored
+	viewed --> ignored
+
+	delivered --> expired
+	viewed --> expired
+
+	withdrawn --> [*]
+	ignored --> [*]
+	expired --> [*]
+```
+
+> `applied` links the invite to a seeker-initiated Application object (separate lifecycle). Adjacency beyond canon is **TODO(?)**.
 
 ## Core fields
 
@@ -19,13 +44,12 @@ Happy path (Lifecycle Registry): `created → delivered → viewed → applied`.
 ## Expiry & reminders
 
 - **Expires 14 days** after send (canon).
-- Reminder before expiration: event-only (`invite_expires_soon` notification event); **no sending implemented** here (founder gate: automated reminders).
+- Reminder before expiration: event-only (`invite_expires_soon` notification event); **no sending implemented** here (founder gate: automated reminders). Proposed reminder offsets (TODO(?), founder-gated): T-3 days and T-1 day before `expiresAt`.
 
 ## Credits & limits (Host Dashboard Spec)
 
-- Sending an invite **consumes an invite credit** (canon).
+- Sending an invite **consumes an invite credit** (`invite_credit_consumed`); withdrawn/expired-before-delivery restoration emits `invite_credit_restored` (restore conditions are **TODO(?)**).
 - Tier scoping: Starter = 0 included invites (can buy credits), Professional = 5 included, Enterprise = 10 included.
-- Credit restore events exist (`invite_credit_restored`) per Event Registry.
 - Anti-spam limits: **TODO(?)** — exact per-host/per-seeker caps need canon/founder.
 
 ## Responsiveness
@@ -35,7 +59,7 @@ Happy path (Lifecycle Registry): `created → delivered → viewed → applied`.
 ## Visibility
 
 - Host sees invite status (delivered/viewed/applied/ignored/expired/withdrawn).
-- Seeker notification surface: in-app + email per Notification routing canon; sending not implemented.
+- Seeker notification surface: in-app + email per Notification routing canon; sending not implemented (see `notifications-reminders-v1.md`).
 
 ## Not implemented here
 

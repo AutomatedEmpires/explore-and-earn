@@ -6,11 +6,38 @@
 
 `applied`, `reviewing`, `saved_by_host`, `offered`, `accepted`, `active`, `completed`, `not_selected`, `withdrawn`, `expired`.
 
-## Canonical happy path (Lifecycle Registry)
+## State diagram
 
-`applied → reviewing → saved_by_host → offered → accepted → active → completed`
+```mermaid
+stateDiagram-v2
+	[*] --> applied
+	applied --> reviewing
+	reviewing --> saved_by_host
+	saved_by_host --> offered
+	offered --> accepted
+	accepted --> active
+	active --> completed
+	completed --> [*]
 
-Terminals: `not_selected`, `withdrawn`, `expired`.
+	applied --> withdrawn
+	reviewing --> withdrawn
+	saved_by_host --> withdrawn
+	offered --> withdrawn
+
+	reviewing --> not_selected
+	saved_by_host --> not_selected
+	offered --> not_selected
+
+	applied --> expired
+	reviewing --> expired
+	saved_by_host --> expired
+
+	withdrawn --> [*]
+	not_selected --> [*]
+	expired --> [*]
+```
+
+> Adjacency beyond the canonical happy path + the auto-expire/withdraw/not-selected branches above is **TODO(?)** — confirm against the State Transition Tables canon before implementation.
 
 ## Expiry
 
@@ -24,16 +51,22 @@ Terminals: `not_selected`, `withdrawn`, `expired`.
 
 ## State visibility separation (Mission Q7)
 
-| Layer | Example |
-| --- | --- |
-| Seeker-visible | applied, under review, saved, offered, accepted, active, completed, not selected, withdrawn, expired |
-| Host-visible | full lifecycle + viewed/saved metadata + match band |
-| Internal | event history, responsiveness inputs, refresh bookkeeping |
-| Event history | `application_*` events (see analytics doc) |
+| Canonical state | Seeker-visible label | Host-visible | Internal/event |
+| --- | --- | --- | --- |
+| applied | Applied | Applied + viewed metadata | `application_submitted` |
+| reviewing | Under review | Reviewing | `application_status_changed` |
+| saved_by_host | Saved | Saved (NOT "shortlisted") | `application_status_changed` |
+| offered | Offer sent | Offered | offer events |
+| accepted | Accepted | Accepted | `application_accepted` |
+| active | Active | Active | `application_status_changed` |
+| completed | Completed | Completed | `application_completed` |
+| not_selected | Not selected | Not selected | `application_not_selected` |
+| withdrawn | Withdrawn | Withdrawn | `application_withdrawn` |
+| expired | Expired | Expired | `application_expired` |
 
 ## Transitions
 
-All transitions MUST be validated against `packages/contracts/lifecycles.ts` via `assert_lifecycle_transition()` (guardrail G16) and use enum values imported from contracts (G13) — no string literals in implementation. Transition table is canonical; this doc does not redefine it.
+All transitions MUST be validated against `packages/contracts/lifecycles.ts` via `assert_lifecycle_transition()` (guardrail G16) and use enum values imported from contracts (G13) — no string literals in implementation. The type-level adjacency in `packages/contracts/src/applications.ts` mirrors canon for editor support; `lifecycles.ts` remains the runtime authority.
 
 ## Not implemented here
 

@@ -19,7 +19,11 @@ Legend: Seeker-visible / Host-visible = whether the signal (or its contribution)
 | `host_requirements_fit` | Listing hard requirements (cert/visa/timeline) | Listing requirements | Yes (missing surfaced) | Yes | Yes (hard modifiers) | Med | Med | Yes | No |
 | `work_style_fit` | Work-style / schedule preference alignment | Seeker + listing | TODO(?) | TODO(?) | No (TODO?) | Med | Med | TODO(?) | TODO(?) |
 
-Notes:
+## Proxy-risk review (fairness)
+
+Signals carrying elevated **proxy** risk for protected attributes — `skills_cert_fit`, `location_travel_fit`, `pay_fit` — must pass a fairness review before weights lock. For example, location can proxy for national origin; certain credentials can proxy for age or national origin. Mitigation: keep these signals tied to **explicit listing requirements** (not free inference), surface them in explanations, and route weight-locking to the founder/legal gate.
+
+## Notes
+
 - `behavioral_reliability` and all responsiveness inputs are **internal-only** per canon ("do not publicly shame seekers"). Host transparency, if any, is aggregate and explainable — never a raw penalty. See `../hiring/responsiveness-inactivity-v1.md`.
-- Any signal touching skills/location/pay carries **proxy fairness risk**; flagged for founder/legal review before weights are locked.
 - `work_style_fit` is exploratory; not in canonical weight table → defaults deferred / TODO(?).

@@ -16,6 +16,21 @@ A **cautious** responsiveness model. Internal-only signals; never public shaming
 
 These map to the canonical `behavioral_reliability` weight (5) and confidence recency (10) — but the **penalty/weighting behavior is TODO(?) and founder-gated**.
 
+## Posture model (proposed — TODO(?), founder-gated)
+
+```mermaid
+stateDiagram-v2
+	[*] --> active
+	active --> recovering: low recent activity
+	recovering --> active: re-engages
+	recovering --> dormant: prolonged no activity
+	dormant --> active: returns + acts
+	not_interested --> active: re-engages
+	active --> not_interested: explicit decline
+```
+
+`not_interested` is an explicit, recoverable seeker choice — **separate** from `dormant`/inactivity. Posture must never be a black-box suppressor.
+
 ## Rules (canon)
 
 - Do **not** over-penalize early users (cold-start protection).
@@ -26,8 +41,8 @@ These map to the canonical `behavioral_reliability` weight (5) and confidence re
 
 ## Recovery
 
-- Activity restores standing. Exact recovery curve: **TODO(?)** (founder gate).
+- Activity restores standing. Exact cold-start window + recovery curve: **TODO(?)** (founder gate).
 
 ## Not implemented here
 
-No scoring, no suppression logic, no ranking effect. Type-only `ResponsivenessSignal` in `packages/contracts/src/responsiveness.ts`.
+No scoring, no suppression logic, no ranking effect. Type-only `ResponsivenessSignal` / `ResponsivenessPosture` in `packages/contracts/src/responsiveness.ts`.
