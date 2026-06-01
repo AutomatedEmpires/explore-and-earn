@@ -56,7 +56,7 @@ export const _runtimeChecks = (): boolean => {
 		return (
 			entry.deprecated === true &&
 			!isCanonicalIconKey(k) &&
-			(target === null || isCanonicalIconKey(target))
+			(target === undefined || target === null || isCanonicalIconKey(target))
 		)
 	})
 	return canonicalOk && deprecatedOk
