@@ -2,14 +2,14 @@
 
 > **DRAFT — DO NOT MERGE. DO NOT IMPLEMENT FEATURES.** This Build Pack prepares the `apps/web` frontend foundation — route architecture, app shells, navigation model, surface patterns, overlay (modal/sheet/drawer/popover) system, state model, and implementation sequencing — so VS Code / Copilot / Codex / Cursor agents can build against a fixed map. It is **planning + app-shell scaffolding only**. No dashboards, no auth, no live data, no DB/API, no Stripe, no matching, no messaging, no notifications.
 >
-> **Source of truth.** Notion is product/UX canon; this repo mirrors it. Primary canon: *Canonical Page Registry & Route Architecture*, *Navigation Architecture Doctrine*, *UX Surface Inventory*, *Popup Architecture & Modal Families*, *Component Inventory Mapping — Phase A*, *Design Tokens & Visual System — V1*, *Discovery Card V1*. Repo mirrors: [`docs/design/`](../design), [`docs/product/`](../product). **Nothing is invented.** Anything unconfirmed against canon is marked `TODO(?)` and routed to the founder approval queue.
+> **Source of truth.** Notion is product/UX canon; this repo mirrors it. Primary canon: *Canonical Page Registry & Route Architecture*, *Navigation Architecture Doctrine*, *UX Surface Inventory*, *Popup Architecture & Modal Families*, *Component Inventory Mapping — Phase A*, *Design Tokens & Visual System — V1*, *Discovery Card V1*. Repo mirrors: [`docs/design/`](../design), [`docs/product/`](../product). **Nothing is invented.** Founder decisions are recorded in §5.
 
 ## 0. How to read this pack
 
 | Doc | Answers |
 | --- | --- |
-| this file | scope, build order, what-not-to-build, founder gates, the 10 mission answers |
-| [`../ux/route-map.md`](../ux/route-map.md) | top-level routes, Next route groups, proposed paths |
+| this file | scope, build order, what-not-to-build, founder decisions, the 10 mission answers |
+| [`../ux/route-map.md`](../ux/route-map.md) | top-level routes, Next route groups, **locked** paths |
 | [`../ux/app-shell-and-navigation.md`](../ux/app-shell-and-navigation.md) | required layouts/shells + per-scope navigation |
 | [`../ux/surface-inventory.md`](../ux/surface-inventory.md) | page/surface inventory + reusable surface patterns |
 | [`../ux/modal-sheet-system.md`](../ux/modal-sheet-system.md) | overlay families, escalation, ModalHost contract |
@@ -27,7 +27,7 @@ Notion decides · GitHub builds · Figma shows · everything else runs. `package
 
 ## 3. Build order context
 
-Per `AGENTS.md` §3: Sprint Zero → Design System V1 → Discovery Card V1 → Database V1 → feature surfaces. This pack is the **app-shell readiness layer** that sits beside Design System V1 (PR #5) and ahead of Discovery Card V1: it fixes *where* surfaces live and *how* they are framed, so the Discovery Card and feature surfaces have a home.
+Per `AGENTS.md` §3: Sprint Zero → Design System V1 → Discovery Card V1 → Database V1 → feature surfaces. This pack is the **app-shell readiness layer** beside Design System V1 (PR #5) and ahead of Discovery Card V1: it fixes *where* surfaces live and *how* they are framed.
 
 ## 4. What agents must NOT build yet
 
@@ -39,41 +39,41 @@ Until a scoped, founder-approved Build Pack exists per surface, do **not**:
 - fetch data, call APIs, or import `apps/web/services/*` runtime logic into shells;
 - wire Stripe, matching, messaging, notifications, or analytics emission;
 - render real Streamline icons by committing licensed assets (guardrail G30 / A-ICON-LICENSE — use registry placeholders);
-- introduce a new top-level route group or route name not present in the Canonical Page Registry without flagging it first.
+- introduce a new top-level route group or route name not present in the route map / Canonical Page Registry without flagging it first.
 
-## 5. Founder approval gates raised by this pack
+## 5. Founder decisions — LOCKED 2026-05-31
 
-Route into [`../source-of-truth/founder-approval-queue.md`](../source-of-truth/founder-approval-queue.md):
+All six gates from the original draft are resolved:
 
-1. **A-FE-ROUTE-SLUGS** — the Canonical Page Registry names surfaces but does not pin URL path strings. All proposed slugs in `route-map.md` are `TODO(?)` until the founder confirms verbatim paths.
-2. **A-FE-MARKETING-SPLIT** — registry has one "Public / Logged-Out" bucket but the repo has both `(marketing)` and `(public)` groups. Proposed split must be confirmed.
-3. **A-FE-COMMUNITY-GROUP** — Community surfaces (Feed, Photo Post Detail, Host Announcement Detail, Platform Post/Blog Detail) are registered but there is **no** `(community)` route group in the repo. Need a decision: new group vs nest under `(public)`/`(seeker)`.
-4. **A-FE-SEEKER-NAV-ORDER** — Navigation Doctrine and UX Surface Inventory disagree on seeker bottom-nav order (Seek/Swipe/Map/Saved vs Swipe/Map/Seek/Profile). Founder must lock the order.
-5. **A-FE-LISTING-DETAIL-MODE** — whether authenticated Listing Detail is a route, a modal, or both (canon shows a Discovery Card Detail Popup *and* a public detail page). Needs reconciliation.
-6. **A-FE-DEMO-TIER-ROUTING** — Demo Host Dashboard has Starter/Professional/Enterprise variants; route shape (`/demo/host/[tier]` vs separate paths) unconfirmed.
+1. **A-FE-ROUTE-SLUGS — RESOLVED.** Simple slugs approved (see `route-map.md`): `/explore`, `/opportunities/[slug]`, `/hosts/[slug]`, `/seeker(+/saved,/applications,/offers,/profile)`, `/host(+/listings,/applicants,/offers,/profile,/analytics)`, `/admin`, `/community`, `/demo(+/design-system,/discovery-card,/listing-detail,/seeker-dashboard,/host-dashboard)`. Registry surfaces outside this set are **registered but deferred**.
+2. **A-FE-MARKETING-SPLIT — RESOLVED.** Keep both groups. `(marketing)` = landing/about/how-it-works/pricing/brand; `(public)` = explore, opportunity detail, host profile.
+3. **A-FE-COMMUNITY-GROUP — RESOLVED.** `(community)` approved as a route group; **keep V1 light** (single `/community` feed). Do not let it become a feature rabbit hole before core marketplace surfaces work.
+4. **A-FE-SEEKER-NAV-ORDER — RESOLVED.** Mobile seeker bottom nav: **Explore → Saved → Applications → Offers → Profile.** Community is **not** in the V1 seeker bottom nav.
+5. **A-FE-LISTING-DETAIL-MODE — RESOLVED.** Dual mode: route `/opportunities/[slug]` for public/direct/share/SEO; modal/sheet over discovery context for in-app taps. One component, two containers.
+6. **A-FE-DEMO-TIER-ROUTING — RESOLVED.** No Starter/Professional/Enterprise tiers in routes for V1. Use `/demo/design-system`, `/demo/discovery-card`, `/demo/listing-detail`, `/demo/seeker-dashboard`, `/demo/host-dashboard` (+ `/demo`).
 
-Gates already owned elsewhere (auth, pricing/plans, schema, payments, verification, permissions/RLS, icon licensing) are untouched here.
+Gates owned elsewhere (auth, pricing/plans, schema, payments, verification, permissions/RLS, icon licensing) remain untouched.
 
 ## 6. The ten mission answers (summary)
 
-1. **Top-level routes (V1):** six audience route groups — `(marketing)`, `(public)`, `(seeker)`, `(host)`, `(admin)`, `(demo)` — plus `app/api` (owned by the backend track). Full table in `route-map.md`.
-2. **Page groups:** the six Next route groups above already exist as folders; this pack defines their contents and adds shell layouts. Community is an open gap (gate A-FE-COMMUNITY-GROUP).
-3. **Layouts/shells:** root layout (exists) + one shell layout per route group (added as placeholders). Shells supply chrome only — header, audience nav, overlay host — never data/auth. See `app-shell-and-navigation.md`.
-4. **Navigation:** distinct models per audience (global marketing nav, public discovery nav, seeker bottom nav + more-hub, host bottom nav + More, admin queue nav). Detailed in `app-shell-and-navigation.md`.
-5. **Reusable surface patterns:** PageShell/PageHeader, DiscoveryFeed, FilterBar, CardGrid/Rail, DetailLayout, DashboardLayout, QueueLayout, ListPane+DetailPane, Empty/Loading/Error/Locked states. See `surface-inventory.md`.
-6. **Overlay system:** one ModalHost overlay router with five form-factors (modal, bottom sheet, drawer, popover, fullscreen) and five behavior families. See `modal-sheet-system.md`.
-7. **Empty/loading/error states:** a shared, non-color-only state model (default · loading · empty · error · locked · restricted) reusing `Skeleton` + `Meter` neutrality rules. See `states.md`.
-8. **Frontend code before features:** shell layouts, shell chrome placeholders (`AppHeader`, `BottomNav`, `ModalHost`), the overlay router contract, and shared surface-pattern stubs — all non-functional. Feature `page.tsx` files come later, per surface.
+1. **Top-level routes (V1):** locked in `route-map.md` across seven route groups.
+2. **Page groups:** `(marketing)`, `(public)`, `(seeker)`, `(host)`, `(admin)`, `(community)`, `(demo)` — all present as folders with shell layouts; `app/api` is the backend track.
+3. **Layouts/shells:** root layout (exists) + one shell layout per route group (placeholders). Chrome only — never data/auth. See `app-shell-and-navigation.md`.
+4. **Navigation:** marketing/public global nav; **locked** seeker bottom nav (Explore/Saved/Applications/Offers/Profile); host bottom nav + More; admin queue nav; light community nav; isolated demo nav.
+5. **Reusable surface patterns:** PageShell/PageHeader, DiscoveryFeed, FilterBar, CardGrid/Rail, DetailLayout (shared by listing route + overlay), DashboardLayout, QueueLayout, ListPane+DetailPane, state surfaces. See `surface-inventory.md`.
+6. **Overlay system:** one ModalHost overlay router, five form-factors, five behavior families, dual-mode listing detail. See `modal-sheet-system.md`.
+7. **Empty/loading/error states:** shared non-color-only model. See `states.md`.
+8. **Frontend code before features:** shell layouts, shell chrome placeholders (`AppHeader`, `BottomNav`, `ModalHost`), overlay router contract, shared surface-pattern stubs — all non-functional.
 9. **Do not build yet:** see §4.
-10. **Founder approval:** see §5.
+10. **Founder approval:** all six gates resolved (§5).
 
 ## 7. Implementation sequencing (recommended)
 
-1. **Lock canon gaps** (§5 gates) — especially route slugs, marketing/public split, community group, seeker nav order.
-2. **Land app shells** — finalize the route-group layouts added here once tokens (PR #5) merge.
-3. **Build shell chrome** — `AppHeader`, `BottomNav`, `ModalHost` against canon, using `packages/ui` primitives + the Streamline registry only.
-4. **Build shared surface patterns** — PageShell/PageHeader/Empty/Loading/Error/Locked as `packages/ui` primitives where reusable.
+1. **(done) Lock canon gaps** — §5 decisions are recorded.
+2. **Land app shells** — finalize the route-group layouts (incl. `(community)`) once tokens (PR #5) merge.
+3. **Build shell chrome** — `AppHeader`, `BottomNav` (locked seeker order), `ModalHost` against canon, using `packages/ui` primitives + the Streamline registry only.
+4. **Build shared surface patterns** — PageShell/PageHeader/DetailLayout/Empty/Loading/Error/Locked as `packages/ui` primitives.
 5. **Discovery Card V1** — implement `<DiscoveryCard />` (its own Build Pack).
-6. **Feature surfaces** — one Build Pack → issue → PR per surface, in audience order (public discovery → seeker → host → admin → demo → community).
+6. **Feature surfaces** — one Build Pack → issue → PR per surface, in audience order (public marketplace → seeker → host → admin → demo → community-light).
 
 Each step is its own `ready-for-engineering` issue + PR; nothing merges without founder review + local VS Code verification.

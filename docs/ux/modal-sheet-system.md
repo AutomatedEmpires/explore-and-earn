@@ -1,6 +1,6 @@
 # Overlay System (Modal / Sheet / Drawer / Popover / Fullscreen) — V1
 
-> Source: Notion *Popup Architecture & Modal Families*, *Canonical Page Registry* (registered popups), *Navigation Architecture Doctrine* (routing doctrine). One overlay system, shared families — **never** 20+ one-off modals. This pack defines the contract only; **no overlay logic is implemented yet**.
+> Source: Notion *Popup Architecture & Modal Families*, *Canonical Page Registry* (registered popups), *Navigation Architecture Doctrine* (routing doctrine); **founder listing-detail decision locked 2026-05-31**. One overlay system, shared families — **never** 20+ one-off modals. This pack defines the contract only; **no overlay logic is implemented yet**.
 
 ## Form-factors (responsive)
 
@@ -14,11 +14,20 @@
 
 Routing doctrine: **Full page** for dashboards, editors, billing, admin queues, resume builder. **Overlay** for rapid review, previews, report, upgrade, match explanation, media, scheduling.
 
+## Listing detail — dual mode (LOCKED: A-FE-LISTING-DETAIL-MODE)
+
+Listing/Opportunity Detail is **both** a route and an overlay:
+
+- **Route** `/opportunities/[slug]` — public / direct / share / SEO access; full page in `(public)`.
+- **Overlay** — an **in-app discovery tap** (Explore, Saved, etc.) opens a listing detail **modal/sheet over the discovery context**, preserving scroll / card / map position (Interaction Preservation Rule).
+
+Both render the **same** detail content/component; only the container differs (page vs overlay). Do not fork the detail UI.
+
 ## Behavior families (from canon)
 
 1. **Profile popups** — Seeker / Host / Explore&Earn / Admin profile.
 2. **Media bucket popups** — Cover/Icon buckets, Host Photo Carousel, Housing Media, Meals Media (source order: listing override → host profile bucket).
-3. **Detail & review** — Discovery Card Detail, Seeker Resume, Quick Peek, Match Score Explanation, Listing Relevance Extension.
+3. **Detail & review** — **Listing/Opportunity Detail (overlay mode)**, Discovery Card Detail, Seeker Resume, Quick Peek, Match Score Explanation, Listing Relevance Extension.
 4. **Workflow** — Report Pipeline, Calendar/Scheduling, Messaging, Get More Listings, Get More Announcements, Upgrade to Professional, Upgrade to Enterprise, Boost Your Listing, Invite to Apply, Offer, Travel Plan.
 5. **Navigation/utility** — Host More, Notification Center, scope switcher, quick action.
 
@@ -31,7 +40,7 @@ Seeker/Host/E&E/Admin Profile · Cover/Icon Photo Bucket · Host Photo Carousel 
 A single root-level **overlay router** (`apps/web/components/shell/ModalHost.tsx`, placeholder shipped here) owns:
 
 - a typed registry of overlay keys → form-factor + family;
-- open/close state, stacking, and **escalation** (small popover → deeper sheet/modal → full route when content outgrows the overlay);
+- open/close state, stacking, and **escalation** (small popover → deeper sheet/modal → full route when content outgrows the overlay — e.g. the listing overlay can escalate to `/opportunities/[slug]`);
 - **focus trap, keyboard (Esc/Tab), and SR labels** on every overlay;
 - **permission/tier checks before open** (e.g. upgrade-gated actions) — checks only, no billing logic;
 - the **Interaction Preservation Rule**: closing returns the user to the exact prior scroll / card / map position;
@@ -42,5 +51,5 @@ Mobile renders families as bottom sheets / fullscreen; desktop as popovers / cen
 ## Do not
 
 - create per-surface bespoke modals outside these families;
-- deep-link overlays as routes;
+- deep-link overlays as routes (the listing detail **route** is the canonical deep link, not the overlay);
 - implement any overlay's feature behavior in this pack (report submission, messaging, scheduling, billing) — placeholder + contract only.
