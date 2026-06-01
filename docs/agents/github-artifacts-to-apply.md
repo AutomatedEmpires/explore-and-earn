@@ -1,8 +1,9 @@
 # GitHub Artifacts to Apply (CLAOS Lite)
 
 This file is the single copy/paste-ready source for the **operational** GitHub artifacts
-of the CLAOS Lite relay. It exists because the connected agent integration can write
-*some* of `.github/` but **not** `.github/workflows/`.
+of the CLAOS Lite relay. The connected agent integration could write *some* of `.github/`
+but not `.github/workflows/`, so the workflow file was committed locally and is reproduced
+here as the canonical source.
 
 ## Application status (what this agent could and could not write)
 
@@ -10,12 +11,12 @@ of the CLAOS Lite relay. It exists because the connected agent integration can w
 | --- | --- | --- |
 | PR template | `.github/pull_request_template.md` | ✅ **Written directly** to branch `claos-lite/agent-handoff-relay` (PR #7). |
 | Agent verification issue form | `.github/ISSUE_TEMPLATE/agent-verification-task.yml` | ✅ **Written directly** to the same branch. |
-| Handoff-helper workflow | `.github/workflows/agent-handoff-helper.yml` | ❌ **Blocked** — `403 Resource not accessible by integration`. The connected app lacks the `workflows` scope. **Apply manually** from §3 below. |
+| Handoff-helper workflow | `.github/workflows/agent-handoff-helper.yml` | ✅ **Committed on branch** in PR #7. It stays disabled unless `ENABLE_HANDOFF_HELPER == 'true'`. |
 | Labels | repo Settings (not a file) | ⚠️ Seed with `gh` from §4 below. Labels live in repo settings, not in committed files. |
 
-> **VS Code / human action required:** create the workflow file in §3 and run the label
-> seed commands in §4. Everything else is already on the branch. This mirrors the same
-> `.github`/workflow write limitation first noted in PR #1.
+> **VS Code / human action required:** run the label seed commands in §4. The workflow,
+> PR template, and issue forms are already on the branch. The workflow write limitation
+> still explains why the helper was committed locally instead of via the connected app.
 
 The PR template (§1) and issue form (§2) below are reproduced verbatim so the VS Code agent
 can recreate them if needed; they already exist on the branch.
@@ -192,10 +193,10 @@ body:
 
 ---
 
-## 3. `.github/workflows/agent-handoff-helper.yml` (MUST be applied manually)
+## 3. `.github/workflows/agent-handoff-helper.yml` (already applied; disabled by default)
 
-This file could **not** be written by the agent (missing `workflows` scope). A human or the
-VS Code agent must create it. It is **disabled/stubbed**: it no-ops unless the repo variable
+This file is already committed on the PR branch and is reproduced here as the canonical
+copy. It is **disabled/stubbed**: it no-ops unless the repo variable
 `ENABLE_HANDOFF_HELPER == 'true'`. It **never** auto-merges, deploys, or modifies anything —
 it only posts a reminder comment when a PR is labeled `status:needs-local-verification`. No secrets.
 
@@ -227,7 +228,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Post local verification reminder
-        uses: actions/github-script@v7
+        uses: actions/github-script@91a83c091797b22c5771b1d7178fd0fddacc73ea
         with:
           script: |
             const body = [
@@ -258,7 +259,7 @@ jobs:
             });
 `````
 
-Apply locally with:
+If you need to recreate the committed file locally, use:
 
 ```bash
 # from the repo root, on the PR branch
