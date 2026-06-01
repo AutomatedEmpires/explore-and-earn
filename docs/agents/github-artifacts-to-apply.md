@@ -318,14 +318,27 @@ gh label create "risk:medium"            -c FBCA04 -d "Medium risk" --force
 gh label create "risk:high"              -c D93F0B -d "High risk" --force
 gh label create "risk:approval-required" -c B60205 -d "Requires founder approval before merge" --force
 
-# --- gate / governance / freeze ---
-gh label create "gate:review"      -c 5319E7 -d "Human review gate" --force
-gh label create "gate:test"        -c 1D76DB -d "Must pass CI/tests gate" --force
-gh label create "gate:release"     -c B60205 -d "Release/deploy gate (founder only)" --force
-gh label create "canon:cited"      -c 0E8A16 -d "Notion canon source cited in the PR" --force
-gh label create "blocked:drift"    -c D93F0B -d "Blocked: drifts from canon" --force
-gh label create "blocked:conflict" -c D93F0B -d "Blocked: merge/ownership conflict" --force
-gh label create "freeze:all"       -c B60205 -d "Global freeze — do not merge anything" --force
+# --- gate (relay process) ---
+gh label create "gate:review"             -c 5319E7 -d "Human review gate" --force
+gh label create "gate:test"               -c 1D76DB -d "Must pass CI/tests gate" --force
+gh label create "gate:release"            -c B60205 -d "Release/deploy gate (founder only)" --force
+
+# --- gate (founder approval) ---
+gh label create "gate:money"              -c B60205 -d "Pricing, plans, SKUs, Stripe, refunds, entitlements" --force
+gh label create "gate:auth"               -c B60205 -d "Authentication, sessions, identity, secrets" --force
+gh label create "gate:db-destructive"     -c B60205 -d "Schema changes, migrations, RLS, data deletion/drops" --force
+gh label create "gate:permissions"        -c B60205 -d "Access control, team scopes, dashboard access" --force
+gh label create "gate:trust-safety"       -c B60205 -d "Verified Host integrity, moderation, KYC" --force
+gh label create "gate:legal"              -c B60205 -d "Terms, privacy, compliance" --force
+gh label create "gate:asset-license"      -c B60205 -d "Paid icon, font, or media licensing" --force
+gh label create "gate:launch"             -c B60205 -d "Production launch, public exposure, domain/DNS" --force
+gh label create "gate:product-philosophy" -c B60205 -d "Changes to locked principles or the Constitution" --force
+
+# --- governance / freeze ---
+gh label create "canon:cited"             -c 0E8A16 -d "Notion canon source cited in the PR" --force
+gh label create "blocked:drift"           -c D93F0B -d "Blocked: drifts from canon" --force
+gh label create "blocked:conflict"        -c D93F0B -d "Blocked: merge/ownership conflict" --force
+gh label create "freeze:all"              -c B60205 -d "Global freeze — do not merge anything" --force
 ```
 
 ---

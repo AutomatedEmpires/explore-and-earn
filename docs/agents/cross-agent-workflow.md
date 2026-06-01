@@ -15,31 +15,31 @@ Never rely on chat memory between agents. Chat is private and disappears; shared
 
 ```mermaid
 flowchart TD
-    A["Notion: canon + Build Pack"] --> B["GitHub Issue created (ready-for-engineering)"]
-    B --> C["Coding agent picks up issue (in-progress)"]
-    C --> D["Pull Request opened (in-review)"]
+    A["Notion: canon + Build Pack"] --> B["GitHub Issue created (status:ready)"]
+    B --> C["Coding agent picks up issue (status:claimed -> status:in-progress)"]
+    C --> D["Draft PR opened (status:needs-local-verification)"]
     D --> E["CI guardrails + reviewer check"]
     E -->|changes requested| C
-    E -->|approved| F["Merge to main + repo docs updated"]
+    E -->|approved| F["Merge to main + repo docs updated (status:complete)"]
     F --> G["Notion updated if product truth changed"]
-    G --> H["Next issue flagged ready-for-engineering"]
+    G --> H["Next issue flagged status:ready"]
     H --> B
 ```
 
 ## Status vocabulary (the baton)
 
-`backlog` → `ready-for-engineering` → `in-progress` → `in-review` → `changes-requested` → `done`
+`status:ready` → `status:claimed` → `status:in-progress` → `status:needs-local-verification` → `status:verified-local` → `status:needs-review` → `status:ready-for-review` → `status:complete`
 
-- `ready-for-engineering` is set **only** when a task is spec-complete (has a Build Pack or acceptance criteria).
-- `in-review` means a PR exists and CI is running.
-- `done` means merged + docs updated (+ Notion updated if product truth changed).
+- `status:ready` is set **only** when a task is spec-complete (has a Build Pack or acceptance criteria).
+- `status:needs-local-verification` means a draft PR exists and local WSL verification is next.
+- `status:complete` means merged + docs updated (+ Notion updated if product truth changed).
 
 ## The autonomy ladder (climb it; do not skip it)
 
 | Rung | What's automated | Human stays in the loop |
 | --- | --- | --- |
 | 0 — Manual relay | Agents do tasks; founder triggers each handoff | Every handoff |
-| 1 — Auto-dispatch | `ready-for-engineering` auto-creates issues | Approve issues + all merges |
+| 1 — Auto-dispatch | `status:ready` issues route automatically | Approve issues + all merges |
 | 2 — Auto-implement | Agent auto-picks issues, opens PRs | Approve merges + product-truth changes |
 | 3 — Auto-merge (guarded) | Low-risk PRs passing CI self-merge | Approval gates on schema/pricing/auth/money/trust |
 | 4 — Continuous flow | Agents relay task→task | Founder gates at high-risk decisions + periodic audits |

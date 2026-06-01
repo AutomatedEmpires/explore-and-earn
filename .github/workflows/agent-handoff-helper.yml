@@ -1,0 +1,56 @@
+name: Agent Handoff Helper (stub)
+
+# CLAOS Lite — handoff helper.
+# SAFETY CONTRACT: NEVER auto-merges, deploys, or modifies production/code/settings.
+# Only posts a reminder comment with the local verification checklist when a PR is
+# labeled `status:needs-local-verification`.
+#
+# Ships DISABLED/STUBBED: no-ops unless repo variable ENABLE_HANDOFF_HELPER == 'true'
+# (Settings -> Secrets and variables -> Actions -> Variables). No secrets used.
+
+on:
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  remind-local-verification:
+    # Stub guard + label guard. BOTH must be true for the job to run.
+    if: >-
+      vars.ENABLE_HANDOFF_HELPER == 'true' &&
+      github.event.label.name == 'status:needs-local-verification'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post local verification reminder
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              '### Local verification requested',
+              '',
+              'This PR is labeled `status:needs-local-verification`. The next agent',
+              '(VS Code / Copilot on WSL) should run:',
+              '',
+              '```bash',
+              'pnpm install',
+              'pnpm typecheck',
+              'pnpm lint',
+              'pnpm build   # if applicable',
+              'pnpm test    # if applicable',
+              '```',
+              '',
+              'Then post the Agent Handoff block with results and set:',
+              '- `status:verified-local` + `agent:review` if everything passes, or',
+              '- `status:needs-opus-fix` + `agent:opus` if something fails.',
+              '',
+              '_Automated reminder only. Does not merge, deploy, or modify anything._',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
