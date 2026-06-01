@@ -1,58 +1,97 @@
-## What & why
+<!--
+CLAOS Lite PR template — Explore&Earn.
+Fill every section. This template encodes the agent handoff relay so the founder
+never has to write the handoff format by hand.
+See docs/agents/claos-lite-handoff-relay.md and docs/agents/handoff-protocol.md.
+-->
 
-<!-- What does this PR change, and why? Link the Notion canon page or repo docs source. -->
+## Summary
 
-## Source of truth
+<!-- What does this PR change, and why? One short paragraph. -->
 
-- Canon:
+## Source of Truth
+
+- Notion canon:
 - Build pack / issue:
+- [ ] `canon:cited` applied
 
-## Type
+## Scope
 
-- [ ] Control plane (docs, agent context, source-of-truth, scaffolding)
-- [ ] Design system
-- [ ] Feature (scoped + approved build pack)
-- [ ] Fix
-- [ ] Chore / tooling
+<!-- What is intentionally inside this PR. -->
+-
 
-## Founder approval gates
+## Out of Scope
 
-- [ ] Money / billing
-- [ ] Auth / security
-- [ ] Database destructive change or final migration
-- [ ] Legal / trust / safety
-- [ ] Major product philosophy change
-- [ ] Public launch / deploy
-- [ ] Paid asset licensing
-- [ ] None of the above
+<!-- What this PR deliberately does NOT touch. -->
+-
 
-## Design drift checklist (if UI is touched)
+## Files Changed
+
+<!-- Bullet each file + a one-line purpose. -->
+-
+
+## Verification Commands
+
+```bash
+pnpm install
+pnpm typecheck
+pnpm lint
+# add PR-specific commands here
+```
+
+## Results
+
+<!-- Paste the actual output / pass-fail of the commands above. -->
+- [ ] typecheck passed
+- [ ] lint passed
+- [ ] build / tests passed (as applicable)
+
+## Risk Level
+
+- [ ] `risk:low`
+- [ ] `risk:medium`
+- [ ] `risk:high`
+- [ ] `risk:approval-required`
+
+## Founder Approval Required?
+
+- [ ] No
+- [ ] Yes — gate(s): `money | auth | db-destructive | permissions | trust-safety | legal | asset-license | launch | product-philosophy`
+
+<!-- If yes: add the matching gate label + `status:needs-founder` and a row in docs/source-of-truth/founder-approval-queue.md. -->
+
+## Next Agent Handoff
+
+- **Next agent:** `agent:opus | agent:vscode | agent:codex | agent:cursor | agent:claude | agent:review | agent:founder`
+- **Required action:**
+- **Commands to run:**
+  ```bash
+  ```
+- **Expected output:**
+- **Blocking status:** `status:needs-local-verification | status:needs-review | status:needs-opus-fix | status:needs-founder | status:blocked`
+- **If pass:** <e.g. set `status:verified-local`, hand to `agent:review`>
+- **If fail:** <e.g. set `status:needs-opus-fix`, hand back to `agent:opus` with notes>
+
+## What Was Intentionally Not Implemented
+
+-
+
+## Known Risks
+
+-
+
+## Follow-up Tasks
+
+- [ ]
+
+---
+
+### Design drift checklist (only if UI is touched)
 
 - [ ] Semantic tokens only (no raw hex / px type / ad-hoc radius)
 - [ ] Icons via the Streamline Freehand registry only (G30)
-- [ ] Reuses existing packages/ui primitives where possible
+- [ ] Reuses existing `packages/ui` primitives where possible
 - [ ] Borders-first; shadows only on overlays
 - [ ] Photos framed, never filtered
-- [ ] Triad intact; Verified Host badge present where applicable (G22)
+- [ ] Housing / Meals / Pay triad intact; Verified Host badge present where applicable (G22)
 - [ ] No color-only status
-
-## Sprint Zero checks
-
-- [ ] References canonical Notion page(s)
-- [ ] States whether a Notion update is required
-- [ ] Confirms no product feature work was introduced accidentally
-- [ ] Confirms pricing canon was not changed
-- [ ] Confirms permissions/RLS implications were reviewed
-- [ ] Confirms media visibility implications were reviewed
-- [ ] Confirms demo data isolation implications were reviewed
-- [ ] Confirms ADR or data-dictionary updates are not required, or lists them
-
-## Handoff
-
-- Done:
-- Artifact updated:
-- Next agent / step:
-
-## Not in scope
-
-<!-- Confirm no out-of-scope work unless approved above. -->
