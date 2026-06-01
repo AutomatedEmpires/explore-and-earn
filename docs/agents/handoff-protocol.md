@@ -2,20 +2,55 @@
 
 The mechanism that makes the relay continuous. Each step ends by leaving a **durable signal** that the next agent reacts to.
 
+Under CLAOS Lite the durable signal is always a GitHub artifact — an issue, a draft PR, a label change, a review, or a **handoff comment** — never a private chat message and never the founder copying text between agents. See [`claos-lite-handoff-relay.md`](./claos-lite-handoff-relay.md) and [`closed-loop-workflow.md`](./closed-loop-workflow.md).
+
 ## Steps
 
 1. **Task born in Notion.** When spec-complete, it is marked `Ready for Engineering` and carries a Build Pack or acceptance criteria.
 2. **Dispatch to GitHub.** A dispatcher creates a GitHub issue: title, body, acceptance criteria, labels, agent type, priority, and a link back to the Notion source. The issue URL is written back into Notion. *(Start with this one automation only — the Notion → GitHub Issue Dispatcher. Do not build all workers at once.)*
-3. **Pick up.** A coding agent assigns itself, sets `in-progress`, and works on a feature branch in WSL.
-4. **Propose.** The agent opens a PR (`in-review`) using the PR template, linking the issue + Notion source.
+3. **Pick up.** A coding agent assigns itself, sets `status:in-progress` + `agent:<self>`, and works on a feature branch in WSL.
+4. **Propose.** The agent opens a draft PR (`status:in-review`) using the PR template, linking the issue + Notion source.
 5. **Verify.** CI guardrails (lint, typecheck, tests, drift checks) run automatically; a reviewer approves or requests changes.
 6. **Merge + reconcile.** On merge, repo docs update. If product truth changed, Notion + the Canonical Source Registry / decision log are updated.
-7. **Flag next.** The next task is set `ready-for-engineering`, and the loop repeats.
+7. **Flag next.** The next task is set `status:ready-for-engineering`, and the loop repeats.
+
+## The handoff comment (the baton message)
+
+Whenever an agent passes the baton, it posts **one structured comment** on the issue/PR, then
+swaps the `status:*` and `agent:*` labels. The comment — not chat — is the message to the next agent.
+
+```
+### 🤝 Handoff
+- **From:** <agent:self>   **To:** <agent:next>
+- **Artifact:** #<issue/PR number>   **Branch:** <branch-name>
+- **New status:** <status:label>
+
+**What I did**
+- ...
+
+**Verified locally (WSL)**
+- [ ] pnpm install
+- [ ] pnpm typecheck
+- [ ] pnpm lint
+- [ ] pnpm build / test (as applicable)
+
+**What the next agent must do**
+- ...
+
+**Open questions / gates**
+- <none | gate:* + link to founder-approval-queue row>
+
+**Source of truth:** <Notion canon link>
+```
+
+After posting: remove your `agent:*` label, add the next owner's `agent:*`, and set the new `status:*`.
 
 ## A clean handoff includes
 
+- [ ] A handoff comment using the template above.
 - [ ] The artifact (issue/PR) clearly states what was done and what remains.
 - [ ] Status label updated to reflect the new state (the baton moved).
+- [ ] Exactly one `agent:*` label = the new owner (no collisions).
 - [ ] A link back to the Notion source of truth.
 - [ ] Any product-truth change reflected in Notion **before** marking `done`.
 - [ ] No two agents assigned to the same artifact.
