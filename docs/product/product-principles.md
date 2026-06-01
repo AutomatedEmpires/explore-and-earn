@@ -23,7 +23,7 @@ Closer to **Airbnb / Patagonia / National Geographic / premium travel-work** —
 3. **Mobile-first.** Design and build for the phone first; desktop is the enhancement.
 4. **Trust is a feature.** Verified Host (self-declared), housing/meals evidence photos, and honest information build a marketplace people trust.
 5. **Zero bloat.** Fast scanning, clean information blocks, no decorative clutter, no dark patterns.
-6. **One system, many worlds.** A single component system serves all visual lanes (Farm/Orchard/Greenhouse, Seasonal Lodge/Outdoor, Maritime, Remote). Vary imagery + accent, never fork the system.
+6. **One system, many worlds.** A single component system serves all visual lanes (Farm/Orchard/Greenhouse, Maritime, Remote, Seasonal/Outdoor, Mix). Vary imagery + accent, never fork the system. Categories are locked to **farm/maritime/remote/seasonal/mix** — *lodge is not a category* (it is a setting under seasonal).
 7. **Visual quality is non-negotiable.** Generic, ugly, default SaaS UI is a defect. Drift toward it is a bug. (See `../design/design-drift-prevention.md`.)
 8. **Warm Working Landscape matters.** Don't let the brand collapse into only alpine adventure — farm/greenhouse/maritime/remote are equally first-class.
 

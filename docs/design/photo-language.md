@@ -21,12 +21,12 @@ Why:
 
 ## Photography direction (warm, organic, real)
 
-Use warm, organic, lifestyle photography that reads as a real working landscape. Balance imagery across the four visual lanes — do not default everything to alpine adventure:
+Use warm, organic, lifestyle photography that reads as a real working landscape. Balance imagery across the visual lanes — do not default everything to alpine adventure:
 
 - **Farm / Orchard / Greenhouse** — warm earth, produce, soil, barns, golden-hour light, wood, baskets, greenhouses.
-- **Seasonal Lodge / Outdoor** — mountains, cabins, trails, lakes, pine, stone, scenic work.
 - **Maritime** — rope, docks, water, boats, nets, salt.
 - **Remote** — cabins, laptops, quiet landscapes, desks, simple workspaces.
+- **Seasonal / Outdoor** — mountains, cabins, lodges, trails, lakes, pine, stone, scenic work (lodge is a setting under seasonal, not a category).
 
 ## Rejected for V1
 
