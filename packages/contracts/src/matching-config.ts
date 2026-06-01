@@ -141,3 +141,70 @@ export const EXPLANATION_STORAGE_V1 = {
 	store_explanation_text: false,
 	persist_structured_reasons_only: true,
 } as const
+
+// ---------------------------------------------------------------------------
+// Determinism & edge-case config (LOCKED — ADR-0001 §17).
+// Full spec: docs/matching/match-edge-cases-v1.md. Tests: docs/security/matching-guardrail-tests-v1.md.
+// Data/config only — the engine that applies these rules remains founder-gated.
+// ---------------------------------------------------------------------------
+
+/**
+ * Score determinism & rounding. Display is informational; the BAND carries meaning.
+ * Band is computed from the INTERNAL (unrounded) score; the displayed integer is CLAMPED
+ * into the band's range so a shown number can never contradict its band (e.g. an internal
+ * 74.6 displays as 74 with a "Developing" band, never a misleading 75). Half-up rounding.
+ */
+export const MATCH_SCORE_ROUNDING_V1 = {
+	internal_precision: "float", // engine works in float; never expose decimals
+	display: "integer", // round to nearest integer for display
+	round_half: "up", // 0.5 rounds away from zero
+	band_source: "internal_unrounded", // band derived from the float score, not the display int
+	clamp_display_into_band: true, // displayed int clamped to [band_min, band_max]
+	show_numeric_min_confidence: 60, // numeric shown only at confidence >= 60 (mirrors display gate)
+} as const
+
+/**
+ * Hard-modifier stacking. When multiple caps apply, take the MOST restrictive (minimum) cap —
+ * never average, never additive. A cap is a ceiling, so the lowest ceiling wins. Every applied
+ * cap emits a MatchConcern (no hidden disqualifiers).
+ */
+export const MATCH_MODIFIER_STACKING_V1 = {
+	rule: "apply_minimum_cap",
+	emit_concern_per_cap: true,
+} as const
+
+/**
+ * Deterministic tie-break order for ranking within a host's candidate pool.
+ * Fit-first, then a single neutral promptness step, then a STABLE deterministic key.
+ * NEVER random; NEVER a protected/sensitive attribute; NEVER engagement as a primary key.
+ */
+export const MATCH_TIEBREAK_ORDER_V1 = [
+	"score_desc", // 1. higher relevance first
+	"confidence_desc", // 2. better-evidenced score first
+	"required_skill_coverage_desc", // 3. stronger gating-reality fit (true fit, not behavior)
+	"applied_at_asc", // 4. neutral promptness (first-come); null sorts last
+	"match_result_version_desc", // 5. freshest computation
+	"stable_id_hash_asc", // 6. deterministic final key (hash of seekerProfileId) — never random
+] as const
+
+/**
+ * Missing-data policy. Absence of data NEVER lowers SCORE and NEVER caps; it lowers CONFIDENCE
+ * and surfaces a "needs info" prompt. Fairness: candidates are nudged via confidence gating +
+ * completion prompts, never punished via score for an incomplete profile.
+ */
+export const MATCH_MISSING_DATA_POLICY_V1 = {
+	missing_optional_signal: "contributes_zero_to_subweight_no_cap",
+	missing_required_listing_requirement: "treat_unknown_no_cap_surface_needs_info",
+	missing_blocks_score_caps: false, // never cap purely because data is absent
+	missing_lowers_confidence: true, // route the gap to confidence + prompts instead
+} as const
+
+/**
+ * Empty / sparse candidate pool. Never fabricate matches to fill space; show an honest
+ * pool-building prompt. Mirrors events empty_match_bucket_shown / match_pool_building_prompt_shown.
+ */
+export const MATCH_EMPTY_POOL_POLICY_V1 = {
+	fabricate_to_fill: false,
+	min_results_before_prompt: 1, // fewer than this -> show building prompt, not filler
+	show_building_prompt_when_empty: true,
+} as const

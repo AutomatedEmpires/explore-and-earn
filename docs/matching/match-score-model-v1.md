@@ -72,6 +72,16 @@ Modifiers cap or hide; they never silently delete a candidate without an explain
 
 Encoded in `MATCH_CONFIDENCE_DISPLAY_V1`. This operationalizes "no false precision."
 
+## Determinism, rounding & edge cases (LOCKED — ADR-0001 §17)
+
+Full specification: [`match-edge-cases-v1.md`](./match-edge-cases-v1.md). Acceptance tests: [`../security/matching-guardrail-tests-v1.md`](../security/matching-guardrail-tests-v1.md). Summary of the locked rules:
+
+- **Rounding** (`MATCH_SCORE_ROUNDING_V1`): the engine works in float; the display is a half-up integer shown only at confidence >= 60. The **band is derived from the internal (unrounded) score**, and the displayed integer is **clamped into the band's range** so a shown number can never contradict its band (an internal 74.6 displays as 74 with a "Developing" band, never a misleading 75).
+- **Stacking caps** (`MATCH_MODIFIER_STACKING_V1`): when several hard modifiers apply, the **most restrictive (minimum) cap wins** — caps are ceilings, never averaged or summed. Every applied cap emits a `MatchConcern` (no hidden disqualifiers).
+- **Tie-breaking** (`MATCH_TIEBREAK_ORDER_V1`): ties resolve by score -> confidence -> required-skill coverage -> neutral promptness (applied_at) -> result version -> a **stable deterministic id hash**. Never random; never a protected/sensitive attribute; never engagement as a primary key.
+- **Missing data** (`MATCH_MISSING_DATA_POLICY_V1`): absence of data **never lowers the score and never triggers a cap** — it lowers **confidence** and surfaces a "needs info" prompt. Candidates are nudged via completion prompts, not punished via score.
+- **Empty pool** (`MATCH_EMPTY_POOL_POLICY_V1`): never fabricate matches to fill space; show an honest pool-building prompt.
+
 ## Pipeline shape (architecture only — NOT an implementation)
 
 ```mermaid

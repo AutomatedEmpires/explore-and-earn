@@ -44,6 +44,8 @@ Ranking is the **ordering of candidates or opportunities for display**, derived 
 | `match-score-model-v1.md` | Score purpose, scale, display, confidence, staleness, recompute, storage |
 | `match-signal-registry-v1.md` | Every candidate signal + visibility/weight/privacy/fairness/V1 status |
 | `match-explanation-v1.md` | Explanation structure and copy rules |
+| `match-edge-cases-v1.md` | Determinism: tie-breaking, stacking caps, rounding/boundary, missing-data, empty-pool |
+| `match-tuning-v1-decisions.md` | Locked tuning values + full justification (ADR-0001 mirror) |
 | `prohibited-signals-v1.md` | Signals that must never be used or inferred |
 | `seeker-recommendations-v1.md` | Seeker-side discovery recommendation architecture |
 | `../hiring/application-lifecycle-v1.md` | Application states, transitions, expiry (+ diagram) |
@@ -54,6 +56,7 @@ Ranking is the **ordering of candidates or opportunities for display**, derived 
 | `../hiring/notifications-reminders-v1.md` | Notification/reminder events (events only) |
 | `../analytics/matching-hiring-events-v1.md` | PostHog event taxonomy (per-event tables) |
 | `../security/matching-fairness-approval-gates.md` | Founder approval gates + proposed guardrails |
+| `../security/matching-guardrail-tests-v1.md` | Given/When/Then acceptance tests for G8/G11/G16/G31-G34 |
 | `../architecture/matching-service-boundaries.md` | Service roles + import boundaries |
 
 ## End-to-end flow (architecture, not implementation)
@@ -73,11 +76,11 @@ flowchart TD
 	H -.no auto-decision.-> H
 ```
 
-## Contracts (type-only)
+## Contracts (type-only + locked config)
 
-This pack adds type-only contracts under `packages/contracts/src/`: `matching.ts`, `applications.ts`, `invites.ts`, `offers.ts`, `hiring.ts`, `responsiveness.ts`, `matching-events.ts`. They contain **types only** — no scoring weights, no functions, no algorithm, no DB/AI calls. Status unions and type-level transition maps mirror the Canonical Enum / Lifecycle Registries verbatim; runtime authority remains `lifecycles.ts` (G16). When `enums.ts`/`lifecycles.ts` are regenerated (Contracts V1), these should import from there. See each file header.
+This pack adds type-only contracts under `packages/contracts/src/`: `matching.ts`, `applications.ts`, `invites.ts`, `offers.ts`, `hiring.ts`, `responsiveness.ts`, `matching-events.ts`, plus locked tuning **config data** in `matching-config.ts` (constants only — no algorithm, no functions, no DB/AI calls). The type files contain **types only**; `matching-config.ts` contains **plain config constants**. Status unions and type-level transition maps mirror the Canonical Enum / Lifecycle Registries verbatim; runtime authority remains `lifecycles.ts` (G16). When `enums.ts`/`lifecycles.ts` are regenerated (Contracts V1), these should import from there. See each file header.
 
-> Note: final match **weights are deliberately NOT encoded in contracts** — weights are a founder approval gate. Contracts expose only the component *keys* (type-only). Canonical weights live in `match-score-model-v1.md` for reference.
+> Note: as of 2026-05-31 (founder-authorized), the locked tuning **values** (weights, sub-weights, caps, band thresholds, inactivity, anti-spam, reminders, determinism rules) live in `matching-config.ts` as **configuration data only** — there is no scoring function. `matching.ts` still exposes only type-level component *keys*; the scoring **engine** that consumes the config remains founder-gated (A-MATCH-DEPLOY). Full justification in `match-tuning-v1-decisions.md` / ADR-0001.
 
 ## Future DB/API dependencies (Mission Q13)
 
