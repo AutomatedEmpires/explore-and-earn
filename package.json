@@ -12,7 +12,7 @@
     "test": "corepack pnpm -r --if-present test",
     "test:e2e": "corepack pnpm --filter @explore-and-earn/web test:e2e",
     "db:assert": "corepack pnpm --filter @explore-and-earn/db-assert check",
-    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs"
+    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-pricing-units.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
