@@ -22,6 +22,8 @@ The PR template (§1) and issue form (§2) below are summarized so the VS Code a
 recreate the canonical fields if needed. For the exact committed contents, read the files on
 the branch; they already exist there.
 
+> **Two Copilots:** `agent:vscode` = **local WSL** verifier on Jackson's laptop; `agent:copilot-cloud` = GitHub-hosted **cloud** coding agent started by an `@copilot` mention. They are not interchangeable and a cloud run never counts as local verification. See [`agent-roster-and-routing.md`](./agent-roster-and-routing.md) → “Two Copilots” and [`label-system.md`](./label-system.md).
+
 ---
 
 ## 1. `.github/pull_request_template.md` (canonical summary; already applied)
@@ -84,7 +86,7 @@ pnpm lint
 
 ## Next Agent Handoff
 
-- **Next agent:** `agent:opus | agent:vscode | agent:codex | agent:cursor | agent:claude | agent:review | agent:founder`
+- **Next agent:** `agent:opus | agent:vscode | agent:copilot-cloud | agent:codex | agent:cursor | agent:claude | agent:review | agent:founder`
 - **Required action:**
 - **Commands to run:**
 - **Expected output:**
@@ -106,7 +108,9 @@ pnpm lint
 `````
 
 > The exact committed file also carries a UI design-drift checklist; the required
-> CLAOS Lite sections above are the canonical core.
+> CLAOS Lite sections above are the canonical core. `agent:vscode` is local WSL verification;
+> `agent:copilot-cloud` is the GitHub cloud agent and cannot verify local WSL — don't type
+> `@copilot` in the handoff unless you intend to invoke the cloud agent.
 
 ---
 
@@ -114,7 +118,8 @@ pnpm lint
 
 GitHub issue **form** that collects PR number, source branch, requesting agent, next
 agent, required verification commands, acceptance criteria, founder-approval flag, risk
-level, expected output, and blocking status.
+level, expected output, and blocking status. Local verification is an `agent:vscode` job
+(`gh pr checkout` + pnpm on the laptop); `agent:copilot-cloud` cannot satisfy it.
 
 `````yaml
 name: Agent Verification Task
@@ -140,14 +145,14 @@ body:
     id: requesting-agent
     attributes:
       label: Requesting agent
-      options: ["agent:opus", "agent:vscode", "agent:codex", "agent:cursor", "agent:claude", "agent:review", "agent:founder"]
+      options: ["agent:opus", "agent:vscode", "agent:copilot-cloud", "agent:codex", "agent:cursor", "agent:claude", "agent:review", "agent:founder"]
     validations:
       required: true
   - type: dropdown
     id: next-agent
     attributes:
       label: Next agent
-      options: ["agent:vscode", "agent:opus", "agent:codex", "agent:cursor", "agent:claude", "agent:review", "agent:founder"]
+      options: ["agent:vscode", "agent:opus", "agent:copilot-cloud", "agent:codex", "agent:cursor", "agent:claude", "agent:review", "agent:founder"]
     validations:
       required: true
   - type: textarea
@@ -281,13 +286,14 @@ Labels are the relay **baton + routing**. Seed the canonical CLAOS Lite set with
 
 ```bash
 # --- agent (whose turn it is; one at a time) ---
-gh label create "agent:opus"    -c 5319E7 -d "Notion/Opus — architect, reviewer, orchestrator" --force
-gh label create "agent:vscode"  -c 1D76DB -d "VS Code — local WSL verification environment (Copilot is the assistant inside it; the durable relay destination is the environment/role: VS Code)" --force
-gh label create "agent:codex"   -c 0E8A16 -d "Codex — implementation/review" --force
-gh label create "agent:cursor"  -c 0E8A16 -d "Cursor — implementation/review" --force
-gh label create "agent:claude"  -c 0E8A16 -d "Claude — implementation/review" --force
-gh label create "agent:review"  -c FBCA04 -d "Awaiting code review" --force
-gh label create "agent:founder" -c B60205 -d "Human — approval gate / taste / business call" --force
+gh label create "agent:opus"          -c 5319E7 -d "Notion/Opus — architect, reviewer, orchestrator" --force
+gh label create "agent:vscode"        -c 1D76DB -d "VS Code — LOCAL WSL verification on Jackson's laptop (Copilot-in-editor; durable destination = the environment/role: VS Code). NOT the cloud bot." --force
+gh label create "agent:copilot-cloud" -c 8957E5 -d "GitHub-hosted Copilot CLOUD coding agent — started by an @copilot mention in a PR/issue comment. Cannot verify local WSL." --force
+gh label create "agent:codex"         -c 0E8A16 -d "Codex — implementation/review" --force
+gh label create "agent:cursor"        -c 0E8A16 -d "Cursor — implementation/review" --force
+gh label create "agent:claude"        -c 0E8A16 -d "Claude — implementation/review" --force
+gh label create "agent:review"        -c FBCA04 -d "Awaiting code review" --force
+gh label create "agent:founder"       -c B60205 -d "Human — approval gate / taste / business call" --force
 
 # --- status (the baton; exactly one at a time) ---
 gh label create "status:ready"                   -c 0E8A16 -d "Spec-complete; pickable" --force
