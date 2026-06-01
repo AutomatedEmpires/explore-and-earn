@@ -8,6 +8,7 @@ Decisions that have hit a **founder approval gate** (see [`../agents/founder-app
 | A-PKGMGR | Confirm **pnpm + Turborepo** as the workspace toolchain (remove npm lockfile)? | (Process / not destructive to product) | pnpm+turbo is canon and better for a monorepo; npm lockfile previously created drift. | Approved and applied in Sprint Zero substrate reconciliation. | Approved 2026-05-31 |
 | A-NODE | Pin **Node 24.16.0** as canonical (override the Node 20 LTS canon)? | (Process) | 24 matches the machine; 20 LTS is broader-compat. | Approved and pinned in `.nvmrc` + CI. | Approved 2026-05-31 |
 | A-ARCHIVE-V2 | Archive the old `exploreandearnv2` repo? | (Process) | Two repos cause agent confusion. | Archive after confirming nothing needed remains. | Waiting |
+| A-CLAOS-UI-SMOKE | How should PR #7 validate GitHub issue-form and PR-template rendering before merge, given GitHub only exposes templates from the default branch? | (Process / GitHub platform constraint) | 1) Merge PR #7 after file/API validation, then verify live UI rendering on `main`; 2) temporarily change default branch or use a preview repo/fork to validate UI before merge; 3) block merge until a separate preview path exists. | Option 1. GitHub docs state issue templates/forms and PR templates in non-default branches are not available to collaborators, so pre-merge live-UI rendering for PR #7 cannot be truthfully confirmed in this repo before merge. | Waiting |
 
 ## Process
 
