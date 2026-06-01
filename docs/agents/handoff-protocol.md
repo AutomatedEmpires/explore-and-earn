@@ -19,15 +19,27 @@ All labels referenced below use the canonical CLAOS Lite set in [`label-system.m
 ## The handoff comment (the baton message)
 
 Whenever an agent passes the baton, it posts **one structured comment** on the issue/PR, then
-swaps the `status:*` and `agent:*` labels. The comment — not chat — is the message to the next agent.
+swaps the `status:*` and `agent:*` labels. Use the same field order as the reusable Agent
+Handoff block in [`github-artifacts-to-apply.md`](./github-artifacts-to-apply.md) §5. The
+comment — not chat — is the message to the next agent.
 
-```
+```markdown
 ### 🤝 Handoff
-- **From:** <agent:self>   **To:** <agent:next>
-- **Artifact:** #<issue/PR number>   **Branch:** <branch-name>
-- **New status:** <status:label>
+- **From Agent:**
+- **To Agent:**
+- **Status:**
+- **PR / Branch:**
+- **Source of Truth:**
+- **What changed:**
+- **What needs verification:**
+- **Commands to run:**
+- **Expected output:**
+- **Founder approval required:**
+- **Blocked by:**
+- **Next step if passed:**
+- **Next step if failed:**
 
-**What I did**
+**Implementation notes**
 - ...
 
 **Verified locally (WSL)**
@@ -35,14 +47,6 @@ swaps the `status:*` and `agent:*` labels. The comment — not chat — is the m
 - [ ] pnpm typecheck
 - [ ] pnpm lint
 - [ ] pnpm build / test (as applicable)
-
-**What the next agent must do**
-- ...
-
-**Open questions / gates**
-- <none | gate:* + link to founder-approval-queue row>
-
-**Source of truth:** <Notion canon link>
 ```
 
 After posting: remove your `agent:*` label, add the next owner's `agent:*`, and set the new `status:*`.

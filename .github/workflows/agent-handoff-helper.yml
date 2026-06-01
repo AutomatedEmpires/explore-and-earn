@@ -32,7 +32,7 @@ jobs:
               '### Local verification requested',
               '',
               'This PR is labeled `status:needs-local-verification`. The next agent',
-              '(VS Code / Copilot on WSL) should run:',
+              '(VS Code on WSL) should run:',
               '',
               '```bash',
               'pnpm install',

@@ -1,5 +1,5 @@
 name: Agent Verification Task
-description: Dispatch a local verification task to the next agent (e.g. VS Code/Copilot) from a GitHub artifact — not chat.
+description: Dispatch a local verification task to the next agent (e.g. VS Code / agent:vscode) from a GitHub artifact — not chat.
 title: "[verify] PR #<number>: <short summary>"
 labels:
   - "agent:vscode"
