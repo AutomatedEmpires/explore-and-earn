@@ -19,9 +19,9 @@ at an issue/PR's labels must answer:
 
 | Label | Color | Who / what |
 | --- | --- | --- |
-| `agent:opus` | `#5319E7` | Notion/Opus — architect, reviewer, orchestrator |
-| `agent:vscode` | `#1D76DB` | VS Code — **local WSL verification** on Jackson's laptop (Copilot-in-editor; the durable relay destination is the environment/role: VS Code). **NOT** the cloud bot. |
-| `agent:copilot-cloud` | `#8957E5` | GitHub-hosted Copilot **cloud** coding agent — started/routed by an `@copilot` mention in a PR/issue comment. Runs on GitHub's servers; **cannot** verify local WSL. |
+| `agent:opus` | `#5319E7` | Notion/Opus — architect, PR author, reviewer, orchestrator |
+| `agent:vscode` | `#1D76DB` | VS Code — **local WSL verification** on Jackson's laptop (`gh pr checkout` + `pnpm install / lint / typecheck / guardrails / build / test`). The Copilot-in-editor case lives here, but the durable meaning is the environment/role: **local laptop verifier**. **NOT** the cloud bot. |
+| `agent:copilot-cloud` | `#8957E5` | GitHub-hosted Copilot **cloud reviewer/coding agent** — started by an `@copilot` mention **or** automatic Copilot PR review. May review, comment, and patch PR branches from GitHub's servers; **cannot** verify local WSL and **never** replaces local verification. |
 | `agent:codex` | `#0E8A16` | Codex — implementation/review |
 | `agent:cursor` | `#0E8A16` | Cursor — implementation/review |
 | `agent:claude` | `#0E8A16` | Claude — implementation/review |
@@ -30,7 +30,7 @@ at an issue/PR's labels must answer:
 
 **Collision rule:** never leave two `agent:*` labels on one artifact. One agent, one task, one branch.
 
-> **Two Copilots — not interchangeable:** `agent:vscode` (local WSL verifier on Jackson's laptop) and `agent:copilot-cloud` (GitHub-hosted cloud coding agent, started by an `@copilot` mention) are **distinct actors**. A cloud run never counts as local verification, and only `agent:vscode` can set `status:verified-local`. Bare `agent:copilot` is ambiguous and banned — always disambiguate. See [`agent-roster-and-routing.md`](./agent-roster-and-routing.md) → “Two Copilots” for the full trigger rules.
+> **Two Copilots — not interchangeable:** `agent:vscode` (local WSL verifier on Jackson's laptop) and `agent:copilot-cloud` (GitHub-hosted cloud reviewer/coding agent) are **distinct actors**. The GitHub **trigger text** is `@copilot`, but the **durable internal label** is always `agent:copilot-cloud`. A cloud run/review never counts as local verification, and only `agent:vscode` can set `status:verified-local`. Bare `agent:copilot` is ambiguous and banned — always disambiguate. See [`agent-roster-and-routing.md`](./agent-roster-and-routing.md) → “Two Copilots” for the full trigger rules.
 
 ## Status labels (the baton — one at a time)
 
@@ -39,8 +39,10 @@ at an issue/PR's labels must answer:
 | `status:ready` | `#0E8A16` | Spec-complete (Build Pack / acceptance criteria). Pickable. |
 | `status:claimed` | `#C2E0C6` | An agent has claimed it but not started. |
 | `status:in-progress` | `#FBCA04` | A worker owns it and is implementing on a branch. |
-| `status:needs-local-verification` | `#D4C5F9` | Awaiting local WSL verification (typecheck/lint/build/test). |
-| `status:verified-local` | `#BFDADC` | Passed local verification. |
+| `status:needs-local-verification` | `#D4C5F9` | Awaiting **local WSL** verification (typecheck/lint/build/test on Jackson's laptop). |
+| `status:verified-local` | `#BFDADC` | Passed **local WSL** verification. Only `agent:vscode` can set this. |
+| `status:needs-cloud-review` | `#C5DEF5` | *(optional)* Awaiting GitHub **cloud** Copilot review/patch (`@copilot` / automatic Copilot review). Runs in **parallel** to local verification. |
+| `status:cloud-reviewed` | `#A2EEEF` | *(optional)* Cloud Copilot has reviewed/patched. **Advisory only — does NOT equal `status:verified-local`.** |
 | `status:needs-opus-fix` | `#D93F0B` | Sent back to Opus for architecture/spec fixes. |
 | `status:needs-review` | `#1D76DB` | Awaiting reviewer. |
 | `status:ready-for-review` | `#0E8A16` | Prepared and ready for a reviewer to pick up. |
@@ -57,6 +59,13 @@ status:ready -> status:claimed -> status:in-progress -> status:needs-local-verif
 
 Branches: `status:needs-opus-fix` (back to `status:in-progress`), `status:blocked`, and
 `status:needs-founder` (gate) can interrupt at any point.
+
+> **Optional cloud-review side-loop:** at the PR stage, `status:needs-cloud-review` ⇄
+> `status:cloud-reviewed` may run **in parallel** with the local path (triggered by `@copilot`
+> or automatic Copilot review). It is **advisory** and **never substitutes** for
+> `status:verified-local` — the cloud agent cannot see Jackson's WSL. Keep the two pairs
+> separate: **local** = `needs-local-verification`/`verified-local`; **cloud** =
+> `needs-cloud-review`/`cloud-reviewed`.
 
 ## Area labels (which part of the system)
 
@@ -122,4 +131,4 @@ never create or apply them as active labels. Translate as:
 | `status:in-review` | `status:needs-review` / `status:ready-for-review` |
 | `status:changes-requested` | `status:needs-opus-fix` |
 | `status:done` | `status:complete` |
-| `agent:copilot` (ambiguous — banned) | Disambiguate: `agent:vscode` (local WSL verifier) **or** `agent:copilot-cloud` (GitHub cloud coding agent). Never apply bare `agent:copilot`. |
+| `agent:copilot` (ambiguous — banned) | Disambiguate: `agent:vscode` (local WSL verifier) **or** `agent:copilot-cloud` (GitHub cloud reviewer/coding agent). Never apply bare `agent:copilot`. |

@@ -13,7 +13,7 @@ stateDiagram-v2
     ready --> claimed: agent self-assigns
     claimed --> in_progress: work starts on a branch
     in_progress --> needs_local_verification: draft PR opened
-    needs_local_verification --> verified_local: typecheck/lint/build/test pass
+    needs_local_verification --> verified_local: typecheck/lint/build/test pass (WSL)
     needs_local_verification --> needs_opus_fix: verification fails
     needs_opus_fix --> in_progress: Opus revises spec / fix
     verified_local --> needs_review: ready for a reviewer
@@ -25,6 +25,11 @@ stateDiagram-v2
     in_progress --> blocked: dependency / conflict
     blocked --> in_progress: unblocked
     complete --> [*]
+
+    %% Optional, parallel cloud-review side-loop (advisory only).
+    needs_review --> needs_cloud_review: (optional) @copilot / auto Copilot review
+    needs_cloud_review --> cloud_reviewed: cloud Copilot reviewed/patched
+    cloud_reviewed --> needs_review: rejoin human review (cloud != local verify)
 ```
 
 (The diagram uses underscores for Mermaid node names; the real labels use the colon form, e.g. `status:needs-local-verification`.)
@@ -33,8 +38,27 @@ stateDiagram-v2
 
 - Exactly one `status:*` and one `agent:*` at all times. Swapping the baton = remove the old label and add the new one in the same action.
 - `status:blocked` is the baton state for ordinary work stoppage. `blocked:*` and `freeze:*` labels are additive gates; they do not remove or replace the current `status:*` or `agent:*` labels.
-- Every transition is announced with an **Agent Handoff** comment (template in [`github-artifacts-to-apply.md`](./github-artifacts-to-apply.md) §5). No silent transitions.
+- Every transition is announced with an **Agent Handoff** comment (template in [`github-artifacts-to-apply.md`](./github-artifacts-to-apply.md) §5; role-specific templates in [`handoff-protocol.md`](./handoff-protocol.md)). No silent transitions.
 - A draft PR is required from `status:needs-local-verification` onward; it leaves draft only at `status:ready-for-review`.
+
+### Optional cloud review (parallel, advisory)
+
+The GitHub **cloud** Copilot agent (`agent:copilot-cloud`) can review or patch a PR in
+parallel with the local path. It is **never** on the critical path to merge.
+
+- **Trigger:** an `@copilot` mention in a PR/issue comment, or GitHub's automatic Copilot PR
+  review. The durable internal label for this actor is always `agent:copilot-cloud` (the
+  `@copilot` text is only the trigger).
+- **States:** `status:needs-cloud-review` → `status:cloud-reviewed`. These live **beside** the
+  local pair `status:needs-local-verification` → `status:verified-local`; they do not replace
+  it.
+- **Hard rule:** `status:cloud-reviewed` is **advisory** and does **not** satisfy
+  `status:verified-local`. The cloud agent cannot see or run Jackson's WSL, so a green cloud
+  pass is not local verification. An artifact still needs `agent:vscode` to run
+  `gh pr checkout` + `pnpm` locally before it can carry `status:verified-local`.
+- **Baton hygiene:** while the cloud agent holds the work, `agent:copilot-cloud` is the single
+  `agent:*` owner; when it hands back, swap to `agent:vscode` (for local verification) or
+  `agent:opus` (for review/fix) per the templates in [`handoff-protocol.md`](./handoff-protocol.md).
 
 ## Stall protocol 1 — Drift (`blocked:drift`)
 

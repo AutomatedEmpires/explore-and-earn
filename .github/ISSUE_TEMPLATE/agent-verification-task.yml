@@ -12,8 +12,10 @@ body:
         next agent needs must live here — CLAOS Lite forbids relying on private chat.
 
         `agent:vscode` = LOCAL WSL verification on Jackson's laptop (`gh pr checkout` + pnpm).
-        `agent:copilot-cloud` = GitHub-hosted cloud coding agent (started by an `@copilot`
-        mention) — it CANNOT verify the local WSL environment, so it can never satisfy a
+        It is the only actor that can set `status:verified-local`.
+        `agent:copilot-cloud` = GitHub-hosted cloud reviewer/coding agent (started by an
+        `@copilot` mention or automatic Copilot PR review) — it CANNOT verify the local WSL
+        environment, so `status:cloud-reviewed` is advisory and never satisfies a
         local-verification task.
   - type: input
     id: pr-number
@@ -117,6 +119,8 @@ body:
       label: Blocking status
       options:
         - "status:needs-local-verification"
+        - "status:needs-cloud-review"
+        - "status:cloud-reviewed"
         - "status:needs-review"
         - "status:needs-opus-fix"
         - "status:needs-founder"
