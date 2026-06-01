@@ -12,18 +12,19 @@ Read alongside [`claos-lite-handoff-relay.md`](./claos-lite-handoff-relay.md) (t
 
 ```mermaid
 flowchart TD
-    N["Notion / Opus: canon + Build Pack"] --> I["GitHub Issue created\nstatus:ready-for-engineering + agent:copilot"]
-    I --> P["Worker self-assigns\nstatus:in-progress\nbranch + draft PR"]
-    P --> V["Local verify on WSL\n(typecheck / lint / build / tests)"]
-    V --> H["Handoff comment posted\nbaton -> agent:opus, status:in-review"]
+  N["Notion / Opus: canon + Build Pack"] --> I["GitHub Issue created\nstatus:ready + agent:vscode"]
+  I --> C["Worker self-assigns\nstatus:claimed"]
+  C --> P["Work starts on a branch\nstatus:in-progress\nbranch + draft PR"]
+  P --> V["Local verify on WSL\nstatus:needs-local-verification\n(typecheck / lint / build / tests)"]
+  V --> H["Handoff comment posted\nbaton -> agent:review, status:needs-review"]
     H --> R{"Opus / reviewer\nreview + CI"}
-    R -->|changes requested| C["status:changes-requested\nbaton -> agent:copilot"]
-    C --> P
-    R -->|gate touched| G["status:blocked + gate:*\nfounder approval queue"]
+  R -->|changes requested| F["status:needs-opus-fix\nbaton -> agent:opus"]
+  F --> P
+  R -->|gate touched| G["status:needs-founder + gate:*\nfounder approval queue"]
     G -->|approved| R
-    R -->|approved, no gate| M["Founder merges\nstatus:done + repo docs updated"]
+  R -->|approved, no gate| M["Founder merges\nstatus:complete + repo docs updated"]
     M --> RC["Reconcile: Notion updated if\nproduct truth changed"]
-    RC --> NEXT["Next issue flagged\nstatus:ready-for-engineering"]
+  RC --> NEXT["Next issue flagged\nstatus:ready"]
     NEXT --> I
 ```
 
@@ -35,9 +36,9 @@ Each arrow is a **durable artifact**, never a chat message:
 | --- | --- |
 | Notion → work queued | GitHub **issue** with source link + acceptance checklist |
 | Worker → reviewer | Draft **PR** + **handoff comment** + label swap |
-| Reviewer → worker | **PR review** (`changes-requested`) + label swap |
-| Anything → gate | `gate:*` + `status:blocked` + **approval-queue** row |
-| Merge → next | `status:done`, updated repo docs, next issue `ready-for-engineering` |
+| Reviewer → worker | **PR review** + label swap to `status:needs-opus-fix` |
+| Anything → gate | `gate:*` + `status:needs-founder` or `status:blocked` + **approval-queue** row |
+| Merge → next | `status:complete`, updated repo docs, next issue `status:ready` |
 
 If a transition has no artifact, the baton has not actually moved — fix the artifact, do not
 DM the founder.
@@ -55,7 +56,7 @@ Everything else is agent-to-agent through GitHub.
 ## Roles in one line each
 
 - **Opus (Notion)** — turns canon into issues/draft PRs; reviews; reconciles Notion after merges.
-- **Copilot (VS Code)** — picks up `ready-for-engineering`, implements, verifies locally on WSL, opens/updates the draft PR.
+- **VS Code / Copilot** — picks up `status:ready`, implements, verifies locally on WSL, opens/updates the draft PR.
 - **Codex / Cursor / Claude** — same relay, additional implementation/review hands when introduced.
 - **CI guardrails** — lint, typecheck, tests, drift checks; the automated reviewer that must pass before a human merge.
 - **Founder** — gates + merge + taste only.
@@ -76,4 +77,4 @@ Everything else is agent-to-agent through GitHub.
 
 - Any agent can open the repo cold and know the exact state from labels + the latest handoff comment.
 - No work item is waiting on a message that exists only in someone's chat history.
-- Every product-truth change is reflected in Notion **before** the issue is marked `status:done`.
+- Every product-truth change is reflected in Notion **before** the issue is marked `status:complete`.
