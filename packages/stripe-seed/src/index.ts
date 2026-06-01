@@ -1,5 +1,9 @@
-export function stripeSeedPlaceholder() {
-  // TODO: Seed Stripe catalog items from canonical pricing and SKU definitions
-  // once those docs are mirrored into the repo and approved for implementation.
-  return "stripe-seed-placeholder";
-}
+/**
+ * stripe-seed package surface (DRAFT). Re-exports placeholder modules only.
+ * Nothing here performs Stripe calls or touches secrets.
+ */
+export * from "./catalog"
+export * from "./safety"
+export * from "./dry-run"
+export * from "./manifest"
+export * from "./reconcile"
