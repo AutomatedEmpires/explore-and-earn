@@ -1,10 +1,129 @@
+/**
+ * Explore&Earn — Design System V1 token namespace.
+ *
+ * SINGLE SOURCE OF TRUTH for visual values. Token VALUES are founder-LOCKED
+ * (2026-05-30) — see Notion "Design Tokens & Visual System — V1 Direction".
+ * Do NOT invent or deviate from these values; change them only via a Design
+ * System V1 founder decision.
+ *
+ * Two-tier naming: primitives (--paper-100) -> semantic (--color-surface).
+ * Components consume the SEMANTIC layer (and the typed contract in
+ * packages/ui/src/tokens) — never raw primitives or literals. Dark mode is out
+ * of scope for V1; the semantic layer is kept so it can be added later without
+ * a refactor.
+ */
+
 :root {
-  /* TODO: Replace placeholder values once design tokens are canonically locked. */
-  --surface-default: #ffffff;
-  --surface-raised: #f7f7f5;
-  --text-primary: #171717;
-  --text-secondary: #525252;
-  --border-default: #d4d4d4;
-  --radius-md: 16px;
-  --space-md: 16px;
+  /* ----- Primitive palette (raw, locked) ----- */
+  --paper-100: #f6f3ec;
+  --paper-50: #fbf9f3;
+  --white: #ffffff;
+  --ink-900: #24221e;
+  --ink-600: #6e685d;
+  --ink-400: #9a9486;
+  --ink-line: #33312b;
+  --line-200: #e7e1d3;
+
+  /* category accents — bg / ink (ListingCategory: farm|maritime|remote|seasonal|mix) */
+  --farm-bg: #ede3cf;        --farm-ink: #6b5326;
+  --maritime-bg: #d6e6e9;    --maritime-ink: #2e5e6b;
+  --remote-bg: #dee0f2;      --remote-ink: #3f4a87;
+  --seasonal-bg: #dcebd6;    --seasonal-ink: #41663a;
+  --mix-bg: #e7e2ee;         --mix-ink: #5b5172;
+
+  /* benefit indicators — bg / ink (Housing / Meals / Pay triad) */
+  --housing-bg: #dcebd6;     --housing-ink: #41663a;
+  --meals-bg: #f3dfd3;       --meals-ink: #9a5b3c;
+  --pay-bg: #dae4f0;         --pay-ink: #3f5687;
+
+  /* system / status — bg / ink */
+  --boosted-bg: #f3e6cc;     --boosted-ink: #8a6516;
+  --match-bg: #e0e0f4;       --match-ink: #4a47a0;
+  --featured-bg: #e7e1f2;    --featured-ink: #6a55a0;
+  --verified-bg: #dbeae2;    --verified-ink: #2e6b57;
+  --founding-bg: #efe0d6;    --founding-ink: #8a4b2a;
+  --success-bg: #dbefe1;     --success-ink: #2e7d54;
+  --warning-bg: #f4e8cc;     --warning-ink: #9a6b12;
+  --error-bg: #f1dad3;       --error-ink: #a3402f;
+
+  /* ----- Semantic color ----- */
+  --color-paper: var(--paper-100);
+  --color-surface: var(--paper-50);
+  --color-surface-raised: var(--white);
+  --border-soft: var(--line-200);
+  --border-ink: var(--ink-line);
+  --text-primary: var(--ink-900);
+  --text-secondary: var(--ink-600);
+  --text-muted: var(--ink-400);
+
+  /* ----- Typography (Patrick Hand display, Inter UI, Cabin Sketch accent) ----- */
+  --font-display: "Patrick Hand", ui-rounded, system-ui, sans-serif;
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+  --font-accent: "Cabin Sketch", var(--font-display);
+
+  --text-display-size: 30px;   --text-display-lh: 1.15;
+  --text-page-size: 26px;      --text-page-lh: 1.2;
+  --text-section-size: 22px;   --text-section-lh: 1.2;
+  --text-card-size: 20px;      --text-card-lh: 1.25;
+  --text-body-size: 16px;      --text-body-lh: 1.5;
+  --text-meta-size: 14px;      --text-meta-lh: 1.45;
+  --text-caption-size: 12px;   --text-caption-lh: 1.4;
+  --text-button-size: 15px;    --text-button-lh: 1;
+  --text-label-size: 12px;     --text-label-lh: 1;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --label-tracking: 0.06em;
+
+  /* ----- Spacing (4px base) ----- */
+  --space-2: 2px;   --space-4: 4px;   --space-8: 8px;
+  --space-12: 12px; --space-16: 16px; --space-20: 20px;
+  --space-24: 24px; --space-32: 32px; --space-40: 40px; --space-48: 48px;
+  --card-padding: 16px;
+  --row-gap: 12px;
+  --section-gap: 24px;
+  --screen-gutter: 16px;
+  --bottom-nav-height: 64px;
+
+  /* ----- Radius ----- */
+  --radius-pill: 999px;
+  --radius-input: 12px;
+  --radius-button: 16px;
+  --radius-row: 16px;
+  --radius-image: 16px;
+  --radius-card: 24px;
+  --radius-sheet: 28px;
+
+  /* ----- Elevation (borders-first; shadows reserved for overlays) ----- */
+  --elevation-flat: none;
+  --elevation-overlay: 0 8px 24px rgba(40, 38, 34, 0.12);
+  --elevation-pin: 0 2px 6px rgba(40, 38, 34, 0.18);
+
+  /* ----- Motion ----- */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-drawer: 320ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ----- Breakpoints (reference; for JS / container queries) ----- */
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+
+  /* ----- Icon sizing ----- */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-chip: 40px;
+  --icon-chip-compact: 36px;
+
+  /* ----- Legacy aliases (pre-lock placeholder names kept resolving;
+     prefer the semantic tokens above). ----- */
+  --surface-default: var(--color-surface-raised);
+  --surface-raised: var(--color-surface);
+  --border-default: var(--border-soft);
+  --radius-md: var(--radius-button);
+  --space-md: var(--space-16);
 }

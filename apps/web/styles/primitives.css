@@ -1,0 +1,188 @@
+/**
+ * Explore&Earn — placeholder primitive styles (Design System V1).
+ *
+ * Styles the token-driven primitives in @explore-and-earn/ui (Badge, Chip,
+ * Button, Meter, Skeleton, Card, Modal). Consumes ONLY semantic tokens from
+ * tokens.css — no raw color/size literals. Accessibility is first-class:
+ * visible focus, non-color-only status, reduced motion, large touch targets.
+ * The finished hand-drawn ink-border treatment is refined as Design System V1
+ * matures; these are intentionally restrained, not the final look.
+ *
+ * NOTE: the primitive COMPONENTS arrive via the Sprint Zero substrate PR (#4).
+ * This stylesheet is additive and inert until those components exist; either
+ * PR may merge first.
+ */
+
+:root {
+  --ui-focus-ring: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--match-ink);
+}
+
+*:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+  border-radius: var(--radius-input);
+}
+
+/* ---------- Card ---------- */
+.ui-card {
+  background: var(--color-surface);
+  border: 1px solid var(--border-ink);
+  border-radius: var(--radius-card);
+  padding: var(--card-padding);
+  color: var(--text-primary);
+}
+.ui-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-card-size);
+  line-height: var(--text-card-lh);
+  margin: 0 0 var(--space-8);
+}
+.ui-card__body {
+  font-family: var(--font-ui);
+  font-size: var(--text-body-size);
+  line-height: var(--text-body-lh);
+}
+
+/* ---------- Modal / bottom-sheet ---------- */
+.ui-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(40, 38, 34, 0.32);
+  padding: var(--screen-gutter);
+}
+.ui-modal__surface {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-ink);
+  border-radius: var(--radius-sheet);
+  box-shadow: var(--elevation-overlay);
+  padding: var(--space-24);
+  max-width: 32rem;
+  width: 100%;
+}
+
+/* ---------- Badge (never color-only: always label/icon) ---------- */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-ink);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+}
+.ui-badge__label {
+  font-family: var(--font-ui);
+  font-size: var(--text-label-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--text-label-lh);
+  text-transform: uppercase;
+  letter-spacing: var(--label-tracking);
+}
+.ui-badge__qualifier {
+  font-family: var(--font-ui);
+  font-size: var(--text-caption-size);
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.ui-badge--featured { background: var(--featured-bg); color: var(--featured-ink); }
+.ui-badge--seasonal { background: var(--seasonal-bg); color: var(--seasonal-ink); }
+.ui-badge--boosted  { background: var(--boosted-bg);  color: var(--boosted-ink); }
+.ui-badge--verified { background: var(--verified-bg); color: var(--verified-ink); }
+
+/* ---------- Chip ---------- */
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 36px;
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--motion-ease);
+}
+.ui-chip--selected {
+  border-color: var(--border-ink);
+  background: var(--color-surface);
+}
+.ui-chip__label {
+  font-family: var(--font-ui);
+  font-size: var(--text-meta-size);
+}
+
+/* ---------- Button ---------- */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: var(--space-12) var(--space-20);
+  border-radius: var(--radius-button);
+  border: 1px solid var(--border-ink);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--motion-ease);
+}
+.ui-button__label {
+  font-family: var(--font-ui);
+  font-size: var(--text-button-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--text-button-lh);
+}
+.ui-button--primary   { background: var(--seasonal-bg); color: var(--seasonal-ink); }
+.ui-button--secondary { background: var(--color-surface); }
+.ui-button--ghost     { background: transparent; border-color: transparent; }
+.ui-button:disabled,
+.ui-button[data-state="disabled"] { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- Meter (relevance/match — NEUTRAL, never red/green) ---------- */
+.ui-meter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  color: var(--match-ink);
+  font-family: var(--font-ui);
+}
+.ui-meter__label {
+  font-size: var(--text-label-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--label-tracking);
+}
+.ui-meter__value {
+  font-size: var(--text-meta-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ---------- Skeleton ---------- */
+.ui-skeleton {
+  display: block;
+  background: var(--border-soft);
+  border-radius: var(--radius-input);
+  animation: ui-skeleton-pulse 1.4s var(--motion-ease) infinite;
+}
+.ui-skeleton--text   { height: 1em; border-radius: var(--radius-input); }
+.ui-skeleton--rect   { width: 100%; aspect-ratio: 3 / 2; border-radius: var(--radius-image); }
+.ui-skeleton--circle { width: var(--icon-chip); height: var(--icon-chip); border-radius: var(--radius-pill); }
+
+@keyframes ui-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* ---------- Accessibility: reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
