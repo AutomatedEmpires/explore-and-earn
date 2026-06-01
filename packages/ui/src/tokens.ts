@@ -8,7 +8,7 @@
  *
  * Usage:
  *   import { COLOR_TOKENS, cssVar } from "@explore-and-earn/ui";
- *   <div style= background: cssVar(COLOR_TOKENS.surface)  />
+ *   const bg = cssVar(COLOR_TOKENS.surface); // => "var(--color-surface)"
  */
 
 /** A CSS custom-property name, e.g. "--color-surface". */
