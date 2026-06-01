@@ -62,16 +62,22 @@ pnpm lint
 
 ## Next Agent Handoff
 
-<!-- agent:vscode = LOCAL WSL verification on the laptop. agent:copilot-cloud = GitHub-hosted cloud coding agent, started by an @copilot mention; it CANNOT verify local WSL. Do not type @copilot here unless you intend to invoke the cloud agent. -->
+<!--
+agent:vscode = LOCAL WSL verification on the laptop (the only path to status:verified-local).
+agent:copilot-cloud = GitHub-hosted CLOUD reviewer/coding agent, started by an @copilot mention
+or automatic Copilot PR review; it CANNOT verify local WSL and status:cloud-reviewed is advisory only.
+Do not type @copilot here unless you intend to invoke the cloud agent.
+Role-specific handoff templates: docs/agents/handoff-protocol.md.
+-->
 - **Next agent:** `agent:opus | agent:vscode | agent:copilot-cloud | agent:codex | agent:cursor | agent:claude | agent:review | agent:founder`
 - **Required action:**
 - **Commands to run:**
   ```bash
   ```
 - **Expected output:**
-- **Blocking status:** `status:needs-local-verification | status:needs-review | status:needs-opus-fix | status:needs-founder | status:blocked`
+- **Blocking status:** `status:needs-local-verification | status:needs-cloud-review | status:cloud-reviewed | status:needs-review | status:needs-opus-fix | status:needs-founder | status:blocked`
 - **If pass:** <e.g. set `status:verified-local`, hand to `agent:review`>
-- **If fail:** <e.g. set `status:needs-opus-fix`, hand back to `agent:opus` with notes>
+- **If fail:** <e.g. set `status:needs-opus-fix`, hand back to `agent:opus`>
 
 ## What Was Intentionally Not Implemented
 

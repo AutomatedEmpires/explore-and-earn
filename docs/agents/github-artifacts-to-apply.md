@@ -11,18 +11,20 @@ here as the canonical source.
 | --- | --- | --- |
 | PR template | `.github/pull_request_template.md` | ✅ **Written directly** to branch `claos-lite/agent-handoff-relay` (PR #7). |
 | Agent verification issue form | `.github/ISSUE_TEMPLATE/agent-verification-task.yml` | ✅ **Written directly** to the same branch. |
+| Agent build-task issue form | `.github/ISSUE_TEMPLATE/agent-build-task.yml` | ✅ **Written directly** to the same branch. |
+| Founder-approval-gate issue form | `.github/ISSUE_TEMPLATE/founder-approval-gate.yml` | ✅ **Written directly** to the same branch. |
+| Issue chooser config | `.github/ISSUE_TEMPLATE/config.yml` | ✅ **Written directly** to the same branch. |
 | Handoff-helper workflow | `.github/workflows/agent-handoff-helper.yml` | ✅ **Committed on branch** in PR #7. It stays disabled unless `ENABLE_HANDOFF_HELPER == 'true'`. |
-| Labels | repo Settings (not a file) | ⚠️ Seed with `gh` from §4 below. Labels live in repo settings, not in committed files. |
+| Labels | repo Settings (not a file) | ⚠️ Core set already seeded. **Seed delta:** run the new `agent:copilot-cloud`, `status:needs-cloud-review`, and `status:cloud-reviewed` lines from §4. Labels live in repo settings, not in committed files. |
 
-> **VS Code / human action required:** run the label seed commands in §4. The workflow,
-> PR template, and issue forms are already on the branch. The workflow write limitation
-> still explains why the helper was committed locally instead of via the connected app.
+> **VS Code / human action required:** run the **seed-delta** label commands in §4 (the three
+> new labels). The workflow, PR template, and issue forms are already on the branch.
 
 The PR template (§1) and issue form (§2) below are summarized so the VS Code agent can
 recreate the canonical fields if needed. For the exact committed contents, read the files on
 the branch; they already exist there.
 
-> **Two Copilots:** `agent:vscode` = **local WSL** verifier on Jackson's laptop; `agent:copilot-cloud` = GitHub-hosted **cloud** coding agent started by an `@copilot` mention. They are not interchangeable and a cloud run never counts as local verification. See [`agent-roster-and-routing.md`](./agent-roster-and-routing.md) → “Two Copilots” and [`label-system.md`](./label-system.md).
+> **Two Copilots:** `agent:vscode` = **local WSL** verifier on Jackson's laptop (the only actor that can set `status:verified-local`); `agent:copilot-cloud` = GitHub-hosted **cloud** reviewer/coding agent started by an `@copilot` mention or automatic Copilot PR review. They are not interchangeable; a cloud review (`status:cloud-reviewed`) never counts as local verification. The GitHub trigger text is `@copilot`; the durable internal label is `agent:copilot-cloud`. See [`agent-roster-and-routing.md`](./agent-roster-and-routing.md) → “Two Copilots” and [`label-system.md`](./label-system.md).
 
 ---
 
@@ -37,8 +39,6 @@ See docs/agents/claos-lite-handoff-relay.md and docs/agents/handoff-protocol.md.
 -->
 
 ## Summary
-
-<!-- What does this PR change, and why? One short paragraph. -->
 
 ## Source of Truth
 
@@ -90,7 +90,7 @@ pnpm lint
 - **Required action:**
 - **Commands to run:**
 - **Expected output:**
-- **Blocking status:** `status:needs-local-verification | status:needs-review | status:needs-opus-fix | status:needs-founder | status:blocked`
+- **Blocking status:** `status:needs-local-verification | status:needs-cloud-review | status:cloud-reviewed | status:needs-review | status:needs-opus-fix | status:needs-founder | status:blocked`
 - **If pass:**
 - **If fail:**
 
@@ -108,9 +108,10 @@ pnpm lint
 `````
 
 > The exact committed file also carries a UI design-drift checklist; the required
-> CLAOS Lite sections above are the canonical core. `agent:vscode` is local WSL verification;
-> `agent:copilot-cloud` is the GitHub cloud agent and cannot verify local WSL — don't type
-> `@copilot` in the handoff unless you intend to invoke the cloud agent.
+> CLAOS Lite sections above are the canonical core. `agent:vscode` is local WSL verification
+> (the only path to `status:verified-local`); `agent:copilot-cloud` is the GitHub cloud
+> reviewer/coding agent and cannot verify local WSL — don't type `@copilot` in the handoff
+> unless you intend to invoke the cloud agent.
 
 ---
 
@@ -192,7 +193,7 @@ body:
     id: blocking-status
     attributes:
       label: Blocking status
-      options: ["status:needs-local-verification", "status:needs-review", "status:needs-opus-fix", "status:needs-founder", "status:blocked"]
+      options: ["status:needs-local-verification", "status:needs-cloud-review", "status:cloud-reviewed", "status:needs-review", "status:needs-opus-fix", "status:needs-founder", "status:blocked"]
     validations:
       required: true
 `````
@@ -284,11 +285,15 @@ Labels are the relay **baton + routing**. Seed the canonical CLAOS Lite set with
 (`--force` makes re-runs idempotent). Canonical definitions live in
 [`label-system.md`](./label-system.md).
 
+> **Seed delta (run these now — newly added):** `agent:copilot-cloud`,
+> `status:needs-cloud-review`, `status:cloud-reviewed`. The rest of the set is already seeded
+> in repo settings; re-running with `--force` is harmless and keeps descriptions in sync.
+
 ```bash
 # --- agent (whose turn it is; one at a time) ---
-gh label create "agent:opus"          -c 5319E7 -d "Notion/Opus — architect, reviewer, orchestrator" --force
-gh label create "agent:vscode"        -c 1D76DB -d "VS Code — LOCAL WSL verification on Jackson's laptop (Copilot-in-editor; durable destination = the environment/role: VS Code). NOT the cloud bot." --force
-gh label create "agent:copilot-cloud" -c 8957E5 -d "GitHub-hosted Copilot CLOUD coding agent — started by an @copilot mention in a PR/issue comment. Cannot verify local WSL." --force
+gh label create "agent:opus"          -c 5319E7 -d "Notion/Opus — architect, PR author, reviewer, orchestrator" --force
+gh label create "agent:vscode"        -c 1D76DB -d "VS Code — LOCAL laptop/WSL verifier (gh pr checkout + pnpm install/lint/typecheck/guardrails/build/test). Only actor that can set status:verified-local. NOT the cloud bot." --force
+gh label create "agent:copilot-cloud" -c 8957E5 -d "GitHub-hosted Copilot CLOUD reviewer/coding agent — started by an @copilot mention or automatic Copilot PR review. May review/comment/patch PR branches; cannot verify local WSL." --force
 gh label create "agent:codex"         -c 0E8A16 -d "Codex — implementation/review" --force
 gh label create "agent:cursor"        -c 0E8A16 -d "Cursor — implementation/review" --force
 gh label create "agent:claude"        -c 0E8A16 -d "Claude — implementation/review" --force
@@ -296,17 +301,19 @@ gh label create "agent:review"        -c FBCA04 -d "Awaiting code review" --forc
 gh label create "agent:founder"       -c B60205 -d "Human — approval gate / taste / business call" --force
 
 # --- status (the baton; exactly one at a time) ---
-gh label create "status:ready"                   -c 0E8A16 -d "Spec-complete; pickable" --force
-gh label create "status:claimed"                 -c C2E0C6 -d "An agent has claimed it" --force
-gh label create "status:in-progress"             -c FBCA04 -d "Implementation underway on a branch" --force
-gh label create "status:needs-local-verification" -c D4C5F9 -d "Awaiting local WSL verification" --force
-gh label create "status:verified-local"          -c BFDADC -d "Passed local verification" --force
-gh label create "status:needs-opus-fix"          -c D93F0B -d "Sent back to Opus for fixes" --force
-gh label create "status:needs-review"            -c 1D76DB -d "Awaiting review" --force
-gh label create "status:ready-for-review"        -c 0E8A16 -d "Ready for reviewer" --force
-gh label create "status:blocked"                 -c B60205 -d "Blocked by a dependency or conflict" --force
-gh label create "status:needs-founder"           -c B60205 -d "Awaiting founder approval gate" --force
-gh label create "status:complete"                -c 5319E7 -d "Merged + docs reconciled" --force
+gh label create "status:ready"                     -c 0E8A16 -d "Spec-complete; pickable" --force
+gh label create "status:claimed"                   -c C2E0C6 -d "An agent has claimed it" --force
+gh label create "status:in-progress"               -c FBCA04 -d "Implementation underway on a branch" --force
+gh label create "status:needs-local-verification"  -c D4C5F9 -d "Awaiting LOCAL WSL verification (Jackson's laptop)" --force
+gh label create "status:verified-local"            -c BFDADC -d "Passed LOCAL WSL verification (only agent:vscode can set)" --force
+gh label create "status:needs-cloud-review"        -c C5DEF5 -d "OPTIONAL: awaiting GitHub cloud Copilot review/patch (@copilot / auto review). Parallel to local verification; never replaces it." --force
+gh label create "status:cloud-reviewed"            -c A2EEEF -d "OPTIONAL: cloud Copilot reviewed/patched. ADVISORY — does NOT equal status:verified-local." --force
+gh label create "status:needs-opus-fix"            -c D93F0B -d "Sent back to Opus for fixes" --force
+gh label create "status:needs-review"              -c 1D76DB -d "Awaiting review" --force
+gh label create "status:ready-for-review"          -c 0E8A16 -d "Ready for reviewer" --force
+gh label create "status:blocked"                   -c B60205 -d "Blocked by a dependency or conflict" --force
+gh label create "status:needs-founder"             -c B60205 -d "Awaiting founder approval gate" --force
+gh label create "status:complete"                  -c 5319E7 -d "Merged + docs reconciled" --force
 
 # --- area (which part of the system) ---
 gh label create "area:sprint-zero"      -c 0052CC -d "Substrate / control plane" --force
@@ -355,7 +362,9 @@ gh label create "freeze:all"              -c B60205 -d "Global freeze — do not
 
 Paste this block as a PR/issue comment (or fill the PR template's **Next Agent Handoff**
 section) every time the baton moves. This is what removes the founder as the manual
-message bus — the format lives here, not in the founder's head.
+message bus — the format lives here, not in the founder's head. Role-specific variants for the
+three Copilot legs (Opus -> Copilot Cloud, Copilot Cloud -> VS Code, VS Code -> Opus) live in
+[`handoff-protocol.md`](./handoff-protocol.md).
 
 ```markdown
 ## Agent Handoff

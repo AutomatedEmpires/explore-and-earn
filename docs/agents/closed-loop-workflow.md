@@ -26,6 +26,8 @@ flowchart TD
     M --> RC["Reconcile: Notion updated if\nproduct truth changed"]
   RC --> NEXT["Next issue flagged\nstatus:ready"]
     NEXT --> I
+  R -. "optional: @copilot / auto review" .-> CR["Cloud Copilot review/patch\nstatus:needs-cloud-review -> status:cloud-reviewed\n(advisory; NOT local verification)"]
+    CR -. "rejoin" .-> R
 ```
 
 ## What makes the loop *closed*
@@ -37,6 +39,7 @@ Each arrow is a **durable artifact**, never a chat message:
 | Notion → work queued | GitHub **issue** with source link + acceptance checklist |
 | Worker → reviewer | Draft **PR** + **handoff comment** + label swap |
 | Reviewer → worker | **PR review** + label swap to `status:needs-opus-fix` |
+| Optional cloud review | `@copilot` / auto Copilot **PR review** + `status:needs-cloud-review` -> `status:cloud-reviewed` (advisory) |
 | Anything → gate | `gate:*` + `status:needs-founder` or `status:blocked` + **approval-queue** row |
 | Merge → next | `status:complete`, updated repo docs, next issue `status:ready` |
 
@@ -55,8 +58,9 @@ Everything else is agent-to-agent through GitHub.
 
 ## Roles in one line each
 
-- **Opus (Notion)** — turns canon into issues/draft PRs; reviews; reconciles Notion after merges.
-- **VS Code / Copilot** — picks up `status:ready`, implements, verifies locally on WSL, opens/updates the draft PR.
+- **Opus (Notion)** — architect / PR author; turns canon into issues/draft PRs; reviews; reconciles Notion after merges; cannot run code locally.
+- **VS Code / `agent:vscode`** — the **local laptop / WSL verifier**: picks up `status:ready`, implements, runs `pnpm install / lint / typecheck / guardrails / build / test` on Jackson's machine, opens/updates the draft PR, and is the **only** actor that can set `status:verified-local`.
+- **GitHub Copilot cloud / `agent:copilot-cloud`** — optional cloud reviewer/coding agent triggered by `@copilot` or automatic Copilot PR review; can review/comment/patch a PR, sets `status:cloud-reviewed` (advisory). **Does not** verify local WSL and never replaces `agent:vscode`.
 - **Codex / Cursor / Claude** — same relay, additional implementation/review hands when introduced.
 - **CI guardrails** — lint, typecheck, tests, drift checks; the automated reviewer that must pass before a human merge.
 - **Founder** — gates + merge + taste only.
@@ -64,7 +68,7 @@ Everything else is agent-to-agent through GitHub.
 ## Guardrails this loop must never cross
 
 - One agent owns one task on one branch at a time (the **collision rule**).
-- No auto-merge, no deploy automation, no arbiter in CLAOS Lite.
+- No auto-merge, no deploy automation, no arbiter in CLAOS Lite. A `status:cloud-reviewed` never authorizes merge.
 - Product canon is protected at every handoff: not a generic job board — Premium Adventure,
   Warm Working Landscape, Operational Efficiency, card-first, mobile-first, zero bloat, the
   **Housing / Meals / Pay** triad, mandatory **Verified Host**, canonical categories
