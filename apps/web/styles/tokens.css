@@ -1,10 +1,166 @@
+/**
+ * Design tokens — V1 (LOCKED).
+ *
+ * Canon: docs/design/design-system-v1.md (founder-locked 2026-05-30), sourced
+ * from Notion "Design Tokens & Visual System — V1 Direction".
+ *
+ * DO NOT invent values. Two-tier by design: TIER 1 primitives (raw palette) feed
+ * TIER 2 semantic tokens. Feature code references SEMANTIC tokens only — never
+ * raw hex and never the primitives directly (drift rule #1).
+ *
+ * Dark mode is out of scope for V1; the semantic layer exists so it can be added
+ * later (re-point semantics to a dark palette) without refactoring feature code.
+ *
+ * Typed contract mirror: packages/ui/src/tokens.ts
+ */
+
 :root {
-  /* TODO: Replace placeholder values once design tokens are canonically locked. */
-  --surface-default: #ffffff;
-  --surface-raised: #f7f7f5;
-  --text-primary: #171717;
-  --text-secondary: #525252;
-  --border-default: #d4d4d4;
-  --radius-md: 16px;
-  --space-md: 16px;
+  /* =============================================================== */
+  /* TIER 1 — PRIMITIVES (raw palette; never reference directly)     */
+  /* =============================================================== */
+
+  /* foundation */
+  --palette-paper: #F6F3EC;
+  --palette-surface: #FBF9F3;
+  --palette-white: #FFFFFF;
+  --palette-line: #E7E1D3;
+  --palette-ink-stroke: #33312B;
+  --palette-ink: #24221E;
+  --palette-ink-soft: #6E685D;
+  --palette-ink-muted: #9A9486;
+
+  /* category accents (chip bg / ink fg) */
+  --palette-farm-bg: #EDE3CF;      --palette-farm-fg: #6B5326;
+  --palette-maritime-bg: #D6E6E9;  --palette-maritime-fg: #2E5E6B;
+  --palette-remote-bg: #DEE0F2;    --palette-remote-fg: #3F4A87;
+  --palette-seasonal-bg: #DCEBD6;  --palette-seasonal-fg: #41663A;
+  --palette-mix-bg: #E7E2EE;       --palette-mix-fg: #5B5172;
+
+  /* benefit triad (chip bg / ink fg) — HOUSING / MEALS / PAY */
+  --palette-housing-bg: #DCEBD6;   --palette-housing-fg: #41663A;
+  --palette-meals-bg: #F3DFD3;     --palette-meals-fg: #9A5B3C;
+  --palette-pay-bg: #DAE4F0;       --palette-pay-fg: #3F5687;
+
+  /* status / system (chip bg / ink fg) */
+  --palette-boosted-bg: #F3E6CC;   --palette-boosted-fg: #8A6516;
+  --palette-match-bg: #E0E0F4;     --palette-match-fg: #4A47A0;
+  --palette-featured-bg: #E7E1F2;  --palette-featured-fg: #6A55A0;
+  --palette-verified-bg: #DBEAE2;  --palette-verified-fg: #2E6B57;
+  --palette-founding-bg: #EFE0D6;  --palette-founding-fg: #8A4B2A;
+  --palette-success-bg: #DBEFE1;   --palette-success-fg: #2E7D54;
+  --palette-warning-bg: #F4E8CC;   --palette-warning-fg: #9A6B12;
+  --palette-error-bg: #F1DAD3;     --palette-error-fg: #A3402F;
+
+  /* =============================================================== */
+  /* TIER 2 — SEMANTIC TOKENS (reference these in feature code)      */
+  /* =============================================================== */
+
+  /* surfaces / text / borders */
+  --color-paper: var(--palette-paper);
+  --color-surface: var(--palette-surface);
+  --color-surface-raised: var(--palette-white);
+  --border-soft: var(--palette-line);
+  --border-ink: var(--palette-ink-stroke);
+  --text-primary: var(--palette-ink);
+  --text-secondary: var(--palette-ink-soft);
+  --text-muted: var(--palette-ink-muted);
+
+  /* category accents */
+  --accent-farm-bg: var(--palette-farm-bg);          --accent-farm-fg: var(--palette-farm-fg);
+  --accent-maritime-bg: var(--palette-maritime-bg);  --accent-maritime-fg: var(--palette-maritime-fg);
+  --accent-remote-bg: var(--palette-remote-bg);      --accent-remote-fg: var(--palette-remote-fg);
+  --accent-seasonal-bg: var(--palette-seasonal-bg);  --accent-seasonal-fg: var(--palette-seasonal-fg);
+  --accent-mix-bg: var(--palette-mix-bg);            --accent-mix-fg: var(--palette-mix-fg);
+
+  /* benefit triad */
+  --benefit-housing-bg: var(--palette-housing-bg);   --benefit-housing-fg: var(--palette-housing-fg);
+  --benefit-meals-bg: var(--palette-meals-bg);       --benefit-meals-fg: var(--palette-meals-fg);
+  --benefit-pay-bg: var(--palette-pay-bg);           --benefit-pay-fg: var(--palette-pay-fg);
+
+  /* status / system */
+  --status-boosted-bg: var(--palette-boosted-bg);         --status-boosted-fg: var(--palette-boosted-fg);
+  --status-match-bg: var(--palette-match-bg);             --status-match-fg: var(--palette-match-fg);
+  --status-featured-bg: var(--palette-featured-bg);       --status-featured-fg: var(--palette-featured-fg);
+  --status-verified_host-bg: var(--palette-verified-bg);  --status-verified_host-fg: var(--palette-verified-fg);
+  --status-founding_host-bg: var(--palette-founding-bg);  --status-founding_host-fg: var(--palette-founding-fg);
+  --status-success-bg: var(--palette-success-bg);         --status-success-fg: var(--palette-success-fg);
+  --status-warning-bg: var(--palette-warning-bg);         --status-warning-fg: var(--palette-warning-fg);
+  --status-error-bg: var(--palette-error-bg);             --status-error-fg: var(--palette-error-fg);
+
+  /* spacing scale (4px base) */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  /* named spacing */
+  --space-card: 16px;       /* card padding */
+  --space-row-gap: 12px;    /* row gap */
+  --space-section: 24px;    /* section spacing */
+  --space-gutter: 16px;     /* screen gutter */
+  --size-bottom-nav: 64px;  /* bottom nav height */
+
+  /* radius */
+  --radius-pill: 999px;
+  --radius-input: 12px;
+  --radius-button: 16px;
+  --radius-cell: 16px;
+  --radius-image: 16px;
+  --radius-card: 24px;
+  --radius-modal: 28px;
+
+  /* elevation — borders-first; cards/rows have NO shadow (flat) */
+  --elevation-overlay: 0 8px 24px rgba(40, 38, 34, 0.12);
+  --elevation-pin: 0 2px 6px rgba(40, 38, 34, 0.18);
+
+  /* motion — no bounce; honor reduced-motion in feature code */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-drawer: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* breakpoints (reference values; CSS media queries restate them) */
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1280px;
+
+  /* icon sizing */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-chip: 40px;
+  --icon-chip-compact: 36px;
+
+  /* typography — families (self-hosted OFL) */
+  --font-display: "Patrick Hand", ui-rounded, cursive;        /* display/brand, min 18px */
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; /* body/UI */
+  --font-accent: "Cabin Sketch", "Patrick Hand", cursive;     /* marketing only, not product UI */
+
+  /* typography — role sizes (size / line-height) */
+  --type-display-size: 30px;  --type-display-lh: 1.15;
+  --type-page-size: 26px;     --type-page-lh: 1.2;
+  --type-section-size: 22px;  --type-section-lh: 1.2;
+  --type-card-size: 20px;     --type-card-lh: 1.25;
+  --type-body-size: 16px;     --type-body-lh: 1.5;
+  --type-meta-size: 14px;     --type-meta-lh: 1.45;
+  --type-caption-size: 12px;  --type-caption-lh: 1.4;
+  --type-button-size: 15px;   --type-button-lh: 1;
+  --type-label-size: 12px;    --type-label-lh: 1;
+  --type-label-tracking: 0.06em; /* uppercase labels/badges only */
+
+  /* =============================================================== */
+  /* DEPRECATED — Sprint Zero stub aliases. Do not use in new code;  */
+  /* retained so any early placeholder markup keeps resolving.       */
+  /* =============================================================== */
+  --surface-default: var(--color-surface-raised);
+  --surface-raised: var(--color-surface);
+  --border-default: var(--border-soft);
+  --radius-md: var(--radius-button);
+  --space-md: var(--space-16);
 }
