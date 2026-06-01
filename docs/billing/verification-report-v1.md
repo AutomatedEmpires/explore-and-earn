@@ -4,11 +4,16 @@
 
 ## Summary
 
-The billing slice compiles and lints cleanly and holds all architecture-only invariants. The single concrete billing defect is the **expected** dollars-vs-cents drift in `packages/contracts/src/pricing.ts` (Q-BILL-1), now caught by an automated gate that is **intended to be red** until the founder approves normalization (Gate P-UNIT). In response to the “documented but not enforced” finding, the non-gated static invariants are now wired as real checks.
+The billing slice compiles and lints cleanly and holds all architecture-only invariants. Following founder approval on 2026-05-31, the four open billing questions are now **resolved against canon** (no values invented; every change traces to a canon page):
+
+- **Q-BILL-1 / Gate P-UNIT** — `packages/contracts/src/pricing.ts` is normalized from dollars to **integer USD cents** (x100 from the founder-locked dollar canon, ADR-028). `pricing.ts` is now the single source of truth for every amount (plans, founding discounts, add-ons, boosts, invite packs, team seat, announcement) plus plan-included entitlement counts (G1). `check-pricing-units.mjs` is now **green**.
+- **Q-BILL-2** — `CampaignStatus` / `CampaignDeliveryStatus` member values now mirror the Canonical Enum Registry exactly.
+- **Q-BILL-3** — billing entity field lists + sub-enums (`AddOnPurchaseStatus`, `InviteCreditSourceType`, `InviteCreditRelatedObjectType`) now mirror the Field-Level Billing Dictionary; `add_on_type` aligned to the dictionary token `announcement`.
+- **G-BILL-4** — `expected-stripe-manifest.json` is populated with the canonical structural catalog (33 entries: 9 products, 18 prices, 6 coupons) and enforced by the new `check-stripe-manifest.mjs` (set-based drift check; amounts excluded per G1).
 
 ## A. Type-check
 
-- Focused billing type-check **passes**: `billing-routes.ts`, `billing-events.ts` compile; `PlanTier`, `BillingInterval`, `BillingStatus`, `EntitlementKey`, `StripePriceKey`, `StripeWebhookEventType` resolve and re-export via `packages/contracts/src/index.ts`.
+- Focused billing type-check **passes**: `billing.ts`, `billing-routes.ts`, `billing-events.ts`, `entitlements.ts`, `stripe.ts`, `refund-review.ts` compile and re-export via `packages/contracts/src/index.ts`. No file consumes the realigned entity field names, so the Q-BILL-3 rename is type-safe.
 - `stripe-seed` `manifest.ts` + `reconcile.ts` compile against `catalog.ts`.
 - **Out of scope / pre-existing:** workspace-wide `tsc -b` fails in generated `.next` validator files (`apps/web` route-group layout modules missing from generated output). Unrelated to the billing branch and not introduced here.
 
@@ -26,13 +31,14 @@ Legend: **enforced** = a wired check fails on violation; **documented** = contra
 
 | Guardrail | Status | Note |
 | --- | --- | --- |
-| G1 / P-UNIT | **enforced (intended red)** | `check-pricing-units.mjs` asserts canon integer cents; currently fails on the dollars drift (Q-BILL-1) by design |
+| G1 / P-UNIT | **enforced (green)** | `check-pricing-units.mjs` asserts canon integer cents; `pricing.ts` normalized (Q-BILL-1 resolved, founder-approved 2026-05-31) |
 | G5 | **enforced** | `check-refund-isolation.mjs` fails if `refunds.create()` appears outside the refund-review service (currently none) |
 | G-BILL-1 | **enforced** | `check-no-stripe-sdk.mjs` fails on any Stripe SDK import in contracts/stripe-seed (currently none) |
 | G-BILL-2 | **enforced** | `check-no-secrets.mjs` fails on committed `sk_live_`/`sk_test_`/`rk_live_`/`whsec_` key bodies (prefix-only mentions ignored) |
 | G-BILL-3 | **enforced** | `check-seed-safety.mjs` fails if the live-mode hard stop in `safety.ts` is weakened/removed |
+| G-BILL-4 | **enforced** | `check-stripe-manifest.mjs` fails on drift between `expected-stripe-manifest.json` and the conventional catalog in `catalog.ts` |
 | G-BILL-5 | **enforced** | `check-sku-parity.mjs` fails on SKU drift between `contracts/src/stripe.ts` and `stripe-seed/src/catalog.ts` |
-| G23 | partial | boost/team-seat cent constants live in contracts; covered indirectly by the cents gate, no dedicated test |
+| G23 | partial | boost/team-seat cent constants live in `pricing.ts`; covered indirectly by the cents gate, no dedicated test |
 | G4 | n/a-branch | `ee_audience` hard-coded `host`; RLS/table half needs billing tables |
 | G8 | documented | only a placeholder string scan exists; weaker than the documented dependency + match_score rule |
 | G14 | n/a-branch | route metadata only; no handlers / `requireEntitlement` yet |
@@ -42,31 +48,31 @@ Legend: **enforced** = a wired check fails on violation; **documented** = contra
 | G21 | n/a-branch | default plan entitlement sets not encoded yet |
 | G24 | n/a-branch | no founding seat / cap logic yet |
 | G29 | n/a-branch | service-credit FIFO/expiry not implemented yet |
-| G-BILL-4 | n/a-branch | `expected-stripe-manifest.json` is placeholder; canonical hash-match not meaningful yet |
 | G-BILL-6..10 | documented | no wired checks; no implementation paths yet to enforce against |
 
 ## Wired guardrail checks (in the `guardrails` npm script)
 
-Order: `db:assert` → `check-pricing.mjs` (legacy literals) → `check-calendar-sync.mjs` → `check-match-isolation.mjs` → `check-no-stripe-sdk.mjs` → `check-no-secrets.mjs` → `check-sku-parity.mjs` → `check-refund-isolation.mjs` → `check-seed-safety.mjs` → `check-pricing-units.mjs`.
+Order: `db:assert` -> `check-pricing.mjs` (legacy literals) -> `check-calendar-sync.mjs` -> `check-match-isolation.mjs` -> `check-no-stripe-sdk.mjs` -> `check-no-secrets.mjs` -> `check-sku-parity.mjs` -> `check-refund-isolation.mjs` -> `check-seed-safety.mjs` -> `check-stripe-manifest.mjs` -> `check-pricing-units.mjs`.
 
-The green invariant checks run **before** the intended-red cents gate so they execute and report on every run.
+All checks are now expected **green** on the branch.
 
 ## E. Invariant check (all hold)
 
-- No Stripe SDK import anywhere on the branch (now enforced by `check-no-stripe-sdk.mjs`).
-- No committed secret bodies (now enforced by `check-no-secrets.mjs`).
+- No Stripe SDK import anywhere on the branch (enforced by `check-no-stripe-sdk.mjs`).
+- No committed secret bodies (enforced by `check-no-secrets.mjs`).
 - No price amounts outside `packages/contracts/src/pricing.ts`.
-- `stripe-seed/src/safety.ts` live-mode hard stop confirmed (now guarded by `check-seed-safety.mjs`).
+- `stripe-seed/src/safety.ts` live-mode hard stop confirmed (guarded by `check-seed-safety.mjs`).
 - No network calls in any `stripe-seed/src/*` file.
-- No SKU drift between `contracts/src/stripe.ts` and `stripe-seed/src/catalog.ts` (now enforced by `check-sku-parity.mjs`).
+- No SKU drift between `contracts/src/stripe.ts` and `stripe-seed/src/catalog.ts` (enforced by `check-sku-parity.mjs`).
+- Expected Stripe manifest matches the conventional catalog (enforced by `check-stripe-manifest.mjs`).
 
-## F. Escalate to founder
+## F. Resolved (founder-approved 2026-05-31)
 
-- **Q-BILL-1 / P-UNIT:** `pricing.ts` is dollar-based; the cents gate is wired and red by design. Resolving requires a founder-approved dollars→cents normalization (do not normalize unilaterally).
-- **Q-BILL-2:** `CampaignStatus` / `CampaignDeliveryStatus` member values still `TODO(?)`.
-- **Q-BILL-3:** billing entity field lists still `TODO(?)`.
-- **Expected manifest canon:** `expected-stripe-manifest.json` is placeholder; G-BILL-4 stays inert until the expected manifest is approved.
+- **Q-BILL-1 / P-UNIT:** `pricing.ts` normalized dollars -> integer cents (x100 of the ADR-028 dollar canon); cents gate green. No pricing invented.
+- **Q-BILL-2:** `CampaignStatus` / `CampaignDeliveryStatus` set from the Canonical Enum Registry.
+- **Q-BILL-3:** billing entity field lists + sub-enums set from the Field-Level Billing Dictionary.
+- **Expected manifest:** populated from the SKU Catalog and enforced by `check-stripe-manifest.mjs` (G-BILL-4 now live).
 
 ## Enforcement backlog (deferred, not gated by canon)
 
-Implement during the relevant phases of `implementation-sequencing-v1.md`: real `no-pricing-literals` ESLint AST rule; G8 dependency-cruiser boundary; G14/G15/G17/G20/G21/G24/G29 (need implementation code); G-BILL-4 manifest hash (needs approved expected manifest); G-BILL-6/7 (client-secret + Stripe-client import boundary, need app code); G-BILL-8/9/10 (need routes/handlers). None block the build pack; they harden future implementation PRs.
+Implement during the relevant phases of `implementation-sequencing-v1.md`: real `no-pricing-literals` ESLint AST rule; G8 dependency-cruiser boundary; G14/G15/G17/G20/G21/G24/G29 (need implementation code); a runtime hash assertion for `buildSeedManifest()` once a test runner is wired; G-BILL-6/7 (client-secret + Stripe-client import boundary, need app code); G-BILL-8/9/10 (need routes/handlers). None block the build pack; they harden future implementation PRs.
