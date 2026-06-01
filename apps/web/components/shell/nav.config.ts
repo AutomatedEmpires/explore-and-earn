@@ -1,51 +1,59 @@
 import { routes } from "../../lib/routes";
 import type { RouteGroup } from "../../lib/routes";
+import type { OverlayKey } from "./overlays";
 
-// Navigation models per audience.
-// Source of truth: docs/ux/app-shell-and-navigation.md (Notion: Navigation Architecture Doctrine, UX Surface Inventory).
-// SCOPE: typed config only. No rendering, no active-state, no routing logic. Consumed later by AppHeader/BottomNav.
+// Navigation configuration — typed source of the app-shell's nav surfaces.
+// Source of truth: docs/ux/app-shell-and-navigation.md (Notion: Navigation Architecture Doctrine).
+//
+// Orders here are LOCKED by founder decisions (PR #8):
+//   - A-FE-SEEKER-NAV-ORDER: Explore -> Saved -> Applications -> Offers -> Profile.
+// An item with an `overlayKey` opens an overlay (see overlays.ts) instead of navigating.
 
 export type NavItem = {
-  /** Stable identifier (not the label). */
-  key: string;
-  label: string;
-  /** Target route, or an overlay placeholder route pending wiring (see `overlayKey`). */
-  href: string;
-  /** If set, this item opens an overlay rather than navigating. See overlays.ts. */
-  overlayKey?: string;
+	key: string;
+	label: string;
+	href: string;
+	/** When set, the item opens this overlay instead of navigating. */
+	overlayKey?: OverlayKey;
 };
 
-// Seeker bottom nav order is LOCKED (A-FE-SEEKER-NAV-ORDER, 2026-05-31). Community is intentionally excluded.
+// Seeker mobile primary navigation (LOCKED order). Community is intentionally absent.
 export const seekerBottomNav: readonly NavItem[] = [
-  { key: "explore", label: "Explore", href: routes.explore },
-  { key: "saved", label: "Saved", href: routes.seekerSaved },
-  { key: "applications", label: "Applications", href: routes.seekerApplications },
-  { key: "offers", label: "Offers", href: routes.seekerOffers },
-  { key: "profile", label: "Profile", href: routes.seekerProfile },
+	{ key: "explore", label: "Explore", href: routes.explore },
+	{ key: "saved", label: "Saved", href: routes.seekerSaved },
+	{ key: "applications", label: "Applications", href: routes.seekerApplications },
+	{ key: "offers", label: "Offers", href: routes.seekerOffers },
+	{ key: "profile", label: "Profile", href: routes.seekerProfile },
 ];
 
-// Host bottom nav follows Navigation Doctrine (not separately founder-locked).
-// "More" opens the Host More overlay; V1 routes Offers/Profile are reachable there or via header.
+// Host mobile primary navigation (Navigation Doctrine: Home / Listings / Applicants / Analytics / More).
+// "More" opens the host overflow overlay rather than navigating.
 export const hostBottomNav: readonly NavItem[] = [
-  { key: "home", label: "Home", href: routes.host },
-  { key: "listings", label: "Listings", href: routes.hostListings },
-  { key: "applicants", label: "Applicants", href: routes.hostApplicants },
-  { key: "analytics", label: "Analytics", href: routes.hostAnalytics },
-  { key: "more", label: "More", href: routes.host, overlayKey: "hostMore" },
+	{ key: "home", label: "Home", href: routes.host },
+	{ key: "listings", label: "Listings", href: routes.hostListings },
+	{ key: "applicants", label: "Applicants", href: routes.hostApplicants },
+	{ key: "analytics", label: "Analytics", href: routes.hostAnalytics },
+	{ key: "more", label: "More", href: routes.host, overlayKey: "hostMore" },
 ];
 
-// Logged-out global nav (shared by (marketing) + (public)).
+// Marketing/public (logged-out) top navigation.
 export const publicGlobalNav: readonly NavItem[] = [
-  { key: "explore", label: "Explore", href: routes.explore },
-  // TODO(?): confirm the "For Hosts" target (a marketing host landing page vs the host app entry). Canon names the item, not the URL.
-  { key: "for-hosts", label: "For Hosts", href: routes.host },
-  { key: "pricing", label: "Pricing", href: routes.pricing },
-  { key: "about", label: "About", href: routes.about },
+	{ key: "explore", label: "Explore", href: routes.explore },
+	{ key: "how-it-works", label: "How it works", href: routes.howItWorks },
+	{ key: "pricing", label: "Pricing", href: routes.pricing },
+	{ key: "about", label: "About", href: routes.about },
+	{ key: "for-hosts", label: "For hosts", href: routes.host },
 ];
 
-export const navByGroup: Partial<Record<RouteGroup, readonly NavItem[]>> = {
-  marketing: publicGlobalNav,
-  public: publicGlobalNav,
-  seeker: seekerBottomNav,
-  host: hostBottomNav,
+// Top (header) navigation by route group. Only logged-out brand surfaces carry
+// top nav in V1; seeker/host lead with the bottom nav; admin/community/demo are brand-only.
+export const headerNavByGroup: Partial<Record<RouteGroup, readonly NavItem[]>> = {
+	marketing: publicGlobalNav,
+	public: publicGlobalNav,
+};
+
+// Mobile primary (bottom) navigation by route group. Only seeker/host in V1.
+export const bottomNavByGroup: Partial<Record<RouteGroup, readonly NavItem[]>> = {
+	seeker: seekerBottomNav,
+	host: hostBottomNav,
 };
