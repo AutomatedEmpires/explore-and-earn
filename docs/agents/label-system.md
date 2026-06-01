@@ -20,7 +20,7 @@ Plus descriptive axes: **`area:*`** (which part of the system) and **`risk:*`**.
 | Label | Who / what |
 | --- | --- |
 | `agent:opus` | Notion/Opus — architect, reviewer, orchestrator |
-| `agent:vscode` | VS Code / Copilot — implementation + local WSL verification |
+| `agent:vscode` | VS Code — local WSL verification environment (Copilot is the assistant inside it; the durable relay destination is the environment/role: VS Code) |
 | `agent:codex` | Codex — implementation/review |
 | `agent:cursor` | Cursor — implementation/review |
 | `agent:claude` | Claude — implementation/review |
@@ -84,14 +84,16 @@ Branches: `status:needs-opus-fix` (back to `status:in-progress`), `status:blocke
 The permanent founder gates these map to are defined in
 [`founder-approval-gates.md`](./founder-approval-gates.md).
 
-## Old → new name mapping (for earlier docs)
+## Old → new name mapping (deprecated aliases — NOT active labels)
 
-Earlier relay docs used a smaller informal set. Translate as:
+Earlier relay docs used a smaller informal set. These names are **deprecated aliases only**;
+never create or apply them as active labels. Translate as:
 
-| Earlier name | Canonical now |
+| Earlier name (deprecated) | Canonical now |
 | --- | --- |
 | `status:ready-for-engineering` | `status:ready` |
 | `status:in-review` | `status:needs-review` / `status:ready-for-review` |
+| `status:changes-requested` | `status:needs-opus-fix` |
 | `status:done` | `status:complete` |
 | `agent:copilot` | `agent:vscode` |
 | `gate:*` per [`founder-approval-gates.md`](./founder-approval-gates.md) | unchanged (still the gate set) |

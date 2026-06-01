@@ -40,7 +40,7 @@ Opus (Notion)  ──creates──>  GitHub Issue / draft PR
 
 - **Notion / Opus** — architect & reviewer. Creates architecture, issues, and draft PRs. Decides product truth.
 - **GitHub** — the shared memory. Stores work, comments, labels, issues, handoffs.
-- **VS Code / Copilot** — implementation worker. Verifies locally on Jackson's WSL machine.
+- **VS Code / Copilot** — implementation worker. Verifies locally on Jackson's WSL machine. The canonical relay label is `agent:vscode` (the environment/role); Copilot is the assistant inside it.
 - **Codex / Cursor / Claude** — may later take implementation/review tasks via the same relay.
 - **Founder** — handles *approval gates* and taste/business decisions only. **Not** the message bus.
 
@@ -69,7 +69,7 @@ No private chat. No founder copy/paste. If it is not in one of the above, it is 
    **handoff comment** (the template in `handoff-protocol.md`) describing what was done, what was
    verified, and what the next agent must do.
 4. The worker flips the baton: removes its own `agent:*`/`status:*`, sets the next ones
-   (e.g. `status:in-review`, `agent:opus`).
+   (e.g. `status:needs-review`, `agent:opus`).
 5. **Opus / reviewer** reacts to the comment + diff, approves or requests changes via review,
    and either advances the baton or hands it back.
 6. On approval, the founder (or, later, a guarded automation) handles any `gate:*` decision and merge.

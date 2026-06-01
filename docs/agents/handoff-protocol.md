@@ -4,15 +4,17 @@ The mechanism that makes the relay continuous. Each step ends by leaving a **dur
 
 Under CLAOS Lite the durable signal is always a GitHub artifact — an issue, a draft PR, a label change, a review, or a **handoff comment** — never a private chat message and never the founder copying text between agents. See [`claos-lite-handoff-relay.md`](./claos-lite-handoff-relay.md) and [`closed-loop-workflow.md`](./closed-loop-workflow.md).
 
+All labels referenced below use the canonical CLAOS Lite set in [`label-system.md`](./label-system.md). Deprecated names (`status:ready-for-engineering`, `status:in-review`, `status:changes-requested`, `status:done`, `agent:copilot`) must not be applied as active labels.
+
 ## Steps
 
-1. **Task born in Notion.** When spec-complete, it is marked `Ready for Engineering` and carries a Build Pack or acceptance criteria.
+1. **Task born in Notion.** When spec-complete, it carries a Build Pack or acceptance criteria and is marked ready for engineering in Notion, which maps to the canonical `status:ready` label once dispatched to GitHub.
 2. **Dispatch to GitHub.** A dispatcher creates a GitHub issue: title, body, acceptance criteria, labels, agent type, priority, and a link back to the Notion source. The issue URL is written back into Notion. *(Start with this one automation only — the Notion → GitHub Issue Dispatcher. Do not build all workers at once.)*
 3. **Pick up.** A coding agent assigns itself, sets `status:in-progress` + `agent:<self>`, and works on a feature branch in WSL.
-4. **Propose.** The agent opens a draft PR (`status:in-review`) using the PR template, linking the issue + Notion source.
-5. **Verify.** CI guardrails (lint, typecheck, tests, drift checks) run automatically; a reviewer approves or requests changes.
+4. **Propose.** The agent opens a draft PR (`status:needs-review` once it is ready for a reviewer) using the PR template, linking the issue + Notion source.
+5. **Verify.** CI guardrails (lint, typecheck, tests, drift checks) run automatically; a reviewer approves or requests changes (sent back as `status:needs-opus-fix`).
 6. **Merge + reconcile.** On merge, repo docs update. If product truth changed, Notion + the Canonical Source Registry / decision log are updated.
-7. **Flag next.** The next task is set `status:ready-for-engineering`, and the loop repeats.
+7. **Flag next.** The next task is set `status:ready`, and the loop repeats.
 
 ## The handoff comment (the baton message)
 
@@ -52,7 +54,7 @@ After posting: remove your `agent:*` label, add the next owner's `agent:*`, and 
 - [ ] Status label updated to reflect the new state (the baton moved).
 - [ ] Exactly one `agent:*` label = the new owner (no collisions).
 - [ ] A link back to the Notion source of truth.
-- [ ] Any product-truth change reflected in Notion **before** marking `done`.
+- [ ] Any product-truth change reflected in Notion **before** marking `status:complete`.
 - [ ] No two agents assigned to the same artifact.
 
 ## Issue body template (what a dispatched task should contain)
