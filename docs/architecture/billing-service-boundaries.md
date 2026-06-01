@@ -1,15 +1,26 @@
 # Billing Service Boundaries
 
-> **DRAFT.** Defines where billing logic may live and the import rules between domains. No route handlers are implemented in this pack.
+> **DRAFT.** Defines where billing logic may live and the import rules between domains. No route handlers are implemented in this pack. Routes follow canon namespace `/api/v1/{domain}/{action}`; handlers stay **thin**, with core logic in packages (per "Route-Level API Contracts").
 
-## Services & routes
+## Packages
 
-| Path | Purpose | Auth | Role | Founder gate | Deferred |
+- **`packages/contracts`** (exists) — type-only billing/entitlement/stripe/refund/route contracts (this pack).
+- **`packages/billing`** (canon package, **not yet created**) — intended home for billing service logic; route handlers delegate here. Do not create until Phase P3 (founder-gated).
+- **`packages/stripe-seed`** (exists) — test-mode seed; placeholders only in this pack.
+
+## Services & routes (canon `/api/v1`)
+
+| Path / module | Purpose | Auth | Scope/Role | Founder gate | Deferred |
 | --- | --- | --- | --- | --- | --- |
-| `apps/web/services/stripe/` | Stripe client wrapper, object-map lookups, checkout/portal session builders | server-only | host (self) | P-LIVEKEY, P-CHECKOUT, P-PORTAL | live calls |
-| `apps/web/services/refund-review/` | **Sole** holder of `stripe.refunds.create` (G5) | server-only | admin/founder | P-REFUND | automation |
-| `apps/web/app/api/billing/` | host-facing billing reads/mutations (plan, add-ons, entitlements) | required | host | P-CHECKOUT | mutations until gated |
-| `apps/web/app/api/stripe/webhook/` | inbound Stripe webhooks | signature-verified, public path but server-validated | n/a | P-WEBHOOK | live deploy |
+| `POST /api/v1/billing/checkout` | create Stripe Checkout session | required | host | P-CHECKOUT | live session |
+| `POST /api/v1/billing/webhook` | inbound Stripe webhooks | signature-verified (no scope) | service role | P-WEBHOOK | live deploy |
+| `GET /api/v1/host/billing` | host plan + entitlement summary | required | host | — | read model wiring |
+| `apps/web/services/stripe/` (→ `packages/billing`) | Stripe client wrapper, object-map lookups, session builders | server-only | host (self) | P-LIVEKEY, P-CHECKOUT, P-PORTAL | live calls |
+| `apps/web/services/refund-review/` | **sole** holder of `stripe.refunds.create` (G5) | server-only | admin/founder | P-REFUND | automation |
+
+## Shared contract shapes (canon)
+
+Billing responses wrap in the shared `ApiResponse<T>` envelope; errors use `ApiError { code, message, field?, details? }` with `BillingErrorCode` values; auth/scope/entitlements come from the shared `RequestContext` (`activeScope`, `permissions`, `entitlements`). These shared types are canon (Route-Level API Contracts); `billing-routes.ts` defines billing payload DATA shapes that fit inside them.
 
 ## Import / boundary rules (CI-enforced)
 
@@ -26,8 +37,8 @@ One Stripe Customer per `users.id`; mirror `host_profiles.stripe_customer_id`; o
 
 ## Data mirror tables (conceptual, later)
 
-`stripe_customers`, `subscriptions`, `subscription_items`, `invoices`, `payments`, `entitlements`, `entitlement_grants`, `usage_counters`, `invite_credit_ledger`, `invite_pack_purchases`, `boost_purchases`, `refund_reviews`, `service_credit_ledger`, `stripe_object_map`, `stripe_webhook_events`, `billing_events`, `dispute_cases`. No migrations in this pack.
+See `../billing/data-mirror-erd-v1.md` for the conceptual ERD and `../billing/rls-billing-policy-v1.md` for RLS intent. No migrations in this pack.
 
 ## Seed & reconciliation
 
-`packages/stripe-seed` is idempotent, test-mode, dry-run-first, with a live-mode hard stop. Nightly `reconcileStripe()` diffs Stripe vs mirror → `admin_alerts`. See `packages/stripe-seed/README.md`.
+`packages/stripe-seed` is idempotent, test-mode, dry-run-first, with a live-mode hard stop; `src/manifest.ts` builds a deterministic manifest hash for CI drift checks against `expected-stripe-manifest.json`. Nightly `reconcileStripe()` diffs Stripe vs mirror → `admin_alerts`.

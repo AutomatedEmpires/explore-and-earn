@@ -10,29 +10,30 @@
 | `addon_invite_pack_10` | 10 Invite Credits | $400 | 10 | **No** | `product_addon_invite_pack` | `price_addon_invite_pack_10` | `invite.credit` +10 |
 | `addon_invite_pack_25` | 25 Invite Credits | $750 | 25 | **No** | `product_addon_invite_pack` | `price_addon_invite_pack_25` | `invite.credit` +25 |
 
-Plan-included credits (Pro 5, Ent 10) are separate from purchased packs.
+Plan-included credits (Pro 5/cycle, Ent 10/cycle) are separate from purchased packs but share the same ledger.
 
-## Expiration
+## Rollover & expiration (Locked Decision)
 
-Purchased invite credits do not expire in V1 unless canon states otherwise. `TODO(?)` confirm expiry policy in Refund/Pricing canon.
+**Invite credits roll over.** Both plan-included and purchased credits accumulate in `invite_credit_ledger` and **do not expire** and **do not reset** per billing cycle. (Locked Decision — Open Questions & Decision Log.)
 
 ## Refundability
 
-**Non-refundable.** A refund-review on an invite-credit purchase must be rejected: `refund_reviews` INSERT with `related_object_type = 'invite_credit_purchase'` → `403 non_refundable_product`. (See `refund-review-v1.md`.)
+**Non-refundable.** A refund-review on an invite-credit purchase must be rejected: `refund_reviews` INSERT with `related_object_type = 'invite_credit_purchase'` → `403 non_refundable_product` (`BillingErrorCode = non_refundable_product`). See `refund-review-v1.md`.
 
 ## Usage decrement
 
-- Credits live in `InviteCreditLedger`.
-- Decrement **only** on a successful candidate invite send (idempotent per invite).
+- Credits live in `invite_credit_ledger` (signed deltas: `plan_grant`, `pack_purchase`, `consumption`, `adjustment`).
+- Decrement **only** on a successful candidate invite send (idempotent per invite) via `POST /api/v1/host/listings/{listingId}/invites`.
 - Never decrement on draft/abandoned invites.
+- Balance surfaced via `GET /api/v1/host/billing` (`inviteCreditsRemaining`).
 
 ## Abuse / anti-spam guardrails
 
 - Rate-limit invite sends per host per window (`TODO(?)` exact thresholds in canon).
 - Block invites to candidates who opted out / blocked the host.
-- Audit log every credit grant and consumption (G15).
+- Audit-log every credit grant and consumption (G15).
 - Invites must never imply guaranteed match quality (G8).
 
 ## Founder gate
 
-Pack pricing, quantities, and refundability are founder-locked.
+Pack pricing, quantities, and refundability are founder-locked (P-PRICE).
