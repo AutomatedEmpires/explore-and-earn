@@ -1,11 +1,13 @@
-// Matching contracts — TYPE-ONLY. No runtime values, no scoring weights, no
-// algorithm, no DB/AI calls. Final match weights are a FOUNDER APPROVAL GATE and
-// are intentionally NOT encoded here (see docs/matching/match-score-model-v1.md).
+// Matching contracts — TYPE-ONLY (types + interfaces). No scoring algorithm, no I/O.
+// Numeric tuning (weights, sub-weights, caps, band thresholds, inactivity, anti-spam,
+// reminders) is now LOCKED as config in ./matching-config.ts (founder-authorized
+// 2026-05-31; see docs/source-of-truth/decisions/ADR-0001-matching-tuning-v1.md and
+// docs/matching/match-tuning-v1-decisions.md). The scoring ENGINE that consumes those
+// values remains founder-gated (production deploy) and unimplemented.
 //
 // Source of truth: Notion "Exact Ranking, Matching & Boost Formula",
-// "Matching Pipeline / Scoring / Refresh". Unlocked values are marked TODO(?).
-// Status/enum unions mirror the Canonical Enum Registry; when enums.ts is
-// regenerated (Contracts V1), prefer importing from there.
+// "Matching Pipeline / Scoring / Refresh". Status/enum unions mirror the Canonical Enum
+// Registry; when enums.ts is regenerated (Contracts V1), prefer importing from there.
 //
 // Guardrails: G8 (no monetization in score), G11 (host-visible band is categorical,
 // raw numeric admin-only). MUST NOT add protected-class fields (see
@@ -17,10 +19,10 @@ export type MatchScore = number
 /** Confidence in the score, 0-100 (separate axis from score). */
 export type MatchConfidence = number
 
-/** Host-visible categorical band. Numeric cutoffs are founder-gated (TODO?). */
-export type MatchBand = "strong" | "developing" | "needs_attention" // TODO(?) confirm labels/thresholds
+/** Host-visible categorical band. Thresholds LOCKED in matching-config.ts (strong >=75, developing >=50). */
+export type MatchBand = "strong" | "developing" | "needs_attention"
 
-/** Canonical scoring component keys (mirror weight table; WEIGHTS NOT encoded). */
+/** Canonical scoring component keys (mirror weight table; weights live in matching-config.ts). */
 export type MatchScoreComponentKey =
 	| "timeline_availability"
 	| "skills_certifications"
@@ -31,7 +33,7 @@ export type MatchScoreComponentKey =
 	| "completeness_confidence"
 	| "behavioral_reliability"
 
-/** Canonical hard-modifier kinds (caps applied after raw score). Cap VALUES not encoded. */
+/** Canonical hard-modifier kinds (caps applied after raw score). Cap VALUES in matching-config.ts. */
 export type MatchHardModifierKind =
 	| "required_cert_missing"
 	| "timeline_conflict"
@@ -58,11 +60,11 @@ export type MatchSignalKind =
 	| "completeness_confidence"
 	| "behavioral_reliability"
 	| "host_requirements_fit"
-// TODO(?) "work_style_fit" — not in canonical weight table; deferred.
+// "work_style_fit" — deferred to V2 (decision 2026-05-31; not in canonical 100-pt table).
 
 export type MatchSignalVisibility = "seeker" | "host" | "internal"
 
-/** A single contributing signal. Contribution is descriptive, not the locked weight. */
+/** A single contributing signal. Contribution is descriptive; locked weights live in matching-config.ts. */
 export interface MatchSignal {
 	kind: MatchSignalKind
 	visibility: MatchSignalVisibility

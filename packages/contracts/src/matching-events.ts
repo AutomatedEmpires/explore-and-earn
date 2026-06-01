@@ -48,14 +48,21 @@ export type ApplicationEventType =
 	| "application_accepted"
 	| "application_completed"
 
+// Candidate-review + UI interaction events. RATIFIED 2026-05-31 (founder-authorized).
+// `candidate_saved` is the canonical replacement for the directive's prohibited
+// `candidate_shortlisted` ("shortlisted" is banned; canon save-state is saved_by_host).
+// CANON-SYNC OWED: these must be mirrored into the Notion Canonical Event Registry
+// (tracked in open-questions: Q-MATCH-EVENT-ADDS, Q-MATCH-EVENT-SHORTLIST).
+export type CandidateReviewEventType =
+	| "candidate_saved"
+	| "candidate_card_opened"
+	| "candidate_profile_popup_opened"
+	| "quick_apply_clicked"
+	| "match_score_impression"
+
 export type MatchingHiringEventType =
 	| MatchingEventType
 	| InviteEventType
 	| OfferEventType
 	| ApplicationEventType
-
-// TODO(?) proposed additions NOT yet in Event Registry — require founder/registry update:
-//   candidate_card_opened, candidate_profile_popup_opened, quick_apply_clicked
-// CONFLICT: directive "candidate_shortlisted" uses prohibited "shortlisted" term;
-//   propose candidate_saved instead. "candidate_invited"/"invite_responded"/
-//   "candidate_not_selected" duplicate canonical events; prefer canonical names.
+	| CandidateReviewEventType

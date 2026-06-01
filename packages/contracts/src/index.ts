@@ -12,3 +12,6 @@ export * from "./offers";
 export * from "./hiring";
 export * from "./responsiveness";
 export * from "./matching-events";
+
+// Locked tuning config (data only; founder-authorized 2026-05-31). No algorithm.
+export * from "./matching-config";

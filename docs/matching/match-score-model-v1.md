@@ -1,6 +1,6 @@
 # Match Score Model V1
 
-> DRAFT — architecture only. Canonical values cited from "Exact Ranking, Matching & Boost Formula" and "Matching Pipeline / Scoring / Refresh". Unlocked values marked TODO(?). Final weights are a founder approval gate.
+> DRAFT — architecture only. Canonical values cited from "Exact Ranking, Matching & Boost Formula" and "Matching Pipeline / Scoring / Refresh". **Tuning values are LOCKED 2026-05-31** (founder-authorized) — see [`match-tuning-v1-decisions.md`](./match-tuning-v1-decisions.md) and encoded config in `packages/contracts/src/matching-config.ts`. The scoring **engine** that consumes them is still gated (A-MATCH-DEPLOY) and unbuilt.
 
 ## Purpose
 
@@ -8,38 +8,48 @@ The match score is an **assistive relevance estimate** between a seeker profile 
 
 ## Scale & axes
 
-- `score`: integer **0–100** (canon).
-- `confidence`: integer **0–100**, a separate axis describing how much data backs the score (canon). Low confidence must visibly temper the score.
-- `band`: a categorical label derived from score. Host-facing display uses the **band**, not raw internal subscores (guardrail G11). Canonical band thresholds and labels are **TODO(?)**; proposed bands `strong` / `developing` / `needs_attention` mirror G11's host-visible categorical labels ("Strong" / "Developing" / "Needs attention"). Exact numeric cutoffs require founder approval.
+- `score`: integer **0-100** (canon).
+- `confidence`: integer **0-100**, a separate axis describing how much data backs the score (canon). Low confidence visibly tempers the score (see display gating).
+- `band`: a categorical label derived from score. Host-facing display uses the **band**, not raw internal subscores (guardrail G11).
 
-## Component weights (canon — do NOT alter without ADR + founder gate)
+## Band thresholds (LOCKED — ADR-0001 §6)
 
-Raw score is composed from (Exact Ranking & Matching Formula). Weights are documented here for reference and are **not** encoded in contracts (founder-gated):
+| Band | Score range | Host label | Seeker label |
+| --- | --- | --- | --- |
+| `strong` | 75-100 | Strong | Strong fit |
+| `developing` | 50-74 | Developing | Good fit |
+| `needs_attention` | 0-49 | Needs attention | Partial fit |
 
-| Component | Weight | Notes |
+Thresholds + labels are encoded in `matching-config.ts` (`MATCH_BAND_THRESHOLDS_V1`, `BAND_LABELS_V1`). Rationale: reaching 75 requires clearing most of the two gating realities (timeline+skills = 40 pts) plus real secondary fit; below 50 a gating reality is weak or a hard cap applied. Proposed CI check **G33** keeps thresholds ordered.
+
+## Component weights (LOCKED — canon top-level + architect sub-weights, ADR-0001 §1-§2)
+
+Encoded in `matching-config.ts` (`MATCH_COMPONENT_WEIGHTS_V1`, `MATCH_SUBWEIGHTS_V1`). Proposed CI checks **G31** (sum=100) and **G32** (sub-weights sum to parent).
+
+| Component | Weight | Sub-weights |
 | --- | --- | --- |
-| Timeline / availability fit | 20 | Overlap of seeker availability and listing season/dates |
-| Skills / certifications fit | 20 | Structured skills/certs vs listing requirements |
-| Role / category fit | 15 | Desired category/role vs listing |
-| Housing / meals / pay preference fit | 15 | housing 5 / meals 3 / pay 7 (HOUSING/MEALS/PAY triad) |
-| Location / travel fit | 10 | Relative location / travel willingness |
-| Seeker goals / open-to fit | 10 | Stated goals and openness |
-| Completeness confidence | 5 | Profile/listing completeness contribution |
-| Behavioral reliability | 5 | Internal responsiveness/reliability (never public) |
+| Timeline / availability | 20 | window overlap 14 / start alignment 4 / shift compat 2 |
+| Skills / certifications | 20 | required coverage 12 / preferred 5 / tag overlap 3 |
+| Role / category | 15 | primary 11 / adjacent 4 |
+| Housing / Meals / Pay | 15 | housing 5 / meals 3 / pay-meets-min 5 / pay-above-margin 2 |
+| Location / travel | 10 | region or commute 6 / travel willingness 4 |
+| Seeker goals / open-to | 10 | explicit open-to 6 / stated goal 4 |
+| Completeness confidence | 5 | completeness 5 |
+| Behavioral reliability | 5 | activity recency 3 / response rate 2 |
 
-Sum = 100. Per-signal sub-weights beyond those shown are **TODO(?)**.
+Sum = 100. The two gating realities (timeline, skills) carry the most weight; completeness + behavioral are deliberately the smallest so platform behavior can never out-rank genuine fit. Full defense in the decisions doc.
 
-## Hard modifiers (caps applied AFTER raw score) — canon
+## Hard modifiers (caps applied AFTER raw score) — canon, ratified
 
-Modifiers cap or hide; they never silently delete a candidate without an explainable reason (no hidden disqualifiers).
+Modifiers cap or hide; they never silently delete a candidate without an explainable reason (no hidden disqualifiers). Caps are encoded in `MATCH_HARD_MODIFIER_CAPS_V1` and set at band boundaries so the resulting band tells the truth.
 
 | Condition | Effect |
 | --- | --- |
-| Required certification missing | cap score at 60 |
+| Required certification missing | cap score at 60 (never "Strong") |
 | Impossible timeline conflict | cap at 50 |
 | Seeker requires housing but not included | cap at 65 |
 | Visa support required but unavailable | cap at 50 |
-| Trust / moderation concern | cap or hide |
+| Trust / moderation concern | cap or hide (moderation service) |
 
 **Exclusions (not scored at all):** listing not live; seeker blocked/restricted; host/account banned/suspended; listing closed/archived.
 
@@ -54,40 +64,50 @@ Modifiers cap or hide; they never silently delete a candidate without an explain
 | Host profile / trust media | 10 |
 | Recency / activity | 10 |
 
+## Confidence display gating (LOCKED — ADR-0001 §7)
+
+- **confidence < 40** -> withhold score + band; show "Building match - complete your profile" (seeker) / "Limited data" (host).
+- **40 <= confidence < 60** -> show band with a "based on limited info" qualifier.
+- **confidence >= 60** -> full display (band + rounded score where shown).
+
+Encoded in `MATCH_CONFIDENCE_DISPLAY_V1`. This operationalizes "no false precision."
+
 ## Pipeline shape (architecture only — NOT an implementation)
 
 ```mermaid
 flowchart LR
-	P["Eligible pool"] --> R["Raw weighted score (FUTURE)"]
+	P["Eligible pool"] --> R["Raw weighted score (FUTURE engine)"]
 	R --> M["Apply hard-modifier caps"]
 	M --> X{"Exclusion?"}
 	X -->|yes| H["Hidden / not surfaced"]
 	X -->|no| C["Attach confidence + reasons"]
-	C --> S["Persist MatchResult (score, confidence, reasons, staleAt, version)"]
+	C --> G{"Confidence gate"}
+	G -->|< 40| W["Withhold band (building match)"]
+	G -->|>= 40| S["Persist MatchResult (score, confidence, band, reasons, staleAt, version)"]
 ```
 
-The boxes marked FUTURE are the founder-gated algorithm; this pack defines their inputs/outputs and boundaries only.
+The box marked FUTURE engine is gated by A-MATCH-DEPLOY; this pack defines its inputs/outputs, config, and boundaries only.
 
 ## Worked example (illustrative — NOT a locked output)
 
-> Seeker A vs Listing X: availability overlaps full season (timeline strong), structured farm-equipment certs match requirements (skills strong), housing provided matches need, pay meets minimum. No required cert missing, no timeline conflict. Result: high raw score, high confidence. Surfaced to host as band "Strong" with an explanation listing the four positive signals and one missing item (no references yet). The 30-day-old availability data is within freshness, so no stale flag.
+> Seeker A vs Listing X: availability overlaps full season (timeline ~19/20), structured farm-equipment certs cover required skills (skills ~18/20), housing provided matches need, pay meets minimum (HMP ~13/15), role exact (15), location in-region (8/10), goals aligned (8/10), profile complete (confidence ~78). No required cert missing, no timeline conflict. Raw ~ 88 -> band **Strong** (>=75), confidence 78 -> full display. Surfaced to the host as "Strong" with the four positive signals + one missing item (no references yet). 30-day-old availability is within freshness -> no stale flag.
 
-This example demonstrates **explainability and no false precision** — it never claims "97% perfect".
+This demonstrates **explainability and no false precision** — it never claims "97% perfect".
 
 ## Display format
 
-- Host-facing: categorical band + score, always paired with an explanation entry point (guardrail: no score display without explanation contract). Example layout (copy not locked — TODO(?)): `Match 82% · Strong fit · Review why`.
-- Seeker-facing: optional score or a "why this fits" summary. Exact seeker-visible wording is a **founder approval gate**.
-- **No false precision**: never present sub-percent precision or claims like "97% perfect match". The score is heuristic and must be described as such.
+- Host-facing: categorical band + score (confidence-gated), always paired with an explanation entry point (no score display without an explanation contract). Example: `Strong - Review why` (numeric score shown only at confidence >= 60).
+- Seeker-facing: band label ("Strong fit" / "Good fit" / "Partial fit") + "Why this fits" summary. Locked copy in `BAND_LABELS_V1`.
+- **No false precision**: never present sub-percent precision or claims like "97% perfect match".
 
 ## When the score appears / is hidden
 
-- Appears: on relevant cards and in host candidate review when a `MatchResult` exists and the listing is live.
-- Hidden: when excluded (see exclusions), when confidence is below a **TODO(?)** display threshold (founder gate), or when a trust/moderation concern triggers hide.
+- Appears: on relevant cards and in host candidate review when a `MatchResult` exists, the listing is live, and confidence >= 40.
+- Hidden: when excluded (see exclusions), when confidence < 40 (show "building match"), or when a trust/moderation concern triggers hide.
 
 ## Storage, staleness, recompute (canon: Matching Pipeline / Scoring / Refresh)
 
-- **Stored**, not computed on read. `MatchResult` core fields: `seekerProfileId`, `listingId`, `score`, `confidence`, `reasons`, `generatedAt`, `staleAt`, `version`.
+- **Stored**, not computed on read. `MatchResult` core fields: `seekerProfileId`, `listingId`, `score`, `confidence`, `band`, `reasons`, `generatedAt`, `staleAt`, `version`.
 - Refresh is **hybrid**:
 
 | Trigger class | Examples | Refresh mode |
@@ -96,7 +116,7 @@ This example demonstrates **explainability and no false precision** — it never
 | Bulk change | new listing enters a pool, batch profile updates | queued bulk recompute |
 | Time decay | `now > staleAt` | scheduled stale refresh |
 
-- Stale results (`now > staleAt`) are flagged; display rules for stale-but-shown results are **TODO(?)** (founder gate).
+- **Stale-but-shown rule (LOCKED — ADR-0001 §7):** if `now > staleAt` and confidence >= 40, show the last good band with a "Refreshing" indicator and queue a refresh; if a high-impact input changed, mark stale, queue an immediate recompute, and show "Updating match" instead of a possibly-wrong band.
 - Candidate pools are built by category / timeline / location / preferences / eligibility / boosted membership (canon). Boosted membership affects pool/placement, never score (G8).
 
 ## What the score must NOT claim
