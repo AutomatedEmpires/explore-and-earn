@@ -1,5 +1,5 @@
 name: Agent Build Task
-description: Dispatch a spec-complete implementation task to a worker agent (the relay's buildable-work inbox).
+description: Dispatch a spec-complete implementation task to a worker agent (the relay's buildable-work inbox). Selected routing values are mirrored into labels after creation.
 title: "[build] <area>: <short summary>"
 labels:
   - "status:ready"
@@ -8,6 +8,9 @@ body:
     attributes:
       value: |
         Opus (or another orchestrator) files this to hand a spec-complete task to a worker agent.
+        GitHub issue forms can only apply static labels at creation time; the build-task router
+        workflow mirrors the selected Area, Suggested agent, and Risk level into labels
+        immediately after the issue opens.
         One task per issue. Cite canon. The worker claims it by self-assigning and swapping
         `status:ready` -> `status:claimed` -> `status:in-progress`.
   - type: dropdown
