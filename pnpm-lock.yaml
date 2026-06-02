@@ -43,6 +43,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@explore-and-earn/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@explore-and-earn/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       next:
         specifier: ^15.3.0
         version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)

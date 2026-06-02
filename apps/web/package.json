@@ -1,17 +1,19 @@
 {
-  "name": "@explore-and-earn/web",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:e2e": "playwright test"
-  },
-  "dependencies": {
-    "next": "^15.3.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  }
+	"name": "@explore-and-earn/web",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"dev": "next dev",
+		"build": "next build",
+		"lint": "eslint .",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test:e2e": "playwright test"
+	},
+	"dependencies": {
+		"@explore-and-earn/contracts": "workspace:*",
+		"@explore-and-earn/ui": "workspace:*",
+		"next": "^15.3.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	}
 }
