@@ -34,15 +34,15 @@ export function Icon({ name, size = 24, title, ...rest }: IconProps) {
 			aria-hidden={hidden}
 			data-icon={name}
 			data-streamline={entry.streamline}
-			style={{
+			style=
 				display: "inline-flex",
 				alignItems: "center",
 				justifyContent: "center",
 				width: size,
 				height: size,
 				fontSize: size,
-				lineHeight: 1
-			}}
+				lineHeight: 1,
+			
 		>
 			{/* TODO(A-ICON-LICENSE): swap placeholder for licensed Streamline Freehand asset */}
 			{entry.placeholder}
