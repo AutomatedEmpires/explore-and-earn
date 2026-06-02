@@ -1,0 +1,358 @@
+/*
+ * Component styles — V1.
+ *
+ * References SEMANTIC tokens only (see styles/tokens.css). No raw hex, no ad-hoc
+ * radii or px type sizes (drift rule #1). Cards are flat / borders-first; the
+ * Housing/Meals/Pay triad is always visually first-class.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+}
+
+/* ---- generic Card primitive ---- */
+.ui-card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  padding: var(--space-card);
+}
+
+.ui-card__title {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+}
+
+/* ---- badges ---- */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.ui-badge--verified {
+  background: var(--status-verified_host-bg);
+  color: var(--status-verified_host-fg);
+}
+
+.ui-badge__qualifier {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--type-caption-size);
+  opacity: 0.85;
+}
+
+/* ---- home ---- */
+.home {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-48) var(--space-gutter);
+}
+
+.home__title {
+  font-family: var(--font-display);
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-lh);
+  margin: 0 0 var(--space-12);
+}
+
+.home__tagline {
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-24);
+}
+
+.home__cta {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-12) var(--space-20);
+  border-radius: var(--radius-button);
+  background: var(--border-ink);
+  color: var(--color-surface-raised);
+  text-decoration: none;
+  font-size: var(--type-button-size);
+}
+
+/* ---- discovery feed layout ---- */
+.discovery-feed {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: var(--space-32) var(--space-gutter) var(--space-48);
+}
+
+.discovery-feed__header {
+  margin-bottom: var(--space-section);
+}
+
+.discovery-feed__title {
+  font-family: var(--font-display);
+  font-size: var(--type-page-size);
+  line-height: var(--type-page-lh);
+  margin: 0 0 var(--space-4);
+}
+
+.discovery-feed__tagline {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.discovery-feed__section {
+  margin-top: var(--space-section);
+}
+
+.discovery-feed__lane-title {
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  margin: 0 0 var(--space-16);
+}
+
+.discovery-feed__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-section);
+}
+
+@media (min-width: 640px) {
+  .discovery-feed__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .discovery-feed__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ---- discovery card ---- */
+.discovery-card {
+  --card-accent-bg: var(--color-surface);
+  --card-accent-fg: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.discovery-card[data-category="farm"] {
+  --card-accent-bg: var(--accent-farm-bg);
+  --card-accent-fg: var(--accent-farm-fg);
+}
+
+.discovery-card[data-category="maritime"] {
+  --card-accent-bg: var(--accent-maritime-bg);
+  --card-accent-fg: var(--accent-maritime-fg);
+}
+
+.discovery-card[data-category="remote"] {
+  --card-accent-bg: var(--accent-remote-bg);
+  --card-accent-fg: var(--accent-remote-fg);
+}
+
+.discovery-card[data-category="seasonal"] {
+  --card-accent-bg: var(--accent-seasonal-bg);
+  --card-accent-fg: var(--accent-seasonal-fg);
+}
+
+.discovery-card[data-category="mix"] {
+  --card-accent-bg: var(--accent-mix-bg);
+  --card-accent-fg: var(--accent-mix-fg);
+}
+
+.discovery-card__hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-8);
+  min-height: 84px;
+  padding: var(--space-12);
+  background: var(--card-accent-bg);
+}
+
+.discovery-card__category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--card-accent-fg);
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.discovery-card__pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: flex-end;
+}
+
+.discovery-card__pill {
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+}
+
+.discovery-card__pill[data-badge="featured"] {
+  background: var(--status-featured-bg);
+  color: var(--status-featured-fg);
+}
+
+.discovery-card__pill[data-badge="boosted"] {
+  background: var(--status-boosted-bg);
+  color: var(--status-boosted-fg);
+}
+
+.discovery-card__pill[data-badge="seasonal"] {
+  background: var(--accent-seasonal-bg);
+  color: var(--accent-seasonal-fg);
+}
+
+.discovery-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-card);
+}
+
+.discovery-card__host {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.discovery-card__host-name {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.discovery-card__title {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  margin: 0;
+}
+
+.discovery-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.discovery-card__dot {
+  color: var(--text-muted);
+}
+
+/* the triad is always first-class — three equal, prominent cells */
+.discovery-card__triad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-8);
+  margin: 0;
+}
+
+.triad-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  border-radius: var(--radius-cell);
+}
+
+.triad-cell[data-benefit="housing"] {
+  background: var(--benefit-housing-bg);
+  color: var(--benefit-housing-fg);
+}
+
+.triad-cell[data-benefit="meals"] {
+  background: var(--benefit-meals-bg);
+  color: var(--benefit-meals-fg);
+}
+
+.triad-cell[data-benefit="pay"] {
+  background: var(--benefit-pay-bg);
+  color: var(--benefit-pay-fg);
+}
+
+.triad-cell__label {
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.triad-cell__value {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: 600;
+}
+
+.discovery-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  margin-top: var(--space-4);
+}
+
+.discovery-card__match {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--status-match-bg);
+  color: var(--status-match-fg);
+  font-size: var(--type-meta-size);
+}
+
+.discovery-card__apply {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+  padding: var(--space-8) var(--space-16);
+  border: none;
+  border-radius: var(--radius-button);
+  background: var(--border-ink);
+  color: var(--color-surface-raised);
+  font-size: var(--type-button-size);
+  cursor: pointer;
+}
+
+.discovery-card__apply:hover {
+  opacity: 0.92;
+}
