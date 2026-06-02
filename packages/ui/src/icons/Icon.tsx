@@ -1,4 +1,5 @@
 import { getIcon, type IconKey } from "./registry"
+import type { CSSProperties } from "react"
 
 /**
  * <Icon> — the ONLY sanctioned way to render an icon in Explore&Earn.
@@ -27,6 +28,15 @@ export function Icon({ name, size = 24, title, ...rest }: IconProps) {
 	const entry = getIcon(name)
 	const label = title ?? entry.label
 	const hidden = rest["aria-hidden"]
+	const style: CSSProperties = {
+		display: "inline-flex",
+		alignItems: "center",
+		justifyContent: "center",
+		width: size,
+		height: size,
+		fontSize: size,
+		lineHeight: 1,
+	}
 	return (
 		<span
 			role="img"
@@ -34,15 +44,7 @@ export function Icon({ name, size = 24, title, ...rest }: IconProps) {
 			aria-hidden={hidden}
 			data-icon={name}
 			data-streamline={entry.streamline}
-			style={{
-				display: "inline-flex",
-				alignItems: "center",
-				justifyContent: "center",
-				width: size,
-				height: size,
-				fontSize: size,
-				lineHeight: 1
-			}}
+			style={style}
 		>
 			{/* TODO(A-ICON-LICENSE): swap placeholder for licensed Streamline Freehand asset */}
 			{entry.placeholder}
