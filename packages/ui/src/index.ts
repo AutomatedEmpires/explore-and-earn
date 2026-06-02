@@ -2,6 +2,7 @@ export * from "./Badge";
 export * from "./Button";
 export * from "./Card";
 export * from "./Chip";
+export * from "./DiscoveryCard";
 export * from "./FoundingCountdown";
 export * from "./Meter";
 export * from "./Modal";
