@@ -49,30 +49,24 @@ if they diverge).
 
 ## Deprecated aliases (back-compat only)
 
-The first registry cut shipped five keys that are **not** in the locked taxonomy.
+The first registry cut shipped keys that are **not** in the locked taxonomy.
 They are retained as `deprecated: true` with an `aliasOf` pointer so existing
 consumers keep compiling. Do not add new references.
 
 | Deprecated key | `aliasOf` | Reason |
 | --- | --- | --- |
-| `category.lodge` | `null` | **Category drift** -- blocked on open question (below) |
 | `status.featured` | `trust.featured_employer` | "Featured" is a trust/employer badge, not a fill status |
 | `status.seasonal` | `category.seasonal` | Seasonal is a category lane, not a fill status |
 | `mappin.location` | `null` | Generic pin; use `mappin.<category>` or `nav.map` |
 | `nav.host` | `nav.profile` | Host view is a profile surface |
 
-## Open question -- category drift (founder decision)
+## Category lanes (resolved 2026-06-01)
 
-- **Discovery Card spec** (`docs/design/discovery-card-v1.md`): category badge =
-  `farm / lodge / maritime / remote`.
-- **Locked icon taxonomy** + **`packages/contracts` enums**
-  (`MARKETPLACE_CATEGORIES`) + **root `AGENTS.md`**: `farm / maritime / remote /
-  seasonal / mix`.
-
-This registry follows the **locked icon taxonomy** and parks `category.lodge` as
-a deprecated alias rather than guessing. Reconciliation belongs to the founder /
-design owner; tracked alongside the contracts canon work in PR #13. Until then,
-no code should map a real lane to `lodge`.
+The canonical category lanes are **farm / maritime / remote / seasonal / mix** --
+matching the locked icon taxonomy, the `packages/contracts` enums
+(`MARKETPLACE_CATEGORIES`), and root `AGENTS.md`. **"Lodge" is not a category
+lane** -- it is a setting under the **seasonal** lane. There is therefore no
+`category.lodge` key; code maps lodge-type listings to `category.seasonal`.
 
 ## Wiring real assets later (per icon)
 

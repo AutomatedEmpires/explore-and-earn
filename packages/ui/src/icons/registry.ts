@@ -17,13 +17,11 @@
  * ~100 distinct icons per project; exceeding it requires the Extended Vector
  * License (founder gate G30). This registry is intentionally < 100 keys.
  *
- * OPEN QUESTION (canon drift -- do not resolve unilaterally): the Discovery Card
- * spec (docs/design/discovery-card-v1.md) describes category lanes as
- * farm/lodge/maritime/remote, while the LOCKED icon taxonomy and the
- * packages/contracts enums (MARKETPLACE_CATEGORIES) use
- * farm/maritime/remote/seasonal/mix. This registry follows the LOCKED icon
- * taxonomy and keeps `category.lodge` as a deprecated alias pending founder
- * reconciliation. See docs/architecture-mirror/icon-registry.md.
+ * CATEGORY LANES (founder-resolved 2026-06-01): the canonical lanes are
+ * farm/maritime/remote/seasonal/mix, matching the LOCKED icon taxonomy and the
+ * packages/contracts enums (MARKETPLACE_CATEGORIES). "Lodge" is NOT a category --
+ * it is a setting under the seasonal lane -- so no `category.lodge` key exists.
+ * See docs/architecture-mirror/icon-registry.md.
  */
 
 /** Canonical icon keys -- the founder-locked taxonomy (docs/design/icon-system.md). */
@@ -95,11 +93,10 @@ export type CanonicalIconKey =
 /**
  * Legacy keys from the first registry cut, retained as DEPRECATED aliases so
  * existing consumers keep compiling. Do NOT reference these in new code -- use
- * `aliasOf` (below) to find the canonical replacement. `aliasOf: null` means the
- * mapping is blocked on an open canon question (see file header).
+ * `aliasOf` (below) to find the canonical replacement. `aliasOf: null` means
+ * there is no single canonical replacement (pick by context).
  */
 export type DeprecatedIconKey =
-	| "category.lodge"
 	| "status.featured"
 	| "status.seasonal"
 	| "mappin.location"
@@ -118,7 +115,7 @@ export interface IconEntry {
 	label: string
 	/** True for legacy keys retained only for back-compat. */
 	deprecated?: boolean
-	/** Canonical key this alias should migrate to (null = blocked on open canon question). */
+	/** Canonical key this alias should migrate to (null = no single canonical replacement). */
 	aliasOf?: CanonicalIconKey | null
 }
 
@@ -187,7 +184,6 @@ export const ICON_REGISTRY: Record<IconKey, IconEntry> = {
 	"system.lock": { key: "system.lock", streamline: "padlock", placeholder: "\u{1F512}", label: "Lock" },
 	"system.loading": { key: "system.loading", streamline: "spinner / hourglass", placeholder: "\u{23F3}", label: "Loading" },
 	// ---- DEPRECATED ALIASES (retained for back-compat; do not use in new code) ----
-	"category.lodge": { key: "category.lodge", streamline: "cabin / mountain lodge", placeholder: "\u{1F3D4}", label: "Lodge (deprecated -- category drift)", deprecated: true, aliasOf: null },
 	"status.featured": { key: "status.featured", streamline: "star", placeholder: "\u{2B50}", label: "Featured (deprecated)", deprecated: true, aliasOf: "trust.featured_employer" },
 	"status.seasonal": { key: "status.seasonal", streamline: "leaf", placeholder: "\u{1F343}", label: "Seasonal status (deprecated -- seasonal is a category)", deprecated: true, aliasOf: "category.seasonal" },
 	"mappin.location": { key: "mappin.location", streamline: "generic map-pin", placeholder: "\u{1F4CD}", label: "Generic pin (deprecated -- use mappin.<category> or nav.map)", deprecated: true, aliasOf: null },

@@ -44,7 +44,6 @@ export const _runtimeChecks = (): boolean => {
 		(k) => isCanonicalIconKey(k) && getIcon(k).key === k,
 	)
 	const deprecatedKeys: DeprecatedIconKey[] = [
-		"category.lodge",
 		"status.featured",
 		"status.seasonal",
 		"mappin.location",
