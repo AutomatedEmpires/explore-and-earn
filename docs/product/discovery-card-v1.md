@@ -20,8 +20,8 @@ The Discovery Card is how a seeker evaluates an opportunity at a glance and deci
 | meals | yes | triad — "what will I eat?" |
 | pay | yes | triad — "what will I earn?" |
 | Verified Host badge | yes | self-declared qualifier |
-| category badge | yes | lane (farm/lodge/maritime/remote) |
-| seasonal / featured badge | conditional | when applicable |
+| category badge | yes | lane (farm/maritime/remote/seasonal/mix) |
+| time-window / featured badge | conditional | seasonality / time-window — distinct from the Seasonal category lane; shown when applicable |
 | match score | conditional | matched surface only |
 | boosted treatment | conditional | boosted surface only |
 | Quick Apply | yes | primary action |
@@ -33,6 +33,7 @@ The Discovery Card is how a seeker evaluates an opportunity at a glance and deci
 - **One component** serves all surfaces; behavior varies by variant + props, not by forking.
 - Boosted cards must be **subtle**, never spammy/ad-like.
 - Status must never be conveyed by color alone.
+- Categories are locked to **farm/maritime/remote/seasonal/mix**. *Lodge is not a category* — it is a setting/environment under **seasonal**.
 
 ## Surfaces
 

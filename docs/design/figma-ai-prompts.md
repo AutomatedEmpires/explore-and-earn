@@ -35,8 +35,9 @@ Notion = product truth; GitHub = implementation truth. Do **not** invent visual 
 
 - **Triad mandatory:** Housing / Meals / Pay — never "Perks."
 - **Verified Host badge mandatory** and reads **"Self-Declared"** (no implied platform verification).
-- **One unified component system** across all four lanes — vary imagery + accent, never fork per category.
+- **One unified component system** across all lanes — vary imagery + accent, never fork per category.
 - **Tokens only** (exact hex below). Borders-first — **no card shadows.** Frame photos, never filter. One hand-drawn line-icon set. Never color-only status. Mobile-first.
+- **Locked categories:** farm / maritime / remote / seasonal / mix. *Lodge is not a category* — it is a setting under seasonal.
 
 **Tokens (use exactly):**
 
@@ -50,9 +51,10 @@ Notion = product truth; GitHub = implementation truth. Do **not** invent visual 
 | Pay chip | bg `#DAE4F0` · text `#3F5687` |
 | Verified Host | bg `#DBEAE2` · text `#2E6B57` |
 | Category Farm | bg `#EDE3CF` · text `#6B5326` |
-| Category Seasonal/Lodge | bg `#DCEBD6` · text `#41663A` |
 | Category Maritime | bg `#D6E6E9` · text `#2E5E6B` |
 | Category Remote | bg `#DEE0F2` · text `#3F4A87` |
+| Category Seasonal | bg `#DCEBD6` · text `#41663A` |
+| Category Mix | bg `#E7E2EE` · text `#5B5172` |
 | Radius | card 24 · image 16 · chips/badges full pill |
 | Type | titles: hand-drawn display (Patrick Hand) · UI/body: Inter |
 | Photo | 3:2, cover, framed (never filtered) |
@@ -94,10 +96,10 @@ RULES: one consistent hand-drawn line-icon set (no mixed libraries); never use c
 Using the SAME design system, tokens, and aesthetic as the Discovery Card test (and the canon in the Notion brief + this GitHub repo), build TWO connected mobile screens (390px). Keep: paper surfaces, ink borders, borders-first (no shadows), hand-drawn display font for titles + Inter for UI, pill chips, 3:2 framed photos (frame around, never filter), the mandatory triad (Housing/Meals/Pay), and a "Verified Host · Self-Declared" badge on every card.
 
 SCREEN 1 — DISCOVERY FEED (mobile):
-- Paper header: product name in the hand-drawn display font + search field + a row of category filter pills (Farm, Lodge/Outdoor, Maritime, Remote).
-- Vertical scroll of 4 Discovery Cards, each a DIFFERENT visual lane so the system reads as ONE unified component across worlds (same card, different imagery + accent — do NOT fork the UI per category):
+- Paper header: product name in the hand-drawn display font + search field + a row of category filter pills (Farm, Maritime, Remote, Seasonal, Mix).
+- Vertical scroll of 4 Discovery Cards sampling lanes (Farm, Maritime, Remote, Seasonal); Mix is blended and demoed separately so the system still reads as ONE unified component across worlds (same card, different imagery + accent — do NOT fork the UI per category):
    1. FARM/ORCHARD — golden-hour, barn, produce. Category pill bg #EDE3CF / text #6B5326.
-   2. SEASONAL LODGE/OUTDOOR — mountains, cabin, pine, trail. Pill bg #DCEBD6 / text #41663A.
+   2. SEASONAL / OUTDOOR — mountains, cabin, pine, trail, lodge (a setting, not a category). Pill bg #DCEBD6 / text #41663A.
    3. MARITIME — docks, rope, boats, blue-gray. Pill bg #D6E6E9 / text #2E5E6B.
    4. REMOTE — quiet cabin, laptop, desk. Pill bg #DEE0F2 / text #3F4A87.
 - One card shows a subtle "Featured" pill; one shows a subtle "Match" indicator — tasteful, never spammy/ad-like.
@@ -111,7 +113,7 @@ SCREEN 2 — LISTING DETAIL (mobile), opened from a card:
 - A small map preview for location.
 - A STICKY bottom bar: "Quick Apply" primary button + Save (heart) + Share.
 
-GLOBAL RULES: one consistent hand-drawn line-icon set across both screens; tokens only (exact hex above); never signal status by color alone; mobile-first, large tap targets, generous whitespace; warm organic photography across all four lanes (do not let it become only alpine — farm/greenhouse/maritime/remote are equally important).
+GLOBAL RULES: one consistent hand-drawn line-icon set across both screens; tokens only (exact hex above); never signal status by color alone; mobile-first, large tap targets, generous whitespace; warm organic photography across all five lanes (do not let it become only alpine — farm/greenhouse/maritime/remote/seasonal must all read distinctly, and Mix must read intentionally blended).
 ```
 
 ## Hard rules / anti-patterns (paste if Figma drifts)
@@ -123,6 +125,7 @@ GLOBAL RULES: one consistent hand-drawn line-icon set across both screens; token
 - Color-only status → icon + label always
 - Separate UI per category → one component, varied imagery + accent
 - Corporate/stock office look → warm, organic, real working landscapes
+- Lodge as a top-level category → lodge is a setting under seasonal; categories are locked to farm / maritime / remote / seasonal / mix
 
 ## Bring it back
 

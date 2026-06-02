@@ -24,12 +24,15 @@ Indeed · ZipRecruiter · generic SaaS dashboard · corporate HR/ATS tool.
 
 Explore&Earn supports multiple lifestyle categories through **one unified component system**. Do **not** build a separate UI system per category — vary **imagery + accent color** only.
 
+The locked category taxonomy is **farm / maritime / remote / seasonal / mix**. *Lodge is not a category* — it is a setting/environment that lives under **seasonal**.
+
 | Lane | Imagery cues | Accent |
 | --- | --- | --- |
 | **Farm / Orchard / Greenhouse** | warm earth, produce, soil, barns, golden-hour light, wood, baskets, greenhouses | Farm accent |
-| **Seasonal Lodge / Outdoor** | mountains, cabins, trails, lakes, pine, stone, scenic work | Seasonal accent |
 | **Maritime** | rope, docks, water, boats, nets, salt | Maritime blue-gray |
 | **Remote** | cabins, laptops, quiet landscapes, desks, simple workspaces | Remote accent |
+| **Seasonal / Outdoor** | mountains, cabins, lodges, trails, lakes, pine, stone, scenic work (lodge is a *setting* here, never a top-level category) | Seasonal accent |
+| **Mix** | blended / multi-category opportunities; compass + folded-map cues | Mix accent |
 
 > **Do not let Explore&Earn become only alpine adventure.** The Farm/greenhouse "Warm Working Landscape" lane is co-equal. Balance imagery across lanes everywhere defaults appear.
 
