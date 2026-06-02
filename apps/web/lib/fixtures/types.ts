@@ -5,21 +5,55 @@
  * Discovery Card, Listing Detail, and Host Profile surfaces, so every feature
  * lane renders against ONE canonical shape instead of inventing its own mocks.
  *
- * This is NOT a persisted object model / DB schema / data-dictionary row. It
- * mirrors the canonical registries in @explore-and-earn/contracts and uses
- * human-readable display strings only — no money math, no persistence, no
- * routing. The gated data-dictionary build pack still owns the real object
- * model (see packages/contracts/src/card.ts).
+ * This is NOT a persisted object model / DB schema / data-dictionary row. These
+ * are presentation view-models with human-readable display strings only — no
+ * money math, persistence, or routing. The real object model stays gated in the
+ * data-dictionary build pack (see packages/contracts/src/card.ts).
  *
- * Imports are TYPE-ONLY so nothing from contracts ends up in the runtime bundle.
+ * The unions below MIRROR the canonical registries in
+ * @explore-and-earn/contracts (enums.ts MARKETPLACE_CATEGORIES, card.ts,
+ * benefits.ts). They are intentionally redeclared locally so this fixtures
+ * layer carries ZERO cross-package build coupling; unifying the import is a
+ * separate, deliberate step once the apps/web -> contracts build path is
+ * validated. Category drift is caught by the G031 taxonomy guardrail.
  */
-import type {
-	BenefitTriad,
-	DiscoveryCardConditionalBadge,
-	OpportunityCategory,
-	OpportunityTriad,
-	VerifiedHostQualifier,
-} from "@explore-and-earn/contracts"
+
+/** Locked opportunity lanes — mirrors MARKETPLACE_CATEGORIES. */
+export type FixtureCategory =
+	| "farm"
+	| "maritime"
+	| "remote"
+	| "seasonal"
+	| "mix"
+
+/** Whether / how a benefit is provided — mirrors BENEFIT_PROVISION. */
+export type FixtureProvision = "provided" | "partial" | "not_provided"
+
+/** Conditional card badges beyond the always-on category + Verified-Host. */
+export type FixtureConditionalBadge = "seasonal" | "featured" | "boosted"
+
+/** The Verified-Host badge always carries this exact qualifier (G22). */
+export type VerifiedHostQualifier = "Self-Declared by Host"
+
+/** Display strings for the mandatory Housing / Meals / Pay triad. */
+export interface FixtureTriad {
+	readonly housing: string
+	readonly meals: string
+	readonly pay: string
+}
+
+/** One benefit on the detail surface: provision + short display summary. */
+export interface FixtureBenefit {
+	readonly provision: FixtureProvision
+	readonly summary: string
+}
+
+/** The richer triad shown on the listing detail surface. */
+export interface FixtureBenefitTriad {
+	readonly housing: FixtureBenefit
+	readonly meals: FixtureBenefit
+	readonly pay: FixtureBenefit
+}
 
 /** A photo rendered on a card or detail surface (display URL + alt only). */
 export interface FixturePhoto {
@@ -32,7 +66,6 @@ export interface HostSummaryViewModel {
 	readonly id: string
 	readonly name: string
 	readonly avatar: FixturePhoto
-	/** The Verified-Host badge always carries the canonical qualifier (G22). */
 	readonly verifiedQualifier: VerifiedHostQualifier
 }
 
@@ -48,11 +81,9 @@ export interface DiscoveryCardViewModel {
 	readonly location: string
 	/** Human-readable window, e.g. "May – Sep 2026". */
 	readonly opportunityWindow: string
-	readonly category: OpportunityCategory
-	/** Display strings for the mandatory Housing / Meals / Pay triad. */
-	readonly triad: OpportunityTriad
-	/** Conditional badges beyond the always-on category + Verified-Host badges. */
-	readonly conditionalBadges?: readonly DiscoveryCardConditionalBadge[]
+	readonly category: FixtureCategory
+	readonly triad: FixtureTriad
+	readonly conditionalBadges?: readonly FixtureConditionalBadge[]
 	/** Present only on the "matched" surface (0–100). */
 	readonly matchScore?: number
 	/** Subtle, never-an-ad "boosted" treatment flag. */
@@ -68,7 +99,6 @@ export interface HostProfileViewModel {
 	readonly tagline: string
 	readonly bio: string
 	readonly location: string
-	/** Ids of other listings this host offers. */
 	readonly listingIds: readonly string[]
 }
 
@@ -78,8 +108,7 @@ export interface ListingDetailViewModel {
 	readonly summary: string
 	readonly description: readonly string[]
 	readonly gallery: readonly FixturePhoto[]
-	/** Richer triad with provision + summary for the detail surface. */
-	readonly benefits: BenefitTriad
+	readonly benefits: FixtureBenefitTriad
 	readonly housingEvidence: readonly FixturePhoto[]
 	readonly mealsEvidence: readonly FixturePhoto[]
 	readonly host: HostProfileViewModel

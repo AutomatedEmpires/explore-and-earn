@@ -10,9 +10,6 @@
     "incremental": true,
     "jsx": "preserve"
   },
-  "references": [
-    { "path": "../../packages/contracts" }
-  ],
   "include": [
     "app/**/*.ts",
     "app/**/*.tsx",
