@@ -21,7 +21,7 @@ These are the top-level canon documents. The repo mirrors the build-relevant par
 | # | Canon document (Notion) | Mirrored here as |
 | --- | --- | --- |
 | 1 | Explore&Earn Constitution — Immutable Product Truths | `docs/product/product-principles.md` |
-| 2 | Source of Truth — Master Index | this map |
+| 2 | Source of Truth — Master Index | this map + `docs/source-of-truth/master-index-inventory.md` |
 | 3 | Build Context & Cross-Agent Operating Model | `docs/agents/*` |
 | 4 | Agentic Orchestration Manual / Agent Roles & Orchestration Map | `docs/agents/cross-agent-workflow.md`, `handoff-protocol.md` |
 | 5 | Canonical Source Registry & Drift Control System | `docs/source-of-truth/canon-registry.md` |

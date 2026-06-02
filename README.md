@@ -1,5 +1,11 @@
 # Explore&Earn
 
+[![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/AutomatedEmpires/explore-and-earn?utm_source=oss&utm_medium=github&utm_campaign=AutomatedEmpires%2Fexplore-and-earn&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)
+[![Phase: Sprint Zero](https://img.shields.io/badge/phase-Sprint%20Zero-CB6E17?style=flat-square)](./docs/sprint-zero/sprint-zero-build-pack.md)
+[![Hosting: Vercel](https://img.shields.io/badge/hosting-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://vercel.com/docs)
+[![Analytics: PostHog](https://img.shields.io/badge/analytics-PostHog-FF6D2D?style=flat-square&logo=posthog&logoColor=white)](https://posthog.com)
+[![Backend: Supabase](https://img.shields.io/badge/backend-Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/docs)
+
 > built by seekers for seekers
 
 Explore&Earn is a **mobile-first, lifestyle-driven opportunity marketplace** — not a generic job board. Every opportunity answers three questions: **Where will I sleep? (Housing) · What will I eat? (Meals) · What will I earn? (Pay).**

@@ -8,6 +8,7 @@
     { "path": "./packages/ui" },
     { "path": "./packages/stripe-seed" },
     { "path": "./packages/test-utils" },
-    { "path": "./packages/mailer" }
+    { "path": "./packages/mailer" },
+    { "path": "./tools/notion-github-dispatcher" }
   ]
 }

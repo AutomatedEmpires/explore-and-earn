@@ -2,6 +2,8 @@ import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import exploreAndEarnPlugin from "./tools/eslint-plugin-explore-and-earn/index.mjs";
+
 export default tseslint.config(
   {
     ignores: [
@@ -26,6 +28,15 @@ export default tseslint.config(
     },
     rules: {
       "no-console": "off"
+    }
+  },
+  {
+    files: ["apps/**/*.{js,mjs,cjs,ts,tsx}", "packages/**/*.{js,mjs,cjs,ts,tsx}"],
+    plugins: {
+      "@explore-and-earn": exploreAndEarnPlugin
+    },
+    rules: {
+      "@explore-and-earn/category-taxonomy-lock": "error"
     }
   }
 );
