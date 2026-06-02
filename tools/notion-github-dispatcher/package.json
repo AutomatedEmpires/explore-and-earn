@@ -1,0 +1,15 @@
+{
+  "name": "@explore-and-earn/notion-github-dispatcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit false --emitDeclarationOnly false",
+    "deploy": "ntn workers deploy",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@notionhq/workers": "^0.4.0"
+  }
+}
