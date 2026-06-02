@@ -95,7 +95,7 @@ Using the SAME design system, tokens, and aesthetic as the Discovery Card test (
 
 SCREEN 1 — DISCOVERY FEED (mobile):
 - Paper header: product name in the hand-drawn display font + search field + a row of category filter pills (Farm, Lodge/Outdoor, Maritime, Remote).
-- Vertical scroll of 4 Discovery Cards, each a DIFFERENT visual lane so the system reads as ONE unified component across worlds (same card, different imagery + accent — do NOT fork the UI per category):
+- Vertical scroll of 4 Discovery Cards sampling lanes (Farm, Maritime, Remote, Seasonal); Mix is blended and demoed separately so the system still reads as ONE unified component across worlds (same card, different imagery + accent — do NOT fork the UI per category):
    1. FARM/ORCHARD — golden-hour, barn, produce. Category pill bg #EDE3CF / text #6B5326.
    2. SEASONAL LODGE/OUTDOOR — mountains, cabin, pine, trail. Pill bg #DCEBD6 / text #41663A.
    3. MARITIME — docks, rope, boats, blue-gray. Pill bg #D6E6E9 / text #2E5E6B.
@@ -111,7 +111,7 @@ SCREEN 2 — LISTING DETAIL (mobile), opened from a card:
 - A small map preview for location.
 - A STICKY bottom bar: "Quick Apply" primary button + Save (heart) + Share.
 
-GLOBAL RULES: one consistent hand-drawn line-icon set across both screens; tokens only (exact hex above); never signal status by color alone; mobile-first, large tap targets, generous whitespace; warm organic photography across all four lanes (do not let it become only alpine — farm/greenhouse/maritime/remote are equally important).
+GLOBAL RULES: one consistent hand-drawn line-icon set across both screens; tokens only (exact hex above); never signal status by color alone; mobile-first, large tap targets, generous whitespace; warm organic photography across all five lanes (do not let it become only alpine — farm/greenhouse/maritime/remote/seasonal must all read distinctly, and Mix must read intentionally blended).
 ```
 
 ## Hard rules / anti-patterns (paste if Figma drifts)
