@@ -1,0 +1,99 @@
+/*
+ * App Shell & Navigation — lane-owned chrome styles.
+ *
+ * Semantic tokens only (see apps/web/styles/tokens.css). Borders-first and
+ * flat (no shadows). 1px hairlines mirror the frozen primitives.css
+ * convention; there is no border-width token. prefers-reduced-motion honored.
+ */
+
+.shell {
+	display: flex;
+	flex-direction: column;
+	min-height: 100dvh;
+	background: var(--color-paper);
+	color: var(--text-primary);
+}
+
+/* Top bar — brand chrome */
+.topBar {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	padding: var(--space-12) var(--space-gutter);
+	padding-top: calc(var(--space-12) + env(safe-area-inset-top));
+	background: var(--color-paper);
+	border-bottom: 1px solid var(--border-soft);
+}
+
+.brand {
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
+	color: var(--text-primary);
+}
+
+/* Content region — every route mounts here */
+.content {
+	flex: 1;
+	padding: var(--space-gutter);
+	/* Clear the fixed bottom nav + the device safe area. */
+	padding-bottom: calc(
+		var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom)
+	);
+}
+
+/* Bottom navigation */
+.bottomNav {
+	position: fixed;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	z-index: 2;
+	background: var(--color-surface-raised);
+	border-top: 1px solid var(--border-soft);
+	padding-bottom: env(safe-area-inset-bottom);
+}
+
+.bottomNavList {
+	display: flex;
+	align-items: stretch;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.bottomNavItem {
+	flex: 1;
+}
+
+.bottomNavLink {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	height: var(--size-bottom-nav);
+	padding: var(--space-4);
+	color: var(--text-secondary);
+	text-decoration: none;
+	transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.bottomNavLink[data-active="true"] {
+	color: var(--text-primary);
+}
+
+.bottomNavLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	font-weight: var(--font-weight-medium);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bottomNavLink {
+		transition: none;
+	}
+}
