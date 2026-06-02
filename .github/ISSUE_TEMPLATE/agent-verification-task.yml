@@ -1,0 +1,129 @@
+name: Agent Verification Task
+description: Dispatch a local verification task to the next agent (e.g. VS Code / agent:vscode) from a GitHub artifact — not chat.
+title: "[verify] PR #<number>: <short summary>"
+labels:
+  - "agent:vscode"
+  - "status:needs-local-verification"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to hand a verification task to the next agent. Everything the
+        next agent needs must live here — CLAOS Lite forbids relying on private chat.
+
+        `agent:vscode` = LOCAL WSL verification on Jackson's laptop (`gh pr checkout` + pnpm).
+        It is the only actor that can set `status:verified-local`.
+        `agent:copilot-cloud` = GitHub-hosted cloud reviewer/coding agent (started by an
+        `@copilot` mention or automatic Copilot PR review) — it CANNOT verify the local WSL
+        environment, so `status:cloud-reviewed` is advisory and never satisfies a
+        local-verification task.
+  - type: input
+    id: pr-number
+    attributes:
+      label: PR number
+      description: The pull request to verify.
+      placeholder: "#7"
+    validations:
+      required: true
+  - type: input
+    id: source-branch
+    attributes:
+      label: Source branch
+      placeholder: "claos-lite/agent-handoff-relay"
+    validations:
+      required: true
+  - type: dropdown
+    id: requesting-agent
+    attributes:
+      label: Requesting agent
+      options:
+        - "agent:opus"
+        - "agent:vscode"
+        - "agent:copilot-cloud"
+        - "agent:codex"
+        - "agent:cursor"
+        - "agent:claude"
+        - "agent:review"
+        - "agent:founder"
+    validations:
+      required: true
+  - type: dropdown
+    id: next-agent
+    attributes:
+      label: Next agent
+      options:
+        - "agent:vscode"
+        - "agent:opus"
+        - "agent:copilot-cloud"
+        - "agent:codex"
+        - "agent:cursor"
+        - "agent:claude"
+        - "agent:review"
+        - "agent:founder"
+    validations:
+      required: true
+  - type: textarea
+    id: verification-commands
+    attributes:
+      label: Required verification commands
+      description: Exact commands the next agent must run locally (WSL).
+      render: bash
+      placeholder: |
+        pnpm install
+        pnpm typecheck
+        pnpm lint
+        pnpm build
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: Checkboxes that define done.
+      value: |
+        - [ ] typecheck passes
+        - [ ] lint passes
+        - [ ] build / tests pass (as applicable)
+    validations:
+      required: true
+  - type: dropdown
+    id: founder-approval
+    attributes:
+      label: Founder approval required?
+      options:
+        - "No"
+        - "Yes"
+    validations:
+      required: true
+  - type: dropdown
+    id: risk-level
+    attributes:
+      label: Risk level
+      options:
+        - "risk:low"
+        - "risk:medium"
+        - "risk:high"
+        - "risk:approval-required"
+    validations:
+      required: true
+  - type: textarea
+    id: expected-output
+    attributes:
+      label: Expected output
+      description: What a passing run looks like (so the next agent can self-check).
+    validations:
+      required: true
+  - type: dropdown
+    id: blocking-status
+    attributes:
+      label: Blocking status
+      options:
+        - "status:needs-local-verification"
+        - "status:needs-cloud-review"
+        - "status:cloud-reviewed"
+        - "status:needs-review"
+        - "status:needs-opus-fix"
+        - "status:needs-founder"
+        - "status:blocked"
+    validations:
+      required: true

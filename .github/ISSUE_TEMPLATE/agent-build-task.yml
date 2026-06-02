@@ -1,0 +1,100 @@
+name: Agent Build Task
+description: Dispatch a spec-complete implementation task to a worker agent (the relay's buildable-work inbox). Selected routing values are mirrored into labels after creation.
+title: "[build] <area>: <short summary>"
+labels:
+  - "status:ready"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Opus (or another orchestrator) files this to hand a spec-complete task to a worker agent.
+        GitHub issue forms can only apply static labels at creation time; the build-task router
+        workflow mirrors the selected Area, Suggested agent, and Risk level into labels
+        immediately after the issue opens.
+        One task per issue. Cite canon. The worker claims it by self-assigning and swapping
+        `status:ready` -> `status:claimed` -> `status:in-progress`.
+        Note: `agent:vscode` = local WSL verifier (Jackson's laptop). `agent:copilot-cloud` =
+        GitHub cloud reviewer/coding agent (started by `@copilot`); it cannot verify local WSL.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - "area:sprint-zero"
+        - "area:design-system"
+        - "area:contracts"
+        - "area:ui"
+        - "area:database"
+        - "area:auth"
+        - "area:billing"
+        - "area:analytics"
+        - "area:docs"
+        - "area:agent-governance"
+    validations:
+      required: true
+  - type: dropdown
+    id: suggested-agent
+    attributes:
+      label: Suggested agent
+      options:
+        - "agent:vscode"
+        - "agent:copilot-cloud"
+        - "agent:codex"
+        - "agent:cursor"
+        - "agent:claude"
+        - "agent:opus"
+    validations:
+      required: true
+  - type: textarea
+    id: source-of-truth
+    attributes:
+      label: Source of truth (canon)
+      description: Link the Notion canon / Build Pack this task derives from. Apply `canon:cited`.
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: Task & acceptance criteria
+      description: What to build and the exact conditions for "done".
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files expected to change
+    validations:
+      required: false
+  - type: textarea
+    id: verification-commands
+    attributes:
+      label: Verification commands
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+    validations:
+      required: false
+  - type: dropdown
+    id: risk-level
+    attributes:
+      label: Risk level
+      options: ["risk:low", "risk:medium", "risk:high", "risk:approval-required"]
+    validations:
+      required: true
+  - type: dropdown
+    id: founder-approval
+    attributes:
+      label: Founder approval required?
+      options: ["No", "Yes"]
+    validations:
+      required: true
+  - type: input
+    id: blocked-by
+    attributes:
+      label: Blocked by (dependencies / other issues or PRs)
+    validations:
+      required: false

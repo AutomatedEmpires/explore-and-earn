@@ -1,0 +1,81 @@
+name: Founder Approval Gate
+description: Request a recorded human decision at a permanent founder gate before work proceeds or merges.
+title: "[gate] <gate>: <short summary>"
+labels:
+  - "status:needs-founder"
+  - "agent:founder"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when a change touches a permanent founder gate (see docs/agents/founder-approval-gates.md).
+        The relay pauses here: nothing merges past a gate without an explicit founder decision recorded below.
+  - type: dropdown
+    id: gate
+    attributes:
+      label: Gate
+      options:
+        - "money (pricing / payouts / Stripe)"
+        - "auth (identity / sessions / access)"
+        - "db-destructive (migrations / data loss)"
+        - "permissions (roles / sharing)"
+        - "trust-safety (abuse / moderation)"
+        - "legal (terms / compliance)"
+        - "asset-license (fonts / icons / media)"
+        - "launch (going live / public exposure)"
+        - "product-philosophy (taste / positioning)"
+    validations:
+      required: true
+  - type: input
+    id: pr-branch
+    attributes:
+      label: PR / branch
+    validations:
+      required: false
+  - type: dropdown
+    id: requesting-agent
+    attributes:
+      label: Requesting agent
+      options: ["agent:opus", "agent:vscode", "agent:codex", "agent:cursor", "agent:claude", "agent:review"]
+    validations:
+      required: true
+  - type: textarea
+    id: decision-needed
+    attributes:
+      label: Decision needed
+      description: State the precise question the founder must answer.
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options considered
+    validations:
+      required: false
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommendation
+    validations:
+      required: false
+  - type: dropdown
+    id: reversibility
+    attributes:
+      label: Reversibility
+      options: ["Reversible", "Hard to reverse", "Irreversible"]
+    validations:
+      required: true
+  - type: dropdown
+    id: risk-level
+    attributes:
+      label: Risk level
+      options: ["risk:low", "risk:medium", "risk:high", "risk:approval-required"]
+    validations:
+      required: true
+  - type: textarea
+    id: founder-decision
+    attributes:
+      label: Founder decision (filled by founder)
+      description: Approve / reject / modify, plus any conditions. Recording the decision here closes the gate.
+    validations:
+      required: false
