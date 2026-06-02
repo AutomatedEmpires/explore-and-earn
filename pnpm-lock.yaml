@@ -69,7 +69,11 @@ importers:
 
   packages/test-utils: {}
 
-  packages/ui: {}
+  packages/ui:
+    dependencies:
+      '@explore-and-earn/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   tools/db-assert: {}
 
