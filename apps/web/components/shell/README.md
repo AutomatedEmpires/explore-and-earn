@@ -7,12 +7,15 @@ into.
 ## What lives here
 
 - `AppShell.tsx` — root chrome wrapper. Lays out `TopBar` + a scrollable
-  content region (`{children}`) + `BottomNav`.
+  content region (`{children}`) + `BottomNav`. Imports `shell.css`.
 - `TopBar.tsx` — brand bar (server component).
 - `BottomNav.tsx` — fixed primary navigation (client component; uses
   `usePathname` for active state).
 - `nav-items.ts` — typed, ordered list of navigation destinations.
-- `shell.module.css` — chrome styles (semantic tokens only).
+- `shell.css` — global, namespaced chrome styles (`shell-*`), semantic tokens
+  only. Plain global CSS mirrors the repo convention (`primitives.css` uses
+  global `ui-*` classes) and keeps `tsc -b` free of `*.module.css` ambient-type
+  assumptions.
 
 ## Contract for other lanes
 

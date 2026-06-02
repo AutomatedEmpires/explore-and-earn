@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import { BottomNav } from "./BottomNav";
 import { TopBar } from "./TopBar";
-import styles from "./shell.module.css";
+import "./shell.css";
 
 export interface AppShellProps {
 	readonly children: ReactNode;
@@ -22,9 +22,9 @@ export interface AppShellProps {
  */
 export function AppShell({ children }: AppShellProps) {
 	return (
-		<div className={styles.shell}>
+		<div className="shell-frame">
 			<TopBar />
-			<main className={styles.content}>{children}</main>
+			<main className="shell-content">{children}</main>
 			<BottomNav />
 		</div>
 	);
