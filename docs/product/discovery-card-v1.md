@@ -21,7 +21,7 @@ The Discovery Card is how a seeker evaluates an opportunity at a glance and deci
 | pay | yes | triad — "what will I earn?" |
 | Verified Host badge | yes | self-declared qualifier |
 | category badge | yes | lane (farm/maritime/remote/seasonal/mix) |
-| time-window / featured badge | conditional | when applicable; seasonality/time-window signal only, distinct from the Seasonal category lane |
+| time-window / featured badge | conditional | seasonality / time-window — distinct from the Seasonal category lane; shown when applicable |
 | match score | conditional | matched surface only |
 | boosted treatment | conditional | boosted surface only |
 | Quick Apply | yes | primary action |
