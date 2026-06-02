@@ -181,7 +181,11 @@ export interface DiscoveryCardData {
 	readonly triad: OpportunityTriad;
 	readonly verifiedHost?: boolean;
 	readonly conditionalBadges?: readonly DiscoveryCardConditionalBadge[];
+<<<<<<< HEAD
 	/** 0-100 relevance. Rendered (neutral Meter) only on the "matched" surface. */
+=======
+	/** 0\u2013100 relevance. Rendered (neutral Meter) only on the "matched" surface. */
+>>>>>>> d1a7a58 (foundation: enable seeker lane (web→ui/contracts deps + refs, DiscoveryCard primitive))
 	readonly matchScore?: number;
 }
 
@@ -231,7 +235,11 @@ export function DiscoveryCard({
 						<span style={titleStyle}>{data.title}</span>
 					)}
 					<p style={metaStyle}>
+<<<<<<< HEAD
 						{data.hostName} · {data.location} · {data.opportunityWindow}
+=======
+						{data.hostName} \u00b7 {data.location} \u00b7 {data.opportunityWindow}
+>>>>>>> d1a7a58 (foundation: enable seeker lane (web→ui/contracts deps + refs, DiscoveryCard primitive))
 					</p>
 				</header>
 
