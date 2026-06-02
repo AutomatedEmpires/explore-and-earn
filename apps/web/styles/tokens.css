@@ -154,6 +154,11 @@
   --type-label-size: 12px;    --type-label-lh: 1;
   --type-label-tracking: 0.06em; /* uppercase labels/badges only */
 
+  /* typography — weights (canon: 400/500/600) */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+
   /* =============================================================== */
   /* DEPRECATED — Sprint Zero stub aliases. Do not use in new code;  */
   /* retained so any early placeholder markup keeps resolving.       */
