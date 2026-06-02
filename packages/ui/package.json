@@ -10,5 +10,8 @@
   "scripts": {
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@explore-and-earn/contracts": "workspace:*"
   }
 }
