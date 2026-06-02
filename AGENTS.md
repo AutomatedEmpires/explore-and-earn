@@ -69,7 +69,7 @@ The founder's biggest concern is **visual quality**. Do not ship generic, ugly, 
 - Use **one unified component system** across all lifestyle categories (Farm, Maritime, Remote, Seasonal). Vary imagery + accent color, never the component system.
 - **One icon system only: Streamline Freehand**, via the `<Icon name="domain.name"/>` registry in `packages/ui`. No Lucide / Heroicons / Font Awesome / Material / react-icons / ad-hoc inline SVG in feature code (CI guardrail **G30**).
 - **Never commit paid/proprietary Streamline asset files** to this public repo. Use placeholder icon components with stable names + TODO comments. See [`docs/design/icon-system.md`](./docs/design/icon-system.md).
-- Photos get a **hand-drawn frame + paper mat around them** — never filters/overlays *on* host photos. See [`docs/design/photo-language.md`](./docs/design/photo-language.md).
+- Photos get a **hand-drawn frame + paper mat around them** — never filters/overlays *on* host photos. See [`docs/design/photo-language.md`](./docs/design/photo-language.md) and [`docs/design/media-buckets.md`](./docs/design/media-buckets.md).
 
 ## 7. Setup & commands
 
@@ -86,6 +86,22 @@ Canonical environment: **Windows 11 ARM64 → WSL2 Ubuntu 24.04 → VS Code → 
 - UI primitives live in `packages/ui` — features compose them, they do not re-implement them.
 - Small, reviewable PRs. No unrelated drive-by changes.
 - Cite the Notion canon page (or repo doc) in any PR that encodes a product decision.
+
+## 8.5. Start here: the typed substrate (compose, don't reinvent)
+
+Before writing any feature code, compose against the shared substrate. These are the canonical, typed homes — never redefine these shapes inside a feature:
+
+- **Contracts** (`packages/contracts/src`): import shared types from `@explore-and-earn/contracts`, never duplicate them.
+  - `enums.ts` — `MARKETPLACE_CATEGORIES` (`farm · maritime · remote · seasonal · mix`) and other locked enum tuples. The single source for category lanes.
+  - `categories.ts` — `OpportunityCategory`, `CuratedPhotoCategory`, `CURATED_PHOTO_CATEGORIES` (curated buckets exclude `mix`).
+  - `benefits.ts` — the Housing/Meals/Pay triad: `BenefitTriad`, `HousingInfo`, `MealsInfo`, `PayInfo`, `BenefitProvision`. The triad is product law (§1) — never collapse to "Perks".
+  - `media.ts` — `MediaBucketType`, `CuratedPhotoScope`, `ResponsiveImage`, `ListingMedia`, `ImageSelection`. See the strategy doc below.
+  - `card.ts` — the canonical Discovery Card contract (surfaces, zones, fields, Verified-Host qualifier). Build the card against this.
+- **UI primitives** (`packages/ui/src`): compose these, do not re-implement them — `Badge`, `Button`, `Chip`, `Meter`, `Skeleton`, plus existing `Card`, `Modal`, `VerifiedHostBadge`, `FoundingCountdown`. All are token-className-driven (no hardcoded colors/spacing); the `ui-*` classes are styled by Design System V1.
+- **Icons** (`packages/ui/src/icons`): one system only — `<Icon name="domain.name"/>` via the registry. `category.*` keys mirror `MARKETPLACE_CATEGORIES` exactly (no `lodge`; lodge is a Seasonal setting). See §6 and [`docs/design/icon-system.md`](./docs/design/icon-system.md).
+- **Media strategy**: [`docs/design/media-buckets.md`](./docs/design/media-buckets.md) — two media systems (user-uploaded buckets vs the curated library), frame-not-filter, the responsive pipeline, and the Figma/AI→repo seed flow. No image binaries in git.
+
+If a contract or primitive you need is missing, add it to `packages/contracts` or `packages/ui` (with a Notion canon citation) — never inline a one-off in feature code.
 
 ## 9. When in doubt
 
