@@ -12,6 +12,7 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
+    "noEmit": true,
     "jsx": "react-jsx",
     "types": ["node"]
   }

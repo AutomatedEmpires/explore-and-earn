@@ -1,29 +1,30 @@
 {
-	"extends": "../../tsconfig.base.json",
-	"compilerOptions": {
-		"composite": true,
-		"plugins": [
-			{
-				"name": "next"
-			}
-		],
-		"incremental": true,
-		"jsx": "preserve"
-	},
-	"include": [
-		"app/**/*.ts",
-		"app/**/*.tsx",
-		"components/**/*.ts",
-		"components/**/*.tsx",
-		"lib/**/*.ts",
-		"lib/**/*.tsx",
-		"next-env.d.ts",
-		"services/**/*.ts",
-		"services/**/*.tsx",
-		"styles/**/*.css",
-		".next/types/**/*.ts"
-	],
-	"exclude": [
-		"node_modules"
-	]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "incremental": true,
+    "jsx": "preserve",
+    "noEmit": true
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "next-env.d.ts",
+    "services/**/*.ts",
+    "services/**/*.tsx",
+    "styles/**/*.css",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
