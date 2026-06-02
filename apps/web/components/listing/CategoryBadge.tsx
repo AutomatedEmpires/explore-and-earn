@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react"
 import { Icon, type IconKey } from "@explore-and-earn/ui"
 import type { MarketplaceCategory } from "@explore-and-earn/contracts"
 
@@ -30,24 +31,23 @@ const CATEGORY_ACCENT: Record<
 
 export function CategoryBadge({ category }: { readonly category: MarketplaceCategory }) {
 	const accent = CATEGORY_ACCENT[category]
+	const badgeStyle: CSSProperties = {
+		display: "inline-flex",
+		alignItems: "center",
+		gap: "var(--space-4)",
+		padding: "var(--space-4) var(--space-12)",
+		borderRadius: "var(--radius-pill)",
+		background: accent.background,
+		color: accent.color,
+		fontFamily: "var(--font-ui)",
+		fontSize: "var(--type-label-size)",
+		lineHeight: "var(--type-label-lh)",
+		letterSpacing: "var(--type-label-tracking)",
+		textTransform: "uppercase",
+		whiteSpace: "nowrap",
+	}
 	return (
-		<span
-			style=
-				display: "inline-flex",
-				alignItems: "center",
-				gap: "var(--space-4)",
-				padding: "var(--space-4) var(--space-12)",
-				borderRadius: "var(--radius-pill)",
-				background: accent.background,
-				color: accent.color,
-				fontFamily: "var(--font-ui)",
-				fontSize: "var(--type-label-size)",
-				lineHeight: "var(--type-label-lh)",
-				letterSpacing: "var(--type-label-tracking)",
-				textTransform: "uppercase",
-				whiteSpace: "nowrap",
-			
-		>
+		<span style={badgeStyle}>
 			<Icon aria-hidden name={CATEGORY_ICON[category]} size={16} />
 			<span>{CATEGORY_LABEL[category]}</span>
 		</span>
