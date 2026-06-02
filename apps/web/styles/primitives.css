@@ -1,0 +1,262 @@
+/**
+ * Primitive component styles — Design System V1.
+ *
+ * Styles the `ui-*` class contract emitted by the packages/ui primitives
+ * (Card, Modal, Badge, Button, Chip, Meter, Skeleton). References TIER 2
+ * semantic tokens from tokens.css ONLY — never raw hex/px (drift rule #1).
+ * Borders-first, flat (no shadow on cards), no bounce; reduced-motion honored.
+ *
+ * Canon: docs/design/design-system-v1.md (founder-locked 2026-05-30).
+ */
+
+:root {
+  /* shared a11y focus ring (paper gap + match-ink halo) */
+  --ui-focus-ring: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--status-match-fg);
+  /* modal scrim — derived from --palette-ink (#24221E = rgb(36,34,30)) */
+  --ui-scrim: rgba(36, 34, 30, 0.44);
+}
+
+.ui-button:focus-visible,
+.ui-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* =================================================================== */
+/* Card — flat, borders-first (NO shadow)                              */
+/* =================================================================== */
+.ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  padding: var(--space-card);
+  color: var(--text-primary);
+}
+
+.ui-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.ui-card__body {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+/* =================================================================== */
+/* Modal — full-bleed dialog layer + raised surface                    */
+/* =================================================================== */
+.ui-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-gutter);
+  background: var(--ui-scrim);
+}
+
+.ui-modal__surface {
+  width: 100%;
+  max-width: 28rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--elevation-overlay);
+  padding: var(--space-24);
+  color: var(--text-primary);
+}
+
+.ui-modal__surface h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  font-weight: var(--font-weight-regular);
+}
+
+/* =================================================================== */
+/* Badge — pill, label-first (never color-only), uppercase label       */
+/* =================================================================== */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  white-space: nowrap;
+}
+
+.ui-badge__label {
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.ui-badge__qualifier {
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
+}
+
+.ui-badge--neutral  { background: var(--color-surface);            color: var(--text-secondary); }
+.ui-badge--featured { background: var(--status-featured-bg);       color: var(--status-featured-fg); }
+.ui-badge--seasonal { background: var(--accent-seasonal-bg);       color: var(--accent-seasonal-fg); }
+.ui-badge--boosted  { background: var(--status-boosted-bg);        color: var(--status-boosted-fg); }
+.ui-badge--verified { background: var(--status-verified_host-bg);  color: var(--status-verified_host-fg); }
+
+/* =================================================================== */
+/* Button — token-driven variants                                      */
+/* =================================================================== */
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-20);
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  line-height: var(--type-button-lh);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.ui-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-button--primary {
+  background: var(--text-primary);
+  color: var(--color-surface-raised);
+}
+
+.ui-button--secondary {
+  background: var(--color-surface-raised);
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+}
+
+.ui-button--ghost {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+/* =================================================================== */
+/* Chip — filter / tag pill                                            */
+/* =================================================================== */
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.ui-chip--selected {
+  background: var(--status-match-bg);
+  border-color: var(--status-match-fg);
+  color: var(--status-match-fg);
+}
+
+/* =================================================================== */
+/* Meter — NEUTRAL relevance signal (never red/green good-bad)         */
+/* =================================================================== */
+.ui-meter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+}
+
+.ui-meter__label {
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ui-meter__value {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+}
+
+/* =================================================================== */
+/* Skeleton — loading placeholder                                      */
+/* =================================================================== */
+.ui-skeleton {
+  display: block;
+  background: var(--border-soft);
+  animation: ui-skeleton-pulse var(--motion-drawer) var(--ease-standard) infinite alternate;
+}
+
+.ui-skeleton--text {
+  height: var(--type-body-size);
+  border-radius: var(--radius-input);
+}
+
+.ui-skeleton--rect {
+  width: 100%;
+  height: var(--space-48);
+  border-radius: var(--radius-image);
+}
+
+.ui-skeleton--circle {
+  width: var(--icon-chip);
+  height: var(--icon-chip);
+  border-radius: var(--radius-pill);
+}
+
+@keyframes ui-skeleton-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.55; }
+}
+
+/* =================================================================== */
+/* Reduced motion — disable transitions/animations                    */
+/* =================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .ui-button,
+  .ui-chip,
+  .ui-skeleton {
+    transition: none;
+    animation: none;
+  }
+}
