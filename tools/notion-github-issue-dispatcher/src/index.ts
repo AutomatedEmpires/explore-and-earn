@@ -154,7 +154,8 @@ worker.tool("dispatchTaskToGithub", {
 		labels: j.array(j.string()),
 		notionWriteBack: j.enum("updated", "skipped", "failed"),
 	}),
-	execute: async (input: DispatchInput, { notion }) => {
+	execute: async (input, { notion }) => {
+		const dispatchInput = input as DispatchInput
 		const token = process.env.GITHUB_TOKEN
 		if (!token) {
 			throw new Error(
@@ -164,18 +165,18 @@ worker.tool("dispatchTaskToGithub", {
 		const owner = process.env.GITHUB_OWNER ?? "AutomatedEmpires"
 		const repo = process.env.GITHUB_REPO ?? "explore-and-earn"
 
-		if (clean(input.inScope).length === 0) {
+		if (clean(dispatchInput.inScope).length === 0) {
 			throw new Error("inScope must contain at least one non-empty item.")
 		}
-		if (clean(input.acceptanceCriteria).length === 0) {
+		if (clean(dispatchInput.acceptanceCriteria).length === 0) {
 			throw new Error(
 				"acceptanceCriteria must contain at least one non-empty item.",
 			)
 		}
 
-		const title = deriveTitle(input.goal, input.title)
-		const body = buildBody(input)
-		const labels = buildLabels(input)
+		const title = deriveTitle(dispatchInput.goal, dispatchInput.title)
+		const body = buildBody(dispatchInput)
+		const labels = buildLabels(dispatchInput)
 
 		const res = await fetch(
 			`https://api.github.com/repos/${owner}/${repo}/issues`,
@@ -202,11 +203,11 @@ worker.tool("dispatchTaskToGithub", {
 		const issue = (await res.json()) as { html_url: string; number: number }
 
 		let notionWriteBack: "updated" | "skipped" | "failed" = "skipped"
-		if (input.notionPageId) {
-			const prop = input.issueUrlProperty?.trim() || "GitHub Issue"
+		if (dispatchInput.notionPageId) {
+			const prop = dispatchInput.issueUrlProperty?.trim() || "GitHub Issue"
 			try {
 				await notion.pages.update({
-					page_id: input.notionPageId,
+					page_id: dispatchInput.notionPageId,
 					properties: { [prop]: { url: issue.html_url } },
 				})
 				notionWriteBack = "updated"
