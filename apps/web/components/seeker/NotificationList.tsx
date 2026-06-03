@@ -28,9 +28,13 @@ export function NotificationList({ items }: NotificationListProps) {
 						<Icon name={item.icon} size={20} aria-hidden />
 					</span>
 					<span className={styles.body}>
-						<span className={styles.title}>{item.title}</span>
+						<span className={styles.title}>
+							{item.unread ? <span className={styles.srOnly}>Unread: </span> : null}
+							{item.title}
+						</span>
 						<span className={styles.detail}>{item.detail}</span>
 					</span>
+					{item.unread ? <span className={styles.dot} aria-hidden /> : null}
 					<span className={styles.time}>{item.timeAgo}</span>
 				</li>
 			))}

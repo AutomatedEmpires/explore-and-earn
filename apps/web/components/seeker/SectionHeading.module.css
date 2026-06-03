@@ -35,4 +35,14 @@
   font-weight: var(--font-weight-semibold);
   color: var(--status-match-fg);
   text-decoration: none;
+  border-radius: var(--radius-input);
+}
+
+.action:hover {
+  text-decoration: underline;
+}
+
+.action:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
 }
