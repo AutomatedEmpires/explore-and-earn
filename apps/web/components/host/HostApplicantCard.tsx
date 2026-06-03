@@ -16,7 +16,8 @@ export interface HostApplicantCardProps {
 /**
  * Host-side applicant review. Renders the SINGLE canonical DiscoveryCard on its
  * host_applicant_review surface (no forked card), wrapped with the applicant's
- * identity, stage, and a message action via the card's action slot.
+ * identity, stage, and a link into the applicant detail view via the card's
+ * action slot.
  */
 export function HostApplicantCard({ applicant }: HostApplicantCardProps) {
   return (
@@ -36,8 +37,8 @@ export function HostApplicantCard({ applicant }: HostApplicantCardProps) {
         data={toDiscoveryCardData(applicant.listing)}
         surface="host_applicant_review"
         actions={
-          <Link className={styles.action} href="/host/messages">
-            Message {applicant.applicantName}
+          <Link className={styles.action} href={`/host/applicants/${applicant.id}`}>
+            Review applicant
           </Link>
         }
       />

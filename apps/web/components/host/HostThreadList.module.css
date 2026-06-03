@@ -7,6 +7,10 @@
   list-style: none;
 }
 
+.row {
+  list-style: none;
+}
+
 .item {
   display: flex;
   align-items: flex-start;
@@ -15,6 +19,18 @@
   background: var(--color-surface-raised);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.item:hover {
+  border-color: var(--text-primary);
+}
+
+.item:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
 }
 
 .avatar {
@@ -87,4 +103,10 @@
   font-size: var(--type-caption-size);
   line-height: var(--type-caption-lh);
   font-weight: var(--font-weight-semibold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
 }

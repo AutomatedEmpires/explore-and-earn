@@ -97,6 +97,16 @@ export interface HostApplicantItem {
   readonly appliedOn: string;
   /** Short note/snippet from the applicant. */
   readonly note?: string;
+  /** Links this applicant to their message thread (HostMessageThread.id). */
+  readonly threadId?: string;
+}
+
+/** A single message inside a host <-> applicant conversation (UI-only). */
+export interface HostThreadMessage {
+  readonly id: string;
+  readonly from: "host" | "applicant";
+  readonly body: string;
+  readonly sentOn: string;
 }
 
 export interface HostMessageThread {
@@ -106,6 +116,8 @@ export interface HostMessageThread {
   readonly preview: string;
   readonly unread: boolean;
   readonly updatedOn: string;
+  /** Full transcript for the thread-detail view (preview is the last entry). */
+  readonly messages?: readonly HostThreadMessage[];
 }
 
 /**
