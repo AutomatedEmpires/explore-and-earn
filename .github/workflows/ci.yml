@@ -2,21 +2,27 @@ name: CI
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - main
 
+concurrency:
+  group: ci-$ github.ref 
+  cancel-in-progress: true
+
 jobs:
-  guardrails:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24.16.0
       - uses: pnpm/action-setup@v4
         with:
           version: 10.12.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+          cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile=false
       - name: Typecheck
@@ -27,6 +33,10 @@ jobs:
         run: pnpm lint:workflows
       - name: Run guardrail checks
         run: pnpm guardrails
+      - name: Build
+        run: pnpm build
+      - name: Test
+        run: pnpm test
 
   design-guardrails:
     runs-on: ubuntu-latest
