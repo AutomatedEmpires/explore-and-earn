@@ -22,6 +22,8 @@ export { HostPipelineBoard } from "./HostPipelineBoard";
 export type { HostPipelineBoardProps } from "./HostPipelineBoard";
 export { HostThreadList } from "./HostThreadList";
 export type { HostThreadListProps } from "./HostThreadList";
+export { HostThreadGroups } from "./HostThreadGroups";
+export type { HostThreadGroupsProps } from "./HostThreadGroups";
 export { HostThreadView } from "./HostThreadView";
 export type { HostThreadViewProps } from "./HostThreadView";
 export { HostProfilePanel } from "./HostProfilePanel";
