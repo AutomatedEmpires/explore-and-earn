@@ -1,0 +1,63 @@
+.nav {
+	position: sticky;
+	bottom: 0;
+	z-index: 10;
+	width: 100%;
+	border-top: 1px solid var(--border-soft);
+	background: var(--color-surface-raised);
+}
+
+.list {
+	display: flex;
+	align-items: stretch;
+	gap: var(--space-2);
+	width: 100%;
+	max-width: var(--bp-lg);
+	min-height: var(--size-bottom-nav);
+	margin: 0 auto;
+	padding: 0 var(--space-8);
+	list-style: none;
+}
+
+.item {
+	flex: 1;
+}
+
+.tab {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	height: 100%;
+	padding: var(--space-8) var(--space-4);
+	border-radius: var(--radius-cell);
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	font-weight: var(--font-weight-regular);
+	letter-spacing: var(--type-label-tracking);
+	text-decoration: none;
+	transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.tab:hover {
+	color: var(--text-primary);
+}
+
+.tab:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.active {
+	color: var(--text-primary);
+	font-weight: var(--font-weight-semibold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tab {
+		transition: none;
+	}
+}
