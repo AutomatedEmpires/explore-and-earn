@@ -49,6 +49,16 @@
   background: var(--color-surface);
   color: var(--text-primary);
   text-decoration: none;
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.iconLink:hover {
+  border-color: var(--border-ink);
+}
+
+.iconLink:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
 }
 
 .badge {
@@ -67,4 +77,10 @@
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   font-weight: var(--font-weight-semibold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconLink {
+    transition: none;
+  }
 }

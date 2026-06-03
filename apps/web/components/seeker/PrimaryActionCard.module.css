@@ -67,4 +67,20 @@
   line-height: var(--type-button-lh);
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.cta:hover {
+  background: var(--border-ink);
+}
+
+.cta:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta {
+    transition: none;
+  }
 }
