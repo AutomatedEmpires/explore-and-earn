@@ -11,6 +11,10 @@
     "jsx": "preserve",
     "noEmit": true
   },
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/ui" }
+  ],
   "include": [
     "app/**/*.ts",
     "app/**/*.tsx",

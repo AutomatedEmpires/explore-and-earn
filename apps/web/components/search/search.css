@@ -1,0 +1,199 @@
+/* Search lane styles — Search & Filters (Agent #2).
+   Token-only, borders-first, flat, mobile-first. */
+
+.ee-search {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-section, var(--space-24));
+	padding: var(--space-gutter, var(--space-16));
+	background: var(--color-paper);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+}
+
+.ee-search__header {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+}
+
+.ee-search__title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-semibold);
+	font-size: var(--type-title-size, 1.5rem);
+	line-height: var(--type-title-lh, 1.25);
+	color: var(--text-primary);
+}
+
+.ee-search__field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.ee-search__label,
+.ee-search__filters-label {
+	font-size: var(--type-label-size, 0.75rem);
+	line-height: var(--type-label-lh, 1.2);
+	letter-spacing: var(--type-label-tracking, 0.04em);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.ee-search__input {
+	width: 100%;
+	box-sizing: border-box;
+	padding: var(--space-12) var(--space-16);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-input);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font: inherit;
+}
+
+.ee-search__input::placeholder {
+	color: var(--text-muted);
+}
+
+.ee-search__input:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: 2px;
+}
+
+.ee-search__filters {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.ee-search__chip-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+.ee-search__chip-button {
+	display: inline-flex;
+	margin: 0;
+	padding: 0;
+	border: none;
+	background: none;
+	cursor: pointer;
+	border-radius: var(--radius-pill);
+}
+
+.ee-search__chip-button:focus-visible {
+	outline: var(--ui-focus-ring);
+	outline-offset: 2px;
+}
+
+/* Selected category chips adopt their lane accent tokens. */
+.ee-search__chip-button[data-accent="farm"][aria-pressed="true"] .ui-chip {
+	background: var(--accent-farm-bg);
+	color: var(--accent-farm-fg);
+	border-color: var(--accent-farm-fg);
+}
+.ee-search__chip-button[data-accent="maritime"][aria-pressed="true"] .ui-chip {
+	background: var(--accent-maritime-bg);
+	color: var(--accent-maritime-fg);
+	border-color: var(--accent-maritime-fg);
+}
+.ee-search__chip-button[data-accent="remote"][aria-pressed="true"] .ui-chip {
+	background: var(--accent-remote-bg);
+	color: var(--accent-remote-fg);
+	border-color: var(--accent-remote-fg);
+}
+.ee-search__chip-button[data-accent="seasonal"][aria-pressed="true"] .ui-chip {
+	background: var(--accent-seasonal-bg);
+	color: var(--accent-seasonal-fg);
+	border-color: var(--accent-seasonal-fg);
+}
+.ee-search__chip-button[data-accent="mix"][aria-pressed="true"] .ui-chip {
+	background: var(--accent-mix-bg);
+	color: var(--accent-mix-fg);
+	border-color: var(--accent-mix-fg);
+}
+
+/* Selected benefit chips adopt their benefit tokens. */
+.ee-search__chip-button[data-benefit="housing"][aria-pressed="true"] .ui-chip {
+	background: var(--benefit-housing-bg);
+	color: var(--benefit-housing-fg);
+	border-color: var(--benefit-housing-fg);
+}
+.ee-search__chip-button[data-benefit="meals"][aria-pressed="true"] .ui-chip {
+	background: var(--benefit-meals-bg);
+	color: var(--benefit-meals-fg);
+	border-color: var(--benefit-meals-fg);
+}
+.ee-search__chip-button[data-benefit="pay"][aria-pressed="true"] .ui-chip {
+	background: var(--benefit-pay-bg);
+	color: var(--benefit-pay-fg);
+	border-color: var(--benefit-pay-fg);
+}
+
+.ee-search__results {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-row-gap, var(--space-16));
+}
+
+.ee-search__count {
+	margin: 0;
+	font-size: var(--type-label-size, 0.75rem);
+	letter-spacing: var(--type-label-tracking, 0.04em);
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.ee-search__list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-row-gap, var(--space-16));
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.ee-search__list-item {
+	display: block;
+}
+
+.ee-search__empty {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding: var(--space-24);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+	text-align: center;
+}
+
+.ee-search__empty-title {
+	margin: 0;
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.ee-search__empty-body {
+	margin: 0;
+	color: var(--text-secondary);
+}
+
+@media (min-width: 640px) {
+	.ee-search {
+		padding: var(--space-32);
+	}
+
+	.ee-search__title {
+		font-size: var(--type-display-size, 2rem);
+		line-height: var(--type-display-lh, 1.2);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ee-search * {
+		transition: none !important;
+	}
+}
