@@ -18,6 +18,12 @@ import type { DiscoveryListing } from "../discovery";
 export interface HostProfileSummary {
   readonly hostName: string;
   readonly orgName: string;
+  /** Short marketplace tagline shown on the public host profile. */
+  readonly tagline?: string;
+  /** Home base shown to seekers (city/region, presentation only). */
+  readonly location?: string;
+  /** Longer "about" blurb shown on the host profile. */
+  readonly bio?: string;
   /** Self-declared verified host (G22). Rendered via VerifiedHostBadge. */
   readonly verified: boolean;
 }

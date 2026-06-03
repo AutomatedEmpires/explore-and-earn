@@ -20,5 +20,7 @@ export { HostThreadView } from "./HostThreadView";
 export type { HostThreadViewProps } from "./HostThreadView";
 export { HostProfilePanel } from "./HostProfilePanel";
 export type { HostProfilePanelProps } from "./HostProfilePanel";
+export { HostProfileForm } from "./HostProfileForm";
+export type { HostProfileFormProps } from "./HostProfileForm";
 export * from "./models";
 export * from "./fixtures";

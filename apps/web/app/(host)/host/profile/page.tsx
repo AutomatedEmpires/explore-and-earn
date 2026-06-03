@@ -17,6 +17,8 @@ export default function HostProfilePage() {
       <HostSectionHeading
         title="Host profile"
         description="How seekers see you across the marketplace."
+        actionLabel="Edit profile"
+        actionHref="/host/profile/edit"
       />
       <HostProfilePanel profile={HOST_PROFILE} stats={stats} />
     </section>

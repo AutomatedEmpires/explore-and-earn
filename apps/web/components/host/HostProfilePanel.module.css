@@ -48,6 +48,29 @@
   color: var(--text-secondary);
 }
 
+.meta {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.tagline {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.bio {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
 .facts {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

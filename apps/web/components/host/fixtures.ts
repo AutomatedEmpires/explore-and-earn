@@ -29,6 +29,9 @@ function findListing(id: string): DiscoveryListing {
 export const HOST_PROFILE: HostProfileSummary = {
   hostName: "Maya",
   orgName: "Wenatchee Orchard Co.",
+  tagline: "Family orchard hiring seasonal crews since 1998.",
+  location: "Wenatchee, WA",
+  bio: "We are a third-generation apple and pear orchard in the Wenatchee Valley. Each season we welcome a small crew for harvest, packing, and farm-stay work, with on-site housing and daily meals provided.",
   verified: true,
 };
 

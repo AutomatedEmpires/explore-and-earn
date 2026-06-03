@@ -18,9 +18,16 @@ export function HostProfilePanel({ profile, stats }: HostProfilePanelProps) {
         <div className={styles.identity}>
           <span className={styles.name}>{profile.orgName}</span>
           <span className={styles.contact}>Hosted by {profile.hostName}</span>
+          {profile.location ? (
+            <span className={styles.meta}>{profile.location}</span>
+          ) : null}
           {profile.verified ? <VerifiedHostBadge /> : null}
         </div>
       </header>
+      {profile.tagline ? (
+        <p className={styles.tagline}>{profile.tagline}</p>
+      ) : null}
+      {profile.bio ? <p className={styles.bio}>{profile.bio}</p> : null}
       <dl className={styles.facts}>
         <div className={styles.fact}>
           <dt className={styles.factLabel}>Active listings</dt>
