@@ -51,6 +51,7 @@ Set via `ntn workers env set KEY=value` (or a local `.env`, see `.env.example`):
 
 ```bash
 pnpm --filter @explore-and-earn/github-notion-sync check   # tsc --noEmit
+pnpm --filter @explore-and-earn/github-notion-sync build   # emit dist/ for hosted deploys
 ntn doctor                                                 # validate the worker
 ntn workers sync trigger githubSync --preview              # dry run, writes nothing
 ntn workers deploy                                         # creates the managed DB
@@ -66,9 +67,9 @@ ntn workers sync trigger githubSync                        # first real sync
   `worker.sync`, `Schema.*`, `Builder.*`).
 - Like the dispatcher, this package is intentionally **not** in the root
   `tsconfig.json` project references; root `typecheck` is `tsc -b`. It
-  type-checks standalone via its own `check` script, and `build` is
-  `tsc --noEmit` so it emits nothing into the repo. `ntn` bundles the source at
-  deploy time.
+  type-checks standalone via its own `check` script. `build` emits `dist/` for
+  hosted `ntn workers deploy`, while `check` remains `tsc --noEmit` so local
+  validation stays side-effect free.
 - v1 keeps only verified SDK surface. Candidate upgrades, once validated with
   `ntn doctor`: a `worker.pacer` rate-limiter, writing each issue/PR body into
   the row's page content, per-row emoji icons, and `mode: "incremental"` with a
