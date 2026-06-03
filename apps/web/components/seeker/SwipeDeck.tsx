@@ -229,6 +229,9 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 	const passStrength = clamp(-offset.x / COMMIT_DISTANCE);
 	const saveStrength = clamp(offset.x / COMMIT_DISTANCE);
 	const applyStrength = clamp(-offset.y / COMMIT_DISTANCE);
+	const passOverlayStyle: CSSProperties = { opacity: passStrength };
+	const saveOverlayStyle: CSSProperties = { opacity: saveStrength };
+	const applyOverlayStyle: CSSProperties = { opacity: applyStrength };
 	const visible = listings.slice(index, index + MAX_VISIBLE);
 
 	return (
@@ -285,25 +288,13 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 						>
 							{isTop ? (
 								<>
-									<span
-										className={`${styles.overlay} ${styles.overlayPass}`}
-										style= opacity: passStrength 
-										aria-hidden
-									>
+									<span className={`${styles.overlay} ${styles.overlayPass}`} style={passOverlayStyle} aria-hidden>
 										<Icon name="action.close" size={20} aria-hidden /> Pass
 									</span>
-									<span
-										className={`${styles.overlay} ${styles.overlaySave}`}
-										style= opacity: saveStrength 
-										aria-hidden
-									>
+									<span className={`${styles.overlay} ${styles.overlaySave}`} style={saveOverlayStyle} aria-hidden>
 										<Icon name="action.save" size={20} aria-hidden /> Save
 									</span>
-									<span
-										className={`${styles.overlay} ${styles.overlayApply}`}
-										style= opacity: applyStrength 
-										aria-hidden
-									>
+									<span className={`${styles.overlay} ${styles.overlayApply}`} style={applyOverlayStyle} aria-hidden>
 										<Icon name="action.apply" size={20} aria-hidden /> Apply
 									</span>
 								</>
