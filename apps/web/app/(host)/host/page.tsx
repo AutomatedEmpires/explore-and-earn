@@ -2,14 +2,17 @@ import {
   HOST_APPLICANTS,
   HOST_LISTINGS,
   HOST_PROFILE,
+  HOST_THREADS,
   HostApplicantCard,
   HostListingCard,
   HostSectionHeading,
   HostStatStrip,
+  deriveHostStats,
 } from "../../../components/host";
 import styles from "./page.module.css";
 
 export default function HostDashboardPage() {
+  const stats = deriveHostStats(HOST_LISTINGS, HOST_APPLICANTS, HOST_THREADS);
   const newApplicants = HOST_APPLICANTS.filter(
     (applicant) => applicant.stage === "new",
   );
@@ -22,7 +25,7 @@ export default function HostDashboardPage() {
           title={`Welcome back, ${HOST_PROFILE.hostName}`}
           description="Your hosting command center — listings, applicants, and messages at a glance."
         />
-        <HostStatStrip profile={HOST_PROFILE} />
+        <HostStatStrip stats={stats} />
       </section>
 
       <section className={styles.block}>
