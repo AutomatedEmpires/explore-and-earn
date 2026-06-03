@@ -15,7 +15,7 @@
 	color: var(--text-primary);
 }
 
-/* Top bar — brand chrome */
+/* Top bar — brand chrome (available for scope layouts to use via TopBar) */
 .shell-topbar {
 	position: sticky;
 	top: 0;
@@ -35,66 +35,8 @@
 	color: var(--text-primary);
 }
 
-/* Content region — every route mounts here */
+/* Content region — scope layouts mount their <main> here */
 .shell-content {
 	flex: 1;
 	padding: var(--space-gutter);
-	/* Clear the fixed bottom nav + the device safe area. */
-	padding-bottom: calc(
-		var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom)
-	);
-}
-
-/* Bottom navigation */
-.shell-bottomnav {
-	position: fixed;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	z-index: 2;
-	background: var(--color-surface-raised);
-	border-top: 1px solid var(--border-soft);
-	padding-bottom: env(safe-area-inset-bottom);
-}
-
-.shell-bottomnav__list {
-	display: flex;
-	align-items: stretch;
-	margin: 0;
-	padding: 0;
-	list-style: none;
-}
-
-.shell-bottomnav__item {
-	flex: 1;
-}
-
-.shell-bottomnav__link {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	justify-content: center;
-	gap: var(--space-2);
-	height: var(--size-bottom-nav);
-	padding: var(--space-4);
-	color: var(--text-secondary);
-	text-decoration: none;
-	transition: color var(--motion-fast) var(--ease-standard);
-}
-
-.shell-bottomnav__link[data-active="true"] {
-	color: var(--text-primary);
-}
-
-.shell-bottomnav__label {
-	font-family: var(--font-ui);
-	font-size: var(--type-caption-size);
-	line-height: var(--type-caption-lh);
-	font-weight: var(--font-weight-medium);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.shell-bottomnav__link {
-		transition: none;
-	}
 }
