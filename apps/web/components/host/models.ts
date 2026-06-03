@@ -59,6 +59,18 @@ export const ACTIVE_HOST_LISTING_STATES: readonly HostListingState[] = [
   "filled",
 ];
 
+/**
+ * Full lifecycle order for listing management (filter chips, grouping).
+ * Presentation only — ordering is a display concern, not a workflow engine.
+ */
+export const HOST_LISTING_STATE_ORDER: readonly HostListingState[] = [
+  "draft",
+  "open",
+  "partially_filled",
+  "filled",
+  "closed",
+];
+
 export interface HostListingItem {
   readonly listing: DiscoveryListing;
   readonly state: HostListingState;
@@ -155,6 +167,27 @@ export function countByStage(
   };
   for (const applicant of applicants) {
     counts[applicant.stage] += 1;
+  }
+  return counts;
+}
+
+/**
+ * Pure, deterministic listing tally by lifecycle state, for the listings
+ * management filter. Presentation only — mirrors countByStage. Unit-testable
+ * without a backend.
+ */
+export function countListingsByState(
+  listings: readonly HostListingItem[],
+): Record<HostListingState, number> {
+  const counts: Record<HostListingState, number> = {
+    draft: 0,
+    open: 0,
+    partially_filled: 0,
+    filled: 0,
+    closed: 0,
+  };
+  for (const item of listings) {
+    counts[item.state] += 1;
   }
   return counts;
 }

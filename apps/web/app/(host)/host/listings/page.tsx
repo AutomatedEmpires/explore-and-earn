@@ -1,6 +1,6 @@
 import {
   HOST_LISTINGS,
-  HostListingCard,
+  HostListingsManager,
   HostSectionHeading,
 } from "../../../../components/host";
 import { EmptyState } from "../../../../components/discovery";
@@ -11,16 +11,12 @@ export default function HostListingsPage() {
     <section className={styles.block}>
       <HostSectionHeading
         title="Listings"
-        description="Every opportunity you have posted, with live applicant counts."
+        description="Every opportunity you have posted, with live applicant counts. Filter by status to focus your pipeline."
         actionLabel="New listing"
         actionHref="/host/listings/new"
       />
       {HOST_LISTINGS.length > 0 ? (
-        <div className={styles.stack}>
-          {HOST_LISTINGS.map((item) => (
-            <HostListingCard key={item.listing.id} item={item} />
-          ))}
-        </div>
+        <HostListingsManager listings={HOST_LISTINGS} />
       ) : (
         <EmptyState
           title="No listings yet"
