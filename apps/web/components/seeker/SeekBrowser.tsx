@@ -89,7 +89,7 @@ export function SeekBrowser({ listings }: SeekBrowserProps) {
 			<header className={styles.header}>
 				<h1 className={styles.heading}>Seek opportunities</h1>
 				<p className={styles.subheading}>
-					Browse every open work-travel opportunity \u2014 housing, meals, and pay
+					Browse every open work-travel opportunity — housing, meals, and pay
 					from hosts worldwide.
 				</p>
 			</header>
