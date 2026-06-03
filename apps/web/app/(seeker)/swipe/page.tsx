@@ -1,19 +1,20 @@
-import { BucketPage, MATCHED_LISTINGS, SwipeDeck } from "../../../components/seeker";
+import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+import { BucketPage, SwipeDeck } from "../../../components/seeker";
 
 /**
  * Swipe — locked seeker-nav tab (Swipe · Map · Seek · Profile).
  *
- * Phase D: replaces the placeholder shipped with the locked bottom nav. Steps
- * through matched opportunities one at a time via the canonical DiscoveryCard
- * ("swipe" surface). UI-only — no backend or matching algorithm yet.
+ * Phase D: a true swipe experience over the canonical DiscoveryCard — drag,
+ * keyboard, undo, peeking card stack, and a neutral match Meter. UI-only; no
+ * backend or matching algorithm yet.
  */
 export default function SwipePage() {
 	return (
 		<BucketPage
 			title="Swipe"
-			description="Review matched opportunities one at a time — pass, save, or apply."
+			description="Drag through opportunities — pass, save, or apply. Use the buttons or arrow keys."
 		>
-			<SwipeDeck listings={MATCHED_LISTINGS} />
+			<SwipeDeck listings={DISCOVERY_FIXTURES} />
 		</BucketPage>
 	);
 }
