@@ -1,0 +1,52 @@
+/* Discovery feed — mobile-first responsive grid. Semantic tokens only;
+   px appears ONLY in breakpoint media queries (mirrors --bp-* values). */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-section);
+  padding: var(--space-gutter);
+  background: var(--color-paper);
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-page-size);
+  line-height: var(--type-page-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.subheading {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-section);
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

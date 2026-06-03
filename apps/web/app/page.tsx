@@ -1,11 +1,9 @@
+import { DiscoveryFeed, DISCOVERY_FIXTURES } from "../components/discovery";
+
 export default function HomePage() {
   return (
     <main>
-      <h1>Explore&Earn Sprint Zero</h1>
-      <p>
-        TODO: Replace this placeholder once the public marketing shell is
-        approved for implementation.
-      </p>
+      <DiscoveryFeed listings={DISCOVERY_FIXTURES} />
     </main>
   );
 }
