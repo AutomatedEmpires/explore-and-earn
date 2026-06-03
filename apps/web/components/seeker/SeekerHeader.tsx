@@ -17,6 +17,9 @@ export function SeekerHeader() {
         <span className={styles.scope}>Seeker</span>
       </div>
       <nav className={styles.actions} aria-label="Seeker quick links">
+        <Link className={styles.iconLink} href="/messages" aria-label="Messages">
+          <Icon name="nav.messages" size={20} aria-hidden />
+        </Link>
         <Link className={styles.iconLink} href="/notifications" aria-label="Notifications">
           <Icon name="system.info" size={20} aria-hidden />
           {SEEKER_STATUS.unreadNotifications > 0 ? (
