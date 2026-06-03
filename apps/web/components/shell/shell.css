@@ -15,7 +15,12 @@
 	color: var(--text-primary);
 }
 
-/* Top bar — brand chrome (available for scope layouts to use via TopBar) */
+/*
+ * Top bar — brand chrome styles.
+ * Scope layouts that include <TopBar> (from `@/components/shell`) will use
+ * these classes. AppShell does not render TopBar globally; each scope decides
+ * whether to include it.
+ */
 .shell-topbar {
 	position: sticky;
 	top: 0;
@@ -33,10 +38,4 @@
 	font-size: var(--type-section-size);
 	line-height: var(--type-section-lh);
 	color: var(--text-primary);
-}
-
-/* Content region — scope layouts mount their <main> here */
-.shell-content {
-	flex: 1;
-	padding: var(--space-gutter);
 }
