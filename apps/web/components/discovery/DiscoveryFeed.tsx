@@ -1,7 +1,8 @@
-import { DiscoveryCard } from "./DiscoveryCard";
+import { DiscoveryCard } from "@explore-and-earn/ui";
+
 import { DiscoveryCardSkeleton } from "./DiscoveryCardSkeleton";
 import { EmptyState } from "./EmptyState";
-import type { DiscoveryListing } from "./listing";
+import { toDiscoveryCardData, type DiscoveryListing } from "./listing";
 import styles from "./DiscoveryFeed.module.css";
 
 export interface DiscoveryFeedProps {
@@ -19,7 +20,7 @@ export function DiscoveryFeed({
   loading = false,
   skeletonCount = 6,
   heading = "Discover work-travel opportunities",
-  subheading = "Housing, meals, and pay — from hosts around the world.",
+  subheading = "Housing, meals, and pay \u2014 from hosts around the world.",
 }: DiscoveryFeedProps) {
   return (
     <section className={styles.wrap}>
@@ -39,7 +40,11 @@ export function DiscoveryFeed({
       ) : (
         <div className={styles.grid}>
           {listings.map((listing) => (
-            <DiscoveryCard key={listing.id} listing={listing} />
+            <DiscoveryCard
+              key={listing.id}
+              data={toDiscoveryCardData(listing)}
+              surface="discovery_feed"
+            />
           ))}
         </div>
       )}

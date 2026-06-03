@@ -1,4 +1,5 @@
 import type {
+  BenefitProvision,
   BenefitTriad,
   DiscoveryCardConditionalBadge,
   ImageSelection,
@@ -6,7 +7,7 @@ import type {
   OpportunityCategory,
   ResponsiveImage,
 } from "@explore-and-earn/contracts";
-import type { IconKey } from "@explore-and-earn/ui";
+import type { DiscoveryCardData, IconKey } from "@explore-and-earn/ui";
 
 /**
  * Discovery & Feed lane — LOCAL fixture/view model.
@@ -16,8 +17,12 @@ import type { IconKey } from "@explore-and-earn/ui";
  * founder-gated and must arrive via a scoped contract build pack). So this lane
  * composes a LOCAL view-model from the enumerated contract registries
  * (categories, benefit triad, media, lifecycle, conditional badges) to drive
- * the Discovery card + feed against typed fixtures. When the canonical Listing
+ * the Discovery feed against typed fixtures. When the canonical Listing
  * contract lands, replace (or map from) this type.
+ *
+ * The card itself is NOT defined here: every surface renders the single
+ * canonical @explore-and-earn/ui DiscoveryCard. This view-model is mapped into
+ * that card's DiscoveryCardData via toDiscoveryCardData below.
  */
 export interface DiscoveryListingHost {
   readonly name: string;
@@ -35,7 +40,7 @@ export interface DiscoveryListing {
   /** One of the five canonical lanes (farm | maritime | remote | seasonal | mix). */
   readonly category: OpportunityCategory;
   readonly location: string;
-  /** Human-readable opportunity window, e.g. "Aug–Oct 2026". */
+  /** Human-readable opportunity window, e.g. "Aug\u2013Oct 2026". */
   readonly opportunityWindow: string;
   readonly status: ListingStatus;
   readonly host: DiscoveryListingHost;
@@ -80,4 +85,46 @@ export function resolveCoverImage(
     return undefined;
   }
   return selection.source === "uploaded" ? selection.media : selection.image;
+}
+
+/** Display fallback when a benefit has no human summary. */
+const PROVISION_LABEL: Record<BenefitProvision, string> = {
+  provided: "Provided",
+  partial: "Partial",
+  not_provided: "Not provided",
+};
+
+/** Collapse a single benefit into the card's display string. */
+function benefitDisplay(info: {
+  readonly provision: BenefitProvision;
+  readonly summary?: string;
+}): string {
+  return info.summary ?? PROVISION_LABEL[info.provision];
+}
+
+/**
+ * Pure mapper: local DiscoveryListing view-model -> the canonical
+ * @explore-and-earn/ui DiscoveryCardData. The richer provision/summary benefit
+ * data is collapsed into the card's Housing / Meals / Pay display-string triad
+ * (the card supplies the triad labels and icons itself). Relevance/match is
+ * carried through as matchScore; the card renders it (neutral Meter) only on
+ * the "matched" surface.
+ */
+export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardData {
+  return {
+    id: listing.id,
+    title: listing.title,
+    hostName: listing.host.name,
+    category: listing.category,
+    location: listing.location,
+    opportunityWindow: listing.opportunityWindow,
+    triad: {
+      housing: benefitDisplay(listing.benefits.housing),
+      meals: benefitDisplay(listing.benefits.meals),
+      pay: benefitDisplay(listing.benefits.pay),
+    },
+    verifiedHost: listing.host.verified,
+    conditionalBadges: listing.conditionalBadges,
+    matchScore: listing.matchScore,
+  };
 }
