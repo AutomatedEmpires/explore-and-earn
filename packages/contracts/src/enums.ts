@@ -343,6 +343,12 @@ export const MEDIA_OWNER_TYPE = [
 ] as const
 export type MediaOwnerType = (typeof MEDIA_OWNER_TYPE)[number]
 
+// NOTE: media.ts (PR #4) already exports a NARROWER user-upload `MediaBucketType`
+// (6 values: housing/meals/facilities/cover_photo/community_photo/
+// verification_evidence). This registry tuple is the FULL DB-level enum (12
+// values) and is exported under a distinct type name to avoid an ambiguous
+// barrel re-export. The name clash is flagged for canon reconciliation
+// (Canonical Enum Registry vs Photo Buckets V1).
 export const MEDIA_BUCKET_TYPE = [
   "profile_gallery",
   "cover_photo",
@@ -357,7 +363,7 @@ export const MEDIA_BUCKET_TYPE = [
   "dispute_evidence",
   "report_evidence",
 ] as const
-export type MediaBucketType = (typeof MEDIA_BUCKET_TYPE)[number]
+export type MediaBucketTypeRegistry = (typeof MEDIA_BUCKET_TYPE)[number]
 
 export const MEDIA_VISIBILITY = [
   "private",
