@@ -1,18 +1,8 @@
-import type { OpportunityCategory } from "@explore-and-earn/contracts";
 import { DiscoveryCard, Icon } from "@explore-and-earn/ui";
-import type { IconKey } from "@explore-and-earn/ui";
 
 import { EmptyState, toDiscoveryCardData, type DiscoveryListing } from "../discovery";
+import { MAPPIN_ICON } from "./mappin";
 import styles from "./OpportunityMap.module.css";
-
-/** Geographic pin icon per canonical category (never the deprecated mappin.location). */
-const MAPPIN_ICON: Record<OpportunityCategory, IconKey> = {
-	farm: "mappin.farm",
-	maritime: "mappin.maritime",
-	remote: "mappin.remote",
-	seasonal: "mappin.seasonal",
-	mix: "mappin.mix",
-};
 
 interface RegionGroup {
 	readonly region: string;
