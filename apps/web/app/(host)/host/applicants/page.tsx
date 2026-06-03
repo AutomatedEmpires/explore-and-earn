@@ -1,6 +1,6 @@
 import {
   HOST_APPLICANTS,
-  HostApplicantCard,
+  HostPipelineBoard,
   HostSectionHeading,
 } from "../../../../components/host";
 import { EmptyState } from "../../../../components/discovery";
@@ -11,14 +11,10 @@ export default function HostApplicantsPage() {
     <section className={styles.block}>
       <HostSectionHeading
         title="Applicants"
-        description="Review everyone who applied to your opportunities."
+        description="Your applicant pipeline, grouped by stage. Review only — moving applicants between stages activates with the hiring pipeline."
       />
       {HOST_APPLICANTS.length > 0 ? (
-        <div className={styles.stack}>
-          {HOST_APPLICANTS.map((applicant) => (
-            <HostApplicantCard key={applicant.id} applicant={applicant} />
-          ))}
-        </div>
+        <HostPipelineBoard applicants={HOST_APPLICANTS} />
       ) : (
         <EmptyState
           title="No applicants yet"

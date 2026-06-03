@@ -14,6 +14,8 @@ export { HostApplicantCard } from "./HostApplicantCard";
 export type { HostApplicantCardProps } from "./HostApplicantCard";
 export { HostApplicantDetail } from "./HostApplicantDetail";
 export type { HostApplicantDetailProps } from "./HostApplicantDetail";
+export { HostPipelineBoard } from "./HostPipelineBoard";
+export type { HostPipelineBoardProps } from "./HostPipelineBoard";
 export { HostThreadList } from "./HostThreadList";
 export type { HostThreadListProps } from "./HostThreadList";
 export { HostThreadView } from "./HostThreadView";
