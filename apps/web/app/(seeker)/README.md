@@ -1,41 +1,27 @@
-# Seeker Routes
+# Seeker lane (`apps/web/app/(seeker)`)
 
-Phase A of the seeker lane (Home + application lifecycle buckets). Mobile-first,
-card-first, fixtures-only — no backend (Sprint Zero). Every surface renders the
-single canonical `@explore-and-earn/ui` DiscoveryCard and the locked design
-tokens; lane-local pieces live in `apps/web/components/seeker`.
+Mobile-first seeker command center. Server components, fixtures-only (Sprint Zero).
+Grounded in the Seeker Dashboard Spec, Home Wireframe, and Nav/Cards/Popups canon.
 
 ## Routes
 
-- `home/` — Adventure command center: status strip, a single primary next
-  action (offer → expiring invite → upcoming role → resume → strong match),
-  matched preview, and application bucket chips.
-- `saved/` — Saved opportunities.
-- `applied/` — Submitted applications + status.
-- `offered/` — Offers from hosts.
-- `accepted/` — Confirmed roles + pre-arrival.
-- `not-selected/` — Respectful closure.
-- `invites/` — Host invitations to apply.
+### Phase A — Home + application lifecycle
+- `/home` — adventure status strip, primary next action, matched preview, bucket chips
+- `/saved` `/applied` `/offered` `/accepted` `/not-selected` `/invites` — lifecycle buckets
 
-## Navigation
+### Phase B — Profile & account
+- `/resume` — resume completion (neutral Meter) + section checklist + apply gate
+- `/settings` — account, notification, privacy, and account-control groups
+- `/notifications` — invites, offers, matches, reminders feed
+- `/help` — support, safety, application, and account help
 
-The seeker bottom navigation is **founder-locked: Swipe · Map · Seek · Profile**.
-It is owned by the App Shell lane and is intentionally not re-implemented here to
-avoid a duplicate shell. This route group provides the seeker context header +
-page container; the lifecycle buckets above are reached from Home / Profile per
-the Seeker Dashboard spec (expanded navigation).
+## Conventions
+- Lane-local components live in `apps/web/components/seeker` with a barrel `index.ts`.
+- All UI primitives come from `@explore-and-earn/ui` (DiscoveryCard, Icon, Meter, etc.). Frozen `packages/ui/src` and `packages/contracts` are never edited here.
+- Styling uses CSS modules + semantic tokens only. `px` appears only in media-query breakpoints.
+- No matching/scoring logic — relevance is display-only via the neutral Meter.
+- Bottom navigation (Swipe · Map · Seek · Profile) is founder-locked and owned by the App Shell lane; it is intentionally not rendered here.
 
-## Lane boundaries
-
-- No edits to `packages/ui/src` or `packages/contracts` (frozen foundation).
-- Lifecycle view-models are UI-only (`components/seeker/models.ts`) and compose
-  the frozen contract registries; they are NOT added to contracts.
-- No matching/scoring logic — relevance is displayed via the neutral Meter only.
-- Semantic tokens only; categories farm · maritime · remote · seasonal · mix;
-  benefit triad Housing / Meals / Pay; verified host "Self-Declared by Host".
-
-## Source of truth (Notion)
-
-- Seeker Dashboard — Product Specification
-- Exact Dashboard Home — Wireframe Specs
-- Navigation, Cards, Popups & Interaction Rules
+## Not yet built
+- Phase C: Messages, Schedule, Travel Plans, Journey Map, Community Activity
+- Phase D: `/seek`, `/swipe`, `/map` (coordinating `/discover` with the discovery lane)
