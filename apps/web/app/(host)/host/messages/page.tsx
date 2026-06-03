@@ -1,7 +1,7 @@
 import {
   HOST_THREADS,
   HostSectionHeading,
-  HostThreadList,
+  HostThreadGroups,
 } from "../../../../components/host";
 import styles from "./page.module.css";
 
@@ -10,9 +10,9 @@ export default function HostMessagesPage() {
     <section className={styles.block}>
       <HostSectionHeading
         title="Messages"
-        description="Stay in touch with applicants and confirmed crew."
+        description="Conversations with applicants and confirmed crew, unread first."
       />
-      <HostThreadList threads={HOST_THREADS} />
+      <HostThreadGroups threads={HOST_THREADS} />
     </section>
   );
 }
