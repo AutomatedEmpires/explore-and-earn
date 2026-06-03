@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Notion Worker: mirrors GitHub issues and pull requests into a managed Notion database (GitHub → Notion, one direction). Second automation in the Explore&Earn agent relay.",
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc --outDir dist --rootDir src --noEmit false",
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "deploy": "ntn workers deploy",

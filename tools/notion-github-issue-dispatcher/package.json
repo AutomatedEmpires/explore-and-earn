@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Notion Worker: dispatches Ready-for-Engineering tasks from Notion into GitHub issues and writes the issue URL back to Notion. First automation in the Explore&Earn agent relay.",
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc --outDir dist --rootDir src --noEmit false",
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "deploy": "ntn workers deploy",
