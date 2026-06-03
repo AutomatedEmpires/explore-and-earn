@@ -1,21 +1,23 @@
 import type { ReactNode } from "react";
 
-import { SeekerHeader } from "../../components/seeker";
+import { SeekerBottomNav, SeekerHeader } from "../../components/seeker";
 import styles from "./layout.module.css";
 
 /**
- * Seeker scope layout (Phase A: Home + lifecycle buckets).
+ * Seeker scope layout.
  *
- * The seeker bottom navigation is founder-locked — Swipe · Map · Seek · Profile
- * — and is owned by the App Shell lane. It is intentionally NOT re-implemented
- * here to avoid a duplicate shell. This layout provides the seeker context
- * header + page container only.
+ * Navigation is scoped per user type — there is no single global bottom nav.
+ * The seeker-scope bottom navigation is founder-locked (Swipe · Map · Seek ·
+ * Profile) and OWNED BY THE SEEKER LANE, so it is wired here inside the (seeker)
+ * route group via <SeekerBottomNav>. The locked tab set and order must not
+ * change.
  */
 export default function SeekerLayout({ children }: { children: ReactNode }) {
   return (
     <div className={styles.shell}>
       <SeekerHeader />
       <main className={styles.main}>{children}</main>
+      <SeekerBottomNav />
     </div>
   );
 }

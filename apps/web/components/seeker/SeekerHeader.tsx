@@ -5,9 +5,11 @@ import { SEEKER_STATUS } from "./fixtures";
 import styles from "./SeekerHeader.module.css";
 
 /**
- * Seeker context header (greeting + scope + quick links). The locked bottom
- * navigation (Swipe · Map · Seek · Profile) is owned by the App Shell lane and
- * deliberately not rendered here.
+ * Seeker context header (greeting + scope + secondary quick links).
+ *
+ * Primary scope navigation lives in the locked seeker bottom nav
+ * (<SeekerBottomNav>: Swipe · Map · Seek · Profile). The header intentionally
+ * carries only secondary quick links (notifications, resume/profile).
  */
 export function SeekerHeader() {
   return (
@@ -17,9 +19,6 @@ export function SeekerHeader() {
         <span className={styles.scope}>Seeker</span>
       </div>
       <nav className={styles.actions} aria-label="Seeker quick links">
-        <Link className={styles.iconLink} href="/messages" aria-label="Messages">
-          <Icon name="nav.messages" size={20} aria-hidden />
-        </Link>
         <Link className={styles.iconLink} href="/notifications" aria-label="Notifications">
           <Icon name="system.info" size={20} aria-hidden />
           {SEEKER_STATUS.unreadNotifications > 0 ? (

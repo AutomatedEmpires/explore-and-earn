@@ -13,6 +13,7 @@ export type { SectionHeadingProps } from "./SectionHeading";
 export { BucketPage } from "./BucketPage";
 export type { BucketPageProps } from "./BucketPage";
 export { SeekerHeader } from "./SeekerHeader";
+export { SeekerBottomNav } from "./SeekerBottomNav";
 export { ResumePanel } from "./ResumePanel";
 export type { ResumePanelProps } from "./ResumePanel";
 export { SettingsPanel } from "./SettingsPanel";
