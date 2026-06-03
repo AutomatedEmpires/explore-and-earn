@@ -94,6 +94,18 @@ export const APPLICANT_STAGE_ICON: Record<ApplicantStage, IconKey> = {
   declined: "action.close",
 };
 
+/**
+ * Funnel order for the applicant pipeline (board columns, stage timelines).
+ * Presentation only — ordering is a display concern, not a hiring workflow.
+ */
+export const APPLICANT_STAGE_ORDER: readonly ApplicantStage[] = [
+  "new",
+  "reviewing",
+  "saved_by_host",
+  "offered",
+  "declined",
+];
+
 export interface HostApplicantItem {
   readonly id: string;
   readonly applicantName: string;
