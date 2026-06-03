@@ -12,7 +12,7 @@ export function HelpPanel({ items }: HelpPanelProps) {
 			{items.map((item) => (
 				<li key={item.id} className={styles.item}>
 					<span className={styles.icon}>
-						<Icon name={item.icon} size={18} aria-hidden />
+						<Icon name={item.icon} size={20} aria-hidden />
 					</span>
 					<span className={styles.body}>
 						<span className={styles.title}>{item.title}</span>

@@ -16,7 +16,7 @@ export function SettingsPanel({ groups }: SettingsPanelProps) {
 						{group.rows.map((row) => (
 							<li key={row.id} className={styles.row}>
 								<span className={styles.icon}>
-									<Icon name={row.icon} size={18} aria-hidden />
+									<Icon name={row.icon} size={20} aria-hidden />
 								</span>
 								<span className={styles.label}>{row.label}</span>
 								<span className={styles.value}>{row.value}</span>

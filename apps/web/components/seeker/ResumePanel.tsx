@@ -37,7 +37,7 @@ export function ResumePanel({ progress }: ResumePanelProps) {
 				{progress.sections.map((section) => (
 					<li key={section.id} className={styles.section}>
 						<span className={styles.icon}>
-							<Icon name={STATUS_ICON[section.status]} size={18} aria-hidden />
+							<Icon name={STATUS_ICON[section.status]} size={20} aria-hidden />
 						</span>
 						<span className={styles.text}>
 							<span className={styles.title}>
