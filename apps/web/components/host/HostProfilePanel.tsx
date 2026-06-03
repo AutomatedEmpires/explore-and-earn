@@ -1,13 +1,14 @@
 import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
 
-import type { HostProfileSummary } from "./models";
+import type { HostProfileSummary, HostStats } from "./models";
 import styles from "./HostProfilePanel.module.css";
 
 export interface HostProfilePanelProps {
   readonly profile: HostProfileSummary;
+  readonly stats: HostStats;
 }
 
-export function HostProfilePanel({ profile }: HostProfilePanelProps) {
+export function HostProfilePanel({ profile, stats }: HostProfilePanelProps) {
   return (
     <section className={styles.panel}>
       <header className={styles.header}>
@@ -23,11 +24,11 @@ export function HostProfilePanel({ profile }: HostProfilePanelProps) {
       <dl className={styles.facts}>
         <div className={styles.fact}>
           <dt className={styles.factLabel}>Active listings</dt>
-          <dd className={styles.factValue}>{profile.activeListings}</dd>
+          <dd className={styles.factValue}>{stats.activeListings}</dd>
         </div>
         <div className={styles.fact}>
           <dt className={styles.factLabel}>Total applicants</dt>
-          <dd className={styles.factValue}>{profile.totalApplicants}</dd>
+          <dd className={styles.factValue}>{stats.totalApplicants}</dd>
         </div>
       </dl>
     </section>

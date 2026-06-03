@@ -12,6 +12,8 @@ export default function HostListingsPage() {
       <HostSectionHeading
         title="Listings"
         description="Every opportunity you have posted, with live applicant counts."
+        actionLabel="New listing"
+        actionHref="/host/listings/new"
       />
       {HOST_LISTINGS.length > 0 ? (
         <div className={styles.stack}>

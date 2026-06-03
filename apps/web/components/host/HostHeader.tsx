@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 
-import { HOST_PROFILE } from "./fixtures";
+import { HOST_PROFILE, HOST_THREADS } from "./fixtures";
 import styles from "./HostHeader.module.css";
 
 /**
@@ -14,6 +14,8 @@ import styles from "./HostHeader.module.css";
  * quick links (messages, profile).
  */
 export function HostHeader() {
+  const unreadMessages = HOST_THREADS.filter((thread) => thread.unread).length;
+
   return (
     <header className={styles.header}>
       <div className={styles.identity}>
@@ -23,8 +25,8 @@ export function HostHeader() {
       <nav className={styles.actions} aria-label="Host quick links">
         <Link className={styles.iconLink} href="/host/messages" aria-label="Messages">
           <Icon name="nav.messages" size={20} aria-hidden />
-          {HOST_PROFILE.unreadMessages > 0 ? (
-            <span className={styles.badge}>{HOST_PROFILE.unreadMessages}</span>
+          {unreadMessages > 0 ? (
+            <span className={styles.badge}>{unreadMessages}</span>
           ) : null}
         </Link>
         <Link className={styles.iconLink} href="/host/profile" aria-label="Host profile">

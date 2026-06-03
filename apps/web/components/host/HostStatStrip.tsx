@@ -1,6 +1,6 @@
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
-import type { HostProfileSummary } from "./models";
+import type { HostStats } from "./models";
 import styles from "./HostStatStrip.module.css";
 
 interface Stat {
@@ -10,26 +10,26 @@ interface Stat {
 }
 
 export interface HostStatStripProps {
-  readonly profile: HostProfileSummary;
+  readonly stats: HostStats;
 }
 
-export function HostStatStrip({ profile }: HostStatStripProps) {
-  const stats: readonly Stat[] = [
-    { icon: "category.mix", label: "Active listings", value: profile.activeListings },
-    { icon: "status.match", label: "Applicants", value: profile.totalApplicants },
-    { icon: "status.open", label: "New", value: profile.newApplicants },
-    { icon: "nav.messages", label: "Unread", value: profile.unreadMessages },
+export function HostStatStrip({ stats }: HostStatStripProps) {
+  const cells: readonly Stat[] = [
+    { icon: "category.mix", label: "Active listings", value: stats.activeListings },
+    { icon: "status.match", label: "Applicants", value: stats.totalApplicants },
+    { icon: "status.open", label: "New", value: stats.newApplicants },
+    { icon: "nav.messages", label: "Unread", value: stats.unreadMessages },
   ];
 
   return (
     <dl className={styles.strip}>
-      {stats.map((stat) => (
-        <div key={stat.label} className={styles.cell}>
+      {cells.map((cell) => (
+        <div key={cell.label} className={styles.cell}>
           <dt className={styles.label}>
-            <Icon name={stat.icon} size={20} aria-hidden />
-            <span>{stat.label}</span>
+            <Icon name={cell.icon} size={20} aria-hidden />
+            <span>{cell.label}</span>
           </dt>
-          <dd className={styles.value}>{stat.value}</dd>
+          <dd className={styles.value}>{cell.value}</dd>
         </div>
       ))}
     </dl>

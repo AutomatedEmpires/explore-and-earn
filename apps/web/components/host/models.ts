@@ -20,10 +20,6 @@ export interface HostProfileSummary {
   readonly orgName: string;
   /** Self-declared verified host (G22). Rendered via VerifiedHostBadge. */
   readonly verified: boolean;
-  readonly activeListings: number;
-  readonly totalApplicants: number;
-  readonly newApplicants: number;
-  readonly unreadMessages: number;
 }
 
 export type HostListingState =
@@ -50,6 +46,13 @@ export const HOST_LISTING_STATE_ICON: Record<HostListingState, IconKey> = {
   closed: "system.success",
 };
 
+/** Lifecycle states that count as a live, publicly listed opportunity. */
+export const ACTIVE_HOST_LISTING_STATES: readonly HostListingState[] = [
+  "open",
+  "partially_filled",
+  "filled",
+];
+
 export interface HostListingItem {
   readonly listing: DiscoveryListing;
   readonly state: HostListingState;
@@ -60,16 +63,29 @@ export interface HostListingItem {
 export type ApplicantStage =
   | "new"
   | "reviewing"
-  | "shortlisted"
+  | "saved_by_host"
   | "offered"
   | "declined";
 
 export const APPLICANT_STAGE_LABEL: Record<ApplicantStage, string> = {
   new: "New",
   reviewing: "Reviewing",
-  shortlisted: "Shortlisted",
+  saved_by_host: "Saved",
   offered: "Offered",
   declined: "Declined",
+};
+
+/**
+ * Canonical Icon registry key per applicant stage. Presentation only — these
+ * label a stage badge and never drive any hiring decision (match/hiring
+ * pipeline is founder-gated and out of scope here).
+ */
+export const APPLICANT_STAGE_ICON: Record<ApplicantStage, IconKey> = {
+  new: "status.open",
+  reviewing: "status.partially_filled",
+  saved_by_host: "action.save",
+  offered: "status.boosted",
+  declined: "action.close",
 };
 
 export interface HostApplicantItem {
@@ -103,7 +119,7 @@ export function countByStage(
   const counts: Record<ApplicantStage, number> = {
     new: 0,
     reviewing: 0,
-    shortlisted: 0,
+    saved_by_host: 0,
     offered: 0,
     declined: 0,
   };
@@ -111,4 +127,32 @@ export function countByStage(
     counts[applicant.stage] += 1;
   }
   return counts;
+}
+
+/**
+ * Dashboard / profile headline figures. DERIVED from the fixture arrays (never
+ * hardcoded) so the numbers can never drift from the listings, applicants, and
+ * threads actually rendered. Presentation only — no matching/scoring.
+ */
+export interface HostStats {
+  readonly activeListings: number;
+  readonly totalApplicants: number;
+  readonly newApplicants: number;
+  readonly unreadMessages: number;
+}
+
+export function deriveHostStats(
+  listings: readonly HostListingItem[],
+  applicants: readonly HostApplicantItem[],
+  threads: readonly HostMessageThread[],
+): HostStats {
+  const stages = countByStage(applicants);
+  return {
+    activeListings: listings.filter((item) =>
+      ACTIVE_HOST_LISTING_STATES.includes(item.state),
+    ).length,
+    totalApplicants: applicants.length,
+    newApplicants: stages.new,
+    unreadMessages: threads.filter((thread) => thread.unread).length,
+  };
 }

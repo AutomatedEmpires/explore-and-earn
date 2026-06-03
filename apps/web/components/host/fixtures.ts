@@ -1,7 +1,9 @@
 import { DISCOVERY_FIXTURES, type DiscoveryListing } from "../discovery";
+import { countByStage } from "./models";
 import type {
   HostApplicantItem,
   HostListingItem,
+  HostListingState,
   HostMessageThread,
   HostProfileSummary,
 } from "./models";
@@ -11,6 +13,10 @@ import type {
  * Discovery lane's typed DiscoveryListing fixtures so the same canonical
  * listings flow through every lane. Replace with live data when the lifecycle
  * contracts + data layer land.
+ *
+ * Headline numbers are DERIVED (see HOST_LISTINGS + deriveHostStats), never
+ * hardcoded, so the dashboard can't advertise a count that contradicts the
+ * rows actually rendered.
  */
 function findListing(id: string): DiscoveryListing {
   const found = DISCOVERY_FIXTURES.find((listing) => listing.id === id);
@@ -24,32 +30,7 @@ export const HOST_PROFILE: HostProfileSummary = {
   hostName: "Maya",
   orgName: "Wenatchee Orchard Co.",
   verified: true,
-  activeListings: 3,
-  totalApplicants: 14,
-  newApplicants: 4,
-  unreadMessages: 2,
 };
-
-export const HOST_LISTINGS: readonly HostListingItem[] = [
-  {
-    listing: findListing("lst_orchard_wenatchee"),
-    state: "open",
-    applicantCount: 7,
-    newApplicantCount: 3,
-  },
-  {
-    listing: findListing("lst_vineyard_napa"),
-    state: "partially_filled",
-    applicantCount: 5,
-    newApplicantCount: 1,
-  },
-  {
-    listing: findListing("lst_deckhand_sitka"),
-    state: "draft",
-    applicantCount: 0,
-    newApplicantCount: 0,
-  },
-];
 
 export const HOST_APPLICANTS: readonly HostApplicantItem[] = [
   {
@@ -72,11 +53,38 @@ export const HOST_APPLICANTS: readonly HostApplicantItem[] = [
     id: "app_jordan",
     applicantName: "Jordan",
     listing: findListing("lst_vineyard_napa"),
-    stage: "shortlisted",
+    stage: "saved_by_host",
     appliedOn: "May 22, 2026",
     note: "Sommelier background with strong references.",
   },
 ];
+
+/**
+ * Listing lifecycle state per opportunity. Applicant counts are DERIVED from
+ * HOST_APPLICANTS so a listing can never advertise a count that doesn't match
+ * its real applicant rows.
+ */
+const HOST_LISTING_BASE: readonly {
+  readonly listing: DiscoveryListing;
+  readonly state: HostListingState;
+}[] = [
+  { listing: findListing("lst_orchard_wenatchee"), state: "open" },
+  { listing: findListing("lst_vineyard_napa"), state: "partially_filled" },
+  { listing: findListing("lst_deckhand_sitka"), state: "draft" },
+];
+
+export const HOST_LISTINGS: readonly HostListingItem[] = HOST_LISTING_BASE.map(
+  (base) => {
+    const applicants = HOST_APPLICANTS.filter(
+      (applicant) => applicant.listing.id === base.listing.id,
+    );
+    return {
+      ...base,
+      applicantCount: applicants.length,
+      newApplicantCount: countByStage(applicants).new,
+    };
+  },
+);
 
 export const HOST_THREADS: readonly HostMessageThread[] = [
   {
@@ -104,3 +112,17 @@ export const HOST_THREADS: readonly HostMessageThread[] = [
     updatedOn: "May 30",
   },
 ];
+
+/** Look up a single host listing view-model by its discovery listing id. */
+export function findHostListing(id: string): HostListingItem | undefined {
+  return HOST_LISTINGS.find((item) => item.listing.id === id);
+}
+
+/** All applicants who applied to a given listing. */
+export function applicantsForListing(
+  listingId: string,
+): readonly HostApplicantItem[] {
+  return HOST_APPLICANTS.filter(
+    (applicant) => applicant.listing.id === listingId,
+  );
+}

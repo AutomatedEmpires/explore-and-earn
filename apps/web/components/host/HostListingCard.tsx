@@ -44,9 +44,9 @@ export function HostListingCard({ item }: HostListingCardProps) {
           <dd className={styles.statValue}>{newApplicantCount}</dd>
         </div>
       </dl>
-      <Link className={styles.action} href="/host/applicants">
-        <Icon name="status.match" size={20} aria-hidden />
-        <span>Review applicants</span>
+      <Link className={styles.action} href={`/host/listings/${listing.id}`}>
+        <Icon name="action.forward" size={20} aria-hidden />
+        <span>Manage listing</span>
       </Link>
     </article>
   );
