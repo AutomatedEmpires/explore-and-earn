@@ -18,6 +18,8 @@ export { SwipeDeck } from "./SwipeDeck";
 export type { SwipeDeckProps } from "./SwipeDeck";
 export { OpportunityMap } from "./OpportunityMap";
 export type { OpportunityMapProps } from "./OpportunityMap";
+export { SeekBrowser } from "./SeekBrowser";
+export type { SeekBrowserProps } from "./SeekBrowser";
 export { ProfileHub } from "./ProfileHub";
 export type { ProfileHubProps } from "./ProfileHub";
 export { ResumePanel } from "./ResumePanel";

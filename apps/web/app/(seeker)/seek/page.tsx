@@ -1,17 +1,11 @@
-import { DiscoveryFeed, DISCOVERY_FIXTURES } from "../../../components/discovery";
+import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+import { SeekBrowser } from "../../../components/seeker";
 
 /**
  * Seek — locked seeker-nav tab (founder-flagged). The seeker-scope opportunity
- * feed: every open listing rendered through the single canonical DiscoveryCard
- * via DiscoveryFeed. Phase D replacement for the placeholder shipped with the
- * locked bottom nav.
+ * feed, now browsable: SeekBrowser layers client-side category + benefit
+ * filters and sort over the single canonical DiscoveryCard.
  */
 export default function SeekPage() {
-	return (
-		<DiscoveryFeed
-			listings={DISCOVERY_FIXTURES}
-			heading="Seek opportunities"
-			subheading="Browse every open work-travel opportunity — housing, meals, and pay from hosts worldwide."
-		/>
-	);
+	return <SeekBrowser listings={DISCOVERY_FIXTURES} />;
 }
