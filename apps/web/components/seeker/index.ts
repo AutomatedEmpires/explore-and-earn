@@ -14,6 +14,8 @@ export { BucketPage } from "./BucketPage";
 export type { BucketPageProps } from "./BucketPage";
 export { SeekerHeader } from "./SeekerHeader";
 export { SeekerBottomNav } from "./SeekerBottomNav";
+export { SwipeDeck } from "./SwipeDeck";
+export type { SwipeDeckProps } from "./SwipeDeck";
 export { ResumePanel } from "./ResumePanel";
 export type { ResumePanelProps } from "./ResumePanel";
 export { SettingsPanel } from "./SettingsPanel";

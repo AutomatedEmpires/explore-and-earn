@@ -1,0 +1,30 @@
+.deck {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	width: 100%;
+	max-width: var(--bp-sm);
+	margin: 0 auto;
+}
+
+.progress {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+	text-align: center;
+}
+
+.card {
+	width: 100%;
+}
+
+.controls {
+	display: flex;
+	justify-content: center;
+	gap: var(--space-8);
+}
