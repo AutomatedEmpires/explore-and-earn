@@ -5,6 +5,7 @@ import { DiscoveryCard, Icon } from "@explore-and-earn/ui";
 
 import {
 	EmptyState,
+	HostProfilePopup,
 	QuickPeekDrawer,
 	toDiscoveryCardData,
 	type DiscoveryListing,
@@ -53,17 +54,23 @@ export interface OpportunityMapProps {
  * answers "what's open, and where" by clustering opportunities under their
  * region, each card flagged with its category pin. Tapping a card opens the
  * lane-local QuickPeekDrawer with the full listing detail (the same drawer the
- * Seek tab uses), so the two surfaces never drift. When a real tile/vector map
- * + geocoded listings land with the data layer, this view-model swaps in behind
- * the same component contract.
+ * Seek tab uses); tapping the host identity circle opens the HostProfilePopup,
+ * so the two surfaces never drift. When a real tile/vector map + geocoded
+ * listings land with the data layer, this view-model swaps in behind the same
+ * component contract.
  *
  * UI-only (Sprint Zero): no geocoding, backend, or persistence.
  */
 export function OpportunityMap({ listings }: OpportunityMapProps) {
 	const [activeId, setActiveId] = useState<string | null>(null);
+	const [activeHostId, setActiveHostId] = useState<string | null>(null);
 	const activeListing = useMemo(
 		() => listings.find((listing) => listing.id === activeId) ?? null,
 		[listings, activeId],
+	);
+	const activeHost = useMemo(
+		() => listings.find((listing) => listing.id === activeHostId)?.host ?? null,
+		[listings, activeHostId],
 	);
 
 	if (listings.length === 0) {
@@ -103,6 +110,7 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 										data={toDiscoveryCardData(listing)}
 										surface="map"
 										onOpen={(id) => setActiveId(id)}
+										onHostClick={(id) => setActiveHostId(id)}
 									/>
 								</div>
 							</li>
@@ -112,6 +120,16 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 			))}
 
 			<QuickPeekDrawer listing={activeListing} onClose={() => setActiveId(null)} />
+
+			<HostProfilePopup
+				host={activeHost}
+				listings={listings}
+				onClose={() => setActiveHostId(null)}
+				onSelectListing={(id) => {
+					setActiveHostId(null);
+					setActiveId(id);
+				}}
+			/>
 		</div>
 	);
 }
