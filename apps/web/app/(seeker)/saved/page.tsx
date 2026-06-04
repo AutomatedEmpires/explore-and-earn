@@ -4,19 +4,20 @@ import {
   BucketPage,
   CardStatus,
   LifecycleList,
-  SAVED_ITEMS,
+  getSavedItems,
 } from "../../../components/seeker";
 
 export const metadata: Metadata = {
   title: "Saved",
 };
 
-export default function SavedPage() {
+export default async function SavedPage() {
+  const savedItems = await getSavedItems();
   return (
     <BucketPage title="Saved" description="Opportunities you want to revisit.">
       <LifecycleList
         surface="saved"
-        items={SAVED_ITEMS.map((item) => ({
+        items={savedItems.map((item) => ({
           listing: item.listing,
           actions: <CardStatus icon="nav.saved" label="Saved" detail={item.note} />,
         }))}

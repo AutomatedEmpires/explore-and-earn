@@ -40,6 +40,7 @@ export { JourneyTimeline } from "./JourneyTimeline";
 export type { JourneyTimelineProps } from "./JourneyTimeline";
 export * from "./models";
 export * from "./fixtures";
+export * from "./data";
 export * from "./resume";
 export * from "./account";
 export * from "./messaging";
