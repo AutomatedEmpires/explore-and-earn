@@ -1,16 +1,27 @@
+import type { Metadata } from "next";
+
 import {
   BucketChips,
   LifecycleList,
   PrimaryActionCard,
   SectionHeading,
   StatusStrip,
-  MATCHED_LISTINGS,
-  PRIMARY_ACTION_INPUT,
-  SEEKER_STATUS,
+  getMatchedListings,
+  getPrimaryActionInput,
+  getSeekerStatus,
 } from "../../../components/seeker";
 import styles from "./page.module.css";
 
-export default function SeekerHomePage() {
+export const metadata: Metadata = {
+  title: "Home",
+};
+
+export default async function SeekerHomePage() {
+  const [status, primaryActionInput, matchedListings] = await Promise.all([
+    getSeekerStatus(),
+    getPrimaryActionInput(),
+    getMatchedListings(),
+  ]);
   return (
     <>
       <section className={styles.block}>
@@ -18,22 +29,22 @@ export default function SeekerHomePage() {
           title="Your adventure command center"
           description="What matters now, and your next best action."
         />
-        <StatusStrip status={SEEKER_STATUS} />
+        <StatusStrip status={status} />
       </section>
 
       <section className={styles.block}>
-        <PrimaryActionCard input={PRIMARY_ACTION_INPUT} />
+        <PrimaryActionCard input={primaryActionInput} />
       </section>
 
       <section className={styles.block}>
         <SectionHeading
           title="Matched listings"
-          description="Relevance is shown as a neutral signal — never a score to chase."
+          description="Relevance is shown as a neutral signal \u2014 never a score to chase."
           actionLabel="See all"
           actionHref="/seek"
         />
         <LifecycleList
-          items={MATCHED_LISTINGS.map((listing) => ({ listing }))}
+          items={matchedListings.map((listing) => ({ listing }))}
           surface="matched"
           emptyTitle="No matches yet"
           emptyMessage="Complete your resume and preferences to start seeing matched opportunities."
@@ -42,7 +53,7 @@ export default function SeekerHomePage() {
 
       <section className={styles.block}>
         <SectionHeading title="Your applications" description="Jump back into any bucket." />
-        <BucketChips status={SEEKER_STATUS} />
+        <BucketChips status={status} />
       </section>
     </>
   );

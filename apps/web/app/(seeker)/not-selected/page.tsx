@@ -1,19 +1,26 @@
+import type { Metadata } from "next";
+
 import {
   BucketPage,
   CardStatus,
   LifecycleList,
-  NOT_SELECTED_ITEMS,
+  getNotSelectedItems,
 } from "../../../components/seeker";
 
-export default function NotSelectedPage() {
+export const metadata: Metadata = {
+  title: "Not selected",
+};
+
+export default async function NotSelectedPage() {
+  const notSelectedItems = await getNotSelectedItems();
   return (
     <BucketPage
       title="Not selected"
-      description="Closure without the noise — explore similar opportunities."
+      description="Closure without the noise \u2014 explore similar opportunities."
     >
       <LifecycleList
         surface="applied"
-        items={NOT_SELECTED_ITEMS.map((item) => ({
+        items={notSelectedItems.map((item) => ({
           listing: item.listing,
           actions: (
             <CardStatus

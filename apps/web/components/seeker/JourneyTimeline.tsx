@@ -1,18 +1,10 @@
 import { Icon, type IconKey } from "@explore-and-earn/ui";
-import type { OpportunityCategory } from "@explore-and-earn/contracts";
 
 import { EmptyState } from "../discovery";
 import { CardStatus } from "./CardStatus";
 import { JOURNEY_STATUS_LABEL, type JourneyStatus, type JourneyStop } from "./journey";
+import { MAPPIN_ICON } from "./mappin";
 import styles from "./JourneyTimeline.module.css";
-
-const MAPPIN_ICON: Record<OpportunityCategory, IconKey> = {
-	farm: "mappin.farm",
-	maritime: "mappin.maritime",
-	remote: "mappin.remote",
-	seasonal: "mappin.seasonal",
-	mix: "mappin.mix",
-};
 
 const STATUS_ICON: Record<JourneyStatus, IconKey> = {
 	completed: "system.success",

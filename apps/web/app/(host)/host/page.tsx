@@ -9,6 +9,7 @@ import {
   HostStatStrip,
   deriveHostStats,
 } from "../../../components/host";
+import { EmptyState } from "../../../components/discovery";
 import styles from "./page.module.css";
 
 export default function HostDashboardPage() {
@@ -49,11 +50,18 @@ export default function HostDashboardPage() {
           actionLabel="All applicants"
           actionHref="/host/applicants"
         />
-        <div className={styles.stack}>
-          {newApplicants.map((applicant) => (
-            <HostApplicantCard key={applicant.id} applicant={applicant} />
-          ))}
-        </div>
+        {newApplicants.length > 0 ? (
+          <div className={styles.stack}>
+            {newApplicants.map((applicant) => (
+              <HostApplicantCard key={applicant.id} applicant={applicant} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="You are all caught up"
+            message="No new applicants are waiting on a first review right now."
+          />
+        )}
       </section>
     </>
   );

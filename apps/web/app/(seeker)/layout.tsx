@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { SeekerBottomNav, SeekerHeader } from "../../components/seeker";
@@ -12,6 +13,15 @@ import styles from "./layout.module.css";
  * route group via <SeekerBottomNav>. The locked tab set and order must not
  * change.
  */
+export const metadata: Metadata = {
+  title: {
+    default: "Explore & Earn",
+    template: "%s · Explore & Earn",
+  },
+  description:
+    "Find work-travel opportunities — housing, meals, and pay from hosts worldwide.",
+};
+
 export default function SeekerLayout({ children }: { children: ReactNode }) {
   return (
     <div className={styles.shell}>

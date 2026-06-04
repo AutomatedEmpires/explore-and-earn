@@ -1,17 +1,24 @@
+import type { Metadata } from "next";
+
 import {
   APPLICATION_STATUS_LABEL,
-  APPLIED_ITEMS,
   BucketPage,
   CardStatus,
   LifecycleList,
+  getAppliedItems,
 } from "../../../components/seeker";
 
-export default function AppliedPage() {
+export const metadata: Metadata = {
+  title: "Applied",
+};
+
+export default async function AppliedPage() {
+  const appliedItems = await getAppliedItems();
   return (
     <BucketPage title="Applied" description="Track the applications you've submitted.">
       <LifecycleList
         surface="applied"
-        items={APPLIED_ITEMS.map((item) => ({
+        items={appliedItems.map((item) => ({
           listing: item.listing,
           actions: (
             <CardStatus

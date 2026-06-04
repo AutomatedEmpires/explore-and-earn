@@ -1,16 +1,23 @@
+import type { Metadata } from "next";
+
 import {
-  ACCEPTED_ITEMS,
   BucketPage,
   CardStatus,
   LifecycleList,
+  getAcceptedItems,
 } from "../../../components/seeker";
 
-export default function AcceptedPage() {
+export const metadata: Metadata = {
+  title: "Accepted",
+};
+
+export default async function AcceptedPage() {
+  const acceptedItems = await getAcceptedItems();
   return (
     <BucketPage title="Accepted" description="Your confirmed roles and pre-arrival steps.">
       <LifecycleList
         surface="applied"
-        items={ACCEPTED_ITEMS.map((item) => ({
+        items={acceptedItems.map((item) => ({
           listing: item.listing,
           actions: (
             <CardStatus

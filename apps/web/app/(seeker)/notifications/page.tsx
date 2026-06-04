@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
+
 import { BucketPage, NotificationList, NOTIFICATIONS } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Notifications",
+};
 
 export default function NotificationsPage() {
 	return (

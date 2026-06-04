@@ -29,6 +29,9 @@ function findListing(id: string): DiscoveryListing {
 export const HOST_PROFILE: HostProfileSummary = {
   hostName: "Maya",
   orgName: "Wenatchee Orchard Co.",
+  tagline: "Family orchard hiring seasonal crews since 1998.",
+  location: "Wenatchee, WA",
+  bio: "We are a third-generation apple and pear orchard in the Wenatchee Valley. Each season we welcome a small crew for harvest, packing, and farm-stay work, with on-site housing and daily meals provided.",
   verified: true,
 };
 
@@ -40,6 +43,7 @@ export const HOST_APPLICANTS: readonly HostApplicantItem[] = [
     stage: "new",
     appliedOn: "May 28, 2026",
     note: "Five seasons of orchard and harvest experience.",
+    threadId: "thr_riley",
   },
   {
     id: "app_sam",
@@ -48,6 +52,7 @@ export const HOST_APPLICANTS: readonly HostApplicantItem[] = [
     stage: "reviewing",
     appliedOn: "May 26, 2026",
     note: "Available through October; flexible on housing.",
+    threadId: "thr_sam",
   },
   {
     id: "app_jordan",
@@ -56,6 +61,7 @@ export const HOST_APPLICANTS: readonly HostApplicantItem[] = [
     stage: "saved_by_host",
     appliedOn: "May 22, 2026",
     note: "Sommelier background with strong references.",
+    threadId: "thr_jordan",
   },
 ];
 
@@ -94,6 +100,26 @@ export const HOST_THREADS: readonly HostMessageThread[] = [
     preview: "Thank you! I can start the week of the 18th.",
     unread: true,
     updatedOn: "10:02 AM",
+    messages: [
+      {
+        id: "msg_riley_1",
+        from: "applicant",
+        body: "Hi Maya, I just applied to the Orchard Harvest Crew listing.",
+        sentOn: "Mon 9:40 AM",
+      },
+      {
+        id: "msg_riley_2",
+        from: "host",
+        body: "Thanks Riley! Your harvest experience looks great. Could you start mid-month?",
+        sentOn: "Mon 9:58 AM",
+      },
+      {
+        id: "msg_riley_3",
+        from: "applicant",
+        body: "Thank you! I can start the week of the 18th.",
+        sentOn: "10:02 AM",
+      },
+    ],
   },
   {
     id: "thr_sam",
@@ -102,6 +128,20 @@ export const HOST_THREADS: readonly HostMessageThread[] = [
     preview: "Is on-site housing still available?",
     unread: true,
     updatedOn: "Yesterday",
+    messages: [
+      {
+        id: "msg_sam_1",
+        from: "host",
+        body: "Hi Sam, thanks for applying to the Orchard Harvest Crew.",
+        sentOn: "Yesterday 2:10 PM",
+      },
+      {
+        id: "msg_sam_2",
+        from: "applicant",
+        body: "Happy to be considered. Is on-site housing still available?",
+        sentOn: "Yesterday 2:25 PM",
+      },
+    ],
   },
   {
     id: "thr_jordan",
@@ -110,6 +150,20 @@ export const HOST_THREADS: readonly HostMessageThread[] = [
     preview: "Looking forward to the next steps.",
     unread: false,
     updatedOn: "May 30",
+    messages: [
+      {
+        id: "msg_jordan_1",
+        from: "host",
+        body: "Hi Jordan, we have saved your application for the Vineyard Tasting Host role.",
+        sentOn: "May 30 11:00 AM",
+      },
+      {
+        id: "msg_jordan_2",
+        from: "applicant",
+        body: "Looking forward to the next steps.",
+        sentOn: "May 30 11:20 AM",
+      },
+    ],
   },
 ];
 
@@ -125,4 +179,14 @@ export function applicantsForListing(
   return HOST_APPLICANTS.filter(
     (applicant) => applicant.listing.id === listingId,
   );
+}
+
+/** Look up a single applicant by id. */
+export function findHostApplicant(id: string): HostApplicantItem | undefined {
+  return HOST_APPLICANTS.find((applicant) => applicant.id === id);
+}
+
+/** Look up a single message thread by id. */
+export function findHostThread(id: string): HostMessageThread | undefined {
+  return HOST_THREADS.find((thread) => thread.id === id);
 }

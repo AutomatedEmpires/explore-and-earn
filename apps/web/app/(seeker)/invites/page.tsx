@@ -1,17 +1,24 @@
+import type { Metadata } from "next";
+
 import {
   BucketPage,
   CardStatus,
-  INVITE_ITEMS,
   INVITE_STATE_LABEL,
   LifecycleList,
+  getInviteItems,
 } from "../../../components/seeker";
 
-export default function InvitesPage() {
+export const metadata: Metadata = {
+  title: "Invites",
+};
+
+export default async function InvitesPage() {
+  const inviteItems = await getInviteItems();
   return (
     <BucketPage title="Invites" description="Hosts who invited you to apply.">
       <LifecycleList
         surface="saved"
-        items={INVITE_ITEMS.map((item) => ({
+        items={inviteItems.map((item) => ({
           listing: item.listing,
           actions: (
             <CardStatus

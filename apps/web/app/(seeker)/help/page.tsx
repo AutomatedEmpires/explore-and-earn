@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
+
 import { BucketPage, HelpPanel, HELP_ITEMS } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Help",
+};
 
 export default function HelpPage() {
 	return (

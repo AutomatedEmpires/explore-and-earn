@@ -1,17 +1,24 @@
+import type { Metadata } from "next";
+
 import {
   BucketPage,
   CardStatus,
   LifecycleList,
-  OFFER_ITEMS,
   OFFER_STATE_LABEL,
+  getOfferItems,
 } from "../../../components/seeker";
 
-export default function OfferedPage() {
+export const metadata: Metadata = {
+  title: "Offered",
+};
+
+export default async function OfferedPage() {
+  const offerItems = await getOfferItems();
   return (
     <BucketPage title="Offered" description="Offers and next steps from hosts.">
       <LifecycleList
         surface="applied"
-        items={OFFER_ITEMS.map((item) => ({
+        items={offerItems.map((item) => ({
           listing: item.listing,
           actions: (
             <CardStatus

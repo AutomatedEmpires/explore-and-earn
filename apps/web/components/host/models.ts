@@ -18,6 +18,12 @@ import type { DiscoveryListing } from "../discovery";
 export interface HostProfileSummary {
   readonly hostName: string;
   readonly orgName: string;
+  /** Short marketplace tagline shown on the public host profile. */
+  readonly tagline?: string;
+  /** Home base shown to seekers (city/region, presentation only). */
+  readonly location?: string;
+  /** Longer "about" blurb shown on the host profile. */
+  readonly bio?: string;
   /** Self-declared verified host (G22). Rendered via VerifiedHostBadge. */
   readonly verified: boolean;
 }
@@ -51,6 +57,18 @@ export const ACTIVE_HOST_LISTING_STATES: readonly HostListingState[] = [
   "open",
   "partially_filled",
   "filled",
+];
+
+/**
+ * Full lifecycle order for listing management (filter chips, grouping).
+ * Presentation only — ordering is a display concern, not a workflow engine.
+ */
+export const HOST_LISTING_STATE_ORDER: readonly HostListingState[] = [
+  "draft",
+  "open",
+  "partially_filled",
+  "filled",
+  "closed",
 ];
 
 export interface HostListingItem {
@@ -88,6 +106,18 @@ export const APPLICANT_STAGE_ICON: Record<ApplicantStage, IconKey> = {
   declined: "action.close",
 };
 
+/**
+ * Funnel order for the applicant pipeline (board columns, stage timelines).
+ * Presentation only — ordering is a display concern, not a hiring workflow.
+ */
+export const APPLICANT_STAGE_ORDER: readonly ApplicantStage[] = [
+  "new",
+  "reviewing",
+  "saved_by_host",
+  "offered",
+  "declined",
+];
+
 export interface HostApplicantItem {
   readonly id: string;
   readonly applicantName: string;
@@ -97,6 +127,16 @@ export interface HostApplicantItem {
   readonly appliedOn: string;
   /** Short note/snippet from the applicant. */
   readonly note?: string;
+  /** Links this applicant to their message thread (HostMessageThread.id). */
+  readonly threadId?: string;
+}
+
+/** A single message inside a host <-> applicant conversation (UI-only). */
+export interface HostThreadMessage {
+  readonly id: string;
+  readonly from: "host" | "applicant";
+  readonly body: string;
+  readonly sentOn: string;
 }
 
 export interface HostMessageThread {
@@ -106,6 +146,8 @@ export interface HostMessageThread {
   readonly preview: string;
   readonly unread: boolean;
   readonly updatedOn: string;
+  /** Full transcript for the thread-detail view (preview is the last entry). */
+  readonly messages?: readonly HostThreadMessage[];
 }
 
 /**
@@ -125,6 +167,27 @@ export function countByStage(
   };
   for (const applicant of applicants) {
     counts[applicant.stage] += 1;
+  }
+  return counts;
+}
+
+/**
+ * Pure, deterministic listing tally by lifecycle state, for the listings
+ * management filter. Presentation only — mirrors countByStage. Unit-testable
+ * without a backend.
+ */
+export function countListingsByState(
+  listings: readonly HostListingItem[],
+): Record<HostListingState, number> {
+  const counts: Record<HostListingState, number> = {
+    draft: 0,
+    open: 0,
+    partially_filled: 0,
+    filled: 0,
+    closed: 0,
+  };
+  for (const item of listings) {
+    counts[item.state] += 1;
   }
   return counts;
 }
