@@ -3,6 +3,8 @@ export { DiscoveryFeed } from "./DiscoveryFeed";
 export type { DiscoveryFeedProps } from "./DiscoveryFeed";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
+export { HostProfilePopup } from "./HostProfilePopup";
+export type { HostProfilePopupProps } from "./HostProfilePopup";
 export {
   CATEGORY_ICON,
   CATEGORY_LABEL,
@@ -11,3 +13,6 @@ export {
 } from "./listing";
 export type { DiscoveryListing, DiscoveryListingHost } from "./listing";
 export { DISCOVERY_FIXTURES } from "./fixtures";
+export { getDiscoveryListings, getDiscoveryListingById } from "./data";
+export { QuickPeekDrawer } from "./QuickPeekDrawer";
+export type { QuickPeekDrawerProps } from "./QuickPeekDrawer";

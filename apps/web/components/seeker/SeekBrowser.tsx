@@ -9,6 +9,8 @@ import {
 	CATEGORY_ICON,
 	CATEGORY_LABEL,
 	EmptyState,
+	HostProfilePopup,
+	QuickPeekDrawer,
 	toDiscoveryCardData,
 	type DiscoveryListing,
 } from "../discovery";
@@ -79,7 +81,9 @@ export interface SeekBrowserProps {
  *
  * Filter + sort state is hydrated from the URL query (category / benefits /
  * sort) and mirrored back with history.replaceState, so a filtered view is
- * shareable and bookmarkable without a server round-trip per toggle.
+ * shareable and bookmarkable without a server round-trip per toggle. Tapping a
+ * card title opens the lane-local QuickPeekDrawer with the full listing detail;
+ * tapping the host identity circle opens the HostProfilePopup.
  */
 export function SeekBrowser({
 	listings,
@@ -95,6 +99,8 @@ export function SeekBrowser({
 		parseBenefits(initialBenefits),
 	);
 	const [sort, setSort] = useState<SortKey>(() => parseSort(initialSort));
+	const [activeId, setActiveId] = useState<string | null>(null);
+	const [activeHostId, setActiveHostId] = useState<string | null>(null);
 
 	const toggleBenefit = (key: BenefitKey) => {
 		setBenefits((prev) =>
@@ -141,6 +147,16 @@ export function SeekBrowser({
 		}
 		return sorted;
 	}, [listings, category, benefits, sort]);
+
+	const activeListing = useMemo(
+		() => listings.find((listing) => listing.id === activeId) ?? null,
+		[listings, activeId],
+	);
+
+	const activeHost = useMemo(
+		() => listings.find((listing) => listing.id === activeHostId)?.host ?? null,
+		[listings, activeHostId],
+	);
 
 	const countLabel = `${results.length} ${
 		results.length === 1 ? "opportunity" : "opportunities"
@@ -249,10 +265,27 @@ export function SeekBrowser({
 							key={listing.id}
 							data={toDiscoveryCardData(listing)}
 							surface="discovery_feed"
+							onOpen={(id) => setActiveId(id)}
+							onHostClick={(id) => setActiveHostId(id)}
 						/>
 					))}
 				</div>
 			)}
+
+			<QuickPeekDrawer
+				listing={activeListing}
+				onClose={() => setActiveId(null)}
+			/>
+
+			<HostProfilePopup
+				host={activeHost}
+				listings={listings}
+				onClose={() => setActiveHostId(null)}
+				onSelectListing={(id) => {
+					setActiveHostId(null);
+					setActiveId(id);
+				}}
+			/>
 		</section>
 	);
 }
