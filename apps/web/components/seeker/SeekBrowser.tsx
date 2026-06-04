@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
 
@@ -25,6 +26,10 @@ const CATEGORY_ORDER: readonly OpportunityCategory[] = [
 	"mix",
 ];
 
+const CATEGORY_FILTERS: readonly CategoryFilter[] = ["all", ...CATEGORY_ORDER];
+const BENEFIT_KEYS: readonly BenefitKey[] = ["housing", "meals", "pay"];
+const SORT_KEYS: readonly SortKey[] = ["match", "title"];
+
 const BENEFIT_FILTERS: readonly {
 	readonly key: BenefitKey;
 	readonly label: string;
@@ -40,27 +45,84 @@ const SORTS: readonly { readonly key: SortKey; readonly label: string }[] = [
 	{ key: "title", label: "A\u2013Z" },
 ];
 
+function parseCategory(value: string | undefined): CategoryFilter {
+	return CATEGORY_FILTERS.includes(value as CategoryFilter)
+		? (value as CategoryFilter)
+		: "all";
+}
+
+function parseBenefits(value: string | undefined): readonly BenefitKey[] {
+	if (!value) {
+		return [];
+	}
+	const requested = value.split(",").map((entry) => entry.trim());
+	return BENEFIT_KEYS.filter((key) => requested.includes(key));
+}
+
+function parseSort(value: string | undefined): SortKey {
+	return SORT_KEYS.includes(value as SortKey) ? (value as SortKey) : "match";
+}
+
 export interface SeekBrowserProps {
 	readonly listings: readonly DiscoveryListing[];
+	readonly initialCategory?: string;
+	readonly initialBenefits?: string;
+	readonly initialSort?: string;
 }
 
 /**
- * SeekBrowser — the browsable Seek tab. Client-side category + benefit filters
- * and sort layered over the single canonical DiscoveryCard. Owns no data model:
- * it filters/sorts the DiscoveryListing view-model and renders the same card
- * every other seeker surface uses. The discovery-lane DiscoveryFeed is left
- * untouched so the two surfaces never collide.
+ * SeekBrowser \u2014 the browsable Seek tab. Client-side category + benefit
+ * filters and sort layered over the single canonical DiscoveryCard. Owns no
+ * data model: it filters/sorts the DiscoveryListing view-model and renders the
+ * same card every other seeker surface uses. The discovery-lane DiscoveryFeed
+ * is left untouched so the two surfaces never collide.
+ *
+ * Filter + sort state is hydrated from the URL query (category / benefits /
+ * sort) and mirrored back with history.replaceState, so a filtered view is
+ * shareable and bookmarkable without a server round-trip per toggle.
  */
-export function SeekBrowser({ listings }: SeekBrowserProps) {
-	const [category, setCategory] = useState<CategoryFilter>("all");
-	const [benefits, setBenefits] = useState<readonly BenefitKey[]>([]);
-	const [sort, setSort] = useState<SortKey>("match");
+export function SeekBrowser({
+	listings,
+	initialCategory,
+	initialBenefits,
+	initialSort,
+}: SeekBrowserProps) {
+	const pathname = usePathname();
+	const [category, setCategory] = useState<CategoryFilter>(() =>
+		parseCategory(initialCategory),
+	);
+	const [benefits, setBenefits] = useState<readonly BenefitKey[]>(() =>
+		parseBenefits(initialBenefits),
+	);
+	const [sort, setSort] = useState<SortKey>(() => parseSort(initialSort));
 
 	const toggleBenefit = (key: BenefitKey) => {
 		setBenefits((prev) =>
 			prev.includes(key) ? prev.filter((entry) => entry !== key) : [...prev, key],
 		);
 	};
+
+	useEffect(() => {
+		const params = new URLSearchParams();
+		if (category !== "all") {
+			params.set("category", category);
+		}
+		const selectedBenefits = BENEFIT_KEYS.filter((key) =>
+			benefits.includes(key),
+		);
+		if (selectedBenefits.length > 0) {
+			params.set("benefits", selectedBenefits.join(","));
+		}
+		if (sort !== "match") {
+			params.set("sort", sort);
+		}
+		const query = params.toString();
+		window.history.replaceState(
+			null,
+			"",
+			query ? `${pathname}?${query}` : pathname,
+		);
+	}, [category, benefits, sort, pathname]);
 
 	const results = useMemo(() => {
 		const filtered = listings.filter((listing) => {
@@ -89,7 +151,7 @@ export function SeekBrowser({ listings }: SeekBrowserProps) {
 			<header className={styles.header}>
 				<h1 className={styles.heading}>Seek opportunities</h1>
 				<p className={styles.subheading}>
-					Browse every open work-travel opportunity — housing, meals, and pay
+					Browse every open work-travel opportunity \u2014 housing, meals, and pay
 					from hosts worldwide.
 				</p>
 			</header>
