@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+import { getDiscoveryListings } from "../../../components/discovery";
 import { SeekBrowser } from "../../../components/seeker";
 
 export const metadata: Metadata = {
@@ -20,17 +20,21 @@ function firstValue(value: string | string[] | undefined): string | undefined {
  * opportunity feed, now browsable: SeekBrowser layers client-side category +
  * benefit filters and sort over the single canonical DiscoveryCard. Filter and
  * sort state is hydrated from the URL query so a filtered view is shareable and
- * bookmarkable.
+ * bookmarkable. Listings now arrive through the discovery data-access boundary
+ * (getDiscoveryListings) rather than importing fixtures directly.
  */
 export default async function SeekPage({
 	searchParams,
 }: {
 	searchParams: Promise<SeekSearchParams>;
 }) {
-	const params = await searchParams;
+	const [params, listings] = await Promise.all([
+		searchParams,
+		getDiscoveryListings(),
+	]);
 	return (
 		<SeekBrowser
-			listings={DISCOVERY_FIXTURES}
+			listings={listings}
 			initialCategory={firstValue(params.category)}
 			initialBenefits={firstValue(params.benefits)}
 			initialSort={firstValue(params.sort)}
