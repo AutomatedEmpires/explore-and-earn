@@ -8,6 +8,8 @@
 --   DR-B3: money stored as integer cents (compensation_*_cents).
 --   G7: ONE listing object across categories (no per-category tables);
 --     category depth lives in listing_relevance_extensions.
+--   Discovery Card triad (Housing/Meals/Pay) is first-class; NO generic perks
+--     bucket on listings.
 --   DR-B1 text+CHECK (mirrors LISTING_STATUS / LISTING_CATEGORY / COMPENSATION_
 --     UNIT / FILLED_STATUS), DR-B2 uuid PK.
 -- Listing status has no canonical transition map in the contracts yet, so no
@@ -46,7 +48,6 @@ create table listings (
   accepted_count        integer not null default 0 check (accepted_count >= 0),
   remaining_role_count  integer not null default 1 check (remaining_role_count >= 0),
   tags                  text[] not null default '{}',
-  perks                 text[] not null default '{}',
   cover_asset_id        uuid,
   completion_score      integer not null default 0 check (completion_score between 0 and 100),
   filled_status         text not null default 'open'
@@ -64,6 +65,9 @@ create table listings (
     compensation_min_cents is null
     or compensation_max_cents is null
     or compensation_max_cents >= compensation_min_cents
+  ),
+  constraint listings_timeline_range_chk check (
+    begins_at is null or ends_at is null or ends_at >= begins_at
   )
 );
 
@@ -106,12 +110,22 @@ create table listing_media_overrides (
   id             uuid primary key default gen_random_uuid(),
   listing_id     uuid not null references listings(id) on delete cascade,
   media_asset_id uuid references media_assets(id) on delete cascade,
+  -- Narrowed to the user-uploaded listing-media buckets defined by
+  -- packages/contracts/src/media.ts (MEDIA_BUCKET_TYPES). The broader
+  -- media_buckets registry (icon_photo, travel/dispute/report evidence, etc.)
+  -- is intentionally NOT permitted as a listing override, to keep sensitive or
+  -- non-listing media out of listing galleries.
   bucket_type    text not null
-                   check (bucket_type in ('profile_gallery','cover_photo','icon_photo','housing','meals','facilities','listing_specific','community_photo','travel_attachment','verification_evidence','dispute_evidence','report_evidence')),
+                   check (bucket_type in ('housing','meals','facilities','cover_photo','community_photo','verification_evidence')),
   caption        text,
   sort_order     integer not null default 0,
-  created_at     timestamptz not null default now()
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
 );
 
 create index idx_listing_media_overrides_listing on listing_media_overrides (listing_id);
 create index idx_listing_media_overrides_bucket_type on listing_media_overrides (bucket_type);
+
+create trigger trg_listing_media_overrides_updated_at
+  before update on listing_media_overrides
+  for each row execute function set_updated_at();

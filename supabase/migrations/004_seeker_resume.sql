@@ -2,7 +2,7 @@
 -- Seeker resume shell: experiences, educations, certifications.
 -- All cascade from seeker_profiles. category_tags constrained to the canonical
 -- marketplace categories (consistent with seeker_profiles.desired_categories);
--- skill_tags are freeform.
+-- skill_tags are freeform. Date-range CHECKs keep resume timelines consistent.
 
 create table seeker_resume_experiences (
   id                uuid primary key default gen_random_uuid(),
@@ -18,7 +18,13 @@ create table seeker_resume_experiences (
   skill_tags        text[] not null default '{}',
   sort_order        integer not null default 0,
   created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
+  updated_at        timestamptz not null default now(),
+  constraint seeker_resume_experiences_date_range_chk check (
+    start_date is null or end_date is null or end_date >= start_date
+  ),
+  constraint seeker_resume_experiences_current_chk check (
+    not is_current or end_date is null
+  )
 );
 
 create index idx_seeker_resume_experiences_profile on seeker_resume_experiences (seeker_profile_id);
@@ -40,7 +46,10 @@ create table seeker_resume_educations (
   skill_tags        text[] not null default '{}',
   sort_order        integer not null default 0,
   created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
+  updated_at        timestamptz not null default now(),
+  constraint seeker_resume_educations_date_range_chk check (
+    start_date is null or end_date is null or end_date >= start_date
+  )
 );
 
 create index idx_seeker_resume_educations_profile on seeker_resume_educations (seeker_profile_id);
@@ -61,7 +70,10 @@ create table seeker_certifications (
                          check (category_tags <@ array['farm','maritime','remote','seasonal','mix']::text[]),
   sort_order           integer not null default 0,
   created_at           timestamptz not null default now(),
-  updated_at           timestamptz not null default now()
+  updated_at           timestamptz not null default now(),
+  constraint seeker_certifications_date_range_chk check (
+    issued_at is null or expires_at is null or expires_at >= issued_at
+  )
 );
 
 create index idx_seeker_certifications_profile on seeker_certifications (seeker_profile_id);
