@@ -1,10 +1,3 @@
-<!--
-CLAOS Lite PR template — Explore&Earn.
-Fill every section. This template encodes the agent handoff relay so the founder
-never has to write the handoff format by hand.
-See docs/agents/claos-lite-handoff-relay.md and docs/agents/handoff-protocol.md.
--->
-
 ## Summary
 
 <!-- What does this PR change, and why? One short paragraph. -->

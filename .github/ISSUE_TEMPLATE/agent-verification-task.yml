@@ -9,7 +9,7 @@ body:
     attributes:
       value: |
         Use this form to hand a verification task to the next agent. Everything the
-        next agent needs must live here — CLAOS Lite forbids relying on private chat.
+        next agent needs must live here — agents must not rely on private chat.
 
         `agent:vscode` = LOCAL WSL verification on Jackson's laptop (`gh pr checkout` + pnpm).
         It is the only actor that can set `status:verified-local`.
@@ -29,7 +29,7 @@ body:
     id: source-branch
     attributes:
       label: Source branch
-      placeholder: "claos-lite/agent-handoff-relay"
+      placeholder: "chore/example-branch"
     validations:
       required: true
   - type: dropdown

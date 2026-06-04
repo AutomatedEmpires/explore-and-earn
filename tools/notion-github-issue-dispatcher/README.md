@@ -1,7 +1,7 @@
 # Notion → GitHub Issue Dispatcher
 
 First automation in the Explore&Earn agent relay. Implements **step 2** of
-[`docs/agents/handoff-protocol.md`](../../docs/agents/handoff-protocol.md):
+[`docs/archive/claos/handoff-protocol.md`](../../docs/archive/claos/handoff-protocol.md):
 
 > A dispatcher creates a GitHub issue: title, body, acceptance criteria, labels,
 > agent type, priority, and a link back to the Notion source. The issue URL is
