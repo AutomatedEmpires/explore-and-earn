@@ -8,7 +8,8 @@
 --     (no direct application UPDATE; enforced further in the RLS migration).
 --   DR-B5: host team roles = owner/admin/hiring_manager/analyst/billing/viewer.
 --   DR-B1 (text+CHECK), DR-B2 (uuid PK), DR-B3 (integer cents for money).
--- Enum CHECK values mirror contracts enums.ts.
+-- Enum CHECK values mirror the merged contracts: enums.ts, except team
+-- role_preset which mirrors permissions.ts HOST_TEAM_ROLES (DR-B5).
 
 -- ---------------------------------------------------------------------------
 -- Seeker profiles
@@ -172,9 +173,14 @@ create index idx_host_attestations_policy on host_attestations (policy_version);
 -- The ONLY writer of host_profiles.attestation_status (G2). Firing on insert of
 -- a new attestation moves the profile to 'attested'. not_attested|attested_stale|
 -- withdrawn -> attested are all permitted by HOST_ATTESTATION_TRANSITIONS.
+-- Declared SECURITY DEFINER with a pinned search_path so this status write keeps
+-- working once the RLS migration forbids direct UPDATEs of attestation_status by
+-- application users (otherwise the trigger's own UPDATE would be blocked too).
 create or replace function set_host_attestation()
 returns trigger
 language plpgsql
+security definer
+set search_path = public, pg_temp
 as $$
 begin
   update host_profiles

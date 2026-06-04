@@ -54,9 +54,24 @@ as $$
 declare
   v_machine text := tg_argv[0];
   v_col     text := coalesce(tg_argv[1], 'status');
+  v_new     jsonb := to_jsonb(new);
   v_from    text := to_jsonb(old) ->> v_col;
-  v_to      text := to_jsonb(new) ->> v_col;
+  v_to      text := v_new ->> v_col;
 begin
+  -- Misconfiguration guards: a missing machine arg or a wrong/typo'd status
+  -- column name would otherwise let an illegal transition slip through as a
+  -- silent no-op (v_to would resolve to NULL).
+  if v_machine is null then
+    raise exception
+      'enforce_lifecycle_transition: machine argument (tg_argv[0]) is required';
+  end if;
+  if not (v_new ? v_col) then
+    raise exception
+      'enforce_lifecycle_transition: status column "%" not found on % row',
+      v_col, tg_table_name
+      using errcode = 'undefined_column';
+  end if;
+
   -- No-op when the status column is unchanged or was null (initial set).
   if v_from is null or v_from is not distinct from v_to then
     return new;
