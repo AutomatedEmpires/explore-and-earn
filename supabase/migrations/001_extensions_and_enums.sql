@@ -1,3 +1,0 @@
--- Sprint Zero placeholder migration.
--- TODO: Replace with the approved extensions and enum bootstrap migration after
--- the canonical enum registry mirror is committed.
