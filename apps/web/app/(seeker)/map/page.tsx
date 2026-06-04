@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
+
 import { BucketPage, OpportunityMap } from "../../../components/seeker";
 import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+
+export const metadata: Metadata = {
+	title: "Map",
+};
 
 /**
  * Map — locked seeker-nav tab. Sprint Zero ships a location-grouped opportunity

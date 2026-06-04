@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
+
 import {
 	BucketPage,
 	SCHEDULE_PROPOSALS,
 	SchedulePanel,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Schedule",
+};
 
 export default function SchedulePage() {
 	return (

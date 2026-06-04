@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
+
 import { BucketPage, ProfileHub, SEEKER_STATUS } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Profile",
+};
 
 /**
  * Profile — founder-locked seeker-nav tab. The unified profile hub: identity,

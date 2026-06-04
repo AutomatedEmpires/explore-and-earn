@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import {
   BucketPage,
   CardStatus,
@@ -5,6 +7,10 @@ import {
   OFFER_ITEMS,
   OFFER_STATE_LABEL,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+  title: "Offered",
+};
 
 export default function OfferedPage() {
   return (

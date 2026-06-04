@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
+
 import {
   BucketPage,
   CardStatus,
   LifecycleList,
   NOT_SELECTED_ITEMS,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+  title: "Not selected",
+};
 
 export default function NotSelectedPage() {
   return (
