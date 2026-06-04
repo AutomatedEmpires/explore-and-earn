@@ -50,5 +50,14 @@ Stacked on `backend/migrations-v1-foundation` (PR #87). References tables from
   to live in a media bucket owned by the same listing with a matching
   `bucket_type`, so evidence/travel/icon media can't be relabeled into a listing
   gallery.
-- `media_assets.bucket_id` is `on delete set null` so assets survive bucket
-  deletion; `listing_media_overrides.media_asset_id` cascades on asset deletion.
+- `media_assets.bucket_id` is `NOT NULL` with `on delete restrict`: every asset
+  belongs to exactly one bucket, and a bucket cannot be deleted while it still
+  owns assets (remove the assets first — that cascades to any
+  `listing_media_overrides`). `listing_media_overrides.media_asset_id` cascades
+  on asset deletion.
+- Deferred to the RLS / integrity migration: an update-time guard that prevents
+  an asset's `bucket_id` (or a bucket's `owner_type`/`owner_id`/`bucket_type`)
+  from being changed out from under an existing `listing_media_overrides` or
+  `listings.cover_asset_id` reference. Inserts/updates of the references
+  themselves are already validated by `enforce_listing_media_override()` and
+  `enforce_listing_cover_asset()`.

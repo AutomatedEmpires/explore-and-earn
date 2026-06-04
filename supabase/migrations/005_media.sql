@@ -28,12 +28,13 @@ create trigger trg_media_buckets_updated_at
 
 create table media_assets (
   id                  uuid primary key default gen_random_uuid(),
-  -- ON DELETE RESTRICT (not SET NULL): a bucket cannot be deleted while it still
-  -- owns assets. Nulling bucket_id would orphan the asset and silently break the
+  -- NOT NULL + ON DELETE RESTRICT (not SET NULL): every asset belongs to exactly
+  -- one bucket, and a bucket cannot be deleted while it still owns assets.
+  -- Nulling/orphaning bucket_id would silently break the
   -- listing_media_overrides / cover_asset_id invariants (which require every
   -- referenced asset to live in a listing-owned bucket). Admins must remove the
   -- assets first (that cascades to overrides) before deleting a bucket.
-  bucket_id           uuid references media_buckets(id) on delete restrict,
+  bucket_id           uuid not null references media_buckets(id) on delete restrict,
   uploaded_by_user_id uuid references auth.users(id),
   storage_key         text not null,
   asset_type          text not null check (asset_type in ('image','video','document')),

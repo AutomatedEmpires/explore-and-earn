@@ -61,10 +61,15 @@ create table seeker_profiles (
     pay_expectation_min_cents is null
     or pay_expectation_max_cents is null
     or pay_expectation_max_cents >= pay_expectation_min_cents
+  ),
+  constraint seeker_profiles_availability_range_chk check (
+    availability_start is null
+    or availability_end is null
+    or availability_end >= availability_start
   )
 );
 
-create index idx_seeker_profiles_user on seeker_profiles (user_id);
+-- (no separate user_id index: seeker_profiles_user_unique already provides one)
 create index idx_seeker_profiles_visibility on seeker_profiles (visibility_status);
 create index idx_seeker_profiles_availability on seeker_profiles (availability_status);
 create index idx_seeker_profiles_desired_categories on seeker_profiles using gin (desired_categories);
@@ -158,7 +163,12 @@ create table attestation_policy (
   body          text not null,
   is_current    boolean not null default false,
   published_at  timestamptz,
-  created_at    timestamptz not null default now()
+  created_at    timestamptz not null default now(),
+  -- A policy can only be marked current once it has been published, so hosts
+  -- can never attest against an unpublished/draft policy (belt-and-suspenders
+  -- alongside the set_host_attestation() guard).
+  constraint attestation_policy_current_published_chk
+    check (not is_current or published_at is not null)
 );
 
 -- At most one current policy version.
@@ -197,18 +207,25 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_is_current boolean;
+  v_is_current   boolean;
+  v_published_at timestamptz;
 begin
   -- Trust integrity: an attestation may only be recorded against the policy
-  -- version currently in force, so a stale policy_version cannot refresh the
-  -- host's attested state after a policy bump.
-  select is_current into v_is_current
+  -- version currently in force AND published, so a stale/draft policy_version
+  -- cannot refresh the host's attested state after a policy bump. FOR SHARE
+  -- locks the selected policy row: a concurrent founder policy bump (which
+  -- UPDATEs is_current) must wait until this attestation commits, closing the
+  -- READ COMMITTED race where this trigger could otherwise read a pre-bump
+  -- is_current = true and attest against a now-stale policy.
+  select is_current, published_at
+    into v_is_current, v_published_at
     from public.attestation_policy
-   where version = new.policy_version;
+   where version = new.policy_version
+     for share;
 
-  if v_is_current is distinct from true then
+  if v_is_current is distinct from true or v_published_at is null then
     raise exception
-      'set_host_attestation: policy_version % is not the current attestation policy',
+      'set_host_attestation: policy_version % is not the current published attestation policy',
       new.policy_version
       using errcode = '23514';
   end if;
