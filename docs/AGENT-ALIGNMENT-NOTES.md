@@ -23,16 +23,27 @@ Three apps — **Explore&Earn (E&E)**, **BidSpace**, **Sweepza** — are built b
    - Added **Clerk** auth keys (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, sign-in/up URLs).
    - Replaced **Azure Maps** with **Mapbox** (`NEXT_PUBLIC_MAPBOX_TOKEN`, `MAPBOX_ACCESS_TOKEN`); `AZURE_MAPS_KEY` left commented and marked DEPRECATED until the code migration lands.
 3. **This note** — handoff record for build agents.
+4. **`middleware.ts`** — migrated from Supabase Auth stub → **Clerk** (`clerkMiddleware` + `createRouteMatcher`). Seeker and host routes are now protected; unauthenticated requests are redirected by Clerk automatically.
+5. **`apps/web/app/layout.tsx`** — **`ClerkProvider`** wraps the app root, enabling session access throughout the React tree.
+6. **`apps/web/package.json`** — `@clerk/nextjs` added as a dependency.
+7. **`docs/architecture/stack-and-providers.md`** — updated provider table: Auth → Clerk, Maps → Mapbox, Supabase → DB/storage only.
 
-## What this pass did NOT change (do not assume it is done)
-- **No application code was migrated.** Supabase Auth → Clerk and Azure Maps → Mapbox are real code changes (middleware/session, sign-in/up flows, map components, deps + lockfile) and are **gated build work**, tracked in **issue #91**. This branch only locks the decision + env manifest + docs so nobody keeps building on the old providers.
-- **Do NOT** wire any new feature against Supabase Auth or Azure Maps. New auth work = Clerk. New map work = Mapbox.
+## Migration status
+
+### Auth (Supabase Auth → Clerk) — ✅ COMPLETE
+- `@clerk/nextjs` installed.
+- `ClerkProvider` wraps the app root in `apps/web/app/layout.tsx`.
+- `middleware.ts` uses `clerkMiddleware` to protect seeker + host routes.
+- Auth service placeholder updated with Clerk guidance.
+- Supabase Postgres and Storage are retained; Supabase Auth is retired.
+
+### Maps (Azure Maps → Mapbox) — ⏳ PENDING real tile/vector implementation
+- Decision locked: **Mapbox** is the provider (cross-app standard).
+- `.env.example` already lists `NEXT_PUBLIC_MAPBOX_TOKEN` and `MAPBOX_ACCESS_TOKEN`.
+- The Sprint Zero `OpportunityMap` component is a location-grouped list view (no map library was ever wired in Sprint Zero). Mapbox GL JS integration lands when the geocoded data layer ships (tracked separately).
+- **Do NOT** wire any map work against Azure Maps — Mapbox only.
 
 ## Still pending (founder / build agents)
-- **Issue #91** — execute the Clerk + Mapbox code migration in E&E (needs a Build Pack + founder sign-off per `AGENTS.md`; auth is a founder-gated area).
-- **CI `.nvmrc` alignment** — E&E's `.github/workflows/ci.yml` still hardcodes `node-version: 24.16.0`. BidSpace + Sweepza CI already use `node-version-file: .nvmrc`. Change E&E's setup-node step to `node-version-file: .nvmrc` so the runtime is single-sourced. (Teach could not commit this — the connected GitHub app lacks the `workflows` permission; founder or a workflow-scoped agent must apply it.)
-
-## What to do next (agent picking this up)
-- Review + merge this PR (founder is the approver — builder ≠ approver).
-- Pick up issue #91 with a Build Pack to do the actual Clerk/Mapbox code migration.
-- Apply the CI `.nvmrc` change above.
+- **CI `.nvmrc` alignment** — E&E's `.github/workflows/ci.yml` still hardcodes `node-version: 24.16.0`. BidSpace + Sweepza CI already use `node-version-file: .nvmrc`. Change E&E's setup-node step to `node-version-file: .nvmrc` so the runtime is single-sourced. (Requires `workflows` permission.)
+- **Mapbox GL JS wiring** — when the geocoded listings data layer ships, swap `OpportunityMap`'s list view for a real Mapbox tile/vector map behind the same component contract.
+- **RLS migration** — update Supabase RLS policies to key on Clerk user ID (instead of Supabase Auth `auth.users.id`) once the Clerk JWT → Supabase integration is configured.

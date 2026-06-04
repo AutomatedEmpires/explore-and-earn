@@ -79,6 +79,20 @@ Canonical environment: **Windows 11 ARM64 → WSL2 Ubuntu 24.04 → VS Code → 
 - Package manager: **pnpm + Turborepo** is the canonical workspace toolchain for Sprint Zero.
 - Common commands (once scaffolded): `pnpm install`, `pnpm dev`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`.
 
+## 7.5. Locked integration providers (cross-app standard, 2026-06-04)
+
+These are **locked** across all three apps (E&E / BidSpace / Sweepza). Do not wire new work against the retired providers.
+
+| Concern | Provider | Note |
+|---|---|---|
+| **Auth** | **Clerk** (`@clerk/nextjs`) | `ClerkProvider` in root layout; `clerkMiddleware` in `middleware.ts`. Replaces Supabase Auth. |
+| **Maps / geo** | **Mapbox** | `NEXT_PUBLIC_MAPBOX_TOKEN` / `MAPBOX_ACCESS_TOKEN`. Replaces Azure Maps. |
+| **Database / Storage** | Supabase Postgres + Storage | Auth removed from Supabase scope — DB/storage only. |
+
+- **Do NOT** use Supabase Auth (`@supabase/auth-helpers-nextjs`, `supabase.auth.*`) anywhere.
+- **Do NOT** use Azure Maps or `AZURE_MAPS_KEY` anywhere.
+- New auth work = Clerk. New map work = Mapbox.
+
 ## 8. Code style
 
 - TypeScript everywhere; strict mode on.

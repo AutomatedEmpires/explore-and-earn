@@ -15,10 +15,10 @@
 | App framework | Next.js + React | Locked |
 | Hosting / deploy | Vercel | Locked (initial) |
 | Database | PostgreSQL | Locked |
-| Backend platform | Supabase (Postgres + Auth + Storage + Realtime) | Locked direction |
-| Auth | Supabase Auth | Locked direction |
+| Backend platform | Supabase (Postgres + Storage + Realtime — **DB/storage only**) | Locked direction |
+| Auth | **Clerk** (cross-app standard, locked 2026-06-04) | Locked |
 | Payments / billing | Stripe (test mode until go-live) | Locked |
-| Maps / geo | Azure Maps | Locked |
+| Maps / geo | **Mapbox** (cross-app standard, locked 2026-06-04) | Locked |
 | Product analytics | PostHog | Locked |
 | Error monitoring | Sentry | Locked |
 | Transactional email | Resend | Locked |
@@ -28,6 +28,10 @@
 | Secrets manager | Doppler | Locked (2026-06-01) |
 | Design | Figma | Locked |
 | Docs / source of truth | Notion | Locked |
+
+> **Migration note (2026-06-04):** Auth migrated from Supabase Auth → **Clerk**; maps
+> migrated from Azure Maps → **Mapbox**. Supabase is retained for Postgres + Storage only.
+> See issue #91 and `docs/AGENT-ALIGNMENT-NOTES.md`.
 
 ## Not locked yet (do not assume)
 

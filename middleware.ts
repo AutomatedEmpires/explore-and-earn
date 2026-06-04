@@ -1,10 +1,23 @@
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-export function middleware(_request: NextRequest) {
-  void _request;
+// Routes that require an authenticated session.
+const isProtectedRoute = createRouteMatcher([
+  "/(seeker)(.*)",
+  "/(host)(.*)",
+  "/host(.*)",
+]);
 
-  // TODO: Refresh Supabase session and attach request scope metadata once
-  // production auth/session handling is approved for implementation.
-  return NextResponse.next();
-}
+export default clerkMiddleware(async (auth, request) => {
+  if (isProtectedRoute(request)) {
+    await auth.protect();
+  }
+});
+
+export const config = {
+  matcher: [
+    // Skip Next.js internals and static files.
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Always run for API routes.
+    "/(api|trpc)(.*)",
+  ],
+};
