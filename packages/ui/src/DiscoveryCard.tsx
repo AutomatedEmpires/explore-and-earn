@@ -364,12 +364,6 @@ const triadItemIncludedStyle: CSSProperties = {
 	borderColor: "var(--status-success-fg)",
 }
 
-const triadButtonStyle: CSSProperties = {
-	...triadItemStyle,
-	cursor: "pointer",
-	font: "inherit",
-}
-
 const triadButtonIncludedStyle: CSSProperties = {
 	...triadItemIncludedStyle,
 	cursor: "pointer",
