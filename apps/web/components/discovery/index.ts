@@ -11,3 +11,5 @@ export {
 } from "./listing";
 export type { DiscoveryListing, DiscoveryListingHost } from "./listing";
 export { DISCOVERY_FIXTURES } from "./fixtures";
+export { QuickPeekDrawer } from "./QuickPeekDrawer";
+export type { QuickPeekDrawerProps } from "./QuickPeekDrawer";
