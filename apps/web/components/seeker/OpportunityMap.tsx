@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { DiscoveryCard, Icon } from "@explore-and-earn/ui";
 
 import {
+	BenefitBucketDrawer,
 	EmptyState,
 	HostProfilePopup,
 	QuickPeekDrawer,
 	toDiscoveryCardData,
+	type BenefitBucket,
 	type DiscoveryListing,
 } from "../discovery";
 import { MAPPIN_ICON } from "./mappin";
@@ -21,7 +23,7 @@ interface RegionGroup {
 /**
  * Derive a coarse region label from a listing's location string. We key on the
  * segment after the last comma (state / country), falling back to the whole
- * string for comma-free locations like "Remote \u00b7 Worldwide".
+ * string for comma-free locations like "Remote · Worldwide".
  */
 function regionOf(location: string): string {
 	const parts = location.split(",");
@@ -48,22 +50,27 @@ export interface OpportunityMapProps {
 }
 
 /**
- * OpportunityMap \u2014 the /map surface. Sprint Zero ships a location-grouped
+ * OpportunityMap — the /map surface. Sprint Zero ships a location-grouped
  * index (no map library is in the frozen dependency set), built on the SINGLE
  * canonical DiscoveryCard ("map" surface) plus the canonical mappin.* pins. It
  * answers "what's open, and where" by clustering opportunities under their
  * region, each card flagged with its category pin. Tapping a card opens the
  * lane-local QuickPeekDrawer with the full listing detail (the same drawer the
- * Seek tab uses); tapping the host identity circle opens the HostProfilePopup,
- * so the two surfaces never drift. When a real tile/vector map + geocoded
- * listings land with the data layer, this view-model swaps in behind the same
- * component contract.
+ * Seek tab uses); tapping the host identity circle opens the HostProfilePopup;
+ * tapping the Housing or Meals cell opens the BenefitBucketDrawer, so the
+ * surfaces never drift. When a real tile/vector map + geocoded listings land
+ * with the data layer, this view-model swaps in behind the same component
+ * contract.
  *
  * UI-only (Sprint Zero): no geocoding, backend, or persistence.
  */
 export function OpportunityMap({ listings }: OpportunityMapProps) {
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [activeHostId, setActiveHostId] = useState<string | null>(null);
+	const [activeBenefit, setActiveBenefit] = useState<{
+		readonly id: string;
+		readonly bucket: BenefitBucket;
+	} | null>(null);
 	const activeListing = useMemo(
 		() => listings.find((listing) => listing.id === activeId) ?? null,
 		[listings, activeId],
@@ -71,6 +78,10 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 	const activeHost = useMemo(
 		() => listings.find((listing) => listing.id === activeHostId)?.host ?? null,
 		[listings, activeHostId],
+	);
+	const activeBenefitListing = useMemo(
+		() => listings.find((listing) => listing.id === activeBenefit?.id) ?? null,
+		[listings, activeBenefit],
 	);
 
 	if (listings.length === 0) {
@@ -111,6 +122,12 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 										surface="map"
 										onOpen={(id) => setActiveId(id)}
 										onHostClick={(id) => setActiveHostId(id)}
+										onHousingClick={(id) =>
+											setActiveBenefit({ id, bucket: "housing" })
+										}
+										onMealsClick={(id) =>
+											setActiveBenefit({ id, bucket: "meals" })
+										}
 									/>
 								</div>
 							</li>
@@ -129,6 +146,12 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 					setActiveHostId(null);
 					setActiveId(id);
 				}}
+			/>
+
+			<BenefitBucketDrawer
+				listing={activeBenefitListing}
+				bucket={activeBenefit?.bucket ?? null}
+				onClose={() => setActiveBenefit(null)}
 			/>
 		</div>
 	);

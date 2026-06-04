@@ -6,12 +6,14 @@ import type { OpportunityCategory } from "@explore-and-earn/contracts";
 import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
 
 import {
+	BenefitBucketDrawer,
 	CATEGORY_ICON,
 	CATEGORY_LABEL,
 	EmptyState,
 	HostProfilePopup,
 	QuickPeekDrawer,
 	toDiscoveryCardData,
+	type BenefitBucket,
 	type DiscoveryListing,
 } from "../discovery";
 import styles from "./SeekBrowser.module.css";
@@ -44,7 +46,7 @@ const BENEFIT_FILTERS: readonly {
 
 const SORTS: readonly { readonly key: SortKey; readonly label: string }[] = [
 	{ key: "match", label: "Best match" },
-	{ key: "title", label: "A\u2013Z" },
+	{ key: "title", label: "A–Z" },
 ];
 
 function parseCategory(value: string | undefined): CategoryFilter {
@@ -73,7 +75,7 @@ export interface SeekBrowserProps {
 }
 
 /**
- * SeekBrowser \u2014 the browsable Seek tab. Client-side category + benefit
+ * SeekBrowser — the browsable Seek tab. Client-side category + benefit
  * filters and sort layered over the single canonical DiscoveryCard. Owns no
  * data model: it filters/sorts the DiscoveryListing view-model and renders the
  * same card every other seeker surface uses. The discovery-lane DiscoveryFeed
@@ -83,7 +85,8 @@ export interface SeekBrowserProps {
  * sort) and mirrored back with history.replaceState, so a filtered view is
  * shareable and bookmarkable without a server round-trip per toggle. Tapping a
  * card title opens the lane-local QuickPeekDrawer with the full listing detail;
- * tapping the host identity circle opens the HostProfilePopup.
+ * tapping the host identity circle opens the HostProfilePopup; tapping the
+ * Housing or Meals cell opens the BenefitBucketDrawer (evidence photo bucket).
  */
 export function SeekBrowser({
 	listings,
@@ -101,6 +104,10 @@ export function SeekBrowser({
 	const [sort, setSort] = useState<SortKey>(() => parseSort(initialSort));
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [activeHostId, setActiveHostId] = useState<string | null>(null);
+	const [activeBenefit, setActiveBenefit] = useState<{
+		readonly id: string;
+		readonly bucket: BenefitBucket;
+	} | null>(null);
 
 	const toggleBenefit = (key: BenefitKey) => {
 		setBenefits((prev) =>
@@ -158,6 +165,11 @@ export function SeekBrowser({
 		[listings, activeHostId],
 	);
 
+	const activeBenefitListing = useMemo(
+		() => listings.find((listing) => listing.id === activeBenefit?.id) ?? null,
+		[listings, activeBenefit],
+	);
+
 	const countLabel = `${results.length} ${
 		results.length === 1 ? "opportunity" : "opportunities"
 	}`;
@@ -167,7 +179,7 @@ export function SeekBrowser({
 			<header className={styles.header}>
 				<h1 className={styles.heading}>Seek opportunities</h1>
 				<p className={styles.subheading}>
-					Browse every open work-travel opportunity \u2014 housing, meals, and pay
+					Browse every open work-travel opportunity — housing, meals, and pay
 					from hosts worldwide.
 				</p>
 			</header>
@@ -267,6 +279,10 @@ export function SeekBrowser({
 							surface="discovery_feed"
 							onOpen={(id) => setActiveId(id)}
 							onHostClick={(id) => setActiveHostId(id)}
+							onHousingClick={(id) =>
+								setActiveBenefit({ id, bucket: "housing" })
+							}
+							onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
 						/>
 					))}
 				</div>
@@ -285,6 +301,12 @@ export function SeekBrowser({
 					setActiveHostId(null);
 					setActiveId(id);
 				}}
+			/>
+
+			<BenefitBucketDrawer
+				listing={activeBenefitListing}
+				bucket={activeBenefit?.bucket ?? null}
+				onClose={() => setActiveBenefit(null)}
 			/>
 		</section>
 	);

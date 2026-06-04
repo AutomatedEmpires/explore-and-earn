@@ -3,6 +3,11 @@ export { DiscoveryFeed } from "./DiscoveryFeed";
 export type { DiscoveryFeedProps } from "./DiscoveryFeed";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
+export { BenefitBucketDrawer } from "./BenefitBucketDrawer";
+export type {
+  BenefitBucket,
+  BenefitBucketDrawerProps,
+} from "./BenefitBucketDrawer";
 export { HostProfilePopup } from "./HostProfilePopup";
 export type { HostProfilePopupProps } from "./HostProfilePopup";
 export {
