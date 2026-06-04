@@ -106,14 +106,18 @@ function benefitDisplay(info: {
  * Pure mapper: local DiscoveryListing view-model -> the canonical
  * @explore-and-earn/ui DiscoveryCardData. The richer provision/summary benefit
  * data is collapsed into the card's Housing / Meals / Pay display-string triad
- * (the card supplies the triad labels and icons itself). Relevance/match is
- * carried through as matchScore; the card renders it (neutral Meter) only on
- * the "matched" surface.
+ * (the card supplies the triad labels and icons itself), while the raw
+ * provision is carried through as benefitProvision so the card can render the
+ * green included-border on Housing & Meals. Relevance/match is carried through
+ * as matchScore; the card renders it (neutral Meter) only on the "matched"
+ * surface. The listing title becomes the role/position row; the host business
+ * name is the card's display title.
  */
 export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardData {
   return {
     id: listing.id,
     title: listing.title,
+    positionTitle: listing.title,
     hostName: listing.host.name,
     category: listing.category,
     location: listing.location,
@@ -122,6 +126,11 @@ export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardDat
       housing: benefitDisplay(listing.benefits.housing),
       meals: benefitDisplay(listing.benefits.meals),
       pay: benefitDisplay(listing.benefits.pay),
+    },
+    benefitProvision: {
+      housing: listing.benefits.housing.provision,
+      meals: listing.benefits.meals.provision,
+      pay: listing.benefits.pay.provision,
     },
     verifiedHost: listing.host.verified,
     conditionalBadges: listing.conditionalBadges,
