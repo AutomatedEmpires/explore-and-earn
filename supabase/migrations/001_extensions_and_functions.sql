@@ -23,6 +23,7 @@ create extension if not exists pgcrypto;
 create or replace function set_updated_at()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 begin
   new.updated_at := now();
@@ -50,6 +51,7 @@ comment on table lifecycle_transition is
 create or replace function enforce_lifecycle_transition()
 returns trigger
 language plpgsql
+set search_path = public, pg_temp
 as $$
 declare
   v_machine text := tg_argv[0];
@@ -60,7 +62,8 @@ declare
 begin
   -- Misconfiguration guards: a missing machine arg or a wrong/typo'd status
   -- column name would otherwise let an illegal transition slip through as a
-  -- silent no-op (v_to would resolve to NULL).
+  -- silent no-op (v_to would resolve to NULL). errcodes are explicit 5-char
+  -- SQLSTATEs (42703 = undefined_column, 23514 = check_violation).
   if v_machine is null then
     raise exception
       'enforce_lifecycle_transition: machine argument (tg_argv[0]) is required';
@@ -69,7 +72,7 @@ begin
     raise exception
       'enforce_lifecycle_transition: status column "%" not found on % row',
       v_col, tg_table_name
-      using errcode = 'undefined_column';
+      using errcode = '42703';
   end if;
 
   -- No-op when the status column is unchanged or was null (initial set).
@@ -77,15 +80,17 @@ begin
     return new;
   end if;
 
+  -- search_path is pinned above, but qualify the table explicitly so the G16
+  -- check can never resolve to a temp/shadow lifecycle_transition.
   if not exists (
-    select 1 from lifecycle_transition t
+    select 1 from public.lifecycle_transition t
     where t.machine = v_machine
       and t.from_state = v_from
       and t.to_state = v_to
   ) then
     raise exception
       'Illegal % lifecycle transition: % -> %', v_machine, v_from, v_to
-      using errcode = 'check_violation';
+      using errcode = '23514';
   end if;
 
   return new;

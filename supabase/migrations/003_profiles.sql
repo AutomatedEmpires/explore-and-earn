@@ -8,8 +8,11 @@
 --     (no direct application UPDATE; enforced further in the RLS migration).
 --   DR-B5: host team roles = owner/admin/hiring_manager/analyst/billing/viewer.
 --   DR-B1 (text+CHECK), DR-B2 (uuid PK), DR-B3 (integer cents for money).
--- Enum CHECK values mirror the merged contracts: enums.ts, except team
--- role_preset which mirrors permissions.ts HOST_TEAM_ROLES (DR-B5).
+-- CHECK vocabularies mirror the merged contracts where a matching enum exists:
+-- most mirror enums.ts; team role_preset mirrors permissions.ts HOST_TEAM_ROLES
+-- (DR-B5). A few seeker preference vocabularies (availability_status,
+-- housing_preference, meals_preference, travel_readiness) are migration-local
+-- pending a contracts enum and are NOT sourced from enums.ts yet.
 
 -- ---------------------------------------------------------------------------
 -- Seeker profiles
@@ -29,7 +32,10 @@ create table seeker_profiles (
   availability_status       text
                               check (availability_status in ('available_now','date_range','flexible','unavailable')),
   desired_categories        text[] not null default '{}'
-                              check (desired_categories <@ array['farm','maritime','remote','seasonal','mix']::text[]),
+                              check (
+                                desired_categories <@ array['farm','maritime','remote','seasonal','mix']::text[]
+                                and array_position(desired_categories, null) is null
+                              ),
   desired_roles             text[] not null default '{}',
   housing_preference        text
                               check (housing_preference in ('required','preferred','not_needed','flexible')),
@@ -77,7 +83,10 @@ create table host_profiles (
   slug                      text not null unique,
   about                     text,
   category_scopes           text[] not null default '{}'
-                              check (category_scopes <@ array['farm','maritime','remote','seasonal','mix']::text[]),
+                              check (
+                                category_scopes <@ array['farm','maritime','remote','seasonal','mix']::text[]
+                                and array_position(category_scopes, null) is null
+                              ),
   -- Attestation (G2: status written only by set_host_attestation()).
   attestation_status        text not null default 'not_attested'
                               check (attestation_status in ('not_attested','attested','attested_stale','withdrawn')),
@@ -176,6 +185,7 @@ create index idx_host_attestations_policy on host_attestations (policy_version);
 -- Declared SECURITY DEFINER with a pinned search_path so this status write keeps
 -- working once the RLS migration forbids direct UPDATEs of attestation_status by
 -- application users (otherwise the trigger's own UPDATE would be blocked too).
+-- EXECUTE is revoked from PUBLIC below so it can only run via the trigger path.
 create or replace function set_host_attestation()
 returns trigger
 language plpgsql
@@ -193,6 +203,10 @@ begin
   return new;
 end;
 $$;
+
+-- Trigger functions do not require EXECUTE on the function, so locking down
+-- direct callers does not affect the trigger path (G2).
+revoke execute on function set_host_attestation() from public;
 
 create trigger trg_set_host_attestation
   after insert on host_attestations

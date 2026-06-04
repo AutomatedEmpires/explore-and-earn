@@ -3,8 +3,8 @@
 -- overrides.
 --
 -- Canon honored:
---   DR-B6: listings.mix_domains text[] constrained to the four non-mix domains;
---     only a `mix` listing may carry mix_domains.
+--   DR-B6: listings.mix_domains text[] constrained to the four non-mix domains
+--     (and rejects NULL elements); only a `mix` listing may carry mix_domains.
 --   DR-B3: money stored as integer cents (compensation_*_cents).
 --   G7: ONE listing object across categories (no per-category tables);
 --     category depth lives in listing_relevance_extensions.
@@ -22,7 +22,10 @@ create table listings (
   category              text not null
                           check (category in ('farm','maritime','remote','seasonal','mix')),
   mix_domains           text[] not null default '{}'
-                          check (mix_domains <@ array['farm','maritime','remote','seasonal']::text[]),
+                          check (
+                            mix_domains <@ array['farm','maritime','remote','seasonal']::text[]
+                            and array_position(mix_domains, null) is null
+                          ),
   status                text not null default 'draft'
                           check (status in ('draft','under_review','live','paused','closed','archived')),
   description           text,
@@ -68,6 +71,11 @@ create table listings (
   ),
   constraint listings_timeline_range_chk check (
     begins_at is null or ends_at is null or ends_at >= begins_at
+  ),
+  -- Keep the redundant availability counters internally consistent.
+  constraint listings_role_counts_chk check (
+    accepted_count <= role_count
+    and remaining_role_count = role_count - accepted_count
   )
 );
 
@@ -109,12 +117,14 @@ create trigger trg_listing_relevance_extensions_updated_at
 create table listing_media_overrides (
   id             uuid primary key default gen_random_uuid(),
   listing_id     uuid not null references listings(id) on delete cascade,
-  media_asset_id uuid references media_assets(id) on delete cascade,
+  media_asset_id uuid not null references media_assets(id) on delete cascade,
   -- Narrowed to the user-uploaded listing-media buckets defined by
   -- packages/contracts/src/media.ts (MEDIA_BUCKET_TYPES). The broader
   -- media_buckets registry (icon_photo, travel/dispute/report evidence, etc.)
   -- is intentionally NOT permitted as a listing override, to keep sensitive or
-  -- non-listing media out of listing galleries.
+  -- non-listing media out of listing galleries. The bucket value is further
+  -- enforced against the referenced asset's bucket by
+  -- enforce_listing_media_override() below.
   bucket_type    text not null
                    check (bucket_type in ('housing','meals','facilities','cover_photo','community_photo','verification_evidence')),
   caption        text,
@@ -125,7 +135,58 @@ create table listing_media_overrides (
 
 create index idx_listing_media_overrides_listing on listing_media_overrides (listing_id);
 create index idx_listing_media_overrides_bucket_type on listing_media_overrides (bucket_type);
+create index idx_listing_media_overrides_asset on listing_media_overrides (media_asset_id);
 
 create trigger trg_listing_media_overrides_updated_at
   before update on listing_media_overrides
   for each row execute function set_updated_at();
+
+-- Integrity guard: an override may only reference an asset whose media bucket is
+-- owned by THIS listing and whose bucket_type matches the override. The narrow
+-- column CHECK alone cannot stop an asset from a sensitive bucket (e.g.
+-- dispute_evidence) being relabeled as a listing photo, so validate against the
+-- referenced asset's actual bucket here.
+create or replace function enforce_listing_media_override()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_owner_type  text;
+  v_owner_id    uuid;
+  v_bucket_type text;
+begin
+  select b.owner_type, b.owner_id, b.bucket_type
+    into v_owner_type, v_owner_id, v_bucket_type
+    from media_assets a
+    join media_buckets b on b.id = a.bucket_id
+   where a.id = new.media_asset_id;
+
+  if not found then
+    raise exception
+      'listing_media_overrides: media asset % is not attached to a media bucket',
+      new.media_asset_id
+      using errcode = '23514';
+  end if;
+
+  if v_owner_type <> 'listing' or v_owner_id <> new.listing_id then
+    raise exception
+      'listing_media_overrides: media asset % belongs to %/%, not listing %',
+      new.media_asset_id, v_owner_type, v_owner_id, new.listing_id
+      using errcode = '23514';
+  end if;
+
+  if v_bucket_type is distinct from new.bucket_type then
+    raise exception
+      'listing_media_overrides: bucket_type % does not match the asset bucket %',
+      new.bucket_type, v_bucket_type
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+create trigger trg_listing_media_overrides_validate
+  before insert or update on listing_media_overrides
+  for each row execute function enforce_listing_media_override();

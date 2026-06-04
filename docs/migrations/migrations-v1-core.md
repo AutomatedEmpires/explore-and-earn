@@ -25,12 +25,18 @@ Stacked on `backend/migrations-v1-foundation` (PR #87). References tables from
   by `enforce_lifecycle_transition()`. Listings have no canonical transition map
   yet, so no listing lifecycle guard is attached.
 
-## Data-integrity CHECKs
+## Data-integrity CHECKs & guards
 
 - Resume experiences/educations: `end_date >= start_date`; experiences also
   enforce `is_current => end_date is null`.
 - Certifications: `expires_at >= issued_at`.
-- Listings: `ends_at >= begins_at` and `compensation_max >= compensation_min`.
+- Listings: `ends_at >= begins_at`, `compensation_max >= compensation_min`, and
+  `listings_role_counts_chk` (`accepted_count <= role_count` and
+  `remaining_role_count = role_count - accepted_count`) so the redundant
+  availability counters can't drift.
+- All `<@` array CHECKs also assert no NULL elements
+  (`array_position(col, null) is null`); a NULL element would otherwise make the
+  containment test evaluate to NULL and pass.
 
 ## Notes for review
 
@@ -39,6 +45,10 @@ Stacked on `backend/migrations-v1-foundation` (PR #87). References tables from
 - `listing_media_overrides.bucket_type` is narrowed to the user-uploaded
   listing-media buckets from `packages/contracts/src/media.ts`
   (`housing`, `meals`, `facilities`, `cover_photo`, `community_photo`,
-  `verification_evidence`); evidence/travel/icon buckets are excluded.
+  `verification_evidence`). `media_asset_id` is `NOT NULL` and
+  `enforce_listing_media_override()` additionally requires the referenced asset
+  to live in a media bucket owned by the same listing with a matching
+  `bucket_type`, so evidence/travel/icon media can't be relabeled into a listing
+  gallery.
 - `media_assets.bucket_id` is `on delete set null` so assets survive bucket
   deletion; `listing_media_overrides.media_asset_id` cascades on asset deletion.

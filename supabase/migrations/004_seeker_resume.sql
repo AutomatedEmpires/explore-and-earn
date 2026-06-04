@@ -1,8 +1,9 @@
 -- 004_seeker_resume.sql
 -- Seeker resume shell: experiences, educations, certifications.
 -- All cascade from seeker_profiles. category_tags constrained to the canonical
--- marketplace categories (consistent with seeker_profiles.desired_categories);
--- skill_tags are freeform. Date-range CHECKs keep resume timelines consistent.
+-- marketplace categories (consistent with seeker_profiles.desired_categories)
+-- and rejects NULL array elements; skill_tags are freeform. Date-range CHECKs
+-- keep resume timelines consistent.
 
 create table seeker_resume_experiences (
   id                uuid primary key default gen_random_uuid(),
@@ -14,7 +15,10 @@ create table seeker_resume_experiences (
   is_current        boolean not null default false,
   summary           text,
   category_tags     text[] not null default '{}'
-                      check (category_tags <@ array['farm','maritime','remote','seasonal','mix']::text[]),
+                      check (
+                        category_tags <@ array['farm','maritime','remote','seasonal','mix']::text[]
+                        and array_position(category_tags, null) is null
+                      ),
   skill_tags        text[] not null default '{}',
   sort_order        integer not null default 0,
   created_at        timestamptz not null default now(),
@@ -67,7 +71,10 @@ create table seeker_certifications (
   expires_at           date,
   credential_url       text,
   category_tags        text[] not null default '{}'
-                         check (category_tags <@ array['farm','maritime','remote','seasonal','mix']::text[]),
+                         check (
+                           category_tags <@ array['farm','maritime','remote','seasonal','mix']::text[]
+                           and array_position(category_tags, null) is null
+                         ),
   sort_order           integer not null default 0,
   created_at           timestamptz not null default now(),
   updated_at           timestamptz not null default now(),
