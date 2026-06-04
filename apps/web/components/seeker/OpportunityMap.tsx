@@ -1,6 +1,14 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { DiscoveryCard, Icon } from "@explore-and-earn/ui";
 
-import { EmptyState, toDiscoveryCardData, type DiscoveryListing } from "../discovery";
+import {
+	EmptyState,
+	QuickPeekDrawer,
+	toDiscoveryCardData,
+	type DiscoveryListing,
+} from "../discovery";
 import { MAPPIN_ICON } from "./mappin";
 import styles from "./OpportunityMap.module.css";
 
@@ -12,7 +20,7 @@ interface RegionGroup {
 /**
  * Derive a coarse region label from a listing's location string. We key on the
  * segment after the last comma (state / country), falling back to the whole
- * string for comma-free locations like "Remote · Worldwide".
+ * string for comma-free locations like "Remote \u00b7 Worldwide".
  */
 function regionOf(location: string): string {
 	const parts = location.split(",");
@@ -39,17 +47,25 @@ export interface OpportunityMapProps {
 }
 
 /**
- * OpportunityMap — the /map surface. Sprint Zero ships a location-grouped index
- * (no map library is in the frozen dependency set), built on the SINGLE
+ * OpportunityMap \u2014 the /map surface. Sprint Zero ships a location-grouped
+ * index (no map library is in the frozen dependency set), built on the SINGLE
  * canonical DiscoveryCard ("map" surface) plus the canonical mappin.* pins. It
  * answers "what's open, and where" by clustering opportunities under their
- * region, each card flagged with its category pin. When a real tile/vector map
+ * region, each card flagged with its category pin. Tapping a card opens the
+ * lane-local QuickPeekDrawer with the full listing detail (the same drawer the
+ * Seek tab uses), so the two surfaces never drift. When a real tile/vector map
  * + geocoded listings land with the data layer, this view-model swaps in behind
  * the same component contract.
  *
  * UI-only (Sprint Zero): no geocoding, backend, or persistence.
  */
 export function OpportunityMap({ listings }: OpportunityMapProps) {
+	const [activeId, setActiveId] = useState<string | null>(null);
+	const activeListing = useMemo(
+		() => listings.find((listing) => listing.id === activeId) ?? null,
+		[listings, activeId],
+	);
+
 	if (listings.length === 0) {
 		return (
 			<EmptyState
@@ -83,13 +99,19 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 									<Icon name={MAPPIN_ICON[listing.category]} size={20} />
 								</span>
 								<div className={styles.pinCard}>
-									<DiscoveryCard data={toDiscoveryCardData(listing)} surface="map" />
+									<DiscoveryCard
+										data={toDiscoveryCardData(listing)}
+										surface="map"
+										onOpen={(id) => setActiveId(id)}
+									/>
 								</div>
 							</li>
 						))}
 					</ul>
 				</section>
 			))}
+
+			<QuickPeekDrawer listing={activeListing} onClose={() => setActiveId(null)} />
 		</div>
 	);
 }
