@@ -51,7 +51,10 @@ create table listings (
   accepted_count        integer not null default 0 check (accepted_count >= 0),
   remaining_role_count  integer not null default 1 check (remaining_role_count >= 0),
   tags                  text[] not null default '{}',
-  cover_asset_id        uuid,
+  -- cover_asset_id FKs media_assets so it can't dangle; ON DELETE SET NULL keeps
+  -- the listing if the cover asset is removed. enforce_listing_cover_asset()
+  -- additionally requires the asset to live in THIS listing's cover_photo bucket.
+  cover_asset_id        uuid references media_assets(id) on delete set null,
   completion_score      integer not null default 0 check (completion_score between 0 and 100),
   filled_status         text not null default 'open'
                           check (filled_status in ('open','partially_filled','filled','overfilled')),
@@ -145,11 +148,15 @@ create trigger trg_listing_media_overrides_updated_at
 -- owned by THIS listing and whose bucket_type matches the override. The narrow
 -- column CHECK alone cannot stop an asset from a sensitive bucket (e.g.
 -- dispute_evidence) being relabeled as a listing photo, so validate against the
--- referenced asset's actual bucket here.
+-- referenced asset's actual bucket here. SECURITY DEFINER (with an empty,
+-- schema-qualified search_path) keeps the SELECTs against media_assets /
+-- media_buckets working once the RLS migration restricts those tables; EXECUTE
+-- is revoked from PUBLIC so it only runs via the trigger.
 create or replace function enforce_listing_media_override()
 returns trigger
 language plpgsql
-set search_path = public, pg_temp
+security definer
+set search_path = ''
 as $$
 declare
   v_owner_type  text;
@@ -158,8 +165,8 @@ declare
 begin
   select b.owner_type, b.owner_id, b.bucket_type
     into v_owner_type, v_owner_id, v_bucket_type
-    from media_assets a
-    join media_buckets b on b.id = a.bucket_id
+    from public.media_assets a
+    join public.media_buckets b on b.id = a.bucket_id
    where a.id = new.media_asset_id;
 
   if not found then
@@ -187,6 +194,65 @@ begin
 end;
 $$;
 
+revoke execute on function enforce_listing_media_override() from public;
+
 create trigger trg_listing_media_overrides_validate
   before insert or update on listing_media_overrides
   for each row execute function enforce_listing_media_override();
+
+-- Mirror the override guard for the canonical cover image. cover_asset_id (when
+-- set) must reference an asset that lives in THIS listing's own cover_photo
+-- bucket, so the most visible listing surface can't point at a foreign or
+-- sensitive asset. SECURITY DEFINER + empty search_path + EXECUTE revoked from
+-- PUBLIC, same as the override guard.
+create or replace function enforce_listing_cover_asset()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_owner_type  text;
+  v_owner_id    uuid;
+  v_bucket_type text;
+begin
+  if new.cover_asset_id is null then
+    return new;
+  end if;
+
+  select b.owner_type, b.owner_id, b.bucket_type
+    into v_owner_type, v_owner_id, v_bucket_type
+    from public.media_assets a
+    join public.media_buckets b on b.id = a.bucket_id
+   where a.id = new.cover_asset_id;
+
+  if not found then
+    raise exception
+      'listings: cover_asset_id % is not attached to a media bucket',
+      new.cover_asset_id
+      using errcode = '23514';
+  end if;
+
+  if v_owner_type <> 'listing' or v_owner_id <> new.id then
+    raise exception
+      'listings: cover_asset_id % is not owned by listing %',
+      new.cover_asset_id, new.id
+      using errcode = '23514';
+  end if;
+
+  if v_bucket_type <> 'cover_photo' then
+    raise exception
+      'listings: cover_asset_id % must come from a cover_photo bucket (got %)',
+      new.cover_asset_id, v_bucket_type
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function enforce_listing_cover_asset() from public;
+
+create trigger trg_listings_cover_asset_validate
+  before insert or update on listings
+  for each row execute function enforce_listing_cover_asset();
