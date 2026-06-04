@@ -1,11 +1,5 @@
 blank_issues_enabled: true
 contact_links:
-  - name: Label system (baton & routing)
-    url: https://github.com/AutomatedEmpires/explore-and-earn/blob/main/docs/agents/label-system.md
-    about: What each agent / status / area / risk / gate label means.
-  - name: Agent roster & routing
-    url: https://github.com/AutomatedEmpires/explore-and-earn/blob/main/docs/agents/agent-roster-and-routing.md
-    about: Who picks up what, who reviews, and who can merge.
   - name: Founder approval gates
     url: https://github.com/AutomatedEmpires/explore-and-earn/blob/main/docs/agents/founder-approval-gates.md
     about: When a change needs a human decision before merge.
