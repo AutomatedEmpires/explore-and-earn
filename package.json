@@ -4,6 +4,9 @@
   "private": true,
   "description": "Explore&Earn Sprint Zero monorepo scaffold",
   "packageManager": "pnpm@10.12.4",
+  "engines": {
+    "node": "24.16.0"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "corepack pnpm --filter @explore-and-earn/web dev",
