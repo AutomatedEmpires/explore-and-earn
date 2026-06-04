@@ -1,10 +1,14 @@
-import { BucketPage } from "../../../components/seeker";
-import { EmptyState } from "../../../components/discovery";
+import type { Metadata } from "next";
+
+import { BucketPage, ProfileHub, SEEKER_STATUS } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Profile",
+};
 
 /**
- * Profile — locked seeker-nav tab. Placeholder surface until the Phase D unified
- * profile hub lands; ships now so the founder-locked bottom nav has no dead tab.
- * Resume editing currently lives at the Resume & profile surface (/resume).
+ * Profile — founder-locked seeker-nav tab. The unified profile hub: identity,
+ * pipeline snapshot, resume readiness, and links to every seeker surface.
  */
 export default function ProfilePage() {
 	return (
@@ -12,10 +16,7 @@ export default function ProfilePage() {
 			title="Profile"
 			description="Your seeker profile, resume, and account settings."
 		>
-			<EmptyState
-				title="Profile hub is coming soon"
-				message="A unified profile hub is in active development. For now, manage your resume from Resume & profile."
-			/>
+			<ProfileHub status={SEEKER_STATUS} />
 		</BucketPage>
 	);
 }

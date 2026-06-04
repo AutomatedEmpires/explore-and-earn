@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
+
 import {
   ACCEPTED_ITEMS,
   BucketPage,
   CardStatus,
   LifecycleList,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+  title: "Accepted",
+};
 
 export default function AcceptedPage() {
   return (

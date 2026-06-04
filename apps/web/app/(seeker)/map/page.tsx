@@ -1,9 +1,16 @@
-import { BucketPage } from "../../../components/seeker";
-import { EmptyState } from "../../../components/discovery";
+import type { Metadata } from "next";
+
+import { BucketPage, OpportunityMap } from "../../../components/seeker";
+import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+
+export const metadata: Metadata = {
+	title: "Map",
+};
 
 /**
- * Map — locked seeker-nav tab. Placeholder surface until the Phase D map view
- * lands; ships now so the founder-locked bottom nav has no dead tab.
+ * Map — locked seeker-nav tab. Sprint Zero ships a location-grouped opportunity
+ * index (no map library in the frozen deps); a real tile/vector map swaps in
+ * behind OpportunityMap when the geocoded data layer lands.
  */
 export default function MapPage() {
 	return (
@@ -11,10 +18,7 @@ export default function MapPage() {
 			title="Map"
 			description="Explore open opportunities by location."
 		>
-			<EmptyState
-				title="Map is coming soon"
-				message="The opportunity map is in active development. Check back shortly."
-			/>
+			<OpportunityMap listings={DISCOVERY_FIXTURES} />
 		</BucketPage>
 	);
 }

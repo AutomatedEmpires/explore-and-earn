@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import {
   BucketPage,
   CardStatus,
@@ -5,6 +7,10 @@ import {
   INVITE_STATE_LABEL,
   LifecycleList,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+  title: "Invites",
+};
 
 export default function InvitesPage() {
   return (

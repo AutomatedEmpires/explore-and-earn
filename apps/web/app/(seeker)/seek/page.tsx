@@ -1,21 +1,17 @@
-import { BucketPage } from "../../../components/seeker";
-import { EmptyState } from "../../../components/discovery";
+import type { Metadata } from "next";
+
+import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+import { SeekBrowser } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Seek",
+};
 
 /**
- * Seek — locked seeker-nav tab (the founder-flagged route). Placeholder surface
- * until the Phase D opportunity feed lands; ships now so the locked bottom nav
- * has no dead tab.
+ * Seek — locked seeker-nav tab (founder-flagged). The seeker-scope opportunity
+ * feed, now browsable: SeekBrowser layers client-side category + benefit
+ * filters and sort over the single canonical DiscoveryCard.
  */
 export default function SeekPage() {
-	return (
-		<BucketPage
-			title="Seek"
-			description="Browse and search every open opportunity."
-		>
-			<EmptyState
-				title="Seek is coming soon"
-				message="The full opportunity feed is in active development. Check back shortly."
-			/>
-		</BucketPage>
-	);
+	return <SeekBrowser listings={DISCOVERY_FIXTURES} />;
 }

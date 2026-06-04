@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
+
 import {
 	BucketPage,
 	JOURNEY_STOPS,
 	JourneyTimeline,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Journey",
+};
 
 export default function JourneyPage() {
 	return (

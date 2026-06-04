@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import {
   APPLICATION_STATUS_LABEL,
   APPLIED_ITEMS,
@@ -5,6 +7,10 @@ import {
   CardStatus,
   LifecycleList,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+  title: "Applied",
+};
 
 export default function AppliedPage() {
   return (

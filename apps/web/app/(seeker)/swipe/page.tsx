@@ -1,20 +1,26 @@
-import { BucketPage } from "../../../components/seeker";
-import { EmptyState } from "../../../components/discovery";
+import type { Metadata } from "next";
+
+import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+import { BucketPage, SwipeDeck } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Swipe",
+};
 
 /**
- * Swipe — locked seeker-nav tab. Placeholder surface until the Phase D swipe
- * deck lands; ships now so the founder-locked bottom nav has no dead tab.
+ * Swipe — locked seeker-nav tab (Swipe · Map · Seek · Profile).
+ *
+ * Phase D: a true swipe experience over the canonical DiscoveryCard — drag,
+ * keyboard, undo, peeking card stack, and a neutral match Meter. UI-only; no
+ * backend or matching algorithm yet.
  */
 export default function SwipePage() {
 	return (
 		<BucketPage
 			title="Swipe"
-			description="Swipe through matched opportunities one at a time."
+			description="Drag through opportunities — pass, save, or apply. Use the buttons or arrow keys."
 		>
-			<EmptyState
-				title="Swipe is coming soon"
-				message="The discovery deck is in active development. Check back shortly."
-			/>
+			<SwipeDeck listings={DISCOVERY_FIXTURES} />
 		</BucketPage>
 	);
 }

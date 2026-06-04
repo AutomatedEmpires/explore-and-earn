@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
+
 import { BucketPage, SettingsPanel, SETTINGS_GROUPS } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Settings",
+};
 
 export default function SettingsPage() {
 	return (
