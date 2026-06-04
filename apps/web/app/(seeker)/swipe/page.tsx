@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
+
 import { DISCOVERY_FIXTURES } from "../../../components/discovery";
 import { BucketPage, SwipeDeck } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Swipe",
+};
 
 /**
  * Swipe — locked seeker-nav tab (Swipe · Map · Seek · Profile).

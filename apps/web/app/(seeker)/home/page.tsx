@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import {
   BucketChips,
   LifecycleList,
@@ -9,6 +11,10 @@ import {
   SEEKER_STATUS,
 } from "../../../components/seeker";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = {
+  title: "Home",
+};
 
 export default function SeekerHomePage() {
   return (

@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
+
 import {
 	BucketPage,
 	TRAVEL_PLANS,
 	TravelPanel,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Travel",
+};
 
 export default function TravelPage() {
 	return (

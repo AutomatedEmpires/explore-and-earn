@@ -1,5 +1,11 @@
+import type { Metadata } from "next";
+
 import { DISCOVERY_FIXTURES } from "../../../components/discovery";
 import { SeekBrowser } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+	title: "Seek",
+};
 
 /**
  * Seek — locked seeker-nav tab (founder-flagged). The seeker-scope opportunity

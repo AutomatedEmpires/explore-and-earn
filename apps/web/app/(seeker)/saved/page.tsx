@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
+
 import {
   BucketPage,
   CardStatus,
   LifecycleList,
   SAVED_ITEMS,
 } from "../../../components/seeker";
+
+export const metadata: Metadata = {
+  title: "Saved",
+};
 
 export default function SavedPage() {
   return (
