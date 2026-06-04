@@ -30,5 +30,6 @@ export { HostProfilePanel } from "./HostProfilePanel";
 export type { HostProfilePanelProps } from "./HostProfilePanel";
 export { HostProfileForm } from "./HostProfileForm";
 export type { HostProfileFormProps } from "./HostProfileForm";
+export { HostDetailSkeleton } from "./HostDetailSkeleton";
 export * from "./models";
 export * from "./fixtures";
