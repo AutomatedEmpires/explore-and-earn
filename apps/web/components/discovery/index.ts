@@ -3,6 +3,8 @@ export { DiscoveryFeed } from "./DiscoveryFeed";
 export type { DiscoveryFeedProps } from "./DiscoveryFeed";
 export { EmptyState } from "./EmptyState";
 export type { EmptyStateProps } from "./EmptyState";
+export { HostProfilePopup } from "./HostProfilePopup";
+export type { HostProfilePopupProps } from "./HostProfilePopup";
 export {
   CATEGORY_ICON,
   CATEGORY_LABEL,
