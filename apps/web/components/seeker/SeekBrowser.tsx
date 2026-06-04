@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
 
@@ -12,6 +12,7 @@ import {
 	EmptyState,
 	HostProfilePopup,
 	QuickPeekDrawer,
+	ReportListingDrawer,
 	toDiscoveryCardData,
 	type BenefitBucket,
 	type DiscoveryListing,
@@ -86,7 +87,9 @@ export interface SeekBrowserProps {
  * shareable and bookmarkable without a server round-trip per toggle. Tapping a
  * card title opens the lane-local QuickPeekDrawer with the full listing detail;
  * tapping the host identity circle opens the HostProfilePopup; tapping the
- * Housing or Meals cell opens the BenefitBucketDrawer (evidence photo bucket).
+ * Housing or Meals cell opens the BenefitBucketDrawer (evidence photo bucket);
+ * tapping the location row deep-links to the Map tab focused on that listing;
+ * tapping the report flag opens the ReportListingDrawer.
  */
 export function SeekBrowser({
 	listings,
@@ -95,6 +98,7 @@ export function SeekBrowser({
 	initialSort,
 }: SeekBrowserProps) {
 	const pathname = usePathname();
+	const router = useRouter();
 	const [category, setCategory] = useState<CategoryFilter>(() =>
 		parseCategory(initialCategory),
 	);
@@ -108,6 +112,7 @@ export function SeekBrowser({
 		readonly id: string;
 		readonly bucket: BenefitBucket;
 	} | null>(null);
+	const [reportId, setReportId] = useState<string | null>(null);
 
 	const toggleBenefit = (key: BenefitKey) => {
 		setBenefits((prev) =>
@@ -168,6 +173,11 @@ export function SeekBrowser({
 	const activeBenefitListing = useMemo(
 		() => listings.find((listing) => listing.id === activeBenefit?.id) ?? null,
 		[listings, activeBenefit],
+	);
+
+	const activeReportListing = useMemo(
+		() => listings.find((listing) => listing.id === reportId) ?? null,
+		[listings, reportId],
 	);
 
 	const countLabel = `${results.length} ${
@@ -283,6 +293,8 @@ export function SeekBrowser({
 								setActiveBenefit({ id, bucket: "housing" })
 							}
 							onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
+							onLocationClick={(id) => router.push(`/map?focus=${id}`)}
+							onReport={(id) => setReportId(id)}
 						/>
 					))}
 				</div>
@@ -307,6 +319,11 @@ export function SeekBrowser({
 				listing={activeBenefitListing}
 				bucket={activeBenefit?.bucket ?? null}
 				onClose={() => setActiveBenefit(null)}
+			/>
+
+			<ReportListingDrawer
+				listing={activeReportListing}
+				onClose={() => setReportId(null)}
 			/>
 		</section>
 	);

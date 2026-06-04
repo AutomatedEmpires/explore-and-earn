@@ -8,6 +8,7 @@ import {
 	EmptyState,
 	HostProfilePopup,
 	QuickPeekDrawer,
+	ReportListingDrawer,
 	toDiscoveryCardData,
 	type BenefitBucket,
 	type DiscoveryListing,
@@ -47,6 +48,8 @@ function groupByRegion(listings: readonly DiscoveryListing[]): readonly RegionGr
 
 export interface OpportunityMapProps {
 	readonly listings: readonly DiscoveryListing[];
+	/** Listing id to auto-open on mount (set by a deep link from the card location row). */
+	readonly initialFocusId?: string;
 }
 
 /**
@@ -57,20 +60,25 @@ export interface OpportunityMapProps {
  * region, each card flagged with its category pin. Tapping a card opens the
  * lane-local QuickPeekDrawer with the full listing detail (the same drawer the
  * Seek tab uses); tapping the host identity circle opens the HostProfilePopup;
- * tapping the Housing or Meals cell opens the BenefitBucketDrawer, so the
- * surfaces never drift. When a real tile/vector map + geocoded listings land
- * with the data layer, this view-model swaps in behind the same component
- * contract.
+ * tapping the Housing or Meals cell opens the BenefitBucketDrawer; tapping the
+ * location row opens that listing's peek; tapping the report flag opens the
+ * ReportListingDrawer. A deep link from another surface (?focus=<id>) auto-
+ * opens that listing's peek on mount, so the surfaces never drift. When a real
+ * tile/vector map + geocoded listings land with the data layer, this view-model
+ * swaps in behind the same component contract.
  *
  * UI-only (Sprint Zero): no geocoding, backend, or persistence.
  */
-export function OpportunityMap({ listings }: OpportunityMapProps) {
-	const [activeId, setActiveId] = useState<string | null>(null);
+export function OpportunityMap({ listings, initialFocusId }: OpportunityMapProps) {
+	const [activeId, setActiveId] = useState<string | null>(
+		() => initialFocusId ?? null,
+	);
 	const [activeHostId, setActiveHostId] = useState<string | null>(null);
 	const [activeBenefit, setActiveBenefit] = useState<{
 		readonly id: string;
 		readonly bucket: BenefitBucket;
 	} | null>(null);
+	const [reportId, setReportId] = useState<string | null>(null);
 	const activeListing = useMemo(
 		() => listings.find((listing) => listing.id === activeId) ?? null,
 		[listings, activeId],
@@ -82,6 +90,10 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 	const activeBenefitListing = useMemo(
 		() => listings.find((listing) => listing.id === activeBenefit?.id) ?? null,
 		[listings, activeBenefit],
+	);
+	const activeReportListing = useMemo(
+		() => listings.find((listing) => listing.id === reportId) ?? null,
+		[listings, reportId],
 	);
 
 	if (listings.length === 0) {
@@ -128,6 +140,8 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 										onMealsClick={(id) =>
 											setActiveBenefit({ id, bucket: "meals" })
 										}
+										onLocationClick={(id) => setActiveId(id)}
+										onReport={(id) => setReportId(id)}
 									/>
 								</div>
 							</li>
@@ -152,6 +166,11 @@ export function OpportunityMap({ listings }: OpportunityMapProps) {
 				listing={activeBenefitListing}
 				bucket={activeBenefit?.bucket ?? null}
 				onClose={() => setActiveBenefit(null)}
+			/>
+
+			<ReportListingDrawer
+				listing={activeReportListing}
+				onClose={() => setReportId(null)}
 			/>
 		</div>
 	);
