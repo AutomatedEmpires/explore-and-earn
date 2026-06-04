@@ -10,6 +10,8 @@ export type {
 } from "./BenefitBucketDrawer";
 export { HostProfilePopup } from "./HostProfilePopup";
 export type { HostProfilePopupProps } from "./HostProfilePopup";
+export { ReportListingDrawer } from "./ReportListingDrawer";
+export type { ReportListingDrawerProps } from "./ReportListingDrawer";
 export {
   CATEGORY_ICON,
   CATEGORY_LABEL,
