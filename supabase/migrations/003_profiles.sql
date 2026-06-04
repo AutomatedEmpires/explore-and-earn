@@ -78,7 +78,9 @@ create trigger trg_seeker_profiles_updated_at
 -- ---------------------------------------------------------------------------
 create table host_profiles (
   id                        uuid primary key default gen_random_uuid(),
-  owner_user_id             uuid not null references auth.users(id),
+  -- ON DELETE CASCADE mirrors seeker_profiles.user_id / team_memberships.user_id:
+  -- deleting the auth user tears down the host profile they own.
+  owner_user_id             uuid not null references auth.users(id) on delete cascade,
   company_name              text not null,
   slug                      text not null unique,
   about                     text,
@@ -182,23 +184,40 @@ create index idx_host_attestations_policy on host_attestations (policy_version);
 -- The ONLY writer of host_profiles.attestation_status (G2). Firing on insert of
 -- a new attestation moves the profile to 'attested'. not_attested|attested_stale|
 -- withdrawn -> attested are all permitted by HOST_ATTESTATION_TRANSITIONS.
--- Declared SECURITY DEFINER with a pinned search_path so this status write keeps
--- working once the RLS migration forbids direct UPDATEs of attestation_status by
--- application users (otherwise the trigger's own UPDATE would be blocked too).
--- EXECUTE is revoked from PUBLIC below so it can only run via the trigger path.
+-- Declared SECURITY DEFINER so the status write keeps working once the RLS
+-- migration forbids direct UPDATEs of attestation_status by application users
+-- (otherwise the trigger's own UPDATE would be blocked too). search_path is
+-- pinned empty and every object is schema-qualified to prevent object-shadowing
+-- (pg_catalog is always searched implicitly, so now() still resolves). EXECUTE
+-- is revoked from PUBLIC below so it can only run via the trigger path.
 create or replace function set_host_attestation()
 returns trigger
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
+declare
+  v_is_current boolean;
 begin
-  update host_profiles
+  -- Trust integrity: an attestation may only be recorded against the policy
+  -- version currently in force, so a stale policy_version cannot refresh the
+  -- host's attested state after a policy bump.
+  select is_current into v_is_current
+    from public.attestation_policy
+   where version = new.policy_version;
+
+  if v_is_current is distinct from true then
+    raise exception
+      'set_host_attestation: policy_version % is not the current attestation policy',
+      new.policy_version
+      using errcode = '23514';
+  end if;
+
+  update public.host_profiles
      set attestation_status     = 'attested',
          attested_at            = new.attested_at,
          attestation_expires_at = null,
-         current_attestation_id = new.id,
-         updated_at             = now()
+         current_attestation_id = new.id
    where id = new.host_profile_id;
   return new;
 end;
