@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	startTransition,
 	useCallback,
 	useEffect,
 	useRef,
@@ -13,6 +14,7 @@ import {
 import { Button, DiscoveryCard, Icon, Meter } from "@explore-and-earn/ui";
 
 import { EmptyState, toDiscoveryCardData, type DiscoveryListing } from "../discovery";
+import { saveListingAction } from "../../app/actions/savedListings";
 import styles from "./SwipeDeck.module.css";
 
 type SwipeAction = "pass" | "save" | "apply";
@@ -46,8 +48,10 @@ export interface SwipeDeckProps {
  * no-cost Undo — zero dark patterns. Motion uses design-system tokens and fully
  * honors prefers-reduced-motion.
  *
- * UI-only (Sprint Zero): decisions update local state. No backend, matching
- * algorithm, or persistence — those arrive with the gated data layer.
+ * Persistence: decisions update local state, and a swipe-right / Save is
+ * additionally persisted best-effort via the saveListingAction server action
+ * (failures are swallowed so the deck never blocks). The matching algorithm and
+ * pass/apply persistence still arrive with the gated data layer.
  */
 export function SwipeDeck({ listings }: SwipeDeckProps) {
 	const total = listings.length;
@@ -89,6 +93,16 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 			const card = listings[index];
 			if (!card) {
 				return;
+			}
+			if (action === "save") {
+				// Persist the save without blocking the swipe animation. Best-effort:
+				// a failure (e.g. the seeker has no profile row yet) is intentionally
+				// swallowed so the gesture/animation is never interrupted.
+				startTransition(() => {
+					void saveListingAction(card.id).catch(() => {
+						/* best-effort; saving must never block the swipe UX */
+					});
+				});
 			}
 			setDecisions((prev) => [...prev, { id: card.id, action }]);
 			setDragging(false);
