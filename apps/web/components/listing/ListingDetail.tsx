@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react"
-import { Button, Meter } from "@explore-and-earn/ui"
+import { Meter } from "@explore-and-earn/ui"
+import { ApplyForm } from "./ApplyForm"
 import { BenefitTriadDetail } from "./BenefitTriadDetail"
 import { CategoryBadge } from "./CategoryBadge"
 import type { ListingDetailData } from "./fixtures"
@@ -71,7 +72,15 @@ const ctaRowStyle: CSSProperties = {
 	display: "flex",
 }
 
-export function ListingDetail({ listing }: { readonly listing: ListingDetailData }) {
+export function ListingDetail({
+	listing,
+	isAuthenticated,
+	alreadyApplied,
+}: {
+	readonly listing: ListingDetailData
+	readonly isAuthenticated: boolean
+	readonly alreadyApplied: boolean
+}) {
 	return (
 		<main style={mainStyle}>
 			<ImageGallery images={listing.gallery} title={listing.title} />
@@ -100,9 +109,11 @@ export function ListingDetail({ listing }: { readonly listing: ListingDetailData
 			</section>
 			<HostSummaryBlock host={listing.host} />
 			<div style={ctaRowStyle}>
-				<Button variant="primary" icon="action.apply" type="button">
-					Apply to this opportunity
-				</Button>
+				<ApplyForm
+					listingId={listing.id}
+					isAuthenticated={isAuthenticated}
+					alreadyApplied={alreadyApplied}
+				/>
 			</div>
 		</main>
 	)
