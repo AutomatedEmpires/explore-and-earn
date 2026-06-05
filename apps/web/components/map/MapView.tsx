@@ -28,6 +28,9 @@ type MappedListing = DiscoveryListing & {
 /** Geographic centre of the contiguous USA — the default view on load. */
 const USA_VIEW = { longitude: -98.5795, latitude: 39.8283, zoom: 4 } as const;
 
+/** The Mapbox canvas fills its bordered container. */
+const MAP_STYLE = { width: "100%", height: "100%" };
+
 function hasCoordinates(listing: DiscoveryListing): listing is MappedListing {
   return listing.coordinates != null;
 }
@@ -92,7 +95,7 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
         mapboxAccessToken={token}
         initialViewState={initialViewState}
         mapStyle="mapbox://styles/mapbox/light-v11"
-        style= width: "100%", height: "100%" 
+        style={MAP_STYLE}
         onLoad={() => setLoaded(true)}
         onError={() => setErrored(true)}
         reuseMaps
