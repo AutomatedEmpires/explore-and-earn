@@ -15,10 +15,10 @@
 | App framework | Next.js + React | Locked |
 | Hosting / deploy | Vercel | Locked (initial) |
 | Database | PostgreSQL | Locked |
-| Backend platform | Supabase (Postgres + Auth + Storage + Realtime) | Locked direction |
-| Auth | Supabase Auth | Locked direction |
+| Backend platform | Supabase (Postgres + Storage + Realtime) | Locked direction |
+| Auth | **Clerk** | **Locked (cross-app standard — D013, 2026-06-04)** |
 | Payments / billing | Stripe (test mode until go-live) | Locked |
-| Maps / geo | Azure Maps | Locked |
+| Maps / geo | **Mapbox** | **Locked (cross-app standard — D013, 2026-06-04)** |
 | Product analytics | PostHog | Locked |
 | Error monitoring | Sentry | Locked |
 | Transactional email | Resend | Locked |

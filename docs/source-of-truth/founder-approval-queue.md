@@ -4,6 +4,7 @@ Decisions that have hit a **founder approval gate** (see [`../agents/founder-app
 
 | ID | Decision needed | Gate | Options / tradeoffs | Recommendation | Status |
 | --- | --- | --- | --- | --- | --- |
+| A-AUTH-CLERK | Migrate auth from Supabase Auth → **Clerk** and maps from Azure Maps → **Mapbox** as cross-app standard? | auth | Supabase Auth is self-hosted in Supabase; Clerk is a dedicated auth provider with better DX + cross-app identity. Mapbox is already used in Sweepza + BidSpace. | Clerk + Mapbox — aligns all ventures. Repo doc + .env.example updated 2026-06-05. | **Approved 2026-06-05 (Notion D013)** |
 | A-ICON-LICENSE | Purchase Streamline **Extended Vector License**? | Paid-asset licensing | Standard license caps usage at ~100 distinct icons/project. Extended lifts the cap. | Defer until the V1 distinct-icon inventory is counted; revisit before exceeding 100. | Waiting |
 | A-PKGMGR | Confirm **pnpm + Turborepo** as the workspace toolchain (remove npm lockfile)? | (Process / not destructive to product) | pnpm+turbo is canon and better for a monorepo; npm lockfile previously created drift. | Approved and applied in Sprint Zero substrate reconciliation. | Approved 2026-05-31 |
 | A-NODE | Pin **Node 24.16.0** as canonical (override the Node 20 LTS canon)? | (Process) | 24 matches the machine; 20 LTS is broader-compat. | Approved and pinned in `.nvmrc` + CI. | Approved 2026-05-31 |

@@ -1,5 +1,18 @@
 # Explore&Earn Next Steps
 
+## 2026-06-05 Alignment Audit
+
+Full alignment, triage, and launch-readiness audit performed 2026-06-05. Reports:
+
+- [EXPLORE_AND_EARN_ALIGNMENT_REPORT.md](./EXPLORE_AND_EARN_ALIGNMENT_REPORT.md) — local + GitHub + Notion alignment, source-of-truth conflicts, AI review status
+- [EXPLORE_AND_EARN_GITHUB_TRIAGE_REPORT.md](./EXPLORE_AND_EARN_GITHUB_TRIAGE_REPORT.md) — open issue/PR classifications, CI status, AI review recommendations
+- [EXPLORE_AND_EARN_PRODUCT_STATE_AND_LAUNCH_REPORT.md](./EXPLORE_AND_EARN_PRODUCT_STATE_AND_LAUNCH_REPORT.md) — surface inventory, backend status, launch scorecard, timeline estimates
+- [EXPLORE_AND_EARN_STREAMLINE_ASSET_PLAN.md](./EXPLORE_AND_EARN_STREAMLINE_ASSET_PLAN.md) — icon asset policy, first 20-icon plan, open questions for Jackson
+
+**Key findings:** Branch  is 12 behind main — rebase needed. Notion D013 (2026-06-04) locks Clerk + Mapbox; repo doc is stale. PR #102 needs founder auth-gate approval. Issue #58 (Contracts V1) is ready-for-engineering. MVP readiness: 3/10 — strong UI shell; backend/auth/persistence are critical gaps. Validation: typecheck ✅ lint ✅ guardrails ✅ build ✅
+
+---
+
 ## 0. Completed Foundation Progress
 
 - 2026-06-04: removed root shell ownership from `apps/web/app/layout.tsx`, so route-scoped chrome now lives only in `(seeker)` and `(host)` layouts. Public, marketing, search, listing detail, and admin routes no longer inherit the stale global bottom nav.
