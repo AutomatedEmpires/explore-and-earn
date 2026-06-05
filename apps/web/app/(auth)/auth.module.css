@@ -1,0 +1,7 @@
+.authPage {
+	min-height: 100dvh;
+	display: grid;
+	place-items: center;
+	padding: var(--space-gutter);
+	background: var(--color-surface);
+}

@@ -10,6 +10,7 @@
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {
+		"@clerk/nextjs": "^7.4.2",
 		"@explore-and-earn/contracts": "workspace:*",
 		"@explore-and-earn/ui": "workspace:*",
 		"next": "^15.3.0",
