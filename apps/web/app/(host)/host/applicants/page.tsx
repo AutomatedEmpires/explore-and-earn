@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function HostApplicantsPage() {
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken() : null;
+  const token = userId ? await getToken({ template: "supabase" }) : null;
 
   // Unauthenticated (or no session token): graceful fallback. The (host) route
   // group is also middleware-protected, so this is belt-and-braces.
@@ -48,9 +48,13 @@ export default async function HostApplicantsPage() {
       rowToDiscoveryFields(row),
     ]),
   );
-  const applicants = applications.map((application) =>
-    toApplicantItem(application, listingsById),
-  );
+  // Defense-in-depth: only show applications for listings we can confirm belong
+  // to this host (present in listingsById). Guards against any ownership filter
+  // ambiguity in the DB layer.
+  const hostListingIds = new Set(listingRows.map((row) => row.id));
+  const applicants = applications
+    .filter((application) => hostListingIds.has(application.listingId))
+    .map((application) => toApplicantItem(application, listingsById));
 
   return (
     <section className={styles.block}>

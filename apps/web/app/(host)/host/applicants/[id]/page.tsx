@@ -25,7 +25,7 @@ export default async function HostApplicantDetailPage({
 }) {
   const { id } = await params;
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken() : null;
+  const token = userId ? await getToken({ template: "supabase" }) : null;
   if (!userId || !token) {
     notFound();
   }
@@ -35,9 +35,12 @@ export default async function HostApplicantDetailPage({
     getHostListings(token).catch(() => []),
   ]);
 
-  // The applicant id in the route is the application id. Scoping getHostApplications
-  // to this host means a non-owned id simply will not be found -> 404.
-  const application = applications.find((entry) => entry.id === id);
+  // Ownership check: application must belong to one of this host's own listings.
+  // Guards against any ownership filter ambiguity in the DB layer.
+  const hostListingIds = new Set(listingRows.map((row) => row.id));
+  const application = applications.find(
+    (entry) => entry.id === id && hostListingIds.has(entry.listingId),
+  );
   if (!application) {
     notFound();
   }
