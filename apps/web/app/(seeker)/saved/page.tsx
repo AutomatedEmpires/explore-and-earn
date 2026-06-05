@@ -56,7 +56,7 @@ export default async function SavedPage() {
 		);
 	}
 
-	const savedIds = await getSavedListingIds(token);
+	const savedIds = await getSavedListingIds(token, userId).catch(() => [] as string[]);
 
 	// TODO(perf): N+1 query — each saved listing is fetched individually. Replace
 	// with a single batch `getPublicListingsByIds(ids)` query in

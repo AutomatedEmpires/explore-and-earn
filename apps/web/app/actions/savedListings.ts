@@ -21,7 +21,7 @@ export async function saveListingAction(
 	if (!token) {
 		return { ok: false };
 	}
-	return saveListing(token, listingId);
+	return saveListing(token, userId, listingId);
 }
 
 /**
@@ -39,5 +39,5 @@ export async function unsaveListingAction(
 	if (!token) {
 		return { ok: false };
 	}
-	return unsaveListing(token, listingId);
+	return unsaveListing(token, userId, listingId);
 }
