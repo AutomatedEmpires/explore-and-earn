@@ -1,9 +1,13 @@
-import { DiscoveryFeed, DISCOVERY_FIXTURES } from "../components/discovery";
+import { DiscoveryFeed, getDiscoveryListings } from "../components/discovery";
 
-export default function HomePage() {
-  return (
-    <main>
-      <DiscoveryFeed listings={DISCOVERY_FIXTURES} />
-    </main>
-  );
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+	const listings = await getDiscoveryListings();
+
+	return (
+		<main>
+			<DiscoveryFeed listings={listings} />
+		</main>
+	);
 }
