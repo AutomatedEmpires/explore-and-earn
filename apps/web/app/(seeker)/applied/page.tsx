@@ -36,9 +36,9 @@ function toApplicationStatus(value: string): ApplicationStatus {
 
 export default async function AppliedPage() {
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken() : null;
+  const token = userId ? await getToken({ template: "supabase" }) : null;
 
-  if (!token) {
+  if (!userId || !token) {
     return (
       <BucketPage title="Applied" description="Track the applications you've submitted.">
         <EmptyState
@@ -49,7 +49,7 @@ export default async function AppliedPage() {
     );
   }
 
-  const applications = await getSeekerApplications(token);
+  const applications = await getSeekerApplications(token, userId);
 
   // TODO(perf): N+1 — each applied listing is fetched individually. Replace with
   // a single batch getPublicListingsByIds(ids) query in @explore-and-earn/db
@@ -65,10 +65,12 @@ export default async function AppliedPage() {
           return {
             listing: rowToDiscoveryFields(row) as DiscoveryListing,
             status: toApplicationStatus(application.status),
-            appliedOn: new Date(application.submittedAt).toLocaleDateString(
-              "en-US",
-              { month: "long", day: "numeric" },
-            ),
+            appliedOn: application.submittedAt
+              ? new Date(application.submittedAt).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                })
+              : "Unknown date",
           };
         },
       ),

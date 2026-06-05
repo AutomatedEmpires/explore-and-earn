@@ -147,8 +147,10 @@ export interface SeekerApplication {
 /**
  * Full application records for the authed seeker, newest first.
  *
- * Scoped in app code by the seeker_profile_id resolved from the verified Clerk
- * JWT subject (RLS is gated to a separate change — keep this guard regardless).
+ * `clerkUserId` must come from `auth().userId` (already verified by Clerk
+ * middleware) — never decode it from the token. Same safe pattern as the
+ * savedListings functions.
+ *
  * Returns an empty array when the seeker has no profile yet or no applications.
  *
  * TYPES BRIDGE: `submitted_at` predates the committed types.gen.ts (same bridge
@@ -157,13 +159,9 @@ export interface SeekerApplication {
  */
 export async function getSeekerApplications(
   clerkToken: string,
+  clerkUserId: string,
 ): Promise<SeekerApplication[]> {
-  const sub = clerkSubFromToken(clerkToken);
-  if (!sub) {
-    return [];
-  }
-
-  const seekerProfileId = await resolveSeekerProfileId(clerkToken, sub);
+  const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
     return [];
   }
@@ -183,6 +181,6 @@ export async function getSeekerApplications(
     id: row.id as string,
     listingId: row.listing_id as string,
     status: row.status as string,
-    submittedAt: row.submitted_at as string,
+    submittedAt: typeof row.submitted_at === "string" ? row.submitted_at : "",
   }));
 }

@@ -48,9 +48,9 @@ export default async function ProfilePage() {
 
 		let appliedCount = SEEKER_STATUS.appliedCount;
 		try {
-			const token = await getToken();
+			const token = await getToken({ template: "supabase" });
 			if (token) {
-				appliedCount = (await getSeekerApplications(token)).length;
+				appliedCount = (await getSeekerApplications(token, userId)).length;
 			}
 		} catch {
 			// Application count unavailable — keep the fixture count.
