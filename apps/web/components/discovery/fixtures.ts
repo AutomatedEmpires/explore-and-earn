@@ -5,6 +5,11 @@ import type { DiscoveryListing } from "./listing";
  * the local DiscoveryListing view-model, which is composed from the frozen
  * @explore-and-earn/contracts registries. These drive the feed until the data
  * layer + Listing contract land.
+ *
+ * `coordinates` are approximate geocodes of each listing's town centre, used
+ * only to place a marker on the /map Mapbox surface. The "Remote · Worldwide"
+ * listing intentionally has no coordinates — it is discoverable in the feed but
+ * omitted from the map.
  */
 export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
   {
@@ -12,6 +17,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     title: "Orchard Harvest Hand",
     category: "farm",
     location: "Wenatchee, Washington",
+    coordinates: { lat: 47.4235, lon: -120.3103 },
     opportunityWindow: "Aug–Oct 2026",
     status: "live",
     host: { name: "Cascade Bloom Orchards", verified: true },
@@ -41,6 +47,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     title: "Deckhand — Salmon Season",
     category: "maritime",
     location: "Sitka, Alaska",
+    coordinates: { lat: 57.0531, lon: -135.33 },
     opportunityWindow: "Jun–Aug 2026",
     status: "live",
     host: { name: "North Pacific Fisheries Co-op", verified: true },
@@ -96,6 +103,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     title: "Ski Resort Front Desk",
     category: "seasonal",
     location: "Breckenridge, Colorado",
+    coordinates: { lat: 39.4817, lon: -106.0384 },
     opportunityWindow: "Nov 2026–Apr 2027",
     status: "live",
     host: { name: "Summit Pass Hospitality", verified: true },
@@ -124,6 +132,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     title: "Eco-Hostel Allrounder",
     category: "mix",
     location: "Lisbon, Portugal",
+    coordinates: { lat: 38.7223, lon: -9.1393 },
     opportunityWindow: "Flexible · 3+ months",
     status: "live",
     host: { name: "Tejo Green House", verified: true },
@@ -151,6 +160,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     title: "Vineyard Cellar Assistant",
     category: "farm",
     location: "Napa, California",
+    coordinates: { lat: 38.2975, lon: -122.2869 },
     opportunityWindow: "Sep–Nov 2026",
     status: "live",
     host: { name: "Stone Hollow Vineyard", verified: false },
