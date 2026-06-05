@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { getDiscoveryListings } from "../../../components/discovery";
 import { SeekBrowser } from "../../../components/seeker";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
 	title: "Seek",
 };

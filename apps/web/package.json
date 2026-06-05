@@ -12,6 +12,7 @@
 	"dependencies": {
 		"@clerk/nextjs": "^7.4.2",
 		"@explore-and-earn/contracts": "workspace:*",
+		"@explore-and-earn/db": "workspace:*",
 		"@explore-and-earn/ui": "workspace:*",
 		"@sentry/nextjs": "^10.22.0",
 		"@supabase/supabase-js": "^2.107.0",

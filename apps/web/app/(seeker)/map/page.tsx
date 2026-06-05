@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { BucketPage, OpportunityMap } from "../../../components/seeker";
 import { getDiscoveryListings } from "../../../components/discovery";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
 	title: "Map",
 };
