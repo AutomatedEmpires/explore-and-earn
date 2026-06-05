@@ -33,6 +33,18 @@ export interface DiscoveryListingHost {
   readonly verified: boolean;
 }
 
+/**
+ * Geocoded marker position for the seeker /map Mapbox surface. Optional by
+ * design: a listing can be fully discoverable in the feed without a fixed
+ * point (e.g. "Remote · Worldwide"), in which case it is intentionally omitted
+ * from the map. When the persisted Listing contract + geocoding land, this is
+ * sourced from the listing's resolved address rather than the fixture.
+ */
+export interface DiscoveryListingCoordinates {
+  readonly lat: number;
+  readonly lon: number;
+}
+
 export interface DiscoveryListing {
   readonly id: string;
   /** Display title; rendered in the display font. */
@@ -57,6 +69,11 @@ export interface DiscoveryListing {
   readonly matchScore?: number;
   /** Whether to surface the founding-program countdown. */
   readonly founding?: boolean;
+  /**
+   * Geocoded marker position for the /map surface. Optional: listings without
+   * coordinates are omitted from the map (see DiscoveryListingCoordinates).
+   */
+  readonly coordinates?: DiscoveryListingCoordinates;
 }
 
 /** Map a canonical category to its canonical Icon registry key (never "lodge"). */
