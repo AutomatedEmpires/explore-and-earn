@@ -49,6 +49,9 @@ importers:
       '@explore-and-earn/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@explore-and-earn/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@explore-and-earn/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -78,6 +81,9 @@ importers:
 
   packages/db:
     dependencies:
+      '@explore-and-earn/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@supabase/supabase-js':
         specifier: ^2.107.0
         version: 2.107.0
