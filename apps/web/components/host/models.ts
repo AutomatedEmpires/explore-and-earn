@@ -71,6 +71,31 @@ export const HOST_LISTING_STATE_ORDER: readonly HostListingState[] = [
   "closed",
 ];
 
+/**
+ * Map a persisted listings.status value to the host dashboard's lifecycle
+ * state. The DB column (see supabase/migrations 006_listings.sql) allows
+ * draft | under_review | live | paused | closed | archived; the host UI only
+ * models draft / open / closed at this layer (partially_filled & filled are
+ * derived from applicant data, which is not wired yet). Presentation only —
+ * this selects a status label/icon and drives nothing. Unknown values fall
+ * back to "draft", the safest non-public state.
+ */
+export function dbStatusToHostState(status: string): HostListingState {
+  switch (status) {
+    case "live":
+      return "open";
+    case "paused":
+    case "closed":
+    case "archived":
+      return "closed";
+    case "draft":
+    case "under_review":
+      return "draft";
+    default:
+      return "draft";
+  }
+}
+
 export interface HostListingItem {
   readonly listing: DiscoveryListing;
   readonly state: HostListingState;

@@ -1,12 +1,95 @@
+import { auth } from "@clerk/nextjs/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import {
-  HOST_LISTINGS,
+  authedClient,
+  getHostListings,
+  rowToDiscoveryFields,
+  type ListingRow,
+} from "@explore-and-earn/db";
+
+import {
   HostListingsManager,
   HostSectionHeading,
+  dbStatusToHostState,
+  type HostListingItem,
 } from "../../../../components/host";
 import { EmptyState } from "../../../../components/discovery";
 import styles from "./page.module.css";
 
-export default function HostListingsPage() {
+// Host listings are per-user (RLS-scoped) and must never be statically cached.
+export const dynamic = "force-dynamic";
+
+// Same columns as queries/listings.ts LISTING_COLUMNS but WITHOUT the
+// host_profiles embedded join. Used only by the defensive fallback below if
+// PostgREST rejects the relationship embed (named blocker in the build brief).
+const LISTING_COLUMNS_NO_JOIN =
+  "id,title,category,location_display,latitude,longitude,status,housing_included,meals_included,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at";
+
+function toItems(rows: readonly ListingRow[]): HostListingItem[] {
+  return rows.map((row) => ({
+    listing: rowToDiscoveryFields(row),
+    state: dbStatusToHostState(row.status),
+    // TODO(host-applicants): real applicant counts require a COUNT(applications)
+    // query and are scoped to the next backend PR. Intentionally zero for now.
+    applicantCount: 0,
+    newApplicantCount: 0,
+  }));
+}
+
+/**
+ * Load the authed host's own listings (RLS-scoped) as HostListingItem[]. The
+ * primary path is the shared getHostListings query. If PostgREST rejects the
+ * host_profiles embedded join (the named blocker in the build brief), fall back
+ * to a no-join select on the same authed client — queries/listings.ts is left
+ * untouched. Non-join errors are rethrown so they are not masked as "empty".
+ */
+async function loadHostItems(token: string): Promise<HostListingItem[]> {
+  try {
+    return toItems(await getHostListings(token));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/host_profiles|relationship|embed|schema cache/i.test(message)) {
+      throw error;
+    }
+    const db = authedClient(token) as unknown as SupabaseClient;
+    const { data, error: fallbackError } = await db
+      .from("listings")
+      .select(LISTING_COLUMNS_NO_JOIN)
+      .order("created_at", { ascending: false });
+    if (fallbackError) {
+      throw new Error(`getHostListings fallback: ${fallbackError.message}`);
+    }
+    const rows = ((data ?? []) as unknown as Array<Record<string, unknown>>).map(
+      (raw) => ({ ...raw, host_profiles: null }) as unknown as ListingRow,
+    );
+    return toItems(rows);
+  }
+}
+
+export default async function HostListingsPage() {
+  const { userId, getToken } = await auth();
+  const token = userId ? await getToken() : null;
+
+  // Unauthenticated (or no session token): graceful fallback. The (host) route
+  // group is also middleware-protected, so this is a defensive belt-and-braces.
+  if (!token) {
+    return (
+      <section className={styles.block}>
+        <HostSectionHeading
+          title="Listings"
+          description="Sign in as a host to post opportunities and manage your applicant pipeline."
+        />
+        <EmptyState
+          title="Sign in to manage listings"
+          message="You need to be signed in as a host to view and manage your opportunities."
+        />
+      </section>
+    );
+  }
+
+  const items = await loadHostItems(token);
+
   return (
     <section className={styles.block}>
       <HostSectionHeading
@@ -15,8 +98,8 @@ export default function HostListingsPage() {
         actionLabel="New listing"
         actionHref="/host/listings/new"
       />
-      {HOST_LISTINGS.length > 0 ? (
-        <HostListingsManager listings={HOST_LISTINGS} />
+      {items.length > 0 ? (
+        <HostListingsManager listings={items} />
       ) : (
         <EmptyState
           title="No listings yet"

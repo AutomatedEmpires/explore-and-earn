@@ -17,6 +17,12 @@ import styles from "./HostListingDetail.module.css";
 export interface HostListingDetailProps {
   readonly item: HostListingItem;
   readonly applicants: readonly HostApplicantItem[];
+  /**
+   * Whether the current viewer owns this listing and may edit it. Defaults to
+   * true (the management surface). When false (e.g. a read-only public record
+   * surfaced to a non-owner), the edit affordance is hidden.
+   */
+  readonly canEdit?: boolean;
 }
 
 const PIPELINE_ORDER: readonly ApplicantStage[] = [
@@ -34,7 +40,11 @@ const PIPELINE_ORDER: readonly ApplicantStage[] = [
  * only: no hiring decisions are taken here (match/hiring pipeline is
  * founder-gated and out of scope).
  */
-export function HostListingDetail({ item, applicants }: HostListingDetailProps) {
+export function HostListingDetail({
+  item,
+  applicants,
+  canEdit = true,
+}: HostListingDetailProps) {
   const { listing, state } = item;
   const stages = countByStage(applicants);
   const pipelineId = `pipeline-${listing.id}`;
@@ -55,10 +65,12 @@ export function HostListingDetail({ item, applicants }: HostListingDetailProps) 
         />
       </header>
 
-      <Link className={styles.edit} href={`/host/listings/${listing.id}/edit`}>
-        <Icon name="action.forward" size={20} aria-hidden />
-        <span>Edit listing</span>
-      </Link>
+      {canEdit ? (
+        <Link className={styles.edit} href={`/host/listings/${listing.id}/edit`}>
+          <Icon name="action.forward" size={20} aria-hidden />
+          <span>Edit listing</span>
+        </Link>
+      ) : null}
 
       <section className={styles.section} aria-labelledby={pipelineId}>
         <h3 className={styles.sectionTitle} id={pipelineId}>
