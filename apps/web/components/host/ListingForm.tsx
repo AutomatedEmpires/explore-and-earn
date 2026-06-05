@@ -310,9 +310,9 @@ export function ListingForm({ mode, listingId, initial }: ListingFormProps) {
       </div>
 
       <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Housing \u00b7 Meals \u00b7 Pay</legend>
+        <legend className={styles.legend}>Housing · Meals · Pay</legend>
         <p className={styles.fieldsetNote}>
-          The Housing, Meals, and Pay triad is required \u2014 add at least one.
+          The Housing, Meals, and Pay triad is required — add at least one.
         </p>
         {benefitFields.map((benefit) => (
           <div className={styles.benefit} key={benefit.kind}>
