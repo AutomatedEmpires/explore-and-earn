@@ -1,4 +1,7 @@
+import { auth } from "@clerk/nextjs/server";
+import { getHostProfile } from "@explore-and-earn/db";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { HostBottomNav, HostHeader } from "../../components/host";
@@ -13,6 +16,15 @@ import styles from "./layout.module.css";
  * inside the (host) route group via <HostBottomNav>. It does not reuse the
  * app-shell tab set or the locked seeker nav. Host routes live under the /host
  * URL prefix so they never collide with the seeker scope's top-level routes.
+ *
+ * PROFILE GATE: the Clerk webhook creates a seeker_profiles row on signup but
+ * never a host_profiles row, so any authenticated user reaching the host lane
+ * may not yet be a host. This layout resolves the caller's host profile and
+ * redirects to /host/onboarding when none exists. Onboarding deliberately lives
+ * in the sibling (host-onboard) route group so it is NOT wrapped by this layout
+ * — that avoids a redirect loop without needing the (unavailable in RSC)
+ * request pathname. Unauthenticated requests are handled upstream by Clerk
+ * middleware; the userId/token guards below are defensive belt-and-braces.
  */
 export const metadata: Metadata = {
   title: {
@@ -23,7 +35,22 @@ export const metadata: Metadata = {
     "Manage your listings, applicants, and messages — hire work-travelers on Explore & Earn.",
 };
 
-export default function HostLayout({ children }: { children: ReactNode }) {
+export default async function HostLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const { userId, getToken } = await auth();
+  if (userId) {
+    const token = await getToken({ template: "supabase" });
+    if (token) {
+      const hostProfile = await getHostProfile(token, userId);
+      if (!hostProfile) {
+        redirect("/host/onboarding");
+      }
+    }
+  }
+
   return (
     <div className={styles.shell}>
       <HostHeader />
