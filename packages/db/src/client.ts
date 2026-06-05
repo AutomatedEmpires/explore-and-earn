@@ -1,13 +1,53 @@
-export interface DatabaseClientConfig {
-  readonly connectionString?: string;
-  readonly role?: "service" | "request";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import type { GeneratedDatabase } from "./types.gen";
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+
+  return value;
 }
 
-export function createDatabaseClient(config: DatabaseClientConfig = {}) {
-  // TODO: Replace with the approved Supabase/Postgres client wrapper after the
-  // local Supabase scaffold and RLS plan are implemented.
+function supabaseConfig() {
   return {
-    kind: "placeholder-db-client" as const,
-    config
+    url: requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    anonKey: requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   };
+}
+
+export function anonClient(): SupabaseClient<GeneratedDatabase> {
+  const { url, anonKey } = supabaseConfig();
+
+  return createClient<GeneratedDatabase>(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
+export function authedClient(
+  clerkToken: string,
+): SupabaseClient<GeneratedDatabase> {
+  if (!clerkToken) {
+    throw new Error("A Clerk JWT is required to create an authenticated Supabase client.");
+  }
+
+  const { url, anonKey } = supabaseConfig();
+
+  return createClient<GeneratedDatabase>(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${clerkToken}`,
+      },
+    },
+  });
 }
