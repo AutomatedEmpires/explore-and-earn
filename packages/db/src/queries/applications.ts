@@ -130,3 +130,59 @@ export async function getSeekerApplicationIds(
 
   return (data ?? []).map((row) => row.listing_id);
 }
+
+/**
+ * A seeker's own submitted application, shaped for the /applied lifecycle UI.
+ * `status` stays a plain string here (the persisted lifecycle vocabulary is
+ * broader than the local view-model union); the UI narrows it for display.
+ */
+export interface SeekerApplication {
+  readonly id: string;
+  readonly listingId: string;
+  readonly status: string;
+  /** ISO-8601 submission timestamp. */
+  readonly submittedAt: string;
+}
+
+/**
+ * Full application records for the authed seeker, newest first.
+ *
+ * Scoped in app code by the seeker_profile_id resolved from the verified Clerk
+ * JWT subject (RLS is gated to a separate change — keep this guard regardless).
+ * Returns an empty array when the seeker has no profile yet or no applications.
+ *
+ * TYPES BRIDGE: `submitted_at` predates the committed types.gen.ts (same bridge
+ * as resolveSeekerProfileId), so this read goes through an UNTYPED view of the
+ * authed client until the generated types are regenerated.
+ */
+export async function getSeekerApplications(
+  clerkToken: string,
+): Promise<SeekerApplication[]> {
+  const sub = clerkSubFromToken(clerkToken);
+  if (!sub) {
+    return [];
+  }
+
+  const seekerProfileId = await resolveSeekerProfileId(clerkToken, sub);
+  if (!seekerProfileId) {
+    return [];
+  }
+
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await untyped
+    .from("applications")
+    .select("id, listing_id, status, submitted_at")
+    .eq("seeker_profile_id", seekerProfileId)
+    .order("submitted_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`getSeekerApplications: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    listingId: row.listing_id as string,
+    status: row.status as string,
+    submittedAt: row.submitted_at as string,
+  }));
+}
