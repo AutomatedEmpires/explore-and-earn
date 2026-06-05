@@ -12,8 +12,10 @@
 	"dependencies": {
 		"@explore-and-earn/contracts": "workspace:*",
 		"@explore-and-earn/ui": "workspace:*",
+		"@supabase/supabase-js": "^2.107.0",
 		"next": "^15.3.0",
 		"react": "^19.0.0",
-		"react-dom": "^19.0.0"
+		"react-dom": "^19.0.0",
+		"svix": "^1.42.0"
 	}
 }
