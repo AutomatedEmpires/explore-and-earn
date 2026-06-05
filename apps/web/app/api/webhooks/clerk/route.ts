@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { Webhook } from "svix"
@@ -23,57 +24,7 @@ interface ClerkWebhookEvent {
 	readonly data: ClerkUserPayload
 }
 
-type JsonObject = Record<string, string | number | boolean | null>
-
-class SupabaseServiceRoleRestClient {
-	private readonly restUrl: string
-
-	constructor(
-		private readonly supabaseUrl: string,
-		private readonly serviceRoleKey: string,
-	) {
-		this.restUrl = `${supabaseUrl.replace(/\/$/, "")}/rest/v1`
-	}
-
-	async insert(table: string, values: JsonObject): Promise<void> {
-		await this.write(table, {
-			method: "POST",
-			body: JSON.stringify(values),
-		})
-	}
-
-	async update(
-		table: string,
-		filter: Record<string, string>,
-		values: JsonObject,
-	): Promise<void> {
-		const params = new URLSearchParams(filter)
-
-		await this.write(`${table}?${params.toString()}`, {
-			method: "PATCH",
-			body: JSON.stringify(values),
-		})
-	}
-
-	private async write(path: string, init: RequestInit): Promise<void> {
-		const response = await fetch(`${this.restUrl}/${path}`, {
-			...init,
-			headers: {
-				apikey: this.serviceRoleKey,
-				Authorization: `Bearer ${this.serviceRoleKey}`,
-				"Content-Type": "application/json",
-				Prefer: "return=minimal",
-			},
-		})
-
-		if (!response.ok) {
-			const body = await response.text()
-			throw new Error(`Supabase service-role write failed: ${response.status} ${body}`)
-		}
-	}
-}
-
-function getSupabaseServiceRoleClient(): SupabaseServiceRoleRestClient {
+function getSupabaseServiceRoleClient() {
 	const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 	const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -83,7 +34,12 @@ function getSupabaseServiceRoleClient(): SupabaseServiceRoleRestClient {
 		)
 	}
 
-	return new SupabaseServiceRoleRestClient(supabaseUrl, serviceRoleKey)
+	return createClient(supabaseUrl, serviceRoleKey, {
+		auth: {
+			autoRefreshToken: false,
+			persistSession: false,
+		},
+	})
 }
 
 function primaryEmailForUser(user: ClerkUserPayload): string | null {
@@ -118,53 +74,63 @@ async function verifyClerkEvent(payload: string): Promise<ClerkWebhookEvent> {
 	}) as ClerkWebhookEvent
 }
 
-async function syncUserCreated(
-	client: SupabaseServiceRoleRestClient,
-	user: ClerkUserPayload,
-): Promise<void> {
+async function syncUserCreated(user: ClerkUserPayload): Promise<void> {
 	if (!user.id) {
 		throw new Error("Clerk user.created payload is missing data.id.")
 	}
 
-	await client.insert("users_profile_shadow", {
+	const supabase = getSupabaseServiceRoleClient()
+	const { error: shadowError } = await supabase
+		.from("users_profile_shadow")
+		.insert({
+			clerk_user_id: user.id,
+			email: primaryEmailForUser(user),
+			created_at: createdAtForUser(user),
+		})
+
+	if (shadowError) {
+		throw shadowError
+	}
+
+	const { error: seekerError } = await supabase.from("seeker_profiles").insert({
 		clerk_user_id: user.id,
-		email: primaryEmailForUser(user),
-		created_at: createdAtForUser(user),
 	})
 
-	await client.insert("seeker_profiles", {
-		clerk_user_id: user.id,
-	})
+	if (seekerError) {
+		throw seekerError
+	}
 }
 
-async function syncUserUpdated(
-	client: SupabaseServiceRoleRestClient,
-	user: ClerkUserPayload,
-): Promise<void> {
+async function syncUserUpdated(user: ClerkUserPayload): Promise<void> {
 	if (!user.id) {
 		throw new Error("Clerk user.updated payload is missing data.id.")
 	}
 
-	await client.update(
-		"users_profile_shadow",
-		{ clerk_user_id: `eq.${user.id}` },
-		{ email: primaryEmailForUser(user) },
-	)
+	const supabase = getSupabaseServiceRoleClient()
+	const { error } = await supabase
+		.from("users_profile_shadow")
+		.update({ email: primaryEmailForUser(user) })
+		.eq("clerk_user_id", user.id)
+
+	if (error) {
+		throw error
+	}
 }
 
-async function syncUserDeleted(
-	client: SupabaseServiceRoleRestClient,
-	user: ClerkUserPayload,
-): Promise<void> {
+async function syncUserDeleted(user: ClerkUserPayload): Promise<void> {
 	if (!user.id) {
 		throw new Error("Clerk user.deleted payload is missing data.id.")
 	}
 
-	await client.update(
-		"users_profile_shadow",
-		{ clerk_user_id: `eq.${user.id}` },
-		{ deleted_at: new Date().toISOString() },
-	)
+	const supabase = getSupabaseServiceRoleClient()
+	const { error } = await supabase
+		.from("users_profile_shadow")
+		.update({ deleted_at: new Date().toISOString() })
+		.eq("clerk_user_id", user.id)
+
+	if (error) {
+		throw error
+	}
 }
 
 export async function POST(request: Request) {
@@ -181,17 +147,15 @@ export async function POST(request: Request) {
 	}
 
 	try {
-		const client = getSupabaseServiceRoleClient()
-
 		switch (event.type) {
 			case "user.created":
-				await syncUserCreated(client, event.data)
+				await syncUserCreated(event.data)
 				break
 			case "user.updated":
-				await syncUserUpdated(client, event.data)
+				await syncUserUpdated(event.data)
 				break
 			case "user.deleted":
-				await syncUserDeleted(client, event.data)
+				await syncUserDeleted(event.data)
 				break
 			default:
 				break
