@@ -11,6 +11,6 @@ export default withSentryConfig(nextConfig, {
   project: process.env.SENTRY_PROJECT,
   silent: !process.env.CI,
   autoInstrumentServerFunctions: true,
-  hideSourceMaps: false,
+  hideSourceMaps: true,
   tunnelRoute: "/monitoring"
 });
