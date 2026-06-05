@@ -1,7 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
-
-Sentry.init({
-	dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-	tracesSampleRate: 0.2,
-	replaysOnErrorSampleRate: 1.0
-});
+// Migrated to instrumentation-client.ts (Next.js 15).
+// Retained as an empty module to avoid breaking any existing references and to
+// prevent a second Sentry.init() (double-init).
+export {};
