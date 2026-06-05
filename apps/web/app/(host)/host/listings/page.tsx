@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   authedClient,
+  getApplicationCountsByListing,
   getHostListings,
   rowToDiscoveryFields,
   type ListingRow,
@@ -30,8 +31,8 @@ function toItems(rows: readonly ListingRow[]): HostListingItem[] {
   return rows.map((row) => ({
     listing: rowToDiscoveryFields(row),
     state: dbStatusToHostState(row.status),
-    // TODO(host-applicants): real applicant counts require a COUNT(applications)
-    // query and are scoped to the next backend PR. Intentionally zero for now.
+    // Applicant counts are merged in HostListingsPage from
+    // getApplicationCountsByListing; default to zero until merged.
     applicantCount: 0,
     newApplicantCount: 0,
   }));
@@ -67,28 +68,44 @@ async function loadHostItems(token: string): Promise<HostListingItem[]> {
   }
 }
 
+function SignInToManage() {
+  return (
+    <section className={styles.block}>
+      <HostSectionHeading
+        title="Listings"
+        description="Sign in as a host to post opportunities and manage your applicant pipeline."
+      />
+      <EmptyState
+        title="Sign in to manage listings"
+        message="You need to be signed in as a host to view and manage your opportunities."
+      />
+    </section>
+  );
+}
+
 export default async function HostListingsPage() {
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken() : null;
-
-  // Unauthenticated (or no session token): graceful fallback. The (host) route
-  // group is also middleware-protected, so this is a defensive belt-and-braces.
+  if (!userId) {
+    return <SignInToManage />;
+  }
+  const token = await getToken();
   if (!token) {
-    return (
-      <section className={styles.block}>
-        <HostSectionHeading
-          title="Listings"
-          description="Sign in as a host to post opportunities and manage your applicant pipeline."
-        />
-        <EmptyState
-          title="Sign in to manage listings"
-          message="You need to be signed in as a host to view and manage your opportunities."
-        />
-      </section>
-    );
+    return <SignInToManage />;
   }
 
-  const items = await loadHostItems(token);
+  // Listings (with embed/fallback) and real applicant counts are independent;
+  // a counts failure must not break the listings view, so it degrades to {}.
+  const [items, counts] = await Promise.all([
+    loadHostItems(token),
+    getApplicationCountsByListing(token, userId).catch(
+      () => ({}) as Record<string, number>,
+    ),
+  ]);
+
+  const withCounts = items.map((item) => ({
+    ...item,
+    applicantCount: counts[item.listing.id] ?? 0,
+  }));
 
   return (
     <section className={styles.block}>
@@ -98,8 +115,8 @@ export default async function HostListingsPage() {
         actionLabel="New listing"
         actionHref="/host/listings/new"
       />
-      {items.length > 0 ? (
-        <HostListingsManager listings={items} />
+      {withCounts.length > 0 ? (
+        <HostListingsManager listings={withCounts} />
       ) : (
         <EmptyState
           title="No listings yet"

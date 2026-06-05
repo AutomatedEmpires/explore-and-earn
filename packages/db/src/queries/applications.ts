@@ -184,3 +184,192 @@ export async function getSeekerApplications(
     submittedAt: typeof row.submitted_at === "string" ? row.submitted_at : "",
   }));
 }
+
+/**
+ * A single application as the HOST sees it: the application row joined up
+ * through its listing to confirm host ownership, plus the applicant's Clerk id.
+ */
+export interface HostApplication {
+  readonly id: string;
+  readonly listingId: string;
+  readonly listingTitle: string;
+  readonly seekerProfileId: string;
+  readonly seekerClerkUserId: string;
+  readonly status: string;
+  readonly coverMessage: string | null;
+  readonly submittedAt: string;
+}
+
+/**
+ * Embedded-join select string (the single-line pattern used in queries/listings.ts).
+ * `!inner` is required on the listings -> host_profiles chain so that filtering on
+ * host_profiles.clerk_user_id constrains the TOP-LEVEL application rows rather than
+ * merely nulling the embed (which would leak other hosts' applications).
+ */
+const HOST_APPLICATIONS_SELECT =
+  "id,listing_id,seeker_profile_id,status,cover_message,submitted_at,listings!listing_id!inner(title,host_profile_id,host_profiles!host_profile_id!inner(clerk_user_id)),seeker_profiles!seeker_profile_id(clerk_user_id)";
+
+function firstOf(value: unknown): Record<string, unknown> | null {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate && typeof candidate === "object"
+    ? (candidate as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * All applications across the authed host's listings, newest first.
+ *
+ * Scoping is an app-level ownership guard (RLS for applications is gated to a
+ * separate change): we constrain to host_profiles.clerk_user_id = $clerkUserId.
+ * Uses the UNTYPED client cast (same pattern as resolveSeekerProfileId) because
+ * the generated types predate the clerk_user_id columns.
+ *
+ * Primary path uses the PostgREST embedded join; if PostgREST rejects the embed
+ * (named blocker in the build brief) we fall back to discrete queries.
+ */
+export async function getHostApplications(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<HostApplication[]> {
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+
+  try {
+    const { data, error } = await untyped
+      .from("applications")
+      .select(HOST_APPLICATIONS_SELECT)
+      .eq("listings.host_profiles.clerk_user_id", clerkUserId)
+      .order("submitted_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []).map((row) => {
+      const r = row as Record<string, unknown>;
+      const listing = firstOf(r.listings);
+      const seeker = firstOf(r.seeker_profiles);
+      return {
+        id: String(r.id),
+        listingId: String(r.listing_id),
+        listingTitle:
+          listing && typeof listing.title === "string" ? listing.title : "",
+        seekerProfileId: String(r.seeker_profile_id),
+        seekerClerkUserId:
+          seeker && typeof seeker.clerk_user_id === "string"
+            ? seeker.clerk_user_id
+            : "",
+        status: typeof r.status === "string" ? r.status : "applied",
+        coverMessage:
+          typeof r.cover_message === "string" ? r.cover_message : null,
+        submittedAt: String(r.submitted_at),
+      } satisfies HostApplication;
+    });
+  } catch {
+    return getHostApplicationsFallback(untyped, clerkUserId);
+  }
+}
+
+/**
+ * Discrete-query fallback for getHostApplications when the embedded join is
+ * rejected: resolve host profile ids -> the host's listing ids/titles ->
+ * applications on those listings -> applicant Clerk ids. Same app-level guard.
+ */
+async function getHostApplicationsFallback(
+  untyped: SupabaseClient,
+  clerkUserId: string,
+): Promise<HostApplication[]> {
+  const { data: hostRows, error: hostError } = await untyped
+    .from("host_profiles")
+    .select("id")
+    .eq("clerk_user_id", clerkUserId);
+  if (hostError) {
+    throw new Error(`getHostApplications(host_profiles): ${hostError.message}`);
+  }
+  const hostProfileIds = (hostRows ?? []).map((r) =>
+    String((r as Record<string, unknown>).id),
+  );
+  if (hostProfileIds.length === 0) {
+    return [];
+  }
+
+  const { data: listingRows, error: listingError } = await untyped
+    .from("listings")
+    .select("id,title")
+    .in("host_profile_id", hostProfileIds);
+  if (listingError) {
+    throw new Error(`getHostApplications(listings): ${listingError.message}`);
+  }
+  const listingTitleById = new Map<string, string>();
+  for (const raw of listingRows ?? []) {
+    const r = raw as Record<string, unknown>;
+    listingTitleById.set(
+      String(r.id),
+      typeof r.title === "string" ? r.title : "",
+    );
+  }
+  const listingIds = [...listingTitleById.keys()];
+  if (listingIds.length === 0) {
+    return [];
+  }
+
+  const { data: appRows, error: appError } = await untyped
+    .from("applications")
+    .select("id,listing_id,seeker_profile_id,status,cover_message,submitted_at")
+    .in("listing_id", listingIds)
+    .order("submitted_at", { ascending: false });
+  if (appError) {
+    throw new Error(`getHostApplications(applications): ${appError.message}`);
+  }
+  const apps = (appRows ?? []).map((raw) => raw as Record<string, unknown>);
+
+  const seekerProfileIds = [
+    ...new Set(apps.map((r) => String(r.seeker_profile_id))),
+  ];
+  const seekerClerkById = new Map<string, string>();
+  if (seekerProfileIds.length > 0) {
+    const { data: seekerRows, error: seekerError } = await untyped
+      .from("seeker_profiles")
+      .select("id,clerk_user_id")
+      .in("id", seekerProfileIds);
+    if (seekerError) {
+      throw new Error(
+        `getHostApplications(seeker_profiles): ${seekerError.message}`,
+      );
+    }
+    for (const raw of seekerRows ?? []) {
+      const r = raw as Record<string, unknown>;
+      seekerClerkById.set(
+        String(r.id),
+        typeof r.clerk_user_id === "string" ? r.clerk_user_id : "",
+      );
+    }
+  }
+
+  return apps.map((r) => ({
+    id: String(r.id),
+    listingId: String(r.listing_id),
+    listingTitle: listingTitleById.get(String(r.listing_id)) ?? "",
+    seekerProfileId: String(r.seeker_profile_id),
+    seekerClerkUserId: seekerClerkById.get(String(r.seeker_profile_id)) ?? "",
+    status: typeof r.status === "string" ? r.status : "applied",
+    coverMessage: typeof r.cover_message === "string" ? r.cover_message : null,
+    submittedAt: String(r.submitted_at),
+  } satisfies HostApplication));
+}
+
+/**
+ * Application counts keyed by listing id for the authed host, e.g.
+ * { [listingId]: count }. Derived from getHostApplications so the ownership
+ * guard and embed/fallback behaviour stay in one place.
+ */
+export async function getApplicationCountsByListing(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<Record<string, number>> {
+  const applications = await getHostApplications(clerkToken, clerkUserId);
+  const counts: Record<string, number> = {};
+  for (const application of applications) {
+    counts[application.listingId] = (counts[application.listingId] ?? 0) + 1;
+  }
+  return counts;
+}
