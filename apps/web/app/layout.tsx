@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "../styles/tokens.css";
@@ -14,6 +15,20 @@ import { Providers } from "./providers";
  * header/nav, and unscoped routes such as /, /search, /listing/[id],
  * marketing/public, and admin render without a global app shell.
  */
+
+export const metadata: Metadata = {
+	title: { default: "Explore & Earn", template: "%s | Explore & Earn" },
+	description:
+		"Discover lifestyle work opportunities — housing, meals, and pay included. Farm, maritime, remote, and seasonal.",
+	openGraph: {
+		siteName: "Explore & Earn",
+		type: "website",
+	},
+	twitter: { card: "summary_large_image" },
+	metadataBase: new URL(
+		process.env.NEXT_PUBLIC_APP_URL ?? "https://explore-and-earn.vercel.app",
+	),
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
