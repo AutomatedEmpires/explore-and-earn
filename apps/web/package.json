@@ -7,7 +7,7 @@
 		"build": "next build",
 		"lint": "eslint .",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test --config tests/playwright.config.mjs"
 	},
 	"dependencies": {
 		"@clerk/nextjs": "^7.4.2",
