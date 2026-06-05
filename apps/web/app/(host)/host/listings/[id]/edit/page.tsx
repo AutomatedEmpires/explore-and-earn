@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 
 import {
   HOST_LISTINGS,
-  HostListingForm,
   HostSectionHeading,
+  ListingForm,
   findHostListing,
 } from "../../../../../../components/host";
 import styles from "./page.module.css";
@@ -31,7 +31,17 @@ export default async function HostListingEditPage({
         actionLabel="Back to listing"
         actionHref={`/host/listings/${id}`}
       />
-      <HostListingForm mode="edit" item={item} />
+      <ListingForm
+        mode="edit"
+        listingId={item.listing.id}
+        initial=
+          title: item.listing.title,
+          category: item.listing.category,
+          location: item.listing.location,
+          status: item.state === "draft" ? "draft" : "active",
+          triad: item.listing.benefits,
+        
+      />
     </section>
   );
 }

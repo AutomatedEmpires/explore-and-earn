@@ -1,7 +1,4 @@
-import {
-  HostListingForm,
-  HostSectionHeading,
-} from "../../../../../components/host";
+import { HostSectionHeading, ListingForm } from "../../../../../components/host";
 import styles from "./page.module.css";
 
 export default function HostNewListingPage() {
@@ -13,7 +10,7 @@ export default function HostNewListingPage() {
         actionLabel="All listings"
         actionHref="/host/listings"
       />
-      <HostListingForm mode="create" />
+      <ListingForm mode="create" />
     </section>
   );
 }
