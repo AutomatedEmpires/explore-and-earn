@@ -25,6 +25,8 @@ comment — not chat — is the message to the next agent.
 
 > **Mentions matter:** writing `@copilot` in a handoff comment may start or route work to the GitHub **cloud** Copilot agent (`agent:copilot-cloud`); GitHub may also trigger an **automatic** Copilot PR review. If you mean the local WSL verifier, say "VS Code / `agent:vscode`" and do **not** type `@copilot`. Whatever the trigger, label cloud work `agent:copilot-cloud`.
 
+> **PR command router:** PR comments from `OWNER`, `MEMBER`, or `COLLABORATOR` can also route external reviewers/workers. Use `@copilot` for GitHub's cloud Copilot, `/agent codex ...`, `/agent claude ...`, `/agent sentry ...`, or `/git-agent ...` for webhook-backed routes. Codex, Claude, Sentry, and git-agent requests only fire when the matching `*_AGENT_WEBHOOK_URL` secret is configured in GitHub Actions.
+
 ```markdown
 ### 🤝 Handoff
 - **From Agent:**

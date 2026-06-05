@@ -32,6 +32,22 @@ pnpm lint
 # add PR-specific commands here
 ```
 
+## PR Agent Commands
+
+<!--
+Only OWNER / MEMBER / COLLABORATOR comments are routed by the PR agent router.
+External routes require the matching *_AGENT_WEBHOOK_URL secret in GitHub Actions.
+`@copilot` is special: GitHub owns the actual cloud-agent invocation.
+-->
+
+```text
+@copilot review this PR for regressions in shell ownership and route chrome
+/agent codex review the contracts, types, and test gaps
+/agent claude review copy, docs, and product-language drift
+/agent sentry review release risk and monitoring impact
+/git-agent draft the exact git steps needed to land this PR cleanly
+```
+
 ## Results
 
 <!-- Paste the actual output / pass-fail of the commands above. -->
