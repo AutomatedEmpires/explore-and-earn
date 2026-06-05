@@ -1,0 +1,83 @@
+name: Claude Code
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened, assigned]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+  checks: read
+  statuses: read
+
+concurrency:
+  group: claude-code-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    name: Respond with Claude Code
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    if: |
+      github.actor != 'claude[bot]' &&
+      (
+        (
+          github.event_name == 'issue_comment' &&
+          contains(github.event.comment.body, '@claude') &&
+          (
+            github.event.comment.author_association == 'OWNER' ||
+            github.event.comment.author_association == 'MEMBER' ||
+            github.event.comment.author_association == 'COLLABORATOR'
+          )
+        ) ||
+        (
+          github.event_name == 'pull_request_review_comment' &&
+          contains(github.event.comment.body, '@claude') &&
+          (
+            github.event.comment.author_association == 'OWNER' ||
+            github.event.comment.author_association == 'MEMBER' ||
+            github.event.comment.author_association == 'COLLABORATOR'
+          )
+        ) ||
+        (
+          github.event_name == 'pull_request_review' &&
+          contains(github.event.review.body, '@claude') &&
+          (
+            github.event.review.author_association == 'OWNER' ||
+            github.event.review.author_association == 'MEMBER' ||
+            github.event.review.author_association == 'COLLABORATOR'
+          )
+        ) ||
+        (
+          github.event_name == 'issues' &&
+          contains(github.event.issue.body, '@claude') &&
+          (
+            github.event.issue.author_association == 'OWNER' ||
+            github.event.issue.author_association == 'MEMBER' ||
+            github.event.issue.author_association == 'COLLABORATOR'
+          )
+        )
+      )
+
+    steps:
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          trigger_phrase: "@claude"
+          use_sticky_comment: "true"
+          include_fix_links: "true"
+          additional_permissions: "actions: read, checks: read, statuses: read"
+          claude_args: |
+            --max-turns 8
+            --append-system-prompt "You are reviewing and assisting on Explore&Earn, a pnpm monorepo. Clerk is the authentication layer. Supabase/Postgres is the database/backend layer. Do not introduce Supabase Auth, Supabase SSR middleware, new dependencies, or schema changes unless the issue or PR explicitly requires it. Follow AGENTS.md, .agents role files, .agents/skills/supabase, and .agents/skills/supabase-postgres-best-practices. Prioritize host/seeker/admin data isolation, RLS assumptions, migration safety, payment safety, privacy, secrets hygiene, and production deployability. Before approving code, verify or request corepack pnpm lint, corepack pnpm typecheck, corepack pnpm test, and corepack pnpm build. For database/security changes, also verify or request corepack pnpm db:assert or corepack pnpm guardrails when relevant. Be explicit about residual risks, unverified assumptions, and missing tests."
