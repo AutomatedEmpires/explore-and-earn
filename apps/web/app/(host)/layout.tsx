@@ -41,14 +41,16 @@ export default async function HostLayout({
   children: ReactNode;
 }) {
   const { userId, getToken } = await auth();
-  if (userId) {
-    const token = await getToken({ template: "supabase" });
-    if (token) {
-      const hostProfile = await getHostProfile(token, userId);
-      if (!hostProfile) {
-        redirect("/host/onboarding");
-      }
-    }
+  if (!userId) {
+    redirect("/sign-in");
+  }
+  const token = await getToken({ template: "supabase" });
+  if (!token) {
+    redirect("/sign-in");
+  }
+  const hostProfile = await getHostProfile(token, userId);
+  if (!hostProfile) {
+    redirect("/host/onboarding");
   }
 
   return (
