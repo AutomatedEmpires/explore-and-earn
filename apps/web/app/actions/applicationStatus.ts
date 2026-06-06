@@ -3,12 +3,31 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
-import { updateApplicationStatus, type HostSettableStatus } from "@explore-and-earn/db";
+import {
+  getApplicationSeekerContact,
+  updateApplicationStatus,
+  type HostSettableStatus,
+} from "@explore-and-earn/db";
+
+import { getClerkContact } from "../../lib/clerkUser";
+import { absoluteUrl, sendEmail } from "../../lib/email";
+import { applicationStatusEmail } from "../../lib/emails";
 
 export interface StatusActionResult {
   readonly ok: boolean;
   readonly error?: string;
 }
+
+/**
+ * Human-readable status labels shown to the seeker in the notification email.
+ * Source of truth is the build brief's explicit status map.
+ */
+const STATUS_LABELS: Record<HostSettableStatus, string> = {
+  reviewing: "Under Review",
+  saved_by_host: "Host Saved Your Profile",
+  offered: "You Got an Offer! \uD83C\uDF89",
+  not_selected: "Application Update",
+};
 
 /**
  * Host server action: change an application's status. Auth is verified here
@@ -38,6 +57,30 @@ export async function updateApplicationStatusAction(
   );
 
   if (result.ok) {
+    // Best-effort: email the seeker about the status change. Never block.
+    try {
+      const contact = await getApplicationSeekerContact(token, applicationId);
+      if (contact?.seekerClerkUserId) {
+        const seeker = await getClerkContact(contact.seekerClerkUserId);
+        if (seeker.email) {
+          const statusLabel = STATUS_LABELS[newStatus];
+          const listingTitle = contact.listingTitle || "your opportunity";
+          await sendEmail({
+            to: seeker.email,
+            subject: `Your application to ${listingTitle} \u2014 ${statusLabel}`,
+            html: applicationStatusEmail({
+              listingTitle,
+              newStatus,
+              statusLabel,
+              dashboardUrl: absoluteUrl("/applied"),
+            }),
+          });
+        }
+      }
+    } catch {
+      // best-effort notification; ignore failures
+    }
+
     revalidatePath("/host/applicants");
     revalidatePath(`/host/applicants/${applicationId}`);
     revalidatePath("/applied");
