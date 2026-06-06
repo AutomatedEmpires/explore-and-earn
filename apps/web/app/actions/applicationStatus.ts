@@ -77,8 +77,8 @@ export async function updateApplicationStatusAction(
           });
         }
       }
-    } catch {
-      // best-effort notification; ignore failures
+    } catch (e) {
+      console.error("[email] status notification failed:", e);
     }
 
     revalidatePath("/host/applicants");

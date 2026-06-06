@@ -58,8 +58,8 @@ export async function sendMessageAction(
 				});
 			}
 		}
-	} catch {
-		// best-effort notification; ignore failures
+	} catch (e) {
+		console.error("[email] message notification failed:", e);
 	}
 
 	revalidatePath("/messages");

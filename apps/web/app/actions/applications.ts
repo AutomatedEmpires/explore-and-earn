@@ -59,8 +59,8 @@ export async function applyToListingAction(
 					})
 				}
 			}
-		} catch {
-			// best-effort notification; ignore failures
+		} catch (e) {
+			console.error("[email] application notification failed:", e);
 		}
 	}
 
