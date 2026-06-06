@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { authedClient } from "@explore-and-earn/db";
+import { authedClient, type Database } from "@explore-and-earn/db";
 import {
   MARKETPLACE_CATEGORIES,
   type ListingStatus,
@@ -32,7 +32,7 @@ interface ListingWriteModel {
  * Resolve an authenticated, RLS-scoped Supabase client for the current Clerk
  * user. Listing mutations require Clerk auth \u2014 there are no anon writes.
  */
-async function getAuthedDb(): Promise<{ db: SupabaseClient } | { error: string }> {
+async function getAuthedDb(): Promise<{ db: SupabaseClient<Database> } | { error: string }> {
   const { userId, getToken } = await auth();
   if (!userId) {
     return { error: "You must be signed in as a host to manage listings." };
@@ -43,10 +43,7 @@ async function getAuthedDb(): Promise<{ db: SupabaseClient } | { error: string }
     return { error: "Your session has expired \u2014 sign in again to continue." };
   }
 
-  // authedClient is typed against the placeholder GeneratedDatabase (see
-  // packages/db/src/types.gen.ts). Until generated types land, cast to the
-  // default untyped client so table access type-checks.
-  return { db: authedClient(token) as unknown as SupabaseClient };
+  return { db: authedClient(token) };
 }
 
 function resolveCategory(raw: FormDataEntryValue | null): MarketplaceCategory | null {
@@ -133,7 +130,7 @@ function readListingForm(
  * the host's authed (RLS) client this returns their own profile without
  * inventing a Clerk-linkage column (identity wiring is founder-gated, #105).
  */
-async function resolveHostProfileId(db: SupabaseClient): Promise<string | null> {
+async function resolveHostProfileId(db: SupabaseClient<Database>): Promise<string | null> {
   const { data, error } = await db
     .from("host_profiles")
     .select("id")

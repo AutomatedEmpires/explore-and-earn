@@ -113,6 +113,65 @@ export type Database = {
         }
         Relationships: []
       }
+      conversations: {
+        Row: {
+          application_id: string | null
+          created_at: string
+          host_profile_id: string
+          id: string
+          last_message_at: string | null
+          listing_id: string | null
+          seeker_profile_id: string
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string
+          host_profile_id: string
+          id?: string
+          last_message_at?: string | null
+          listing_id?: string | null
+          seeker_profile_id: string
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string
+          host_profile_id?: string
+          id?: string
+          last_message_at?: string | null
+          listing_id?: string | null
+          seeker_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_seeker_profile_id_fkey"
+            columns: ["seeker_profile_id"]
+            isOneToOne: false
+            referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_types: {
         Row: {
           created_at: string
@@ -267,6 +326,7 @@ export type Database = {
           attestation_status: string
           attested_at: string | null
           category_scopes: string[]
+          clerk_user_id: string | null
           company_name: string
           completion_score: number
           cover_asset_id: string | null
@@ -301,6 +361,7 @@ export type Database = {
           attestation_status?: string
           attested_at?: string | null
           category_scopes?: string[]
+          clerk_user_id?: string | null
           company_name: string
           completion_score?: number
           cover_asset_id?: string | null
@@ -335,6 +396,7 @@ export type Database = {
           attestation_status?: string
           attested_at?: string | null
           category_scopes?: string[]
+          clerk_user_id?: string | null
           company_name?: string
           completion_score?: number
           cover_asset_id?: string | null
@@ -836,6 +898,44 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          body: string
+          conversation_id: string
+          created_at: string
+          id: string
+          read_at: string | null
+          sender_profile_id: string
+          sender_type: string
+        }
+        Insert: {
+          body: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_profile_id: string
+          sender_type: string
+        }
+        Update: {
+          body?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          sender_profile_id?: string
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           category: string
@@ -1133,13 +1233,14 @@ export type Database = {
           availability_end: string | null
           availability_start: string | null
           availability_status: string | null
+          clerk_user_id: string | null
           completion_score: number
           cover_photo_asset_id: string | null
           created_at: string
           deleted_at: string | null
           desired_categories: string[]
           desired_roles: string[]
-          display_name: string
+          display_name: string | null
           housing_preference: string | null
           id: string
           match_confidence_score: number
@@ -1154,20 +1255,21 @@ export type Database = {
           short_bio: string | null
           travel_readiness: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
           visibility_status: string
         }
         Insert: {
           availability_end?: string | null
           availability_start?: string | null
           availability_status?: string | null
+          clerk_user_id?: string | null
           completion_score?: number
           cover_photo_asset_id?: string | null
           created_at?: string
           deleted_at?: string | null
           desired_categories?: string[]
           desired_roles?: string[]
-          display_name: string
+          display_name?: string | null
           housing_preference?: string | null
           id?: string
           match_confidence_score?: number
@@ -1182,20 +1284,21 @@ export type Database = {
           short_bio?: string | null
           travel_readiness?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           visibility_status?: string
         }
         Update: {
           availability_end?: string | null
           availability_start?: string | null
           availability_status?: string | null
+          clerk_user_id?: string | null
           completion_score?: number
           cover_photo_asset_id?: string | null
           created_at?: string
           deleted_at?: string | null
           desired_categories?: string[]
           desired_roles?: string[]
-          display_name?: string
+          display_name?: string | null
           housing_preference?: string | null
           id?: string
           match_confidence_score?: number
@@ -1210,7 +1313,7 @@ export type Database = {
           short_bio?: string | null
           travel_readiness?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           visibility_status?: string
         }
         Relationships: []
@@ -1374,6 +1477,7 @@ export type Database = {
       users_profile_shadow: {
         Row: {
           active_scope: string
+          clerk_user_id: string | null
           created_at: string
           deleted_at: string | null
           display_name: string | null
@@ -1387,11 +1491,12 @@ export type Database = {
         }
         Insert: {
           active_scope?: string
+          clerk_user_id?: string | null
           created_at?: string
           deleted_at?: string | null
           display_name?: string | null
           email?: string | null
-          id: string
+          id?: string
           last_active_at?: string | null
           phone?: string | null
           primary_role?: string
@@ -1400,6 +1505,7 @@ export type Database = {
         }
         Update: {
           active_scope?: string
+          clerk_user_id?: string | null
           created_at?: string
           deleted_at?: string | null
           display_name?: string | null
@@ -1552,4 +1658,3 @@ export const Constants = {
   },
 } as const
 
-export type GeneratedDatabase = Database;
