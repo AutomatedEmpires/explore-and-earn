@@ -1,8 +1,4 @@
-export interface DatabaseClientConfig {
-    readonly connectionString?: string;
-    readonly role?: "service" | "request";
-}
-export declare function createDatabaseClient(config?: DatabaseClientConfig): {
-    kind: "placeholder-db-client";
-    config: DatabaseClientConfig;
-};
+import { type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./types.gen";
+export declare function anonClient(): SupabaseClient<Database>;
+export declare function authedClient(clerkToken: string): SupabaseClient<Database>;
