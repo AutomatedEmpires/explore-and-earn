@@ -1,11 +1,7 @@
 import type { DiscoveryListing } from "../discovery";
 import {
-  ACCEPTED_ITEMS,
   APPLIED_ITEMS,
-  INVITE_ITEMS,
   MATCHED_LISTINGS,
-  NOT_SELECTED_ITEMS,
-  OFFER_ITEMS,
   PRIMARY_ACTION_INPUT,
   SAVED_ITEMS,
   SEEKER_STATUS,
@@ -22,16 +18,17 @@ import type {
 } from "./models";
 
 /**
- * Seeker lifecycle data-access boundary \u2014 the single fetch seam for the
- * seeker's own application state (status, saved, applied, invites, offers,
- * accepted, not-selected, and the Home priority inputs).
+ * Seeker lifecycle data-access boundary: the single fetch seam for the seeker's
+ * own application state (status, saved, applied, invites, offers, accepted,
+ * not-selected, and the Home priority inputs).
  *
  * Mirrors the Discovery lane's data.ts: every lifecycle surface reads through
- * these Promise-returning functions instead of importing the fixtures
- * directly, so swapping to the real persisted Application / Invite / Offer data
- * layer (founder-gated Database V1) is a single-file change HERE \u2014 no page,
- * component, or view-model rewrite. The exported function shapes are the
- * contract the UI depends on and must stay stable.
+ * these Promise-returning functions instead of importing the fixtures directly,
+ * so swapping to the real persisted data layer is a localized change. The
+ * status-bucket surfaces (/offered, /accepted, /not-selected) now read real
+ * `applications` rows via getSeekerApplicationsWithListings in
+ * @explore-and-earn/db, so the offer/accepted/not-selected/invite getters below
+ * are deprecated (see each function).
  *
  * Arrays are returned as fresh copies so callers can never mutate the source.
  */
@@ -51,24 +48,41 @@ export function getAppliedItems(): Promise<AppliedItem[]> {
   return Promise.resolve([...APPLIED_ITEMS]);
 }
 
-/** Host invitations to apply. */
+/**
+ * @deprecated Host invites live in the dedicated `invites` table, not in
+ * fixtures or `applications`. The /invites page now renders an EmptyState
+ * directly until that surface is wired. Retained (returns []) so any remaining
+ * importers still compile.
+ */
 export function getInviteItems(): Promise<InviteItem[]> {
-  return Promise.resolve([...INVITE_ITEMS]);
+  return Promise.resolve([]);
 }
 
-/** Offers extended to the seeker by hosts. */
+/**
+ * @deprecated Offers are now read from real `applications` rows (status
+ * "offered") via getSeekerApplicationsWithListings in @explore-and-earn/db; the
+ * /offered page calls that directly. Retained (returns []) for compatibility.
+ */
 export function getOfferItems(): Promise<OfferItem[]> {
-  return Promise.resolve([...OFFER_ITEMS]);
+  return Promise.resolve([]);
 }
 
-/** Confirmed roles the seeker has accepted. */
+/**
+ * @deprecated Accepted roles are now read from real `applications` rows (status
+ * "accepted") via getSeekerApplicationsWithListings; the /accepted page calls
+ * that directly. Retained (returns []) for compatibility.
+ */
 export function getAcceptedItems(): Promise<AcceptedRoleItem[]> {
-  return Promise.resolve([...ACCEPTED_ITEMS]);
+  return Promise.resolve([]);
 }
 
-/** Applications that closed without selection. */
+/**
+ * @deprecated Not-selected applications are now read from real `applications`
+ * rows (status "not_selected") via getSeekerApplicationsWithListings; the
+ * /not-selected page calls that directly. Retained (returns []) for compat.
+ */
 export function getNotSelectedItems(): Promise<NotSelectedItem[]> {
-  return Promise.resolve([...NOT_SELECTED_ITEMS]);
+  return Promise.resolve([]);
 }
 
 /** Matched-listing preview for Seeker Home (relevance via neutral Meter). */
