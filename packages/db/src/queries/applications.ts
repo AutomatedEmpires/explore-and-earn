@@ -373,3 +373,104 @@ export async function getApplicationCountsByListing(
   }
   return counts;
 }
+
+/**
+ * Statuses a host is permitted to set on an application from the dashboard.
+ * This is the host-facing decision vocabulary; seeker-facing values such as
+ * 'applied' and 'withdrawn' are deliberately NOT settable here.
+ */
+const HOST_SETTABLE_STATUSES = [
+  "reviewing",
+  "saved_by_host",
+  "offered",
+  "not_selected",
+] as const;
+
+export type HostSettableStatus = (typeof HOST_SETTABLE_STATUSES)[number];
+
+/**
+ * Host changes the status of a single application.
+ *
+ * Ownership is enforced in application code (RLS for applications is gated to a
+ * separate change), using the same discrete-query pattern as the
+ * getHostApplications fallback: resolve the caller's host_profiles id(s), load
+ * the target application's listing, and confirm that listing belongs to the
+ * host before writing. `clerkUserId` MUST come from auth().userId (already
+ * verified by Clerk) and is never decoded from the token.
+ *
+ * Business outcomes are returned as a typed result rather than thrown:
+ * - `invalid_status` — newStatus is not a host-settable value
+ * - `profile_not_found` — caller has no host_profiles row
+ * - `not_found` — application does not exist
+ * - `forbidden` — application's listing is not owned by the caller
+ */
+export async function updateApplicationStatus(
+  clerkToken: string,
+  clerkUserId: string,
+  applicationId: string,
+  newStatus: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!(HOST_SETTABLE_STATUSES as readonly string[]).includes(newStatus)) {
+    return { ok: false, error: "invalid_status" };
+  }
+
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+
+  // 1. Resolve the caller's own host profile id(s).
+  const { data: hostRows, error: hostError } = await untyped
+    .from("host_profiles")
+    .select("id")
+    .eq("clerk_user_id", clerkUserId);
+  if (hostError) {
+    return { ok: false, error: hostError.message };
+  }
+  const hostProfileIds = new Set(
+    (hostRows ?? []).map((r) => String((r as Record<string, unknown>).id)),
+  );
+  if (hostProfileIds.size === 0) {
+    return { ok: false, error: "profile_not_found" };
+  }
+
+  // 2. Load the target application's listing.
+  const { data: appRow, error: appError } = await untyped
+    .from("applications")
+    .select("id,listing_id")
+    .eq("id", applicationId)
+    .maybeSingle();
+  if (appError) {
+    return { ok: false, error: appError.message };
+  }
+  if (!appRow) {
+    return { ok: false, error: "not_found" };
+  }
+
+  // 3. Confirm that listing belongs to one of the caller's host profiles.
+  const listingId = String((appRow as Record<string, unknown>).listing_id);
+  const { data: listingRow, error: listingError } = await untyped
+    .from("listings")
+    .select("id,host_profile_id")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (listingError) {
+    return { ok: false, error: listingError.message };
+  }
+  if (
+    !listingRow ||
+    !hostProfileIds.has(
+      String((listingRow as Record<string, unknown>).host_profile_id),
+    )
+  ) {
+    return { ok: false, error: "forbidden" };
+  }
+
+  // 4. Apply the status change.
+  const { error: updateError } = await untyped
+    .from("applications")
+    .update({ status: newStatus })
+    .eq("id", applicationId);
+  if (updateError) {
+    return { ok: false, error: updateError.message };
+  }
+
+  return { ok: true };
+}

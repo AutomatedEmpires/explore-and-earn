@@ -13,6 +13,7 @@ import {
 } from "../../../../../components/host";
 import type { DiscoveryListing } from "../../../../../components/discovery";
 import { toApplicantItem } from "../applicants-data";
+import { StatusActions } from "./StatusActions";
 import styles from "../page.module.css";
 
 // Per-host, app-level scoped — never statically cached.
@@ -62,6 +63,7 @@ export default async function HostApplicantDetailPage({
         actionHref="/host/applicants"
       />
       <HostApplicantDetail applicant={applicant} />
+      <StatusActions applicationId={application.id} />
     </section>
   );
 }
