@@ -4,7 +4,6 @@ import { auth } from "@clerk/nextjs/server"
 import {
 	applyToListing,
 	getSeekerApplicationIds,
-	notifyHostOfApplication,
 	type ApplyResult,
 } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
@@ -31,12 +30,9 @@ export async function applyToListingAction(
 
 	const result = await applyToListing(token, listingId, coverMessage)
 
-	// Side-effect: best-effort in-app notification to the host on a successful
-	// application. notifyHostOfApplication swallows its own errors, so this never
-	// blocks or changes the apply result returned to the seeker.
-	if (result.ok) {
-		await notifyHostOfApplication(token, listingId)
-	}
+	// TODO(notifications): insert a host notification on successful apply.
+	// Requires a service-role token (not the seeker JWT) to write to a
+	// host-owned row — safe cross-user writes land with the service-role key.
 
 	revalidatePath(`/listing/${listingId}`)
 	return result

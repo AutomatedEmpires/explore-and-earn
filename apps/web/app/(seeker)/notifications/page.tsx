@@ -106,7 +106,7 @@ export default async function NotificationsPage() {
     );
   }
 
-  const notifications = await getNotifications(token, userId);
+  const notifications = await getNotifications(token, userId).catch(() => [] as Notification[]);
   const items = notifications.map(toNotificationItem);
 
   return (

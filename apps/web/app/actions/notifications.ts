@@ -27,5 +27,6 @@ export async function markNotificationReadAction(
 
 	const result = await markNotificationRead(token, userId, notificationId)
 	revalidatePath("/notifications")
+	revalidatePath("/", "layout")
 	return result
 }
