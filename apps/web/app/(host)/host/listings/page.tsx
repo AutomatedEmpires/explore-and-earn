@@ -1,6 +1,6 @@
+import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
 import {
   authedClient,
   getApplicationCountsByListing,
@@ -18,6 +18,8 @@ import {
 } from "../../../../components/host";
 import { EmptyState } from "../../../../components/discovery";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = { title: "Listings" };
 
 // Host listings are per-user (RLS-scoped) and must never be statically cached.
 export const dynamic = "force-dynamic";

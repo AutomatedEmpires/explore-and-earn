@@ -1,6 +1,6 @@
+import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
-
 import { getHostListings } from "@explore-and-earn/db";
 import type { CompensationUnit } from "@explore-and-earn/contracts";
 
@@ -11,6 +11,7 @@ import {
 } from "../../../../../../components/host";
 import styles from "./page.module.css";
 
+export const metadata: Metadata = { title: "Edit listing" };
 export const dynamic = "force-dynamic";
 
 function centsToInput(cents: number | null): string | undefined {

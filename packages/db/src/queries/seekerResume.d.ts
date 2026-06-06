@@ -38,6 +38,40 @@ export interface SeekerResume {
  * @param clerkUserId - Verified Clerk user ID from `auth().userId` (never decoded).
  */
 export declare function getSeekerResume(clerkToken: string, clerkUserId: string): Promise<SeekerResume>;
+/**
+ * Host-accessible resume read by `seeker_profile_id`.
+ *
+ * Unlike getSeekerResume (which scopes to the caller's OWN profile), this lets a
+ * host read an APPLICANT's resume — but only after the ownership guard confirms
+ * the seeker applied to one of the host's listings. Returns null when the host
+ * is not allowed to view this seeker or the seeker has no profile row.
+ *
+ * NOTE: the brief specified a single `seeker_resume` table and a
+ * `SeekerResumeRow` type; neither exists in this schema. We return the existing
+ * SeekerResume shape (bio via seeker_profiles.short_bio + experiences +
+ * educations) so the host and seeker views stay consistent.
+ *
+ * @param clerkToken - Verified Clerk JWT from `getToken({ template: "supabase" })`.
+ * @param hostClerkUserId - Verified host Clerk user ID from `auth().userId`.
+ * @param seekerProfileId - The applicant's seeker_profiles.id.
+ */
+export declare function getSeekerResumeByProfileId(clerkToken: string, hostClerkUserId: string, seekerProfileId: string): Promise<SeekerResume | null>;
+/**
+ * Host-accessible display name for an applicant, gated by the same ownership
+ * guard as getSeekerResumeByProfileId.
+ *
+ * SCHEMA NOTE: `seeker_profiles` has NO `display_name` column yet. Following the
+ * codebase's missing-column fallback convention, we attempt the read but treat
+ * any PostgREST error (e.g. "column does not exist") as "no name available" and
+ * return null rather than throwing. This is forward-compatible: once a
+ * `display_name` column lands, real names flow through automatically with no
+ * caller changes. Until then callers fall back to a pseudonymous handle.
+ *
+ * @param clerkToken - Verified Clerk JWT from `getToken({ template: "supabase" })`.
+ * @param hostClerkUserId - Verified host Clerk user ID from `auth().userId`.
+ * @param seekerProfileId - The applicant's seeker_profiles.id.
+ */
+export declare function getSeekerDisplayName(clerkToken: string, hostClerkUserId: string, seekerProfileId: string): Promise<string | null>;
 export interface UpdateSeekerProfileBioInput {
     readonly bio?: string | null;
     readonly headline?: string | null;
