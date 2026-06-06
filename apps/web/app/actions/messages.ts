@@ -21,7 +21,7 @@ export async function sendMessageAction(
 	const { userId, getToken } = await auth();
 	if (!userId) return { ok: false, error: "unauthenticated" };
 
-	const token = await getToken();
+	const token = await getToken({ template: "supabase" });
 	if (!token) return { ok: false, error: "unauthenticated" };
 
 	const result = await sendMessage(token, userId, conversationId, body);
