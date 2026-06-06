@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getSeekerApplications } from "@explore-and-earn/db";
+import { getSeekerApplications, getSeekerResume } from "@explore-and-earn/db";
 
 import {
 	BucketPage,
 	ProfileHub,
 	SEEKER_STATUS,
+	computeResumeCompletion,
 	type SeekerStatusSummary,
 } from "../../../components/seeker";
 
@@ -21,10 +22,11 @@ export const dynamic = "force-dynamic";
  * Profile — founder-locked seeker-nav tab. The unified profile hub: identity,
  * pipeline snapshot, resume readiness, and links to every seeker surface.
  *
- * Shows the signed-in seeker's real name (Clerk) and real application count
- * (Supabase). Fields without a real source yet (resume completion, saved/offer
- * counts, notifications) fall back to the SEEKER_STATUS fixture, and the whole
- * page degrades to the fixture if Clerk/DB reads fail — it must render, not crash.
+ * Shows the signed-in seeker's real name (Clerk), real application count, and
+ * real resume completion (Supabase). Fields without a real source yet
+ * (saved/offer counts, notifications) fall back to the SEEKER_STATUS fixture,
+ * and the whole page degrades to the fixture if Clerk/DB reads fail — it must
+ * render, not crash.
  */
 export default async function ProfilePage() {
 	const { userId, getToken } = await auth();
@@ -47,16 +49,20 @@ export default async function ProfilePage() {
 		}
 
 		let appliedCount = SEEKER_STATUS.appliedCount;
+		let resumeCompletion = SEEKER_STATUS.resumeCompletion;
 		try {
 			const token = await getToken({ template: "supabase" });
 			if (token) {
 				appliedCount = (await getSeekerApplications(token, userId)).length;
+				resumeCompletion = computeResumeCompletion(
+					await getSeekerResume(token, userId),
+				);
 			}
 		} catch {
-			// Application count unavailable — keep the fixture count.
+			// Pipeline / resume reads unavailable — keep the fixture values.
 		}
 
-		status = { ...SEEKER_STATUS, seekerName, appliedCount };
+		status = { ...SEEKER_STATUS, seekerName, appliedCount, resumeCompletion };
 	}
 
 	return (
