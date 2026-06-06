@@ -27,7 +27,24 @@ export const config = {
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         {
           key: "Permissions-Policy",
-          value: "camera=(), microphone=(), geolocation=(self)",
+          value: "camera=(), microphone=(), geolocation=()",
+        },
+        {
+          key: "Content-Security-Policy",
+          // Clerk requires unsafe-inline for its injected auth-state scripts.
+          // frame-src covers Clerk's OAuth popup and Cloudflare CAPTCHA.
+          value: [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' https://js.clerk.dev https://challenges.cloudflare.com",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob: https://img.clerk.com https://*.supabase.co https://api.mapbox.com",
+            "font-src 'self' data:",
+            "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.supabase.co wss://*.supabase.co https://us.posthog.com https://*.ingest.sentry.io https://api.mapbox.com https://events.mapbox.com",
+            "frame-src https://accounts.clerk.dev https://*.clerk.accounts.dev https://accounts.google.com https://challenges.cloudflare.com",
+            "frame-ancestors 'none'",
+            "object-src 'none'",
+            "base-uri 'self'",
+          ].join("; "),
         },
       ],
     },

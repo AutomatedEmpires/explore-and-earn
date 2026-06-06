@@ -10,8 +10,10 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         // Supabase Storage (avatars, listing media, etc.)
+        // *.supabase.co covers any project ref (staging → production swap
+        // requires only an env var change, not a code change).
         protocol: "https",
-        hostname: "mamosbzcbigcclafhmmr.supabase.co",
+        hostname: "*.supabase.co",
         pathname: "/storage/v1/object/**"
       },
       {
