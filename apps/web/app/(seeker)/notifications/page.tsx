@@ -11,6 +11,7 @@ import {
   type NotificationKind,
 } from "../../../components/seeker";
 import { EmptyState } from "../../../components/discovery";
+import { MarkAllReadOnView } from "./MarkAllReadOnView";
 
 export const metadata: Metadata = {
   title: "Notifications",
@@ -114,6 +115,7 @@ export default async function NotificationsPage() {
       title="Notifications"
       description="Invites, offers, matches, and reminders."
     >
+      {items.length > 0 ? <MarkAllReadOnView /> : null}
       <NotificationList items={items} />
     </BucketPage>
   );

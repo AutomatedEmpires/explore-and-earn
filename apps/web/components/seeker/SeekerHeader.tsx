@@ -25,6 +25,7 @@ export interface SeekerHeaderProps {
  *
  * This is a pure presentational component: the unread notification count is
  * resolved by the (seeker) layout (a Server Component) and passed in as a prop.
+ * The badge caps the displayed value at 99+ to stay within the chip.
  */
 export function SeekerHeader({ unreadCount = 0 }: SeekerHeaderProps) {
   return (
@@ -37,11 +38,17 @@ export function SeekerHeader({ unreadCount = 0 }: SeekerHeaderProps) {
         <Link
           className={styles.iconLink}
           href="/notifications"
-          aria-label="Notifications"
+          aria-label={
+            unreadCount > 0
+              ? `Notifications, ${unreadCount} unread`
+              : "Notifications"
+          }
         >
           <Icon name="system.info" size={20} aria-hidden />
           {unreadCount > 0 ? (
-            <span className={styles.badge}>{unreadCount}</span>
+            <span className={styles.badge}>
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
           ) : null}
         </Link>
         <Link
