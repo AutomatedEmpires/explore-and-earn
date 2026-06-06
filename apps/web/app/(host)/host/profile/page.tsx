@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
@@ -25,6 +26,7 @@ import { toApplicantItem } from "../applicants/applicants-data";
 import styles from "./page.module.css";
 
 // Real host data is per-user and app-level scoped — never statically cached.
+export const metadata: Metadata = { title: "Host profile" };
 export const dynamic = "force-dynamic";
 
 export default async function HostProfilePage() {

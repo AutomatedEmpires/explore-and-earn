@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { HostSectionHeading, ListingForm } from "../../../../../components/host";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = { title: "New listing" };
 
 export const dynamic = "force-dynamic";
 

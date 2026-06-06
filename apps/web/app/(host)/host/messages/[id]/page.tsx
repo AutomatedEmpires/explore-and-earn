@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import {
   getConversations,
@@ -11,6 +12,7 @@ import { MessageTranscript } from "../../../../../components/messaging/MessageTr
 import { ReplyForm } from "../../../../../components/messaging/ReplyForm";
 import styles from "./page.module.css";
 
+export const metadata: Metadata = { title: "Conversation" };
 export const dynamic = "force-dynamic";
 
 export default async function HostMessageThreadPage({
