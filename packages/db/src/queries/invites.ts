@@ -8,6 +8,20 @@ import type {
 
 import { authedClient } from "../client";
 
+/*
+ * TODO: send inviteReceivedEmail via server action.
+ *
+ * Host-initiated invite CREATION does not yet have a code path in this module
+ * (only seeker-facing reads + respondToInvite live here). When an invite-create
+ * mutation lands, the inviteReceivedEmail notification MUST be sent from the
+ * server action layer (apps/web/app/actions/*), NOT from inside a DB query
+ * function: query functions stay free of transport/side-effects, and the Clerk
+ * user lookup needed to resolve the seeker's email is only available in the
+ * Next server runtime. See apps/web/lib/emails/inviteReceived.ts for the
+ * template and apps/web/app/actions/applications.ts for the established
+ * "resolve context in db -> look up email via Clerk -> sendEmail" pattern.
+ */
+
 /**
  * Resolve seeker_profiles.id for the authed Clerk user.
  *
