@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { auth } from "@clerk/nextjs/server";
 import {
-  getPublicListingById,
+  getPublicListingsByIds,
   getSeekerApplications,
   rowToDiscoveryFields,
 } from "@explore-and-earn/db";
@@ -51,31 +51,32 @@ export default async function AppliedPage() {
 
   const applications = await getSeekerApplications(token, userId);
 
-  // TODO(perf): N+1 — each applied listing is fetched individually. Replace with
-  // a single batch getPublicListingsByIds(ids) query in @explore-and-earn/db
-  // once it exists. Intentionally not implemented in this change.
-  const appliedItems: AppliedItem[] = (
-    await Promise.all(
-      applications.map(
-        async (application): Promise<AppliedItem | null> => {
-          const row = await getPublicListingById(application.listingId);
-          if (!row) {
-            return null;
-          }
-          return {
-            listing: rowToDiscoveryFields(row) as DiscoveryListing,
-            status: toApplicationStatus(application.status),
-            appliedOn: application.submittedAt
-              ? new Date(application.submittedAt).toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                })
-              : "Unknown date",
-          };
-        },
-      ),
-    )
-  ).filter((item): item is AppliedItem => item !== null);
+  // Single batch query for every applied listing (replaces the previous per-id
+  // N+1 loop), then join back to each application. `.in(...)` does not preserve
+  // order, so we look listings up by id while iterating applications (already
+  // newest-first).
+  const listingIds = applications.map((application) => application.listingId);
+  const rows = await getPublicListingsByIds(listingIds);
+  const rowById = new Map(rows.map((row) => [row.id, row] as const));
+
+  const appliedItems: AppliedItem[] = applications
+    .map((application): AppliedItem | null => {
+      const row = rowById.get(application.listingId);
+      if (!row) {
+        return null;
+      }
+      return {
+        listing: rowToDiscoveryFields(row) as DiscoveryListing,
+        status: toApplicationStatus(application.status),
+        appliedOn: application.submittedAt
+          ? new Date(application.submittedAt).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+            })
+          : "Unknown date",
+      };
+    })
+    .filter((item): item is AppliedItem => item !== null);
 
   return (
     <BucketPage title="Applied" description="Track the applications you've submitted.">

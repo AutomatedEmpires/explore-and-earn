@@ -152,6 +152,32 @@ export async function getPublicListingById(id: string): Promise<ListingRow | nul
 }
 
 /**
+ * Batch variant of getPublicListingById: fetch many live listings in a single
+ * query instead of one round-trip per id (eliminates the N+1 on the
+ * saved/applied/messages surfaces). No auth required (public listings).
+ *
+ * - Returns [] for an empty id list — PostgREST `.in(...)` with an empty array
+ *   is invalid, so the guard is required.
+ * - Filters on status "live", matching getPublicListingById. (There is no
+ *   "published" status in this schema; "live" is the published state — see
+ *   contracts LISTING_STATUS / supabase/migrations/006_listings.sql.)
+ * - Result order is NOT guaranteed; callers that need a specific order should
+ *   join the rows back by id (e.g. via a Map).
+ */
+export async function getPublicListingsByIds(ids: string[]): Promise<ListingRow[]> {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await anonClient()
+    .from("listings")
+    .select(LISTING_COLUMNS)
+    .in("id", ids)
+    .eq("status", "live");
+
+  if (error) throw new Error(`getPublicListingsByIds: ${error.message}`);
+  return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
+}
+
+/**
  * Resolve the host_profiles.id for the authenticated Clerk user.
  * Returns null when the user has no host profile yet.
  *

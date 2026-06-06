@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { DiscoveryCard } from "@explore-and-earn/ui";
 import {
-	getPublicListingById,
+	getPublicListingsByIds,
 	getSavedListingIds,
 	rowToDiscoveryFields,
 } from "@explore-and-earn/db";
@@ -58,13 +58,14 @@ export default async function SavedPage() {
 
 	const savedIds = await getSavedListingIds(token, userId).catch(() => [] as string[]);
 
-	// TODO(perf): N+1 query — each saved listing is fetched individually. Replace
-	// with a single batch `getPublicListingsByIds(ids)` query in
-	// `@explore-and-earn/db` once it exists. Intentionally not implemented here.
-	const listings: DiscoveryListing[] = (
-		await Promise.all(savedIds.map((id) => getPublicListingById(id)))
-	)
-		.filter((row): row is NonNullable<typeof row> => row !== null)
+	// Single batch query (replaces the previous per-id N+1 loop). `.in(...)` does
+	// not guarantee row order, so re-order to match savedIds (newest-saved first)
+	// by looking each row up by id.
+	const rows = await getPublicListingsByIds(savedIds);
+	const rowById = new Map(rows.map((row) => [row.id, row] as const));
+	const listings: DiscoveryListing[] = savedIds
+		.map((id) => rowById.get(id))
+		.filter((row): row is NonNullable<typeof row> => row !== undefined)
 		.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
 
 	return (
