@@ -1,4 +1,4 @@
-/* Seek browser — filters + sort over the canonical DiscoveryCard grid.
+/* Seek browser \u2014 filters + sort over the canonical DiscoveryCard grid.
    Mobile-first; semantic tokens only; px appears ONLY in breakpoint media
    queries (mirrors --bp-* values). */
 
@@ -123,6 +123,28 @@
 	font-size: var(--type-label-size);
 	line-height: var(--type-label-lh);
 	color: var(--text-secondary);
+}
+
+.emptyWrap {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-12);
+}
+
+.clearLink {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	text-decoration: underline;
+}
+
+.clearLink:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+	border-radius: var(--radius-input);
 }
 
 .grid {

@@ -5,6 +5,7 @@ import type {
   CompensationUnit,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
+import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 
 export interface ListingRow {
@@ -162,10 +163,10 @@ export async function getPublicListingById(id: string): Promise<ListingRow | nul
  * query instead of one round-trip per id (eliminates the N+1 on the
  * saved/applied/messages surfaces). No auth required (public listings).
  *
- * - Returns [] for an empty id list — PostgREST `.in(...)` with an empty array
+ * - Returns [] for an empty id list \u2014 PostgREST `.in(...)` with an empty array
  *   is invalid, so the guard is required.
  * - Filters on status "live", matching getPublicListingById. (There is no
- *   "published" status in this schema; "live" is the published state — see
+ *   "published" status in this schema; "live" is the published state \u2014 see
  *   contracts LISTING_STATUS / supabase/migrations/006_listings.sql.)
  * - Result order is NOT guaranteed; callers that need a specific order should
  *   join the rows back by id (e.g. via a Map).
@@ -180,6 +181,105 @@ export async function getPublicListingsByIds(ids: string[]): Promise<ListingRow[
     .eq("status", "live");
 
   if (error) throw new Error(`getPublicListingsByIds: ${error.message}`);
+  return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
+}
+
+/**
+ * Filters accepted by {@link searchListings}. Every field is optional; an empty
+ * filter object returns the newest live listings (the same set as
+ * getPublicListings, capped by `limit`).
+ */
+export interface SearchFilters {
+  /** Free text, matched case-insensitively against title, description, and location_display. */
+  query?: string;
+  /** Subset of MARKETPLACE_CATEGORIES; values outside the registry are ignored. */
+  categories?: string[];
+  /** When true, only listings that include housing (housing_included = true). */
+  hasHousing?: boolean;
+  /** When true, only listings that include meals (meals_included = true). */
+  hasMeals?: boolean;
+  /** Minimum pay floor in MAJOR currency units (e.g. dollars); compared to compensation_min_cents. */
+  payMin?: number;
+  /** Partial, case-insensitive match against location_display. */
+  location?: string;
+  /** Max rows to return (default 48). */
+  limit?: number;
+}
+
+const DEFAULT_SEARCH_LIMIT = 48;
+
+/**
+ * Strip characters that would break a PostgREST `or()` / `ilike` filter
+ * expression: commas and parentheses are structural in the or() grammar and
+ * `*` is the wildcard token. Whitespace is collapsed and trimmed. Returns ""
+ * when nothing usable remains, in which case the caller skips that filter.
+ */
+function sanitizeSearchTerm(term: string): string {
+  return term.replace(/[,()*]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Public, server-side search over live listings \u2014 no auth required (anon
+ * client, same trust level as getPublicListings).
+ *
+ * SCHEMA NOTE: the 006_listings.sql `listings` table does NOT have the
+ * `summary` / `primary_location_name` / `housing_description` /
+ * `meals_description` / `pay_min` columns referenced in some early specs. This
+ * implementation maps those intents onto the real columns:
+ *   - free text  -> title / description / location_display
+ *   - location   -> location_display
+ *   - housing    -> housing_included (boolean flag; there is no free-text column)
+ *   - meals      -> meals_included (boolean flag)
+ *   - pay floor  -> compensation_min_cents (integer cents; payMin is given in
+ *                   major units and converted via Math.round(payMin * 100))
+ */
+export async function searchListings(filters: SearchFilters): Promise<ListingRow[]> {
+  let builder = anonClient()
+    .from("listings")
+    .select(LISTING_COLUMNS)
+    .eq("status", "live");
+
+  const term = filters.query ? sanitizeSearchTerm(filters.query) : "";
+  if (term) {
+    builder = builder.or(
+      `title.ilike.%${term}%,description.ilike.%${term}%,location_display.ilike.%${term}%`,
+    );
+  }
+
+  const categories = (filters.categories ?? []).filter((category) =>
+    (MARKETPLACE_CATEGORIES as readonly string[]).includes(category),
+  );
+  if (categories.length > 0) {
+    builder = builder.in("category", categories);
+  }
+
+  if (filters.hasHousing) {
+    builder = builder.eq("housing_included", true);
+  }
+  if (filters.hasMeals) {
+    builder = builder.eq("meals_included", true);
+  }
+
+  if (
+    filters.payMin != null &&
+    Number.isFinite(filters.payMin) &&
+    filters.payMin > 0
+  ) {
+    builder = builder.gte("compensation_min_cents", Math.round(filters.payMin * 100));
+  }
+
+  const location = filters.location ? sanitizeSearchTerm(filters.location) : "";
+  if (location) {
+    builder = builder.ilike("location_display", `%${location}%`);
+  }
+
+  const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;
+
+  const { data, error } = await builder
+    .order("published_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(`searchListings: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
 }
 
