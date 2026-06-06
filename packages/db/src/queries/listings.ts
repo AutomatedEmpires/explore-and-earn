@@ -1,12 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { BenefitProvision, OpportunityCategory } from "@explore-and-earn/contracts";
+import type {
+  BenefitProvision,
+  CompensationUnit,
+  OpportunityCategory,
+} from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 
 export interface ListingRow {
   id: string;
   title: string;
   category: OpportunityCategory;
+  description: string | null;
   location_display: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -32,6 +37,7 @@ type RawListingRow = {
   id: string;
   title: string;
   category: string;
+  description: string | null;
   location_display: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -57,7 +63,7 @@ function formatOpportunityWindow(
   if (row.begins_at && row.ends_at) {
     const fmt = (d: string) =>
       new Date(d).toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    return `${fmt(row.begins_at)}–${fmt(row.ends_at)}`;
+    return `${fmt(row.begins_at)}\u2013${fmt(row.ends_at)}`;
   }
   return "Open";
 }
@@ -84,7 +90,7 @@ function buildCompensationSummary(
       }).format(cents / 100);
     const min = fmt(row.compensation_min_cents);
     const max = row.compensation_max_cents != null ? fmt(row.compensation_max_cents) : null;
-    const range = max && max !== min ? `${min}–${max}` : min;
+    const range = max && max !== min ? `${min}\u2013${max}` : min;
     return unit === "other" || unit === "exchange" || unit === "stipend"
       ? range
       : `${range}/${unit}`;
@@ -124,9 +130,9 @@ export function rowToDiscoveryFields(row: ListingRow) {
 }
 
 const LISTING_COLUMNS =
-  "id,title,category,location_display,latitude,longitude,status,housing_included,meals_included,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,host_profiles(company_name,attestation_status)";
+  "id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,host_profiles(company_name,attestation_status)";
 
-/** Public live listings — no auth required. */
+/** Public live listings \u2014 no auth required. */
 export async function getPublicListings(): Promise<ListingRow[]> {
   const { data, error } = await anonClient()
     .from("listings")
@@ -138,7 +144,7 @@ export async function getPublicListings(): Promise<ListingRow[]> {
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
 }
 
-/** Single live listing by id — no auth required. */
+/** Single live listing by id \u2014 no auth required. */
 export async function getPublicListingById(id: string): Promise<ListingRow | null> {
   const { data, error } = await anonClient()
     .from("listings")
@@ -155,7 +161,7 @@ export async function getPublicListingById(id: string): Promise<ListingRow | nul
  * Resolve the host_profiles.id for the authenticated Clerk user.
  * Returns null when the user has no host profile yet.
  *
- * `clerkUserId` must come from `auth().userId` — never decoded from the token.
+ * `clerkUserId` must come from `auth().userId` \u2014 never decoded from the token.
  */
 async function resolveHostProfileId(
   clerkToken: string,
@@ -172,7 +178,7 @@ async function resolveHostProfileId(
 }
 
 /**
- * Host's own listings — requires Clerk JWT + verified Clerk user id.
+ * Host's own listings \u2014 requires Clerk JWT + verified Clerk user id.
  *
  * Scoped to `host_profile_id` so a host can only read their own listings.
  * `clerkUserId` must come from `auth().userId`.
@@ -192,4 +198,196 @@ export async function getHostListings(
 
   if (error) throw new Error(`getHostListings: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
+}
+
+/**
+ * Field shape accepted by createListing / updateListing.
+ *
+ * Money note: `payMin` / `payMax` are MAJOR currency units (e.g. dollars), not
+ * cents. They are converted to the integer `compensation_*_cents` columns via
+ * Math.round(amount * 100) to satisfy the 006_listings.sql CHECK (>= 0).
+ *
+ * Housing / Meals note: 006_listings.sql has no free-text housing/meals column \u2014
+ * only the boolean `housing_included` / `meals_included` flags. A provided or
+ * partial provision (or any non-empty description) flips the flag to true; the
+ * free-text description itself is NOT persisted yet. Flagged for schema
+ * follow-up.
+ */
+export interface ListingWriteFields {
+  title?: string;
+  category?: OpportunityCategory;
+  locationName?: string | null;
+  housingProvision?: BenefitProvision;
+  housingDescription?: string | null;
+  mealsProvision?: BenefitProvision;
+  mealsDescription?: string | null;
+  payMin?: number | null;
+  payMax?: number | null;
+  payCurrency?: string | null;
+  payPeriod?: CompensationUnit | null;
+  summary?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+type ListingColumnPatch = {
+  title?: string;
+  category?: OpportunityCategory;
+  location_display?: string | null;
+  description?: string | null;
+  begins_at?: string | null;
+  ends_at?: string | null;
+  compensation_min_cents?: number | null;
+  compensation_max_cents?: number | null;
+  compensation_currency?: string;
+  compensation_unit?: CompensationUnit | null;
+  housing_included?: boolean;
+  meals_included?: boolean;
+};
+
+function toCentsOrNull(amount: number | null | undefined): number | null {
+  if (amount == null || !Number.isFinite(amount) || amount < 0) return null;
+  return Math.round(amount * 100);
+}
+
+function benefitIncluded(
+  provision: BenefitProvision | undefined,
+  description: string | null | undefined,
+): boolean {
+  if (provision !== undefined) return provision !== "not_provided";
+  return typeof description === "string" && description.trim().length > 0;
+}
+
+/**
+ * Map the public ListingWriteFields into `listings` table columns. Only keys
+ * that are present on `fields` are emitted, so the same builder serves create
+ * (full) and update (partial) writes.
+ */
+function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch {
+  const patch: ListingColumnPatch = {};
+
+  if (fields.title !== undefined) patch.title = fields.title.trim();
+  if (fields.category !== undefined) patch.category = fields.category;
+
+  if (fields.locationName !== undefined) {
+    const trimmed = fields.locationName?.trim() ?? "";
+    patch.location_display = trimmed.length > 0 ? trimmed : null;
+  }
+  if (fields.summary !== undefined) {
+    const trimmed = fields.summary?.trim() ?? "";
+    patch.description = trimmed.length > 0 ? trimmed : null;
+  }
+  if (fields.startDate !== undefined) {
+    patch.begins_at = fields.startDate && fields.startDate.length > 0 ? fields.startDate : null;
+  }
+  if (fields.endDate !== undefined) {
+    patch.ends_at = fields.endDate && fields.endDate.length > 0 ? fields.endDate : null;
+  }
+  if (fields.payMin !== undefined) patch.compensation_min_cents = toCentsOrNull(fields.payMin);
+  if (fields.payMax !== undefined) patch.compensation_max_cents = toCentsOrNull(fields.payMax);
+  if (fields.payCurrency != null && fields.payCurrency.trim().length > 0) {
+    patch.compensation_currency = fields.payCurrency.trim().toUpperCase();
+  }
+  if (fields.payPeriod != null) patch.compensation_unit = fields.payPeriod;
+  if (fields.housingProvision !== undefined || fields.housingDescription !== undefined) {
+    patch.housing_included = benefitIncluded(fields.housingProvision, fields.housingDescription);
+  }
+  if (fields.mealsProvision !== undefined || fields.mealsDescription !== undefined) {
+    patch.meals_included = benefitIncluded(fields.mealsProvision, fields.mealsDescription);
+  }
+
+  return patch;
+}
+
+/**
+ * Create a draft listing owned by the authenticated host.
+ *
+ * `clerkUserId` must come from `auth().userId` \u2014 never decoded from the token.
+ * The listing is always inserted with status 'draft'.
+ */
+export async function createListing(
+  clerkToken: string,
+  clerkUserId: string,
+  fields: ListingWriteFields,
+): Promise<{ ok: boolean; listingId?: string; error?: string }> {
+  const title = fields.title?.trim() ?? "";
+  if (title.length === 0) {
+    return { ok: false, error: "A listing title is required." };
+  }
+  if (!fields.category) {
+    return { ok: false, error: "Choose a valid category for the listing." };
+  }
+
+  const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
+  if (!hostProfileId) {
+    return {
+      ok: false,
+      error: "No host profile found for your account. Create a host profile first.",
+    };
+  }
+
+  const patch = buildListingColumnPatch(fields);
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await untyped
+    .from("listings")
+    .insert({
+      ...patch,
+      title,
+      host_profile_id: hostProfileId,
+      status: "draft",
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "Could not create the listing." };
+  }
+  return { ok: true, listingId: (data as { id: string }).id };
+}
+
+/**
+ * Update an existing listing the caller owns.
+ *
+ * Ownership is enforced directly in the query:
+ * UPDATE ... WHERE id = listingId AND host_profile_id = <caller's profile>.
+ * A row the host does not own simply matches nothing and returns an error.
+ *
+ * `clerkUserId` must come from `auth().userId`.
+ */
+export async function updateListing(
+  clerkToken: string,
+  clerkUserId: string,
+  listingId: string,
+  fields: ListingWriteFields,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!listingId) {
+    return { ok: false, error: "Missing listing id." };
+  }
+
+  const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
+  if (!hostProfileId) {
+    return { ok: false, error: "No host profile found for your account." };
+  }
+
+  const patch = buildListingColumnPatch(fields);
+  if (Object.keys(patch).length === 0) {
+    return { ok: true };
+  }
+
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await untyped
+    .from("listings")
+    .update(patch)
+    .eq("id", listingId)
+    .eq("host_profile_id", hostProfileId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!data) {
+    return { ok: false, error: "Listing not found or you do not have access to it." };
+  }
+  return { ok: true };
 }
