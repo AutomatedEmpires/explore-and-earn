@@ -1,3 +1,24 @@
+/**
+ * Clerk webhook handler.
+ *
+ * Production webhook URL pattern:
+ *   https://<production-domain>/api/webhooks/clerk
+ *   e.g. https://explore-and-earn.vercel.app/api/webhooks/clerk
+ *        (or the custom production domain once it is configured)
+ *
+ * Setup: register this endpoint in the Clerk Dashboard -> Webhooks for the
+ * PRODUCTION instance, and set CLERK_WEBHOOK_SECRET (the Svix signing secret)
+ * in Vercel's Production environment.
+ *
+ * Handled Clerk events:
+ *   - user.created  -> inserts rows into users_profile_shadow + seeker_profiles
+ *   - user.updated  -> updates the cached email on users_profile_shadow
+ *   - user.deleted  -> soft-deletes (sets deleted_at) on users_profile_shadow
+ *
+ * Requests are verified with Svix using the svix-id / svix-timestamp /
+ * svix-signature headers. Writes use the Supabase service-role key
+ * (server-side only) and therefore bypass RLS.
+ */
 import { createClient } from "@supabase/supabase-js"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
