@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
 
@@ -19,8 +20,7 @@ import {
 } from "../discovery";
 import styles from "./SeekBrowser.module.css";
 
-type CategoryFilter = OpportunityCategory | "all";
-type BenefitKey = "housing" | "meals" | "pay";
+type BenefitToggleKey = "housing" | "meals";
 type SortKey = "match" | "title";
 
 const CATEGORY_ORDER: readonly OpportunityCategory[] = [
@@ -31,38 +31,23 @@ const CATEGORY_ORDER: readonly OpportunityCategory[] = [
 	"mix",
 ];
 
-const CATEGORY_FILTERS: readonly CategoryFilter[] = ["all", ...CATEGORY_ORDER];
-const BENEFIT_KEYS: readonly BenefitKey[] = ["housing", "meals", "pay"];
 const SORT_KEYS: readonly SortKey[] = ["match", "title"];
 
 const BENEFIT_FILTERS: readonly {
-	readonly key: BenefitKey;
+	readonly key: BenefitToggleKey;
 	readonly label: string;
 	readonly icon: IconKey;
 }[] = [
 	{ key: "housing", label: "Housing", icon: "benefit.housing" },
 	{ key: "meals", label: "Meals", icon: "benefit.meals" },
-	{ key: "pay", label: "Pay", icon: "benefit.pay" },
 ];
 
 const SORTS: readonly { readonly key: SortKey; readonly label: string }[] = [
 	{ key: "match", label: "Best match" },
-	{ key: "title", label: "A–Z" },
+	{ key: "title", label: "A\u2013Z" },
 ];
 
-function parseCategory(value: string | undefined): CategoryFilter {
-	return CATEGORY_FILTERS.includes(value as CategoryFilter)
-		? (value as CategoryFilter)
-		: "all";
-}
-
-function parseBenefits(value: string | undefined): readonly BenefitKey[] {
-	if (!value) {
-		return [];
-	}
-	const requested = value.split(",").map((entry) => entry.trim());
-	return BENEFIT_KEYS.filter((key) => requested.includes(key));
-}
+const SEARCH_DEBOUNCE_MS = 400;
 
 function parseSort(value: string | undefined): SortKey {
 	return SORT_KEYS.includes(value as SortKey) ? (value as SortKey) : "match";
@@ -70,42 +55,41 @@ function parseSort(value: string | undefined): SortKey {
 
 export interface SeekBrowserProps {
 	readonly listings: readonly DiscoveryListing[];
-	readonly initialCategory?: string;
-	readonly initialBenefits?: string;
-	readonly initialSort?: string;
+	readonly query?: string;
+	readonly category?: string;
+	readonly housing?: boolean;
+	readonly meals?: boolean;
+	readonly location?: string;
+	readonly payMin?: number;
 }
 
 /**
- * SeekBrowser — the browsable Seek tab. Client-side category + benefit
- * filters and sort layered over the single canonical DiscoveryCard. Owns no
- * data model: it filters/sorts the DiscoveryListing view-model and renders the
- * same card every other seeker surface uses. The discovery-lane DiscoveryFeed
- * is left untouched so the two surfaces never collide.
- *
- * Filter + sort state is hydrated from the URL query (category / benefits /
- * sort) and mirrored back with history.replaceState, so a filtered view is
- * shareable and bookmarkable without a server round-trip per toggle. Tapping a
- * card title opens the lane-local QuickPeekDrawer with the full listing detail;
- * tapping the host identity circle opens the HostProfilePopup; tapping the
- * Housing or Meals cell opens the BenefitBucketDrawer (evidence photo bucket);
- * tapping the location row deep-links to the Map tab focused on that listing;
- * tapping the report flag opens the ReportListingDrawer.
+ * SeekBrowser \u2014 the browsable Seek tab. All filter state (text query, category,
+ * housing/meals, location, pay floor) lives in the URL query string: the server
+ * page parses it, runs searchListings, and hands the already-filtered listings
+ * here. The controls below only navigate \u2014 toggling a chip or typing in the
+ * search box pushes a new URL, which re-renders the server page, so a filtered
+ * view is shareable and bookmarkable. Sort is a client-only reordering of the
+ * returned rows. The drawers (QuickPeek / HostProfile / BenefitBucket / Report)
+ * are unchanged.
  */
 export function SeekBrowser({
 	listings,
-	initialCategory,
-	initialBenefits,
-	initialSort,
+	query,
+	category,
+	housing = false,
+	meals = false,
+	location,
+	payMin,
 }: SeekBrowserProps) {
 	const pathname = usePathname();
 	const router = useRouter();
-	const [category, setCategory] = useState<CategoryFilter>(() =>
-		parseCategory(initialCategory),
+	const searchParams = useSearchParams();
+
+	const [searchText, setSearchText] = useState<string>(query ?? "");
+	const [sort, setSort] = useState<SortKey>(() =>
+		parseSort(searchParams.get("sort") ?? undefined),
 	);
-	const [benefits, setBenefits] = useState<readonly BenefitKey[]>(() =>
-		parseBenefits(initialBenefits),
-	);
-	const [sort, setSort] = useState<SortKey>(() => parseSort(initialSort));
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [activeHostId, setActiveHostId] = useState<string | null>(null);
 	const [activeBenefit, setActiveBenefit] = useState<{
@@ -114,51 +98,59 @@ export function SeekBrowser({
 	} | null>(null);
 	const [reportId, setReportId] = useState<string | null>(null);
 
-	const toggleBenefit = (key: BenefitKey) => {
-		setBenefits((prev) =>
-			prev.includes(key) ? prev.filter((entry) => entry !== key) : [...prev, key],
-		);
+	const currentQuery = query ?? "";
+
+	// Debounced free-text search -> ?q=. router.replace avoids stacking a history
+	// entry per keystroke; we only navigate once the debounced text differs from
+	// what the server last rendered (currentQuery), which also prevents a loop
+	// after the param round-trips back in as a prop.
+	useEffect(() => {
+		const trimmed = searchText.trim();
+		if (trimmed === currentQuery) {
+			return;
+		}
+		const timeout = setTimeout(() => {
+			const next = new URLSearchParams(searchParams.toString());
+			if (trimmed) {
+				next.set("q", trimmed);
+			} else {
+				next.delete("q");
+			}
+			const queryString = next.toString();
+			router.replace(queryString ? `${pathname}?${queryString}` : pathname);
+		}, SEARCH_DEBOUNCE_MS);
+		return () => clearTimeout(timeout);
+	}, [searchText, currentQuery, pathname, router, searchParams]);
+
+	const pushParam = (key: string, value: string | null) => {
+		const next = new URLSearchParams(searchParams.toString());
+		if (value === null || value === "") {
+			next.delete(key);
+		} else {
+			next.set(key, value);
+		}
+		const queryString = next.toString();
+		router.push(queryString ? `${pathname}?${queryString}` : pathname);
 	};
 
-	useEffect(() => {
-		const params = new URLSearchParams();
-		if (category !== "all") {
-			params.set("category", category);
-		}
-		const selectedBenefits = BENEFIT_KEYS.filter((key) =>
-			benefits.includes(key),
-		);
-		if (selectedBenefits.length > 0) {
-			params.set("benefits", selectedBenefits.join(","));
-		}
-		if (sort !== "match") {
-			params.set("sort", sort);
-		}
-		const query = params.toString();
-		window.history.replaceState(
-			null,
-			"",
-			query ? `${pathname}?${query}` : pathname,
-		);
-	}, [category, benefits, sort, pathname]);
+	const toggleCategory = (key: OpportunityCategory) => {
+		pushParam("category", category === key ? null : key);
+	};
+
+	const toggleBenefit = (key: BenefitToggleKey) => {
+		const isOn = key === "housing" ? housing : meals;
+		pushParam(key, isOn ? null : "1");
+	};
 
 	const results = useMemo(() => {
-		const filtered = listings.filter((listing) => {
-			if (category !== "all" && listing.category !== category) {
-				return false;
-			}
-			return benefits.every(
-				(key) => listing.benefits[key].provision === "provided",
-			);
-		});
-		const sorted = [...filtered];
+		const sorted = [...listings];
 		if (sort === "match") {
 			sorted.sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
 		} else {
 			sorted.sort((a, b) => a.title.localeCompare(b.title));
 		}
 		return sorted;
-	}, [listings, category, benefits, sort]);
+	}, [listings, sort]);
 
 	const activeListing = useMemo(
 		() => listings.find((listing) => listing.id === activeId) ?? null,
@@ -180,6 +172,14 @@ export function SeekBrowser({
 		[listings, reportId],
 	);
 
+	const hasActiveFilters =
+		Boolean(query) ||
+		Boolean(category) ||
+		housing ||
+		meals ||
+		Boolean(location) ||
+		payMin != null;
+
 	const countLabel = `${results.length} ${
 		results.length === 1 ? "opportunity" : "opportunities"
 	}`;
@@ -189,12 +189,24 @@ export function SeekBrowser({
 			<header className={styles.header}>
 				<h1 className={styles.heading}>Seek opportunities</h1>
 				<p className={styles.subheading}>
-					Browse every open work-travel opportunity — housing, meals, and pay
+					Browse every open work-travel opportunity \u2014 housing, meals, and pay
 					from hosts worldwide.
 				</p>
 			</header>
 
 			<div className={styles.filters}>
+				<label className={styles.sort}>
+					<span className={styles.sortLabel}>Search</span>
+					<input
+						type="search"
+						className={styles.sortSelect}
+						placeholder="Search opportunities, locations\u2026"
+						value={searchText}
+						onChange={(event) => setSearchText(event.target.value)}
+						aria-label="Search opportunities"
+					/>
+				</label>
+
 				<div
 					className={styles.filterGroup}
 					role="group"
@@ -203,12 +215,10 @@ export function SeekBrowser({
 					<button
 						type="button"
 						className={
-							category === "all"
-								? `${styles.chip} ${styles.chipSelected}`
-								: styles.chip
+							!category ? `${styles.chip} ${styles.chipSelected}` : styles.chip
 						}
-						aria-pressed={category === "all"}
-						onClick={() => setCategory("all")}
+						aria-pressed={!category}
+						onClick={() => pushParam("category", null)}
 					>
 						<span className={styles.chipLabel}>All</span>
 					</button>
@@ -222,7 +232,7 @@ export function SeekBrowser({
 									isSelected ? `${styles.chip} ${styles.chipSelected}` : styles.chip
 								}
 								aria-pressed={isSelected}
-								onClick={() => setCategory(isSelected ? "all" : key)}
+								onClick={() => toggleCategory(key)}
 							>
 								<Icon name={CATEGORY_ICON[key]} size={16} aria-hidden />
 								<span className={styles.chipLabel}>{CATEGORY_LABEL[key]}</span>
@@ -237,7 +247,7 @@ export function SeekBrowser({
 					aria-label="Filter by what is provided"
 				>
 					{BENEFIT_FILTERS.map(({ key, label, icon }) => {
-						const isSelected = benefits.includes(key);
+						const isSelected = key === "housing" ? housing : meals;
 						return (
 							<button
 								key={key}
@@ -276,10 +286,23 @@ export function SeekBrowser({
 			</p>
 
 			{results.length === 0 ? (
-				<EmptyState
-					title="No matches with those filters"
-					message="Try removing a filter to see more opportunities."
-				/>
+				<div className={styles.emptyWrap}>
+					<EmptyState
+						title={
+							query ? `No listings match \u201c${query}\u201d` : "No matches with those filters"
+						}
+						message={
+							query
+								? "Try a different search term or clear your filters to see more opportunities."
+								: "Try removing a filter to see more opportunities."
+						}
+					/>
+					{hasActiveFilters ? (
+						<Link className={styles.clearLink} href="/seek">
+							Clear filters
+						</Link>
+					) : null}
+				</div>
 			) : (
 				<div className={styles.grid}>
 					{results.map((listing) => (
