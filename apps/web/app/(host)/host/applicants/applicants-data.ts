@@ -18,6 +18,7 @@ function statusToStage(status: string): ApplicantStage {
     case "offered":
       return "offered";
     case "declined":
+    case "not_selected":
     case "rejected":
     case "withdrawn":
       return "declined";
