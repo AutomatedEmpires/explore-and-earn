@@ -71,6 +71,20 @@ as $$
      or host_profile_id in (select public.current_host_profile_ids())
 $$;
 
+-- Restrict helper functions to authenticated users + service_role only.
+-- Without this, the anon role can call these as RPC endpoints.
+revoke execute on function public.get_clerk_user_id()          from public;
+revoke execute on function public.current_seeker_profile_ids() from public;
+revoke execute on function public.current_host_profile_ids()   from public;
+revoke execute on function public.current_host_listing_ids()   from public;
+revoke execute on function public.current_conversation_ids()   from public;
+
+grant execute on function public.get_clerk_user_id()          to authenticated, service_role;
+grant execute on function public.current_seeker_profile_ids() to authenticated, service_role;
+grant execute on function public.current_host_profile_ids()   to authenticated, service_role;
+grant execute on function public.current_host_listing_ids()   to authenticated, service_role;
+grant execute on function public.current_conversation_ids()   to authenticated, service_role;
+
 -- ---------------------------------------------------------------------------
 -- Enable RLS
 -- ---------------------------------------------------------------------------
@@ -232,12 +246,15 @@ create policy conversations_select_party on public.conversations
     or host_profile_id in (select public.current_host_profile_ids())
   );
 
+-- INSERT requires BOTH sides to be valid — prevents either party from spoofing
+-- the other side of a new conversation (e.g. host setting seeker_profile_id
+-- to an arbitrary UUID they don't own).
 drop policy if exists conversations_insert_party on public.conversations;
 create policy conversations_insert_party on public.conversations
   for insert to authenticated
   with check (
     seeker_profile_id in (select public.current_seeker_profile_ids())
-    or host_profile_id in (select public.current_host_profile_ids())
+    and host_profile_id in (select public.current_host_profile_ids())
   );
 
 -- ---------------------------------------------------------------------------
@@ -248,7 +265,18 @@ create policy messages_select_participant on public.messages
   for select to authenticated
   using (conversation_id in (select public.current_conversation_ids()));
 
+-- INSERT requires the sender to be a conversation participant AND that
+-- sender_type + sender_profile_id match who they actually are. Without the
+-- identity check, a seeker could insert a message with sender_type='host'
+-- and impersonate the host in the conversation record.
 drop policy if exists messages_insert_participant on public.messages;
 create policy messages_insert_participant on public.messages
   for insert to authenticated
-  with check (conversation_id in (select public.current_conversation_ids()));
+  with check (
+    conversation_id in (select public.current_conversation_ids())
+    and (
+      (sender_type = 'seeker' and sender_profile_id in (select public.current_seeker_profile_ids()))
+      or
+      (sender_type = 'host'   and sender_profile_id in (select public.current_host_profile_ids()))
+    )
+  );
