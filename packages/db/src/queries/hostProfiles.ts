@@ -31,7 +31,34 @@ function untypedClient(clerkToken: string): SupabaseClient {
 }
 
 /**
- * Resolve the caller's own `host_profiles.id` from their Clerk user id.
+ * Editable host_profiles columns for the host-managed profile form.
+ *
+ * All keys are optional: callers send only the fields they intend to change.
+ * `companyName` maps to the NOT NULL `company_name` column, so an explicitly
+ * provided empty value is rejected (see `updateHostProfileDetails`). The
+ * remaining columns are nullable text; pass `null` to clear them.
+ */
+export interface HostProfileDetailsInput {
+  companyName?: string;
+  about?: string | null;
+  primaryLocationName?: string | null;
+  websiteUrl?: string | null;
+}
+
+/**
+ * Normalize an optional free-text field: trim, and treat an empty string as a
+ * cleared (`null`) value. Leaves `null`/`undefined` untouched.
+ */
+function normalizeOptional(value: string | null | undefined): string | null | undefined {
+  if (value === null || value === undefined) {
+    return value;
+  }
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * Resolve the caller's own host profile from their Clerk user id.
  * Returns `null` when the user has not created a host profile yet.
  *
  * @param clerkToken - Verified Clerk JWT from `getToken()`.
@@ -41,17 +68,87 @@ function untypedClient(clerkToken: string): SupabaseClient {
 export async function getHostProfile(
   clerkToken: string,
   clerkUserId: string,
-): Promise<{ id: string } | null> {
+): Promise<{
+  id: string;
+  companyName: string;
+  about: string | null;
+  primaryLocationName: string | null;
+} | null> {
   const db = untypedClient(clerkToken);
   const { data, error } = await db
     .from("host_profiles")
-    .select("id")
+    .select("id, company_name, about, primary_location_name")
     .eq("clerk_user_id", clerkUserId)
     .maybeSingle();
   if (error) {
     throw new Error(`getHostProfile: ${error.message}`);
   }
-  return data ? { id: (data as { id: string }).id } : null;
+  if (!data) {
+    return null;
+  }
+  const row = data as {
+    id: string;
+    company_name: string | null;
+    about: string | null;
+    primary_location_name: string | null;
+  };
+  return {
+    id: row.id,
+    companyName: row.company_name ?? "",
+    about: row.about ?? null,
+    primaryLocationName: row.primary_location_name ?? null,
+  };
+}
+
+/**
+ * Update the caller's own host_profiles row, scoped by their verified Clerk user
+ * id. Only the provided fields are written; an empty patch is a no-op success.
+ *
+ * `company_name` is NOT NULL, so a provided-but-empty company name is rejected
+ * with `name_required` rather than writing an invalid value.
+ */
+export async function updateHostProfileDetails(
+  clerkToken: string,
+  clerkUserId: string,
+  fields: HostProfileDetailsInput,
+): Promise<{ ok: boolean; error?: string }> {
+  const patch: Record<string, string | null> = {};
+
+  if (fields.companyName !== undefined) {
+    const companyName = fields.companyName.trim();
+    if (companyName === "") {
+      return { ok: false, error: "name_required" };
+    }
+    patch.company_name = companyName;
+  }
+  if (fields.about !== undefined) {
+    patch.about = normalizeOptional(fields.about) ?? null;
+  }
+  if (fields.primaryLocationName !== undefined) {
+    patch.primary_location_name = normalizeOptional(fields.primaryLocationName) ?? null;
+  }
+  if (fields.websiteUrl !== undefined) {
+    patch.website_url = normalizeOptional(fields.websiteUrl) ?? null;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return { ok: true };
+  }
+
+  try {
+    const db = untypedClient(clerkToken);
+    const { error } = await db
+      .from("host_profiles")
+      .update(patch)
+      .eq("clerk_user_id", clerkUserId);
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : "update_failed";
+    return { ok: false, error: message };
+  }
 }
 
 /**
