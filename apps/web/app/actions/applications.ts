@@ -4,12 +4,14 @@ import { auth } from "@clerk/nextjs/server"
 import {
 	applyToListing,
 	getSeekerApplicationIds,
+	notifyHostOfApplication,
 	type ApplyResult,
 } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
 
 /**
  * Server action: apply the authenticated seeker to a listing.
+ *
  * Auth is enforced here (Clerk) before any DB work; the Supabase JWT is minted
  * via the "supabase" Clerk JWT template and handed to the db layer.
  */
@@ -28,6 +30,14 @@ export async function applyToListingAction(
 	}
 
 	const result = await applyToListing(token, listingId, coverMessage)
+
+	// Side-effect: best-effort in-app notification to the host on a successful
+	// application. notifyHostOfApplication swallows its own errors, so this never
+	// blocks or changes the apply result returned to the seeker.
+	if (result.ok) {
+		await notifyHostOfApplication(token, listingId)
+	}
+
 	revalidatePath(`/listing/${listingId}`)
 	return result
 }
