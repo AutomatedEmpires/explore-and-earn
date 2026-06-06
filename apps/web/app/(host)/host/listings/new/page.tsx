@@ -1,7 +1,17 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+
 import { HostSectionHeading, ListingForm } from "../../../../../components/host";
 import styles from "./page.module.css";
 
-export default function HostNewListingPage() {
+export const dynamic = "force-dynamic";
+
+export default async function HostNewListingPage() {
+  const { userId } = await auth();
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
   return (
     <section className={styles.block}>
       <HostSectionHeading

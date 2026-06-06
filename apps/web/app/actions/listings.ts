@@ -2,219 +2,172 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { authedClient, type Database } from "@explore-and-earn/db";
 import {
+  createListing as createListingRow,
+  updateListing as updateListingRow,
+  type ListingWriteFields,
+} from "@explore-and-earn/db";
+import {
+  COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
-  type ListingStatus,
+  type CompensationUnit,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
-export type ListingActionResult =
-  | { status: "success"; id: string }
-  | { status: "error"; message: string };
-
-interface ListingWriteModel {
-  title: string;
-  description: string | null;
-  category: MarketplaceCategory;
-  status: ListingStatus;
-  location_display: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  housing_included: boolean;
-  meals_included: boolean;
-  compensation_summary: string | null;
+interface HostAuth {
+  userId: string;
+  token: string;
 }
 
 /**
- * Resolve an authenticated, RLS-scoped Supabase client for the current Clerk
- * user. Listing mutations require Clerk auth \u2014 there are no anon writes.
+ * Resolve the Clerk user id + Supabase-templated JWT for the current host.
+ *
+ * Per repo auth law: `userId` comes from `auth().userId` (never decoded from the
+ * token), and the Supabase RLS token uses the "supabase" JWT template. Both are
+ * required so the db layer can scope every write to the caller's host profile.
  */
-async function getAuthedDb(): Promise<{ db: SupabaseClient<Database> } | { error: string }> {
+async function resolveHostAuth(): Promise<
+  { ok: true; auth: HostAuth } | { ok: false; error: string }
+> {
   const { userId, getToken } = await auth();
   if (!userId) {
-    return { error: "You must be signed in as a host to manage listings." };
+    return { ok: false, error: "You must be signed in as a host to manage listings." };
   }
-
-  const token = await getToken();
+  const token = await getToken({ template: "supabase" });
   if (!token) {
-    return { error: "Your session has expired \u2014 sign in again to continue." };
+    return { ok: false, error: "Your session has expired \u2014 sign in again to continue." };
   }
-
-  return { db: authedClient(token) };
+  return { ok: true, auth: { userId, token } };
 }
 
-function resolveCategory(raw: FormDataEntryValue | null): MarketplaceCategory | null {
+function optionalString(raw: FormDataEntryValue | null): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function resolveCategory(raw: FormDataEntryValue | null): MarketplaceCategory | undefined {
   const value = typeof raw === "string" ? raw : "";
   return (MARKETPLACE_CATEGORIES as readonly string[]).includes(value)
     ? (value as MarketplaceCategory)
-    : null;
+    : undefined;
 }
 
-/**
- * The host form exposes a simple draft/active toggle. listings.status has no
- * "active" value (see contracts enums.ts LISTING_STATUS and
- * supabase/migrations/006_listings.sql) \u2014 "active" maps to the published
- * "live" state. No publish gating is applied yet.
- */
-function resolveStatus(raw: FormDataEntryValue | null): ListingStatus {
-  return raw === "active" ? "live" : "draft";
+function resolvePayPeriod(raw: FormDataEntryValue | null): CompensationUnit | undefined {
+  const value = typeof raw === "string" ? raw : "";
+  return (COMPENSATION_UNIT as readonly string[]).includes(value)
+    ? (value as CompensationUnit)
+    : undefined;
 }
 
-function parseNumeric(raw: FormDataEntryValue | null): number | null {
-  if (typeof raw !== "string" || raw.trim().length === 0) {
-    return null;
-  }
-  const value = Number(raw);
+function parseAmount(raw: FormDataEntryValue | null): number | null | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return undefined;
+  const value = Number(trimmed);
   return Number.isFinite(value) ? value : null;
 }
 
-function readListingForm(
-  formData: FormData,
-): { model: ListingWriteModel } | { error: string } {
-  const title = String(formData.get("title") ?? "").trim();
-  if (title.length === 0) {
-    return { error: "A listing title is required." };
-  }
+/**
+ * Read the create/edit listing form into ListingWriteFields. Only keys the form
+ * actually submits are set, so the same reader serves create and update.
+ */
+function readListingFields(formData: FormData): ListingWriteFields {
+  const fields: ListingWriteFields = {};
+
+  const title = optionalString(formData.get("title"));
+  if (title !== undefined) fields.title = title;
 
   const category = resolveCategory(formData.get("category"));
-  if (!category) {
-    return { error: "Choose a valid category for the listing." };
+  if (category !== undefined) fields.category = category;
+
+  if (formData.has("locationName")) {
+    fields.locationName = optionalString(formData.get("locationName")) ?? null;
+  }
+  if (formData.has("summary")) {
+    fields.summary = optionalString(formData.get("summary")) ?? null;
+  }
+  if (formData.has("housingDescription")) {
+    fields.housingDescription = optionalString(formData.get("housingDescription")) ?? null;
+  }
+  if (formData.has("mealsDescription")) {
+    fields.mealsDescription = optionalString(formData.get("mealsDescription")) ?? null;
   }
 
-  const housingProvision = String(formData.get("housingProvision") ?? "not_provided");
-  const mealsProvision = String(formData.get("mealsProvision") ?? "not_provided");
-  const payProvision = String(formData.get("payProvision") ?? "not_provided");
-  const housingSummary = String(formData.get("housingSummary") ?? "").trim();
-  const mealsSummary = String(formData.get("mealsSummary") ?? "").trim();
-  const paySummary = String(formData.get("paySummary") ?? "").trim();
+  const payMin = parseAmount(formData.get("payMin"));
+  if (payMin !== undefined) fields.payMin = payMin;
+  const payMax = parseAmount(formData.get("payMax"));
+  if (payMax !== undefined) fields.payMax = payMax;
 
-  const hasBenefit =
-    housingProvision !== "not_provided" ||
-    mealsProvision !== "not_provided" ||
-    payProvision !== "not_provided" ||
-    housingSummary.length > 0 ||
-    mealsSummary.length > 0 ||
-    paySummary.length > 0;
-  if (!hasBenefit) {
-    return { error: "Add at least one benefit \u2014 Housing, Meals, or Pay." };
+  const payPeriod = resolvePayPeriod(formData.get("payPeriod"));
+  if (payPeriod !== undefined) fields.payPeriod = payPeriod;
+
+  const payCurrency = optionalString(formData.get("payCurrency"));
+  if (payCurrency !== undefined) fields.payCurrency = payCurrency;
+
+  if (formData.has("startDate")) {
+    fields.startDate = optionalString(formData.get("startDate")) ?? null;
+  }
+  if (formData.has("endDate")) {
+    fields.endDate = optionalString(formData.get("endDate")) ?? null;
   }
 
-  const description = String(formData.get("description") ?? "").trim();
-  const location = String(formData.get("location") ?? "").trim();
-
-  return {
-    model: {
-      title,
-      description: description.length > 0 ? description : null,
-      category,
-      status: resolveStatus(formData.get("status")),
-      location_display: location.length > 0 ? location : null,
-      latitude: parseNumeric(formData.get("latitude")),
-      longitude: parseNumeric(formData.get("longitude")),
-      // BenefitTriad -> columns in 006_listings.sql: housing/meals map to the
-      // boolean inclusion flags, pay maps to compensation_summary. There is no
-      // free-text housing/meals column yet, so only the inclusion flag persists.
-      housing_included:
-        housingProvision !== "not_provided" || housingSummary.length > 0,
-      meals_included: mealsProvision !== "not_provided" || mealsSummary.length > 0,
-      compensation_summary: paySummary.length > 0 ? paySummary : null,
-    },
-  };
+  return fields;
 }
 
-/**
- * Resolve the caller's host profile id. host_profiles is owner-scoped, so under
- * the host's authed (RLS) client this returns their own profile without
- * inventing a Clerk-linkage column (identity wiring is founder-gated, #105).
- */
-async function resolveHostProfileId(db: SupabaseClient<Database>): Promise<string | null> {
-  const { data, error } = await db
-    .from("host_profiles")
-    .select("id")
-    .limit(1)
-    .maybeSingle();
-  if (error || !data) {
-    return null;
-  }
-  return (data as { id: string }).id;
-}
-
-export async function createListing(
+export async function createListingAction(
   formData: FormData,
-): Promise<ListingActionResult> {
-  const authResult = await getAuthedDb();
-  if ("error" in authResult) {
-    return { status: "error", message: authResult.error };
-  }
-  const { db } = authResult;
-
-  const parsed = readListingForm(formData);
-  if ("error" in parsed) {
-    return { status: "error", message: parsed.error };
+): Promise<{ ok: boolean; listingId?: string; error?: string }> {
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) {
+    return { ok: false, error: authResult.error };
   }
 
-  const hostProfileId = await resolveHostProfileId(db);
-  if (!hostProfileId) {
-    return {
-      status: "error",
-      message: "No host profile found for your account. Create a host profile first.",
-    };
-  }
+  const fields = readListingFields(formData);
+  const result = await createListingRow(
+    authResult.auth.token,
+    authResult.auth.userId,
+    fields,
+  );
 
-  const { data, error } = await db
-    .from("listings")
-    .insert({ ...parsed.model, host_profile_id: hostProfileId })
-    .select("id")
-    .single();
-
-  if (error || !data) {
-    return {
-      status: "error",
-      message: error?.message ?? "Could not create the listing.",
-    };
+  if (!result.ok) {
+    return result;
   }
 
   revalidatePath("/host/listings");
-  return { status: "success", id: (data as { id: string }).id };
+  if (result.listingId) {
+    revalidatePath(`/host/listings/${result.listingId}`);
+  }
+  return result;
 }
 
-export async function updateListing(
-  id: string,
+export async function updateListingAction(
+  listingId: string,
   formData: FormData,
-): Promise<ListingActionResult> {
-  if (!id) {
-    return { status: "error", message: "Missing listing id." };
+): Promise<{ ok: boolean; error?: string }> {
+  if (!listingId) {
+    return { ok: false, error: "Missing listing id." };
   }
 
-  const authResult = await getAuthedDb();
-  if ("error" in authResult) {
-    return { status: "error", message: authResult.error };
-  }
-  const { db } = authResult;
-
-  const parsed = readListingForm(formData);
-  if ("error" in parsed) {
-    return { status: "error", message: parsed.error };
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) {
+    return { ok: false, error: authResult.error };
   }
 
-  const { data, error } = await db
-    .from("listings")
-    .update(parsed.model)
-    .eq("id", id)
-    .select("id")
-    .single();
+  const fields = readListingFields(formData);
+  const result = await updateListingRow(
+    authResult.auth.token,
+    authResult.auth.userId,
+    listingId,
+    fields,
+  );
 
-  if (error || !data) {
-    return {
-      status: "error",
-      message: error?.message ?? "Could not update the listing.",
-    };
+  if (!result.ok) {
+    return result;
   }
 
   revalidatePath("/host/listings");
-  revalidatePath(`/host/listings/${id}`);
-  return { status: "success", id: (data as { id: string }).id };
+  revalidatePath(`/host/listings/${listingId}`);
+  return result;
 }
