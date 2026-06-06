@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import type { BenefitProvision, OpportunityCategory } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 
@@ -149,11 +151,43 @@ export async function getPublicListingById(id: string): Promise<ListingRow | nul
   return data ? toListingRow(data as unknown as RawListingRow) : null;
 }
 
-/** Host's own listings — requires Clerk JWT. */
-export async function getHostListings(clerkToken: string): Promise<ListingRow[]> {
+/**
+ * Resolve the host_profiles.id for the authenticated Clerk user.
+ * Returns null when the user has no host profile yet.
+ *
+ * `clerkUserId` must come from `auth().userId` — never decoded from the token.
+ */
+async function resolveHostProfileId(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<string | null> {
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await untyped
+    .from("host_profiles")
+    .select("id")
+    .eq("clerk_user_id", clerkUserId)
+    .maybeSingle();
+  if (error) throw new Error(`resolveHostProfileId: ${error.message}`);
+  return data ? (data as { id: string }).id : null;
+}
+
+/**
+ * Host's own listings — requires Clerk JWT + verified Clerk user id.
+ *
+ * Scoped to `host_profile_id` so a host can only read their own listings.
+ * `clerkUserId` must come from `auth().userId`.
+ */
+export async function getHostListings(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<ListingRow[]> {
+  const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
+  if (!hostProfileId) return [];
+
   const { data, error } = await authedClient(clerkToken)
     .from("listings")
     .select(LISTING_COLUMNS)
+    .eq("host_profile_id", hostProfileId)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(`getHostListings: ${error.message}`);

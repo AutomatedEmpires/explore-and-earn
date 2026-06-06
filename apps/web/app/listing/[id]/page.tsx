@@ -26,7 +26,7 @@ export default async function ListingDetailPage({
 	if (userId) {
 		const token = await getToken({ template: "supabase" })
 		if (token) {
-			const appliedListingIds = await getSeekerApplicationIds(token).catch(() => [] as string[])
+			const appliedListingIds = await getSeekerApplicationIds(token, userId).catch(() => [] as string[])
 			alreadyApplied = appliedListingIds.includes(id)
 		}
 	}

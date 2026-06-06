@@ -39,7 +39,7 @@ export default async function HostApplicantsPage() {
   // resolve each application's full DiscoveryListing for the canonical card.
   const [applications, listingRows] = await Promise.all([
     getHostApplications(token, userId),
-    getHostListings(token).catch(() => []),
+    getHostListings(token, userId).catch(() => []),
   ]);
 
   const listingsById = new Map<string, DiscoveryListing>(

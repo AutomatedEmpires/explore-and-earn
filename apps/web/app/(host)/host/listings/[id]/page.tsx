@@ -44,9 +44,9 @@ export default async function HostListingDetailPage({
   // edit it; otherwise fall back to the public live record for a read-only view
   // with edit controls hidden.
   let owned: ListingRow | undefined;
-  if (token) {
+  if (token && userId) {
     try {
-      owned = (await getHostListings(token)).find((row) => row.id === id);
+      owned = (await getHostListings(token, userId)).find((row) => row.id === id);
     } catch {
       owned = undefined;
     }

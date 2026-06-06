@@ -11,46 +11,22 @@ export interface ApplyResult {
 const UNIQUE_VIOLATION = "23505";
 
 /**
- * Decode the `sub` (Clerk user id) claim from a Clerk-issued JWT WITHOUT
- * verifying the signature. We only need the subject to scope the app-level
- * ownership guard (`WHERE clerk_user_id = $sub`). Authenticity of the token is
- * enforced by Supabase/PostgREST when the query is sent via authedClient(), and
- * by Clerk in the server action that mints the token.
- */
-function clerkSubFromToken(token: string): string | null {
-  const segments = token.split(".");
-  if (segments.length < 2) {
-    return null;
-  }
-  try {
-    const payload = JSON.parse(
-      Buffer.from(segments[1], "base64url").toString("utf8"),
-    ) as { sub?: unknown };
-    return typeof payload.sub === "string" ? payload.sub : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Resolve seeker_profiles.id for the authed Clerk subject.
+ * Resolve seeker_profiles.id for the authed Clerk user.
  *
- * TYPES BRIDGE: the committed packages/db/src/types.gen.ts predates migration
- * 009 (which added seeker_profiles.clerk_user_id), so a fully-typed
- * `.eq("clerk_user_id", ...)` does not compile. Until the generated types are
- * regenerated (requires DB access — see PR notes), this single lookup reads the
- * column through an UNTYPED view of the same authed client. The applications
- * insert/select below continue to use the fully-typed client.
+ * `clerkUserId` must come from `auth().userId` — never decode it from the token.
+ *
+ * TYPES BRIDGE: types.gen.ts predates migration 009 (seeker_profiles.clerk_user_id),
+ * so the column is accessed through an untyped client handle until types are regenerated.
  */
 async function resolveSeekerProfileId(
   clerkToken: string,
-  sub: string,
+  clerkUserId: string,
 ): Promise<string | null> {
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data, error } = await untyped
     .from("seeker_profiles")
     .select("id")
-    .eq("clerk_user_id", sub)
+    .eq("clerk_user_id", clerkUserId)
     .maybeSingle();
 
   if (error) {
@@ -70,15 +46,11 @@ async function resolveSeekerProfileId(
  */
 export async function applyToListing(
   clerkToken: string,
+  clerkUserId: string,
   listingId: string,
   coverMessage?: string,
 ): Promise<ApplyResult> {
-  const sub = clerkSubFromToken(clerkToken);
-  if (!sub) {
-    return { ok: false, error: "unauthenticated" };
-  }
-
-  const seekerProfileId = await resolveSeekerProfileId(clerkToken, sub);
+  const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
     return { ok: false, error: "profile_not_found" };
   }
@@ -107,13 +79,9 @@ export async function applyToListing(
  */
 export async function getSeekerApplicationIds(
   clerkToken: string,
+  clerkUserId: string,
 ): Promise<string[]> {
-  const sub = clerkSubFromToken(clerkToken);
-  if (!sub) {
-    return [];
-  }
-
-  const seekerProfileId = await resolveSeekerProfileId(clerkToken, sub);
+  const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
     return [];
   }

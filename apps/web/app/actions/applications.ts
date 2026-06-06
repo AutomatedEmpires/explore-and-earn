@@ -28,7 +28,7 @@ export async function applyToListingAction(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const result = await applyToListing(token, listingId, coverMessage)
+	const result = await applyToListing(token, userId, listingId, coverMessage)
 
 	// TODO(notifications): insert a host notification on successful apply.
 	// Requires a service-role token (not the seeker JWT) to write to a
@@ -50,5 +50,5 @@ export async function getSeekerApplicationIdsAction(): Promise<string[]> {
 		return []
 	}
 
-	return getSeekerApplicationIds(token)
+	return getSeekerApplicationIds(token, userId)
 }
