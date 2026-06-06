@@ -215,7 +215,7 @@ const DEFAULT_SEARCH_LIMIT = 48;
  * when nothing usable remains, in which case the caller skips that filter.
  */
 function sanitizeSearchTerm(term: string): string {
-  return term.replace(/[,()*]/g, " ").replace(/\s+/g, " ").trim();
+  return term.slice(0, 200).replace(/[,()*%]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 /**
