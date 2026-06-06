@@ -59,6 +59,7 @@ export const DISCOVERY_CARD_SURFACES = [
 	"matched",
 	"host_applicant_review",
 	"community",
+	"invites",
 ] as const
 export type DiscoveryCardSurface = (typeof DISCOVERY_CARD_SURFACES)[number]
 
