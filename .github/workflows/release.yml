@@ -1,10 +1,11 @@
 name: Release
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-  placeholder:
-    runs-on: ubuntu-latest
-    steps:
-      - run: 'echo "TODO: Wire release automation after Sprint Zero approvals."'
+  release:
+    uses: AutomatedEmpires/.github/.github/workflows/reusable-release.yml@main
+    secrets: inherit
