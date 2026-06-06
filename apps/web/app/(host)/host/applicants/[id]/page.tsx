@@ -33,7 +33,7 @@ export default async function HostApplicantDetailPage({
 
   const [applications, listingRows] = await Promise.all([
     getHostApplications(token, userId),
-    getHostListings(token).catch(() => []),
+    getHostListings(token, userId).catch(() => []),
   ]);
 
   // Ownership check: application must belong to one of this host's own listings.

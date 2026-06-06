@@ -278,14 +278,23 @@ export async function sendMessage(
 /**
  * Returns the existing seeker<->host conversation (optionally scoped to an
  * application) or creates one. Used when a host saves/contacts an applicant.
- * Returns null when either profile cannot be resolved.
+ *
+ * `callerClerkUserId` (from `auth().userId`) must match one of the two
+ * participants. Callers who are neither the seeker nor the host receive null
+ * — this prevents cross-user conversation creation without a service-role key.
+ *
+ * Returns null when caller verification fails or either profile cannot be resolved.
  */
 export async function getOrCreateConversation(
   clerkToken: string,
+  callerClerkUserId: string,
   seekerClerkUserId: string,
   hostClerkUserId: string,
   applicationId?: string,
 ): Promise<Conversation | null> {
+  if (callerClerkUserId !== seekerClerkUserId && callerClerkUserId !== hostClerkUserId) {
+    return null;
+  }
   const db = untypedClient(clerkToken);
   const [seekerProfileId, hostProfileId] = await Promise.all([
     resolveSeekerProfileId(db, seekerClerkUserId),

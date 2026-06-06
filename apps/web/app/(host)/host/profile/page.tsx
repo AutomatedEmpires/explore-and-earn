@@ -39,7 +39,7 @@ export default async function HostProfilePage() {
 
   const [hostProfile, listingRows, applications] = await Promise.all([
     getHostProfile(token, userId),
-    getHostListings(token).catch(() => []),
+    getHostListings(token, userId).catch(() => []),
     getHostApplications(token, userId).catch(() => []),
   ]);
 

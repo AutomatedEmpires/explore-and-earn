@@ -5,6 +5,7 @@ import {
   authedClient,
   getApplicationCountsByListing,
   getHostListings,
+  getHostProfile,
   rowToDiscoveryFields,
   type ListingRow,
 } from "@explore-and-earn/db";
@@ -45,18 +46,21 @@ function toItems(rows: readonly ListingRow[]): HostListingItem[] {
  * to a no-join select on the same authed client — queries/listings.ts is left
  * untouched. Non-join errors are rethrown so they are not masked as "empty".
  */
-async function loadHostItems(token: string): Promise<HostListingItem[]> {
+async function loadHostItems(token: string, userId: string): Promise<HostListingItem[]> {
   try {
-    return toItems(await getHostListings(token));
+    return toItems(await getHostListings(token, userId));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/host_profiles|relationship|embed|schema cache/i.test(message)) {
       throw error;
     }
+    const hostProfile = await getHostProfile(token, userId);
+    if (!hostProfile) return [];
     const db = authedClient(token) as unknown as SupabaseClient;
     const { data, error: fallbackError } = await db
       .from("listings")
       .select(LISTING_COLUMNS_NO_JOIN)
+      .eq("host_profile_id", hostProfile.id)
       .order("created_at", { ascending: false });
     if (fallbackError) {
       throw new Error(`getHostListings fallback: ${fallbackError.message}`);
@@ -96,7 +100,7 @@ export default async function HostListingsPage() {
   // Listings (with embed/fallback) and real applicant counts are independent;
   // a counts failure must not break the listings view, so it degrades to {}.
   const [items, counts] = await Promise.all([
-    loadHostItems(token),
+    loadHostItems(token, userId),
     getApplicationCountsByListing(token, userId).catch(
       () => ({}) as Record<string, number>,
     ),
