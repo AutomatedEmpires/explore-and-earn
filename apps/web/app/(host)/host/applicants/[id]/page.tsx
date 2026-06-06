@@ -4,6 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import {
   getHostApplications,
   getHostListings,
+  getSeekerDisplayName,
+  getSeekerResumeByProfileId,
   rowToDiscoveryFields,
 } from "@explore-and-earn/db";
 
@@ -46,6 +48,13 @@ export default async function HostApplicantDetailPage({
     notFound();
   }
 
+  // The applicant's name + resume are gated server-side by the same ownership
+  // guard (host must own a listing this seeker applied to). Loaded in parallel.
+  const [displayName, resume] = await Promise.all([
+    getSeekerDisplayName(token, userId, application.seekerProfileId),
+    getSeekerResumeByProfileId(token, userId, application.seekerProfileId),
+  ]);
+
   const listingsById = new Map<string, DiscoveryListing>(
     listingRows.map((row): [string, DiscoveryListing] => [
       row.id,
@@ -53,6 +62,11 @@ export default async function HostApplicantDetailPage({
     ]),
   );
   const applicant = toApplicantItem(application, listingsById);
+  // Prefer the resolved display name in the heading; fall back to the existing
+  // pseudonymous handle when no name is available yet.
+  const applicantWithName = displayName
+    ? { ...applicant, applicantName: displayName }
+    : applicant;
 
   return (
     <section className={styles.block}>
@@ -62,7 +76,7 @@ export default async function HostApplicantDetailPage({
         actionLabel="All applicants"
         actionHref="/host/applicants"
       />
-      <HostApplicantDetail applicant={applicant} />
+      <HostApplicantDetail applicant={applicantWithName} resume={resume} />
       <StatusActions applicationId={application.id} />
     </section>
   );
