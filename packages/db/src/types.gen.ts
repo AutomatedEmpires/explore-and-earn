@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -1231,13 +1233,14 @@ export type Database = {
           availability_end: string | null
           availability_start: string | null
           availability_status: string | null
+          clerk_user_id: string | null
           completion_score: number
           cover_photo_asset_id: string | null
           created_at: string
           deleted_at: string | null
           desired_categories: string[]
           desired_roles: string[]
-          display_name: string
+          display_name: string | null
           housing_preference: string | null
           id: string
           match_confidence_score: number
@@ -1252,20 +1255,21 @@ export type Database = {
           short_bio: string | null
           travel_readiness: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
           visibility_status: string
         }
         Insert: {
           availability_end?: string | null
           availability_start?: string | null
           availability_status?: string | null
+          clerk_user_id?: string | null
           completion_score?: number
           cover_photo_asset_id?: string | null
           created_at?: string
           deleted_at?: string | null
           desired_categories?: string[]
           desired_roles?: string[]
-          display_name: string
+          display_name?: string | null
           housing_preference?: string | null
           id?: string
           match_confidence_score?: number
@@ -1280,20 +1284,21 @@ export type Database = {
           short_bio?: string | null
           travel_readiness?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           visibility_status?: string
         }
         Update: {
           availability_end?: string | null
           availability_start?: string | null
           availability_status?: string | null
+          clerk_user_id?: string | null
           completion_score?: number
           cover_photo_asset_id?: string | null
           created_at?: string
           deleted_at?: string | null
           desired_categories?: string[]
           desired_roles?: string[]
-          display_name?: string
+          display_name?: string | null
           housing_preference?: string | null
           id?: string
           match_confidence_score?: number
@@ -1308,7 +1313,7 @@ export type Database = {
           short_bio?: string | null
           travel_readiness?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           visibility_status?: string
         }
         Relationships: []
@@ -1472,6 +1477,7 @@ export type Database = {
       users_profile_shadow: {
         Row: {
           active_scope: string
+          clerk_user_id: string | null
           created_at: string
           deleted_at: string | null
           display_name: string | null
@@ -1485,11 +1491,12 @@ export type Database = {
         }
         Insert: {
           active_scope?: string
+          clerk_user_id?: string | null
           created_at?: string
           deleted_at?: string | null
           display_name?: string | null
           email?: string | null
-          id: string
+          id?: string
           last_active_at?: string | null
           phone?: string | null
           primary_role?: string
@@ -1498,6 +1505,7 @@ export type Database = {
         }
         Update: {
           active_scope?: string
+          clerk_user_id?: string | null
           created_at?: string
           deleted_at?: string | null
           display_name?: string | null
@@ -1650,7 +1658,3 @@ export const Constants = {
   },
 } as const
 
-// Back-compat alias: prior code imported `GeneratedDatabase` from this module
-// (the old placeholder type). Keep it pointing at the generated `Database` so
-// existing imports keep working.
-export type GeneratedDatabase = Database
