@@ -29,7 +29,7 @@ export default async function HostProfileEditPage() {
 
   const [hostProfile, listingRows] = await Promise.all([
     getHostProfile(token, userId),
-    getHostListings(token).catch(() => []),
+    getHostListings(token, userId).catch(() => []),
   ]);
 
   // Company name + verification come from the host_profiles embed on the host's
