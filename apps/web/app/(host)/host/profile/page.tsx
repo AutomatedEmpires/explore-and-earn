@@ -62,10 +62,10 @@ export default async function HostProfilePage() {
   // real source yet (messaging not built), so unreadMessages stays 0.
   const stats = deriveHostStats(listings, applicants, []);
 
-  // getHostProfile returns only { id }; the company name + verification come
-  // from the host_profiles embed on the host's own listings
-  // (rowToDiscoveryFields). Fields with no real source yet (contact name,
-  // tagline, location, bio) gracefully fall back to the fixture profile.
+  // company name + verification come from the host_profiles embed on the host's
+  // own listings (rowToDiscoveryFields); about + location come straight from the
+  // host_profiles row. Contact name + tagline have no backing column yet, so
+  // they gracefully fall back to the fixture profile.
   const realHost = listings
     .map((item) => item.listing.host)
     .find((host) => host.name && host.name !== "Unknown Host");
@@ -76,7 +76,9 @@ export default async function HostProfilePage() {
   const profile: HostProfileSummary = hostProfile
     ? {
         ...HOST_PROFILE,
-        orgName: realHost?.name ?? HOST_PROFILE.orgName,
+        orgName: realHost?.name ?? hostProfile.companyName ?? HOST_PROFILE.orgName,
+        location: hostProfile.primaryLocationName ?? HOST_PROFILE.location,
+        bio: hostProfile.about ?? HOST_PROFILE.bio,
         verified: realHost?.verified ?? HOST_PROFILE.verified,
       }
     : HOST_PROFILE;
