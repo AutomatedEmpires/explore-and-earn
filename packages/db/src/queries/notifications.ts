@@ -26,10 +26,15 @@ import { authedClient } from "../client";
  * application code by the resolved `recipient_user_id`. Keep these manual
  * filters even once RLS lands; they are defense in depth.
  *
- * TYPES: `packages/db/src/types.gen.ts` is still a placeholder
- * (`GeneratedDatabase = Record<string, never>`), so we cast to an untyped
- * `SupabaseClient` handle for `.from(...)` calls and narrow rows locally,
- * mirroring the other query modules. Drop the cast once generated types exist.
+ * TYPES: `notifications` is now present in the generated
+ * `packages/db/src/types.gen.ts`, but `resolveRecipientUserId` resolves the
+ * recipient via `seeker_profiles.clerk_user_id`, and that column is NOT in the
+ * generated types (the Clerk-sync columns from migration 009 are not reflected
+ * on the live database). A typed client would reject the
+ * `.select("user_id, clerk_user_id")` / `.eq("clerk_user_id", ...)` lookup, so
+ * we keep an untyped `SupabaseClient` handle for `.from(...)` calls and narrow
+ * rows locally, mirroring the other query modules.
+ * // types not yet generated: seeker_profiles.clerk_user_id
  */
 
 export type NotificationCategory =

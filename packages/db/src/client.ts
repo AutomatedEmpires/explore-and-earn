@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import type { GeneratedDatabase } from "./types.gen";
+import type { Database } from "./types.gen";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -19,10 +19,10 @@ function supabaseConfig() {
   };
 }
 
-export function anonClient(): SupabaseClient<GeneratedDatabase> {
+export function anonClient(): SupabaseClient<Database> {
   const { url, anonKey } = supabaseConfig();
 
-  return createClient<GeneratedDatabase>(url, anonKey, {
+  return createClient<Database>(url, anonKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -32,14 +32,14 @@ export function anonClient(): SupabaseClient<GeneratedDatabase> {
 
 export function authedClient(
   clerkToken: string,
-): SupabaseClient<GeneratedDatabase> {
+): SupabaseClient<Database> {
   if (!clerkToken) {
     throw new Error("A Clerk JWT is required to create an authenticated Supabase client.");
   }
 
   const { url, anonKey } = supabaseConfig();
 
-  return createClient<GeneratedDatabase>(url, anonKey, {
+  return createClient<Database>(url, anonKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
