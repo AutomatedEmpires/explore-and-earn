@@ -17,7 +17,7 @@ export async function saveListingAction(
 	if (!userId) {
 		return { ok: false };
 	}
-	const token = await getToken();
+	const token = await getToken({ template: "supabase" });
 	if (!token) {
 		return { ok: false };
 	}
@@ -35,7 +35,7 @@ export async function unsaveListingAction(
 	if (!userId) {
 		return { ok: false };
 	}
-	const token = await getToken();
+	const token = await getToken({ template: "supabase" });
 	if (!token) {
 		return { ok: false };
 	}
