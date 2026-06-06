@@ -27,7 +27,7 @@ Never reduce this triad to a generic "Perks" label.
 - **Figma** = *optional* visual reference — **not** a required gate.
 - **Streamline Freehand** = the icon language.
 
-Mantra: **Notion decides. GitHub builds. Figma shows. Everything else runs.**
+Mantra: **Notion decides and builds. GitHub reviews and ships. Figma shows. Everything else runs.**
 
 ## 3. Build order (do not skip ahead)
 
