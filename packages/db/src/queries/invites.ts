@@ -242,7 +242,7 @@ export async function getSeekerInvites(
   }
 
   return (data ?? []).map((raw) => {
-    const r = raw as Record<string, unknown>;
+    const r = raw as unknown as Record<string, unknown>;
     return {
       invite: {
         id: String(r.id),

@@ -48,6 +48,6 @@ export async function respondToInviteAction(
 	}
 
 	const result = await respondToInvite(token, userId, inviteId, response)
-	revalidatePath("/invites")
+	if (result.ok) revalidatePath("/invites")
 	return result
 }

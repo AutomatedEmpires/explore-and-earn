@@ -47,12 +47,12 @@ export default async function InvitesPage() {
       : [],
   );
 
-  const heading = invites.length > 0 ? `Invites (${invites.length})` : "Invites";
+  const heading = items.length > 0 ? `Invites (${items.length})` : "Invites";
 
   return (
     <BucketPage title={heading} description="Hosts who invited you to apply.">
       <LifecycleList
-        surface="applied"
+        surface="invites"
         items={items}
         emptyTitle="No invites yet"
         emptyMessage="When a host invites you to apply, it'll show up here."
