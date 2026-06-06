@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
-import { updateApplicationStatus } from "@explore-and-earn/db";
+import { updateApplicationStatus, type HostSettableStatus } from "@explore-and-earn/db";
 
 export interface StatusActionResult {
   readonly ok: boolean;
@@ -18,7 +18,7 @@ export interface StatusActionResult {
  */
 export async function updateApplicationStatusAction(
   applicationId: string,
-  newStatus: string,
+  newStatus: HostSettableStatus,
 ): Promise<StatusActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) {
@@ -40,6 +40,7 @@ export async function updateApplicationStatusAction(
   if (result.ok) {
     revalidatePath("/host/applicants");
     revalidatePath(`/host/applicants/${applicationId}`);
+    revalidatePath("/applied");
   }
 
   return result;

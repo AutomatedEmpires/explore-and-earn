@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@explore-and-earn/ui";
+import type { HostSettableStatus } from "@explore-and-earn/db";
 
 import { updateApplicationStatusAction } from "../../../../actions/applicationStatus";
 import styles from "./StatusActions.module.css";
 
 interface StatusButton {
   readonly label: string;
-  readonly status: string;
+  readonly status: HostSettableStatus;
   readonly variant: "primary" | "secondary" | "ghost";
 }
 
@@ -25,13 +26,13 @@ interface StatusActionsProps {
 
 export function StatusActions({ applicationId }: StatusActionsProps) {
   const [isPending, startTransition] = useTransition();
-  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<HostSettableStatus | null>(null);
   const [message, setMessage] = useState<{
     readonly ok: boolean;
     readonly text: string;
   } | null>(null);
 
-  function handleClick(status: string) {
+  function handleClick(status: HostSettableStatus) {
     setMessage(null);
     setPendingStatus(status);
     startTransition(async () => {
