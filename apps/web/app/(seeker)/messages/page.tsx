@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import {
 	getConversations,
 	getMessages,
-	getPublicListingById,
+	getPublicListingsByIds,
 	rowToDiscoveryFields,
 } from "@explore-and-earn/db";
 
@@ -68,17 +68,21 @@ export default async function MessagesPage() {
 
 	const conversations = await getConversations(token, userId, "seeker");
 
-	// TODO(perf): N+1 — each conversation fetches its listing + messages
-	// individually. Replace with a batched conversation-summary query (listing
-	// title/host + last-message preview) in @explore-and-earn/db once it exists.
+	// Batch-fetch every conversation's listing in a single query (replaces the
+	// previous per-conversation getPublicListingById N+1), then join by id.
+	// Messages are still loaded per conversation (ownership-scoped reads).
+	const listingIds = conversations
+		.map((conversation) => conversation.listingId)
+		.filter((id): id is string => id !== null);
+	const listingRows = await getPublicListingsByIds(listingIds);
+	const listingById = new Map(listingRows.map((row) => [row.id, row] as const));
+
 	const threads: MessageThread[] = await Promise.all(
 		conversations.map(async (conversation): Promise<MessageThread> => {
-			const [listingRow, messages] = await Promise.all([
-				conversation.listingId
-					? getPublicListingById(conversation.listingId)
-					: Promise.resolve(null),
-				getMessages(token, userId, conversation.id),
-			]);
+			const listingRow = conversation.listingId
+				? listingById.get(conversation.listingId) ?? null
+				: null;
+			const messages = await getMessages(token, userId, conversation.id);
 			const listing = listingRow ? rowToDiscoveryFields(listingRow) : null;
 			const lastMessage = messages[messages.length - 1];
 			return {
