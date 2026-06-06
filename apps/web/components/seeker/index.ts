@@ -8,6 +8,8 @@ export { LifecycleList } from "./LifecycleList";
 export type { LifecycleListItem, LifecycleListProps } from "./LifecycleList";
 export { CardStatus } from "./CardStatus";
 export type { CardStatusProps } from "./CardStatus";
+export { InviteActions } from "./InviteActions";
+export type { InviteActionsProps } from "./InviteActions";
 export { SectionHeading } from "./SectionHeading";
 export type { SectionHeadingProps } from "./SectionHeading";
 export { BucketPage } from "./BucketPage";
