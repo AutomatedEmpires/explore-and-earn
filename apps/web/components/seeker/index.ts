@@ -42,6 +42,7 @@ export * from "./models";
 export * from "./fixtures";
 export * from "./data";
 export * from "./resume";
+export * from "./resumeAdapter";
 export * from "./account";
 export * from "./messaging";
 export * from "./schedule";
