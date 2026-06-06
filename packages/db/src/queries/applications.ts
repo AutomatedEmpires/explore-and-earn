@@ -1,4 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type {
+  BenefitProvision,
+  BenefitTriad,
+  ListingStatus,
+  OpportunityCategory,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 
@@ -441,4 +447,182 @@ export async function updateApplicationStatus(
   }
 
   return { ok: true };
+}
+
+/**
+ * Minimal listing view-model carried alongside a seeker application for the
+ * status-bucket surfaces. Structurally a subset of the Discovery lane's
+ * DiscoveryListing (composed here from the frozen @explore-and-earn/contracts
+ * registries) so values map cleanly into LifecycleList / DiscoveryCard WITHOUT
+ * importing the frontend DiscoveryListing type (that would create a
+ * packages/db -> apps/web import cycle). Only the fields the bucket cards read
+ * are produced; the optional DiscoveryListing fields (cover, conditional
+ * badges, match score, coordinates) are intentionally omitted.
+ */
+export interface ApplicationListing {
+  readonly id: string;
+  readonly title: string;
+  readonly category: OpportunityCategory;
+  readonly location: string;
+  readonly opportunityWindow: string;
+  readonly status: ListingStatus;
+  readonly host: { readonly name: string; readonly verified: boolean };
+  readonly benefits: BenefitTriad;
+}
+
+/**
+ * A seeker application joined to its listing view-model, for the status-bucket
+ * pages (/offered, /accepted, /not-selected). `listing` is null when the
+ * embedded listing could not be resolved (e.g. a deleted listing).
+ */
+export type ApplicationWithListing = SeekerApplication & {
+  readonly listing: ApplicationListing | null;
+};
+
+/**
+ * Build the bucket-card compensation display from the embedded listing fields.
+ * Mirrors buildCompensationSummary in queries/listings.ts but operates on the
+ * narrower embedded select (no currency column is selected, so USD is assumed).
+ */
+function embeddedCompensationSummary(row: Record<string, unknown>): string {
+  if (
+    typeof row.compensation_summary === "string" &&
+    row.compensation_summary.length > 0
+  ) {
+    return row.compensation_summary;
+  }
+  const minCents =
+    typeof row.compensation_min_cents === "number"
+      ? row.compensation_min_cents
+      : null;
+  if (minCents != null) {
+    const unit =
+      typeof row.compensation_unit === "string"
+        ? row.compensation_unit
+        : "other";
+    const fmt = (cents: number) =>
+      new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 0,
+      }).format(cents / 100);
+    const min = fmt(minCents);
+    const maxCents =
+      typeof row.compensation_max_cents === "number"
+        ? row.compensation_max_cents
+        : null;
+    const max = maxCents != null ? fmt(maxCents) : null;
+    const range = max && max !== min ? `${min}\u2013${max}` : min;
+    return unit === "other" || unit === "exchange" || unit === "stipend"
+      ? range
+      : `${range}/${unit}`;
+  }
+  return "Negotiable";
+}
+
+/**
+ * Map an embedded `listings` row (from the getSeekerApplicationsWithListings
+ * select) to the ApplicationListing view-model. Modeled on rowToDiscoveryFields
+ * in queries/listings.ts so the produced object is shape-compatible with the
+ * canonical DiscoveryCard. Returns null when the embed is absent.
+ *
+ * NOTE: the embedded select intentionally omits host_profiles and the listing
+ * status/currency columns, so host name/verification default to a neutral
+ * placeholder and status defaults to "live". See PR notes for the follow-up to
+ * surface the real host + listing status here.
+ */
+function rowToDiscoveryListing(value: unknown): ApplicationListing | null {
+  const row = firstOf(value);
+  if (!row) {
+    return null;
+  }
+
+  const housingProvision: BenefitProvision =
+    row.housing_included === true ? "provided" : "not_provided";
+  const mealsProvision: BenefitProvision =
+    row.meals_included === true ? "provided" : "not_provided";
+
+  const benefits: BenefitTriad = {
+    housing: { provision: housingProvision },
+    meals: { provision: mealsProvision },
+    pay: {
+      provision: "provided",
+      summary: embeddedCompensationSummary(row),
+    },
+  };
+
+  return {
+    id: String(row.id),
+    title: typeof row.title === "string" ? row.title : "",
+    category: (typeof row.category === "string"
+      ? row.category
+      : "mix") as OpportunityCategory,
+    location:
+      typeof row.location_display === "string" &&
+      row.location_display.length > 0
+        ? row.location_display
+        : "Location not specified",
+    opportunityWindow:
+      typeof row.timeline_summary === "string" &&
+      row.timeline_summary.length > 0
+        ? row.timeline_summary
+        : "Open",
+    status: (typeof row.status === "string"
+      ? row.status
+      : "live") as ListingStatus,
+    host: { name: "Unknown Host", verified: false },
+    benefits,
+  };
+}
+
+/**
+ * Applications for the authed seeker filtered to the given statuses, each joined
+ * to its listing view-model for the status-bucket surfaces (/offered,
+ * /accepted, /not-selected). Newest first.
+ *
+ * `clerkUserId` MUST come from auth().userId (already verified by Clerk) — never
+ * decoded from the token. Same UNTYPED-client bridge as getSeekerApplications
+ * (submitted_at / clerk_user_id predate the committed types.gen.ts).
+ *
+ * Returns an empty array when the seeker has no profile yet, no matching
+ * applications, or an empty `statuses` list.
+ */
+export async function getSeekerApplicationsWithListings(
+  clerkToken: string,
+  clerkUserId: string,
+  statuses: string[],
+): Promise<ApplicationWithListing[]> {
+  if (statuses.length === 0) {
+    return [];
+  }
+
+  const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
+  if (!seekerProfileId) {
+    return [];
+  }
+
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await untyped
+    .from("applications")
+    .select(
+      "id, listing_id, status, submitted_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)",
+    )
+    .eq("seeker_profile_id", seekerProfileId)
+    .in("status", statuses)
+    .order("submitted_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`getSeekerApplicationsWithListings: ${error.message}`);
+  }
+
+  return (data ?? []).map((raw) => {
+    const r = raw as Record<string, unknown>;
+    return {
+      id: String(r.id),
+      listingId: String(r.listing_id),
+      status: typeof r.status === "string" ? r.status : "applied",
+      submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+      listing: rowToDiscoveryListing(r.listings),
+    } satisfies ApplicationWithListing;
+  });
 }
