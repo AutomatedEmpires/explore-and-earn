@@ -1,13 +1,15 @@
 name: CI
 
-on:
+'on':
   pull_request:
-  merge_group:
   push:
-    branches:
-      - main
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  verify:
+  ci:
     uses: AutomatedEmpires/.github/.github/workflows/reusable-ci.yml@main
     secrets: inherit
