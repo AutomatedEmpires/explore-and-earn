@@ -10,6 +10,7 @@ export * from "./queries/seekerProfiles";
 export * from "./queries/notifications";
 export * from "./queries/messages";
 export * from "./queries/emailContext";
+export * from "./queries/notificationPrefs";
 export * from "./storage";
 export * from "./adminClient";
 export * from "./queries/admin";

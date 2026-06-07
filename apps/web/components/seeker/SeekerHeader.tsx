@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 
 import { SEEKER_STATUS } from "./fixtures";
+import { UnreadBadge } from "./UnreadBadge";
 import styles from "./SeekerHeader.module.css";
 
 export interface SeekerHeaderProps {
@@ -11,6 +12,11 @@ export interface SeekerHeaderProps {
    * Defaults to 0 (no badge) when omitted.
    */
   readonly unreadCount?: number;
+  /**
+   * Authed seeker's Clerk user id, passed to the live <UnreadBadge> so it can
+   * subscribe to realtime notification inserts. Omitted when signed out.
+   */
+  readonly clerkUserId?: string | null;
 }
 
 /**
@@ -23,11 +29,12 @@ export interface SeekerHeaderProps {
  * resume/profile only (the Messages stopgap was retired once Messages moved
  * into its own surface).
  *
- * This is a pure presentational component: the unread notification count is
- * resolved by the (seeker) layout (a Server Component) and passed in as a prop.
- * The badge caps the displayed value at 99+ to stay within the chip.
+ * The unread notification count is resolved by the (seeker) layout (a Server
+ * Component) and passed in as `initialCount`; the live <UnreadBadge> client
+ * child keeps it current via realtime. The badge caps the displayed value at
+ * 99+ to stay within the chip.
  */
-export function SeekerHeader({ unreadCount = 0 }: SeekerHeaderProps) {
+export function SeekerHeader({ unreadCount = 0, clerkUserId }: SeekerHeaderProps) {
   return (
     <header className={styles.header}>
       <Link className={styles.home} href="/home" aria-label="Seeker home">
@@ -45,11 +52,11 @@ export function SeekerHeader({ unreadCount = 0 }: SeekerHeaderProps) {
           }
         >
           <Icon name="system.info" size={20} aria-hidden />
-          {unreadCount > 0 ? (
-            <span className={styles.badge}>
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          ) : null}
+          <UnreadBadge
+            initialCount={unreadCount}
+            clerkUserId={clerkUserId}
+            className={styles.badge}
+          />
         </Link>
         <Link
           className={styles.iconLink}

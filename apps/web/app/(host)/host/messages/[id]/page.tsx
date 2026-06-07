@@ -9,7 +9,6 @@ import {
 import { EmptyState } from "../../../../../components/discovery";
 import { HostSectionHeading } from "../../../../../components/host";
 import { MessageTranscript } from "../../../../../components/messaging/MessageTranscript";
-import { ReplyForm } from "../../../../../components/messaging/ReplyForm";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Conversation" };
@@ -77,11 +76,12 @@ export default async function HostMessageThreadPage({
         actionHref="/host/messages"
       />
       <MessageTranscript
-        messages={messages}
+        initialMessages={messages}
+        conversationId={id}
         viewerType="host"
         counterpartName={seekerName}
+        replyPlaceholder="Message this applicant…"
       />
-      <ReplyForm conversationId={id} placeholder="Message this applicant…" />
     </section>
   );
 }

@@ -6,7 +6,6 @@ import { getMessages } from "@explore-and-earn/db";
 import { EmptyState } from "../../../../components/discovery";
 import { BucketPage } from "../../../../components/seeker";
 import { MessageTranscript } from "../../../../components/messaging/MessageTranscript";
-import { ReplyForm } from "../../../../components/messaging/ReplyForm";
 
 export const metadata: Metadata = {
 	title: "Conversation",
@@ -50,8 +49,12 @@ export default async function SeekerMessageThreadPage({
 
 	return (
 		<BucketPage title="Conversation" description={PAGE_DESCRIPTION}>
-			<MessageTranscript messages={messages} viewerType="seeker" />
-			<ReplyForm conversationId={id} placeholder="Write a message…" />
+			<MessageTranscript
+				initialMessages={messages}
+				conversationId={id}
+				viewerType="seeker"
+				replyPlaceholder="Write a message…"
+			/>
 		</BucketPage>
 	);
 }

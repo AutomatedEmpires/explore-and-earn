@@ -9,6 +9,15 @@ import styles from "./ReplyForm.module.css";
 export interface ReplyFormProps {
 	readonly conversationId: string;
 	readonly placeholder?: string;
+	/**
+	 * Optional send handler. When provided (e.g. by MessageTranscript for
+	 * optimistic + realtime updates), it OWNS sending: this form only collects
+	 * the input and delegates, and does NOT call the server action or refresh the
+	 * router itself (the parent surfaces send errors). When omitted, the form
+	 * falls back to calling sendMessageAction directly and refreshing — the
+	 * legacy standalone behavior.
+	 */
+	readonly onSend?: (body: string) => Promise<{ ok: boolean }>;
 }
 
 const MAX_BODY_LENGTH = 4000;
@@ -16,6 +25,7 @@ const MAX_BODY_LENGTH = 4000;
 export function ReplyForm({
 	conversationId,
 	placeholder = "Write a message…",
+	onSend,
 }: ReplyFormProps) {
 	const [body, setBody] = useState("");
 	const [error, setError] = useState<string | null>(null);
@@ -31,6 +41,12 @@ export function ReplyForm({
 		if (disabled) return;
 		setError(null);
 		startTransition(async () => {
+			if (onSend) {
+				// Parent owns optimistic state + error display; just clear on success.
+				const result = await onSend(trimmed);
+				if (result.ok) setBody("");
+				return;
+			}
 			const result = await sendMessageAction(conversationId, trimmed);
 			if (result.ok) {
 				setBody("");
