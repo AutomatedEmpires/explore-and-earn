@@ -4,6 +4,20 @@ import { auth } from "@clerk/nextjs/server"
 import { createHostProfile, updateHostProfileDetails } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
 
+function isAllowedStorageUrl(url: string | undefined | null): boolean {
+	if (!url) return true;
+	try {
+		const { protocol, hostname, pathname } = new URL(url);
+		return (
+			protocol === "https:" &&
+			hostname.endsWith(".supabase.co") &&
+			pathname.startsWith("/storage/v1/object/")
+		);
+	} catch {
+		return false;
+	}
+}
+
 /**
  * Server action: create a host profile for the authenticated user.
  *
@@ -44,14 +58,15 @@ export interface UpdateHostProfileInput {
 	about?: string | null
 	primaryLocationName?: string | null
 	websiteUrl?: string | null
+	photoUrl?: string | null
 }
 
 /**
  * Server action: update the authenticated host's profile details.
  *
- * Writes company_name, about, primary_location_name, and website_url to the
- * caller's own `host_profiles` row (scoped by the verified `auth().userId` in
- * the db layer). Follows the same auth pattern as the other server actions:
+ * Writes company_name, about, primary_location_name, website_url, and photo_url
+ * to the caller's own `host_profiles` row (scoped by the verified `auth().userId`
+ * in the db layer). Follows the same auth pattern as the other server actions:
  * `auth()` -> `getToken({ template: "supabase" })` -> db call -> revalidate.
  */
 export async function updateHostProfileAction(
@@ -65,6 +80,10 @@ export async function updateHostProfileAction(
 	const token = await getToken({ template: "supabase" })
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
+	}
+
+	if (!isAllowedStorageUrl(fields.photoUrl)) {
+		return { ok: false, error: "invalid_photo_url" }
 	}
 
 	const result = await updateHostProfileDetails(token, userId, fields)

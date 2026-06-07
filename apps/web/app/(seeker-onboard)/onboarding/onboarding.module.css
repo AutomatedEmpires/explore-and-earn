@@ -1,0 +1,204 @@
+.shell {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	min-height: 100dvh;
+	padding: var(--space-gutter);
+	background: var(--color-paper);
+}
+
+.progress {
+	display: flex;
+	gap: var(--space-8);
+}
+
+.progressDot,
+.progressDotActive {
+	height: 6px;
+	flex: 1 1 0;
+	border-radius: var(--radius-cell);
+	background: var(--color-surface-raised);
+}
+
+.progressDotActive {
+	background: var(--text-primary);
+}
+
+.header {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.heading {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
+	color: var(--text-primary);
+}
+
+.sub {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	flex: 1 1 auto;
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	border: none;
+	padding: 0;
+	margin: 0;
+}
+
+.label {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.input,
+.textarea {
+	width: 100%;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+	background: var(--color-surface-raised);
+	border: none;
+	border-radius: var(--radius-cell);
+	padding: var(--space-12);
+}
+
+.textarea {
+	resize: vertical;
+	min-height: var(--space-section);
+}
+
+.options {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.option,
+.optionSelected {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	text-align: left;
+	width: 100%;
+	padding: var(--space-12);
+	border: none;
+	border-radius: var(--radius-card);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	cursor: pointer;
+}
+
+.optionSelected {
+	outline: 2px solid var(--text-primary);
+}
+
+.optionLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	color: var(--text-primary);
+}
+
+.optionDetail {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	color: var(--text-secondary);
+}
+
+.tagGrid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+.tag,
+.tagSelected {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-8) var(--space-12);
+	border: none;
+	border-radius: var(--radius-cell);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	cursor: pointer;
+}
+
+.tagSelected {
+	outline: 2px solid var(--text-primary);
+}
+
+.tagRow {
+	display: flex;
+	gap: var(--space-8);
+}
+
+.footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-8);
+	padding-top: var(--space-12);
+}
+
+.primaryButton {
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	color: var(--color-paper);
+	background: var(--text-primary);
+	border: none;
+	border-radius: var(--radius-cell);
+	padding: var(--space-12) var(--space-section);
+	cursor: pointer;
+}
+
+.primaryButton:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.linkButton {
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	color: var(--text-secondary);
+	background: transparent;
+	border: none;
+	cursor: pointer;
+}
+
+.doneCard {
+	margin: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-12);
+	text-align: center;
+}
+
+.doneIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-primary);
+}

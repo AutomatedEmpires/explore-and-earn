@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { notFound, redirect } from "next/navigation";
-import { getHostListings } from "@explore-and-earn/db";
+import { getHostListings, getHostProfile } from "@explore-and-earn/db";
 import type { CompensationUnit } from "@explore-and-earn/contracts";
 
 import {
@@ -35,7 +35,10 @@ export default async function HostListingEditPage({
     redirect("/sign-in");
   }
 
-  const listings = await getHostListings(token, userId);
+  const [listings, hostProfile] = await Promise.all([
+    getHostListings(token, userId),
+    getHostProfile(token, userId).catch(() => null),
+  ]);
   const listing = listings.find((row) => row.id === id);
   if (!listing) {
     notFound();
@@ -52,6 +55,7 @@ export default async function HostListingEditPage({
       ? (listing.compensation_unit as CompensationUnit)
       : undefined,
     startDate: listing.begins_at ? listing.begins_at.slice(0, 10) : undefined,
+    coverPhotoUrl: listing.cover_photo_url ?? undefined,
   };
 
   return (
@@ -62,7 +66,12 @@ export default async function HostListingEditPage({
         actionLabel="Back to listing"
         actionHref={`/host/listings/${id}`}
       />
-      <ListingForm mode="edit" listingId={id} initial={initial} />
+      <ListingForm
+        mode="edit"
+        listingId={id}
+        initial={initial}
+        hostProfileId={hostProfile?.id}
+      />
     </section>
   );
 }

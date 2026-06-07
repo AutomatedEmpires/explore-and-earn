@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { VerifiedHostBadge } from "@explore-and-earn/ui"
 import type { ListingHostSummary } from "./fixtures"
@@ -68,7 +69,7 @@ export function HostSummaryBlock({ host }: { readonly host: ListingHostSummary }
 		<section aria-label="About the host" style={sectionStyle}>
 			<div style={headerStyle}>
 				{host.avatar ? (
-					<img
+					<Image
 						src={host.avatar.masterPath}
 						alt={host.avatar.alt}
 						width={host.avatar.width}

@@ -14,6 +14,10 @@ const isPublicRoute = createRouteMatcher([
 	"/about",
 	"/sitemap.xml",
 	"/robots.txt",
+	// Seeker onboarding is auth-required, but excluded from the post-auth gate so
+	// the (seeker) layout's onboarding redirect never loops back on itself.
+	"/onboarding",
+	"/onboarding/(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {

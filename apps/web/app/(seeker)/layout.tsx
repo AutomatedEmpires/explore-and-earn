@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { auth } from "@clerk/nextjs/server";
-import { getUnreadNotificationCount } from "@explore-and-earn/db";
+import { redirect } from "next/navigation";
+import {
+  getSeekerProfile,
+  getUnreadNotificationCount,
+} from "@explore-and-earn/db";
 
 import { SeekerBottomNav, SeekerHeader } from "../../components/seeker";
 import styles from "./layout.module.css";
@@ -18,42 +22,56 @@ import styles from "./layout.module.css";
  *
  * This layout also acts as the Server Component wrapper that resolves the
  * authed seeker's unread notification count and Clerk user id, and passes them
- * to <SeekerHeader> for the live unread badge.
+ * to <SeekerHeader> for the live unread badge. It also gates the onboarding
+ * redirect: if a seeker_profiles row exists with onboarding_complete false/null,
+ * the seeker is redirected to /onboarding before any child page renders.
  */
 export const metadata: Metadata = {
   title: {
     default: "Explore & Earn",
     template: "%s · Explore & Earn",
   },
-  description:
-    "Find work-travel opportunities — housing, meals, and pay from hosts worldwide.",
 };
 
-interface SeekerHeaderContext {
+interface SeekerShellState {
   readonly unreadCount: number;
   readonly clerkUserId: string | null;
+  readonly needsOnboarding: boolean;
 }
 
 /**
- * Resolve the authed seeker's unread notification count + Clerk id for the
- * header badge. Resilient: any failure (signed out, unresolved profile,
- * transient error) yields a zero count so the seeker shell always renders. The
- * Clerk id is still returned when available so the live badge can subscribe.
+ * Resolve unread count, Clerk user id, and onboarding gate in a single
+ * auth()/getToken() pass.
+ *
+ * Resilient: any failure (signed out, missing columns before migration 018 is
+ * applied, transient error) yields safe defaults so the shell always renders
+ * and never traps the user in a redirect loop.
+ *
+ * Onboarding gate: redirect ONLY when a seeker_profiles row exists and
+ * onboarding_complete is null/false. Seekers with no profile row yet are
+ * intentionally NOT redirected here.
  */
-async function resolveSeekerHeaderContext(): Promise<SeekerHeaderContext> {
+async function resolveSeekerShellState(): Promise<SeekerShellState> {
   try {
     const { userId, getToken } = await auth();
     if (!userId) {
-      return { unreadCount: 0, clerkUserId: null };
+      return { unreadCount: 0, clerkUserId: null, needsOnboarding: false };
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-      return { unreadCount: 0, clerkUserId: userId };
+      return { unreadCount: 0, clerkUserId: userId, needsOnboarding: false };
     }
-    const unreadCount = await getUnreadNotificationCount(token, userId);
-    return { unreadCount, clerkUserId: userId };
+    const [unreadCount, profile] = await Promise.all([
+      getUnreadNotificationCount(token, userId),
+      getSeekerProfile(token, userId),
+    ]);
+    return {
+      unreadCount,
+      clerkUserId: userId,
+      needsOnboarding: profile !== null && !profile.onboardingComplete,
+    };
   } catch {
-    return { unreadCount: 0, clerkUserId: null };
+    return { unreadCount: 0, clerkUserId: null, needsOnboarding: false };
   }
 }
 
@@ -62,7 +80,14 @@ export default async function SeekerLayout({
 }: {
   children: ReactNode;
 }) {
-  const { unreadCount, clerkUserId } = await resolveSeekerHeaderContext();
+  const { unreadCount, clerkUserId, needsOnboarding } =
+    await resolveSeekerShellState();
+
+  // redirect() throws to interrupt rendering, so it must run OUTSIDE the
+  // try/catch above.
+  if (needsOnboarding) {
+    redirect("/onboarding");
+  }
 
   return (
     <div className={styles.shell}>

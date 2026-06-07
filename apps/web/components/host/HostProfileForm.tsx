@@ -2,14 +2,21 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
+import { useAuth } from "@clerk/nextjs";
 import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
+import { uploadProfilePhoto } from "@explore-and-earn/db";
 
+import { ImageUpload } from "../ImageUpload";
 import { updateHostProfileAction } from "../../app/actions/hostProfile";
 import type { HostProfileSummary } from "./models";
 import styles from "./HostProfileForm.module.css";
 
 export interface HostProfileFormProps {
   readonly profile: HostProfileSummary;
+  /** Owning host profile id \u2014 required to enable the profile photo upload. */
+  readonly hostProfileId?: string;
+  /** Current stored profile photo URL, if any. */
+  readonly photoUrl?: string;
 }
 
 /**
@@ -24,18 +31,35 @@ const ERROR_TEXT: Record<string, string> = {
 
 /**
  * Host profile edit form. Submits the fields backed by real `host_profiles`
- * columns (`company_name`, `primary_location_name`, `about`) via
+ * columns (`company_name`, `primary_location_name`, `about`, `photo_url`) via
  * `updateHostProfileAction`. Host name and tagline have no backing column yet,
  * so they are shown read-only and are not submitted. Verified status is shown
- * read-only — host verification is a trust signal owned by the (founder-gated)
+ * read-only \u2014 host verification is a trust signal owned by the (founder-gated)
  * verification flow, not a self-served toggle.
  */
-export function HostProfileForm({ profile }: HostProfileFormProps) {
+export function HostProfileForm({
+  profile,
+  hostProfileId,
+  photoUrl: initialPhotoUrl,
+}: HostProfileFormProps) {
+  const { getToken } = useAuth();
   const [isPending, startTransition] = useTransition();
+  const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl ?? "");
   const [message, setMessage] = useState<{
     readonly ok: boolean;
     readonly text: string;
   } | null>(null);
+
+  async function uploadPhoto(file: File): Promise<string> {
+    if (!hostProfileId) {
+      throw new Error("Missing host profile \u2014 reload the page and try again.");
+    }
+    const token = await getToken({ template: "supabase" });
+    if (!token) {
+      throw new Error("Your session has expired \u2014 sign in again.");
+    }
+    return uploadProfilePhoto(token, hostProfileId, file, "host");
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,6 +68,7 @@ export function HostProfileForm({ profile }: HostProfileFormProps) {
       companyName: String(formData.get("orgName") ?? ""),
       primaryLocationName: String(formData.get("location") ?? ""),
       about: String(formData.get("bio") ?? ""),
+      photoUrl: photoUrl.length > 0 ? photoUrl : null,
     };
     setMessage(null);
     startTransition(async () => {
@@ -61,6 +86,19 @@ export function HostProfileForm({ profile }: HostProfileFormProps) {
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
+      {hostProfileId ? (
+        <div className={styles.field}>
+          <span className={styles.label}>Profile photo</span>
+          <ImageUpload
+            label="Add a profile photo"
+            currentUrl={photoUrl || undefined}
+            uploader={uploadPhoto}
+            onUpload={setPhotoUrl}
+            disabled={isPending}
+          />
+        </div>
+      ) : null}
+
       <div className={styles.field}>
         <label className={styles.label} htmlFor="profile-org">
           Organization name
