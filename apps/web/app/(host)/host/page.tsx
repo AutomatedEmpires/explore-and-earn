@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   HOST_APPLICANTS,
   HOST_LISTINGS,
@@ -11,6 +12,8 @@ import {
 } from "../../../components/host";
 import { EmptyState } from "../../../components/discovery";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 export default function HostDashboardPage() {
   const stats = deriveHostStats(HOST_LISTINGS, HOST_APPLICANTS, HOST_THREADS);

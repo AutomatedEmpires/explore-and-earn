@@ -1,5 +1,5 @@
+import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
-
 import {
   getHostApplications,
   getHostListings,
@@ -10,6 +10,8 @@ import { HostPipelineBoard, HostSectionHeading } from "../../../../components/ho
 import { EmptyState, type DiscoveryListing } from "../../../../components/discovery";
 import { toApplicantItem } from "./applicants-data";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = { title: "Applicants" };
 
 // Applicants are per-host (app-level scoped) and must never be statically cached.
 export const dynamic = "force-dynamic";

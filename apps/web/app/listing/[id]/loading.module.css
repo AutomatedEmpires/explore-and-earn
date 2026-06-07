@@ -1,0 +1,97 @@
+/* Listing detail loading skeleton. Semantic tokens only. */
+
+.wrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-section);
+	padding-bottom: var(--space-section);
+	background: var(--color-paper);
+	min-height: 100vh;
+}
+
+.hero {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	max-height: 50vh;
+}
+
+.hero :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: 0 var(--space-gutter);
+}
+
+.titleLine {
+	width: min(28ch, 90%);
+}
+
+.titleLine :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: var(--type-page-lh);
+	border-radius: var(--radius-input);
+}
+
+.subtitleLine {
+	width: min(20ch, 70%);
+}
+
+.subtitleLine :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: var(--type-body-lh);
+	border-radius: var(--radius-input);
+}
+
+.triad {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: var(--space-8);
+	margin: var(--space-4) 0;
+}
+
+.triadCard {
+	aspect-ratio: 1 / 1;
+}
+
+.triadCard :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: var(--radius-card);
+}
+
+.bodyLine {
+	width: 100%;
+}
+
+.bodyLineShort {
+	width: 70%;
+}
+
+.bodyLine :global(.ui-skeleton),
+.bodyLineShort :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: var(--type-body-lh);
+	border-radius: var(--radius-input);
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import {
   getConversations,
@@ -14,6 +15,8 @@ import {
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Messages" };
 
 const PAGE_DESCRIPTION =
   "Conversations with applicants and confirmed crew, unread first.";

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
@@ -15,6 +16,8 @@ import {
   type HostListingItem,
 } from "../../../../../components/host";
 import styles from "./page.module.css";
+
+export const metadata: Metadata = { title: "Listing" };
 
 // Reads the authed host's RLS-scoped listings; never statically cached.
 export const dynamic = "force-dynamic";

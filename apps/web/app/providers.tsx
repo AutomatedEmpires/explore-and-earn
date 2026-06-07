@@ -10,7 +10,8 @@ const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST;
 if (typeof window !== "undefined" && posthogKey) {
 	posthog.init(posthogKey, {
 		api_host: posthogHost,
-		capture_pageview: "history_change"
+		capture_pageview: "history_change",
+		opt_out_capturing_by_default: true,
 	});
 }
 

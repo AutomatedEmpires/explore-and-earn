@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
@@ -19,6 +20,7 @@ import { StatusActions } from "./StatusActions";
 import styles from "../page.module.css";
 
 // Per-host, app-level scoped — never statically cached.
+export const metadata: Metadata = { title: "Applicant" };
 export const dynamic = "force-dynamic";
 
 export default async function HostApplicantDetailPage({
