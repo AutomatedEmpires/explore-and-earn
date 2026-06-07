@@ -60,6 +60,11 @@ export interface DiscoveryListing {
   readonly benefits: BenefitTriad;
   /** Resolved cover image. Absent -> category illustration fallback. */
   readonly cover?: ImageSelection;
+  /**
+   * Uploaded cover photo public URL (Supabase Storage). When present, the card
+   * renders this as the hero image; absent -> category illustration fallback.
+   */
+  readonly coverImageUrl?: string;
   /** Conditional badges shown in addition to the always-on category chip. */
   readonly conditionalBadges?: readonly DiscoveryCardConditionalBadge[];
   /**
@@ -139,6 +144,7 @@ export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardDat
     category: listing.category,
     location: listing.location,
     opportunityWindow: listing.opportunityWindow,
+    coverImageUrl: listing.coverImageUrl,
     triad: {
       housing: benefitDisplay(listing.benefits.housing),
       meals: benefitDisplay(listing.benefits.meals),
