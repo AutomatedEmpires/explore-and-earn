@@ -48,7 +48,7 @@ function toView(input: PrimaryActionInput): PrimaryActionView {
           action.role.travelPlanStatus === "shared"
             ? "View travel plan"
             : "Plan your arrival",
-        ctaHref: "/accepted",
+        ctaHref: "/journey",
       };
     case "resume_incomplete":
       return {
@@ -75,7 +75,7 @@ function toView(input: PrimaryActionInput): PrimaryActionView {
         title: "Find your next adventure",
         meta: "Browse housing, meals, and pay from hosts around the world.",
         ctaLabel: "Explore opportunities",
-        ctaHref: "/seek",
+        ctaHref: "/swipe",
       };
   }
 }
