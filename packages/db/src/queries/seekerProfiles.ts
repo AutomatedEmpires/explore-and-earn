@@ -174,3 +174,30 @@ export async function saveSeekerProfile(
     };
   }
 }
+
+/**
+ * Batch-resolve seeker display names by internal seeker_profiles.id.
+ * Missing rows and blank names fall back to "Seeker" at the caller boundary.
+ */
+export async function getSeekerDisplayNames(
+  clerkToken: string,
+  seekerProfileIds: string[],
+): Promise<Map<string, string>> {
+  if (seekerProfileIds.length === 0) return new Map();
+
+  const uniqueIds = [...new Set(seekerProfileIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return new Map();
+
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data } = await untyped
+    .from(SEEKER_PROFILES)
+    .select("id, display_name")
+    .in("id", uniqueIds);
+
+  const map = new Map<string, string>();
+  for (const row of (data ?? []) as Array<{ id: string; display_name: string | null }>) {
+    const displayName = row.display_name?.trim();
+    map.set(row.id, displayName && displayName.length > 0 ? displayName : "Seeker");
+  }
+  return map;
+}

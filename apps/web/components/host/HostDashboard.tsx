@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { Card, Icon, Meter } from "@explore-and-earn/ui";
 
-import type { HostDashboardStats, RecentActivity } from "@explore-and-earn/db";
+import type {
+  HostAnalytics,
+  HostDashboardStats,
+  RecentActivity,
+} from "@explore-and-earn/db";
 import styles from "./HostDashboard.module.css";
 
 export interface HostDashboardProps {
@@ -9,6 +13,8 @@ export interface HostDashboardProps {
   readonly recentActivity: readonly RecentActivity[];
   /** Company name for the greeting. */
   readonly companyName: string | null;
+  /** Full host analytics for the performance cards. */
+  readonly analytics: HostAnalytics;
 }
 
 /** Map a DB listing status to a human-readable label. */
@@ -70,6 +76,7 @@ export function HostDashboard({
   stats,
   recentActivity,
   companyName,
+  analytics,
 }: HostDashboardProps) {
   const liveCount = stats.listingsByStatus["live"] ?? 0;
   const draftCount = stats.listingsByStatus["draft"] ?? 0;
@@ -89,6 +96,13 @@ export function HostDashboard({
   const reviewed = totalAppsMonth - newApps;
   const pipelineFill =
     totalAppsMonth > 0 ? Math.round((reviewed / totalAppsMonth) * 100) : 0;
+
+  // Analytics-derived figures for the performance cards.
+  const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
+  const totalApplicationsAllTime = Object.values(
+    analytics.totalApplicationsByStatus,
+  ).reduce((sum, n) => sum + n, 0);
+  const topListings = analytics.perListingStats.slice(0, 5);
 
   return (
     <div className={styles.dashboard}>
@@ -191,6 +205,50 @@ export function HostDashboard({
           )}
         </Card>
       </div>
+
+      {/* Analytics: invite performance */}
+      <Card title="Invite performance">
+        <dl className={styles.statList}>
+          <div className={styles.statRow}>
+            <dt>Active listings</dt>
+            <dd>{analytics.activeListingCount}</dd>
+          </div>
+          <div className={styles.statRow}>
+            <dt>Total applications</dt>
+            <dd>{totalApplicationsAllTime}</dd>
+          </div>
+          <div className={styles.statRow}>
+            <dt>Invite acceptance rate</dt>
+            <dd>{acceptancePct}%</dd>
+          </div>
+        </dl>
+      </Card>
+
+      {/* Analytics: per-listing performance */}
+      {topListings.length > 0 ? (
+        <Card title="Per-listing performance">
+          <ul className={styles.listingStatsList}>
+            {topListings.map((listing) => (
+              <li key={listing.listingId} className={styles.listingStatsItem}>
+                <div className={styles.listingStatsTitle}>
+                  {listing.listingTitle}
+                </div>
+                <div className={styles.listingStatsMeta}>
+                  <span className={styles.listingStatsMetric}>
+                    {listing.totalApplications} applications
+                  </span>
+                  <span className={styles.listingStatsMetric}>
+                    {listing.invitesSent} invites
+                  </span>
+                  <span className={styles.listingStatsMetric}>
+                    {listing.invitesAccepted} accepted
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       {/* Quick links */}
       <nav className={styles.quickLinks} aria-label="Quick links">

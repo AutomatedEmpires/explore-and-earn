@@ -6,8 +6,10 @@ import { auth } from "@clerk/nextjs/server";
 import {
   getHostListings,
   getHostApplications,
+  getSeekerDisplayNames,
   getPublicListingById,
   rowToDiscoveryFields,
+  type HostApplication,
   type ListingRow,
 } from "@explore-and-earn/db";
 
@@ -15,6 +17,8 @@ import {
   HostListingDetail,
   HostSectionHeading,
   dbStatusToHostState,
+  type ApplicantStage,
+  type HostApplicantItem,
   type HostListingItem,
 } from "../../../../../components/host";
 import styles from "./page.module.css";
@@ -24,14 +28,34 @@ export const metadata: Metadata = { title: "Listing" };
 // Reads the authed host's RLS-scoped listings; never statically cached.
 export const dynamic = "force-dynamic";
 
-function toItem(row: ListingRow): HostListingItem {
-  return {
-    listing: rowToDiscoveryFields(row),
-    state: dbStatusToHostState(row.status),
-    // TODO(host-applicants): real applicant counts land in the next backend PR.
-    applicantCount: 0,
-    newApplicantCount: 0,
-  };
+/** Map a persisted application status to the host UI applicant stage. */
+function applicationStageFromStatus(status: string): ApplicantStage {
+  switch (status) {
+    case "reviewing":
+      return "reviewing";
+    case "saved_by_host":
+      return "saved_by_host";
+    case "offered":
+    case "accepted":
+      return "offered";
+    case "not_selected":
+    case "withdrawn":
+      return "declined";
+    case "applied":
+    default:
+      return "new";
+  }
+}
+
+function formatAppliedOn(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? iso
+    : date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
 }
 
 export default async function HostListingDetailPage({
@@ -62,35 +86,47 @@ export default async function HostListingDetailPage({
     notFound();
   }
 
-  const item = toItem(row);
   const canEdit = Boolean(owned);
+  const listingFields = rowToDiscoveryFields(row);
 
-  // Top 5 most recent applicants for this listing (host-owned view only).
-  let recentApplicantItems: Array<{ id: string; name: string; appliedOn: string }> = [];
+  // Real applicant data — host-owned view only. The public read-only view does
+  // not expose applicant identities.
+  let listingApps: HostApplication[] = [];
+  let displayNames = new Map<string, string>();
   if (token && userId && owned) {
     try {
       const applications = await getHostApplications(token, userId);
-      const listingApps = applications
-        .filter((app) => app.listingId === id)
-        .slice(0, 5);
-      recentApplicantItems = listingApps.map((app) => {
-        const raw = app.seekerClerkUserId || app.seekerProfileId || "";
-        const short = raw.replace(/^user_/, "").slice(0, 8);
-        const name = short ? `Applicant ${short}` : "Applicant";
-        const date = new Date(app.submittedAt);
-        const appliedOn = Number.isNaN(date.getTime())
-          ? app.submittedAt
-          : date.toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            });
-        return { id: app.id, name, appliedOn };
-      });
+      listingApps = applications.filter((app) => app.listingId === id);
+      displayNames = await getSeekerDisplayNames(
+        token,
+        listingApps.map((app) => app.seekerProfileId),
+      );
     } catch {
-      recentApplicantItems = [];
+      listingApps = [];
     }
   }
+
+  const applicantItems: HostApplicantItem[] = listingApps.map((app) => ({
+    id: app.id,
+    applicantName: displayNames.get(app.seekerProfileId) ?? "Seeker",
+    listing: listingFields,
+    stage: applicationStageFromStatus(app.status),
+    appliedOn: formatAppliedOn(app.submittedAt),
+    note: app.coverMessage ?? undefined,
+  }));
+
+  const newApplicantCount = listingApps.filter(
+    (app) => app.status === "applied",
+  ).length;
+
+  const item: HostListingItem = {
+    listing: listingFields,
+    state: dbStatusToHostState(row.status),
+    applicantCount: listingApps.length,
+    newApplicantCount,
+  };
+
+  const recentApplicantItems = applicantItems.slice(0, 5);
 
   return (
     <section className={styles.block}>
@@ -100,7 +136,7 @@ export default async function HostListingDetailPage({
         actionLabel="All listings"
         actionHref="/host/listings"
       />
-      <HostListingDetail item={item} applicants={[]} canEdit={canEdit} />
+      <HostListingDetail item={item} applicants={applicantItems} canEdit={canEdit} />
 
       {recentApplicantItems.length > 0 ? (
         <div className={styles.recentApplicants}>
@@ -120,7 +156,7 @@ export default async function HostListingDetailPage({
                   className={styles.recentLink}
                   href={`/host/applicants/${applicant.id}`}
                 >
-                  {applicant.name}
+                  {applicant.applicantName}
                 </Link>
                 <span className={styles.recentDate}>{applicant.appliedOn}</span>
               </li>

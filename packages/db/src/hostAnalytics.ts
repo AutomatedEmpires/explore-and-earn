@@ -7,10 +7,6 @@ function untypedClient(clerkToken: string): SupabaseClient {
   return authedClient(clerkToken) as unknown as SupabaseClient;
 }
 
-/**
- * Resolve all host_profile ids for the authed Clerk user.
- * Most hosts have a single profile; the array guards the general case.
- */
 async function resolveHostProfileIds(
   db: SupabaseClient,
   clerkUserId: string,
@@ -25,40 +21,143 @@ async function resolveHostProfileIds(
   return (data as Record<string, unknown>[]).map((r) => String(r.id));
 }
 
-/**
- * Listing counts keyed by DB status (live, draft, paused, closed, archived,
- * under_review). Only statuses that appear in the host's listings are present.
- */
 export interface ListingStatusCounts {
   readonly [status: string]: number;
 }
 
-/**
- * Applications submitted this calendar month, keyed by status.
- * Empty when the host has no listings or no recent applications.
- */
 export interface ApplicationsByStage {
   readonly [status: string]: number;
 }
 
 export interface HostDashboardStats {
-  /** Total listing counts per DB status (live, draft, paused…). */
   readonly listingsByStatus: ListingStatusCounts;
-  /** Applications submitted in the current calendar month, grouped by status. */
   readonly applicationsThisMonth: ApplicationsByStage;
-  /**
-   * Count of items awaiting host action: applications in status `applied`
-   * (not yet reviewed) plus invites in status `delivered` or `viewed`.
-   */
   readonly pendingActions: number;
 }
 
+export interface HostPerListingStats {
+  readonly listingId: string;
+  readonly listingTitle: string;
+  readonly listingStatus: string;
+  readonly applicationsByStatus: ApplicationsByStage;
+  readonly totalApplications: number;
+  readonly invitesSent: number;
+  readonly invitesAccepted: number;
+}
+
+export interface HostAnalytics {
+  readonly totalApplicationsByStatus: ApplicationsByStage;
+  readonly activeListingCount: number;
+  /** Accepted invites divided by total sent, from 0 to 1. */
+  readonly inviteAcceptanceRate: number;
+  readonly perListingStats: HostPerListingStats[];
+}
+
 /**
- * Dashboard-level analytics for the authed host.
+ * Full host analytics for dashboard UI wiring.
  *
  * `clerkUserId` MUST come from auth().userId — never decoded from a token.
- * Returns zeroed stats when the host has no profile row yet.
+ * Returns zeroed analytics when the host has no profile row yet.
  */
+export async function getHostAnalytics(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<HostAnalytics> {
+  const db = untypedClient(clerkToken);
+  const hostProfileIds = await resolveHostProfileIds(db, clerkUserId);
+
+  if (hostProfileIds.length === 0) {
+    return {
+      totalApplicationsByStatus: {},
+      activeListingCount: 0,
+      inviteAcceptanceRate: 0,
+      perListingStats: [],
+    };
+  }
+
+  const { data: listingRows } = await db
+    .from("listings")
+    .select("id, title, status")
+    .in("host_profile_id", hostProfileIds);
+
+  const listings = ((listingRows ?? []) as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    title: typeof row.title === "string" ? row.title : "Listing",
+    status: typeof row.status === "string" ? row.status : "draft",
+  }));
+  const listingIds = listings.map((listing) => listing.id);
+
+  if (listingIds.length === 0) {
+    return {
+      totalApplicationsByStatus: {},
+      activeListingCount: 0,
+      inviteAcceptanceRate: 0,
+      perListingStats: [],
+    };
+  }
+
+  const [appResult, inviteResult] = await Promise.all([
+    db
+      .from("applications")
+      .select("id, listing_id, status")
+      .in("listing_id", listingIds),
+    db
+      .from("invites")
+      .select("id, listing_id, status")
+      .in("host_profile_id", hostProfileIds),
+  ]);
+
+  const totalApplicationsByStatus: Record<string, number> = {};
+  const applicationsByListing = new Map<string, Record<string, number>>();
+  for (const row of (appResult.data ?? []) as Record<string, unknown>[]) {
+    const listingId = String(row.listing_id);
+    const status = typeof row.status === "string" ? row.status : "applied";
+    totalApplicationsByStatus[status] = (totalApplicationsByStatus[status] ?? 0) + 1;
+    const perListing = applicationsByListing.get(listingId) ?? {};
+    perListing[status] = (perListing[status] ?? 0) + 1;
+    applicationsByListing.set(listingId, perListing);
+  }
+
+  const invitesByListing = new Map<string, { sent: number; accepted: number }>();
+  let totalInvites = 0;
+  let acceptedInvites = 0;
+  for (const row of (inviteResult.data ?? []) as Record<string, unknown>[]) {
+    const listingId = String(row.listing_id);
+    const status = typeof row.status === "string" ? row.status : "created";
+    const accepted = status === "applied" || status === "accepted";
+    totalInvites += 1;
+    if (accepted) acceptedInvites += 1;
+    const current = invitesByListing.get(listingId) ?? { sent: 0, accepted: 0 };
+    current.sent += 1;
+    if (accepted) current.accepted += 1;
+    invitesByListing.set(listingId, current);
+  }
+
+  const perListingStats = listings.map((listing) => {
+    const applicationsByStatus = applicationsByListing.get(listing.id) ?? {};
+    const inviteStats = invitesByListing.get(listing.id) ?? { sent: 0, accepted: 0 };
+    return {
+      listingId: listing.id,
+      listingTitle: listing.title,
+      listingStatus: listing.status,
+      applicationsByStatus,
+      totalApplications: Object.values(applicationsByStatus).reduce(
+        (sum, value) => sum + value,
+        0,
+      ),
+      invitesSent: inviteStats.sent,
+      invitesAccepted: inviteStats.accepted,
+    } satisfies HostPerListingStats;
+  });
+
+  return {
+    totalApplicationsByStatus,
+    activeListingCount: listings.filter((listing) => listing.status === "live").length,
+    inviteAcceptanceRate: totalInvites > 0 ? acceptedInvites / totalInvites : 0,
+    perListingStats,
+  };
+}
+
 export async function getHostDashboardStats(
   clerkToken: string,
   clerkUserId: string,
@@ -74,7 +173,6 @@ export async function getHostDashboardStats(
     };
   }
 
-  // Load listings, applications, and invites in parallel.
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -107,14 +205,12 @@ export async function getHostDashboardStats(
       .in("status", ["delivered", "viewed"]),
   ]);
 
-  // Listing counts by status.
   const listingsByStatus: Record<string, number> = {};
   for (const row of (listingResult.data ?? []) as Record<string, unknown>[]) {
     const s = typeof row.status === "string" ? row.status : "draft";
     listingsByStatus[s] = (listingsByStatus[s] ?? 0) + 1;
   }
 
-  // Applications this month by status.
   const applicationsThisMonth: Record<string, number> = {};
   for (const row of (appResult.data ?? []) as Record<string, unknown>[]) {
     const s = typeof row.status === "string" ? row.status : "applied";
@@ -123,7 +219,6 @@ export async function getHostDashboardStats(
 
   const pendingInvites = (inviteResult.data ?? []).length;
 
-  // Re-query applied applications globally for an accurate pending count.
   const listingIdsGlobal = (
     (listingResult.data ?? []) as Record<string, unknown>[]
   ).map((r) => String(r.id));
@@ -145,23 +240,13 @@ export async function getHostDashboardStats(
   };
 }
 
-/** A single entry in the recent activity feed. */
 export interface RecentActivity {
   readonly id: string;
-  /** Discriminant for the feed item icon / colour. */
   readonly type: "application" | "invite_sent" | "listing_published";
-  /** Short human-readable description of the activity. */
   readonly description: string;
-  /** ISO-8601 timestamp. */
   readonly timestamp: string;
 }
 
-/**
- * The last 10 notable activities for the authed host across applications and
- * invites, sorted newest-first.
- *
- * `clerkUserId` MUST come from auth().userId.
- */
 export async function getRecentActivityForHost(
   clerkToken: string,
   clerkUserId: string,
@@ -173,7 +258,6 @@ export async function getRecentActivityForHost(
     return [];
   }
 
-  // Gather listing ids once.
   const { data: listingRows } = await db
     .from("listings")
     .select("id, title, published_at, status")
@@ -205,7 +289,6 @@ export async function getRecentActivityForHost(
     }
   }
 
-  // Recent applications (last 20, we'll merge and slice to 10).
   const appActivities: RecentActivity[] = [];
   if (listingIds.length > 0) {
     const { data: appRows } = await db
@@ -228,7 +311,6 @@ export async function getRecentActivityForHost(
     }
   }
 
-  // Recent invites sent.
   const inviteActivities: RecentActivity[] = [];
   const { data: inviteRows } = await db
     .from("invites")
@@ -248,7 +330,6 @@ export async function getRecentActivityForHost(
     });
   }
 
-  // Merge, sort newest-first, take 10.
   const all = [...appActivities, ...inviteActivities, ...recentPublished]
     .filter((item) => item.timestamp.length > 0)
     .sort(
