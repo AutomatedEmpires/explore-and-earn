@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { PublicHostListing } from "@explore-and-earn/db";
 import { Icon } from "@explore-and-earn/ui";
+import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 import { CategoryBadge } from "../listing/CategoryBadge";
 
 interface Props {
@@ -22,7 +23,7 @@ export function PublicListingCard({ listing }: Props) {
   return (
     <Link
       href={`/listing/${listing.id}`}
-      style=
+      style={{
         display: "block",
         backgroundColor: "var(--color-surface-raised)",
         borderRadius: "var(--radius-card)",
@@ -30,43 +31,43 @@ export function PublicListingCard({ listing }: Props) {
         overflow: "hidden",
         textDecoration: "none",
         transition: "border-color var(--motion-fast) var(--ease-standard)",
-      
+      }}
     >
       {/* Cover */}
       {listing.coverPhotoUrl && (
         <div
-          style=
+          style={{
             position: "relative",
             width: "100%",
             aspectRatio: "4 / 3",
             backgroundColor: "var(--color-surface)",
-          
+          }}
         >
           <Image
             src={listing.coverPhotoUrl}
             alt={listing.title}
             fill
-            style= objectFit: "cover" 
+            style={{ objectFit: "cover" }}
           />
         </div>
       )}
 
-      <div style= padding: "var(--space-16)" >
+      <div style={{ padding: "var(--space-16)" }}>
         {/* Category badge */}
-        <div style= marginBottom: "var(--space-8)" >
-          <CategoryBadge category={listing.category as any} />
+        <div style={{ marginBottom: "var(--space-8)" }}>
+          <CategoryBadge category={listing.category as MarketplaceCategory} />
         </div>
 
         {/* Title */}
         <h3
-          style=
+          style={{
             fontFamily: "var(--font-display)",
             fontSize: "var(--type-card-size)",
             lineHeight: "var(--type-card-lh)",
             color: "var(--text-primary)",
             margin: 0,
             marginBottom: "var(--space-8)",
-          
+          }}
         >
           {listing.title}
         </h3>
@@ -74,14 +75,14 @@ export function PublicListingCard({ listing }: Props) {
         {/* Location */}
         {listing.locationDisplay && (
           <div
-            style=
+            style={{
               display: "flex",
               alignItems: "center",
               gap: "var(--space-4)",
               fontSize: "var(--type-meta-size)",
               color: "var(--text-secondary)",
               marginBottom: "var(--space-8)",
-            
+            }}
           >
             <Icon name="nav.map" size={16} aria-hidden />
             <span>{listing.locationDisplay}</span>
@@ -90,11 +91,11 @@ export function PublicListingCard({ listing }: Props) {
 
         {/* Pay */}
         <div
-          style=
+          style={{
             fontSize: "var(--type-meta-size)",
             fontWeight: "var(--font-weight-medium)",
             color: "var(--text-primary)",
-          
+          }}
         >
           {paySummary}
         </div>

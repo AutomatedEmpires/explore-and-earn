@@ -1,4 +1,4 @@
-import type { BenefitProvision, CompensationUnit, OpportunityCategory } from "@explore-and-earn/contracts";
+import type { BenefitProvision, CompensationUnit, ListingStatus, OpportunityCategory } from "@explore-and-earn/contracts";
 export interface ListingRow {
     id: string;
     title: string;
@@ -29,7 +29,7 @@ export interface ListingRow {
 export declare function rowToDiscoveryFields(row: ListingRow): {
     id: string;
     title: string;
-    category: "seasonal" | "farm" | "maritime" | "remote" | "mix";
+    category: "farm" | "maritime" | "remote" | "seasonal" | "mix";
     location: string;
     opportunityWindow: string;
     status: "live" | "draft" | "paused" | "closed" | "archived" | "under_review";
@@ -50,7 +50,13 @@ export declare function rowToDiscoveryFields(row: ListingRow): {
         };
     };
     coverImageUrl: string | undefined;
+    coordinates: {
+        lat: number;
+        lon: number;
+    } | undefined;
 };
+/** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
+export declare const SWIPE_BATCH_SIZE = 20;
 /** Public live listings \u2014 no auth required. */
 export declare function getPublicListings(): Promise<ListingRow[]>;
 /** Single live listing by id \u2014 no auth required. */
@@ -59,73 +65,53 @@ export declare function getPublicListingById(id: string): Promise<ListingRow | n
  * Batch variant of getPublicListingById: fetch many live listings in a single
  * query instead of one round-trip per id (eliminates the N+1 on the
  * saved/applied/messages surfaces). No auth required (public listings).
- *
- * - Returns [] for an empty id list \u2014 PostgREST `.in(...)` with an empty array
- *   is invalid, so the guard is required.
- * - Filters on status "live", matching getPublicListingById. (There is no
- *   "published" status in this schema; "live" is the published state \u2014 see
- *   contracts LISTING_STATUS / supabase/migrations/006_listings.sql.)
- * - Result order is NOT guaranteed; callers that need a specific order should
- *   join the rows back by id (e.g. via a Map).
  */
 export declare function getPublicListingsByIds(ids: string[]): Promise<ListingRow[]>;
+/**
+ * Swipe-deck batch for the authenticated seeker (/swipe surface).
+ *
+ * Returns up to SWIPE_BATCH_SIZE live listings, newest-first with a stable
+ * (published_at DESC, id DESC) order so cursor pagination below is
+ * deterministic. Excludes:
+ *   - every id in `excludeIds` (cards already seen this session + the seeker's
+ *     saved ids passed by the caller), and
+ *   - every listing the seeker has already applied to (resolved server-side via
+ *     getSeekerApplicationIds \u2014 never trust a client-supplied applied set).
+ *
+ * `clerkUserId` MUST come from auth().userId \u2014 never decoded from the token.
+ * `cursor` is the published_at of the last row from the previous page; when
+ * present we fetch strictly older rows via .lt("published_at", cursor).
+ *
+ * Best-effort on the applied filter: a seeker with no profile resolves to [] so
+ * nothing is excluded on that axis.
+ */
+export declare function getSwipeBatch(clerkToken: string, clerkUserId: string, excludeIds: string[], cursor?: string): Promise<ListingRow[]>;
+/**
+ * All live listings that carry geocoordinates, newest-first \u2014 backs the seeker
+ * /map surface. latitude/longitude are the real columns (the brief's lat/lng);
+ * rows missing either are filtered out so every result is mappable.
+ *
+ * Public data (same trust level as getPublicListings). Pass a Clerk token to go
+ * through the authed client, or omit it to use the anon client (the map is a
+ * public read).
+ */
+export declare function getLiveListingsWithCoords(clerkToken?: string): Promise<ListingRow[]>;
 /**
  * Filters accepted by {@link searchListings}. Every field is optional; an empty
  * filter object returns the newest live listings (the same set as
  * getPublicListings, capped by `limit`).
  */
 export interface SearchFilters {
-    /** Free text, matched case-insensitively against title, description, and location_display. */
     query?: string;
-    /** Subset of MARKETPLACE_CATEGORIES; values outside the registry are ignored. */
     categories?: string[];
-    /** When true, only listings that include housing (housing_included = true). */
     hasHousing?: boolean;
-    /** When true, only listings that include meals (meals_included = true). */
     hasMeals?: boolean;
-    /** Minimum pay floor in MAJOR currency units (e.g. dollars); compared to compensation_min_cents. */
     payMin?: number;
-    /** Partial, case-insensitive match against location_display. */
     location?: string;
-    /** Max rows to return (default 48). */
     limit?: number;
 }
-/**
- * Public, server-side search over live listings \u2014 no auth required (anon
- * client, same trust level as getPublicListings).
- *
- * SCHEMA NOTE: the 006_listings.sql `listings` table does NOT have the
- * `summary` / `primary_location_name` / `housing_description` /
- * `meals_description` / `pay_min` columns referenced in some early specs. This
- * implementation maps those intents onto the real columns:
- *   - free text  -> title / description / location_display
- *   - location   -> location_display
- *   - housing    -> housing_included (boolean flag; there is no free-text column)
- *   - meals      -> meals_included (boolean flag)
- *   - pay floor  -> compensation_min_cents (integer cents; payMin is given in
- *                   major units and converted via Math.round(payMin * 100))
- */
 export declare function searchListings(filters: SearchFilters): Promise<ListingRow[]>;
-/**
- * Host's own listings \u2014 requires Clerk JWT + verified Clerk user id.
- *
- * Scoped to `host_profile_id` so a host can only read their own listings.
- * `clerkUserId` must come from `auth().userId`.
- */
 export declare function getHostListings(clerkToken: string, clerkUserId: string): Promise<ListingRow[]>;
-/**
- * Field shape accepted by createListing / updateListing.
- *
- * Money note: `payMin` / `payMax` are MAJOR currency units (e.g. dollars), not
- * cents. They are converted to the integer `compensation_*_cents` columns via
- * Math.round(amount * 100) to satisfy the 006_listings.sql CHECK (>= 0).
- *
- * Housing / Meals note: 006_listings.sql has no free-text housing/meals column \u2014
- * only the boolean `housing_included` / `meals_included` flags. A provided or
- * partial provision (or any non-empty description) flips the flag to true; the
- * free-text description itself is NOT persisted yet. Flagged for schema
- * follow-up.
- */
 export interface ListingWriteFields {
     title?: string;
     category?: OpportunityCategory;
@@ -143,27 +129,75 @@ export interface ListingWriteFields {
     endDate?: string | null;
     coverPhotoUrl?: string | null;
 }
-/**
- * Create a draft listing owned by the authenticated host.
- *
- * `clerkUserId` must come from `auth().userId` \u2014 never decoded from the token.
- * The listing is always inserted with status 'draft'.
- */
 export declare function createListing(clerkToken: string, clerkUserId: string, fields: ListingWriteFields): Promise<{
     ok: boolean;
     listingId?: string;
     error?: string;
 }>;
-/**
- * Update an existing listing the caller owns.
- *
- * Ownership is enforced directly in the query:
- * UPDATE ... WHERE id = listingId AND host_profile_id = <caller's profile>.
- * A row the host does not own simply matches nothing and returns an error.
- *
- * `clerkUserId` must come from `auth().userId`.
- */
 export declare function updateListing(clerkToken: string, clerkUserId: string, listingId: string, fields: ListingWriteFields): Promise<{
     ok: boolean;
     error?: string;
 }>;
+/**
+ * Joined host_profiles fields on a public listing detail. id is needed to
+ * link /host/{id} and generate hiringOrganization JSON-LD.
+ */
+export interface PublicListingDetailHost {
+    id: string;
+    companyName: string;
+    photoUrl: string | null;
+    about: string | null;
+    primaryLocationName: string | null;
+    attestationStatus: string;
+}
+/**
+ * A single listing for the public detail page, joined to its host_profiles row.
+ *
+ * Does NOT filter on status — the page layer decides visibility (non-live
+ * listings are only shown to the owning host). Uses the anon client.
+ */
+export interface PublicListingDetail {
+    id: string;
+    title: string;
+    category: OpportunityCategory;
+    description: string | null;
+    locationDisplay: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    status: ListingStatus;
+    housingIncluded: boolean;
+    mealsIncluded: boolean;
+    compensationSummary: string | null;
+    compensationMinCents: number | null;
+    compensationMaxCents: number | null;
+    compensationUnit: string | null;
+    compensationCurrency: string;
+    timelineSummary: string | null;
+    beginsAt: string | null;
+    endsAt: string | null;
+    publishedAt: string | null;
+    coverPhotoUrl: string | null;
+    hostProfileId: string | null;
+    host: PublicListingDetailHost | null;
+}
+/**
+ * Fetch a listing for the public detail page. No status filter — the page
+ * decides who may view non-live listings. Anon client (no auth required).
+ */
+export declare function getListingDetailPublic(listingId: string): Promise<PublicListingDetail | null>;
+/**
+ * Whether the authed seeker has an active (non-withdrawn) application to a
+ * listing. Returns false when the seeker has no profile yet.
+ * `clerkUserId` must come from auth().userId.
+ */
+export declare function hasApplied(clerkToken: string, clerkUserId: string, listingId: string): Promise<boolean>;
+/**
+ * Whether the authed seeker has actively saved a listing (status='saved').
+ * `clerkUserId` must come from auth().userId.
+ */
+export declare function hasSaved(clerkToken: string, clerkUserId: string, listingId: string): Promise<boolean>;
+/**
+ * Distinct host_profile_id values with at least one live listing.
+ * Used to populate host-profile entries in the sitemap. Anon client.
+ */
+export declare function getHostIdsWithLiveListings(): Promise<string[]>;

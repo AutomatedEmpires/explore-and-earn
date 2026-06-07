@@ -4,7 +4,7 @@
 export const dynamic = "force-static";
 
 const baseUrl =
-	process.env.NEXT_PUBLIC_APP_URL ?? "https://explore-and-earn.vercel.app";
+	process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com";
 
 export function GET(): Response {
 	const body = [

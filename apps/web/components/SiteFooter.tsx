@@ -9,7 +9,7 @@ import styles from "./SiteFooter.module.css";
 export function SiteFooter() {
 	return (
 		<footer className={styles.footer}>
-			<span>© 2025 Automated Empires</span>
+			<span>© 2026 Automated Empires</span>
 			<span className={styles.sep} aria-hidden="true">
 				·
 			</span>
@@ -21,6 +21,12 @@ export function SiteFooter() {
 			</span>
 			<Link className={styles.link} href="/privacy">
 				Privacy
+			</Link>
+			<span className={styles.sep} aria-hidden="true">
+				·
+			</span>
+			<Link className={styles.link} href="/cookies">
+				Cookies
 			</Link>
 			<span className={styles.sep} aria-hidden="true">
 				·

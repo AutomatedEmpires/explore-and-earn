@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
-import { Badge, Button, Icon, Skeleton, VerifiedHostBadge, type IconKey } from "@explore-and-earn/ui";
+import { Button, Icon, VerifiedHostBadge, type IconKey } from "@explore-and-earn/ui";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 import type { SavedListingDetail } from "@explore-and-earn/db";
 
@@ -92,4 +92,47 @@ export function SavedListingCard({ listing }: SavedListingCardProps) {
         </div>
 
         <div className={styles.infoRow}>
-          <Icon name={MAPPIN_ICON[listing.
+          <Icon name={MAPPIN_ICON[listing.category]} size={16} aria-hidden />
+          <span>{listing.location}</span>
+        </div>
+
+        <dl className={styles.triad}>
+          <div className={styles.triadItem}>
+            <Icon name="benefit.housing" size={16} aria-hidden />
+            <dt className={styles.triadLabel}>Housing</dt>
+            <dd className={styles.triadValue}>{benefitText(listing.benefits.housing)}</dd>
+          </div>
+          <div className={styles.triadItem}>
+            <Icon name="benefit.meals" size={16} aria-hidden />
+            <dt className={styles.triadLabel}>Meals</dt>
+            <dd className={styles.triadValue}>{benefitText(listing.benefits.meals)}</dd>
+          </div>
+          <div className={styles.triadItem}>
+            <Icon name="benefit.pay" size={16} aria-hidden />
+            <dt className={styles.triadLabel}>Pay</dt>
+            <dd className={styles.triadValue}>{benefitText(listing.benefits.pay)}</dd>
+          </div>
+        </dl>
+
+        {error && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className={styles.actions}>
+          {applied ? (
+            <span className={styles.appliedStatus}>Applied</span>
+          ) : (
+            <Button variant="primary" onClick={handleApply} disabled={isPending}>
+              Apply
+            </Button>
+          )}
+          <Button variant="ghost" onClick={handleRemove} disabled={isPending}>
+            Unsave
+          </Button>
+        </div>
+      </div>
+    </article>
+  );
+}

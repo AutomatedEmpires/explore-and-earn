@@ -67,7 +67,7 @@ export async function applyToListing(
     .eq("id", listingId)
     .maybeSingle();
 
-  const hostClerkId = (listingOwner as any)?.host_profiles?.clerk_user_id;
+  const hostClerkId = (listingOwner as unknown as { host_profiles?: { clerk_user_id?: string } } | null)?.host_profiles?.clerk_user_id;
   if (hostClerkId && hostClerkId === clerkUserId) {
     return { ok: false, error: "cannot_apply_to_own_listing" as const };
   }
@@ -629,7 +629,7 @@ export async function getApplicationsForSeekerWithListings(
   }
 
   return (data ?? []).map((raw) => {
-    const r = raw as Record<string, unknown>;
+    const r = raw as unknown as Record<string, unknown>;
     return {
       id: String(r.id),
       listingId: String(r.listing_id),
@@ -666,7 +666,7 @@ export async function getApplicationById(
   }
   if (!data) return null;
 
-  const r = data as Record<string, unknown>;
+  const r = data as unknown as Record<string, unknown>;
   return {
     id: String(r.id),
     listingId: String(r.listing_id),
@@ -728,34 +728,6 @@ export async function updateApplicationStatusBySeeker(
 
   if (updateError) return { ok: false, error: updateError.message };
   return { ok: true };
-}
-
-/**
- * Host contact info for a listing (used to send application-received email).
- */
-export interface ListingHostContact {
-  readonly hostClerkUserId: string;
-  readonly listingTitle: string;
-}
-
-export async function getListingHostContact(
-  clerkToken: string,
-  listingId: string,
-): Promise<ListingHostContact | null> {
-  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data, error } = await untyped
-    .from("listings")
-    .select("title, host_profiles!host_profile_id(clerk_user_id)")
-    .eq("id", listingId)
-    .maybeSingle();
-  if (error || !data) return null;
-  const row = data as Record<string, unknown>;
-  const host = firstOf(row.host_profiles);
-  if (!host || typeof host.clerk_user_id !== "string") return null;
-  return {
-    hostClerkUserId: host.clerk_user_id,
-    listingTitle: typeof row.title === "string" ? row.title : "",
-  };
 }
 
 /* -------------------------------------------------------------------------- */

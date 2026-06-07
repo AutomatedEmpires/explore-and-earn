@@ -26,11 +26,6 @@ import { getHostApplications } from "./applications";
 function untypedClient(clerkToken) {
     return authedClient(clerkToken);
 }
-/**
- * Load the experience + education rows for an already-resolved
- * `seeker_profile_id`. Shared by the seeker-owned and host-facing resume reads
- * so the row mapping and ordering live in exactly one place.
- */
 async function loadResumeRows(db, seekerProfileId) {
     const [experienceResult, educationResult] = await Promise.all([
         db
@@ -44,12 +39,10 @@ async function loadResumeRows(db, seekerProfileId) {
             .eq("seeker_profile_id", seekerProfileId)
             .order("sort_order", { ascending: true }),
     ]);
-    if (experienceResult.error) {
+    if (experienceResult.error)
         throw new Error(`loadResumeRows experiences: ${experienceResult.error.message}`);
-    }
-    if (educationResult.error) {
+    if (educationResult.error)
         throw new Error(`loadResumeRows educations: ${educationResult.error.message}`);
-    }
     const experienceRows = (experienceResult.data ?? []);
     const educationRows = (educationResult.data ?? []);
     const experiences = experienceRows.map((row) => ({
@@ -72,15 +65,6 @@ async function loadResumeRows(db, seekerProfileId) {
     }));
     return { experiences, educations };
 }
-/**
- * Load the seeker's resume: their `seeker_profiles` row (bio only — headline is
- * not yet a column) plus experience and education rows, scoped by the
- * `seeker_profile_id` resolved from `clerkUserId`. Returns an empty resume when
- * the seeker has no profile row yet.
- *
- * @param clerkToken - Verified Clerk JWT from `getToken({ template: "supabase" })`.
- * @param clerkUserId - Verified Clerk user ID from `auth().userId` (never decoded).
- */
 export async function getSeekerResume(clerkToken, clerkUserId) {
     const db = untypedClient(clerkToken);
     const { data: profileData, error: profileError } = await db
@@ -88,104 +72,52 @@ export async function getSeekerResume(clerkToken, clerkUserId) {
         .select("id, short_bio")
         .eq("clerk_user_id", clerkUserId)
         .maybeSingle();
-    if (profileError) {
+    if (profileError)
         throw new Error(`getSeekerResume profile: ${profileError.message}`);
-    }
-    if (!profileData) {
+    if (!profileData)
         return { profile: null, experiences: [], educations: [] };
-    }
     const profileRow = profileData;
     const { experiences, educations } = await loadResumeRows(db, profileRow.id);
     return {
-        profile: {
-            seekerProfileId: profileRow.id,
-            bio: profileRow.short_bio ?? null,
-            headline: null,
-        },
+        profile: { seekerProfileId: profileRow.id, bio: profileRow.short_bio ?? null, headline: null },
         experiences,
         educations,
     };
 }
 /**
- * Host-side ownership guard: returns true only when the seeker identified by
- * `seekerProfileId` has applied to at least one listing owned by the host
- * identified by `hostClerkUserId`. Reuses getHostApplications so the
- * embed/fallback ownership logic stays in exactly one place — a host can never
- * read the resume or name of a seeker who never applied to them.
- *
- * `hostClerkUserId` MUST come from `auth().userId` (already verified by Clerk),
- * never decoded from the token.
+ * Host-side ownership guard: true only when the seeker applied to at least one
+ * listing owned by this host. `hostClerkUserId` MUST come from auth().userId.
  */
 async function hostCanViewSeeker(clerkToken, hostClerkUserId, seekerProfileId) {
     const applications = await getHostApplications(clerkToken, hostClerkUserId);
-    return applications.some((application) => application.seekerProfileId === seekerProfileId);
+    return applications.some((a) => a.seekerProfileId === seekerProfileId);
 }
-/**
- * Host-accessible resume read by `seeker_profile_id`.
- *
- * Unlike getSeekerResume (which scopes to the caller's OWN profile), this lets a
- * host read an APPLICANT's resume — but only after the ownership guard confirms
- * the seeker applied to one of the host's listings. Returns null when the host
- * is not allowed to view this seeker or the seeker has no profile row.
- *
- * NOTE: the brief specified a single `seeker_resume` table and a
- * `SeekerResumeRow` type; neither exists in this schema. We return the existing
- * SeekerResume shape (bio via seeker_profiles.short_bio + experiences +
- * educations) so the host and seeker views stay consistent.
- *
- * @param clerkToken - Verified Clerk JWT from `getToken({ template: "supabase" })`.
- * @param hostClerkUserId - Verified host Clerk user ID from `auth().userId`.
- * @param seekerProfileId - The applicant's seeker_profiles.id.
- */
 export async function getSeekerResumeByProfileId(clerkToken, hostClerkUserId, seekerProfileId) {
     const allowed = await hostCanViewSeeker(clerkToken, hostClerkUserId, seekerProfileId);
-    if (!allowed) {
+    if (!allowed)
         return null;
-    }
     const db = untypedClient(clerkToken);
     const { data: profileData, error: profileError } = await db
         .from("seeker_profiles")
         .select("id, short_bio")
         .eq("id", seekerProfileId)
         .maybeSingle();
-    if (profileError) {
+    if (profileError)
         throw new Error(`getSeekerResumeByProfileId profile: ${profileError.message}`);
-    }
-    if (!profileData) {
+    if (!profileData)
         return null;
-    }
     const profileRow = profileData;
     const { experiences, educations } = await loadResumeRows(db, profileRow.id);
     return {
-        profile: {
-            seekerProfileId: profileRow.id,
-            bio: profileRow.short_bio ?? null,
-            headline: null,
-        },
+        profile: { seekerProfileId: profileRow.id, bio: profileRow.short_bio ?? null, headline: null },
         experiences,
         educations,
     };
 }
-/**
- * Host-accessible display name for an applicant, gated by the same ownership
- * guard as getSeekerResumeByProfileId.
- *
- * SCHEMA NOTE: `seeker_profiles` has NO `display_name` column yet. Following the
- * codebase's missing-column fallback convention, we attempt the read but treat
- * any PostgREST error (e.g. "column does not exist") as "no name available" and
- * return null rather than throwing. This is forward-compatible: once a
- * `display_name` column lands, real names flow through automatically with no
- * caller changes. Until then callers fall back to a pseudonymous handle.
- *
- * @param clerkToken - Verified Clerk JWT from `getToken({ template: "supabase" })`.
- * @param hostClerkUserId - Verified host Clerk user ID from `auth().userId`.
- * @param seekerProfileId - The applicant's seeker_profiles.id.
- */
 export async function getSeekerDisplayName(clerkToken, hostClerkUserId, seekerProfileId) {
     const allowed = await hostCanViewSeeker(clerkToken, hostClerkUserId, seekerProfileId);
-    if (!allowed) {
+    if (!allowed)
         return null;
-    }
     const db = untypedClient(clerkToken);
     try {
         const { data, error } = await db
@@ -193,11 +125,8 @@ export async function getSeekerDisplayName(clerkToken, hostClerkUserId, seekerPr
             .select("display_name")
             .eq("id", seekerProfileId)
             .maybeSingle();
-        // Missing-column fallback: a "column does not exist" error (or any read
-        // error) means there is no name to show yet, not a hard failure.
-        if (error || !data) {
+        if (error || !data)
             return null;
-        }
         const value = data.display_name;
         return typeof value === "string" && value.trim().length > 0 ? value : null;
     }
@@ -205,35 +134,74 @@ export async function getSeekerDisplayName(clerkToken, hostClerkUserId, seekerPr
         return null;
     }
 }
-/**
- * Persist the seeker's bio. `bio` is written to `seeker_profiles.short_bio`.
- * `headline` is accepted for forward-compatibility but intentionally NOT written
- * — there is no `headline` column yet (per the missing-column fallback).
- *
- * Scoped by the verified `clerkUserId`; returns `{ ok: false }` with an error
- * message when the profile row is missing or the write fails.
- */
 export async function updateSeekerProfileBio(clerkToken, clerkUserId, fields) {
     const db = untypedClient(clerkToken);
     const updates = {};
-    if (fields.bio !== undefined) {
+    if (fields.bio !== undefined)
         updates.short_bio = fields.bio;
-    }
-    // NOTE: `headline` has no column yet, so it is deliberately dropped here
-    // rather than written. Re-enable once a column lands.
-    if (Object.keys(updates).length === 0) {
+    if (Object.keys(updates).length === 0)
         return { ok: true };
-    }
     const { data, error } = await db
         .from("seeker_profiles")
         .update(updates)
         .eq("clerk_user_id", clerkUserId)
         .select("id");
-    if (error) {
+    if (error)
         return { ok: false, error: error.message };
-    }
-    if (!data || data.length === 0) {
+    if (!data || data.length === 0)
         return { ok: false, error: "seeker profile not found" };
-    }
     return { ok: true };
+}
+/**
+ * Fetch a seeker's profile for a host viewer. Gated by hostCanViewSeeker
+ * (seeker must have applied to one of the host's listings). Reads
+ * visibility_status defensively, falling back without the column if PostgREST
+ * errors. Returns null when the host is not allowed or the profile is missing.
+ *
+ * `hostClerkUserId` MUST come from auth().userId.
+ */
+export async function getSeekerProfileForHost(clerkToken, hostClerkUserId, seekerProfileId) {
+    const allowed = await hostCanViewSeeker(clerkToken, hostClerkUserId, seekerProfileId);
+    if (!allowed)
+        return null;
+    const db = untypedClient(clerkToken);
+    const baseColumns = "id, display_name, short_bio, location_pref, housing_preference, desired_categories, desired_roles, onboarding_complete";
+    let row = null;
+    let visibilityStatus = null;
+    // Attempt read with visibility_status; fall back if the column is absent.
+    const withVis = await db
+        .from("seeker_profiles")
+        .select(`${baseColumns}, visibility_status`)
+        .eq("id", seekerProfileId)
+        .maybeSingle();
+    if (!withVis.error && withVis.data) {
+        row = withVis.data;
+        visibilityStatus =
+            typeof row.visibility_status === "string" ? row.visibility_status : null;
+    }
+    else {
+        const base = await db
+            .from("seeker_profiles")
+            .select(baseColumns)
+            .eq("id", seekerProfileId)
+            .maybeSingle();
+        if (base.error || !base.data)
+            return null;
+        row = base.data;
+    }
+    if (!row)
+        return null;
+    return {
+        seekerProfileId: String(row.id),
+        displayName: typeof row.display_name === "string" ? row.display_name : null,
+        shortBio: typeof row.short_bio === "string" ? row.short_bio : null,
+        locationPref: typeof row.location_pref === "string" ? row.location_pref : null,
+        housingPreference: typeof row.housing_preference === "string"
+            ? row.housing_preference
+            : null,
+        desiredCategories: (row.desired_categories ?? []).slice(),
+        desiredRoles: (row.desired_roles ?? []).slice(),
+        onboardingComplete: Boolean(row.onboarding_complete),
+        visibilityStatus,
+    };
 }

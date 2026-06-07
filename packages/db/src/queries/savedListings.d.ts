@@ -1,28 +1,45 @@
-/**
- * Save (or re-save) a listing for the current seeker by upserting a
- * `saved_listings` row with `status='saved'`.
- *
- * Best-effort by design: returns `{ ok: false }` silently when the seeker has no
- * profile yet or the write fails, so the swipe UX is never blocked. Never throws.
- *
- * @param clerkToken - Verified Clerk JWT from `getToken()`.
- * @param clerkUserId - Verified Clerk user ID from `auth().userId` — do NOT
- *   decode this from the token; pass it from the already-verified `auth()` call.
- */
+import type { OpportunityCategory } from "@explore-and-earn/contracts";
 export declare function saveListing(clerkToken: string, clerkUserId: string, listingId: string): Promise<{
     ok: boolean;
 }>;
-/**
- * Mark a previously saved listing as removed (`status='removed'`) for the current
- * seeker. Best-effort: returns `{ ok: false }` silently on any failure and never
- * throws.
- */
+export declare function saveListingWithStatus(clerkToken: string, clerkUserId: string, listingId: string): Promise<{
+    ok: boolean;
+    alreadySaved: boolean;
+}>;
 export declare function unsaveListing(clerkToken: string, clerkUserId: string, listingId: string): Promise<{
     ok: boolean;
 }>;
-/**
- * Return the `listing_id`s the current seeker has actively saved
- * (`status='saved'`), newest first. Returns an empty array when the seeker has
- * no profile yet or has saved nothing.
- */
 export declare function getSavedListingIds(clerkToken: string, clerkUserId: string): Promise<string[]>;
+/** Benefit sub-item shape used by SavedListingDetail. */
+export interface SavedListingBenefit {
+    readonly provision: string;
+    readonly summary?: string;
+}
+/** Full saved listing detail for the /saved card grid. */
+export interface SavedListingDetail {
+    readonly id: string;
+    readonly title: string;
+    readonly category: OpportunityCategory;
+    readonly location: string;
+    readonly opportunityWindow: string;
+    readonly status: string;
+    readonly host: {
+        readonly name: string;
+        readonly verified: boolean;
+    };
+    readonly benefits: {
+        readonly housing: SavedListingBenefit;
+        readonly meals: SavedListingBenefit;
+        readonly pay: SavedListingBenefit;
+    };
+    readonly coverImageUrl: string | undefined;
+    /** True when the seeker already has a non-withdrawn application for this listing. */
+    readonly alreadyApplied: boolean;
+}
+/**
+ * Saved listings joined to full live-listing detail + host, with an
+ * `alreadyApplied` flag computed from the applications table.
+ *
+ * Returns an empty array when the seeker has no profile or no saved listings.
+ */
+export declare function getSavedListingsWithDetails(clerkToken: string, clerkUserId: string): Promise<SavedListingDetail[]>;

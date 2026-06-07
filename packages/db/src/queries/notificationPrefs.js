@@ -1,5 +1,4 @@
 import { authedClient } from "../client";
-/** Safe defaults: every email is ON unless the seeker turns it off. */
 export const DEFAULT_NOTIFICATION_PREFS = {
     emailOnInvite: true,
     emailOnStatusChange: true,
@@ -20,11 +19,6 @@ function rowToPrefs(row) {
         emailOnMessage: asBool(row.email_on_message, true),
     };
 }
-/**
- * Read the seeker's notification preferences by Clerk user id. Best-effort:
- * returns all-ON defaults when the profile/columns can't be resolved, so a
- * lookup failure never silently suppresses a notification.
- */
 export async function getNotificationPrefs(clerkToken, clerkUserId) {
     if (!clerkUserId)
         return DEFAULT_NOTIFICATION_PREFS;
@@ -43,10 +37,6 @@ export async function getNotificationPrefs(clerkToken, clerkUserId) {
         return DEFAULT_NOTIFICATION_PREFS;
     }
 }
-/**
- * Persist the seeker's notification preferences by Clerk user id. Scoped to the
- * seeker's own row (clerk_user_id from auth().userId).
- */
 export async function saveNotificationPrefs(clerkToken, clerkUserId, prefs) {
     if (!clerkUserId)
         return { ok: false, error: "unauthenticated" };
@@ -66,5 +56,38 @@ export async function saveNotificationPrefs(clerkToken, clerkUserId, prefs) {
     }
     catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : "unknown" };
+    }
+}
+/**
+ * Partially update the seeker's notification preferences. Only the keys
+ * present in `prefs` are written; others are untouched.
+ */
+export async function updateNotificationPrefs(clerkToken, clerkUserId, prefs) {
+    if (!clerkUserId)
+        return { ok: false, error: "unauthenticated" };
+    const patch = {};
+    if (prefs.emailOnInvite !== undefined)
+        patch.email_on_invite = prefs.emailOnInvite;
+    if (prefs.emailOnStatusChange !== undefined)
+        patch.email_on_status_change = prefs.emailOnStatusChange;
+    if (prefs.emailOnMessage !== undefined)
+        patch.email_on_message = prefs.emailOnMessage;
+    if (Object.keys(patch).length === 0)
+        return { ok: true };
+    try {
+        const db = untypedClient(clerkToken);
+        const { error } = await db
+            .from("seeker_profiles")
+            .update(patch)
+            .eq("clerk_user_id", clerkUserId);
+        if (error)
+            return { ok: false, error: error.message };
+        return { ok: true };
+    }
+    catch (err) {
+        return {
+            ok: false,
+            error: err instanceof Error ? err.message : "unknown",
+        };
     }
 }
