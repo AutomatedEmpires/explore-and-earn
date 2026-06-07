@@ -49,6 +49,7 @@ export async function applyToListingAction(
 
 	// Best-effort: email the host that a new application arrived. This must never
 	// block or fail the apply result, so all of it is guarded and swallowed.
+	// Hosts have no notification-prefs flag for this, so it is always sent.
 	if (result.ok) {
 		try {
 			const listingContact = await getListingHostContact(token, listingId)
@@ -68,6 +69,7 @@ export async function applyToListingAction(
 							listingTitle,
 							reviewUrl: absoluteUrl("/host/applicants"),
 						}),
+						template: "applicationReceived",
 					})
 				}
 			}

@@ -85,6 +85,7 @@ export async function updateApplicationStatusAction(
                 statusLabel,
                 dashboardUrl: absoluteUrl("/applied"),
               }),
+              template: "applicationStatus",
             });
           }
         }
