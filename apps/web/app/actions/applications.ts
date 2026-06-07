@@ -5,6 +5,7 @@ import {
 	applyToListing,
 	getListingHostContact,
 	getSeekerApplicationIds,
+	withdrawApplication,
 	type ApplyResult,
 } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
@@ -93,4 +94,30 @@ export async function getSeekerApplicationIdsAction(): Promise<string[]> {
 	}
 
 	return getSeekerApplicationIds(token, userId)
+}
+
+/**
+ * Server action: withdraw the authed seeker's own application.
+ *
+ * Auth is enforced here; ownership and the `applied`-only status guard are
+ * enforced in the db layer. Returns a typed result rather than throwing.
+ */
+export async function withdrawApplicationAction(
+	applicationId: string,
+): Promise<{ ok: boolean; error?: string }> {
+	const { userId, getToken } = await auth()
+	if (!userId) {
+		return { ok: false, error: "unauthenticated" }
+	}
+
+	const token = await getToken({ template: "supabase" })
+	if (!token) {
+		return { ok: false, error: "unauthenticated" }
+	}
+
+	const result = await withdrawApplication(token, userId, applicationId)
+	if (result.ok) {
+		revalidatePath("/applied")
+	}
+	return result
 }
