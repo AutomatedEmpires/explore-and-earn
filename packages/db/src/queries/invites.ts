@@ -177,7 +177,7 @@ function rowToInviteListing(
       : "Unknown Host";
   // Mirrors rowToDiscoveryFields in queries/listings.ts (verified === attested).
   const verified =
-    host != null && host.attestation_status === "verified";
+    host != null && host.attestation_status === "attested";
 
   const housingProvision: BenefitProvision =
     row.housing_included === true ? "provided" : "not_provided";
@@ -415,7 +415,9 @@ async function resolveHostProfileId(
 
 /** Sanitize a freeform search query for use in a ILIKE pattern. */
 function sanitizeSearchQuery(raw: string): string {
-  return raw.trim().slice(0, 100).replace(/%/g, "");
+  // Strip characters that could inject into a PostgREST .or() filter string
+  // or act as LIKE wildcards. Mirror the sanitizer in queries/listings.ts.
+  return raw.slice(0, 100).replace(/[,()*%]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 /** A seeker match returned by the invite search surface. */
@@ -449,21 +451,45 @@ export async function searchSeekersForInvite(
     return [];
   }
 
+  // Use two separate parameterized .ilike() queries and merge in JS rather than
+  // building an .or() filter string — eliminates PostgREST filter injection surface.
   const pattern = `%${safe}%`;
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
 
-  const { data, error } = await untyped
-    .from("seeker_profiles")
-    .select("id, display_name, short_bio")
-    .or(`display_name.ilike.${pattern},short_bio.ilike.${pattern}`)
-    .limit(20);
+  const [nameRes, bioRes] = await Promise.all([
+    untyped
+      .from("seeker_profiles")
+      .select("id, display_name, short_bio")
+      .ilike("display_name", pattern)
+      .limit(20),
+    untyped
+      .from("seeker_profiles")
+      .select("id, display_name, short_bio")
+      .ilike("short_bio", pattern)
+      .limit(20),
+  ]);
 
-  if (error) {
-    // Missing-column fallback: display_name may not exist yet.
+  if (nameRes.error && bioRes.error) {
+    // Missing-column fallback: display_name / short_bio may not exist yet.
     return [];
   }
 
-  return (data ?? []).map((raw) => {
+  // Merge and deduplicate by id; name matches rank first.
+  const seen = new Set<string>();
+  const merged: Array<Record<string, unknown>> = [];
+  for (const row of [
+    ...((nameRes.data ?? []) as Array<Record<string, unknown>>),
+    ...((bioRes.data ?? []) as Array<Record<string, unknown>>),
+  ]) {
+    const id = String(row.id);
+    if (!seen.has(id)) {
+      seen.add(id);
+      merged.push(row);
+    }
+  }
+  const data = merged.slice(0, 20);
+
+  return data.map((raw) => {
     const r = raw as Record<string, unknown>;
     return {
       seekerProfileId: String(r.id),
