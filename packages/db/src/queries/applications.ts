@@ -38,6 +38,16 @@ async function resolveSeekerProfileId(
   return data ? (data.id as string) : null;
 }
 
+/**
+ * Apply the authed seeker to a listing.
+ *
+ * App-level ownership guard only (RLS is gated to a separate change). Expected
+ * business outcomes are returned as a typed result rather than thrown:
+ * - `unauthenticated`  — token had no decodable subject
+ * - `profile_not_found` — no seeker_profiles row yet (Clerk webhook pending)
+ * - `already_applied`   — unique (listing_id, seeker_profile_id) violation
+ * - `cannot_apply_to_own_listing` — host cannot apply to their own listing
+ */
 export async function applyToListing(
   clerkToken: string,
   clerkUserId: string,
@@ -47,6 +57,19 @@ export async function applyToListing(
   const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
     return { ok: false, error: "profile_not_found" };
+  }
+
+  // Prevent self-application: host cannot apply to their own listing
+  const authed = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data: listingOwner } = await authed
+    .from("listings")
+    .select("host_profiles!host_profile_id(clerk_user_id)")
+    .eq("id", listingId)
+    .maybeSingle();
+
+  const hostClerkId = (listingOwner as any)?.host_profiles?.clerk_user_id;
+  if (hostClerkId && hostClerkId === clerkUserId) {
+    return { ok: false, error: "cannot_apply_to_own_listing" as const };
   }
 
   const { error } = await authedClient(clerkToken)
