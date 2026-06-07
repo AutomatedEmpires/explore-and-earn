@@ -5,10 +5,16 @@ import styles from "../../auth.module.css";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-export default function SignInPage() {
-	return (
-		<main className={styles.authPage}>
-			<SignIn />
-		</main>
-	);
+interface Props {
+  searchParams: Promise<{ redirect_url?: string }>;
+}
+
+export default async function SignInPage({ searchParams }: Props) {
+  const { redirect_url } = await searchParams;
+
+  return (
+    <main className={styles.authPage}>
+      <SignIn forceRedirectUrl={redirect_url} />
+    </main>
+  );
 }
