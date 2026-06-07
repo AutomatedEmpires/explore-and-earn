@@ -1,54 +1,15 @@
 "use client";
 
-import { useEffect, type CSSProperties } from "react";
+import * as Sentry from "@sentry/nextjs";
+import Link from "next/link";
+import { useEffect } from "react";
 
-// Token-only inline styles (no hardcoded colors) so the boundary works even if
-// a CSS-module bundle failed to load as part of the error being handled.
-const containerStyle: CSSProperties = {
-	display: "flex",
-	flexDirection: "column",
-	alignItems: "center",
-	justifyContent: "center",
-	gap: "var(--space-12)",
-	padding: "var(--space-section) var(--space-gutter)",
-	minHeight: "60vh",
-	textAlign: "center",
-	background: "var(--color-paper)",
-};
-
-const headingStyle: CSSProperties = {
-	margin: 0,
-	fontFamily: "var(--font-display)",
-	fontSize: "var(--type-page-size)",
-	lineHeight: "var(--type-page-lh)",
-	color: "var(--text-primary)",
-};
-
-const messageStyle: CSSProperties = {
-	margin: 0,
-	maxWidth: "36ch",
-	fontFamily: "var(--font-ui)",
-	fontSize: "var(--type-body-size)",
-	lineHeight: "var(--type-body-lh)",
-	color: "var(--text-secondary)",
-};
-
-const buttonStyle: CSSProperties = {
-	display: "inline-flex",
-	padding: "var(--space-8) var(--space-16)",
-	borderRadius: "var(--radius-button)",
-	border: "1px solid var(--text-primary)",
-	background: "var(--text-primary)",
-	color: "var(--color-surface-raised)",
-	fontFamily: "var(--font-ui)",
-	fontSize: "var(--type-body-size)",
-	cursor: "pointer",
-};
+import styles from "../status.module.css";
 
 /**
- * Error boundary for the seeker onboarding flow. Catches render/runtime errors
- * and offers a recovery action instead of a blank screen. Client Component per
- * the Next.js error-boundary contract.
+ * Error boundary for the seeker onboarding flow. If onboarding fails, direct
+ * the seeker to retry rather than leaving them stranded at a blank screen.
+ * Reports to Sentry on mount.
  */
 export default function SeekerOnboardingError({
 	error,
@@ -58,26 +19,25 @@ export default function SeekerOnboardingError({
 	readonly reset: () => void;
 }) {
 	useEffect(() => {
-		// Report to Sentry if a client hub is available; no-op when absent.
-		const hub = (
-			globalThis as typeof globalThis & {
-				__sentryHub?: { captureException: (e: unknown) => void };
-			}
-		).__sentryHub;
-		hub?.captureException(error);
+		Sentry.captureException(error);
 	}, [error]);
 
 	return (
-		<div role="alert" style={containerStyle}>
-			<h2 style={headingStyle}>Something went wrong</h2>
-			<p style={messageStyle}>
-				{error.digest
-					? `Error ID: ${error.digest}`
-					: "An unexpected error occurred."}
+		<section className={styles.wrap} role="alert">
+			<h1 className={styles.heading}>Couldn&apos;t complete setup</h1>
+			<p className={styles.message}>
+				Something went wrong during onboarding. Try again or head back to the
+				homepage.
 			</p>
-			<button type="button" onClick={() => reset()} style={buttonStyle}>
+			{error.digest ? (
+				<p className={styles.digest}>Reference: {error.digest}</p>
+			) : null}
+			<button type="button" className={styles.action} onClick={() => reset()}>
 				Try again
 			</button>
-		</div>
+			<Link className={styles.action} href="/">
+				Go home
+			</Link>
+		</section>
 	);
 }

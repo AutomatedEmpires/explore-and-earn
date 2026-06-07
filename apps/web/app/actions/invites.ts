@@ -84,15 +84,16 @@ export async function sendInviteAction(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const token = await getToken({ template: "supabase" })
-	if (!token) {
-		return { ok: false, error: "unauthenticated" }
-	}
-
-	// Rate limit: 20 invites per hour per host. checkRateLimit never throws.
+	// Rate limit: 20 invites per hour per host. Checked after auth, before any DB
+	// work. Never throws — degrades to a friendly error code.
 	const { allowed } = checkRateLimit(`invite:${userId}`, 20, 60 * 60 * 1000)
 	if (!allowed) {
 		return { ok: false, error: "rate_limit_exceeded" }
+	}
+
+	const token = await getToken({ template: "supabase" })
+	if (!token) {
+		return { ok: false, error: "unauthenticated" }
 	}
 
 	// Ownership check: listing must belong to this host.

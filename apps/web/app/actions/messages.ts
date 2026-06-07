@@ -30,12 +30,13 @@ export async function sendMessageAction(
 	const { userId, getToken } = await auth();
 	if (!userId) return { ok: false, error: "unauthenticated" };
 
-	const token = await getToken({ template: "supabase" });
-	if (!token) return { ok: false, error: "unauthenticated" };
-
-	// Rate limit: 30 messages per minute per user. checkRateLimit never throws.
+	// Rate limit: 30 messages per minute per user. Checked after auth, before any
+	// DB work. Never throws — degrades to a friendly error code.
 	const { allowed } = checkRateLimit(`msg:${userId}`, 30, 60 * 1000);
 	if (!allowed) return { ok: false, error: "rate_limit_exceeded" };
+
+	const token = await getToken({ template: "supabase" });
+	if (!token) return { ok: false, error: "unauthenticated" };
 
 	const result = await sendMessage(token, userId, conversationId, body);
 	if (!result.ok) return result;

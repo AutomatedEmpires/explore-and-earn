@@ -29,15 +29,16 @@ export async function applyToListingAction(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const token = await getToken({ template: "supabase" })
-	if (!token) {
-		return { ok: false, error: "unauthenticated" }
-	}
-
-	// Rate limit: 5 applications per hour per user. checkRateLimit never throws.
+	// Rate limit: 5 applications per hour per user. Checked after auth, before any
+	// DB work. Never throws — degrades to a friendly error code.
 	const { allowed } = checkRateLimit(`apply:${userId}`, 5, 60 * 60 * 1000)
 	if (!allowed) {
 		return { ok: false, error: "rate_limit_exceeded" }
+	}
+
+	const token = await getToken({ template: "supabase" })
+	if (!token) {
+		return { ok: false, error: "unauthenticated" }
 	}
 
 	const result = await applyToListing(token, userId, listingId, coverMessage)

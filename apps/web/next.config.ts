@@ -1,9 +1,10 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
-// Security + CSP headers applied to every route. CSP is Report-Only first —
-// switch the key to "Content-Security-Policy" to enforce after verifying that
-// nothing breaks (Clerk / Mapbox / Supabase / PostHog / Sentry) in the browser.
+// Baseline security headers applied to every response. CSP is sent in
+// report-only mode first: it logs violations without blocking, so we can verify
+// Clerk / Mapbox / Supabase / Sentry / PostHog all load before switching to an
+// enforcing `Content-Security-Policy` header.
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -18,13 +19,14 @@ const securityHeaders = [
     value: "max-age=63072000; includeSubDomains; preload"
   },
   {
+    // Report-only first — switch to enforcing after verifying nothing breaks.
     key: "Content-Security-Policy-Report-Only",
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev https://browser.sentry-cdn.com https://us.posthog.com",
       "style-src 'self' 'unsafe-inline' https://api.tiles.mapbox.com https://api.mapbox.com",
       "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://sentry.io https://o*.ingest.sentry.io",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://sentry.io https://*.ingest.sentry.io",
       "font-src 'self' data:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
