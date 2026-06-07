@@ -44,7 +44,7 @@ const BENEFIT_FILTERS: readonly {
 
 const SORTS: readonly { readonly key: SortKey; readonly label: string }[] = [
 	{ key: "match", label: "Best match" },
-	{ key: "title", label: "A\u2013Z" },
+	{ key: "title", label: "A–Z" },
 ];
 
 const SEARCH_DEBOUNCE_MS = 400;
@@ -66,10 +66,10 @@ export interface SeekBrowserProps {
 }
 
 /**
- * SeekBrowser \u2014 the browsable Seek tab. All filter state (text query, category,
+ * SeekBrowser — the browsable Seek tab. All filter state (text query, category,
  * housing/meals, location, pay floor, start-date range) lives in the URL query
  * string: the server page parses it, runs searchListings, and hands the
- * already-filtered listings here. The controls below only navigate \u2014 toggling a
+ * already-filtered listings here. The controls below only navigate — toggling a
  * chip, typing in the search box, or picking a start-date pushes a new URL,
  * which re-renders the server page, so a filtered view is shareable and
  * bookmarkable. Sort is a client-only reordering of the returned rows. The
@@ -201,7 +201,7 @@ export function SeekBrowser({
 			<header className={styles.header}>
 				<h1 className={styles.heading}>Seek opportunities</h1>
 				<p className={styles.subheading}>
-					Browse every open work-travel opportunity \u2014 housing, meals, and pay
+					Browse every open work-travel opportunity — housing, meals, and pay
 					from hosts worldwide.
 				</p>
 			</header>
@@ -212,7 +212,7 @@ export function SeekBrowser({
 					<input
 						type="search"
 						className={styles.sortSelect}
-						placeholder="Search opportunities, locations\u2026"
+						placeholder="Search opportunities, locations…"
 						value={searchText}
 						onChange={(event) => setSearchText(event.target.value)}
 						aria-label="Search opportunities"
@@ -334,7 +334,7 @@ export function SeekBrowser({
 				<div className={styles.emptyWrap}>
 					<EmptyState
 						title={
-							query ? `No listings match \u201c${query}\u201d` : "No matches with those filters"
+							query ? `No listings match “${query}”` : "No matches with those filters"
 						}
 						message={
 							query
