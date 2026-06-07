@@ -17,13 +17,14 @@ export interface ApplicantPipelineRowProps {
   readonly applicant: HostApplicantItem;
 }
 
-/** Map ApplicantStage -> the host-settable DB status value. */
+/** Map ApplicantStage -> the host-settable DB status value (only where they differ). */
 const STAGE_TO_STATUS: Partial<Record<ApplicantStage, string>> = {
-  reviewing: "reviewing",
-  saved_by_host: "saved_by_host",
-  offered: "offered",
   declined: "not_selected",
 };
+
+function stageToDbStatus(stage: ApplicantStage): string {
+  return STAGE_TO_STATUS[stage] ?? stage;
+}
 
 /** Quick-action buttons shown per current stage. */
 type StageAction = {
@@ -59,8 +60,7 @@ export function ApplicantPipelineRow({ applicant }: ApplicantPipelineRowProps) {
   const actions = STAGE_ACTIONS[optimisticStage] ?? [];
 
   function handleAction(targetStage: ApplicantStage) {
-    const dbStatus = STAGE_TO_STATUS[targetStage];
-    if (!dbStatus) return;
+    const dbStatus = stageToDbStatus(targetStage);
 
     startTransition(async () => {
       setOptimisticStage(targetStage);

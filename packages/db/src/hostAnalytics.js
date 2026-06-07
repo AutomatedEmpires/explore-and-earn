@@ -74,10 +74,6 @@ export async function getHostDashboardStats(clerkToken, clerkUserId) {
         const s = typeof row.status === "string" ? row.status : "applied";
         applicationsThisMonth[s] = (applicationsThisMonth[s] ?? 0) + 1;
     }
-    // Pending actions: unreviewed applications + outstanding invites.
-    const pendingApps = (applicationsThisMonth["applied"] ?? 0) +
-        // Also count applied apps outside this month (not captured above).
-        0; // approximate; dashboard stat, not a precise audit count
     const pendingInvites = (inviteResult.data ?? []).length;
     // Re-query applied applications globally for an accurate pending count.
     const listingIdsGlobal = (listingResult.data ?? []).map((r) => String(r.id));
@@ -90,7 +86,6 @@ export async function getHostDashboardStats(clerkToken, clerkUserId) {
             .eq("status", "applied");
         totalPendingApps = (pendingAppRows ?? []).length;
     }
-    void pendingApps; // suppress unused-var lint (approximation superseded above)
     return {
         listingsByStatus,
         applicationsThisMonth,
