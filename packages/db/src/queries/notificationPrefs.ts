@@ -6,15 +6,10 @@ import { authedClient } from "../client";
  * Seeker email-notification preferences.
  *
  * Stored as boolean columns on `seeker_profiles` (migration 018). Hosts have no
- * preference row — only seekers can tune these — so callers gate host-recipient
- * emails separately.
+ * preference row -- only seekers can tune these.
  *
- * SECURITY / TYPES: same model as the sibling query modules. RLS is not yet
- * enabled, so reads/writes go through an UNTYPED authed client (the
- * clerk_user_id column and the 018 preference columns are not in the committed
- * types.gen.ts) and the caller passes an already-verified Clerk token plus the
- * Clerk user id from auth().userId — never decoded from the token.
- * // types not yet generated: seeker_profiles.clerk_user_id, email_on_invite, email_on_status_change, email_on_message
+ * SECURITY / TYPES: same model as sibling query modules. RLS not yet enabled.
+ * // types not yet generated: email_on_invite, email_on_status_change, email_on_message
  */
 
 export interface NotificationPrefs {
@@ -23,7 +18,6 @@ export interface NotificationPrefs {
   readonly emailOnMessage: boolean;
 }
 
-/** Safe defaults: every email is ON unless the seeker turns it off. */
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   emailOnInvite: true,
   emailOnStatusChange: true,
@@ -47,11 +41,6 @@ function rowToPrefs(row: Record<string, unknown> | null): NotificationPrefs {
   };
 }
 
-/**
- * Read the seeker's notification preferences by Clerk user id. Best-effort:
- * returns all-ON defaults when the profile/columns can't be resolved, so a
- * lookup failure never silently suppresses a notification.
- */
 export async function getNotificationPrefs(
   clerkToken: string,
   clerkUserId: string,
@@ -76,10 +65,6 @@ export interface SaveNotificationPrefsResult {
   readonly error?: string;
 }
 
-/**
- * Persist the seeker's notification preferences by Clerk user id. Scoped to the
- * seeker's own row (clerk_user_id from auth().userId).
- */
 export async function saveNotificationPrefs(
   clerkToken: string,
   clerkUserId: string,
@@ -100,5 +85,53 @@ export async function saveNotificationPrefs(
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "unknown" };
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Partial preference update (Wave 10 / Agent B).                             */
+/* -------------------------------------------------------------------------- */
+
+/** Subset of notification prefs to update; omitted keys are left unchanged. */
+export interface NotificationPrefsPatch {
+  readonly emailOnInvite?: boolean;
+  readonly emailOnStatusChange?: boolean;
+  readonly emailOnMessage?: boolean;
+}
+
+/**
+ * Partially update the seeker's notification preferences. Only the keys
+ * present in `prefs` are written; others are untouched.
+ */
+export async function updateNotificationPrefs(
+  clerkToken: string,
+  clerkUserId: string,
+  prefs: NotificationPrefsPatch,
+): Promise<SaveNotificationPrefsResult> {
+  if (!clerkUserId) return { ok: false, error: "unauthenticated" };
+
+  const patch: Record<string, boolean> = {};
+  if (prefs.emailOnInvite !== undefined)
+    patch.email_on_invite = prefs.emailOnInvite;
+  if (prefs.emailOnStatusChange !== undefined)
+    patch.email_on_status_change = prefs.emailOnStatusChange;
+  if (prefs.emailOnMessage !== undefined)
+    patch.email_on_message = prefs.emailOnMessage;
+
+  if (Object.keys(patch).length === 0) return { ok: true };
+
+  try {
+    const db = untypedClient(clerkToken);
+    const { error } = await db
+      .from("seeker_profiles")
+      .update(patch)
+      .eq("clerk_user_id", clerkUserId);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "unknown",
+    };
   }
 }

@@ -63,11 +63,15 @@ export async function updateApplicationStatusAction(
     try {
       const contact = await getApplicationSeekerContact(token, applicationId);
       if (contact?.seekerClerkUserId) {
-        const prefs = await getNotificationPrefs(
-          token,
-          contact.seekerClerkUserId,
-        );
-        if (prefs.emailOnStatusChange) {
+        // Cross-user prefs read: host's token, seeker's userId. May fail under RLS.
+        // Degrade silently — never block the status update or email.
+        let prefs = null;
+        try {
+          prefs = await getNotificationPrefs(token, contact.seekerClerkUserId);
+        } catch {
+          // Cross-user read failed; skip notification prefs check.
+        }
+        if (prefs === null || prefs.emailOnStatusChange) {
           const seeker = await getClerkContact(contact.seekerClerkUserId);
           if (seeker.email) {
             const statusLabel = STATUS_LABELS[newStatus];

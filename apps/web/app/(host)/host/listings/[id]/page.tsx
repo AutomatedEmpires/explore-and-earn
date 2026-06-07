@@ -39,7 +39,7 @@ export default async function HostListingDetailPage({
 }) {
   const { id } = await params;
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken() : null;
+  const token = userId ? await getToken({ template: "supabase" }) : null;
 
   // Ownership-first: the host's own RLS-scoped listings include drafts/paused
   // records that the public (live-only) query would hide, and ownership of the

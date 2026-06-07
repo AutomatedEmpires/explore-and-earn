@@ -14,3 +14,4 @@ export * from "./queries/notificationPrefs";
 export * from "./storage";
 export * from "./adminClient";
 export * from "./queries/admin";
+export * from "./lib/matchScore";

@@ -1,9 +1,9 @@
 /**
- * Primitive component styles — Design System V1.
+ * Primitive component styles -- Design System V1.
  *
  * Styles the `ui-*` class contract emitted by the packages/ui primitives
  * (Card, Modal, Badge, Button, Chip, Meter, Skeleton). References TIER 2
- * semantic tokens from tokens.css ONLY — never raw hex/px (drift rule #1).
+ * semantic tokens from tokens.css ONLY -- never raw hex/px (drift rule #1).
  * Borders-first, flat (no shadow on cards), no bounce; reduced-motion honored.
  *
  * Canon: docs/design/design-system-v1.md (founder-locked 2026-05-30).
@@ -12,7 +12,7 @@
 :root {
   /* shared a11y focus ring (paper gap + match-ink halo) */
   --ui-focus-ring: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--status-match-fg);
-  /* modal scrim — derived from --palette-ink (#24221E = rgb(36,34,30)) */
+  /* modal scrim -- derived from --palette-ink (#24221E = rgb(36,34,30)) */
   --ui-scrim: rgba(36, 34, 30, 0.44);
 }
 
@@ -23,7 +23,7 @@
 }
 
 /* =================================================================== */
-/* Card — flat, borders-first (NO shadow)                              */
+/* Card -- flat, borders-first (NO shadow)                              */
 /* =================================================================== */
 .ui-card {
   display: flex;
@@ -53,7 +53,7 @@
 }
 
 /* =================================================================== */
-/* Modal — full-bleed dialog layer + raised surface                    */
+/* Modal -- full-bleed dialog layer + raised surface                    */
 /* =================================================================== */
 .ui-modal {
   position: fixed;
@@ -87,7 +87,7 @@
 }
 
 /* =================================================================== */
-/* Badge — pill, label-first (never color-only), uppercase label       */
+/* Badge -- pill, label-first (never color-only), uppercase label       */
 /* =================================================================== */
 .ui-badge {
   display: inline-flex;
@@ -121,9 +121,13 @@
 .ui-badge--seasonal { background: var(--accent-seasonal-bg);       color: var(--accent-seasonal-fg); }
 .ui-badge--boosted  { background: var(--status-boosted-bg);        color: var(--status-boosted-fg); }
 .ui-badge--verified { background: var(--status-verified_host-bg);  color: var(--status-verified_host-fg); }
+/* Wave 10 semantic variants -- token-driven (no hardcoded values) */
+.ui-badge--info     { background: var(--status-featured-bg);       color: var(--status-featured-fg); }
+.ui-badge--match    { background: var(--status-match-bg);          color: var(--status-match-fg); }
+.ui-badge--success  { background: var(--status-success-bg);        color: var(--status-success-fg); }
 
 /* =================================================================== */
-/* Button — token-driven variants                                      */
+/* Button -- token-driven variants                                      */
 /* =================================================================== */
 .ui-button {
   display: inline-flex;
@@ -166,7 +170,7 @@
 }
 
 /* =================================================================== */
-/* Chip — filter / tag pill                                            */
+/* Chip -- filter / tag pill                                            */
 /* =================================================================== */
 .ui-chip {
   display: inline-flex;
@@ -192,8 +196,13 @@
   color: var(--status-match-fg);
 }
 
+.ui-chip__label {
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
 /* =================================================================== */
-/* Meter — NEUTRAL relevance signal (never red/green good-bad)         */
+/* Meter -- NEUTRAL relevance signal (never red/green good-bad)         */
 /* =================================================================== */
 .ui-meter {
   display: inline-flex;
@@ -219,7 +228,7 @@
 }
 
 /* =================================================================== */
-/* Skeleton — loading placeholder                                      */
+/* Skeleton -- loading placeholder                                      */
 /* =================================================================== */
 .ui-skeleton {
   display: block;
@@ -250,7 +259,7 @@
 }
 
 /* =================================================================== */
-/* Reduced motion — disable transitions/animations                    */
+/* Reduced motion -- disable transitions/animations                    */
 /* =================================================================== */
 @media (prefers-reduced-motion: reduce) {
   .ui-button,
