@@ -64,7 +64,7 @@ const linkStyle: CSSProperties = {
 }
 
 export function HostSummaryBlock({ host }: { readonly host: ListingHostSummary }) {
-	const profileHref = `/host/${host.id}`
+	const profileHref = host.id ? `/host/${host.id}` : null
 	return (
 		<section aria-label="About the host" style={sectionStyle}>
 			<div style={headerStyle}>
@@ -78,17 +78,23 @@ export function HostSummaryBlock({ host }: { readonly host: ListingHostSummary }
 					/>
 				) : null}
 				<div style={identityStyle}>
-					<Link href={profileHref} style={nameStyle}>
-						{host.name}
-					</Link>
+					{profileHref ? (
+						<Link href={profileHref} style={nameStyle}>
+							{host.name}
+						</Link>
+					) : (
+						<span style={nameStyle}>{host.name}</span>
+					)}
 					<span style={locationStyle}>Based in {host.location}</span>
 				</div>
 			</div>
 			{host.verified ? <VerifiedHostBadge /> : null}
 			{host.tagline ? <p style={taglineStyle}>{host.tagline}</p> : null}
-			<Link href={profileHref} style={linkStyle}>
-				View host profile →
-			</Link>
+			{profileHref && (
+				<Link href={profileHref} style={linkStyle}>
+					View host profile →
+				</Link>
+			)}
 		</section>
 	)
 }

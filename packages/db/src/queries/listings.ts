@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   BenefitProvision,
   CompensationUnit,
+  ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
 import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
@@ -173,14 +174,6 @@ export async function getPublicListingById(id: string): Promise<ListingRow | nul
  * Batch variant of getPublicListingById: fetch many live listings in a single
  * query instead of one round-trip per id (eliminates the N+1 on the
  * saved/applied/messages surfaces). No auth required (public listings).
- *
- * - Returns [] for an empty id list \u2014 PostgREST `.in(...)` with an empty array
- *   is invalid, so the guard is required.
- * - Filters on status "live", matching getPublicListingById. (There is no
- *   "published" status in this schema; "live" is the published state \u2014 see
- *   contracts LISTING_STATUS / supabase/migrations/006_listings.sql.)
- * - Result order is NOT guaranteed; callers that need a specific order should
- *   join the rows back by id (e.g. via a Map).
  */
 export async function getPublicListingsByIds(ids: string[]): Promise<ListingRow[]> {
   if (ids.length === 0) return [];
@@ -276,49 +269,21 @@ export async function getLiveListingsWithCoords(
  * getPublicListings, capped by `limit`).
  */
 export interface SearchFilters {
-  /** Free text, matched case-insensitively against title, description, and location_display. */
   query?: string;
-  /** Subset of MARKETPLACE_CATEGORIES; values outside the registry are ignored. */
   categories?: string[];
-  /** When true, only listings that include housing (housing_included = true). */
   hasHousing?: boolean;
-  /** When true, only listings that include meals (meals_included = true). */
   hasMeals?: boolean;
-  /** Minimum pay floor in MAJOR currency units (e.g. dollars); compared to compensation_min_cents. */
   payMin?: number;
-  /** Partial, case-insensitive match against location_display. */
   location?: string;
-  /** Max rows to return (default 48). */
   limit?: number;
 }
 
 const DEFAULT_SEARCH_LIMIT = 48;
 
-/**
- * Strip characters that would break a PostgREST `or()` / `ilike` filter
- * expression: commas and parentheses are structural in the or() grammar and
- * `*` is the wildcard token. Whitespace is collapsed and trimmed. Returns ""
- * when nothing usable remains, in which case the caller skips that filter.
- */
 function sanitizeSearchTerm(term: string): string {
   return term.slice(0, 200).replace(/[,()*%]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/**
- * Public, server-side search over live listings \u2014 no auth required (anon
- * client, same trust level as getPublicListings).
- *
- * SCHEMA NOTE: the 006_listings.sql `listings` table does NOT have the
- * `summary` / `primary_location_name` / `housing_description` /
- * `meals_description` / `pay_min` columns referenced in some early specs. This
- * implementation maps those intents onto the real columns:
- *   - free text  -> title / description / location_display
- *   - location   -> location_display
- *   - housing    -> housing_included (boolean flag; there is no free-text column)
- *   - meals      -> meals_included (boolean flag)
- *   - pay floor  -> compensation_min_cents (integer cents; payMin is given in
- *                   major units and converted via Math.round(payMin * 100))
- */
 export async function searchListings(filters: SearchFilters): Promise<ListingRow[]> {
   let builder = anonClient()
     .from("listings")
@@ -339,25 +304,15 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
     builder = builder.in("category", categories);
   }
 
-  if (filters.hasHousing) {
-    builder = builder.eq("housing_included", true);
-  }
-  if (filters.hasMeals) {
-    builder = builder.eq("meals_included", true);
-  }
+  if (filters.hasHousing) builder = builder.eq("housing_included", true);
+  if (filters.hasMeals) builder = builder.eq("meals_included", true);
 
-  if (
-    filters.payMin != null &&
-    Number.isFinite(filters.payMin) &&
-    filters.payMin > 0
-  ) {
+  if (filters.payMin != null && Number.isFinite(filters.payMin) && filters.payMin > 0) {
     builder = builder.gte("compensation_min_cents", Math.round(filters.payMin * 100));
   }
 
   const location = filters.location ? sanitizeSearchTerm(filters.location) : "";
-  if (location) {
-    builder = builder.ilike("location_display", `%${location}%`);
-  }
+  if (location) builder = builder.ilike("location_display", `%${location}%`);
 
   const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;
 
@@ -369,12 +324,6 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
 }
 
-/**
- * Resolve the host_profiles.id for the authenticated Clerk user.
- * Returns null when the user has no host profile yet.
- *
- * `clerkUserId` must come from `auth().userId` \u2014 never decoded from the token.
- */
 async function resolveHostProfileId(
   clerkToken: string,
   clerkUserId: string,
@@ -389,12 +338,6 @@ async function resolveHostProfileId(
   return data ? (data as { id: string }).id : null;
 }
 
-/**
- * Host's own listings \u2014 requires Clerk JWT + verified Clerk user id.
- *
- * Scoped to `host_profile_id` so a host can only read their own listings.
- * `clerkUserId` must come from `auth().userId`.
- */
 export async function getHostListings(
   clerkToken: string,
   clerkUserId: string,
@@ -412,19 +355,6 @@ export async function getHostListings(
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
 }
 
-/**
- * Field shape accepted by createListing / updateListing.
- *
- * Money note: `payMin` / `payMax` are MAJOR currency units (e.g. dollars), not
- * cents. They are converted to the integer `compensation_*_cents` columns via
- * Math.round(amount * 100) to satisfy the 006_listings.sql CHECK (>= 0).
- *
- * Housing / Meals note: 006_listings.sql has no free-text housing/meals column \u2014
- * only the boolean `housing_included` / `meals_included` flags. A provided or
- * partial provision (or any non-empty description) flips the flag to true; the
- * free-text description itself is NOT persisted yet. Flagged for schema
- * follow-up.
- */
 export interface ListingWriteFields {
   title?: string;
   category?: OpportunityCategory;
@@ -472,11 +402,6 @@ function benefitIncluded(
   return typeof description === "string" && description.trim().length > 0;
 }
 
-/**
- * Map the public ListingWriteFields into `listings` table columns. Only keys
- * that are present on `fields` are emitted, so the same builder serves create
- * (full) and update (partial) writes.
- */
 function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch {
   const patch: ListingColumnPatch = {};
 
@@ -517,43 +442,25 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
   return patch;
 }
 
-/**
- * Create a draft listing owned by the authenticated host.
- *
- * `clerkUserId` must come from `auth().userId` \u2014 never decoded from the token.
- * The listing is always inserted with status 'draft'.
- */
 export async function createListing(
   clerkToken: string,
   clerkUserId: string,
   fields: ListingWriteFields,
 ): Promise<{ ok: boolean; listingId?: string; error?: string }> {
   const title = fields.title?.trim() ?? "";
-  if (title.length === 0) {
-    return { ok: false, error: "A listing title is required." };
-  }
-  if (!fields.category) {
-    return { ok: false, error: "Choose a valid category for the listing." };
-  }
+  if (title.length === 0) return { ok: false, error: "A listing title is required." };
+  if (!fields.category) return { ok: false, error: "Choose a valid category for the listing." };
 
   const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
   if (!hostProfileId) {
-    return {
-      ok: false,
-      error: "No host profile found for your account. Create a host profile first.",
-    };
+    return { ok: false, error: "No host profile found for your account. Create a host profile first." };
   }
 
   const patch = buildListingColumnPatch(fields);
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data, error } = await untyped
     .from("listings")
-    .insert({
-      ...patch,
-      title,
-      host_profile_id: hostProfileId,
-      status: "draft",
-    })
+    .insert({ ...patch, title, host_profile_id: hostProfileId, status: "draft" })
     .select("id")
     .single();
 
@@ -563,34 +470,19 @@ export async function createListing(
   return { ok: true, listingId: (data as { id: string }).id };
 }
 
-/**
- * Update an existing listing the caller owns.
- *
- * Ownership is enforced directly in the query:
- * UPDATE ... WHERE id = listingId AND host_profile_id = <caller's profile>.
- * A row the host does not own simply matches nothing and returns an error.
- *
- * `clerkUserId` must come from `auth().userId`.
- */
 export async function updateListing(
   clerkToken: string,
   clerkUserId: string,
   listingId: string,
   fields: ListingWriteFields,
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!listingId) {
-    return { ok: false, error: "Missing listing id." };
-  }
+  if (!listingId) return { ok: false, error: "Missing listing id." };
 
   const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
-  if (!hostProfileId) {
-    return { ok: false, error: "No host profile found for your account." };
-  }
+  if (!hostProfileId) return { ok: false, error: "No host profile found for your account." };
 
   const patch = buildListingColumnPatch(fields);
-  if (Object.keys(patch).length === 0) {
-    return { ok: true };
-  }
+  if (Object.keys(patch).length === 0) return { ok: true };
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data, error } = await untyped
@@ -601,11 +493,249 @@ export async function updateListing(
     .select("id")
     .maybeSingle();
 
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-  if (!data) {
-    return { ok: false, error: "Listing not found or you do not have access to it." };
-  }
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "Listing not found or you do not have access to it." };
   return { ok: true };
+}
+
+/* ========================================================================== */
+/* Wave 10 — public listing detail + per-seeker state queries                 */
+/* ========================================================================== */
+
+/**
+ * Joined host_profiles fields on a public listing detail. id is needed to
+ * link /host/{id} and generate hiringOrganization JSON-LD.
+ */
+export interface PublicListingDetailHost {
+  id: string;
+  companyName: string;
+  photoUrl: string | null;
+  about: string | null;
+  primaryLocationName: string | null;
+  attestationStatus: string;
+}
+
+/**
+ * A single listing for the public detail page, joined to its host_profiles row.
+ *
+ * Does NOT filter on status — the page layer decides visibility (non-live
+ * listings are only shown to the owning host). Uses the anon client.
+ */
+export interface PublicListingDetail {
+  id: string;
+  title: string;
+  category: OpportunityCategory;
+  description: string | null;
+  locationDisplay: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  status: ListingStatus;
+  housingIncluded: boolean;
+  mealsIncluded: boolean;
+  compensationSummary: string | null;
+  compensationMinCents: number | null;
+  compensationMaxCents: number | null;
+  compensationUnit: string | null;
+  compensationCurrency: string;
+  timelineSummary: string | null;
+  beginsAt: string | null;
+  endsAt: string | null;
+  publishedAt: string | null;
+  coverPhotoUrl: string | null;
+  hostProfileId: string | null;
+  host: PublicListingDetailHost | null;
+}
+
+const LISTING_DETAIL_COLUMNS =
+  "id,title,category,description,location_display,latitude,longitude,status," +
+  "housing_included,meals_included,compensation_summary,compensation_min_cents," +
+  "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
+  "begins_at,ends_at,published_at,cover_photo_url,host_profile_id," +
+  "host_profiles(id,company_name,photo_url,about,primary_location_name,attestation_status)";
+
+function firstEmbed(value: unknown): Record<string, unknown> | null {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return candidate && typeof candidate === "object"
+    ? (candidate as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * Fetch a listing for the public detail page. No status filter — the page
+ * decides who may view non-live listings. Anon client (no auth required).
+ */
+export async function getListingDetailPublic(
+  listingId: string,
+): Promise<PublicListingDetail | null> {
+  const db = anonClient() as unknown as SupabaseClient;
+  const { data, error } = await db
+    .from("listings")
+    .select(LISTING_DETAIL_COLUMNS)
+    .eq("id", listingId)
+    .maybeSingle();
+
+  if (error) throw new Error(`getListingDetailPublic: ${error.message}`);
+  if (!data) return null;
+
+  const row = data as Record<string, unknown>;
+  const hostRow = firstEmbed(row.host_profiles);
+
+  const host: PublicListingDetailHost | null = hostRow
+    ? {
+        id: String(hostRow.id ?? row.host_profile_id ?? ""),
+        companyName:
+          typeof hostRow.company_name === "string" ? hostRow.company_name : "",
+        photoUrl:
+          typeof hostRow.photo_url === "string" ? hostRow.photo_url : null,
+        about: typeof hostRow.about === "string" ? hostRow.about : null,
+        primaryLocationName:
+          typeof hostRow.primary_location_name === "string"
+            ? hostRow.primary_location_name
+            : null,
+        attestationStatus:
+          typeof hostRow.attestation_status === "string"
+            ? hostRow.attestation_status
+            : "not_attested",
+      }
+    : null;
+
+  return {
+    id: String(row.id),
+    title: typeof row.title === "string" ? row.title : "",
+    category: (typeof row.category === "string"
+      ? row.category
+      : "mix") as OpportunityCategory,
+    description:
+      typeof row.description === "string" ? row.description : null,
+    locationDisplay:
+      typeof row.location_display === "string" ? row.location_display : null,
+    latitude: typeof row.latitude === "number" ? row.latitude : null,
+    longitude: typeof row.longitude === "number" ? row.longitude : null,
+    status: (typeof row.status === "string"
+      ? row.status
+      : "draft") as ListingStatus,
+    housingIncluded: row.housing_included === true,
+    mealsIncluded: row.meals_included === true,
+    compensationSummary:
+      typeof row.compensation_summary === "string"
+        ? row.compensation_summary
+        : null,
+    compensationMinCents:
+      typeof row.compensation_min_cents === "number"
+        ? row.compensation_min_cents
+        : null,
+    compensationMaxCents:
+      typeof row.compensation_max_cents === "number"
+        ? row.compensation_max_cents
+        : null,
+    compensationUnit:
+      typeof row.compensation_unit === "string" ? row.compensation_unit : null,
+    compensationCurrency:
+      typeof row.compensation_currency === "string"
+        ? row.compensation_currency
+        : "USD",
+    timelineSummary:
+      typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+    beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
+    endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
+    publishedAt:
+      typeof row.published_at === "string" ? row.published_at : null,
+    coverPhotoUrl:
+      typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
+    hostProfileId:
+      typeof row.host_profile_id === "string" ? row.host_profile_id : null,
+    host,
+  };
+}
+
+/**
+ * Resolve seeker_profiles.id for the authed Clerk user.
+ * Internal helper shared by hasApplied / hasSaved.
+ */
+async function resolveSeekerProfileIdForListings(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<string | null> {
+  const db = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await db
+    .from("seeker_profiles")
+    .select("id")
+    .eq("clerk_user_id", clerkUserId)
+    .maybeSingle();
+  if (error) throw new Error(`resolveSeekerProfileIdForListings: ${error.message}`);
+  return data ? String((data as { id: string }).id) : null;
+}
+
+/**
+ * Whether the authed seeker has an active (non-withdrawn) application to a
+ * listing. Returns false when the seeker has no profile yet.
+ * `clerkUserId` must come from auth().userId.
+ */
+export async function hasApplied(
+  clerkToken: string,
+  clerkUserId: string,
+  listingId: string,
+): Promise<boolean> {
+  const seekerProfileId = await resolveSeekerProfileIdForListings(
+    clerkToken,
+    clerkUserId,
+  );
+  if (!seekerProfileId) return false;
+
+  const db = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await db
+    .from("applications")
+    .select("id")
+    .eq("seeker_profile_id", seekerProfileId)
+    .eq("listing_id", listingId)
+    .neq("status", "withdrawn")
+    .maybeSingle();
+  if (error) throw new Error(`hasApplied: ${error.message}`);
+  return Boolean(data);
+}
+
+/**
+ * Whether the authed seeker has actively saved a listing (status='saved').
+ * `clerkUserId` must come from auth().userId.
+ */
+export async function hasSaved(
+  clerkToken: string,
+  clerkUserId: string,
+  listingId: string,
+): Promise<boolean> {
+  const seekerProfileId = await resolveSeekerProfileIdForListings(
+    clerkToken,
+    clerkUserId,
+  );
+  if (!seekerProfileId) return false;
+
+  const db = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await db
+    .from("saved_listings")
+    .select("listing_id")
+    .eq("seeker_profile_id", seekerProfileId)
+    .eq("listing_id", listingId)
+    .eq("status", "saved")
+    .maybeSingle();
+  if (error) throw new Error(`hasSaved: ${error.message}`);
+  return Boolean(data);
+}
+
+/**
+ * Distinct host_profile_id values with at least one live listing.
+ * Used to populate host-profile entries in the sitemap. Anon client.
+ */
+export async function getHostIdsWithLiveListings(): Promise<string[]> {
+  const db = anonClient() as unknown as SupabaseClient;
+  const { data, error } = await db
+    .from("listings")
+    .select("host_profile_id")
+    .eq("status", "live");
+  if (error) throw new Error(`getHostIdsWithLiveListings: ${error.message}`);
+
+  const ids = new Set<string>();
+  for (const raw of (data ?? []) as Array<{ host_profile_id: string | null }>) {
+    if (raw.host_profile_id) ids.add(raw.host_profile_id);
+  }
+  return [...ids];
 }
