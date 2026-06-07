@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getNotifications, type Notification } from "@explore-and-earn/db";
 import type { IconKey } from "@explore-and-earn/ui";
 
+import { markAllNotificationsReadAction } from "../../actions/notifications";
 import {
   BucketPage,
   NotificationList,
@@ -11,7 +12,7 @@ import {
   type NotificationKind,
 } from "../../../components/seeker";
 import { EmptyState } from "../../../components/discovery";
-import { MarkAllReadOnView } from "./MarkAllReadOnView";
+import styles from "./page.module.css";
 
 export const metadata: Metadata = {
   title: "Notifications",
@@ -109,13 +110,20 @@ export default async function NotificationsPage() {
 
   const notifications = await getNotifications(token, userId).catch(() => [] as Notification[]);
   const items = notifications.map(toNotificationItem);
+  const hasUnread = items.some((item) => item.unread);
 
   return (
     <BucketPage
       title="Notifications"
       description="Invites, offers, matches, and reminders."
     >
-      {items.length > 0 ? <MarkAllReadOnView /> : null}
+      {hasUnread ? (
+        <form className={styles.toolbar} action={markAllNotificationsReadAction}>
+          <button className={styles.button} type="submit">
+            Mark all as read
+          </button>
+        </form>
+      ) : null}
       <NotificationList items={items} />
     </BucketPage>
   );

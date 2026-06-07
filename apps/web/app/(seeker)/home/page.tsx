@@ -29,7 +29,7 @@ export default async function SeekerHomePage() {
   const [status, primaryActionInput, matchedListings] = await Promise.all([
     getSeekerStatus(token, userId, fallbackName),
     getPrimaryActionInput(token, userId),
-    getMatchedListings(),
+    getMatchedListings(token, userId),
   ]);
   return (
     <>
@@ -48,7 +48,7 @@ export default async function SeekerHomePage() {
       <section className={styles.block}>
         <SectionHeading
           title="Matched listings"
-          description="Relevance is shown as a neutral signal \u2014 never a score to chase."
+          description="Relevance is shown as a neutral signal — never a score to chase."
           actionLabel="See all"
           actionHref="/seek"
         />

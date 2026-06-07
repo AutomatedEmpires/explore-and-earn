@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 
-import { getSeekerApplicationsWithListings } from "@explore-and-earn/db";
+import { getApplicationsForSeekerWithListings } from "@explore-and-earn/db";
 
-import {
-  BucketPage,
-  CardStatus,
-  LifecycleList,
-} from "../../../components/seeker";
+import { ApplicationCard, BucketPage } from "../../../components/seeker";
 import { EmptyState } from "../../../components/discovery";
+import styles from "../../../components/seeker/LifecycleList.module.css";
 
 export const metadata: Metadata = {
   title: "Not selected",
@@ -25,7 +22,7 @@ export default async function NotSelectedPage() {
     return (
       <BucketPage
         title="Not selected"
-        description="Closure without the noise \u2014 explore similar opportunities."
+        description="Closure without the noise — explore similar opportunities."
       >
         <EmptyState
           title="Sign in to see your applications"
@@ -35,31 +32,37 @@ export default async function NotSelectedPage() {
     );
   }
 
-  const notSelected = await getSeekerApplicationsWithListings(token, userId, [
-    "not_selected",
-  ]);
-  const items = notSelected.flatMap((application) =>
-    application.listing
-      ? [
-          {
-            listing: application.listing,
-            actions: <CardStatus icon="system.info" label="Not selected" />,
-          },
-        ]
-      : [],
+  const applications = await getApplicationsForSeekerWithListings(token, userId).catch(
+    () => [],
   );
+  const notSelected = applications
+    .filter(
+      (application) =>
+        application.status === "not_selected" || application.status === "rejected",
+    )
+    .map((application) =>
+      application.status === "rejected"
+        ? { ...application, status: "not_selected" }
+        : application,
+    );
 
   return (
     <BucketPage
       title="Not selected"
-      description="Closure without the noise \u2014 explore similar opportunities."
+      description="Closure without the noise — explore similar opportunities."
     >
-      <LifecycleList
-        surface="applied"
-        items={items}
-        emptyTitle="Nothing here"
-        emptyMessage="Roles that didn't work out will be listed here, quietly and respectfully. Keep exploring opportunities under Seek."
-      />
+      {notSelected.length > 0 ? (
+        <div className={styles.grid}>
+          {notSelected.map((application) => (
+            <ApplicationCard key={application.id} application={application} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          title="Nothing here"
+          message="Roles that didn't work out will be listed here, quietly and respectfully. Keep exploring opportunities under Seek."
+        />
+      )}
     </BucketPage>
   );
 }

@@ -1,0 +1,24 @@
+.toolbar {
+	display: flex;
+	justify-content: flex-end;
+	margin-block-end: var(--space-12);
+}
+
+.button {
+	min-height: 40px;
+	padding: var(--space-8) var(--space-12);
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	cursor: pointer;
+}
+
+.button:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
