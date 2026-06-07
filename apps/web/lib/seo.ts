@@ -94,5 +94,12 @@ export function generateJobPostingJsonLd(
     if (cleaned[key] === null) delete cleaned[key];
   });
 
-  return JSON.stringify(cleaned, null, 2);
+  // Escape characters that can break out of a <script> tag so user-controlled
+  // fields (title, description, companyName) cannot inject </script> or similar.
+  return JSON.stringify(cleaned, null, 2)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/ /g, "\\u2028")
+    .replace(/ /g, "\\u2029");
 }
