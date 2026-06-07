@@ -4,7 +4,7 @@
 
 ## What Explore&Earn is
 
-A **built by seekers, for seekers discovery marketplace that rewards real-world exploration.** It is mobile-first, card-first, and premium, and it keeps **housing, meals, and pay** visible from the start.
+A **discovery marketplace built by seekers, for seekers that rewards real-world exploration.** It is mobile-first, card-first, and premium, and it keeps **housing, meals, and pay** visible from the start.
 
 ## North-star feel
 

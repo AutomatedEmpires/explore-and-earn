@@ -2,7 +2,7 @@
 
 > built by seekers for seekers
 
-Explore&Earn is a **built by seekers, for seekers discovery marketplace that rewards real-world exploration.** Every opportunity answers three questions: **Where will I sleep? (Housing) · What will I eat? (Meals) · What will I earn? (Pay).**
+Explore&Earn is a **discovery marketplace built by seekers, for seekers that rewards real-world exploration.** Every opportunity answers three questions: **Where will I sleep? (Housing) · What will I eat? (Meals) · What will I earn? (Pay).**
 
 This repository is the **implementation control plane**. The product brain lives in Notion. Design truth is codified here in `docs/design/` (Figma is an optional reference, not a required gate).
 

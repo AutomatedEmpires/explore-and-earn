@@ -29,7 +29,7 @@ export interface ListingRow {
 export declare function rowToDiscoveryFields(row: ListingRow): {
     id: string;
     title: string;
-    category: "farm" | "maritime" | "remote" | "seasonal" | "mix";
+    category: "seasonal" | "farm" | "maritime" | "remote" | "mix";
     location: string;
     opportunityWindow: string;
     status: "live" | "draft" | "paused" | "closed" | "archived" | "under_review";
