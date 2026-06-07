@@ -8,7 +8,7 @@ import {
   type FormEvent,
 } from "react";
 import { Button, Icon } from "@explore-and-earn/ui";
-import type { SeekerSearchResult } from "@explore-and-earn/db";
+import type { SeekerSearchResult } from "@explore-and-earn/db/client";
 
 import { searchSeekersAction, sendInviteAction } from "../../app/actions/invites";
 import styles from "./SeekerSearchDrawer.module.css";

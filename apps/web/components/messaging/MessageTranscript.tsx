@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { anonClient, type Message } from "@explore-and-earn/db";
+import { anonClient, type Message } from "@explore-and-earn/db/client";
 
 import { EmptyState } from "../discovery";
 import { ReplyForm } from "./ReplyForm";

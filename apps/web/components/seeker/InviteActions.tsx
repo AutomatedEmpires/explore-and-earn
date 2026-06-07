@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@explore-and-earn/ui";
-import type { InviteResponse } from "@explore-and-earn/db";
+import type { InviteResponse } from "@explore-and-earn/db/client";
 
 import { respondToInviteAction } from "../../app/actions/invites";
 import styles from "./InviteActions.module.css";

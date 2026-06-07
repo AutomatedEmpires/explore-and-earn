@@ -20,12 +20,5 @@ export {
 } from "./listing";
 export type { DiscoveryListing, DiscoveryListingHost } from "./listing";
 export { DISCOVERY_FIXTURES } from "./fixtures";
-export {
-  getDiscoveryListings,
-  getDiscoveryListingById,
-  getDiscoveryListingsWithCoords,
-  getSwipeListings,
-} from "./data";
-export type { SwipeBatch } from "./data";
 export { QuickPeekDrawer } from "./QuickPeekDrawer";
 export type { QuickPeekDrawerProps } from "./QuickPeekDrawer";

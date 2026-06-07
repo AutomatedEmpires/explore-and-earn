@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Notifications data access for the seeker notification feed + unread badge,
  * plus the host-facing "new application" side-effect insert.

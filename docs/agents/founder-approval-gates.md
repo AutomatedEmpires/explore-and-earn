@@ -25,7 +25,7 @@ When a task touches a gate, the owning agent must, **instead of implementing**:
 1. Add the matching `gate:*` label **and** `status:blocked`.
 2. Post a handoff comment swapping the baton to `agent:founder`.
 3. Add a row to the founder approval queue (decision, why gated, options + tradeoffs, recommendation).
-4. Leave the issue out of `status:ready-for-engineering` until the founder resolves it.
+4. Leave the issue out of `status:ready` until the founder resolves it.
 
 This keeps gated work visible and stalled-by-design in GitHub — never silently waiting in a chat.
 
@@ -33,8 +33,8 @@ This keeps gated work visible and stalled-by-design in GitHub — never silently
 
 1. Do **not** write the code. Stop at the boundary.
 2. Add a row to the founder approval queue with: the decision, why it is gated, options + tradeoffs, and your recommendation.
-3. Leave the issue in `backlog`/`blocked` (not `ready-for-engineering`) until the founder resolves it.
-4. Once approved, the decision is recorded in Notion canon **first**, then the task becomes `ready-for-engineering`.
+3. Leave the issue in `status:blocked` or unqueued work, but do not move it to `status:ready`, until the founder resolves it.
+4. Once approved, the decision is recorded in Notion canon **first**, then the task becomes `status:ready`.
 
 ## Why gates exist
 

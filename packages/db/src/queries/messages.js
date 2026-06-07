@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 const MAX_BODY_LENGTH = 4000;
 const UNIQUE_VIOLATION = "23505";

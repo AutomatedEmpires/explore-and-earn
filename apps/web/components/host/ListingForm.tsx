@@ -6,7 +6,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useAuth } from "@clerk/nextjs";
 
 import { Button } from "@explore-and-earn/ui";
-import { uploadListingMedia } from "@explore-and-earn/db";
+import { uploadListingMedia } from "@explore-and-earn/db/client";
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,

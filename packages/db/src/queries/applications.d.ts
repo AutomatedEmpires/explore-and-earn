@@ -1,3 +1,4 @@
+import "server-only";
 import type { BenefitTriad, ListingStatus, OpportunityCategory } from "@explore-and-earn/contracts";
 export interface ApplyResult {
     readonly ok: boolean;

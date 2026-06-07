@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Messaging data access — scoped seeker <-> host conversations + transcripts.
  *

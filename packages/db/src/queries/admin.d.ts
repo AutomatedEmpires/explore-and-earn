@@ -1,3 +1,4 @@
+import "server-only";
 /** Marketplace-wide counts for the founder admin dashboard. */
 export interface MarketplaceStats {
     readonly totalListings: number;

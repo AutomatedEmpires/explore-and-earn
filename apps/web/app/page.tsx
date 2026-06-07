@@ -1,4 +1,5 @@
-import { DiscoveryFeed, getDiscoveryListings } from "../components/discovery";
+import { DiscoveryFeed } from "../components/discovery";
+import { getDiscoveryListings } from "../components/discovery/data";
 
 export const dynamic = "force-dynamic";
 

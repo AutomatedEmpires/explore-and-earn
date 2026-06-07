@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Badge, Button, Icon } from "@explore-and-earn/ui";
-import type { HostInvite } from "@explore-and-earn/db";
-import type { ListingRow } from "@explore-and-earn/db";
+import type { HostInvite } from "@explore-and-earn/db/client";
+import type { ListingRow } from "@explore-and-earn/db/client";
 
 import { SeekerSearchDrawer } from "../../../../components/host/SeekerSearchDrawer";
 import styles from "./InvitesList.module.css";

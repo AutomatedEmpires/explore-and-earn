@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 /** Postgres unique_violation SQLSTATE -- surfaced as the already-applied case. */
 const UNIQUE_VIOLATION = "23505";
@@ -40,8 +41,7 @@ export async function applyToListing(clerkToken, clerkUserId, listingId, coverMe
         .select("host_profiles!host_profile_id(clerk_user_id)")
         .eq("id", listingId)
         .maybeSingle();
-    const hostProfile = firstOf(listingOwner?.host_profiles);
-    const hostClerkId = hostProfile?.clerk_user_id;
+    const hostClerkId = listingOwner?.host_profiles?.clerk_user_id;
     if (hostClerkId && hostClerkId === clerkUserId) {
         return { ok: false, error: "cannot_apply_to_own_listing" };
     }

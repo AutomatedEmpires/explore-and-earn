@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 /**
  * Seeker profile data access for onboarding + profile edit.
@@ -121,4 +122,26 @@ export async function saveSeekerProfile(clerkToken, clerkUserId, update) {
             error: caught instanceof Error ? caught.message : "unknown_error",
         };
     }
+}
+/**
+ * Batch-resolve seeker display names by internal seeker_profiles.id.
+ * Missing rows and blank names fall back to "Seeker" at the caller boundary.
+ */
+export async function getSeekerDisplayNames(clerkToken, seekerProfileIds) {
+    if (seekerProfileIds.length === 0)
+        return new Map();
+    const uniqueIds = [...new Set(seekerProfileIds.filter(Boolean))];
+    if (uniqueIds.length === 0)
+        return new Map();
+    const untyped = authedClient(clerkToken);
+    const { data } = await untyped
+        .from(SEEKER_PROFILES)
+        .select("id, display_name")
+        .in("id", uniqueIds);
+    const map = new Map();
+    for (const row of (data ?? [])) {
+        const displayName = row.display_name?.trim();
+        map.set(row.id, displayName && displayName.length > 0 ? displayName : "Seeker");
+    }
+    return map;
 }

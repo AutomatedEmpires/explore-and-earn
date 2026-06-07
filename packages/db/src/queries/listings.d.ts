@@ -1,3 +1,4 @@
+import "server-only";
 import type { BenefitProvision, CompensationUnit, ListingStatus, OpportunityCategory } from "@explore-and-earn/contracts";
 export interface ListingRow {
     id: string;

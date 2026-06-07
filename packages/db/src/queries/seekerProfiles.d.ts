@@ -1,3 +1,4 @@
+import "server-only";
 export type SeekerLocationPref = "remote" | "on_site" | "either";
 export type SeekerHousingPref = "required" | "preferred" | "not_needed" | "flexible";
 export interface SeekerProfileRecord {
@@ -37,3 +38,8 @@ export declare function saveSeekerProfile(clerkToken: string, clerkUserId: strin
     ok: boolean;
     error?: string;
 }>;
+/**
+ * Batch-resolve seeker display names by internal seeker_profiles.id.
+ * Missing rows and blank names fall back to "Seeker" at the caller boundary.
+ */
+export declare function getSeekerDisplayNames(clerkToken: string, seekerProfileIds: string[]): Promise<Map<string, string>>;

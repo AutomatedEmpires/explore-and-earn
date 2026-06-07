@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { anonClient } from "@explore-and-earn/db";
+import { anonClient } from "@explore-and-earn/db/client";
 
 export interface UnreadBadgeProps {
 	/** Server-resolved unread count at render time. */

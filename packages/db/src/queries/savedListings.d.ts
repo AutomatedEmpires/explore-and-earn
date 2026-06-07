@@ -1,3 +1,4 @@
+import "server-only";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 export declare function saveListing(clerkToken: string, clerkUserId: string, listingId: string): Promise<{
     ok: boolean;
