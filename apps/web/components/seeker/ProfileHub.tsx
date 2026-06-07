@@ -22,9 +22,9 @@ interface ProfileLink {
  * Unified seeker profile hub. Composes existing lane pieces (StatusStrip, the
  * Meter primitive, SectionHeading) and links out to every seeker surface, so
  * the founder-locked Profile tab is a real home base instead of a dead end.
- * UI-only (Sprint Zero) — reads the SEEKER_STATUS fixture; no backend.
  */
 const PROFILE_LINKS: readonly ProfileLink[] = [
+	{ href: "/profile/edit", icon: "nav.profile", label: "Edit profile", detail: "Update your name, bio, and preferences." },
 	{ href: "/resume", icon: "nav.profile", label: "Resume", detail: "Edit your tag-based compatibility profile." },
 	{ href: "/saved", icon: "nav.saved", label: "Saved", detail: "Opportunities you have bookmarked." },
 	{ href: "/applied", icon: "action.apply", label: "Applications", detail: "Track every application status." },

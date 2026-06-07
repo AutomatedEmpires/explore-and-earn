@@ -6,6 +6,7 @@ export * from "./queries/applications";
 export * from "./queries/invites";
 export * from "./queries/hostProfiles";
 export * from "./queries/seekerResume";
+export * from "./queries/seekerProfiles";
 export * from "./queries/notifications";
 export * from "./queries/messages";
 export * from "./queries/emailContext";

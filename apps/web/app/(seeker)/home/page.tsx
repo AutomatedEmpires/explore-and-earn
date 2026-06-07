@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { auth, currentUser } from "@clerk/nextjs/server";
+
 import {
   BucketChips,
   LifecycleList,
@@ -12,14 +14,21 @@ import {
 } from "../../../components/seeker";
 import styles from "./page.module.css";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Home",
 };
 
 export default async function SeekerHomePage() {
+  const { userId, getToken } = await auth();
+  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const user = userId ? await currentUser() : null;
+  const fallbackName = user?.firstName ?? null;
+
   const [status, primaryActionInput, matchedListings] = await Promise.all([
-    getSeekerStatus(),
-    getPrimaryActionInput(),
+    getSeekerStatus(token, userId, fallbackName),
+    getPrimaryActionInput(token, userId),
     getMatchedListings(),
   ]);
   return (
