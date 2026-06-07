@@ -1,0 +1,3 @@
+-- 016_storage_buckets.sql (stub)
+-- Content moved to 017_storage_buckets.sql to avoid a sequence collision with
+-- 016_lock_down_security_definer_functions.sql (merged via PR #149).

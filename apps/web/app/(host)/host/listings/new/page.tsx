@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
+import { getHostProfile } from "@explore-and-earn/db";
+
 import { HostSectionHeading, ListingForm } from "../../../../../components/host";
 import styles from "./page.module.css";
 
@@ -10,10 +12,16 @@ export const metadata: Metadata = { title: "New listing" };
 export const dynamic = "force-dynamic";
 
 export default async function HostNewListingPage() {
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
   if (!userId) {
     redirect("/sign-in");
   }
+  const token = await getToken({ template: "supabase" });
+  if (!token) {
+    redirect("/sign-in");
+  }
+
+  const hostProfile = await getHostProfile(token, userId).catch(() => null);
 
   return (
     <section className={styles.block}>
@@ -23,7 +31,7 @@ export default async function HostNewListingPage() {
         actionLabel="All listings"
         actionHref="/host/listings"
       />
-      <ListingForm mode="create" />
+      <ListingForm mode="create" hostProfileId={hostProfile?.id} />
     </section>
   );
 }
