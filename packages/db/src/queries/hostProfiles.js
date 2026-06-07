@@ -10,11 +10,15 @@ import { authedClient } from "../client";
  * the token. Keep these manual scoping filters even once RLS lands; they are
  * defense in depth.
  *
- * TYPES: `packages/db/src/types.gen.ts` is still a placeholder
- * (`GeneratedDatabase = Record<string, never>`), so the typed client cannot
- * describe `host_profiles` yet. We cast to an untyped `SupabaseClient` handle
- * for `.from(...)` calls and narrow returned rows locally, mirroring
- * `savedListings.ts`. Drop the cast once generated types exist.
+ * TYPES: `host_profiles` is now present in the generated
+ * `packages/db/src/types.gen.ts`, but `createHostProfile` below inserts only
+ * `clerk_user_id` / `company_name` / `attestation_status`, while the generated
+ * `Insert` type marks `owner_user_id` and `slug` as required. A typed client
+ * would reject that insert, and "fixing" it would mean supplying those columns
+ * (a runtime behavior change) rather than a pure type fix. We therefore keep an
+ * untyped `SupabaseClient` handle for `.from(...)` calls and narrow returned
+ * rows locally, mirroring `savedListings.ts`.
+ * // types not yet generated: host_profiles insert omits required owner_user_id/slug
  */
 const PENDING_ATTESTATION = "pending";
 /** Postgres unique_violation SQLSTATE (host_profiles.clerk_user_id is UNIQUE). */
