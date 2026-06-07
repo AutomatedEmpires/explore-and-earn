@@ -1,0 +1,71 @@
+/* Applied list loading skeleton. Semantic tokens only. */
+
+.wrap {
+	padding: var(--space-gutter);
+	background: var(--color-paper);
+	min-height: 100vh;
+}
+
+.list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+}
+
+.row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-16);
+	padding: var(--space-card);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+}
+
+.thumb {
+	width: 4rem;
+	height: 4rem;
+	flex: none;
+}
+
+.thumb :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: var(--radius-image);
+}
+
+.lines {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.lineWide {
+	width: 70%;
+}
+
+.line {
+	width: 45%;
+}
+
+.lineWide :global(.ui-skeleton),
+.line :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: var(--type-body-lh);
+	border-radius: var(--radius-input);
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}

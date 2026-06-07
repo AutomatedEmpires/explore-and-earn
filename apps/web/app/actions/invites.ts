@@ -18,6 +18,7 @@ import { revalidatePath } from "next/cache"
 import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
 import { inviteEmail } from "../../lib/emails"
+import { checkRateLimit } from "../../lib/rateLimit"
 
 /**
  * Server function: invites for the authenticated seeker (newest first).
@@ -86,6 +87,12 @@ export async function sendInviteAction(
 	const token = await getToken({ template: "supabase" })
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
+	}
+
+	// Rate limit: 20 invites per hour per host. checkRateLimit never throws.
+	const { allowed } = checkRateLimit(`invite:${userId}`, 20, 60 * 60 * 1000)
+	if (!allowed) {
+		return { ok: false, error: "rate_limit_exceeded" }
 	}
 
 	// Ownership check: listing must belong to this host.

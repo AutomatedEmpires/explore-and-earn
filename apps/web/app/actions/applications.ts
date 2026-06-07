@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache"
 import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
 import { applicationReceivedEmail } from "../../lib/emails"
+import { checkRateLimit } from "../../lib/rateLimit"
 
 /**
  * Server action: apply the authenticated seeker to a listing.
@@ -31,6 +32,12 @@ export async function applyToListingAction(
 	const token = await getToken({ template: "supabase" })
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
+	}
+
+	// Rate limit: 5 applications per hour per user. checkRateLimit never throws.
+	const { allowed } = checkRateLimit(`apply:${userId}`, 5, 60 * 60 * 1000)
+	if (!allowed) {
+		return { ok: false, error: "rate_limit_exceeded" }
 	}
 
 	const result = await applyToListing(token, userId, listingId, coverMessage)

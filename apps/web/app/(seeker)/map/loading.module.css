@@ -1,0 +1,32 @@
+/* Map view loading skeleton. Full-height canvas placeholder; semantic tokens only. */
+
+.wrap {
+	display: block;
+	padding: var(--space-gutter);
+	background: var(--color-paper);
+	min-height: 100vh;
+}
+
+.canvas {
+	width: 100%;
+	height: calc(100vh - var(--space-section));
+}
+
+.canvas :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: var(--radius-image);
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}

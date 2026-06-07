@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { getClerkContact } from "../../lib/clerkUser";
 import { absoluteUrl, sendEmail } from "../../lib/email";
 import { newMessageEmail } from "../../lib/emails";
+import { checkRateLimit } from "../../lib/rateLimit";
 
 export interface SendMessageActionResult {
 	readonly ok: boolean;
@@ -31,6 +32,10 @@ export async function sendMessageAction(
 
 	const token = await getToken({ template: "supabase" });
 	if (!token) return { ok: false, error: "unauthenticated" };
+
+	// Rate limit: 30 messages per minute per user. checkRateLimit never throws.
+	const { allowed } = checkRateLimit(`msg:${userId}`, 30, 60 * 1000);
+	if (!allowed) return { ok: false, error: "rate_limit_exceeded" };
 
 	const result = await sendMessage(token, userId, conversationId, body);
 	if (!result.ok) return result;
