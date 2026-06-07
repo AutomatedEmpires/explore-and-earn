@@ -53,7 +53,7 @@ export default function OnboardingStartPage() {
             className={styles.textarea}
             value={bio}
             onChange={(event) => setBio(event.target.value)}
-            placeholder="A sentence or two about what you&apos;re looking for."
+            placeholder="A sentence or two about what you're looking for."
             rows={4}
           />
         </label>

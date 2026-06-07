@@ -16,7 +16,7 @@ const LOCATION_OPTIONS: ReadonlyArray<{
 }> = [
   { value: "remote", label: "Remote", detail: "Work from anywhere." },
   { value: "on_site", label: "On-site", detail: "Live and work at the host." },
-  { value: "either", label: "Either", detail: "I&apos;m open to both." },
+  { value: "either", label: "Either", detail: "I'm open to both." },
 ];
 
 const HOUSING_OPTIONS: ReadonlyArray<{
@@ -27,9 +27,9 @@ const HOUSING_OPTIONS: ReadonlyArray<{
   {
     value: "preferred",
     label: "Housing preferred",
-    detail: "I&apos;d like a host to provide housing.",
+    detail: "I'd like a host to provide housing.",
   },
-  { value: "not_needed", label: "Not needed", detail: "I&apos;ll arrange my own." },
+  { value: "not_needed", label: "Not needed", detail: "I'll arrange my own." },
 ];
 
 export default function OnboardingPrefsPage() {
