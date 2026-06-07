@@ -68,7 +68,9 @@ export default function OnboardingSkillsPage() {
 
   function goNext() {
     startTransition(async () => {
-      await saveOnboardingStep({ categories: selected, freeformSkills: tags });
+      // Pass complete: true here so onboarding_complete is set server-side
+      // on the server action, not in a useEffect on the done page.
+      await saveOnboardingStep({ categories: selected, freeformSkills: tags, complete: true });
       router.push("/onboarding/done");
     });
   }

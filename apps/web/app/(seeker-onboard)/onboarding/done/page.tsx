@@ -1,62 +1,31 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { Icon } from "@explore-and-earn/ui";
 
-import { saveOnboardingStep } from "../../../actions/seekerOnboarding";
 import styles from "../onboarding.module.css";
 
+/**
+ * Onboarding completion page.
+ *
+ * onboarding_complete is set server-side by the skills step's saveOnboardingStep
+ * call (with complete: true) before the router navigates here — not in a useEffect.
+ * This page is a static confirmation screen; the seeker navigates to /swipe
+ * via the link below.
+ */
 export default function OnboardingDonePage() {
-  const router = useRouter();
-  const started = useRef(false);
-  const [saving, setSaving] = useState(true);
-
-  useEffect(() => {
-    if (started.current) {
-      return;
-    }
-    started.current = true;
-    let cancelled = false;
-    let redirectTimer: ReturnType<typeof setTimeout> | undefined;
-
-    saveOnboardingStep({ complete: true })
-      .catch(() => undefined)
-      .finally(() => {
-        if (cancelled) {
-          return;
-        }
-        setSaving(false);
-        redirectTimer = setTimeout(() => router.push("/swipe"), 1500);
-      });
-
-    return () => {
-      cancelled = true;
-      if (redirectTimer) {
-        clearTimeout(redirectTimer);
-      }
-    };
-  }, [router]);
-
   return (
     <div className={styles.shell}>
       <div className={styles.doneCard}>
         <span className={styles.doneIcon} aria-hidden>
-          <Icon name="status.match" size={40} aria-hidden />
+          <Icon name="status.match" size={24} aria-hidden />
         </span>
         <h1 className={styles.heading}>You&apos;re all set!</h1>
         <p className={styles.sub}>
-          Your profile is ready. Taking you to start swiping…
+          Your profile is ready. Start swiping to find your next adventure.
         </p>
-        <button
-          type="button"
-          className={styles.primaryButton}
-          onClick={() => router.push("/swipe")}
-          disabled={saving}
-        >
-          {saving ? "Finishing…" : "Start swiping"}
-        </button>
+        <Link href="/swipe" className={styles.primaryButton}>
+          Start swiping
+        </Link>
       </div>
     </div>
   );

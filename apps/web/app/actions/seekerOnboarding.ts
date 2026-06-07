@@ -15,7 +15,8 @@ import {
  *
  * IDENTITY: clerkUserId ALWAYS comes from auth().userId — never decoded from the
  * Supabase template token. Every step is optional/skippable; the final step sets
- * onboarding_complete = true.
+ * onboarding_complete = true (passed via complete: true from the skills step,
+ * not from a client-side useEffect on the done page).
  */
 export type OnboardingStepData = {
   displayName?: string | null;
@@ -41,29 +42,30 @@ export async function saveOnboardingStep(
     return { ok: false, error: "no_token" };
   }
 
-  const update: SeekerProfileUpdate = {};
-
-  if (stepData.displayName !== undefined) {
-    update.displayName = normalizeText(stepData.displayName);
-  }
-  if (stepData.bio !== undefined) {
-    update.bio = normalizeText(stepData.bio);
-  }
-  if (stepData.locationPref !== undefined) {
-    update.locationPref = stepData.locationPref;
-  }
-  if (stepData.housingPref !== undefined) {
-    update.housingPref = stepData.housingPref;
-  }
-  if (stepData.categories !== undefined) {
-    update.categories = sanitizeCategories(stepData.categories);
-  }
-  if (stepData.freeformSkills !== undefined) {
-    update.freeformSkills = sanitizeFreeform(stepData.freeformSkills);
-  }
-  if (stepData.complete !== undefined) {
-    update.onboardingComplete = stepData.complete;
-  }
+  // SeekerProfileUpdate fields are readonly, so build via conditional spreads.
+  const update: SeekerProfileUpdate = {
+    ...(stepData.displayName !== undefined
+      ? { displayName: normalizeText(stepData.displayName) }
+      : undefined),
+    ...(stepData.bio !== undefined
+      ? { bio: normalizeText(stepData.bio) }
+      : undefined),
+    ...(stepData.locationPref !== undefined
+      ? { locationPref: stepData.locationPref }
+      : undefined),
+    ...(stepData.housingPref !== undefined
+      ? { housingPref: stepData.housingPref }
+      : undefined),
+    ...(stepData.categories !== undefined
+      ? { categories: sanitizeCategories(stepData.categories) }
+      : undefined),
+    ...(stepData.freeformSkills !== undefined
+      ? { freeformSkills: sanitizeFreeform(stepData.freeformSkills) }
+      : undefined),
+    ...(stepData.complete !== undefined
+      ? { onboardingComplete: stepData.complete }
+      : undefined),
+  };
 
   return saveSeekerProfile(token, userId, update);
 }
