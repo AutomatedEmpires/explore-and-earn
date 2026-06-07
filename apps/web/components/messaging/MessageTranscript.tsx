@@ -77,8 +77,10 @@ function rowToMessage(row: Record<string, unknown>): Message {
 /**
  * Fold a realtime INSERT into the local list:
  *  - ignore a row we already have (its real id is present and not optimistic);
- *  - otherwise collapse a matching optimistic bubble (same side + body) into the
- *    persisted row, so the sender's own message is not duplicated;
+ *  - otherwise collapse a matching optimistic bubble (same side + body + sent
+ *    within 30 s) into the persisted row, so the sender's own message is not
+ *    duplicated. The timestamp guard prevents two identical messages sent in
+ *    rapid succession from both collapsing into the same optimistic bubble.
  *  - otherwise append it (a message from the other participant).
  */
 function mergeIncoming(
@@ -88,11 +90,13 @@ function mergeIncoming(
 	if (current.some((m) => !m.id.startsWith(OPTIMISTIC_PREFIX) && m.id === incoming.id)) {
 		return current;
 	}
+	const incomingTs = new Date(incoming.createdAt).getTime();
 	const optimisticIdx = current.findIndex(
 		(m) =>
 			m.id.startsWith(OPTIMISTIC_PREFIX) &&
 			m.senderType === incoming.senderType &&
-			m.body === incoming.body,
+			m.body === incoming.body &&
+			Math.abs(new Date(m.createdAt).getTime() - incomingTs) < 30_000,
 	);
 	if (optimisticIdx !== -1) {
 		const next = current.slice();
