@@ -4,6 +4,7 @@ import {
   getConversations,
   getMessages,
   getPublicListingsByIds,
+  getSeekerDisplayNames,
 } from "@explore-and-earn/db";
 
 import { EmptyState } from "../../../../components/discovery";
@@ -57,15 +58,21 @@ export default async function HostMessagesPage() {
 
   const conversations = await getConversations(token, userId, "host");
 
-  // Batch-fetch every conversation's listing in a single query (replaces the
-  // previous per-conversation getPublicListingById N+1), then join by id.
-  // Messages are still loaded per conversation (ownership-scoped reads).
-  // Applicant display names are not yet sourced (no exported seeker name
-  // resolver); see PR notes.
+  // Batch-fetch every conversation's listing and seeker display name (one
+  // round-trip each) and join by id, replacing the previous per-conversation
+  // N+1 listing read and the "Applicant" name placeholder. Messages are still
+  // loaded per conversation (ownership-scoped reads).
   const listingIds = conversations
     .map((conversation) => conversation.listingId)
     .filter((id): id is string => id !== null);
-  const listingRows = await getPublicListingsByIds(listingIds);
+  const seekerProfileIds = conversations.map(
+    (conversation) => conversation.seekerProfileId,
+  );
+
+  const [listingRows, seekerDisplayNames] = await Promise.all([
+    getPublicListingsByIds(listingIds),
+    getSeekerDisplayNames(token, seekerProfileIds),
+  ]);
   const listingById = new Map(listingRows.map((row) => [row.id, row] as const));
 
   const threads: HostMessageThread[] = await Promise.all(
@@ -77,7 +84,8 @@ export default async function HostMessagesPage() {
       const lastMessage = messages[messages.length - 1];
       return {
         id: conversation.id,
-        applicantName: "Applicant",
+        applicantName:
+          seekerDisplayNames.get(conversation.seekerProfileId) ?? "Seeker",
         listingTitle: listingRow?.title ?? "Conversation",
         preview: lastMessage?.body ?? "No messages yet",
         unread: lastMessage

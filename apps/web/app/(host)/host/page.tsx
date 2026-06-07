@@ -4,6 +4,7 @@ import {
   getHostDashboardStats,
   getRecentActivityForHost,
   getHostProfile,
+  getHostAnalytics,
 } from "@explore-and-earn/db";
 
 import { HostDashboard } from "../../../components/host";
@@ -26,7 +27,7 @@ export default async function HostDashboardPage() {
     );
   }
 
-  const [stats, recentActivity, hostProfile] = await Promise.all([
+  const [stats, recentActivity, hostProfile, analytics] = await Promise.all([
     getHostDashboardStats(token, userId).catch(() => ({
       listingsByStatus: {},
       applicationsThisMonth: {},
@@ -34,6 +35,12 @@ export default async function HostDashboardPage() {
     })),
     getRecentActivityForHost(token, userId).catch(() => []),
     getHostProfile(token, userId).catch(() => null),
+    getHostAnalytics(token, userId).catch(() => ({
+      totalApplicationsByStatus: {},
+      activeListingCount: 0,
+      inviteAcceptanceRate: 0,
+      perListingStats: [],
+    })),
   ]);
 
   return (
@@ -42,6 +49,7 @@ export default async function HostDashboardPage() {
         stats={stats}
         recentActivity={recentActivity}
         companyName={hostProfile?.companyName ?? null}
+        analytics={analytics}
       />
     </div>
   );

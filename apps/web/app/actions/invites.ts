@@ -64,17 +64,20 @@ export async function respondToInviteAction(
 }
 
 /**
- * Server action: the authenticated host sends an invite to a seeker for one of
- * their own listings.
+ * Shared host-invite creation path used by both createInviteAction and
+ * sendInviteAction.
  *
- * Ownership validation: the listing must belong to the caller (via getHostListings).
- * Deduplication: existing invite for (listing_id, seeker_profile_id) surfaces
- * as "already_invited".
- * Email: best-effort via Resend — errors are caught and never rethrown.
+ * - Resolves the caller's host profile (host_profile_id is required by the
+ *   createInvite DB query and scopes ownership).
+ * - Ownership validation: the listing must belong to the caller (via
+ *   getHostListings).
+ * - Deduplication: an existing invite for (listing_id, seeker_profile_id)
+ *   surfaces as "already_invited" from the DB unique constraint.
+ * - Email: best-effort via Resend — errors are caught and never rethrown.
  *
  * userId ALWAYS from auth().userId — never decoded from a token.
  */
-export async function sendInviteAction(
+async function createInviteForCurrentHost(
 	seekerProfileId: string,
 	listingId: string,
 	message?: string,
@@ -96,6 +99,12 @@ export async function sendInviteAction(
 		return { ok: false, error: "unauthenticated" }
 	}
 
+	// Resolve the host profile for the authed user.
+	const hostProfile = await getHostProfile(token, userId).catch(() => null)
+	if (!hostProfile) {
+		return { ok: false, error: "profile_not_found" }
+	}
+
 	// Ownership check: listing must belong to this host.
 	const listings = await getHostListings(token, userId).catch(() => [])
 	const ownedListing = listings.find((row) => row.id === listingId)
@@ -104,26 +113,33 @@ export async function sendInviteAction(
 	}
 
 	// Insert the invite (deduplication enforced by DB UNIQUE constraint).
-	const result = await createInvite(token, userId, listingId, seekerProfileId, message)
+	const result = await createInvite(token, {
+		hostProfileId: hostProfile.id,
+		seekerProfileId,
+		listingId,
+		message,
+		invitedByUserId: userId,
+	})
 	if (!result.ok) {
-		return result
+		return { ok: false, error: result.error }
 	}
 
 	revalidatePath("/host/invites")
 
 	// Best-effort email notification — errors are caught and never rethrown.
 	try {
-		const [hostProfile, seekerClerkUserId] = await Promise.all([
-			getHostProfile(token, userId).catch(() => null),
-			getSeekerClerkIdByProfileId(token, seekerProfileId).catch(() => null),
-		])
+		const seekerClerkUserId = await getSeekerClerkIdByProfileId(
+			token,
+			seekerProfileId,
+		).catch(() => null)
 
 		if (seekerClerkUserId) {
 			const contact = await getClerkContact(seekerClerkUserId)
 			if (contact.email) {
-				const hostName = hostProfile?.companyName ?? "A host"
+				const hostName = hostProfile.companyName || "A host"
 				const listingTitle = ownedListing.title
-				const listingLocation = ownedListing.location_display ?? "Location not specified"
+				const listingLocation =
+					ownedListing.location_display ?? "Location not specified"
 				const html = inviteEmail({
 					hostName,
 					listingTitle,
@@ -139,10 +155,34 @@ export async function sendInviteAction(
 			}
 		}
 	} catch (err) {
-		console.error("[sendInviteAction] email error (non-fatal):", err)
+		console.error("[createInviteForCurrentHost] email error (non-fatal):", err)
 	}
 
 	return { ok: true }
+}
+
+/**
+ * Server action: the authenticated host invites a seeker to one of their own
+ * listings. Thin wrapper over createInviteForCurrentHost (no custom message).
+ */
+export async function createInviteAction(
+	seekerProfileId: string,
+	listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+	return createInviteForCurrentHost(seekerProfileId, listingId)
+}
+
+/**
+ * Server action: same as createInviteAction but carries an optional personal
+ * message (used by the SeekerSearchDrawer compose step). Retained as a distinct
+ * export for the drawer's message-compose flow.
+ */
+export async function sendInviteAction(
+	seekerProfileId: string,
+	listingId: string,
+	message?: string,
+): Promise<{ ok: boolean; error?: string }> {
+	return createInviteForCurrentHost(seekerProfileId, listingId, message)
 }
 
 /**
