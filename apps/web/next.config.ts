@@ -40,7 +40,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Don't leak the Next.js version via the X-Powered-By header.
   poweredByHeader: false,
-  transpilePackages: ["@explore-and-earn/ui", "@explore-and-earn/contracts"],
+  transpilePackages: ["@explore-and-earn/ui", "@explore-and-earn/contracts", "@explore-and-earn/db"],
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
