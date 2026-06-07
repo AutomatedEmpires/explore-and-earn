@@ -1,39 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { OpportunityCategory } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
+import { getPublicListingsByIds, rowToDiscoveryFields } from "./listings";
 
 /**
  * Saved-listings data access for the seeker swipe / saved experience.
  *
- * SECURITY: Row Level Security is NOT yet enabled on `saved_listings`, and
- * `authedClient()` talks to PostgREST with the anon key plus the caller's Clerk
- * JWT (the `anon` role, which performs no row-level enforcement). Every query in
- * this module is therefore scoped in application code by the `seeker_profile_id`
- * we resolve from the caller-supplied, already-verified `clerkUserId`. Keep these
- * manual scoping filters even once RLS lands; they are defense in depth.
+ * SECURITY: Row Level Security is NOT yet enabled on `saved_listings`.
+ * Every query is scoped in application code by the `seeker_profile_id`
+ * resolved from the already-verified `clerkUserId`.
  *
- * TYPES: `packages/db/src/types.gen.ts` is now generated from the live schema,
- * but it does NOT include `seeker_profiles.clerk_user_id` (the Clerk-sync
- * columns from migration 009 are not reflected on the live database). A typed
- * client therefore rejects the `.select("id, clerk_user_id")` /
- * `.eq("clerk_user_id", ...)` lookup in `resolveSeekerProfileId`, so we keep an
- * untyped `SupabaseClient` handle for `.from(...)` calls and narrow rows
- * locally.
- * // types not yet generated: seeker_profiles.clerk_user_id
+ * TYPES: see savedListings TYPES note -- untyped client for clerk_user_id.
  */
 
 const SAVED_STATUS = "saved" as const;
 const REMOVED_STATUS = "removed" as const;
 
-/** Untyped Supabase handle (see TYPES note above). */
 function untypedClient(clerkToken: string): SupabaseClient {
   return authedClient(clerkToken) as unknown as SupabaseClient;
 }
 
-/**
- * Resolve the caller's own `seeker_profiles.id` from their Clerk user id.
- * Returns `null` when the seeker has not created a profile row yet.
- */
 async function resolveSeekerProfileId(
   db: SupabaseClient,
   clerkUserId: string,
@@ -49,17 +36,6 @@ async function resolveSeekerProfileId(
   return data ? (data as { id: string }).id : null;
 }
 
-/**
- * Save (or re-save) a listing for the current seeker by upserting a
- * `saved_listings` row with `status='saved'`.
- *
- * Best-effort by design: returns `{ ok: false }` silently when the seeker has no
- * profile yet or the write fails, so the swipe UX is never blocked. Never throws.
- *
- * @param clerkToken - Verified Clerk JWT from `getToken()`.
- * @param clerkUserId - Verified Clerk user ID from `auth().userId` — do NOT
- *   decode this from the token; pass it from the already-verified `auth()` call.
- */
 export async function saveListing(
   clerkToken: string,
   clerkUserId: string,
@@ -86,11 +62,6 @@ export async function saveListing(
   }
 }
 
-/**
- * Mark a previously saved listing as removed (`status='removed'`) for the current
- * seeker. Best-effort: returns `{ ok: false }` silently on any failure and never
- * throws.
- */
 export async function unsaveListing(
   clerkToken: string,
   clerkUserId: string,
@@ -114,11 +85,6 @@ export async function unsaveListing(
   }
 }
 
-/**
- * Return the `listing_id`s the current seeker has actively saved
- * (`status='saved'`), newest first. Returns an empty array when the seeker has
- * no profile yet or has saved nothing.
- */
 export async function getSavedListingIds(
   clerkToken: string,
   clerkUserId: string,
@@ -142,4 +108,95 @@ export async function getSavedListingIds(
   return ((data ?? []) as Array<{ listing_id: string }>).map(
     (row) => row.listing_id,
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Saved listing detail for /saved dashboard (Wave 10 / Agent B).             */
+/* -------------------------------------------------------------------------- */
+
+/** Benefit sub-item shape used by SavedListingDetail. */
+export interface SavedListingBenefit {
+  readonly provision: string;
+  readonly summary?: string;
+}
+
+/** Full saved listing detail for the /saved card grid. */
+export interface SavedListingDetail {
+  readonly id: string;
+  readonly title: string;
+  readonly category: OpportunityCategory;
+  readonly location: string;
+  readonly opportunityWindow: string;
+  readonly status: string;
+  readonly host: { readonly name: string; readonly verified: boolean };
+  readonly benefits: {
+    readonly housing: SavedListingBenefit;
+    readonly meals: SavedListingBenefit;
+    readonly pay: SavedListingBenefit;
+  };
+  readonly coverImageUrl: string | undefined;
+  /** True when the seeker already has a non-withdrawn application for this listing. */
+  readonly alreadyApplied: boolean;
+}
+
+/**
+ * Saved listings joined to full live-listing detail + host, with an
+ * `alreadyApplied` flag computed from the applications table.
+ *
+ * Returns an empty array when the seeker has no profile or no saved listings.
+ */
+export async function getSavedListingsWithDetails(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<SavedListingDetail[]> {
+  const db = untypedClient(clerkToken);
+  const seekerProfileId = await resolveSeekerProfileId(db, clerkUserId);
+  if (!seekerProfileId) return [];
+
+  // Saved listing ids, newest-saved first.
+  const { data: savedRows, error: savedError } = await db
+    .from("saved_listings")
+    .select("listing_id, created_at")
+    .eq("seeker_profile_id", seekerProfileId)
+    .eq("status", SAVED_STATUS)
+    .order("created_at", { ascending: false });
+  if (savedError) {
+    throw new Error(`getSavedListingsWithDetails: ${savedError.message}`);
+  }
+  const savedIds = ((savedRows ?? []) as Array<{ listing_id: string }>).map(
+    (row) => row.listing_id,
+  );
+  if (savedIds.length === 0) return [];
+
+  // Fetch live listing rows + applied set in parallel.
+  const [rows, appliedResult] = await Promise.all([
+    getPublicListingsByIds(savedIds),
+    db
+      .from("applications")
+      .select("listing_id")
+      .eq("seeker_profile_id", seekerProfileId)
+      .neq("status", "withdrawn")
+      .in("listing_id", savedIds),
+  ]);
+
+  if (appliedResult.error) {
+    throw new Error(
+      `getSavedListingsWithDetails(applications): ${appliedResult.error.message}`,
+    );
+  }
+  const appliedSet = new Set(
+    ((appliedResult.data ?? []) as Array<{ listing_id: string }>).map((r) =>
+      String(r.listing_id),
+    ),
+  );
+
+  const rowById = new Map(rows.map((row) => [row.id, row] as const));
+
+  return savedIds
+    .map((id) => rowById.get(id))
+    .filter((row): row is NonNullable<typeof row> => row !== undefined)
+    .map((row): SavedListingDetail => ({
+      ...rowToDiscoveryFields(row),
+      alreadyApplied: appliedSet.has(row.id),
+    }));
 }
