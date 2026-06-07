@@ -60,7 +60,7 @@ async function countRows(
  * Status/attestation vocabularies:
  *   - pendingApplications  = applications with status 'applied' (awaiting first review)
  *   - acceptedApplications = applications with status 'accepted'
- *   - verifiedHosts        = host_profiles with attestation_status 'verified'
+ *   - verifiedHosts        = host_profiles with attestation_status 'attested'
  *   - totalSeekers         = count of seeker_profiles rows
  */
 export async function getMarketplaceStats(
@@ -88,7 +88,7 @@ export async function getMarketplaceStats(
     countRows(db, "applications", { status: "applied" }),
     countRows(db, "applications", { status: "accepted" }),
     countRows(db, "host_profiles"),
-    countRows(db, "host_profiles", { attestation_status: "verified" }),
+    countRows(db, "host_profiles", { attestation_status: "attested" }),
     countRows(db, "seeker_profiles"),
   ]);
 
@@ -324,21 +324,18 @@ export async function adminCloseListing(
 }
 
 /**
- * Set a host's attestation_status to 'verified' or 'unverified'.
+ * Set a host's attestation_status to 'attested' or 'not_attested'.
  *
- * NOTE (see PR description): migration 003 defines a CHECK + lifecycle trigger
- * on host_profiles.attestation_status whose canonical vocabulary is
- * not_attested / attested / attested_stale / withdrawn. Writing
- * 'verified'/'unverified' follows this task's spec and existing precedent
- * (queries/listings.ts already treats attestation_status === 'verified' as the
- * verified signal), but may conflict with that constraint at runtime until the
- * trust model is reconciled. Flagged as a known follow-up rather than patched
- * here (the trust model is governed separately).
+ * Canonical vocabulary (migration 003 CHECK constraint):
+ *   not_attested | attested | attested_stale | withdrawn
+ * 'attested' = admin has verified the host; 'not_attested' = reverting to
+ * the default unverified state. 'attested_stale' and 'withdrawn' are set by
+ * the trust lifecycle trigger, not by admin action.
  */
 export async function adminSetHostAttestationStatus(
   serviceRoleToken: string,
   hostProfileId: string,
-  attestationStatus: "verified" | "unverified",
+  attestationStatus: "attested" | "not_attested",
 ): Promise<{ ok: boolean; error?: string }> {
   const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
 

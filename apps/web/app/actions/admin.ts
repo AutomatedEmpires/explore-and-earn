@@ -70,7 +70,7 @@ export async function verifyHostAction(
   const result = await adminSetHostAttestationStatus(
     SERVICE_ROLE_KEY,
     hostProfileId,
-    "verified",
+    "attested",
   );
   if (!result.ok) return result;
 
@@ -89,7 +89,7 @@ export async function unverifyHostAction(
   const result = await adminSetHostAttestationStatus(
     SERVICE_ROLE_KEY,
     hostProfileId,
-    "unverified",
+    "not_attested",
   );
   if (!result.ok) return result;
 

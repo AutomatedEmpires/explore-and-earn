@@ -68,7 +68,7 @@ export function AdminHostsTable({
             ) : (
               hosts.map((host) => {
                 const busy = isPending && pendingId === host.id;
-                const verified = host.attestationStatus === "verified";
+                const verified = host.attestationStatus === "attested";
                 return (
                   <tr key={host.id}>
                     <td>{host.companyName || "\u2014"}</td>
