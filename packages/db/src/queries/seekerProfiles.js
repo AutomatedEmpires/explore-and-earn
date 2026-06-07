@@ -128,9 +128,11 @@ export async function saveSeekerProfile(clerkToken, clerkUserId, update) {
  * Missing rows and blank names fall back to "Seeker" at the caller boundary.
  */
 export async function getSeekerDisplayNames(clerkToken, seekerProfileIds) {
-    if (seekerProfileIds.length === 0) return new Map();
+    if (seekerProfileIds.length === 0)
+        return new Map();
     const uniqueIds = [...new Set(seekerProfileIds.filter(Boolean))];
-    if (uniqueIds.length === 0) return new Map();
+    if (uniqueIds.length === 0)
+        return new Map();
     const untyped = authedClient(clerkToken);
     const { data } = await untyped
         .from(SEEKER_PROFILES)
