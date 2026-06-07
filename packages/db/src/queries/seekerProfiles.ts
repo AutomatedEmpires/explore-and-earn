@@ -110,4 +110,67 @@ export async function saveSeekerProfile(
   try {
     const db = untypedClient(clerkToken);
 
-    const patch: Record<string, unknown
+    const patch: Record<string, unknown> = {};
+    if (update.displayName !== undefined) {
+      patch.display_name = update.displayName;
+    }
+    if (update.bio !== undefined) {
+      patch.short_bio = update.bio;
+    }
+    if (update.locationPref !== undefined) {
+      patch.location_pref = update.locationPref;
+    }
+    if (update.housingPref !== undefined) {
+      patch.housing_preference = update.housingPref;
+    }
+    if (update.categories !== undefined) {
+      patch.desired_categories = update.categories;
+    }
+    if (update.freeformSkills !== undefined) {
+      patch.desired_roles = update.freeformSkills;
+    }
+    if (update.onboardingComplete !== undefined) {
+      patch.onboarding_complete = update.onboardingComplete;
+    }
+
+    const { data: existing, error: lookupError } = await db
+      .from(SEEKER_PROFILES)
+      .select("id")
+      .eq("clerk_user_id", clerkUserId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (lookupError) {
+      return { ok: false, error: lookupError.message };
+    }
+
+    const existingId =
+      existing && (existing as Record<string, unknown>).id
+        ? String((existing as Record<string, unknown>).id)
+        : null;
+
+    if (existingId) {
+      const { error } = await db
+        .from(SEEKER_PROFILES)
+        .update(patch)
+        .eq("id", existingId);
+      if (error) {
+        return { ok: false, error: error.message };
+      }
+      return { ok: true };
+    }
+
+    const { error } = await db
+      .from(SEEKER_PROFILES)
+      .insert({ clerk_user_id: clerkUserId, ...patch });
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  } catch (caught) {
+    return {
+      ok: false,
+      error: caught instanceof Error ? caught.message : "unknown_error",
+    };
+  }
+}
