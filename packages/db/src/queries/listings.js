@@ -35,7 +35,7 @@ function toListingRow(raw) {
 /** Maps a ListingRow to the DiscoveryListing view-model fields. */
 export function rowToDiscoveryFields(row) {
     const hostName = row.host_profiles?.company_name ?? "Unknown Host";
-    const verified = row.host_profiles?.attestation_status === "verified";
+    const verified = row.host_profiles?.attestation_status === "attested";
     const housingProvision = row.housing_included ? "provided" : "not_provided";
     const mealsProvision = row.meals_included ? "provided" : "not_provided";
     return {
