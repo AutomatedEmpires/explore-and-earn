@@ -107,7 +107,7 @@
   margin: 0;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  color: var(--text-error, #c0392b);
+  color: var(--status-error-fg);
 }
 
 .appliedStatus {
