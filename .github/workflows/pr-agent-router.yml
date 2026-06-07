@@ -1,5 +1,9 @@
 name: PR Agent Router
 
+# Routing note: @codex is retired (GPT reviewer decommissioned) and @claude is handled by
+# its dedicated claude-code.yml workflow to avoid double-triggering. This router dispatches
+# only copilot (advisory cloud review), sentry, and git-agent.
+
 on:
   issue_comment:
     types: [created]
@@ -45,7 +49,7 @@ jobs:
 
             const recordRequest = (rawAgent, source, prompt = '') => {
               const agent = normalizeAgent(rawAgent);
-              if (!['copilot', 'codex', 'claude', 'sentry', 'git'].includes(agent)) {
+              if (!['copilot', 'sentry', 'git'].includes(agent)) {
                 return;
               }
 
@@ -66,7 +70,7 @@ jobs:
               });
             };
 
-            const mentionAgents = ['copilot', 'codex', 'claude', 'sentry'];
+            const mentionAgents = ['copilot', 'sentry'];
             for (const agent of mentionAgents) {
               const mentionPattern = new RegExp(`(^|\\s)@${agent}\\b`, 'im');
               if (mentionPattern.test(commentBody)) {
@@ -79,8 +83,8 @@ jobs:
             }
 
             const lineCommands = [
-              /(?:^|\n)\s*\/agent\s+(copilot|codex|claude|sentry|git(?:-agent)?)(?:\s+(.+))?$/gim,
-              /(?:^|\n)\s*\/review\s+(copilot|codex|claude|sentry|git(?:-agent)?)(?:\s+(.+))?$/gim,
+              /(?:^|\n)\s*\/agent\s+(copilot|sentry|git(?:-agent)?)(?:\s+(.+))?$/gim,
+              /(?:^|\n)\s*\/review\s+(copilot|sentry|git(?:-agent)?)(?:\s+(.+))?$/gim,
               /(?:^|\n)\s*\/git-agent(?:\s+(.+))?$/gim,
             ];
 
