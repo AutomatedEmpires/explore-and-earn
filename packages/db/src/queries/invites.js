@@ -1,4 +1,17 @@
 import { authedClient } from "../client";
+/*
+ * TODO: send inviteReceivedEmail via server action.
+ *
+ * Host-initiated invite CREATION does not yet have a code path in this module
+ * (only seeker-facing reads + respondToInvite live here). When an invite-create
+ * mutation lands, the inviteReceivedEmail notification MUST be sent from the
+ * server action layer (apps/web/app/actions/*), NOT from inside a DB query
+ * function: query functions stay free of transport/side-effects, and the Clerk
+ * user lookup needed to resolve the seeker's email is only available in the
+ * Next server runtime. See apps/web/lib/emails/inviteReceived.ts for the
+ * template and apps/web/app/actions/applications.ts for the established
+ * "resolve context in db -> look up email via Clerk -> sendEmail" pattern.
+ */
 /**
  * Resolve seeker_profiles.id for the authed Clerk user.
  *
@@ -260,4 +273,165 @@ export async function respondToInvite(clerkToken, clerkUserId, inviteId, respons
         }
     }
     return { ok: true };
+}
+// ---------------------------------------------------------------------------
+// Host-side invite functions
+// ---------------------------------------------------------------------------
+/**
+ * Resolve the caller's host_profile_id from their Clerk user id.
+ * Returns null when the host has no profile row yet.
+ */
+async function resolveHostProfileId(clerkToken, clerkUserId) {
+    const untyped = authedClient(clerkToken);
+    const { data, error } = await untyped
+        .from("host_profiles")
+        .select("id")
+        .eq("clerk_user_id", clerkUserId)
+        .maybeSingle();
+    if (error) {
+        throw new Error(`resolveHostProfileId: ${error.message}`);
+    }
+    return data ? String(data.id) : null;
+}
+/** Sanitize a freeform search query for use in a ILIKE pattern. */
+function sanitizeSearchQuery(raw) {
+    return raw.trim().slice(0, 100).replace(/%/g, "");
+}
+/**
+ * Search seeker profiles by display name or bio for the invite surface.
+ *
+ * Input is sanitized (trimmed, max 100 chars, `%` stripped). Results capped at
+ * 20. Returns empty array when the host has no profile or the query is empty
+ * after sanitization.
+ *
+ * `clerkUserId` MUST come from auth().userId.
+ */
+export async function searchSeekersForInvite(clerkToken, clerkUserId, query) {
+    const safe = sanitizeSearchQuery(query);
+    if (safe.length === 0) {
+        return [];
+    }
+    const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
+    if (!hostProfileId) {
+        return [];
+    }
+    const pattern = `%${safe}%`;
+    const untyped = authedClient(clerkToken);
+    const { data, error } = await untyped
+        .from("seeker_profiles")
+        .select("id, display_name, short_bio")
+        .or(`display_name.ilike.${pattern},short_bio.ilike.${pattern}`)
+        .limit(20);
+    if (error) {
+        // Missing-column fallback: display_name may not exist yet.
+        return [];
+    }
+    return (data ?? []).map((raw) => {
+        const r = raw;
+        return {
+            seekerProfileId: String(r.id),
+            displayName: typeof r.display_name === "string" && r.display_name.trim().length > 0
+                ? r.display_name.trim()
+                : null,
+            bio: typeof r.short_bio === "string" && r.short_bio.trim().length > 0
+                ? r.short_bio.trim()
+                : null,
+        };
+    });
+}
+/**
+ * All invites sent by the authed host, newest first.
+ *
+ * `clerkUserId` MUST come from auth().userId.
+ * Returns an empty array when the host has no profile or no invites yet.
+ */
+export async function getHostInvites(clerkToken, clerkUserId) {
+    const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
+    if (!hostProfileId) {
+        return [];
+    }
+    const untyped = authedClient(clerkToken);
+    const { data, error } = await untyped
+        .from("invites")
+        .select("id, listing_id, seeker_profile_id, status, message, created_at, " +
+        "listings!listing_id(title), " +
+        "seeker_profiles!seeker_profile_id(display_name)")
+        .eq("host_profile_id", hostProfileId)
+        .order("created_at", { ascending: false });
+    if (error) {
+        throw new Error(`getHostInvites: ${error.message}`);
+    }
+    return (data ?? []).map((raw) => {
+        const r = raw;
+        const listing = firstOf(r.listings);
+        const seeker = firstOf(r.seeker_profiles);
+        return {
+            id: String(r.id),
+            listingId: String(r.listing_id),
+            listingTitle: listing && typeof listing.title === "string" ? listing.title : "",
+            seekerProfileId: String(r.seeker_profile_id),
+            seekerDisplayName: seeker &&
+                typeof seeker.display_name === "string" &&
+                seeker.display_name.trim().length > 0
+                ? seeker.display_name.trim()
+                : null,
+            status: typeof r.status === "string" ? r.status : "created",
+            message: typeof r.message === "string" ? r.message : null,
+            createdAt: typeof r.created_at === "string" ? r.created_at : "",
+        };
+    });
+}
+/** Postgres unique_violation SQLSTATE — surfaced as the already-invited case. */
+const UNIQUE_VIOLATION_INVITE = "23505";
+/**
+ * Create a host-initiated invite. Status always starts at `created` (the DB
+ * lifecycle trigger rejects any other initial value).
+ *
+ * Ownership guard: the caller must own the listing (via host_profile_id).
+ * Deduplication: a unique violation on (listing_id, seeker_profile_id)
+ * is returned as `{ ok: false, error: "already_invited" }`.
+ *
+ * `clerkUserId` MUST come from auth().userId.
+ */
+export async function createInvite(clerkToken, clerkUserId, listingId, seekerProfileId, message) {
+    const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
+    if (!hostProfileId) {
+        return { ok: false, error: "profile_not_found" };
+    }
+    // Ownership check: confirm the listing belongs to this host.
+    const untyped = authedClient(clerkToken);
+    const { data: listingRow, error: listingError } = await untyped
+        .from("listings")
+        .select("id")
+        .eq("id", listingId)
+        .eq("host_profile_id", hostProfileId)
+        .maybeSingle();
+    if (listingError) {
+        return { ok: false, error: listingError.message };
+    }
+    if (!listingRow) {
+        return { ok: false, error: "forbidden" };
+    }
+    const trimmedMessage = typeof message === "string" && message.trim().length > 0
+        ? message.trim()
+        : null;
+    const { data, error } = await untyped
+        .from("invites")
+        .insert({
+        listing_id: listingId,
+        host_profile_id: hostProfileId,
+        seeker_profile_id: seekerProfileId,
+        invited_by_user_id: clerkUserId,
+        status: "created",
+        ...(trimmedMessage !== null ? { message: trimmedMessage } : {}),
+    })
+        .select("id")
+        .single();
+    if (error) {
+        if (error.code === UNIQUE_VIOLATION_INVITE) {
+            return { ok: false, error: "already_invited" };
+        }
+        return { ok: false, error: error.message };
+    }
+    return { ok: true, inviteId: String(data.id) };
 }

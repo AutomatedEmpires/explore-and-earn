@@ -147,4 +147,23 @@ export type ApplicationWithListing = SeekerApplication & {
  * applications, or an empty `statuses` list.
  */
 export declare function getSeekerApplicationsWithListings(clerkToken: string, clerkUserId: string, statuses: string[]): Promise<ApplicationWithListing[]>;
+/**
+ * All applications across the authed host's listings, newest first.
+ * Delegates to getHostApplications — provided as a named alias so callers
+ * explicitly referencing the host-pipeline brief can import by that name.
+ */
+export declare function getAllApplicationsForHost(clerkToken: string, clerkUserId: string): Promise<HostApplication[]>;
+/**
+ * A single application enriched with the seeker's display name and bio, for
+ * the applicant-detail surface. Ownership is re-checked via getHostApplications
+ * (which scopes to the caller's listings) before reading the seeker row.
+ *
+ * Returns null when the application is not found or the caller does not own the
+ * listing the application targets.
+ */
+export interface ApplicationWithSeekerDetail extends HostApplication {
+    readonly seekerDisplayName: string | null;
+    readonly seekerBio: string | null;
+}
+export declare function getApplicationWithSeekerDetail(clerkToken: string, clerkUserId: string, applicationId: string): Promise<ApplicationWithSeekerDetail | null>;
 export {};

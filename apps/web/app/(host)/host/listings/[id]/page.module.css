@@ -3,3 +3,74 @@
   flex-direction: column;
   gap: var(--space-12);
 }
+
+.recentApplicants {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.recentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recentTitle {
+  margin: 0;
+  font-size: var(--type-heading-xs);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.viewAllLink {
+  font-size: var(--type-body-sm);
+  font-weight: 500;
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.viewAllLink:hover {
+  text-decoration: underline;
+}
+
+.recentList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.recentItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.recentItem:last-child {
+  border-bottom: none;
+}
+
+.recentLink {
+  font-size: var(--type-body-sm);
+  font-weight: 500;
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.recentLink:hover {
+  text-decoration: underline;
+}
+
+.recentDate {
+  font-size: var(--type-body-xs);
+  color: var(--color-text-secondary);
+}

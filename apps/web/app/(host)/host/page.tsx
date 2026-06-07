@@ -1,71 +1,48 @@
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 import {
-  HOST_APPLICANTS,
-  HOST_LISTINGS,
-  HOST_PROFILE,
-  HOST_THREADS,
-  HostApplicantCard,
-  HostListingCard,
-  HostSectionHeading,
-  HostStatStrip,
-  deriveHostStats,
-} from "../../../components/host";
-import { EmptyState } from "../../../components/discovery";
+  getHostDashboardStats,
+  getRecentActivityForHost,
+  getHostProfile,
+} from "@explore-and-earn/db";
+
+import { HostDashboard } from "../../../components/host";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-export default function HostDashboardPage() {
-  const stats = deriveHostStats(HOST_LISTINGS, HOST_APPLICANTS, HOST_THREADS);
-  const newApplicants = HOST_APPLICANTS.filter(
-    (applicant) => applicant.stage === "new",
-  );
-  const previewListings = HOST_LISTINGS.slice(0, 2);
+// Dashboard data is per-host — never statically cached.
+export const dynamic = "force-dynamic";
+
+export default async function HostDashboardPage() {
+  const { userId, getToken } = await auth();
+  const token = userId ? await getToken({ template: "supabase" }) : null;
+
+  if (!userId || !token) {
+    return (
+      <div className={styles.block}>
+        <p>Sign in as a host to view your dashboard.</p>
+      </div>
+    );
+  }
+
+  const [stats, recentActivity, hostProfile] = await Promise.all([
+    getHostDashboardStats(token, userId).catch(() => ({
+      listingsByStatus: {},
+      applicationsThisMonth: {},
+      pendingActions: 0,
+    })),
+    getRecentActivityForHost(token, userId).catch(() => []),
+    getHostProfile(token, userId).catch(() => null),
+  ]);
 
   return (
-    <>
-      <section className={styles.block}>
-        <HostSectionHeading
-          title={`Welcome back, ${HOST_PROFILE.hostName}`}
-          description="Your hosting command center — listings, applicants, and messages at a glance."
-        />
-        <HostStatStrip stats={stats} />
-      </section>
-
-      <section className={styles.block}>
-        <HostSectionHeading
-          title="Your listings"
-          description="Track status and applicant volume across your opportunities."
-          actionLabel="All listings"
-          actionHref="/host/listings"
-        />
-        <div className={styles.stack}>
-          {previewListings.map((item) => (
-            <HostListingCard key={item.listing.id} item={item} />
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.block}>
-        <HostSectionHeading
-          title="New applicants"
-          description="People who just applied and are waiting on your first review."
-          actionLabel="All applicants"
-          actionHref="/host/applicants"
-        />
-        {newApplicants.length > 0 ? (
-          <div className={styles.stack}>
-            {newApplicants.map((applicant) => (
-              <HostApplicantCard key={applicant.id} applicant={applicant} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title="You are all caught up"
-            message="No new applicants are waiting on a first review right now."
-          />
-        )}
-      </section>
-    </>
+    <div className={styles.block}>
+      <HostDashboard
+        stats={stats}
+        recentActivity={recentActivity}
+        companyName={hostProfile?.companyName ?? null}
+      />
+    </div>
   );
 }

@@ -9,11 +9,14 @@ import { authedClient } from "../client";
  * we resolve from the caller-supplied, already-verified `clerkUserId`. Keep these
  * manual scoping filters even once RLS lands; they are defense in depth.
  *
- * TYPES: `packages/db/src/types.gen.ts` is still a placeholder
- * (`GeneratedDatabase = Record<string, never>`), so the typed client cannot
- * describe these tables yet. We cast to an untyped `SupabaseClient` handle for
- * `.from(...)` calls and narrow the returned rows locally. Drop the cast once
- * generated types exist.
+ * TYPES: `packages/db/src/types.gen.ts` is now generated from the live schema,
+ * but it does NOT include `seeker_profiles.clerk_user_id` (the Clerk-sync
+ * columns from migration 009 are not reflected on the live database). A typed
+ * client therefore rejects the `.select("id, clerk_user_id")` /
+ * `.eq("clerk_user_id", ...)` lookup in `resolveSeekerProfileId`, so we keep an
+ * untyped `SupabaseClient` handle for `.from(...)` calls and narrow rows
+ * locally.
+ * // types not yet generated: seeker_profiles.clerk_user_id
  */
 const SAVED_STATUS = "saved";
 const REMOVED_STATUS = "removed";

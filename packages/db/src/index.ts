@@ -15,3 +15,4 @@ export * from "./storage";
 export * from "./adminClient";
 export * from "./queries/admin";
 export * from "./lib/matchScore";
+export * from "./hostAnalytics";
