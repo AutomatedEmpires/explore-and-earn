@@ -1,0 +1,122 @@
+/* Host profile loading state. Profile header skeleton followed by a responsive
+   listing card grid. Semantic tokens only; px appears only in 1px hairlines. */
+
+.wrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-section);
+	padding: var(--space-gutter);
+	background: var(--color-paper);
+	min-height: 100vh;
+}
+
+.header {
+	display: flex;
+	align-items: center;
+	gap: var(--space-16);
+}
+
+.avatar {
+	flex: 0 0 auto;
+	width: 5rem;
+	height: 5rem;
+}
+
+.avatar :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: var(--radius-pill);
+}
+
+.headerText {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	flex: 1 1 auto;
+}
+
+.nameLine {
+	width: min(20ch, 60%);
+}
+
+.metaLine {
+	width: min(32ch, 80%);
+}
+
+.nameLine :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: var(--type-page-lh);
+	border-radius: var(--radius-input);
+}
+
+.metaLine :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: var(--type-body-lh);
+	border-radius: var(--radius-input);
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-section);
+}
+
+.card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: var(--space-card);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+}
+
+.cover {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+}
+
+.cover :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: var(--radius-image);
+}
+
+.cardLine {
+	width: 70%;
+}
+
+.cardLine :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: var(--type-body-lh);
+	border-radius: var(--radius-input);
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+@media (min-width: 640px) {
+	.grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (min-width: 1024px) {
+	.grid {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}

@@ -1,0 +1,59 @@
+/* Swipe deck loading state. Three stacked card skeletons centered in the
+   viewport. Semantic tokens only; px appears only in 1px hairlines. */
+
+.wrap {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--space-section) var(--space-gutter);
+	min-height: 70vh;
+	background: var(--color-paper);
+}
+
+.deck {
+	position: relative;
+	width: min(24rem, 100%);
+	aspect-ratio: 3 / 4;
+}
+
+.card {
+	position: absolute;
+	inset: 0;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+	overflow: hidden;
+}
+
+.card :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.card1 {
+	transform: translateY(0) scale(1);
+	z-index: 3;
+}
+
+.card2 {
+	transform: translateY(var(--space-12)) scale(0.96);
+	z-index: 2;
+}
+
+.card3 {
+	transform: translateY(calc(var(--space-12) * 2)) scale(0.92);
+	z-index: 1;
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
