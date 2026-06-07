@@ -3,15 +3,16 @@ import type {
 	ListingMedia,
 	ListingStatus,
 	MarketplaceCategory,
+	ResponsiveImage,
 } from "@explore-and-earn/contracts"
 
 export interface ListingHostSummary {
 	readonly id: string
 	readonly name: string
-	readonly location: string
+	readonly location?: string
 	readonly verified: boolean
 	readonly tagline?: string
-	readonly avatar?: ListingMedia
+	readonly avatar?: ResponsiveImage
 }
 
 export interface ListingDetailData {
@@ -95,8 +96,6 @@ const SUNRISE_ORCHARD: ListingDetailData = {
 		verified: true,
 		tagline: "Three generations growing pears and apples in the Columbia Gorge.",
 		avatar: {
-			id: "host-svc-avatar",
-			bucket: "community_photo",
 			masterPath: "/fixtures/hosts/sunrise-valley-collective/avatar.jpg",
 			width: 480,
 			height: 480,

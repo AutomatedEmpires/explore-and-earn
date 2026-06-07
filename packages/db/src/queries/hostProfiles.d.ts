@@ -1,11 +1,3 @@
-/**
- * Editable host_profiles columns for the host-managed profile form.
- *
- * All keys are optional: callers send only the fields they intend to change.
- * `companyName` maps to the NOT NULL `company_name` column, so an explicitly
- * provided empty value is rejected (see `updateHostProfileDetails`). The
- * remaining columns are nullable text; pass `null` to clear them.
- */
 export interface HostProfileDetailsInput {
     companyName?: string;
     about?: string | null;
@@ -13,14 +5,6 @@ export interface HostProfileDetailsInput {
     websiteUrl?: string | null;
     photoUrl?: string | null;
 }
-/**
- * Resolve the caller's own host profile from their Clerk user id.
- * Returns `null` when the user has not created a host profile yet.
- *
- * @param clerkToken - Verified Clerk JWT from `getToken()`.
- * @param clerkUserId - Verified Clerk user ID from `auth().userId` \u2014 do NOT
- *   decode this from the token; pass it from the already-verified `auth()` call.
- */
 export declare function getHostProfile(clerkToken: string, clerkUserId: string): Promise<{
     id: string;
     companyName: string;
@@ -28,26 +12,47 @@ export declare function getHostProfile(clerkToken: string, clerkUserId: string):
     primaryLocationName: string | null;
     photoUrl: string | null;
 } | null>;
-/**
- * Update the caller's own host_profiles row, scoped by their verified Clerk user
- * id. Only the provided fields are written; an empty patch is a no-op success.
- *
- * `company_name` is NOT NULL, so a provided-but-empty company name is rejected
- * with `name_required` rather than writing an invalid value.
- */
 export declare function updateHostProfileDetails(clerkToken: string, clerkUserId: string, fields: HostProfileDetailsInput): Promise<{
     ok: boolean;
     error?: string;
 }>;
-/**
- * Create a `host_profiles` row for the caller and return its new id.
- *
- * Resilient to double-submit: because `clerk_user_id` is UNIQUE, a duplicate
- * insert surfaces as a unique violation; we re-resolve the existing row and
- * return it as `{ ok: true }` rather than failing the user. Other errors return
- * `{ ok: false }`.
- */
 export declare function createHostProfile(clerkToken: string, clerkUserId: string, companyName: string): Promise<{
     ok: boolean;
     id?: string;
 }>;
+/** Host profile fields needed by the public /host/[id] page. */
+export interface PublicHostProfile {
+    id: string;
+    companyName: string;
+    about: string | null;
+    primaryLocationName: string | null;
+    photoUrl: string | null;
+    attestationStatus: string;
+    createdAt: string | null;
+}
+/**
+ * Fetch a host's public profile by host_profiles.id. Anon client — no auth
+ * required. Returns null when the profile does not exist.
+ */
+export declare function getPublicHostProfile(hostProfileId: string): Promise<PublicHostProfile | null>;
+/** A live listing as surfaced on the host's public profile page. */
+export interface PublicHostListing {
+    id: string;
+    title: string;
+    category: string;
+    coverPhotoUrl: string | null;
+    locationDisplay: string | null;
+    housingIncluded: boolean;
+    mealsIncluded: boolean;
+    compensationSummary: string | null;
+    compensationMinCents: number | null;
+    compensationMaxCents: number | null;
+    compensationUnit: string | null;
+    compensationCurrency: string;
+    publishedAt: string | null;
+}
+/**
+ * Fetch all live listings for a host, ordered by published_at DESC.
+ * Anon client — no auth required.
+ */
+export declare function getPublicListingsByHost(hostProfileId: string): Promise<PublicHostListing[]>;

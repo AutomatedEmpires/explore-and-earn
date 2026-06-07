@@ -295,19 +295,16 @@ async function resolveHostProfileId(clerkToken, clerkUserId) {
 }
 /** Sanitize a freeform search query for use in a ILIKE pattern. */
 function sanitizeSearchQuery(raw) {
-    // Strip characters that could inject into a PostgREST .or() filter string.
-    // Mirrors the TS implementation in invites.ts.
+    // Strip characters that could inject into a PostgREST .or() filter string
+    // or act as LIKE wildcards. Mirror the sanitizer in queries/listings.ts.
     return raw.slice(0, 100).replace(/[,()*%]/g, " ").replace(/\s+/g, " ").trim();
 }
 /**
  * Search seeker profiles by display name or bio for the invite surface.
  *
- * Input is sanitized (trimmed, max 100 chars, special chars stripped). Results
- * capped at 20. Returns empty array when the host has no profile or the query
- * is empty after sanitization.
- *
- * Uses two separate parameterized .ilike() queries instead of .or() string
- * interpolation — eliminates PostgREST filter injection surface.
+ * Input is sanitized (trimmed, max 100 chars, `%` stripped). Results capped at
+ * 20. Returns empty array when the host has no profile or the query is empty
+ * after sanitization.
  *
  * `clerkUserId` MUST come from auth().userId.
  */
@@ -320,6 +317,8 @@ export async function searchSeekersForInvite(clerkToken, clerkUserId, query) {
     if (!hostProfileId) {
         return [];
     }
+    // Use two separate parameterized .ilike() queries and merge in JS rather than
+    // building an .or() filter string — eliminates PostgREST filter injection surface.
     const pattern = `%${safe}%`;
     const untyped = authedClient(clerkToken);
     const [nameRes, bioRes] = await Promise.all([
@@ -335,11 +334,16 @@ export async function searchSeekersForInvite(clerkToken, clerkUserId, query) {
             .limit(20),
     ]);
     if (nameRes.error && bioRes.error) {
+        // Missing-column fallback: display_name / short_bio may not exist yet.
         return [];
     }
+    // Merge and deduplicate by id; name matches rank first.
     const seen = new Set();
     const merged = [];
-    for (const row of [...(nameRes.data ?? []), ...(bioRes.data ?? [])]) {
+    for (const row of [
+        ...(nameRes.data ?? []),
+        ...(bioRes.data ?? []),
+    ]) {
         const id = String(row.id);
         if (!seen.has(id)) {
             seen.add(id);

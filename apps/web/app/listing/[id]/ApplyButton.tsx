@@ -60,14 +60,14 @@ export function ApplyButton({
   if (alreadyApplied) {
     return (
       <div
-        style=
+        style={{
           display: "flex",
           alignItems: "center",
           gap: "var(--space-8)",
           fontFamily: "var(--font-ui)",
           fontSize: "var(--type-body-size)",
           color: "var(--text-secondary)",
-        
+        }}
       >
         <span>✓</span>
         <span>Application sent</span>
@@ -105,7 +105,7 @@ export function ApplyButton({
 
   return (
     <>
-      <div style= display: "flex", gap: "var(--space-12)" >
+      <div style={{ display: "flex", gap: "var(--space-12)" }}>
         <Button variant="primary" onClick={handleApply} disabled={isPending}>
           Apply
         </Button>
@@ -121,17 +121,17 @@ export function ApplyButton({
       {showConfirmModal && (
         <Modal heading="Apply to this listing?">
           <p
-            style=
+            style={{
               fontFamily: "var(--font-ui)",
               fontSize: "var(--type-body-size)",
               color: "var(--text-secondary)",
               marginBottom: "var(--space-16)",
-            
+            }}
           >
             Confirm your application to <strong>{title}</strong>. The host will
             review your profile and contact you if interested.
           </p>
-          <div style= display: "flex", gap: "var(--space-12)" >
+          <div style={{ display: "flex", gap: "var(--space-12)" }}>
             <Button
               variant="primary"
               onClick={handleConfirm}
@@ -153,17 +153,17 @@ export function ApplyButton({
       {showOnboardingModal && (
         <Modal heading="Complete your profile first">
           <p
-            style=
+            style={{
               fontFamily: "var(--font-ui)",
               fontSize: "var(--type-body-size)",
               color: "var(--text-secondary)",
               marginBottom: "var(--space-16)",
-            
+            }}
           >
             You need to complete your seeker profile before applying to
             listings.
           </p>
-          <div style= display: "flex", gap: "var(--space-12)" >
+          <div style={{ display: "flex", gap: "var(--space-12)" }}>
             <Button
               variant="primary"
               onClick={() => router.push("/onboarding")}

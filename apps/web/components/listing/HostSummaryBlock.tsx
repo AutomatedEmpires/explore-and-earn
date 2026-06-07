@@ -85,7 +85,7 @@ export function HostSummaryBlock({ host }: { readonly host: ListingHostSummary }
 					) : (
 						<span style={nameStyle}>{host.name}</span>
 					)}
-					<span style={locationStyle}>Based in {host.location}</span>
+					{host.location && <span style={locationStyle}>Based in {host.location}</span>}
 				</div>
 			</div>
 			{host.verified ? <VerifiedHostBadge /> : null}

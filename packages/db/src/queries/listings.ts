@@ -577,7 +577,7 @@ export async function getListingDetailPublic(
   if (error) throw new Error(`getListingDetailPublic: ${error.message}`);
   if (!data) return null;
 
-  const row = data as Record<string, unknown>;
+  const row = data as unknown as Record<string, unknown>;
   const hostRow = firstEmbed(row.host_profiles);
 
   const host: PublicListingDetailHost | null = hostRow

@@ -132,30 +132,30 @@ export default async function ListingDetailPage({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML= __html: jsonLd 
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
       />
       <main
-        style=
+        style={{
           backgroundColor: "var(--color-paper)",
           minHeight: "100vh",
           paddingBottom: "80px",
-        
+        }}
       >
         {/* Cover photo */}
         {listing.coverPhotoUrl && (
           <div
-            style=
+            style={{
               position: "relative",
               width: "100%",
               aspectRatio: "4 / 3",
               backgroundColor: "var(--color-surface)",
-            
+            }}
           >
             <Image
               src={listing.coverPhotoUrl}
               alt={listing.title}
               fill
-              style= objectFit: "cover" 
+              style={{ objectFit: "cover" }}
               priority
             />
           </div>
@@ -163,27 +163,27 @@ export default async function ListingDetailPage({ params }: Props) {
 
         {/* Content */}
         <div
-          style=
+          style={{
             maxWidth: "42rem",
             margin: "0 auto",
             padding: "var(--space-gutter)",
-          
+          }}
         >
           {/* Category badge */}
-          <div style= marginBottom: "var(--space-12)" >
+          <div style={{ marginBottom: "var(--space-12)" }}>
             <CategoryBadge category={listing.category} />
           </div>
 
           {/* Title */}
           <h1
-            style=
+            style={{
               fontFamily: "var(--font-display)",
               fontSize: "var(--type-page-size)",
               lineHeight: "var(--type-page-lh)",
               color: "var(--text-primary)",
               margin: 0,
               marginBottom: "var(--space-12)",
-            
+            }}
           >
             {listing.title}
           </h1>
@@ -191,14 +191,14 @@ export default async function ListingDetailPage({ params }: Props) {
           {/* Location */}
           {listing.locationDisplay && (
             <div
-              style=
+              style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "var(--space-4)",
                 color: "var(--text-secondary)",
                 fontSize: "var(--type-body-size)",
                 marginBottom: "var(--space-16)",
-              
+              }}
             >
               <Icon name="nav.map" size={16} aria-hidden />
               <span>{listing.locationDisplay}</span>
@@ -208,16 +208,16 @@ export default async function ListingDetailPage({ params }: Props) {
           {/* Host summary */}
           {listing.host && (
             <div
-              style=
+              style={{
                 display: "flex",
                 alignItems: "center",
                 gap: "var(--space-12)",
                 marginBottom: "var(--space-16)",
-              
+              }}
             >
               {listing.host.photoUrl && (
                 <div
-                  style=
+                  style={{
                     position: "relative",
                     width: "48px",
                     height: "48px",
@@ -225,34 +225,34 @@ export default async function ListingDetailPage({ params }: Props) {
                     border: "2px solid var(--border-ink)",
                     backgroundColor: "var(--color-surface)",
                     overflow: "hidden",
-                  
+                  }}
                 >
                   <Image
                     src={listing.host.photoUrl}
                     alt={listing.host.companyName}
                     fill
-                    style= objectFit: "cover" 
+                    style={{ objectFit: "cover" }}
                   />
                 </div>
               )}
-              <div style= flex: 1 >
+              <div style={{ flex: 1 }}>
                 <div
-                  style=
+                  style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "var(--space-8)",
                     marginBottom: "var(--space-4)",
-                  
+                  }}
                 >
                   <Link
                     href={`/host/${listing.host.id}`}
-                    style=
+                    style={{
                       fontFamily: "var(--font-ui)",
                       fontSize: "var(--type-body-size)",
                       fontWeight: "var(--font-weight-semibold)",
                       color: "var(--text-primary)",
                       textDecoration: "none",
-                    
+                    }}
                   >
                     {listing.host.companyName}
                   </Link>
@@ -261,10 +261,10 @@ export default async function ListingDetailPage({ params }: Props) {
                   )}
                 </div>
                 <div
-                  style=
+                  style={{
                     fontSize: "var(--type-meta-size)",
                     color: "var(--text-secondary)",
-                  
+                  }}
                 >
                   {dateLabel}
                 </div>
@@ -274,50 +274,50 @@ export default async function ListingDetailPage({ params }: Props) {
 
           {/* Benefit triad */}
           <div
-            style=
+            style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
               gap: "var(--space-12)",
               marginBottom: "var(--space-section)",
-            
+            }}
           >
             {/* Housing */}
             <div
-              style=
+              style={{
                 padding: "var(--space-16)",
                 borderRadius: "var(--radius-card)",
                 backgroundColor: "var(--benefit-housing-bg)",
                 border: "1px solid var(--benefit-housing-fg)",
-              
+              }}
             >
               <div
-                style=
+                style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "var(--space-4)",
                   marginBottom: "var(--space-8)",
-                
+                }}
               >
                 <Icon name="benefit.housing" size={16} aria-hidden />
                 <span
-                  style=
+                  style={{
                     fontFamily: "var(--font-ui)",
                     fontSize: "var(--type-label-size)",
                     fontWeight: "var(--font-weight-semibold)",
                     textTransform: "uppercase",
                     letterSpacing: "var(--type-label-tracking)",
                     color: "var(--benefit-housing-fg)",
-                  
+                  }}
                 >
                   Housing
                 </span>
               </div>
               <div
-                style=
+                style={{
                   fontFamily: "var(--font-ui)",
                   fontSize: "var(--type-meta-size)",
                   color: "var(--benefit-housing-fg)",
-                
+                }}
               >
                 {housingLabel}
               </div>
@@ -325,41 +325,41 @@ export default async function ListingDetailPage({ params }: Props) {
 
             {/* Meals */}
             <div
-              style=
+              style={{
                 padding: "var(--space-16)",
                 borderRadius: "var(--radius-card)",
                 backgroundColor: "var(--benefit-meals-bg)",
                 border: "1px solid var(--benefit-meals-fg)",
-              
+              }}
             >
               <div
-                style=
+                style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "var(--space-4)",
                   marginBottom: "var(--space-8)",
-                
+                }}
               >
                 <Icon name="benefit.meals" size={16} aria-hidden />
                 <span
-                  style=
+                  style={{
                     fontFamily: "var(--font-ui)",
                     fontSize: "var(--type-label-size)",
                     fontWeight: "var(--font-weight-semibold)",
                     textTransform: "uppercase",
                     letterSpacing: "var(--type-label-tracking)",
                     color: "var(--benefit-meals-fg)",
-                  
+                  }}
                 >
                   Meals
                 </span>
               </div>
               <div
-                style=
+                style={{
                   fontFamily: "var(--font-ui)",
                   fontSize: "var(--type-meta-size)",
                   color: "var(--benefit-meals-fg)",
-                
+                }}
               >
                 {mealsLabel}
               </div>
@@ -367,41 +367,41 @@ export default async function ListingDetailPage({ params }: Props) {
 
             {/* Pay */}
             <div
-              style=
+              style={{
                 padding: "var(--space-16)",
                 borderRadius: "var(--radius-card)",
                 backgroundColor: "var(--benefit-pay-bg)",
                 border: "1px solid var(--benefit-pay-fg)",
-              
+              }}
             >
               <div
-                style=
+                style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "var(--space-4)",
                   marginBottom: "var(--space-8)",
-                
+                }}
               >
                 <Icon name="benefit.pay" size={16} aria-hidden />
                 <span
-                  style=
+                  style={{
                     fontFamily: "var(--font-ui)",
                     fontSize: "var(--type-label-size)",
                     fontWeight: "var(--font-weight-semibold)",
                     textTransform: "uppercase",
                     letterSpacing: "var(--type-label-tracking)",
                     color: "var(--benefit-pay-fg)",
-                  
+                  }}
                 >
                   Pay
                 </span>
               </div>
               <div
-                style=
+                style={{
                   fontFamily: "var(--font-ui)",
                   fontSize: "var(--type-meta-size)",
                   color: "var(--benefit-pay-fg)",
-                
+                }}
               >
                 {paySummary}
               </div>
@@ -410,29 +410,29 @@ export default async function ListingDetailPage({ params }: Props) {
 
           {/* Description */}
           {listing.description && (
-            <section style= marginBottom: "var(--space-section)" >
+            <section style={{ marginBottom: "var(--space-section)" }}>
               <h2
-                style=
+                style={{
                   fontFamily: "var(--font-display)",
                   fontSize: "var(--type-section-size)",
                   lineHeight: "var(--type-section-lh)",
                   color: "var(--text-primary)",
                   marginBottom: "var(--space-12)",
-                
+                }}
               >
                 About this opportunity
               </h2>
               <div
-                style=
+                style={{
                   fontFamily: "var(--font-ui)",
                   fontSize: "var(--type-body-size)",
                   lineHeight: "var(--type-body-lh)",
                   color: "var(--text-secondary)",
                   whiteSpace: "pre-wrap",
-                
+                }}
               >
                 {listing.description.split("\n\n").map((para, idx) => (
-                  <p key={idx} style= marginBottom: "var(--space-12)" >
+                  <p key={idx} style={{ marginBottom: "var(--space-12)" }}>
                     {para}
                   </p>
                 ))}
@@ -442,11 +442,12 @@ export default async function ListingDetailPage({ params }: Props) {
 
           {/* Host summary block */}
           {listing.host && (
-            <div style= marginBottom: "var(--space-section)" >
+            <div style={{ marginBottom: "var(--space-section)" }}>
               <HostSummaryBlock
                 host={{
                   id: listing.host.id,
                   name: listing.host.companyName,
+                  location: listing.host.primaryLocationName ?? undefined,
                   verified:
                     listing.host.attestationStatus === "attested",
                   tagline: listing.host.about ?? undefined,
@@ -455,6 +456,7 @@ export default async function ListingDetailPage({ params }: Props) {
                         masterPath: listing.host.photoUrl,
                         width: 120,
                         height: 120,
+                        alt: listing.host.companyName,
                       }
                     : undefined,
                 }}
@@ -465,7 +467,7 @@ export default async function ListingDetailPage({ params }: Props) {
 
         {/* Sticky action bar */}
         <div
-          style=
+          style={{
             position: "fixed",
             bottom: 0,
             left: 0,
@@ -475,7 +477,7 @@ export default async function ListingDetailPage({ params }: Props) {
             padding: "var(--space-16)",
             display: "flex",
             justifyContent: "center",
-          
+          }}
         >
           <ApplyButton
             listingId={listing.id}

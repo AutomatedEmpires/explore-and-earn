@@ -66,27 +66,27 @@ export default async function PublicHostProfilePage({ params }: Props) {
 
   return (
     <main
-      style=
+      style={{
         backgroundColor: "var(--color-paper)",
         minHeight: "100vh",
         padding: "var(--space-gutter)",
-      
+      }}
     >
-      <div style= maxWidth: "56rem", margin: "0 auto" >
+      <div style={{ maxWidth: "56rem", margin: "0 auto" }}>
         {/* Hero */}
-        <div style= marginBottom: "var(--space-section)" >
+        <div style={{ marginBottom: "var(--space-section)" }}>
           {/* Photo + company */}
           <div
-            style=
+            style={{
               display: "flex",
               alignItems: "center",
               gap: "var(--space-16)",
               marginBottom: "var(--space-16)",
-            
+            }}
           >
             {host.photoUrl ? (
               <div
-                style=
+                style={{
                   position: "relative",
                   width: "80px",
                   height: "80px",
@@ -95,28 +95,28 @@ export default async function PublicHostProfilePage({ params }: Props) {
                   backgroundColor: "var(--color-surface)",
                   overflow: "hidden",
                   padding: "4px",
-                
+                }}
               >
                 <div
-                  style=
+                  style={{
                     position: "relative",
                     width: "100%",
                     height: "100%",
                     borderRadius: "calc(var(--radius-image) - 4px)",
                     overflow: "hidden",
-                  
+                  }}
                 >
                   <Image
                     src={host.photoUrl}
                     alt={host.companyName}
                     fill
-                    style= objectFit: "cover" 
+                    style={{ objectFit: "cover" }}
                   />
                 </div>
               </div>
             ) : (
               <div
-                style=
+                style={{
                   width: "80px",
                   height: "80px",
                   borderRadius: "var(--radius-image)",
@@ -125,42 +125,42 @@ export default async function PublicHostProfilePage({ params }: Props) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                
+                }}
               >
                 <Icon name="nav.profile" size={24} aria-hidden />
               </div>
             )}
 
-            <div style= flex: 1 >
+            <div style={{ flex: 1 }}>
               <h1
-                style=
+                style={{
                   fontFamily: "var(--font-display)",
                   fontSize: "var(--type-page-size)",
                   lineHeight: "var(--type-page-lh)",
                   color: "var(--text-primary)",
                   margin: 0,
                   marginBottom: "var(--space-4)",
-                
+                }}
               >
                 {host.companyName}
               </h1>
               <div
-                style=
+                style={{
                   display: "flex",
                   alignItems: "center",
                   gap: "var(--space-8)",
                   flexWrap: "wrap",
-                
+                }}
               >
                 {host.primaryLocationName && (
                   <div
-                    style=
+                    style={{
                       display: "flex",
                       alignItems: "center",
                       gap: "var(--space-4)",
                       fontSize: "var(--type-meta-size)",
                       color: "var(--text-secondary)",
-                    
+                    }}
                   >
                     <Icon name="nav.map" size={16} aria-hidden />
                     <span>{host.primaryLocationName}</span>
@@ -169,10 +169,10 @@ export default async function PublicHostProfilePage({ params }: Props) {
                 {host.attestationStatus === "attested" && <VerifiedHostBadge />}
                 {hostingSinceYear && (
                   <span
-                    style=
+                    style={{
                       fontSize: "var(--type-meta-size)",
                       color: "var(--text-muted)",
-                    
+                    }}
                   >
                     Hosting since {hostingSinceYear}
                   </span>
@@ -183,50 +183,50 @@ export default async function PublicHostProfilePage({ params }: Props) {
 
           {/* About */}
           {host.about && (
-            <div style= marginTop: "var(--space-16)" >
+            <div style={{ marginTop: "var(--space-16)" }}>
               {aboutIsLong ? (
                 <details>
                   <summary
-                    style=
+                    style={{
                       fontFamily: "var(--font-ui)",
                       fontSize: "var(--type-body-size)",
                       color: "var(--text-secondary)",
                       cursor: "pointer",
                       listStyle: "none",
-                    
+                    }}
                   >
                     <span>{host.about.slice(0, 200)}…</span>
                     <span
-                      style=
+                      style={{
                         color: "var(--text-primary)",
                         fontWeight: "var(--font-weight-medium)",
                         marginLeft: "var(--space-4)",
-                      
+                      }}
                     >
                       Read more
                     </span>
                   </summary>
                   <p
-                    style=
+                    style={{
                       fontFamily: "var(--font-ui)",
                       fontSize: "var(--type-body-size)",
                       color: "var(--text-secondary)",
                       marginTop: "var(--space-12)",
                       whiteSpace: "pre-wrap",
-                    
+                    }}
                   >
                     {host.about}
                   </p>
                 </details>
               ) : (
                 <p
-                  style=
+                  style={{
                     fontFamily: "var(--font-ui)",
                     fontSize: "var(--type-body-size)",
                     color: "var(--text-secondary)",
                     margin: 0,
                     whiteSpace: "pre-wrap",
-                  
+                  }}
                 >
                   {host.about}
                 </p>
@@ -238,45 +238,45 @@ export default async function PublicHostProfilePage({ params }: Props) {
         {/* Listings */}
         <section>
           <h2
-            style=
+            style={{
               fontFamily: "var(--font-display)",
               fontSize: "var(--type-section-size)",
               lineHeight: "var(--type-section-lh)",
               color: "var(--text-primary)",
               marginBottom: "var(--space-16)",
-            
+            }}
           >
             Open opportunities
           </h2>
 
           {listings.length === 0 ? (
             <div
-              style=
+              style={{
                 padding: "var(--space-32)",
                 textAlign: "center",
                 backgroundColor: "var(--color-surface-raised)",
                 borderRadius: "var(--radius-card)",
                 border: "1px solid var(--border-soft)",
-              
+              }}
             >
               <p
-                style=
+                style={{
                   fontFamily: "var(--font-ui)",
                   fontSize: "var(--type-body-size)",
                   color: "var(--text-secondary)",
                   margin: 0,
-                
+                }}
               >
                 No open opportunities right now. Check back soon.
               </p>
             </div>
           ) : (
             <div
-              style=
+              style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
                 gap: "var(--space-16)",
-              
+              }}
             >
               {listings.map((listing) => (
                 <PublicListingCard key={listing.id} listing={listing} />

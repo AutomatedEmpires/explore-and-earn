@@ -227,7 +227,7 @@ export async function getPublicListingsByHost(
 
   if (error) throw new Error(`getPublicListingsByHost: ${error.message}`);
 
-  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => ({
     id: String(row.id),
     title: typeof row.title === "string" ? row.title : "",
     category: typeof row.category === "string" ? row.category : "mix",
