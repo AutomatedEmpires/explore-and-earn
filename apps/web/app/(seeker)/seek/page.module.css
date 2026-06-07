@@ -1,0 +1,10 @@
+/* Seek pagination \u2014 server-rendered prev/next links beneath the card grid.
+   Semantic tokens only; no px outside breakpoints. */
+
+.pagination {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-12);
+	padding: var(--space-section) var(--space-gutter);
+	background: var(--

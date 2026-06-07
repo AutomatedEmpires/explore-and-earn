@@ -117,6 +117,39 @@
 	box-shadow: var(--ui-focus-ring);
 }
 
+.dateField {
+	display: inline-flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.dateLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.dateInput {
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-input);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	cursor: pointer;
+}
+
+.dateInput:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
 .count {
 	margin: 0;
 	font-family: var(--font-ui);

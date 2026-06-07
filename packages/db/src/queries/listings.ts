@@ -269,6 +269,10 @@ export async function getLiveListingsWithCoords(
  * Filters accepted by {@link searchListings}. Every field is optional; an empty
  * filter object returns the newest live listings (the same set as
  * getPublicListings, capped by `limit`).
+ *
+ * startDateAfter / startDateBefore filter on the listing `begins_at` column
+ * (ISO date or timestamp strings). `offset` opts into range-based pagination;
+ * when omitted the query falls back to a simple `.limit(limit)`.
  */
 export interface SearchFilters {
   query?: string;
@@ -277,7 +281,10 @@ export interface SearchFilters {
   hasMeals?: boolean;
   payMin?: number;
   location?: string;
+  startDateAfter?: string;
+  startDateBefore?: string;
   limit?: number;
+  offset?: number;
 }
 
 const DEFAULT_SEARCH_LIMIT = 48;
@@ -294,9 +301,13 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
 
   const term = filters.query ? sanitizeSearchTerm(filters.query) : "";
   if (term) {
-    builder = builder.or(
-      `title.ilike.%${term}%,description.ilike.%${term}%,location_display.ilike.%${term}%`,
-    );
+    // Full-text path: query the generated `search_vector` tsvector (migration
+    // 022) via plainto_tsquery. The non-text paths below (location ilike,
+    // category, benefits, pay, date range) still apply for empty/null queries.
+    builder = builder.textSearch("search_vector", term, {
+      type: "plain",
+      config: "english",
+    });
   }
 
   const categories = (filters.categories ?? []).filter((category) =>
@@ -316,11 +327,22 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
   const location = filters.location ? sanitizeSearchTerm(filters.location) : "";
   if (location) builder = builder.ilike("location_display", `%${location}%`);
 
-  const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;
+  if (filters.startDateAfter) {
+    builder = builder.gte("begins_at", filters.startDateAfter);
+  }
+  if (filters.startDateBefore) {
+    builder = builder.lte("begins_at", filters.startDateBefore);
+  }
 
-  const { data, error } = await builder
-    .order("published_at", { ascending: false })
-    .limit(limit);
+  const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;
+  const ordered = builder.order("published_at", { ascending: false });
+  const hasOffset =
+    filters.offset != null && Number.isFinite(filters.offset) && filters.offset >= 0;
+  const paginated = hasOffset
+    ? ordered.range(filters.offset as number, (filters.offset as number) + limit - 1)
+    : ordered.limit(limit);
+
+  const { data, error } = await paginated;
 
   if (error) throw new Error(`searchListings: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
