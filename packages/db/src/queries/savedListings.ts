@@ -87,6 +87,49 @@ export async function saveListing(
 }
 
 /**
+ * Save a listing AND report whether it was ALREADY actively saved beforehand.
+ * The swipe surface uses `alreadySaved` to avoid re-confirming a re-save.
+ *
+ * Reads the existing row's status first, then upserts status='saved'. Mirrors
+ * saveListing's best-effort contract: any failure resolves to
+ * `{ ok: false, alreadySaved: false }` and never throws.
+ */
+export async function saveListingWithStatus(
+  clerkToken: string,
+  clerkUserId: string,
+  listingId: string,
+): Promise<{ ok: boolean; alreadySaved: boolean }> {
+  try {
+    const db = untypedClient(clerkToken);
+    const seekerProfileId = await resolveSeekerProfileId(db, clerkUserId);
+    if (!seekerProfileId) {
+      return { ok: false, alreadySaved: false };
+    }
+
+    const { data: existing } = await db
+      .from("saved_listings")
+      .select("status")
+      .eq("seeker_profile_id", seekerProfileId)
+      .eq("listing_id", listingId)
+      .maybeSingle();
+    const alreadySaved =
+      (existing as { status?: string } | null)?.status === SAVED_STATUS;
+
+    const { error } = await db.from("saved_listings").upsert(
+      {
+        seeker_profile_id: seekerProfileId,
+        listing_id: listingId,
+        status: SAVED_STATUS,
+      },
+      { onConflict: "seeker_profile_id,listing_id" },
+    );
+    return { ok: !error, alreadySaved };
+  } catch {
+    return { ok: false, alreadySaved: false };
+  }
+}
+
+/**
  * Mark a previously saved listing as removed (`status='removed'`) for the current
  * seeker. Best-effort: returns `{ ok: false }` silently on any failure and never
  * throws.

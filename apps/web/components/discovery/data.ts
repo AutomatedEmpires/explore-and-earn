@@ -1,4 +1,11 @@
-import { getPublicListings, getPublicListingById, rowToDiscoveryFields } from "@explore-and-earn/db";
+import {
+  getLiveListingsWithCoords,
+  getPublicListings,
+  getPublicListingById,
+  getSwipeBatch,
+  rowToDiscoveryFields,
+  SWIPE_BATCH_SIZE,
+} from "@explore-and-earn/db";
 import type { DiscoveryListing } from "./listing";
 
 /**
@@ -25,4 +32,45 @@ export async function getDiscoveryListingById(
   const row = await getPublicListingById(id);
   if (!row) return null;
   return rowToDiscoveryFields(row) as DiscoveryListing;
+}
+
+/** Live opportunities that carry coordinates — backs the /map surface. */
+export async function getDiscoveryListingsWithCoords(): Promise<
+  DiscoveryListing[]
+> {
+  const rows = await getLiveListingsWithCoords();
+  return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
+}
+
+/**
+ * A page of swipe-deck listings plus the cursor for the next page.
+ * `nextCursor` is the published_at of the last row, or null when the deck is
+ * exhausted (the final page returned fewer than SWIPE_BATCH_SIZE rows).
+ */
+export interface SwipeBatch {
+  readonly listings: DiscoveryListing[];
+  readonly nextCursor: string | null;
+}
+
+/**
+ * One page of the seeker's swipe deck: live listings newest-first, excluding
+ * `excludeIds` (e.g. saved ids + cards already seen) and anything the seeker
+ * has applied to (enforced inside getSwipeBatch). `clerkUserId` must come from
+ * auth().userId.
+ */
+export async function getSwipeListings(
+  clerkToken: string,
+  clerkUserId: string,
+  excludeIds: string[],
+  cursor?: string,
+): Promise<SwipeBatch> {
+  const rows = await getSwipeBatch(clerkToken, clerkUserId, excludeIds, cursor);
+  const listings = rows.map(
+    (row) => rowToDiscoveryFields(row) as DiscoveryListing,
+  );
+  const nextCursor =
+    rows.length === SWIPE_BATCH_SIZE
+      ? rows[rows.length - 1]?.published_at ?? null
+      : null;
+  return { listings, nextCursor };
 }
