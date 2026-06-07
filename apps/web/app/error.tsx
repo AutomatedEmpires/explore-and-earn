@@ -1,6 +1,8 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
+import { useEffect } from "react";
 
 import styles from "./status.module.css";
 
@@ -15,6 +17,13 @@ export default function RootError({
 	readonly error: Error & { readonly digest?: string };
 	readonly reset: () => void;
 }) {
+	useEffect(() => {
+		Sentry.captureException(error, {
+			tags: { route: "root" },
+			extra: { digest: error.digest },
+		});
+	}, [error]);
+
 	return (
 		<section className={styles.wrap} role="alert">
 			<h1 className={styles.heading}>Something went wrong</h1>
@@ -27,7 +36,7 @@ export default function RootError({
 			<button type="button" className={styles.action} onClick={() => reset()}>
 				Try again
 			</button>
-			<Link className={styles.action} href="/" style={{ marginTop: 0 }}>
+			<Link className={styles.action} href="/">
 				Go home
 			</Link>
 		</section>

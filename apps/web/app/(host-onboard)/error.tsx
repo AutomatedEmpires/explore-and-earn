@@ -1,13 +1,16 @@
 "use client";
 
-import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
+import * as Sentry from "@sentry/nextjs";
+import Link from "next/link";
+import { useEffect } from "react";
 
 import styles from "../(host)/status.module.css";
 
 /**
  * Error boundary for the host onboarding flow. If onboarding fails, direct the
- * host to retry rather than leaving them stranded at a blank screen.
+ * host to retry rather than leaving them stranded at a blank screen. Reports to
+ * Sentry on mount.
  */
 export default function OnboardingError({
 	error,
@@ -16,6 +19,13 @@ export default function OnboardingError({
 	readonly error: Error & { readonly digest?: string };
 	readonly reset: () => void;
 }) {
+	useEffect(() => {
+		Sentry.captureException(error, {
+			tags: { route: "host-onboard" },
+			extra: { digest: error.digest },
+		});
+	}, [error]);
+
 	return (
 		<section className={styles.wrap} role="alert">
 			<Icon name="system.error" size={24} aria-hidden />
@@ -29,7 +39,7 @@ export default function OnboardingError({
 			<button type="button" className={styles.action} onClick={() => reset()}>
 				Try again
 			</button>
-			<Link className={styles.action} href="/" style={{ marginTop: 0 }}>
+			<Link className={styles.action} href="/">
 				Go home
 			</Link>
 		</section>

@@ -18,7 +18,10 @@ export default function HostProfileError({
 	readonly reset: () => void;
 }) {
 	useEffect(() => {
-		Sentry.captureException(error);
+		Sentry.captureException(error, {
+			tags: { route: "host-profile" },
+			extra: { digest: error.digest },
+		});
 	}, [error]);
 
 	return (

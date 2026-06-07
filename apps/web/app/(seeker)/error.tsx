@@ -1,6 +1,8 @@
 "use client";
 
 import { Icon } from "@explore-and-earn/ui";
+import * as Sentry from "@sentry/nextjs";
+import { useEffect } from "react";
 
 import styles from "./status.module.css";
 
@@ -16,6 +18,13 @@ export default function SeekerError({
 	readonly error: Error & { readonly digest?: string };
 	readonly reset: () => void;
 }) {
+	useEffect(() => {
+		Sentry.captureException(error, {
+			tags: { route: "seeker" },
+			extra: { digest: error.digest },
+		});
+	}, [error]);
+
 	return (
 		<section className={styles.wrap} role="alert">
 			<Icon name="system.error" size={24} aria-hidden />

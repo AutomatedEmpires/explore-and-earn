@@ -19,7 +19,10 @@ export default function SeekerOnboardingError({
 	readonly reset: () => void;
 }) {
 	useEffect(() => {
-		Sentry.captureException(error);
+		Sentry.captureException(error, {
+			tags: { route: "seeker-onboard" },
+			extra: { digest: error.digest },
+		});
 	}, [error]);
 
 	return (

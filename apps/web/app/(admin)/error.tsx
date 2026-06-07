@@ -20,7 +20,10 @@ export default function AdminError({
 	readonly reset: () => void;
 }) {
 	useEffect(() => {
-		Sentry.captureException(error);
+		Sentry.captureException(error, {
+			tags: { route: "admin" },
+			extra: { digest: error.digest },
+		});
 	}, [error]);
 
 	return (

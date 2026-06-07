@@ -1,5 +1,9 @@
 import * as Sentry from "@sentry/nextjs";
 
+const environment =
+	process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development";
+const release = process.env.NEXT_PUBLIC_APP_VERSION;
+
 /**
  * Next.js 15 server/edge instrumentation. Sentry.init() must run inside
  * register() (replaces sentry.server.config.ts / sentry.edge.config.ts).
@@ -10,10 +14,14 @@ export function register() {
 	if (process.env.NEXT_RUNTIME === "edge") {
 		Sentry.init({
 			dsn: process.env.SENTRY_DSN,
+			environment,
+			release,
 		});
 	} else {
 		Sentry.init({
 			dsn: process.env.SENTRY_DSN,
+			environment,
+			release,
 			tracesSampleRate: 0.1,
 		});
 	}

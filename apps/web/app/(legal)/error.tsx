@@ -19,7 +19,10 @@ export default function LegalError({
 	readonly reset: () => void;
 }) {
 	useEffect(() => {
-		Sentry.captureException(error);
+		Sentry.captureException(error, {
+			tags: { route: "legal" },
+			extra: { digest: error.digest },
+		});
 	}, [error]);
 
 	return (
