@@ -108,7 +108,37 @@ function toListingRow(raw: RawListingRow): ListingRow {
 }
 
 /** Maps a ListingRow to the DiscoveryListing view-model fields. */
-export function rowToDiscoveryFields(row: ListingRow) {
+export function rowToDiscoveryFields(row: ListingRow): {
+  id: string;
+  title: string;
+  category: OpportunityCategory;
+  location: string;
+  opportunityWindow: string;
+  status: "live" | "draft" | "paused" | "closed" | "archived" | "under_review";
+  host: {
+    name: string;
+    verified: boolean;
+  };
+  benefits: {
+    housing: {
+      provision: "provided" | "not_provided";
+    };
+    meals: {
+      provision: "provided" | "not_provided";
+    };
+    pay: {
+      provision: BenefitProvision;
+      summary: string;
+    };
+  };
+  coverImageUrl: string | undefined;
+  coordinates:
+    | {
+        lat: number;
+        lon: number;
+      }
+    | undefined;
+} {
   const hostName = row.host_profiles?.company_name ?? "Unknown Host";
   const verified = row.host_profiles?.attestation_status === "attested";
 
