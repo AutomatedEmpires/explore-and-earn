@@ -6,7 +6,9 @@ import {
   DEFAULT_NOTIFICATION_PREFS,
   getNotificationPrefs,
   saveNotificationPrefs,
+  updateNotificationPrefs as updateNotificationPrefsQuery,
   type NotificationPrefs,
+  type NotificationPrefsPatch,
 } from "@explore-and-earn/db";
 
 export interface NotificationPrefsActionResult {
@@ -39,6 +41,22 @@ export async function saveNotificationPrefsAction(
   if (!token) return { ok: false, error: "unauthenticated" };
 
   const result = await saveNotificationPrefs(token, userId, prefs);
+  if (result.ok) {
+    revalidatePath("/settings");
+  }
+  return result;
+}
+
+/** Persist a partial notification-preference update for the signed-in seeker. */
+export async function updateNotificationPrefsAction(
+  prefs: NotificationPrefsPatch,
+): Promise<NotificationPrefsActionResult> {
+  const { userId, getToken } = await auth();
+  if (!userId) return { ok: false, error: "unauthenticated" };
+  const token = await getToken({ template: "supabase" });
+  if (!token) return { ok: false, error: "unauthenticated" };
+
+  const result = await updateNotificationPrefsQuery(token, userId, prefs);
   if (result.ok) {
     revalidatePath("/settings");
   }

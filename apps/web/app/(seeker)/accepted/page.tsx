@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 
-import { getSeekerApplicationsWithListings } from "@explore-and-earn/db";
+import { getApplicationsForSeekerWithListings } from "@explore-and-earn/db";
 
-import {
-  BucketPage,
-  CardStatus,
-  LifecycleList,
-} from "../../../components/seeker";
+import { ApplicationCard, BucketPage } from "../../../components/seeker";
 import { EmptyState } from "../../../components/discovery";
+import styles from "../../../components/seeker/LifecycleList.module.css";
 
 export const metadata: Metadata = {
   title: "Accepted",
@@ -35,20 +32,11 @@ export default async function AcceptedPage() {
     );
   }
 
-  const accepted = await getSeekerApplicationsWithListings(token, userId, [
-    "accepted",
-  ]);
-  const items = accepted.flatMap((application) =>
-    application.listing
-      ? [
-          {
-            listing: application.listing,
-            actions: (
-              <CardStatus icon="category.seasonal" label="Accepted" />
-            ),
-          },
-        ]
-      : [],
+  const applications = await getApplicationsForSeekerWithListings(token, userId).catch(
+    () => [],
+  );
+  const accepted = applications.filter(
+    (application) => application.status === "accepted",
   );
 
   return (
@@ -56,12 +44,18 @@ export default async function AcceptedPage() {
       title="Accepted"
       description="Your confirmed roles and pre-arrival steps."
     >
-      <LifecycleList
-        surface="applied"
-        items={items}
-        emptyTitle="No accepted roles yet"
-        emptyMessage="When you accept an offer, your upcoming role will live here. Keep exploring opportunities under Seek."
-      />
+      {accepted.length > 0 ? (
+        <div className={styles.grid}>
+          {accepted.map((application) => (
+            <ApplicationCard key={application.id} application={application} />
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          title="No accepted roles yet"
+          message="When you accept an offer, your upcoming role will live here. Keep exploring opportunities under Seek."
+        />
+      )}
     </BucketPage>
   );
 }

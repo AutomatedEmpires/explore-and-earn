@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import type { DiscoveryListing } from "../discovery";
 import {
   APPLIED_ITEMS,
@@ -16,12 +18,18 @@ import type {
   SeekerStatusSummary,
 } from "./models";
 import {
+  MATCH_SCORE_HIDE_THRESHOLD,
+  authedClient,
+  getPublicListings,
   getSavedListingIds,
+  getSeekerApplicationIds,
   getSeekerApplications,
   getSeekerApplicationsWithListings,
   getSeekerProfile,
   getSeekerResume,
   getUnreadNotificationCount,
+  rowToDiscoveryFields,
+  scoreListingForSeeker,
 } from "@explore-and-earn/db";
 
 /**
@@ -41,6 +49,15 @@ import {
  */
 
 type SeekerResumeData = Awaited<ReturnType<typeof getSeekerResume>>;
+type BaseSeekerProfile = NonNullable<Awaited<ReturnType<typeof getSeekerProfile>>>;
+
+interface MatchProfile {
+  readonly desiredCategories: readonly string[];
+  readonly housingPreference: string | null;
+  readonly mealsPreference: string | null;
+  readonly locationPref: string | null;
+  readonly payExpectationMinCents: number | null;
+}
 
 /**
  * Derive a 0..100 resume-completion estimate. getSeekerResume returns the raw
@@ -62,6 +79,65 @@ function estimateResumeCompletion(resume: SeekerResumeData): number {
     score += 20;
   }
   return Math.min(100, score);
+}
+
+function untypedClient(clerkToken: string): SupabaseClient {
+  return authedClient(clerkToken) as unknown as SupabaseClient;
+}
+
+async function getMatchProfile(
+  token: string,
+  clerkUserId: string,
+  baseProfile: BaseSeekerProfile,
+): Promise<MatchProfile> {
+  try {
+    const db = untypedClient(token);
+    const { data, error } = await db
+      .from("seeker_profiles")
+      .select(
+        "desired_categories, housing_preference, meals_preference, location_pref, pay_expectation_min_cents",
+      )
+      .eq("clerk_user_id", clerkUserId)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (error || !data) {
+      return {
+        desiredCategories: baseProfile.desiredCategories,
+        housingPreference: baseProfile.housingPreference,
+        mealsPreference: null,
+        locationPref: baseProfile.locationPref,
+        payExpectationMinCents: null,
+      };
+    }
+
+    const row = data as Record<string, unknown>;
+    return {
+      desiredCategories: Array.isArray(row.desired_categories)
+        ? row.desired_categories.filter((value): value is string => typeof value === "string")
+        : baseProfile.desiredCategories,
+      housingPreference:
+        typeof row.housing_preference === "string"
+          ? row.housing_preference
+          : baseProfile.housingPreference,
+      mealsPreference:
+        typeof row.meals_preference === "string" ? row.meals_preference : null,
+      locationPref:
+        typeof row.location_pref === "string" ? row.location_pref : baseProfile.locationPref,
+      payExpectationMinCents:
+        typeof row.pay_expectation_min_cents === "number"
+          ? row.pay_expectation_min_cents
+          : null,
+    };
+  } catch {
+    return {
+      desiredCategories: baseProfile.desiredCategories,
+      housingPreference: baseProfile.housingPreference,
+      mealsPreference: null,
+      locationPref: baseProfile.locationPref,
+      payExpectationMinCents: null,
+    };
+  }
 }
 
 /** The seeker's at-a-glance status summary (counts, resume completion, etc.). */
@@ -156,9 +232,79 @@ export function getNotSelectedItems(): Promise<NotSelectedItem[]> {
   return Promise.resolve([]);
 }
 
-/** Matched-listing preview for Seeker Home (relevance via neutral Meter). */
-export function getMatchedListings(): Promise<DiscoveryListing[]> {
-  return Promise.resolve([...MATCHED_LISTINGS]);
+/**
+ * Matched-listing preview for Seeker Home.
+ *
+ * Reads the signed-in seeker's profile, live public listings, applied ids, and
+ * saved ids; filters out already-applied listings; scores every remaining live
+ * listing using the deterministic DB match scorer; then returns the top 20 by
+ * score (saved listings win a same-score tie so familiar opportunities stay
+ * easy to find). Match score is carried into the DiscoveryCard's neutral Meter.
+ */
+export async function getMatchedListings(
+  token?: string | null,
+  clerkUserId?: string | null,
+): Promise<DiscoveryListing[]> {
+  if (!token || !clerkUserId) {
+    return [...MATCHED_LISTINGS];
+  }
+
+  try {
+    const [baseProfile, listings, appliedIds, savedIds] = await Promise.all([
+      getSeekerProfile(token, clerkUserId),
+      getPublicListings(),
+      getSeekerApplicationIds(token, clerkUserId),
+      getSavedListingIds(token, clerkUserId),
+    ]);
+
+    if (!baseProfile) {
+      return [];
+    }
+
+    const profile = await getMatchProfile(token, clerkUserId, baseProfile);
+    const applied = new Set(appliedIds);
+    const saved = new Set(savedIds);
+
+    return listings
+      .filter((listing) => !applied.has(listing.id))
+      .map((listing) => {
+        const matchScore = scoreListingForSeeker(
+          {
+            category: listing.category,
+            housingIncluded: listing.housing_included,
+            compensationMinCents: listing.compensation_min_cents,
+            locationDisplay: listing.location_display,
+          },
+          {
+            desiredCategories: profile.desiredCategories,
+            housingPreference: profile.housingPreference,
+            locationPref: profile.locationPref,
+            payExpectationMin:
+              profile.payExpectationMinCents != null
+                ? profile.payExpectationMinCents / 100
+                : null,
+          },
+        );
+
+        return {
+          listing: {
+            ...(rowToDiscoveryFields(listing) as DiscoveryListing),
+            matchScore,
+          },
+          matchScore,
+          saved: saved.has(listing.id),
+        };
+      })
+      .filter((item) => item.matchScore >= MATCH_SCORE_HIDE_THRESHOLD)
+      .sort((a, b) => {
+        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
+        return Number(b.saved) - Number(a.saved);
+      })
+      .slice(0, 20)
+      .map((item) => item.listing);
+  } catch {
+    return [...MATCHED_LISTINGS];
+  }
 }
 
 /**

@@ -1,7 +1,7 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
-import { markNotificationRead } from "@explore-and-earn/db"
+import { markAllNotificationsRead, markNotificationRead } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
 
 /**
@@ -26,6 +26,24 @@ export async function markNotificationReadAction(
 	}
 
 	const result = await markNotificationRead(token, userId, notificationId)
+	revalidatePath("/notifications")
+	revalidatePath("/", "layout")
+	return result
+}
+
+/** Mark every unread notification for the authenticated seeker as read. */
+export async function markAllNotificationsReadAction(): Promise<{ ok: boolean }> {
+	const { userId, getToken } = await auth()
+	if (!userId) {
+		return { ok: false }
+	}
+
+	const token = await getToken({ template: "supabase" })
+	if (!token) {
+		return { ok: false }
+	}
+
+	const result = await markAllNotificationsRead(token, userId)
 	revalidatePath("/notifications")
 	revalidatePath("/", "layout")
 	return result
