@@ -6,7 +6,7 @@ A lightweight registry of the canonical decisions agents must respect. The autho
 
 | ID | Decision | Status | Enforced by |
 | --- | --- | --- | --- |
-| C-VISION | Explore&Earn is a lifestyle-driven opportunity marketplace, not a job board | Locked | `docs/product/product-principles.md` |
+| C-VISION | Explore&Earn is a built by seekers, for seekers discovery marketplace that rewards real-world exploration | Locked | `docs/product/product-principles.md` |
 | C-TRIAD | Every opportunity surfaces HOUSING / MEALS / PAY as a first-class triad (never "Perks") | Locked | `docs/design/discovery-card-v1.md` |
 | C-CARD | One unified card system across all categories; vary imagery/accent, not the system | Locked | `docs/design/discovery-card-v1.md` |
 | C-SEEKERS-FREE | Seekers are free forever; hosts pay for access/visibility/analytics/recruiting | Locked | Notion: Monetization Strategy |
