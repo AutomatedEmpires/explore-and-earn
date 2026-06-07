@@ -1,7 +1,9 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
-import { useEffect, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+
+import { reportError } from "../lib/sentry";
 
 const bodyStyle: CSSProperties = {
 	margin: 0,
@@ -45,6 +47,12 @@ const buttonStyle: CSSProperties = {
 	cursor: "pointer",
 };
 
+const idStyle: CSSProperties = {
+	opacity: 0.5,
+	fontSize: "0.75rem",
+	marginTop: "1rem",
+};
+
 /**
  * App Router global error boundary. Required by Next.js to catch errors thrown
  * in the root layout; it replaces the layout, so it must render its own
@@ -57,11 +65,11 @@ export default function GlobalError({
 	error: Error & { digest?: string };
 	reset: () => void;
 }) {
+	const [eventId, setEventId] = useState<string | undefined>(undefined);
+
 	useEffect(() => {
-		Sentry.captureException(error, {
-			tags: { route: "global" },
-			extra: { digest: error.digest },
-		});
+		reportError(error, { route: "global" });
+		setEventId(Sentry.lastEventId());
 	}, [error]);
 
 	return (
@@ -76,6 +84,11 @@ export default function GlobalError({
 					<button type="button" onClick={() => reset()} style={buttonStyle}>
 						Reload
 					</button>
+					{eventId ? (
+						<p style={idStyle}>
+							Error ID: {eventId} — quote this if contacting support
+						</p>
+					) : null}
 				</main>
 			</body>
 		</html>

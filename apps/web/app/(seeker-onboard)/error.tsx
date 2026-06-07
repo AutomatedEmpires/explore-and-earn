@@ -2,8 +2,9 @@
 
 import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import { reportError } from "../../lib/sentry";
 import styles from "../status.module.css";
 
 /**
@@ -18,11 +19,11 @@ export default function SeekerOnboardingError({
 	readonly error: Error & { readonly digest?: string };
 	readonly reset: () => void;
 }) {
+	const [eventId, setEventId] = useState<string | undefined>(undefined);
+
 	useEffect(() => {
-		Sentry.captureException(error, {
-			tags: { route: "seeker-onboard" },
-			extra: { digest: error.digest },
-		});
+		reportError(error, { route: "seeker-onboard" });
+		setEventId(Sentry.lastEventId());
 	}, [error]);
 
 	return (
@@ -32,8 +33,10 @@ export default function SeekerOnboardingError({
 				Something went wrong during onboarding. Try again or head back to the
 				homepage.
 			</p>
-			{error.digest ? (
-				<p className={styles.digest}>Reference: {error.digest}</p>
+			{eventId ? (
+				<p className={styles.digest}>
+					Error ID: {eventId} — quote this if contacting support
+				</p>
 			) : null}
 			<button type="button" className={styles.action} onClick={() => reset()}>
 				Try again

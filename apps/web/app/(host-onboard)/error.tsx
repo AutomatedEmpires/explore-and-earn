@@ -3,8 +3,9 @@
 import { Icon } from "@explore-and-earn/ui";
 import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import { reportError } from "../../lib/sentry";
 import styles from "../(host)/status.module.css";
 
 /**
@@ -19,11 +20,11 @@ export default function OnboardingError({
 	readonly error: Error & { readonly digest?: string };
 	readonly reset: () => void;
 }) {
+	const [eventId, setEventId] = useState<string | undefined>(undefined);
+
 	useEffect(() => {
-		Sentry.captureException(error, {
-			tags: { route: "host-onboard" },
-			extra: { digest: error.digest },
-		});
+		reportError(error, { route: "host-onboard" });
+		setEventId(Sentry.lastEventId());
 	}, [error]);
 
 	return (
@@ -33,8 +34,10 @@ export default function OnboardingError({
 			<p className={styles.message}>
 				Something went wrong during host onboarding. Try again or contact support.
 			</p>
-			{error.digest ? (
-				<p className={styles.digest}>Reference: {error.digest}</p>
+			{eventId ? (
+				<p className={styles.digest}>
+					Error ID: {eventId} — quote this if contacting support
+				</p>
 			) : null}
 			<button type="button" className={styles.action} onClick={() => reset()}>
 				Try again
