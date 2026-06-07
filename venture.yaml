@@ -1,0 +1,53 @@
+# venture.yaml — AutomatedEmpires venture manifest
+# One per repo. Declares where this venture sits in the empire and which
+# locked-standard choices apply. Keep in sync with the Notion Master Index
+# (product/vision truth); this file is implementation truth.
+schemaVersion: 1
+
+venture:
+  name: Explore & Earn
+  slug: explore-and-earn
+  domain: explore-and-earn.vercel.app
+  stage: live            # concept | scaffold | building | live
+  repo: AutomatedEmpires/explore-and-earn
+  structure: monorepo    # monorepo | single-app
+  owner: jackson@automatedempires.com
+  notion:
+    masterIndex: "Explore&Earn Source of Truth — Master Index"
+
+# Locked family standard (inherited from "AutomatedEmpires — Ventures").
+# Declared explicitly so CI and agents can assert against it.
+stack:
+  language: typescript
+  framework: next-app-router
+  monorepo: turborepo
+  runtime:
+    node: 24.16.0
+    pnpm: 10.12.4
+    install: --frozen-lockfile
+
+integrations:
+  auth: clerk            # LOCKED — RLS keyed on Clerk sub; never Supabase Auth
+  maps: mapbox           # LOCKED — never Azure/Google Maps
+  database: supabase-postgres
+  secrets: doppler
+  hosting: vercel
+  payments: stripe
+  analytics: posthog
+  monitoring: sentry
+  media: cloudinary
+  icons:
+    provider: streamline
+    style: freehand-pro  # one style per app; never mix
+
+riskGates:
+  low: agents may open PRs autonomously; CI gates merge
+  medium: agent drafts, human reviews before merge
+  high: human approval required before any code change
+  approvalRequired: human approval required before any code change
+
+agents:
+  router: .github/workflows/pr-agent-router.yml
+  primaryBuilder: anthropics/claude-code-action   # @claude
+  retired:
+    - codex            # retired 2026-06-06
