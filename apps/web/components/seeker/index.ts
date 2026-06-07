@@ -6,6 +6,8 @@ export { BucketChips } from "./BucketChips";
 export type { BucketChipsProps } from "./BucketChips";
 export { LifecycleList } from "./LifecycleList";
 export type { LifecycleListItem, LifecycleListProps } from "./LifecycleList";
+export { ApplicationCard } from "./ApplicationCard";
+export type { ApplicationCardProps } from "./ApplicationCard";
 export { CardStatus } from "./CardStatus";
 export type { CardStatusProps } from "./CardStatus";
 export { InviteActions } from "./InviteActions";
