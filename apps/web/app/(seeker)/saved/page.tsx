@@ -41,7 +41,7 @@ export default async function SavedPage() {
 		);
 	}
 
-	const token = await getToken();
+	const token = await getToken({ template: "supabase" });
 	if (!token) {
 		return (
 			<BucketPage
