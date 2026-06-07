@@ -11,13 +11,14 @@ export interface HostProfileDetailsInput {
     about?: string | null;
     primaryLocationName?: string | null;
     websiteUrl?: string | null;
+    photoUrl?: string | null;
 }
 /**
  * Resolve the caller's own host profile from their Clerk user id.
  * Returns `null` when the user has not created a host profile yet.
  *
  * @param clerkToken - Verified Clerk JWT from `getToken()`.
- * @param clerkUserId - Verified Clerk user ID from `auth().userId` — do NOT
+ * @param clerkUserId - Verified Clerk user ID from `auth().userId` \u2014 do NOT
  *   decode this from the token; pass it from the already-verified `auth()` call.
  */
 export declare function getHostProfile(clerkToken: string, clerkUserId: string): Promise<{
@@ -25,6 +26,7 @@ export declare function getHostProfile(clerkToken: string, clerkUserId: string):
     companyName: string;
     about: string | null;
     primaryLocationName: string | null;
+    photoUrl: string | null;
 } | null>;
 /**
  * Update the caller's own host_profiles row, scoped by their verified Clerk user

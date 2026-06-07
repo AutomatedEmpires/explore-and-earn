@@ -35,6 +35,10 @@ export async function applyToListingAction(
 
 	const result = await applyToListing(token, userId, listingId, coverMessage)
 
+	if (result.error === "cannot_apply_to_own_listing") {
+		return { ok: false, error: "You cannot apply to your own listing." }
+	}
+
 	// Best-effort: email the host that a new application arrived. This must never
 	// block or fail the apply result, so all of it is guarded and swallowed.
 	if (result.ok) {

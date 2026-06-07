@@ -10,12 +10,15 @@
  * and refuse any conversation the caller does not own. Keep these manual guards
  * even once RLS lands — they are defense in depth.
  *
- * TYPES: `packages/db/src/types.gen.ts` is still a placeholder
- * (`GeneratedDatabase = Record<string, never>`), and these tables were added in
- * migration 010 (after the committed generated types). We therefore talk to
- * PostgREST through an untyped `SupabaseClient` handle and narrow rows locally,
- * mirroring savedListings.ts / hostProfiles.ts. Drop the cast once the generated
- * types include these tables.
+ * TYPES: `conversations` and `messages` are now present in the generated
+ * `packages/db/src/types.gen.ts`. However, the participant guards below resolve
+ * the caller via `seeker_profiles.clerk_user_id`, and that column is NOT in the
+ * generated types (the Clerk-sync columns from migration 009 are not reflected
+ * on the live database). A typed client would reject the `.eq("clerk_user_id",
+ * ...)` lookup in `resolveSeekerProfileId`, so we keep an untyped
+ * `SupabaseClient` handle and narrow rows locally, mirroring savedListings.ts /
+ * hostProfiles.ts.
+ * // types not yet generated: seeker_profiles.clerk_user_id
  */
 export type ConversationRole = "seeker" | "host";
 export interface Conversation {

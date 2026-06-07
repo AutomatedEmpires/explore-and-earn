@@ -222,3 +222,20 @@ export async function getMessageEmailContext(
     return null;
   }
 }
+
+/**
+ * Resolve a seeker's Clerk user id from their seeker_profiles.id.
+ * Used by the invite-send server action to address the invite notification email.
+ * Best-effort: returns null when the profile cannot be resolved.
+ */
+export async function getSeekerClerkIdByProfileId(
+  clerkToken: string,
+  seekerProfileId: string,
+): Promise<string | null> {
+  try {
+    const db = untypedClient(clerkToken);
+    return await resolveClerkId(db, "seeker_profiles", seekerProfileId);
+  } catch {
+    return null;
+  }
+}

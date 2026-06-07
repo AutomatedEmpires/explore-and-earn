@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 
 import {
@@ -18,6 +19,7 @@ import type { DiscoveryListing } from "../../../../../components/discovery";
 import { toApplicantItem } from "../applicants-data";
 import { StatusActions } from "./StatusActions";
 import styles from "../page.module.css";
+import detailStyles from "./page.module.css";
 
 // Per-host, app-level scoped — never statically cached.
 export const metadata: Metadata = { title: "Applicant" };
@@ -80,6 +82,14 @@ export default async function HostApplicantDetailPage({
       />
       <HostApplicantDetail applicant={applicantWithName} resume={resume} />
       <StatusActions applicationId={application.id} />
+      <div className={detailStyles.messageLink}>
+        <Link
+          href={`/host/messages?seekerProfileId=${application.seekerProfileId}`}
+          className={detailStyles.messageLinkAnchor}
+        >
+          Send a message to this applicant
+        </Link>
+      </div>
     </section>
   );
 }

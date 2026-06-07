@@ -42,10 +42,18 @@ export async function sendMessageAction(
 	try {
 		const context = await getMessageEmailContext(token, userId, conversationId);
 		if (context?.recipientClerkUserId) {
-			const recipientOptedOut =
-				context.recipientRole === "seeker" &&
-				!(await getNotificationPrefs(token, context.recipientClerkUserId))
-					.emailOnMessage;
+			let recipientOptedOut = false;
+			if (context.recipientRole === "seeker") {
+				// Cross-user prefs read: recipient is a different user from the sender,
+				// so the sender's token may fail under RLS. Degrade silently — never block the send.
+				let prefs = null;
+				try {
+					prefs = await getNotificationPrefs(token, context.recipientClerkUserId);
+				} catch {
+					// Cross-user read failed; skip notification prefs check.
+				}
+				recipientOptedOut = prefs !== null && !prefs.emailOnMessage;
+			}
 			if (!recipientOptedOut) {
 				const [recipient, sender] = await Promise.all([
 					getClerkContact(context.recipientClerkUserId),

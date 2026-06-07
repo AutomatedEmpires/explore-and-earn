@@ -20,14 +20,14 @@ Never reduce this triad to a generic "Perks" label.
 
 **Agents communicate through shared, durable artifacts — never through private chat memory.** If it is not written into Notion, a GitHub issue/PR, repo markdown, or a status field, it did not happen, because the next agent cannot see it.
 
-- **Notion** = product truth / strategic memory / decisions.
-- **GitHub** = implementation truth / issues / PRs / repo docs / code.
+- **Notion** = product truth / strategic memory / decisions — and where the bulk of the build (specs, architecture, data models, copy) is authored before code moves.
+- **GitHub** = implementation truth — where Notion's output is validated, reviewed, and shipped; issues / PRs / repo docs / code.
 - **VS Code (Copilot / Codex / Cursor / Claude)** = implementation workers.
 - **The Notion (Opus) agent** = architect / reviewer / orchestrator.
 - **Figma** = *optional* visual reference — **not** a required gate.
 - **Streamline Freehand** = the icon language.
 
-Mantra: **Notion decides. GitHub builds. Figma shows. Everything else runs.**
+Mantra: **Notion decides and builds. GitHub reviews and ships. Figma shows. Everything else runs.**
 
 ## 3. Build order (do not skip ahead)
 

@@ -13,8 +13,13 @@ import {
 
 import { Button, DiscoveryCard, Icon, Meter } from "@explore-and-earn/ui";
 
-import { EmptyState, toDiscoveryCardData, type DiscoveryListing } from "../discovery";
-import { saveListingAction } from "../../app/actions/savedListings";
+import {
+	DiscoveryCardSkeleton,
+	EmptyState,
+	toDiscoveryCardData,
+	type DiscoveryListing,
+} from "../discovery";
+import { getSwipeBatchAction, saveListingAction } from "../../app/actions/swipe";
 import styles from "./SwipeDeck.module.css";
 
 type SwipeAction = "pass" | "save" | "apply";
@@ -31,9 +36,13 @@ const THROW_MS = 240;
 const SNAP_MS = 160;
 /** Top card + cards peeking behind it. */
 const MAX_VISIBLE = 3;
+/** Prefetch the next page once the deck has this many (or fewer) cards left. */
+const PREFETCH_REMAINING = 5;
 
 export interface SwipeDeckProps {
 	readonly listings: readonly DiscoveryListing[];
+	/** published_at of the last server row, or null when there is no next page. */
+	readonly initialCursor?: string | null;
 }
 
 /**
@@ -48,13 +57,21 @@ export interface SwipeDeckProps {
  * no-cost Undo — zero dark patterns. Motion uses design-system tokens and fully
  * honors prefers-reduced-motion.
  *
+ * Infinite load: the deck seeds from the server-fetched first batch, then
+ * pre-fetches the next page (getSwipeBatchAction) once PREFETCH_REMAINING cards
+ * remain, appending de-duplicated rows and advancing the cursor until the feed
+ * is exhausted (nextCursor === null).
+ *
  * Persistence: decisions update local state, and a swipe-right / Save is
  * additionally persisted best-effort via the saveListingAction server action
- * (failures are swallowed so the deck never blocks). The matching algorithm and
- * pass/apply persistence still arrive with the gated data layer.
+ * (failures are swallowed so the deck never blocks). Pass/apply persistence and
+ * the match algorithm still arrive with the gated data layer.
  */
-export function SwipeDeck({ listings }: SwipeDeckProps) {
-	const total = listings.length;
+export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
+	const [deck, setDeck] = useState<DiscoveryListing[]>(() => [...listings]);
+	const [cursor, setCursor] = useState<string | null>(initialCursor);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const total = deck.length;
 	const [index, setIndex] = useState(0);
 	const [decisions, setDecisions] = useState<readonly Decision[]>([]);
 	const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -65,6 +82,12 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 	const startRef = useRef<{ x: number; y: number } | null>(null);
 	const pointerIdRef = useRef<number | null>(null);
 	const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const deckRef = useRef<DiscoveryListing[]>(deck);
+	const loadingRef = useRef(false);
+
+	useEffect(() => {
+		deckRef.current = deck;
+	}, [deck]);
 
 	useEffect(() => {
 		if (typeof window === "undefined" || !window.matchMedia) {
@@ -85,12 +108,49 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 		};
 	}, []);
 
+	const loadMore = useCallback(async () => {
+		if (loadingRef.current || cursor === null) {
+			return;
+		}
+		loadingRef.current = true;
+		setLoadingMore(true);
+		try {
+			const excludeIds = deckRef.current.map((listing) => listing.id);
+			const batch = await getSwipeBatchAction(excludeIds, cursor);
+			setDeck((prev) => {
+				const seen = new Set(prev.map((listing) => listing.id));
+				const merged = [...prev];
+				for (const listing of batch.listings) {
+					if (!seen.has(listing.id)) {
+						merged.push(listing);
+					}
+				}
+				return merged;
+			});
+			setCursor(batch.nextCursor);
+		} catch {
+			// Best-effort infinite load: stop paginating but keep the deck usable
+			// with whatever is already loaded.
+			setCursor(null);
+		} finally {
+			loadingRef.current = false;
+			setLoadingMore(false);
+		}
+	}, [cursor]);
+
+	useEffect(() => {
+		const remaining = deck.length - index;
+		if (remaining <= PREFETCH_REMAINING && cursor !== null && !loadingRef.current) {
+			void loadMore();
+		}
+	}, [index, deck.length, cursor, loadMore]);
+
 	const triggerLeave = useCallback(
 		(action: SwipeAction) => {
 			if (leaving) {
 				return;
 			}
-			const card = listings[index];
+			const card = deck[index];
 			if (!card) {
 				return;
 			}
@@ -124,7 +184,7 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 				reducedMotion ? 0 : THROW_MS,
 			);
 		},
-		[leaving, listings, index, reducedMotion],
+		[leaving, deck, index, reducedMotion],
 	);
 
 	const undo = useCallback(() => {
@@ -143,7 +203,7 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 		setLeaving(null);
 	}, []);
 
-	const current = listings[index];
+	const current = deck[index];
 	const savedCount = decisions.filter((decision) => decision.action === "save").length;
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -223,6 +283,21 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 	};
 
 	if (!current) {
+		// More pages are still in flight (or queued): show skeleton slots rather
+		// than the terminal empty state, so a mid-deck refill doesn't flash
+		// "all caught up".
+		if (loadingMore || cursor !== null) {
+			return (
+				<div className={styles.deck} aria-busy="true">
+					<p className={styles.progress}>Finding more opportunities\u2026</p>
+					<div className={styles.stack}>
+						<DiscoveryCardSkeleton />
+						<DiscoveryCardSkeleton />
+						<DiscoveryCardSkeleton />
+					</div>
+				</div>
+			);
+		}
 		const summary =
 			savedCount > 0
 				? `You saved ${savedCount} ${savedCount === 1 ? "opportunity" : "opportunities"}. Find them under Saved, or run the deck again.`
@@ -246,7 +321,7 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 	const passOverlayStyle: CSSProperties = { opacity: passStrength };
 	const saveOverlayStyle: CSSProperties = { opacity: saveStrength };
 	const applyOverlayStyle: CSSProperties = { opacity: applyStrength };
-	const visible = listings.slice(index, index + MAX_VISIBLE);
+	const visible = deck.slice(index, index + MAX_VISIBLE);
 
 	return (
 		<div
@@ -335,7 +410,7 @@ export function SwipeDeck({ listings }: SwipeDeckProps) {
 			</div>
 
 			<p className={styles.hint}>
-				Drag a card, tap a button, or use ← Pass · → Save · ↑ Apply · Backspace to undo.
+				Drag a card, tap a button, or use \u2190 Pass \u00b7 \u2192 Save \u00b7 \u2191 Apply \u00b7 Backspace to undo.
 			</p>
 
 			<span className={styles.srOnly} role="status" aria-live="polite">
