@@ -28,6 +28,7 @@ export interface ListingRow {
   begins_at: string | null;
   ends_at: string | null;
   published_at: string | null;
+  cover_photo_url: string | null;
   host_profiles: {
     company_name: string;
     attestation_status: string;
@@ -54,6 +55,7 @@ type RawListingRow = {
   begins_at: string | null;
   ends_at: string | null;
   published_at: string | null;
+  cover_photo_url: string | null;
   host_profiles: { company_name: string; attestation_status: string } | null;
 };
 
@@ -127,11 +129,12 @@ export function rowToDiscoveryFields(row: ListingRow) {
         summary: buildCompensationSummary(row),
       },
     },
+    coverImageUrl: row.cover_photo_url ?? undefined,
   };
 }
 
 const LISTING_COLUMNS =
-  "id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,host_profiles(company_name,attestation_status)";
+  "id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,host_profiles(company_name,attestation_status)";
 
 /** Public live listings \u2014 no auth required. */
 export async function getPublicListings(): Promise<ListingRow[]> {
@@ -354,6 +357,7 @@ export interface ListingWriteFields {
   summary?: string | null;
   startDate?: string | null;
   endDate?: string | null;
+  coverPhotoUrl?: string | null;
 }
 
 type ListingColumnPatch = {
@@ -369,6 +373,7 @@ type ListingColumnPatch = {
   compensation_unit?: CompensationUnit | null;
   housing_included?: boolean;
   meals_included?: boolean;
+  cover_photo_url?: string | null;
 };
 
 function toCentsOrNull(amount: number | null | undefined): number | null {
@@ -420,6 +425,10 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
   }
   if (fields.mealsProvision !== undefined || fields.mealsDescription !== undefined) {
     patch.meals_included = benefitIncluded(fields.mealsProvision, fields.mealsDescription);
+  }
+  if (fields.coverPhotoUrl !== undefined) {
+    const trimmed = fields.coverPhotoUrl?.trim() ?? "";
+    patch.cover_photo_url = trimmed.length > 0 ? trimmed : null;
   }
 
   return patch;

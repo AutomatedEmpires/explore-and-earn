@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
+import { useAuth } from "@clerk/nextjs";
 
 import { Button } from "@explore-and-earn/ui";
+import { uploadListingMedia } from "@explore-and-earn/db";
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
@@ -12,6 +14,7 @@ import {
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
+import { ImageUpload } from "../ImageUpload";
 import { createListingAction, updateListingAction } from "../../app/actions/listings";
 import styles from "./ListingForm.module.css";
 
@@ -34,6 +37,7 @@ export interface ListingFormInitialValues {
   readonly payPeriod?: CompensationUnit;
   readonly summary?: string;
   readonly startDate?: string;
+  readonly coverPhotoUrl?: string;
 }
 
 export interface ListingFormProps {
@@ -41,6 +45,12 @@ export interface ListingFormProps {
   /** Required in edit mode: the listing row id passed to updateListingAction. */
   readonly listingId?: string;
   readonly initial?: ListingFormInitialValues;
+  /**
+   * Owning host profile id. Required to enable the cover photo upload (uploads
+   * go to listing-media/{hostProfileId}/cover); when absent the cover field is
+   * hidden.
+   */
+  readonly hostProfileId?: string;
 }
 
 const PAY_PERIOD_LABEL: Record<CompensationUnit, string> = {
@@ -64,11 +74,13 @@ function categoryLabel(category: MarketplaceCategory): string {
  * see AGENTS.md and packages/contracts/src/benefits.ts) and submits to the
  * listing server actions. Token-only styling via the CSS module.
  */
-export function ListingForm({ mode, listingId, initial }: ListingFormProps) {
+export function ListingForm({ mode, listingId, initial, hostProfileId }: ListingFormProps) {
   const router = useRouter();
+  const { getToken } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const [coverPhotoUrl, setCoverPhotoUrl] = useState(initial?.coverPhotoUrl ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [category, setCategory] = useState<MarketplaceCategory>(
     initial?.category ?? MARKETPLACE_CATEGORIES[0],
@@ -91,6 +103,17 @@ export function ListingForm({ mode, listingId, initial }: ListingFormProps) {
   const submitLabel = mode === "create" ? "Create listing" : "Save changes";
   const cancelHref = listingId ? `/host/listings/${listingId}` : "/host/listings";
 
+  async function uploadCover(file: File): Promise<string> {
+    if (!hostProfileId) {
+      throw new Error("Missing host profile \u2014 reload the page and try again.");
+    }
+    const token = await getToken({ template: "supabase" });
+    if (!token) {
+      throw new Error("Your session has expired \u2014 sign in again.");
+    }
+    return uploadListingMedia(token, hostProfileId, file, "cover");
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -111,6 +134,7 @@ export function ListingForm({ mode, listingId, initial }: ListingFormProps) {
     formData.set("payPeriod", payPeriod);
     formData.set("summary", summary.trim());
     formData.set("startDate", startDate.trim());
+    formData.set("coverPhotoUrl", coverPhotoUrl);
 
     startTransition(async () => {
       if (mode === "edit" && listingId) {
@@ -142,6 +166,20 @@ export function ListingForm({ mode, listingId, initial }: ListingFormProps) {
         <p className={styles.error} role="alert">
           {error}
         </p>
+      ) : null}
+
+      {hostProfileId ? (
+        <div className={styles.field}>
+          <span className={styles.label}>Cover photo</span>
+          <ImageUpload
+            label="Add a cover photo"
+            currentUrl={coverPhotoUrl || undefined}
+            uploader={uploadCover}
+            onUpload={setCoverPhotoUrl}
+            disabled={isPending}
+          />
+          <input type="hidden" name="coverPhotoUrl" value={coverPhotoUrl} />
+        </div>
       ) : null}
 
       <div className={styles.field}>

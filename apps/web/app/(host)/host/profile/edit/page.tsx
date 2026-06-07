@@ -17,7 +17,7 @@ import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Edit profile" };
 
-// Real host data is per-user and app-level scoped — never statically cached.
+// Real host data is per-user and app-level scoped \u2014 never statically cached.
 export const dynamic = "force-dynamic";
 
 export default async function HostProfileEditPage() {
@@ -59,7 +59,11 @@ export default async function HostProfileEditPage() {
         actionLabel="Back to profile"
         actionHref="/host/profile"
       />
-      <HostProfileForm profile={profile} />
+      <HostProfileForm
+        profile={profile}
+        hostProfileId={hostProfile?.id}
+        photoUrl={hostProfile?.photoUrl ?? undefined}
+      />
     </section>
   );
 }

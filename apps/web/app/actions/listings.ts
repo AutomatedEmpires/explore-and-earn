@@ -112,6 +112,9 @@ function readListingFields(formData: FormData): ListingWriteFields {
   if (formData.has("endDate")) {
     fields.endDate = optionalString(formData.get("endDate")) ?? null;
   }
+  if (formData.has("coverPhotoUrl")) {
+    fields.coverPhotoUrl = optionalString(formData.get("coverPhotoUrl")) ?? null;
+  }
 
   return fields;
 }

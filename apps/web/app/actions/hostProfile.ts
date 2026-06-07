@@ -44,14 +44,15 @@ export interface UpdateHostProfileInput {
 	about?: string | null
 	primaryLocationName?: string | null
 	websiteUrl?: string | null
+	photoUrl?: string | null
 }
 
 /**
  * Server action: update the authenticated host's profile details.
  *
- * Writes company_name, about, primary_location_name, and website_url to the
- * caller's own `host_profiles` row (scoped by the verified `auth().userId` in
- * the db layer). Follows the same auth pattern as the other server actions:
+ * Writes company_name, about, primary_location_name, website_url, and photo_url
+ * to the caller's own `host_profiles` row (scoped by the verified `auth().userId`
+ * in the db layer). Follows the same auth pattern as the other server actions:
  * `auth()` -> `getToken({ template: "supabase" })` -> db call -> revalidate.
  */
 export async function updateHostProfileAction(
