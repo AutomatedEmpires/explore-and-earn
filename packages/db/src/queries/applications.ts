@@ -734,3 +734,74 @@ export async function getListingHostContact(
     listingTitle: typeof row.title === "string" ? row.title : "",
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Host pipeline: application detail + alias (Wave 10 / Agent C).             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * All applications across the authed host's listings, newest first.
+ * Delegates to getHostApplications — provided as a named alias so callers
+ * explicitly referencing the host-pipeline brief can import by that name.
+ */
+export async function getAllApplicationsForHost(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<HostApplication[]> {
+  return getHostApplications(clerkToken, clerkUserId);
+}
+
+/**
+ * A single application enriched with the seeker's display name and bio, for
+ * the applicant-detail surface. Ownership is re-checked via getHostApplications
+ * (which scopes to the caller's listings) before reading the seeker row.
+ *
+ * Returns null when the application is not found or the caller does not own the
+ * listing the application targets.
+ */
+export interface ApplicationWithSeekerDetail extends HostApplication {
+  readonly seekerDisplayName: string | null;
+  readonly seekerBio: string | null;
+}
+
+export async function getApplicationWithSeekerDetail(
+  clerkToken: string,
+  clerkUserId: string,
+  applicationId: string,
+): Promise<ApplicationWithSeekerDetail | null> {
+  const applications = await getHostApplications(clerkToken, clerkUserId);
+  const application = applications.find((app) => app.id === applicationId);
+  if (!application) {
+    return null;
+  }
+
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+
+  // Best-effort seeker profile read: display_name may not exist as a column
+  // yet (forward-compatible missing-column fallback).
+  let seekerDisplayName: string | null = null;
+  let seekerBio: string | null = null;
+
+  try {
+    const { data, error } = await untyped
+      .from("seeker_profiles")
+      .select("display_name, short_bio")
+      .eq("id", application.seekerProfileId)
+      .maybeSingle();
+    if (!error && data) {
+      const row = data as Record<string, unknown>;
+      seekerDisplayName =
+        typeof row.display_name === "string" && row.display_name.trim().length > 0
+          ? row.display_name.trim()
+          : null;
+      seekerBio =
+        typeof row.short_bio === "string" && row.short_bio.trim().length > 0
+          ? row.short_bio.trim()
+          : null;
+    }
+  } catch {
+    // Missing-column fallback: any error means no extra data to show.
+  }
+
+  return { ...application, seekerDisplayName, seekerBio };
+}

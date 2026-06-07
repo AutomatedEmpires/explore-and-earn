@@ -445,3 +445,45 @@ export async function getSeekerApplicationsWithListings(clerkToken, clerkUserId,
         };
     });
 }
+/**
+ * All applications across the authed host's listings, newest first.
+ * Delegates to getHostApplications — provided as a named alias so callers
+ * explicitly referencing the host-pipeline brief can import by that name.
+ */
+export async function getAllApplicationsForHost(clerkToken, clerkUserId) {
+    return getHostApplications(clerkToken, clerkUserId);
+}
+export async function getApplicationWithSeekerDetail(clerkToken, clerkUserId, applicationId) {
+    const applications = await getHostApplications(clerkToken, clerkUserId);
+    const application = applications.find((app) => app.id === applicationId);
+    if (!application) {
+        return null;
+    }
+    const untyped = authedClient(clerkToken);
+    // Best-effort seeker profile read: display_name may not exist as a column
+    // yet (forward-compatible missing-column fallback).
+    let seekerDisplayName = null;
+    let seekerBio = null;
+    try {
+        const { data, error } = await untyped
+            .from("seeker_profiles")
+            .select("display_name, short_bio")
+            .eq("id", application.seekerProfileId)
+            .maybeSingle();
+        if (!error && data) {
+            const row = data;
+            seekerDisplayName =
+                typeof row.display_name === "string" && row.display_name.trim().length > 0
+                    ? row.display_name.trim()
+                    : null;
+            seekerBio =
+                typeof row.short_bio === "string" && row.short_bio.trim().length > 0
+                    ? row.short_bio.trim()
+                    : null;
+        }
+    }
+    catch {
+        // Missing-column fallback: any error means no extra data to show.
+    }
+    return { ...application, seekerDisplayName, seekerBio };
+}

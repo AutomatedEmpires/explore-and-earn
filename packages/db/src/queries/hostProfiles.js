@@ -6,15 +6,9 @@ import { authedClient } from "../client";
  * `authedClient()` talks to PostgREST with the anon key plus the caller's Clerk
  * JWT (the `anon` role, which performs no row-level enforcement). Every query in
  * this module is therefore scoped in application code by the caller-supplied,
- * already-verified `clerkUserId` (from `auth().userId`) — never decode it from
+ * already-verified `clerkUserId` (from `auth().userId`) \u2014 never decode it from
  * the token. Keep these manual scoping filters even once RLS lands; they are
  * defense in depth.
- *
- * TYPES: `packages/db/src/types.gen.ts` is still a placeholder
- * (`GeneratedDatabase = Record<string, never>`), so the typed client cannot
- * describe `host_profiles` yet. We cast to an untyped `SupabaseClient` handle
- * for `.from(...)` calls and narrow returned rows locally, mirroring
- * `savedListings.ts`. Drop the cast once generated types exist.
  */
 const PENDING_ATTESTATION = "pending";
 /** Postgres unique_violation SQLSTATE (host_profiles.clerk_user_id is UNIQUE). */
@@ -39,14 +33,14 @@ function normalizeOptional(value) {
  * Returns `null` when the user has not created a host profile yet.
  *
  * @param clerkToken - Verified Clerk JWT from `getToken()`.
- * @param clerkUserId - Verified Clerk user ID from `auth().userId` — do NOT
+ * @param clerkUserId - Verified Clerk user ID from `auth().userId` \u2014 do NOT
  *   decode this from the token; pass it from the already-verified `auth()` call.
  */
 export async function getHostProfile(clerkToken, clerkUserId) {
     const db = untypedClient(clerkToken);
     const { data, error } = await db
         .from("host_profiles")
-        .select("id, company_name, about, primary_location_name")
+        .select("id, company_name, about, primary_location_name, photo_url")
         .eq("clerk_user_id", clerkUserId)
         .maybeSingle();
     if (error) {
@@ -61,6 +55,7 @@ export async function getHostProfile(clerkToken, clerkUserId) {
         companyName: row.company_name ?? "",
         about: row.about ?? null,
         primaryLocationName: row.primary_location_name ?? null,
+        photoUrl: row.photo_url ?? null,
     };
 }
 /**
@@ -87,6 +82,9 @@ export async function updateHostProfileDetails(clerkToken, clerkUserId, fields) 
     }
     if (fields.websiteUrl !== undefined) {
         patch.website_url = normalizeOptional(fields.websiteUrl) ?? null;
+    }
+    if (fields.photoUrl !== undefined) {
+        patch.photo_url = normalizeOptional(fields.photoUrl) ?? null;
     }
     if (Object.keys(patch).length === 0) {
         return { ok: true };

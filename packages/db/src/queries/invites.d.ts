@@ -73,3 +73,52 @@ export declare function respondToInvite(clerkToken: string, clerkUserId: string,
     ok: boolean;
     error?: string;
 }>;
+/** A seeker match returned by the invite search surface. */
+export interface SeekerSearchResult {
+    readonly seekerProfileId: string;
+    readonly displayName: string | null;
+    readonly bio: string | null;
+}
+/**
+ * Search seeker profiles by display name or bio for the invite surface.
+ *
+ * Input is sanitized (trimmed, max 100 chars, `%` stripped). Results capped at
+ * 20. Returns empty array when the host has no profile or the query is empty
+ * after sanitization.
+ *
+ * `clerkUserId` MUST come from auth().userId.
+ */
+export declare function searchSeekersForInvite(clerkToken: string, clerkUserId: string, query: string): Promise<SeekerSearchResult[]>;
+/** An invite as the host sees it — minimal view-model for the /host/invites surface. */
+export interface HostInvite {
+    readonly id: string;
+    readonly listingId: string;
+    readonly listingTitle: string;
+    readonly seekerProfileId: string;
+    readonly seekerDisplayName: string | null;
+    readonly status: string;
+    readonly message: string | null;
+    readonly createdAt: string;
+}
+/**
+ * All invites sent by the authed host, newest first.
+ *
+ * `clerkUserId` MUST come from auth().userId.
+ * Returns an empty array when the host has no profile or no invites yet.
+ */
+export declare function getHostInvites(clerkToken: string, clerkUserId: string): Promise<HostInvite[]>;
+/**
+ * Create a host-initiated invite. Status always starts at `created` (the DB
+ * lifecycle trigger rejects any other initial value).
+ *
+ * Ownership guard: the caller must own the listing (via host_profile_id).
+ * Deduplication: a unique violation on (listing_id, seeker_profile_id)
+ * is returned as `{ ok: false, error: "already_invited" }`.
+ *
+ * `clerkUserId` MUST come from auth().userId.
+ */
+export declare function createInvite(clerkToken: string, clerkUserId: string, listingId: string, seekerProfileId: string, message?: string): Promise<{
+    ok: boolean;
+    inviteId?: string;
+    error?: string;
+}>;
