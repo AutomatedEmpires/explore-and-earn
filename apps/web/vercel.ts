@@ -27,22 +27,27 @@ export const config = {
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         {
           key: "Permissions-Policy",
-          value: "camera=(), microphone=(), geolocation=()",
+          // geolocation=(self) required for Mapbox GL "locate me" button.
+          value: "camera=(), microphone=(), geolocation=(self)",
         },
         {
           key: "Content-Security-Policy",
           // Clerk requires unsafe-inline for its injected auth-state scripts.
           // frame-src covers Clerk's OAuth popup and Cloudflare CAPTCHA.
+          // worker-src blob: required for Sentry Session Replay web workers.
           value: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' https://js.clerk.dev https://challenges.cloudflare.com",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob: https://img.clerk.com https://*.supabase.co https://api.mapbox.com",
+            "script-src 'self' 'unsafe-inline' https://js.clerk.dev https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+            "style-src 'self' 'unsafe-inline' https://api.mapbox.com https://api.tiles.mapbox.com",
+            // Mapbox tiles are served from various *.mapbox.com subdomains; api.mapbox.com alone is not enough.
+            "img-src 'self' data: blob: https://img.clerk.com https://*.supabase.co https://*.mapbox.com",
             "font-src 'self' data:",
-            "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.supabase.co wss://*.supabase.co https://us.posthog.com https://*.ingest.sentry.io https://api.mapbox.com https://events.mapbox.com",
+            "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.supabase.co wss://*.supabase.co https://us.posthog.com https://eu.posthog.com https://*.ingest.sentry.io https://sentry.io https://api.mapbox.com https://events.mapbox.com https://*.mapbox.com",
             "frame-src https://accounts.clerk.dev https://*.clerk.accounts.dev https://accounts.google.com https://challenges.cloudflare.com",
             "frame-ancestors 'none'",
             "object-src 'none'",
+            // blob: required for Sentry Session Replay workers and Mapbox GL workers.
+            "worker-src 'self' blob:",
             "base-uri 'self'",
           ].join("; "),
         },

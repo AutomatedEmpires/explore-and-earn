@@ -4,14 +4,16 @@ import { getPublicListings, getHostIdsWithLiveListings } from "@explore-and-earn
 
 export const dynamic = "force-dynamic";
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://explore-and-earn.vercel.app";
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = [
     { url: `${baseUrl}/`, changeFrequency: "daily", priority: 1 },
+    { url: `${baseUrl}/search`, changeFrequency: "daily", priority: 0.9 },
     { url: `${baseUrl}/about`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${baseUrl}/terms`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${baseUrl}/privacy`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${baseUrl}/cookies`, changeFrequency: "monthly", priority: 0.2 },
   ];
 
   let listingEntries: MetadataRoute.Sitemap = [];

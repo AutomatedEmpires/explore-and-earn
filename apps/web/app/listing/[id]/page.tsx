@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : `${listing.title} opportunity at ${listing.host?.companyName ?? "a host organization"}. Housing ${listing.housingIncluded ? "included" : "not included"}, meals ${listing.mealsIncluded ? "included" : "not included"}.`;
 
   const canonical = `${baseUrl}/listing/${listing.id}`;
-  const ogImage = listing.coverPhotoUrl ?? `${baseUrl}/og-default.png`;
+  const ogImage = listing.coverPhotoUrl ?? `${baseUrl}/opengraph-image`;
 
   return {
     title,

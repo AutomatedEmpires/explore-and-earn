@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : `View open opportunities from ${host.companyName} on Explore & Earn.`;
 
   const canonical = `${baseUrl}/host/${id}`;
-  const ogImage = host.photoUrl ?? `${baseUrl}/og-default.png`;
+  const ogImage = host.photoUrl ?? `${baseUrl}/opengraph-image`;
 
   return {
     title,
