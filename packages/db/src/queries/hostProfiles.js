@@ -1,3 +1,4 @@
+import "server-only";
 import { anonClient, authedClient } from "../client";
 /**
  * Host-profile data access for the host onboarding / management experience.

@@ -1,3 +1,4 @@
+import "server-only";
 import type { ConversationRole } from "./messages";
 /** Listing title + the listing owner's Clerk id, for the apply notification email. */
 export interface ListingHostContact {

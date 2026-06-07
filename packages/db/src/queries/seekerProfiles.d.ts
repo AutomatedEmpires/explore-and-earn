@@ -1,3 +1,4 @@
+import "server-only";
 export type SeekerLocationPref = "remote" | "on_site" | "either";
 export type SeekerHousingPref = "required" | "preferred" | "not_needed" | "flexible";
 export interface SeekerProfileRecord {

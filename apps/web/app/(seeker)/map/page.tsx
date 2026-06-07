@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { BucketPage } from "../../../components/seeker";
-import { getDiscoveryListingsWithCoords } from "../../../components/discovery";
+import { getDiscoveryListingsWithCoords } from "../../../components/discovery/data";
 import { MapView } from "../../../components/map";
 
 export const dynamic = "force-dynamic";

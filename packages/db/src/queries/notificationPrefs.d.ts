@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Seeker email-notification preferences.
  *

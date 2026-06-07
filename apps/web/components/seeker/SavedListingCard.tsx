@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Image from "next/image";
 import { Button, Icon, VerifiedHostBadge, type IconKey } from "@explore-and-earn/ui";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
-import type { SavedListingDetail } from "@explore-and-earn/db";
+import type { SavedListingDetail } from "@explore-and-earn/db/client";
 
 import { CATEGORY_ICON } from "../discovery";
 import { applyAction, unsaveListingAction } from "../../app/actions/savedListings";

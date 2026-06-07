@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import type { NotificationPrefs, NotificationPrefsPatch } from "@explore-and-earn/db";
+import type { NotificationPrefs, NotificationPrefsPatch } from "@explore-and-earn/db/client";
 
 import { updateNotificationPrefsAction } from "../../app/actions/notificationPrefs";
 import styles from "./NotificationPrefsForm.module.css";

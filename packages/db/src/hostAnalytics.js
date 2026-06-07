@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "./client";
 /** Untyped Supabase handle (same pattern used across queries/*). */
 function untypedClient(clerkToken) {

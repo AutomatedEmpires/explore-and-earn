@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Supabase Storage helpers for the image upload stack (Wave 9).
  *

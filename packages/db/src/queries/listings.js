@@ -1,3 +1,4 @@
+import "server-only";
 import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 import { getSeekerApplicationIds } from "./applications";

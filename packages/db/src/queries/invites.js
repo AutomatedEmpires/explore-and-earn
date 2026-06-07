@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 /*
  * TODO: send inviteReceivedEmail via server action.

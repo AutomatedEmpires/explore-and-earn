@@ -1,5 +1,3 @@
-import "server-only";
-
 import { authedClient } from "./client";
 
 /**

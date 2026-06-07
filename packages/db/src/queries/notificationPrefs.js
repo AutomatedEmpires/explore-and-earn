@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 export const DEFAULT_NOTIFICATION_PREFS = {
     emailOnInvite: true,

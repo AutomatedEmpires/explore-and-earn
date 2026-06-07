@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 const NOTIFICATION_COLUMNS = "id, category, priority, channel, title, body, event_id, subject_type, subject_id, action_url, read_at, dismissed_at, created_at";
 /** Untyped Supabase handle (see TYPES note above). */

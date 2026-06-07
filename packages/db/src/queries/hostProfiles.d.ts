@@ -1,3 +1,4 @@
+import "server-only";
 export interface HostProfileDetailsInput {
     companyName?: string;
     about?: string | null;

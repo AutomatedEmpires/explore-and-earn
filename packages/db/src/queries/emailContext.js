@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 /**
  * Read-only context resolvers for transactional email notifications.

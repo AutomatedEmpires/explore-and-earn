@@ -1,3 +1,4 @@
+import "server-only";
 import type { BenefitTriad, ListingStatus, OpportunityCategory } from "@explore-and-earn/contracts";
 /**
  * A host invite as the seeker sees it. `status` stays a plain string (the

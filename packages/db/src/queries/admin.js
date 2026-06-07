@@ -1,3 +1,4 @@
+import "server-only";
 import { adminClient } from "../adminClient";
 /**
  * Admin queries run through the SERVICE ROLE client so the numbers and rows

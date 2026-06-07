@@ -3,11 +3,11 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getSavedListingIds } from "@explore-and-earn/db";
 
+import { type DiscoveryListing } from "../../../components/discovery";
 import {
 	getDiscoveryListings,
 	getSwipeListings,
-	type DiscoveryListing,
-} from "../../../components/discovery";
+} from "../../../components/discovery/data";
 import { BucketPage, SwipeDeck } from "../../../components/seeker";
 
 export const dynamic = "force-dynamic";

@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Listing counts keyed by DB status (live, draft, paused, closed, archived,
  * under_review). Only statuses that appear in the host's listings are present.

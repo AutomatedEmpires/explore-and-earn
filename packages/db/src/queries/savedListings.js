@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 import { getPublicListingsByIds, rowToDiscoveryFields } from "./listings";
 /**

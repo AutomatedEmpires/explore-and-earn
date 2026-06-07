@@ -1,3 +1,4 @@
+import "server-only";
 import { authedClient } from "../client";
 /**
  * Seeker profile data access for onboarding + profile edit.

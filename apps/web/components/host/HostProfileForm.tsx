@@ -4,7 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
-import { uploadProfilePhoto } from "@explore-and-earn/db";
+import { uploadProfilePhoto } from "@explore-and-earn/db/client";
 
 import { ImageUpload } from "../ImageUpload";
 import { updateHostProfileAction } from "../../app/actions/hostProfile";
