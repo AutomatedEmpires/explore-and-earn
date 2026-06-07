@@ -61,6 +61,20 @@ function resolvePayPeriod(raw: FormDataEntryValue | null): CompensationUnit | un
     : undefined;
 }
 
+function isAllowedStorageUrl(url: string | undefined | null): boolean {
+  if (!url) return true;
+  try {
+    const { protocol, hostname, pathname } = new URL(url);
+    return (
+      protocol === "https:" &&
+      hostname.endsWith(".supabase.co") &&
+      pathname.startsWith("/storage/v1/object/")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function parseAmount(raw: FormDataEntryValue | null): number | null | undefined {
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
@@ -128,6 +142,9 @@ export async function createListingAction(
   }
 
   const fields = readListingFields(formData);
+  if (!isAllowedStorageUrl(fields.coverPhotoUrl)) {
+    return { ok: false, error: "Invalid cover photo URL." };
+  }
   const result = await createListingRow(
     authResult.auth.token,
     authResult.auth.userId,
@@ -159,6 +176,9 @@ export async function updateListingAction(
   }
 
   const fields = readListingFields(formData);
+  if (!isAllowedStorageUrl(fields.coverPhotoUrl)) {
+    return { ok: false, error: "Invalid cover photo URL." };
+  }
   const result = await updateListingRow(
     authResult.auth.token,
     authResult.auth.userId,

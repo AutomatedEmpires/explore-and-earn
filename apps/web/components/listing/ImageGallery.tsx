@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react"
+import Image from "next/image"
 import type { ListingMedia } from "@explore-and-earn/contracts"
 
 const galleryStyle: CSSProperties = {
@@ -39,7 +40,7 @@ export function ImageGallery({
 		<div role="group" aria-label={`Photos of ${title}`} style={galleryStyle}>
 			{images.map((image) => (
 				<figure key={image.id} style={figureStyle}>
-					<img
+					<Image
 						src={image.masterPath}
 						alt={image.alt}
 						width={image.width}

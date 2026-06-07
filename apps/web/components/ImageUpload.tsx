@@ -78,6 +78,7 @@ export function ImageUpload({
       onUpload(url);
     } catch (cause) {
       setState("error");
+      setPreviewUrl(currentUrl);
       setError(
         cause instanceof Error ? cause.message : "Upload failed. Please try again.",
       );

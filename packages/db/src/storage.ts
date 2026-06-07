@@ -3,7 +3,7 @@ import { authedClient } from "./client";
 /**
  * Supabase Storage helpers for the image upload stack (Wave 9).
  *
- * Buckets + RLS are defined in supabase/migrations/016_storage_buckets.sql.
+ * Buckets + RLS are defined in supabase/migrations/017_storage_buckets.sql.
  * Both buckets are public-read, so a successful upload yields a stable public
  * URL via getPublicUrl(); writes are gated by storage RLS keyed on the caller's
  * Clerk identity (auth.jwt() ->> 'sub').
