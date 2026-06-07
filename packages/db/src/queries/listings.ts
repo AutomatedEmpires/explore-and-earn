@@ -7,6 +7,7 @@ import type {
 } from "@explore-and-earn/contracts";
 import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
+import { getSeekerApplicationIds } from "./applications";
 
 export interface ListingRow {
   id: string;
@@ -108,7 +109,7 @@ function toListingRow(raw: RawListingRow): ListingRow {
 /** Maps a ListingRow to the DiscoveryListing view-model fields. */
 export function rowToDiscoveryFields(row: ListingRow) {
   const hostName = row.host_profiles?.company_name ?? "Unknown Host";
-  const verified = row.host_profiles?.attestation_status === "verified";
+  const verified = row.host_profiles?.attestation_status === "attested";
 
   const housingProvision: BenefitProvision = row.housing_included ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision = row.meals_included ? "provided" : "not_provided";
@@ -130,11 +131,18 @@ export function rowToDiscoveryFields(row: ListingRow) {
       },
     },
     coverImageUrl: row.cover_photo_url ?? undefined,
+    coordinates:
+      row.latitude != null && row.longitude != null
+        ? { lat: row.latitude, lon: row.longitude }
+        : undefined,
   };
 }
 
 const LISTING_COLUMNS =
   "id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,host_profiles(company_name,attestation_status)";
+
+/** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
+export const SWIPE_BATCH_SIZE = 20;
 
 /** Public live listings \u2014 no auth required. */
 export async function getPublicListings(): Promise<ListingRow[]> {
@@ -184,6 +192,81 @@ export async function getPublicListingsByIds(ids: string[]): Promise<ListingRow[
     .eq("status", "live");
 
   if (error) throw new Error(`getPublicListingsByIds: ${error.message}`);
+  return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
+}
+
+/**
+ * Swipe-deck batch for the authenticated seeker (/swipe surface).
+ *
+ * Returns up to SWIPE_BATCH_SIZE live listings, newest-first with a stable
+ * (published_at DESC, id DESC) order so cursor pagination below is
+ * deterministic. Excludes:
+ *   - every id in `excludeIds` (cards already seen this session + the seeker's
+ *     saved ids passed by the caller), and
+ *   - every listing the seeker has already applied to (resolved server-side via
+ *     getSeekerApplicationIds \u2014 never trust a client-supplied applied set).
+ *
+ * `clerkUserId` MUST come from auth().userId \u2014 never decoded from the token.
+ * `cursor` is the published_at of the last row from the previous page; when
+ * present we fetch strictly older rows via .lt("published_at", cursor).
+ *
+ * Best-effort on the applied filter: a seeker with no profile resolves to [] so
+ * nothing is excluded on that axis.
+ */
+export async function getSwipeBatch(
+  clerkToken: string,
+  clerkUserId: string,
+  excludeIds: string[],
+  cursor?: string,
+): Promise<ListingRow[]> {
+  const appliedIds = await getSeekerApplicationIds(clerkToken, clerkUserId);
+  const exclude = Array.from(new Set([...excludeIds, ...appliedIds]));
+
+  let builder = authedClient(clerkToken)
+    .from("listings")
+    .select(LISTING_COLUMNS)
+    .eq("status", "live");
+
+  if (cursor) {
+    builder = builder.lt("published_at", cursor);
+  }
+  if (exclude.length > 0) {
+    // PostgREST not-in group: values are UUIDs (validated at the action layer),
+    // so a bare `(id1,id2,...)` list is safe \u2014 no quoting/escaping needed.
+    builder = builder.not("id", "in", `(${exclude.join(",")})`);
+  }
+
+  const { data, error } = await builder
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(SWIPE_BATCH_SIZE);
+
+  if (error) throw new Error(`getSwipeBatch: ${error.message}`);
+  return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
+}
+
+/**
+ * All live listings that carry geocoordinates, newest-first \u2014 backs the seeker
+ * /map surface. latitude/longitude are the real columns (the brief's lat/lng);
+ * rows missing either are filtered out so every result is mappable.
+ *
+ * Public data (same trust level as getPublicListings). Pass a Clerk token to go
+ * through the authed client, or omit it to use the anon client (the map is a
+ * public read).
+ */
+export async function getLiveListingsWithCoords(
+  clerkToken?: string,
+): Promise<ListingRow[]> {
+  const db = clerkToken ? authedClient(clerkToken) : anonClient();
+  const { data, error } = await db
+    .from("listings")
+    .select(LISTING_COLUMNS)
+    .eq("status", "live")
+    .not("latitude", "is", null)
+    .not("longitude", "is", null)
+    .order("published_at", { ascending: false });
+
+  if (error) throw new Error(`getLiveListingsWithCoords: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
 }
 
