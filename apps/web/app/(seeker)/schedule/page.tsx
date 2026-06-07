@@ -100,7 +100,7 @@ export default async function SchedulePage() {
       title="Schedule"
       description="Keep hosts aligned on when you're available."
     >
-      <form className={styles.form} action={updateScheduleAction}>
+      <form className={styles.form} action={async (fd: FormData) => { await updateScheduleAction(fd); }}>
         <label className={styles.field}>
           <span className={styles.label}>Start date</span>
           <input

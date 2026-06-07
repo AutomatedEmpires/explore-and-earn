@@ -92,7 +92,7 @@ export default async function TravelPage() {
       title="Travel preferences"
       description="Share where you're open to going and how soon you can move."
     >
-      <form className={styles.form} action={updateTravelAction}>
+      <form className={styles.form} action={async (fd: FormData) => { await updateTravelAction(fd); }}>
         <label className={styles.field}>
           <span className={styles.label}>Travel readiness</span>
           <select

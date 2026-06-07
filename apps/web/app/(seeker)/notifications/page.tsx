@@ -118,7 +118,7 @@ export default async function NotificationsPage() {
       description="Invites, offers, matches, and reminders."
     >
       {hasUnread ? (
-        <form className={styles.toolbar} action={markAllNotificationsReadAction}>
+        <form className={styles.toolbar} action={async () => { await markAllNotificationsReadAction(); }}>
           <button className={styles.button} type="submit">
             Mark all as read
           </button>
