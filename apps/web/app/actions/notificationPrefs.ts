@@ -11,16 +11,26 @@ import {
   type NotificationPrefsPatch,
 } from "@explore-and-earn/db";
 
+import { reportError } from "../../lib/sentry";
+
 export interface NotificationPrefsActionResult {
   readonly ok: boolean;
   readonly error?: string;
+}
+
+async function currentUserId(): Promise<string | undefined> {
+  try {
+    return (await auth()).userId ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
  * Read the signed-in seeker's notification preferences. Falls back to all-ON
  * defaults when signed out so the settings form always has something to render.
  */
-export async function getNotificationPrefsAction(): Promise<NotificationPrefs> {
+async function getNotificationPrefsActionImpl(): Promise<NotificationPrefs> {
   const { userId, getToken } = await auth();
   if (!userId) return DEFAULT_NOTIFICATION_PREFS;
   const token = await getToken({ template: "supabase" });
@@ -28,11 +38,23 @@ export async function getNotificationPrefsAction(): Promise<NotificationPrefs> {
   return getNotificationPrefs(token, userId);
 }
 
+export async function getNotificationPrefsAction(): Promise<NotificationPrefs> {
+  try {
+    return await getNotificationPrefsActionImpl();
+  } catch (error) {
+    reportError(error, {
+      action: "getNotificationPrefsAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
+}
+
 /**
  * Persist the signed-in seeker's notification preferences, then revalidate the
  * settings surface so a fresh server render reflects the saved values.
  */
-export async function saveNotificationPrefsAction(
+async function saveNotificationPrefsActionImpl(
   prefs: NotificationPrefs,
 ): Promise<NotificationPrefsActionResult> {
   const { userId, getToken } = await auth();
@@ -47,8 +69,22 @@ export async function saveNotificationPrefsAction(
   return result;
 }
 
+export async function saveNotificationPrefsAction(
+  prefs: NotificationPrefs,
+): Promise<NotificationPrefsActionResult> {
+  try {
+    return await saveNotificationPrefsActionImpl(prefs);
+  } catch (error) {
+    reportError(error, {
+      action: "saveNotificationPrefsAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
+}
+
 /** Persist a partial notification-preference update for the signed-in seeker. */
-export async function updateNotificationPrefsAction(
+async function updateNotificationPrefsActionImpl(
   prefs: NotificationPrefsPatch,
 ): Promise<NotificationPrefsActionResult> {
   const { userId, getToken } = await auth();
@@ -61,4 +97,18 @@ export async function updateNotificationPrefsAction(
     revalidatePath("/settings");
   }
   return result;
+}
+
+export async function updateNotificationPrefsAction(
+  prefs: NotificationPrefsPatch,
+): Promise<NotificationPrefsActionResult> {
+  try {
+    return await updateNotificationPrefsActionImpl(prefs);
+  } catch (error) {
+    reportError(error, {
+      action: "updateNotificationPrefsAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
 }

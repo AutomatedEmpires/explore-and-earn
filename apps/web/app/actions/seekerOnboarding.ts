@@ -10,6 +10,8 @@ import {
   type SeekerProfileUpdate,
 } from "@explore-and-earn/db";
 
+import { reportError } from "../../lib/sentry";
+
 /**
  * Seeker onboarding write path (Wave 9 / Agent B).
  *
@@ -30,7 +32,15 @@ export type OnboardingStepData = {
 
 const MAX_FREEFORM_TAGS = 10;
 
-export async function saveOnboardingStep(
+async function currentUserId(): Promise<string | undefined> {
+  try {
+    return (await auth()).userId ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function saveOnboardingStepImpl(
   stepData: OnboardingStepData,
 ): Promise<{ ok: boolean; error?: string }> {
   const { userId, getToken } = await auth();
@@ -68,6 +78,20 @@ export async function saveOnboardingStep(
   };
 
   return saveSeekerProfile(token, userId, update);
+}
+
+export async function saveOnboardingStep(
+  stepData: OnboardingStepData,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    return await saveOnboardingStepImpl(stepData);
+  } catch (error) {
+    reportError(error, {
+      action: "saveOnboardingStep",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
 }
 
 function normalizeText(value: string | null): string | null {

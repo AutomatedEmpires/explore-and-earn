@@ -12,10 +12,19 @@ import { getClerkContact } from "../../lib/clerkUser";
 import { absoluteUrl, sendEmail } from "../../lib/email";
 import { newMessageEmail } from "../../lib/emails";
 import { checkRateLimit } from "../../lib/rateLimit";
+import { reportError } from "../../lib/sentry";
 
 export interface SendMessageActionResult {
 	readonly ok: boolean;
 	readonly error?: string;
+}
+
+async function currentUserId(): Promise<string | undefined> {
+	try {
+		return (await auth()).userId ?? undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 /**
@@ -23,7 +32,7 @@ export interface SendMessageActionResult {
  * revalidates the seeker + host message surfaces. Ownership and side detection
  * happen in `sendMessage`; this action only supplies the verified identity.
  */
-export async function sendMessageAction(
+async function sendMessageActionImpl(
 	conversationId: string,
 	body: string,
 ): Promise<SendMessageActionResult> {
@@ -93,4 +102,19 @@ export async function sendMessageAction(
 	revalidatePath("/host/messages");
 	revalidatePath(`/host/messages/${conversationId}`);
 	return { ok: true };
+}
+
+export async function sendMessageAction(
+	conversationId: string,
+	body: string,
+): Promise<SendMessageActionResult> {
+	try {
+		return await sendMessageActionImpl(conversationId, body);
+	} catch (error) {
+		reportError(error, {
+			action: "sendMessageAction",
+			userId: await currentUserId(),
+		});
+		throw error;
+	}
 }

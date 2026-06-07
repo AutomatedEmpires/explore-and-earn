@@ -13,6 +13,16 @@ import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
 import { applicationReceivedEmail } from "../../lib/emails"
 import { checkRateLimit } from "../../lib/rateLimit"
+import { reportError } from "../../lib/sentry"
+
+/** Best-effort current Clerk user id for error attribution (catch paths only). */
+async function currentUserId(): Promise<string | undefined> {
+	try {
+		return (await auth()).userId ?? undefined
+	} catch {
+		return undefined
+	}
+}
 
 /**
  * Server action: apply the authenticated seeker to a listing.
@@ -20,7 +30,7 @@ import { checkRateLimit } from "../../lib/rateLimit"
  * Auth is enforced here (Clerk) before any DB work; the Supabase JWT is minted
  * via the "supabase" Clerk JWT template and handed to the db layer.
  */
-export async function applyToListingAction(
+async function applyToListingActionImpl(
 	listingId: string,
 	coverMessage?: string,
 ): Promise<ApplyResult> {
@@ -80,8 +90,23 @@ export async function applyToListingAction(
 	return result
 }
 
+export async function applyToListingAction(
+	listingId: string,
+	coverMessage?: string,
+): Promise<ApplyResult> {
+	try {
+		return await applyToListingActionImpl(listingId, coverMessage)
+	} catch (error) {
+		reportError(error, {
+			action: "applyToListingAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
+}
+
 /** Server action: listing ids the authenticated seeker has applied to. */
-export async function getSeekerApplicationIdsAction(): Promise<string[]> {
+async function getSeekerApplicationIdsActionImpl(): Promise<string[]> {
 	const { userId, getToken } = await auth()
 	if (!userId) {
 		return []
@@ -93,4 +118,16 @@ export async function getSeekerApplicationIdsAction(): Promise<string[]> {
 	}
 
 	return getSeekerApplicationIds(token, userId)
+}
+
+export async function getSeekerApplicationIdsAction(): Promise<string[]> {
+	try {
+		return await getSeekerApplicationIdsActionImpl()
+	} catch (error) {
+		reportError(error, {
+			action: "getSeekerApplicationIdsAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
 }

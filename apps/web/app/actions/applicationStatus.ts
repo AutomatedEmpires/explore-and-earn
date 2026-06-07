@@ -13,10 +13,19 @@ import {
 import { getClerkContact } from "../../lib/clerkUser";
 import { absoluteUrl, sendEmail } from "../../lib/email";
 import { applicationStatusEmail } from "../../lib/emails";
+import { reportError } from "../../lib/sentry";
 
 export interface StatusActionResult {
   readonly ok: boolean;
   readonly error?: string;
+}
+
+async function currentUserId(): Promise<string | undefined> {
+  try {
+    return (await auth()).userId ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -36,7 +45,7 @@ const STATUS_LABELS: Record<HostSettableStatus, string> = {
  * owns the application before writing. On success we revalidate the host
  * applicant surfaces so the new status is reflected immediately.
  */
-export async function updateApplicationStatusAction(
+async function updateApplicationStatusActionImpl(
   applicationId: string,
   newStatus: HostSettableStatus,
 ): Promise<StatusActionResult> {
@@ -99,4 +108,19 @@ export async function updateApplicationStatusAction(
   }
 
   return result;
+}
+
+export async function updateApplicationStatusAction(
+  applicationId: string,
+  newStatus: HostSettableStatus,
+): Promise<StatusActionResult> {
+  try {
+    return await updateApplicationStatusActionImpl(applicationId, newStatus);
+  } catch (error) {
+    reportError(error, {
+      action: "updateApplicationStatusAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
 }
