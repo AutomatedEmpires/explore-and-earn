@@ -11,3 +11,5 @@ export * from "./queries/notifications";
 export * from "./queries/messages";
 export * from "./queries/emailContext";
 export * from "./storage";
+export * from "./adminClient";
+export * from "./queries/admin";
