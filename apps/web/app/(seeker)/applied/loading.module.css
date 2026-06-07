@@ -1,15 +1,14 @@
-/* Applied list loading skeleton. Semantic tokens only. */
+/* Applied listings loading state. A vertical list of row skeletons mirroring
+   the application list items. Semantic tokens only; px appears only in 1px
+   hairlines. */
 
 .wrap {
-	padding: var(--space-gutter);
-	background: var(--color-paper);
-	min-height: 100vh;
-}
-
-.list {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-12);
+	padding: var(--space-gutter);
+	background: var(--color-paper);
+	min-height: 100vh;
 }
 
 .row {
@@ -23,9 +22,9 @@
 }
 
 .thumb {
+	flex: 0 0 auto;
 	width: 4rem;
 	height: 4rem;
-	flex: none;
 }
 
 .thumb :global(.ui-skeleton) {
@@ -36,10 +35,10 @@
 }
 
 .lines {
-	flex: 1;
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-8);
+	flex: 1 1 auto;
 }
 
 .lineWide {

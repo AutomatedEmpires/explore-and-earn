@@ -3,19 +3,25 @@ import { Skeleton } from "@explore-and-earn/ui";
 import styles from "./loading.module.css";
 
 /**
- * Loading state for the swipe deck. Mirrors the stacked-card layout so the
- * transition into the seeker swipe experience feels intentional.
+ * Swipe deck loading state. Mirrors the stacked-card swipe UI with three
+ * layered card skeletons so the transition into the live deck reads as
+ * intentional rather than a flash of empty space.
  */
 export default function SwipeLoading() {
-	const CARD_KEYS = ["card-1", "card-2", "card-3"];
 	return (
 		<div className={styles.wrap} role="status" aria-busy="true">
-			{CARD_KEYS.map((key) => (
-				<div key={key} className={styles.card}>
+			<div className={styles.deck}>
+				<div className={`${styles.card} ${styles.card3}`}>
 					<Skeleton variant="rect" />
 				</div>
-			))}
-			<span className={styles.srOnly}>Loading opportunities</span>
+				<div className={`${styles.card} ${styles.card2}`}>
+					<Skeleton variant="rect" />
+				</div>
+				<div className={`${styles.card} ${styles.card1}`}>
+					<Skeleton variant="rect" />
+				</div>
+			</div>
+			<span className={styles.srOnly}>Loading</span>
 		</div>
 	);
 }

@@ -3,15 +3,16 @@ import { Skeleton } from "@explore-and-earn/ui";
 import styles from "./loading.module.css";
 
 /**
- * Loading state for the map view. A full-height canvas placeholder holds the
- * space while Mapbox and the listing pins resolve.
+ * Map loading state. Fills the viewport with a neutral surface plus a centered
+ * spinner while the Mapbox canvas and listing pins hydrate.
  */
 export default function MapLoading() {
 	return (
 		<div className={styles.wrap} role="status" aria-busy="true">
-			<div className={styles.canvas}>
+			<div className={styles.fill}>
 				<Skeleton variant="rect" />
 			</div>
+			<div className={styles.spinner} aria-hidden />
 			<span className={styles.srOnly}>Loading map</span>
 		</div>
 	);
