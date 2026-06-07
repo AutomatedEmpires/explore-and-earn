@@ -67,7 +67,7 @@ export async function applyToListing(
     .eq("id", listingId)
     .maybeSingle();
 
-  const hostClerkId = (listingOwner as any)?.host_profiles?.clerk_user_id;
+  const hostClerkId = (listingOwner as unknown as { host_profiles?: { clerk_user_id?: string } } | null)?.host_profiles?.clerk_user_id;
   if (hostClerkId && hostClerkId === clerkUserId) {
     return { ok: false, error: "cannot_apply_to_own_listing" as const };
   }

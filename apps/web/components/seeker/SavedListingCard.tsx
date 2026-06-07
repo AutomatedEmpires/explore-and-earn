@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
-import { Badge, Button, Icon, Skeleton, VerifiedHostBadge, type IconKey } from "@explore-and-earn/ui";
+import { Button, Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 import type { SavedListingDetail } from "@explore-and-earn/db";
 

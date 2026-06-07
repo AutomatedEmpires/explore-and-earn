@@ -69,6 +69,7 @@ export function generateJobPostingJsonLd(
   const jobPosting = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
+    url: listingUrl,
     title: listing.title,
     description:
       listing.description ??

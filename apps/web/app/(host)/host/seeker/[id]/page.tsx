@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
-import Link from "next/link";
 
 import { getSeekerProfileForHost } from "@explore-and-earn/db";
-import { Icon, Meter, Chip, Button } from "@explore-and-earn/ui";
+import { Icon, Meter, Chip, Button, type IconKey } from "@explore-and-earn/ui";
 import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 
 export const metadata: Metadata = {
@@ -137,7 +136,7 @@ export default async function SeekerPublicProfilePage({ params }: Props) {
                     ? `category.${cat}`
                     : "nav.seek";
                 return (
-                  <Chip key={cat} icon={iconKey as any}>
+                  <Chip key={cat} icon={iconKey as IconKey}>
                     {cat}
                   </Chip>
                 );

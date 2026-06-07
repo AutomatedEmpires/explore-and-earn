@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { PublicHostListing } from "@explore-and-earn/db";
 import { Icon } from "@explore-and-earn/ui";
+import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 import { CategoryBadge } from "../listing/CategoryBadge";
 
 interface Props {
@@ -54,7 +55,7 @@ export function PublicListingCard({ listing }: Props) {
       <div style={{ padding: "var(--space-16)" }}>
         {/* Category badge */}
         <div style={{ marginBottom: "var(--space-8)" }}>
-          <CategoryBadge category={listing.category as any} />
+          <CategoryBadge category={listing.category as MarketplaceCategory} />
         </div>
 
         {/* Title */}
