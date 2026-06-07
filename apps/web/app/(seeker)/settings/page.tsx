@@ -1,18 +1,23 @@
 import type { Metadata } from "next";
 
-import { BucketPage, SettingsPanel, SETTINGS_GROUPS } from "../../../components/seeker";
+import { BucketPage, NotificationPrefsForm } from "../../../components/seeker";
+import { getNotificationPrefsAction } from "../../actions/notificationPrefs";
 
 export const metadata: Metadata = {
 	title: "Settings",
 };
 
-export default function SettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+	const prefs = await getNotificationPrefsAction();
+
 	return (
 		<BucketPage
 			title="Settings"
 			description="Account, privacy, and notification preferences."
 		>
-			<SettingsPanel groups={SETTINGS_GROUPS} />
+			<NotificationPrefsForm initialPrefs={prefs} />
 		</BucketPage>
 	);
 }

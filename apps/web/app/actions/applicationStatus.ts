@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   getApplicationSeekerContact,
+  getNotificationPrefs,
   updateApplicationStatus,
   type HostSettableStatus,
 } from "@explore-and-earn/db";
@@ -57,24 +58,31 @@ export async function updateApplicationStatusAction(
   );
 
   if (result.ok) {
-    // Best-effort: email the seeker about the status change. Never block.
+    // Best-effort: email the seeker about the status change, unless they have
+    // opted out of status-change emails. Never block the status update.
     try {
       const contact = await getApplicationSeekerContact(token, applicationId);
       if (contact?.seekerClerkUserId) {
-        const seeker = await getClerkContact(contact.seekerClerkUserId);
-        if (seeker.email) {
-          const statusLabel = STATUS_LABELS[newStatus];
-          const listingTitle = contact.listingTitle || "your opportunity";
-          await sendEmail({
-            to: seeker.email,
-            subject: `Your application to ${listingTitle} \u2014 ${statusLabel}`,
-            html: applicationStatusEmail({
-              listingTitle,
-              newStatus,
-              statusLabel,
-              dashboardUrl: absoluteUrl("/applied"),
-            }),
-          });
+        const prefs = await getNotificationPrefs(
+          token,
+          contact.seekerClerkUserId,
+        );
+        if (prefs.emailOnStatusChange) {
+          const seeker = await getClerkContact(contact.seekerClerkUserId);
+          if (seeker.email) {
+            const statusLabel = STATUS_LABELS[newStatus];
+            const listingTitle = contact.listingTitle || "your opportunity";
+            await sendEmail({
+              to: seeker.email,
+              subject: `Your application to ${listingTitle} \u2014 ${statusLabel}`,
+              html: applicationStatusEmail({
+                listingTitle,
+                newStatus,
+                statusLabel,
+                dashboardUrl: absoluteUrl("/applied"),
+              }),
+            });
+          }
         }
       }
     } catch (e) {

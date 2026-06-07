@@ -9,3 +9,4 @@ export * from "./queries/seekerResume";
 export * from "./queries/notifications";
 export * from "./queries/messages";
 export * from "./queries/emailContext";
+export * from "./queries/notificationPrefs";

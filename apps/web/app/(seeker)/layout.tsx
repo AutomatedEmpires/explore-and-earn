@@ -17,8 +17,8 @@ import styles from "./layout.module.css";
  * change.
  *
  * This layout also acts as the Server Component wrapper that resolves the
- * authed seeker's unread notification count and passes it to <SeekerHeader> for
- * the badge.
+ * authed seeker's unread notification count and Clerk user id, and passes them
+ * to <SeekerHeader> for the live unread badge.
  */
 export const metadata: Metadata = {
   title: {
@@ -29,24 +29,31 @@ export const metadata: Metadata = {
     "Find work-travel opportunities — housing, meals, and pay from hosts worldwide.",
 };
 
+interface SeekerHeaderContext {
+  readonly unreadCount: number;
+  readonly clerkUserId: string | null;
+}
+
 /**
- * Resolve the authed seeker's unread notification count for the header badge.
- * Resilient: any failure (signed out, unresolved profile, transient error)
- * yields 0 so the seeker shell always renders.
+ * Resolve the authed seeker's unread notification count + Clerk id for the
+ * header badge. Resilient: any failure (signed out, unresolved profile,
+ * transient error) yields a zero count so the seeker shell always renders. The
+ * Clerk id is still returned when available so the live badge can subscribe.
  */
-async function resolveUnreadCount(): Promise<number> {
+async function resolveSeekerHeaderContext(): Promise<SeekerHeaderContext> {
   try {
     const { userId, getToken } = await auth();
     if (!userId) {
-      return 0;
+      return { unreadCount: 0, clerkUserId: null };
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-      return 0;
+      return { unreadCount: 0, clerkUserId: userId };
     }
-    return await getUnreadNotificationCount(token, userId);
+    const unreadCount = await getUnreadNotificationCount(token, userId);
+    return { unreadCount, clerkUserId: userId };
   } catch {
-    return 0;
+    return { unreadCount: 0, clerkUserId: null };
   }
 }
 
@@ -55,11 +62,11 @@ export default async function SeekerLayout({
 }: {
   children: ReactNode;
 }) {
-  const unreadCount = await resolveUnreadCount();
+  const { unreadCount, clerkUserId } = await resolveSeekerHeaderContext();
 
   return (
     <div className={styles.shell}>
-      <SeekerHeader unreadCount={unreadCount} />
+      <SeekerHeader unreadCount={unreadCount} clerkUserId={clerkUserId} />
       <main className={styles.main}>{children}</main>
       <SeekerBottomNav />
     </div>
