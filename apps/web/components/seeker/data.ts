@@ -2,7 +2,6 @@ import type { DiscoveryListing } from "../discovery";
 import {
   APPLIED_ITEMS,
   MATCHED_LISTINGS,
-  PRIMARY_ACTION_INPUT,
   SAVED_ITEMS,
   SEEKER_STATUS,
 } from "./fixtures";
@@ -16,6 +15,14 @@ import type {
   SavedItem,
   SeekerStatusSummary,
 } from "./models";
+import {
+  getSavedListingIds,
+  getSeekerApplications,
+  getSeekerApplicationsWithListings,
+  getSeekerProfile,
+  getSeekerResume,
+  getUnreadNotificationCount,
+} from "@explore-and-earn/db";
 
 /**
  * Seeker lifecycle data-access boundary: the single fetch seam for the seeker's
@@ -23,19 +30,83 @@ import type {
  * not-selected, and the Home priority inputs).
  *
  * Mirrors the Discovery lane's data.ts: every lifecycle surface reads through
- * these Promise-returning functions instead of importing the fixtures directly,
- * so swapping to the real persisted data layer is a localized change. The
- * status-bucket surfaces (/offered, /accepted, /not-selected) now read real
- * `applications` rows via getSeekerApplicationsWithListings in
- * @explore-and-earn/db, so the offer/accepted/not-selected/invite getters below
- * are deprecated (see each function).
+ * these Promise-returning functions. getSeekerStatus + getPrimaryActionInput
+ * now read REAL data from @explore-and-earn/db (scoped by the verified
+ * clerkUserId from auth().userId) and fall back to the SEEKER_STATUS fixture
+ * when signed out or on any read error — so the UI never crashes pre-migration.
+ * The status-bucket getters (offers/accepted/not-selected/invites) remain
+ * deprecated [] shims; their pages read applications directly.
  *
  * Arrays are returned as fresh copies so callers can never mutate the source.
  */
 
+type SeekerResumeData = Awaited<ReturnType<typeof getSeekerResume>>;
+
+/**
+ * Derive a 0..100 resume-completion estimate. getSeekerResume returns the raw
+ * profile/experiences/educations (not a percentage), so completion is computed
+ * here deterministically: bio (+40), at least one experience (+40), at least
+ * one education (+20). Kept module-local (NOT exported) to avoid colliding with
+ * the resume-lane helpers re-exported through the seeker barrel.
+ */
+function estimateResumeCompletion(resume: SeekerResumeData): number {
+  let score = 0;
+  const bio = resume.profile?.bio;
+  if (typeof bio === "string" && bio.trim().length > 0) {
+    score += 40;
+  }
+  if (resume.experiences.length > 0) {
+    score += 40;
+  }
+  if (resume.educations.length > 0) {
+    score += 20;
+  }
+  return Math.min(100, score);
+}
+
 /** The seeker's at-a-glance status summary (counts, resume completion, etc.). */
-export function getSeekerStatus(): Promise<SeekerStatusSummary> {
-  return Promise.resolve(SEEKER_STATUS);
+export async function getSeekerStatus(
+  token?: string | null,
+  clerkUserId?: string | null,
+  fallbackName?: string | null,
+): Promise<SeekerStatusSummary> {
+  if (!token || !clerkUserId) {
+    return SEEKER_STATUS;
+  }
+  try {
+    const [profile, savedIds, applications, acceptedWithListings, unread, resume] =
+      await Promise.all([
+        getSeekerProfile(token, clerkUserId),
+        getSavedListingIds(token, clerkUserId),
+        getSeekerApplications(token, clerkUserId),
+        getSeekerApplicationsWithListings(token, clerkUserId, ["accepted"]),
+        getUnreadNotificationCount(token, clerkUserId),
+        getSeekerResume(token, clerkUserId),
+      ]);
+
+    const seekerName =
+      profile?.displayName?.trim() ||
+      fallbackName?.trim() ||
+      SEEKER_STATUS.seekerName;
+    const offersCount = applications.filter(
+      (application) => application.status === "offered",
+    ).length;
+    const acceptedUpcoming = acceptedWithListings.find(
+      (application) => application.listing,
+    )?.listing?.title;
+
+    return {
+      seekerName,
+      resumeCompletion: estimateResumeCompletion(resume),
+      savedCount: savedIds.length,
+      appliedCount: applications.length,
+      offersCount,
+      acceptedUpcoming,
+      unreadNotifications: unread,
+    };
+  } catch {
+    return SEEKER_STATUS;
+  }
 }
 
 /** Saved opportunities the seeker wants to revisit. */
@@ -90,7 +161,47 @@ export function getMatchedListings(): Promise<DiscoveryListing[]> {
   return Promise.resolve([...MATCHED_LISTINGS]);
 }
 
-/** Composed input for the Seeker Home primary-action resolver. */
-export function getPrimaryActionInput(): Promise<PrimaryActionInput> {
-  return Promise.resolve(PRIMARY_ACTION_INPUT);
+/**
+ * Composed input for the Seeker Home primary-action resolver. Builds real
+ * pendingOffer / upcomingRole from the seeker's `applications` rows (offered /
+ * accepted). ApplicationListing is structurally a DiscoveryListing (its extra
+ * fields are optional), so the listing maps in directly. Falls back to a
+ * status-only input when signed out or on any read error.
+ */
+export async function getPrimaryActionInput(
+  token?: string | null,
+  clerkUserId?: string | null,
+): Promise<PrimaryActionInput> {
+  const status = await getSeekerStatus(token, clerkUserId);
+  if (!token || !clerkUserId) {
+    return { status };
+  }
+  try {
+    const [offered, accepted] = await Promise.all([
+      getSeekerApplicationsWithListings(token, clerkUserId, ["offered"]),
+      getSeekerApplicationsWithListings(token, clerkUserId, ["accepted"]),
+    ]);
+
+    const offerListing = offered.find((application) => application.listing)
+      ?.listing;
+    const pendingOffer: OfferItem | undefined =
+      offerListing != null
+        ? { listing: offerListing, state: "offered" }
+        : undefined;
+
+    const acceptedListing = accepted.find((application) => application.listing)
+      ?.listing;
+    const upcomingRole: AcceptedRoleItem | undefined =
+      acceptedListing != null
+        ? {
+            listing: acceptedListing,
+            startDate: acceptedListing.opportunityWindow,
+            travelPlanStatus: "not_started",
+          }
+        : undefined;
+
+    return { status, pendingOffer, upcomingRole };
+  } catch {
+    return { status };
+  }
 }
