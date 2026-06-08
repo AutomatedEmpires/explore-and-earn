@@ -5,13 +5,16 @@ import { revalidatePath } from "next/cache";
 
 import {
   createListing as createListingRow,
+  duplicateListing as duplicateListingRow,
   updateListing as updateListingRow,
+  updateListingStatus as updateListingStatusRow,
   type ListingWriteFields,
 } from "@explore-and-earn/db";
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
   type CompensationUnit,
+  type ListingStatus,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
@@ -36,7 +39,7 @@ async function resolveHostAuth(): Promise<
   }
   const token = await getToken({ template: "supabase" });
   if (!token) {
-    return { ok: false, error: "Your session has expired \u2014 sign in again to continue." };
+    return { ok: false, error: "Your session has expired — sign in again to continue." };
   }
   return { ok: true, auth: { userId, token } };
 }
@@ -192,5 +195,61 @@ export async function updateListingAction(
 
   revalidatePath("/host/listings");
   revalidatePath(`/host/listings/${listingId}`);
+  return result;
+}
+
+export async function updateListingStatusAction(
+  listingId: string,
+  newStatus: ListingStatus,
+): Promise<{ ok: boolean; status?: ListingStatus; error?: string }> {
+  if (!listingId) {
+    return { ok: false, error: "Missing listing id." };
+  }
+
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) {
+    return { ok: false, error: authResult.error };
+  }
+
+  const result = await updateListingStatusRow(
+    authResult.auth.token,
+    authResult.auth.userId,
+    listingId,
+    newStatus,
+  );
+  if (!result.ok) {
+    return result;
+  }
+
+  revalidatePath("/host/listings");
+  revalidatePath(`/host/listings/${listingId}`);
+  return result;
+}
+
+export async function duplicateListingAction(
+  listingId: string,
+): Promise<{ ok: boolean; newListingId?: string; error?: string }> {
+  if (!listingId) {
+    return { ok: false, error: "Missing listing id." };
+  }
+
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) {
+    return { ok: false, error: authResult.error };
+  }
+
+  const result = await duplicateListingRow(
+    authResult.auth.token,
+    authResult.auth.userId,
+    listingId,
+  );
+  if (!result.ok) {
+    return result;
+  }
+
+  revalidatePath("/host/listings");
+  if (result.newListingId) {
+    revalidatePath(`/host/listings/${result.newListingId}`);
+  }
   return result;
 }

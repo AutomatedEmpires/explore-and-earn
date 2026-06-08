@@ -1,7 +1,10 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
+import { reportError } from "../lib/sentry";
 import styles from "./status.module.css";
 
 /**
@@ -15,19 +18,28 @@ export default function RootError({
 	readonly error: Error & { readonly digest?: string };
 	readonly reset: () => void;
 }) {
+	const [eventId, setEventId] = useState<string | undefined>(undefined);
+
+	useEffect(() => {
+		reportError(error, { route: "root" });
+		setEventId(Sentry.lastEventId());
+	}, [error]);
+
 	return (
 		<section className={styles.wrap} role="alert">
 			<h1 className={styles.heading}>Something went wrong</h1>
 			<p className={styles.message}>
 				We hit a snag. Try reloading or head back to the homepage.
 			</p>
-			{error.digest ? (
-				<p className={styles.digest}>Reference: {error.digest}</p>
+			{eventId ? (
+				<p className={styles.digest}>
+					Error ID: {eventId} — quote this if contacting support
+				</p>
 			) : null}
 			<button type="button" className={styles.action} onClick={() => reset()}>
 				Try again
 			</button>
-			<Link className={styles.action} href="/" style={{ marginTop: 0 }}>
+			<Link className={styles.action} href="/">
 				Go home
 			</Link>
 		</section>

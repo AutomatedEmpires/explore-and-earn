@@ -6,6 +6,8 @@ export { HostStatStrip } from "./HostStatStrip";
 export type { HostStatStripProps } from "./HostStatStrip";
 export { HostListingCard } from "./HostListingCard";
 export type { HostListingCardProps } from "./HostListingCard";
+export { ListingStatusControls } from "./ListingStatusControls";
+export type { ListingStatusControlsProps } from "./ListingStatusControls";
 export { HostListingDetail } from "./HostListingDetail";
 export type { HostListingDetailProps } from "./HostListingDetail";
 export { HostListingForm } from "./HostListingForm";

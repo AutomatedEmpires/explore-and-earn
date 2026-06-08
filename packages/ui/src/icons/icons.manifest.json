@@ -1,0 +1,275 @@
+{
+  "generated": "2026-06-08",
+  "cloud": "dwiwyt9vi",
+  "base_url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload",
+  "summary": {
+    "total_canonical": 54,
+    "with_asset": 47,
+    "missing_asset": 7
+  },
+  "icons": {
+    "category.farm": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/category/farm",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/farm"
+    },
+    "category.maritime": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/category/maritime",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/maritime"
+    },
+    "category.remote": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/category/remote",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/remote"
+    },
+    "category.seasonal": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/category/seasonal",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/seasonal"
+    },
+    "category.mix": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/category/mix",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/mix"
+    },
+    "benefit.housing": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/benefit/housing",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/housing"
+    },
+    "benefit.meals": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/benefit/meals",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/meals"
+    },
+    "benefit.pay": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/benefit/pay",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/pay"
+    },
+    "benefit.transport": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/benefit/transport",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/transport"
+    },
+    "benefit.wifi": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/benefit/wifi",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/wifi"
+    },
+    "mappin.farm": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/mappin/farm",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/farm"
+    },
+    "mappin.maritime": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/mappin/maritime",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/maritime"
+    },
+    "mappin.remote": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/mappin/remote",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/remote"
+    },
+    "mappin.seasonal": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/mappin/seasonal",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/seasonal"
+    },
+    "mappin.mix": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/mappin/mix",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/mix"
+    },
+    "mappin.cluster": {
+      "status": "missing",
+      "note": "stacked pins / number badge \u2014 source from Streamline Freehand"
+    },
+    "trust.verified_host": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/trust/verified_host",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/trust/verified_host"
+    },
+    "trust.founding_host": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/trust/founding_host",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/trust/founding_host"
+    },
+    "trust.featured_employer": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/trust/featured_employer",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/trust/featured_employer"
+    },
+    "status.open": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/status/open",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/status/open"
+    },
+    "status.partially_filled": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/status/partially_filled",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/status/partially_filled"
+    },
+    "status.filled": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/status/filled",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/status/filled"
+    },
+    "status.boosted": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/status/boosted",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/status/boosted"
+    },
+    "status.match": {
+      "status": "missing",
+      "note": "target / spark \u2014 source from Streamline Freehand"
+    },
+    "action.apply": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/apply",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/apply"
+    },
+    "action.save": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/save",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/save"
+    },
+    "action.share": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/share",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/share"
+    },
+    "action.report": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/report",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/report"
+    },
+    "action.message": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/message",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/message"
+    },
+    "action.filter": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/filter",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/filter"
+    },
+    "action.sort": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/sort",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/sort"
+    },
+    "action.back": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/back",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/back"
+    },
+    "action.forward": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/forward",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/forward"
+    },
+    "action.close": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/close",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/close"
+    },
+    "action.more": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/action/more",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/more"
+    },
+    "nav.seek": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/nav/seek",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/seek"
+    },
+    "nav.swipe": {
+      "status": "missing",
+      "note": "swipe / shuffle cards \u2014 source from Streamline Freehand"
+    },
+    "nav.map": {
+      "status": "missing",
+      "note": "folded map \u2014 GPS-Location-Rectangle was low-confidence, needs re-evaluation"
+    },
+    "nav.saved": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/nav/saved",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/saved"
+    },
+    "nav.messages": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/nav/messages",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/messages"
+    },
+    "nav.dashboard": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/nav/dashboard",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/dashboard"
+    },
+    "nav.profile": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/nav/profile",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/profile"
+    },
+    "nav.admin": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/nav/admin",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/admin"
+    },
+    "analytics.meter": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/analytics/meter",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/analytics/meter"
+    },
+    "analytics.funnel": {
+      "status": "missing",
+      "note": "funnel chart \u2014 source from Streamline Freehand"
+    },
+    "analytics.trend": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/analytics/trend",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/analytics/trend"
+    },
+    "analytics.donut": {
+      "status": "missing",
+      "note": "donut / ring chart \u2014 source from Streamline Freehand"
+    },
+    "analytics.source": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/analytics/source",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/analytics/source"
+    },
+    "system.info": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/system/info",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/info"
+    },
+    "system.success": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/system/success",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/success"
+    },
+    "system.warning": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/system/warning",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/warning"
+    },
+    "system.error": {
+      "status": "missing",
+      "note": "x-circle / error octagon \u2014 source from Streamline Freehand"
+    },
+    "system.lock": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/system/lock",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/lock"
+    },
+    "system.loading": {
+      "status": "uploaded",
+      "cloudinaryId": "explore-and-earn/icons/system/loading",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/loading"
+    }
+  }
+}

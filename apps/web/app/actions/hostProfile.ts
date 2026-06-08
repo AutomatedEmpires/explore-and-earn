@@ -4,6 +4,17 @@ import { auth } from "@clerk/nextjs/server"
 import { createHostProfile, updateHostProfileDetails } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
 
+import { reportError } from "../../lib/sentry"
+
+/** Best-effort current Clerk user id for error attribution (catch paths only). */
+async function currentUserId(): Promise<string | undefined> {
+	try {
+		return (await auth()).userId ?? undefined
+	} catch {
+		return undefined
+	}
+}
+
 function isAllowedStorageUrl(url: string | undefined | null): boolean {
 	if (!url) return true;
 	try {
@@ -25,7 +36,7 @@ function isAllowedStorageUrl(url: string | undefined | null): boolean {
  * is minted via the "supabase" Clerk JWT template and handed to the db layer,
  * along with the verified `userId` used as the app-level ownership scope.
  */
-export async function createHostProfileAction(
+async function createHostProfileActionImpl(
 	companyName: string,
 ): Promise<{ ok: boolean; error?: string }> {
 	const trimmed = companyName.trim()
@@ -52,6 +63,20 @@ export async function createHostProfileAction(
 	return { ok: true }
 }
 
+export async function createHostProfileAction(
+	companyName: string,
+): Promise<{ ok: boolean; error?: string }> {
+	try {
+		return await createHostProfileActionImpl(companyName)
+	} catch (error) {
+		reportError(error, {
+			action: "createHostProfileAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
+}
+
 /** Editable host profile fields submitted from the host profile edit form. */
 export interface UpdateHostProfileInput {
 	companyName?: string
@@ -69,7 +94,7 @@ export interface UpdateHostProfileInput {
  * in the db layer). Follows the same auth pattern as the other server actions:
  * `auth()` -> `getToken({ template: "supabase" })` -> db call -> revalidate.
  */
-export async function updateHostProfileAction(
+async function updateHostProfileActionImpl(
 	fields: UpdateHostProfileInput,
 ): Promise<{ ok: boolean; error?: string }> {
 	const { userId, getToken } = await auth()
@@ -94,4 +119,18 @@ export async function updateHostProfileAction(
 	revalidatePath("/host/profile")
 	revalidatePath("/host/profile/edit")
 	return { ok: true }
+}
+
+export async function updateHostProfileAction(
+	fields: UpdateHostProfileInput,
+): Promise<{ ok: boolean; error?: string }> {
+	try {
+		return await updateHostProfileActionImpl(fields)
+	} catch (error) {
+		reportError(error, {
+			action: "updateHostProfileAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
 }

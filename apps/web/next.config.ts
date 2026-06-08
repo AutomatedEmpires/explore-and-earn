@@ -26,7 +26,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev https://browser.sentry-cdn.com https://us.posthog.com",
       "style-src 'self' 'unsafe-inline' https://api.tiles.mapbox.com https://api.mapbox.com",
       "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://sentry.io https://*.ingest.sentry.io",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://sentry.io https://*.ingest.sentry.io",
       "font-src 'self' data:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
