@@ -10,6 +10,8 @@
 //
 // Idempotency strategy:
 //   - Auth users are looked up by email and only created when missing.
+//   - New auth-user passwords are derived from a required secret, not from the
+//     public fixture email list.
 //   - Profiles/listings/applications use deterministic UUIDv5 ids and are
 //     upserted, so re-running converges to the same dataset (no duplicates).
 //
@@ -17,17 +19,20 @@
 //   - env SEED_ALLOW_NONPROD=true
 //   - env SEED_TARGET_REF=<your supabase project ref> AND it must equal the ref
 //     parsed from SUPABASE_URL (forces the operator to name the exact target)
+//   - env SEED_PASSWORD_SECRET=<non-checked-in secret used to derive auth passwords>
 //   - flag --confirm
+//   - environment must be empty, unless --force is passed explicitly
 //
 // Usage (against a dev/staging project or branch):
 //   SEED_ALLOW_NONPROD=true SEED_TARGET_REF=<ref> \
+//   SEED_PASSWORD_SECRET=<secret> \
 //   SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=... \
 //     pnpm --filter @explore-and-earn/web exec node ../../tools/data/seed-demo-data.mjs --confirm
 //
 // Requires "@supabase/supabase-js" (a dependency of @explore-and-earn/web).
 
 import process from "node:process";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
@@ -89,6 +94,18 @@ if (!urlRef || urlRef !== targetRef) {
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
+
+const passwordSecret = requireEnv("SEED_PASSWORD_SECRET");
+const force = process.argv.includes("--force");
+
+const PROTECTED_TABLES = [
+  "host_profiles",
+  "seeker_profiles",
+  "listings",
+  "applications",
+  "invites",
+  "offers",
+];
 
 // ---------------------------------------------------------------------------
 // Demo fixtures (small but FK/enum-correct per migrations 003/006/007)
@@ -166,6 +183,49 @@ const APPLICATIONS = [
   { listing: "sea-deckhand", seeker: "blake", status: "reviewing" },
 ];
 
+function passwordFor(email) {
+  const digest = createHmac("sha256", passwordSecret)
+    .update(email.toLowerCase())
+    .digest("base64url");
+  return `Seed-${digest.slice(0, 24)}!9a`;
+}
+
+async function countRows(table) {
+  const { count, error } = await supabase
+    .from(table)
+    .select("*", { count: "exact", head: true });
+  if (error) throw new Error(`${table} count failed: ${error.message}`);
+  return count ?? 0;
+}
+
+async function assertSafeTargetState() {
+  const counts = await Promise.all(
+    PROTECTED_TABLES.map(async (table) => ({
+      table,
+      count: await countRows(table),
+    })),
+  );
+  const populated = counts.filter(({ count }) => count > 0);
+  if (populated.length === 0) {
+    return;
+  }
+  if (force) {
+    console.warn(
+      `Proceeding with --force despite existing rows in: ${populated
+        .map(({ table, count }) => `${table}=${count}`)
+        .join(", ")}`,
+    );
+    return;
+  }
+
+  console.error(
+    `Refusing to run: target already contains business data in ${populated
+      .map(({ table, count }) => `${table}=${count}`)
+      .join(", ")}. Re-run only with --force if this mutation is intentional.`,
+  );
+  process.exit(3);
+}
+
 async function getOrCreateUser(email) {
   // Page through users to find an existing match (admin API has no direct
   // get-by-email). Datasets here are tiny, so a couple of pages is plenty.
@@ -184,7 +244,7 @@ async function getOrCreateUser(email) {
   const { data, error } = await supabase.auth.admin.createUser({
     email,
     email_confirm: true,
-    password: `seed-${uuidv5(email)}`,
+    password: passwordFor(email),
     user_metadata: { seeded: true, source: "tools/data/seed-demo-data.mjs" },
   });
   if (error) throw error;
@@ -198,6 +258,8 @@ async function upsert(table, row, onConflict) {
 
 async function main() {
   console.log(`Seeding demo data into ${supabaseUrl} (ref ${targetRef})...`);
+
+  await assertSafeTargetState();
 
   const hostIdByKey = {};
   for (const host of HOSTS) {

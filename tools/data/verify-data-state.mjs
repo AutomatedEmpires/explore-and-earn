@@ -6,13 +6,16 @@
 // Prints the live row count for every reference and business-critical table and
 // classifies the database as "empty / partially seeded / populated". This script
 // performs ONLY count queries (head:true) and never writes. It is safe to run
-// against any environment, including production.
+// against any environment, including production. Use --fast to switch from
+// exact counts to planner estimates on large environments.
 //
 // Usage:
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
 //     pnpm --filter @explore-and-earn/web exec node ../../tools/data/verify-data-state.mjs
 //
 // Flags:
+//   --fast                    use planner estimates (`count: "planned"`) instead
+//                             of exact counts to reduce load on large tables
 //   --expect-business-empty   exit 1 if ANY business-critical table has rows
 //                             (use as a pre-seed prod safety gate)
 //   --json                    emit a machine-readable JSON report only
@@ -63,7 +66,9 @@ const BUSINESS_TABLES = [
 
 const args = new Set(process.argv.slice(2));
 const asJson = args.has("--json");
+const fastMode = args.has("--fast");
 const expectBusinessEmpty = args.has("--expect-business-empty");
+const countMode = fastMode ? "planned" : "exact";
 
 function requireEnv(names) {
   for (const name of names) {
@@ -85,7 +90,7 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 async function countRows(table) {
   const { count, error } = await supabase
     .from(table)
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: countMode, head: true });
   if (error) return { table, count: null, error: error.message };
   return { table, count: count ?? 0, error: null };
 }
@@ -108,6 +113,7 @@ async function main() {
   const report = {
     supabaseUrl,
     checkedAt: new Date().toISOString(),
+    countMode,
     reference,
     business,
     summary: {
@@ -127,6 +133,7 @@ async function main() {
       }`;
     console.log(`Data-state verification @ ${report.checkedAt}`);
     console.log(`Target: ${supabaseUrl}`);
+    console.log(`Count mode: ${countMode}`);
     console.log("\nReference / config tables:");
     reference.forEach((row) => console.log(fmt(row)));
     console.log("\nBusiness-critical tables:");
