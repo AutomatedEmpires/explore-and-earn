@@ -127,12 +127,12 @@ begin
   select count(*) into v_count
   from pg_policies
   where schemaname = 'storage' and tablename = 'objects' and cmd = 'SELECT'
-    and 'anon' = any(roles)
+    and roles && array['anon', 'public']::name[]
     and (coalesce(qual, '') like '%listing-media%'
          or coalesce(qual, '') like '%profile-photos%');
-  raise notice 'storage anon SELECT policies referencing the two buckets: %', v_count;
+  raise notice 'storage anon/public SELECT policies referencing the two buckets: %', v_count;
   if v_count > 0 then
-    raise exception 'db-assert: storage bucket enumeration still open (anon SELECT policy present)';
+    raise exception 'db-assert: storage bucket enumeration still open (anon/public SELECT policy present)';
   end if;
   raise notice 'db-assert: storage enumeration guardrail PASSED';
 end;

@@ -67,10 +67,10 @@ for (const [file, content] of fileContents) {
     )
     let m
     while ((m = grantRe.exec(lower)) !== null) {
-      if (/\banon\b/.test(m[1])) {
+      if (/\banon\b/.test(m[1]) || /\bpublic\b/.test(m[1])) {
         hasFailure = true
         console.error(
-          `G-SEC-RPC: ${file} grants EXECUTE on ${fn} to anon (forbidden).`,
+          `G-SEC-RPC: ${file} grants EXECUTE on ${fn} to anon/public (forbidden).`,
         )
       }
     }
@@ -85,14 +85,24 @@ if (!securityMigration) {
   )
 } else {
   const sql = fileContents.get(securityMigration).toLowerCase()
+  const defaultPrivilegeRoles = new Set()
+  const defaultPrivilegeRe = /alter\s+default\s+privileges[\s\S]*?revoke\s+execute\s+on\s+functions\s+from\s+([^;]*);/g
+  let defaultPrivilegeMatch
+  while ((defaultPrivilegeMatch = defaultPrivilegeRe.exec(sql)) !== null) {
+    for (const role of ["anon", "authenticated", "public"]) {
+      if (new RegExp(`\\b${role}\\b`).test(defaultPrivilegeMatch[1])) {
+        defaultPrivilegeRoles.add(role)
+      }
+    }
+  }
   if (
-    !/alter\s+default\s+privileges[\s\S]*revoke\s+execute\s+on\s+functions\s+from[\s\S]*anon/.test(
-      sql,
-    )
+    !defaultPrivilegeRoles.has("anon")
+    || !defaultPrivilegeRoles.has("authenticated")
+    || !defaultPrivilegeRoles.has("public")
   ) {
     hasFailure = true
     console.error(
-      `G-SEC-RPC: ${securityMigration} must revoke the anon/authenticated default-privilege grant on functions.`,
+      `G-SEC-RPC: ${securityMigration} must revoke default EXECUTE on functions from anon, authenticated, and public.`,
     )
   }
   for (const fn of LOCKED_FUNCTIONS) {
@@ -106,10 +116,14 @@ if (!securityMigration) {
       console.error(
         `G-SEC-RPC: ${securityMigration} must REVOKE EXECUTE on ${fn} from anon/authenticated/public.`,
       )
-    } else if (!/anon/.test(rm[1]) || !/public/.test(rm[1])) {
+    } else if (
+      !/\banon\b/.test(rm[1])
+      || !/\bauthenticated\b/.test(rm[1])
+      || !/\bpublic\b/.test(rm[1])
+    ) {
       hasFailure = true
       console.error(
-        `G-SEC-RPC: ${securityMigration} REVOKE on ${fn} must include anon and public.`,
+        `G-SEC-RPC: ${securityMigration} REVOKE on ${fn} must include anon, authenticated, and public.`,
       )
     }
   }
