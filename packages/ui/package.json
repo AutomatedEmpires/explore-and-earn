@@ -12,6 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@explore-and-earn/contracts": "workspace:*"
+    "@explore-and-earn/contracts": "workspace:*",
+    "@types/dompurify": "^3.2.0",
+    "dompurify": "^3.4.8"
   }
 }

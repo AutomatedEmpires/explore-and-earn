@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import {
+	countConversationMessages,
 	getMessageEmailContext,
 	getNotificationPrefs,
 	sendMessage,
@@ -12,10 +13,19 @@ import { getClerkContact } from "../../lib/clerkUser";
 import { absoluteUrl, sendEmail } from "../../lib/email";
 import { newMessageEmail } from "../../lib/emails";
 import { checkRateLimit } from "../../lib/rateLimit";
+import { reportError } from "../../lib/sentry";
 
 export interface SendMessageActionResult {
 	readonly ok: boolean;
 	readonly error?: string;
+}
+
+async function currentUserId(): Promise<string | undefined> {
+	try {
+		return (await auth()).userId ?? undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 /**
@@ -23,7 +33,7 @@ export interface SendMessageActionResult {
  * revalidates the seeker + host message surfaces. Ownership and side detection
  * happen in `sendMessage`; this action only supplies the verified identity.
  */
-export async function sendMessageAction(
+async function sendMessageActionImpl(
 	conversationId: string,
 	body: string,
 ): Promise<SendMessageActionResult> {
@@ -41,46 +51,59 @@ export async function sendMessageAction(
 	const result = await sendMessage(token, userId, conversationId, body);
 	if (!result.ok) return result;
 
-	// Best-effort: email the OTHER participant about the new message. The sender
-	// is the current user; the recipient + listing come from the conversation.
-	// Seekers can opt out of new-message emails; hosts have no preference row, so
-	// host recipients are always emailed.
+	// Best-effort: email the OTHER participant — but ONLY for the FIRST message in
+	// a thread, never on every reply. After a successful insert the conversation
+	// has exactly one message iff this was the opening message. The sender is the
+	// current user; the recipient + listing come from the conversation. Seekers
+	// can opt out of new-message emails; hosts have no preference row, so host
+	// recipients are always emailed.
 	try {
-		const context = await getMessageEmailContext(token, userId, conversationId);
-		if (context?.recipientClerkUserId) {
-			let recipientOptedOut = false;
-			if (context.recipientRole === "seeker") {
-				// Cross-user prefs read: recipient is a different user from the sender,
-				// so the sender's token may fail under RLS. Degrade silently — never block the send.
-				let prefs = null;
-				try {
-					prefs = await getNotificationPrefs(token, context.recipientClerkUserId);
-				} catch {
-					// Cross-user read failed; skip notification prefs check.
+		const messageCount = await countConversationMessages(token, conversationId);
+		if (messageCount === 1) {
+			const context = await getMessageEmailContext(
+				token,
+				userId,
+				conversationId,
+			);
+			if (context?.recipientClerkUserId) {
+				let recipientOptedOut = false;
+				if (context.recipientRole === "seeker") {
+					// Cross-user prefs read: recipient is a different user from the sender,
+					// so the sender's token may fail under RLS. Degrade silently.
+					let prefs = null;
+					try {
+						prefs = await getNotificationPrefs(
+							token,
+							context.recipientClerkUserId,
+						);
+					} catch {
+						// Cross-user read failed; skip notification prefs check.
+					}
+					recipientOptedOut = prefs !== null && !prefs.emailOnMessage;
 				}
-				recipientOptedOut = prefs !== null && !prefs.emailOnMessage;
-			}
-			if (!recipientOptedOut) {
-				const [recipient, sender] = await Promise.all([
-					getClerkContact(context.recipientClerkUserId),
-					getClerkContact(userId),
-				]);
-				if (recipient.email) {
-					const listingTitle = context.listingTitle || "your conversation";
-					const conversationPath =
-						context.recipientRole === "host"
-							? `/host/messages/${conversationId}`
-							: `/messages/${conversationId}`;
-					await sendEmail({
-						to: recipient.email,
-						subject: `New message about ${listingTitle}`,
-						html: newMessageEmail({
-							senderName: sender.name ?? "Someone",
-							listingTitle,
-							messagePreview: body,
-							conversationUrl: absoluteUrl(conversationPath),
-						}),
-					});
+				if (!recipientOptedOut) {
+					const [recipient, sender] = await Promise.all([
+						getClerkContact(context.recipientClerkUserId),
+						getClerkContact(userId),
+					]);
+					if (recipient.email) {
+						const listingTitle = context.listingTitle || "your conversation";
+						const conversationPath =
+							context.recipientRole === "host"
+								? `/host/messages/${conversationId}`
+								: `/messages/${conversationId}`;
+						await sendEmail({
+							to: recipient.email,
+							subject: `New message about ${listingTitle}`,
+							html: newMessageEmail({
+								senderName: sender.name ?? "Someone",
+								listingTitle,
+								messagePreview: body,
+								conversationUrl: absoluteUrl(conversationPath),
+							}),
+							template: "newMessage",
+						});
+					}
 				}
 			}
 		}
@@ -93,4 +116,19 @@ export async function sendMessageAction(
 	revalidatePath("/host/messages");
 	revalidatePath(`/host/messages/${conversationId}`);
 	return { ok: true };
+}
+
+export async function sendMessageAction(
+	conversationId: string,
+	body: string,
+): Promise<SendMessageActionResult> {
+	try {
+		return await sendMessageActionImpl(conversationId, body);
+	} catch (error) {
+		reportError(error, {
+			action: "sendMessageAction",
+			userId: await currentUserId(),
+		});
+		throw error;
+	}
 }

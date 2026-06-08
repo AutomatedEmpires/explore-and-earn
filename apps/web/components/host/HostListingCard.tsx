@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge, Icon } from "@explore-and-earn/ui";
 
 import { CATEGORY_LABEL } from "../discovery";
+import { ListingStatusControls } from "./ListingStatusControls";
 import {
   HOST_LISTING_STATE_ICON,
   HOST_LISTING_STATE_LABEL,
@@ -44,6 +45,7 @@ export function HostListingCard({ item }: HostListingCardProps) {
           <dd className={styles.statValue}>{newApplicantCount}</dd>
         </div>
       </dl>
+      <ListingStatusControls listingId={listing.id} currentStatus={listing.status} />
       <Link className={styles.action} href={`/host/listings/${listing.id}`}>
         <Icon name="action.forward" size={20} aria-hidden />
         <span>Manage listing</span>

@@ -8,6 +8,7 @@ import {
 } from "@explore-and-earn/db";
 
 import { isCurrentUserAdmin } from "../../lib/admin";
+import { reportError } from "../../lib/sentry";
 
 interface ActionResult {
   ok: boolean;
@@ -29,7 +30,7 @@ async function guardAdmin(): Promise<ActionResult | null> {
   return null;
 }
 
-export async function approveListingAction(
+async function approveListingActionImpl(
   listingId: string,
 ): Promise<ActionResult> {
   const denied = await guardAdmin();
@@ -44,7 +45,18 @@ export async function approveListingAction(
   return { ok: true };
 }
 
-export async function rejectListingAction(
+export async function approveListingAction(
+  listingId: string,
+): Promise<ActionResult> {
+  try {
+    return await approveListingActionImpl(listingId);
+  } catch (error) {
+    reportError(error, { action: "approveListingAction" });
+    throw error;
+  }
+}
+
+async function rejectListingActionImpl(
   listingId: string,
   reason?: string,
 ): Promise<ActionResult> {
@@ -60,7 +72,19 @@ export async function rejectListingAction(
   return { ok: true };
 }
 
-export async function verifyHostAction(
+export async function rejectListingAction(
+  listingId: string,
+  reason?: string,
+): Promise<ActionResult> {
+  try {
+    return await rejectListingActionImpl(listingId, reason);
+  } catch (error) {
+    reportError(error, { action: "rejectListingAction" });
+    throw error;
+  }
+}
+
+async function verifyHostActionImpl(
   hostProfileId: string,
 ): Promise<ActionResult> {
   const denied = await guardAdmin();
@@ -79,7 +103,18 @@ export async function verifyHostAction(
   return { ok: true };
 }
 
-export async function unverifyHostAction(
+export async function verifyHostAction(
+  hostProfileId: string,
+): Promise<ActionResult> {
+  try {
+    return await verifyHostActionImpl(hostProfileId);
+  } catch (error) {
+    reportError(error, { action: "verifyHostAction" });
+    throw error;
+  }
+}
+
+async function unverifyHostActionImpl(
   hostProfileId: string,
 ): Promise<ActionResult> {
   const denied = await guardAdmin();
@@ -96,4 +131,15 @@ export async function unverifyHostAction(
   revalidatePath("/admin/hosts");
   revalidatePath("/admin");
   return { ok: true };
+}
+
+export async function unverifyHostAction(
+  hostProfileId: string,
+): Promise<ActionResult> {
+  try {
+    return await unverifyHostActionImpl(hostProfileId);
+  } catch (error) {
+    reportError(error, { action: "unverifyHostAction" });
+    throw error;
+  }
 }

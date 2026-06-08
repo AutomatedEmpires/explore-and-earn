@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check": "node ./check.mjs"
+    "check": "node ./check.mjs",
+    "assert:grants": "node ./assert-grants.mjs",
+    "verify:security": "node ./check.mjs && node ./assert-grants.mjs"
   }
 }
