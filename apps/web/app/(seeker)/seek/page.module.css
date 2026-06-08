@@ -1,0 +1,49 @@
+/* Seek pagination \u2014 server-rendered prev/next links beneath the card grid.
+   Semantic tokens only; no px outside breakpoints. */
+
+.pagination {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-12);
+	padding: var(--space-section) var(--space-gutter);
+	background: var(--color-paper);
+}
+
+.pageLink {
+	display: inline-flex;
+	align-items: center;
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+	transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.pageLink:hover {
+	border-color: var(--border-ink);
+}
+
+.pageLink:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.pageLinkDisabled {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.pageStatus {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-secondary);
+}
