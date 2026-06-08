@@ -5,6 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { saveListingWithStatus } from "@explore-and-earn/db";
 
 import { getSwipeListings, type SwipeBatch } from "../../components/discovery/data";
+import { reportError } from "../../lib/sentry";
 
 /**
  * Swipe-deck server actions (/swipe surface).
@@ -18,6 +19,15 @@ import { getSwipeListings, type SwipeBatch } from "../../components/discovery/da
 /** Canonical RFC-4122 UUID shape; anything else is rejected/stripped. */
 const UUID_RE =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Best-effort current Clerk user id for error attribution (catch paths only). */
+async function currentUserId(): Promise<string | undefined> {
+	try {
+		return (await auth()).userId ?? undefined;
+	} catch {
+		return undefined;
+	}
+}
 
 /** Keep only well-formed UUID strings, de-duplicated. */
 function sanitizeIds(ids: unknown): string[] {
@@ -37,7 +47,7 @@ function sanitizeIds(ids: unknown): string[] {
  * Returns `{ ok, alreadySaved }`. `ok` is false when signed out, the id is not
  * a UUID, or the write fails — the swipe gesture never blocks on the result.
  */
-export async function saveListingAction(
+async function saveListingActionImpl(
 	listingId: string,
 ): Promise<{ ok: boolean; alreadySaved: boolean }> {
 	if (typeof listingId !== "string" || !UUID_RE.test(listingId)) {
@@ -54,6 +64,20 @@ export async function saveListingAction(
 	return saveListingWithStatus(token, userId, listingId);
 }
 
+export async function saveListingAction(
+	listingId: string,
+): Promise<{ ok: boolean; alreadySaved: boolean }> {
+	try {
+		return await saveListingActionImpl(listingId);
+	} catch (error) {
+		reportError(error, {
+			action: "saveListingAction",
+			userId: await currentUserId(),
+		});
+		throw error;
+	}
+}
+
 /**
  * Next page of the swipe deck. `excludeIds` is sanitized to UUIDs (anything
  * else is dropped); listings the seeker has applied to are excluded inside
@@ -61,7 +85,7 @@ export async function saveListingAction(
  * (published_at of the last row, or null when exhausted). Returns an empty
  * page when signed out.
  */
-export async function getSwipeBatchAction(
+async function getSwipeBatchActionImpl(
 	excludeIds: string[],
 	cursor?: string,
 ): Promise<SwipeBatch> {
@@ -76,4 +100,19 @@ export async function getSwipeBatchAction(
 	const safeCursor =
 		typeof cursor === "string" && cursor.length > 0 ? cursor : undefined;
 	return getSwipeListings(token, userId, sanitizeIds(excludeIds), safeCursor);
+}
+
+export async function getSwipeBatchAction(
+	excludeIds: string[],
+	cursor?: string,
+): Promise<SwipeBatch> {
+	try {
+		return await getSwipeBatchActionImpl(excludeIds, cursor);
+	} catch (error) {
+		reportError(error, {
+			action: "getSwipeBatchAction",
+			userId: await currentUserId(),
+		});
+		throw error;
+	}
 }

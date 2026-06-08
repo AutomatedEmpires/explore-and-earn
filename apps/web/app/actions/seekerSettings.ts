@@ -10,6 +10,8 @@ import {
   type NotificationPrefsPatch,
 } from "@explore-and-earn/db";
 
+import { reportError } from "../../lib/sentry";
+
 export interface SettingsActionResult {
   readonly ok: boolean;
   readonly error?: string;
@@ -22,6 +24,14 @@ const TRAVEL_READINESS = [
   "planning",
   "not_looking",
 ] as const;
+
+async function currentUserId(): Promise<string | undefined> {
+  try {
+    return (await auth()).userId ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function untypedClient(clerkToken: string): SupabaseClient {
   return authedClient(clerkToken) as unknown as SupabaseClient;
@@ -85,7 +95,7 @@ async function updateSeekerProfileColumns(
  * Trim and persist the seeker's display name.
  * Validates: 1-80 characters after trimming.
  */
-export async function updateDisplayNameAction(
+async function updateDisplayNameActionImpl(
   displayName: string,
 ): Promise<SettingsActionResult> {
   const { userId, getToken } = await auth();
@@ -103,10 +113,24 @@ export async function updateDisplayNameAction(
   return result;
 }
 
+export async function updateDisplayNameAction(
+  displayName: string,
+): Promise<SettingsActionResult> {
+  try {
+    return await updateDisplayNameActionImpl(displayName);
+  } catch (error) {
+    reportError(error, {
+      action: "updateDisplayNameAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
+}
+
 /**
  * Persist the seeker's availability window and availability status.
  */
-export async function updateScheduleAction(
+async function updateScheduleActionImpl(
   formData: FormData,
 ): Promise<SettingsActionResult> {
   const { userId, getToken } = await auth();
@@ -132,10 +156,24 @@ export async function updateScheduleAction(
   return result;
 }
 
+export async function updateScheduleAction(
+  formData: FormData,
+): Promise<SettingsActionResult> {
+  try {
+    return await updateScheduleActionImpl(formData);
+  } catch (error) {
+    reportError(error, {
+      action: "updateScheduleAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
+}
+
 /**
  * Persist the seeker's travel readiness and preferred location text.
  */
-export async function updateTravelAction(
+async function updateTravelActionImpl(
   formData: FormData,
 ): Promise<SettingsActionResult> {
   const { userId, getToken } = await auth();
@@ -161,11 +199,25 @@ export async function updateTravelAction(
   return result;
 }
 
+export async function updateTravelAction(
+  formData: FormData,
+): Promise<SettingsActionResult> {
+  try {
+    return await updateTravelActionImpl(formData);
+  } catch (error) {
+    reportError(error, {
+      action: "updateTravelAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
+}
+
 /**
  * Partially update the seeker's email notification preferences.
  * Only keys present in `prefs` are written; others are left unchanged.
  */
-export async function updateNotificationPrefsAction(
+async function updateNotificationPrefsActionImpl(
   prefs: NotificationPrefsPatch,
 ): Promise<SettingsActionResult> {
   const { userId, getToken } = await auth();
@@ -176,4 +228,18 @@ export async function updateNotificationPrefsAction(
   const result = await updateNotificationPrefs(token, userId, prefs);
   if (result.ok) revalidatePath("/settings");
   return result;
+}
+
+export async function updateNotificationPrefsAction(
+  prefs: NotificationPrefsPatch,
+): Promise<SettingsActionResult> {
+  try {
+    return await updateNotificationPrefsActionImpl(prefs);
+  } catch (error) {
+    reportError(error, {
+      action: "updateNotificationPrefsAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
 }

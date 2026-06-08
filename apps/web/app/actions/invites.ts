@@ -21,13 +21,23 @@ import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
 import { inviteAcceptedEmail, inviteEmail } from "../../lib/emails"
 import { checkRateLimit } from "../../lib/rateLimit"
+import { reportError } from "../../lib/sentry"
+
+/** Best-effort current Clerk user id for error attribution (catch paths only). */
+async function currentUserId(): Promise<string | undefined> {
+	try {
+		return (await auth()).userId ?? undefined
+	} catch {
+		return undefined
+	}
+}
 
 /**
  * Server function: invites for the authenticated seeker (newest first).
  * Returns an empty list when unauthenticated rather than throwing, so the
  * /invites page can render its signed-out EmptyState.
  */
-export async function getInvitesAction(): Promise<InviteWithListing[]> {
+async function getInvitesActionImpl(): Promise<InviteWithListing[]> {
 	const { userId, getToken } = await auth()
 	if (!userId) {
 		return []
@@ -41,6 +51,18 @@ export async function getInvitesAction(): Promise<InviteWithListing[]> {
 	return getSeekerInvites(token, userId)
 }
 
+export async function getInvitesAction(): Promise<InviteWithListing[]> {
+	try {
+		return await getInvitesActionImpl()
+	} catch (error) {
+		reportError(error, {
+			action: "getInvitesAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
+}
+
 /**
  * Server action: the authenticated seeker accepts or declines an invite, then
  * revalidates the invites surface. userId always comes from auth().userId — it
@@ -50,7 +72,7 @@ export async function getInvitesAction(): Promise<InviteWithListing[]> {
  * host. Hosts have no notification-prefs row, so this is always sent; the whole
  * notification is wrapped so it can never block or fail the seeker's response.
  */
-export async function respondToInviteAction(
+async function respondToInviteActionImpl(
 	inviteId: string,
 	response: InviteResponse,
 ): Promise<{ ok: boolean; error?: string }> {
@@ -112,6 +134,21 @@ export async function respondToInviteAction(
 	}
 
 	return result
+}
+
+export async function respondToInviteAction(
+	inviteId: string,
+	response: InviteResponse,
+): Promise<{ ok: boolean; error?: string }> {
+	try {
+		return await respondToInviteActionImpl(inviteId, response)
+	} catch (error) {
+		reportError(error, {
+			action: "respondToInviteAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
 }
 
 /**
@@ -234,7 +271,15 @@ export async function createInviteAction(
 	seekerProfileId: string,
 	listingId: string,
 ): Promise<{ ok: boolean; error?: string }> {
-	return createInviteForCurrentHost(seekerProfileId, listingId)
+	try {
+		return await createInviteForCurrentHost(seekerProfileId, listingId)
+	} catch (error) {
+		reportError(error, {
+			action: "createInviteAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
 }
 
 /**
@@ -247,7 +292,15 @@ export async function sendInviteAction(
 	listingId: string,
 	message?: string,
 ): Promise<{ ok: boolean; error?: string }> {
-	return createInviteForCurrentHost(seekerProfileId, listingId, message)
+	try {
+		return await createInviteForCurrentHost(seekerProfileId, listingId, message)
+	} catch (error) {
+		reportError(error, {
+			action: "sendInviteAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
 }
 
 /**
@@ -256,7 +309,7 @@ export async function sendInviteAction(
  *
  * userId ALWAYS from auth().userId — never decoded from a token.
  */
-export async function searchSeekersAction(
+async function searchSeekersActionImpl(
 	query: string,
 ): Promise<SeekerSearchResult[]> {
 	const { userId, getToken } = await auth()
@@ -270,4 +323,18 @@ export async function searchSeekersAction(
 	}
 
 	return searchSeekersForInvite(token, userId, query).catch(() => [])
+}
+
+export async function searchSeekersAction(
+	query: string,
+): Promise<SeekerSearchResult[]> {
+	try {
+		return await searchSeekersActionImpl(query)
+	} catch (error) {
+		reportError(error, {
+			action: "searchSeekersAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
 }
