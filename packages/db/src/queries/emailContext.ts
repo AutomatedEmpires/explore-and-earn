@@ -241,3 +241,45 @@ export async function getSeekerClerkIdByProfileId(
     return null;
   }
 }
+
+/**
+ * Resolve a host's Clerk user id from their host_profiles.id. Used by the
+ * invite-accept server action to address the "invite accepted" email to the
+ * host. Best-effort: returns null when the profile cannot be resolved.
+ */
+export async function getHostClerkIdByProfileId(
+  clerkToken: string,
+  hostProfileId: string,
+): Promise<string | null> {
+  try {
+    const db = untypedClient(clerkToken);
+    return await resolveClerkId(db, "host_profiles", hostProfileId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Count the messages in a conversation. Used by the message server action to
+ * detect the FIRST message in a thread (count === 1) so only the opening
+ * message triggers a notification email, never subsequent replies. Best-effort:
+ * returns 0 on any failure (which suppresses the notification rather than
+ * misfiring it).
+ */
+export async function countConversationMessages(
+  clerkToken: string,
+  conversationId: string,
+): Promise<number> {
+  if (!conversationId) return 0;
+  try {
+    const db = untypedClient(clerkToken);
+    const { count, error } = await db
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .eq("conversation_id", conversationId);
+    if (error || typeof count !== "number") return 0;
+    return count;
+  } catch {
+    return 0;
+  }
+}

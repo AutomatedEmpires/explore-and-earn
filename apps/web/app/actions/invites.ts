@@ -7,6 +7,8 @@ import {
 	createInvite,
 	getHostListings,
 	getHostProfile,
+	getHostClerkIdByProfileId,
+	getNotificationPrefs,
 	getSeekerClerkIdByProfileId,
 	searchSeekersForInvite,
 	type InviteResponse,
@@ -17,7 +19,7 @@ import { revalidatePath } from "next/cache"
 
 import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
-import { inviteEmail } from "../../lib/emails"
+import { inviteAcceptedEmail, inviteEmail } from "../../lib/emails"
 import { checkRateLimit } from "../../lib/rateLimit"
 
 /**
@@ -43,6 +45,10 @@ export async function getInvitesAction(): Promise<InviteWithListing[]> {
  * Server action: the authenticated seeker accepts or declines an invite, then
  * revalidates the invites surface. userId always comes from auth().userId — it
  * is never decoded from the token.
+ *
+ * On ACCEPT we additionally send a best-effort "invite accepted" email to the
+ * host. Hosts have no notification-prefs row, so this is always sent; the whole
+ * notification is wrapped so it can never block or fail the seeker's response.
  */
 export async function respondToInviteAction(
 	inviteId: string,
@@ -59,7 +65,52 @@ export async function respondToInviteAction(
 	}
 
 	const result = await respondToInvite(token, userId, inviteId, response)
-	if (result.ok) revalidatePath("/invites")
+	if (!result.ok) {
+		return result
+	}
+
+	revalidatePath("/invites")
+
+	if (response === "accepted") {
+		try {
+			const invites = await getSeekerInvites(token, userId).catch(
+				() => [] as InviteWithListing[],
+			)
+			const match = invites.find((entry) => entry.invite.id === inviteId)
+			if (match) {
+				const hostClerkUserId = await getHostClerkIdByProfileId(
+					token,
+					match.invite.hostProfileId,
+				)
+				if (hostClerkUserId) {
+					const [host, seeker] = await Promise.all([
+						getClerkContact(hostClerkUserId),
+						getClerkContact(userId),
+					])
+					if (host.email) {
+						const seekerName = seeker.name ?? "A seeker"
+						const listingTitle = match.listing?.title || "your listing"
+						await sendEmail({
+							to: host.email,
+							subject: `${seekerName} accepted your invite to ${listingTitle}`,
+							html: inviteAcceptedEmail({
+								seekerName,
+								listingTitle,
+								applicantsUrl: absoluteUrl("/host/applicants"),
+							}),
+							template: "inviteAccepted",
+						})
+					}
+				}
+			}
+		} catch (err) {
+			console.error(
+				"[respondToInviteAction] accept email error (non-fatal):",
+				err,
+			)
+		}
+	}
+
 	return result
 }
 
@@ -73,7 +124,8 @@ export async function respondToInviteAction(
  *   getHostListings).
  * - Deduplication: an existing invite for (listing_id, seeker_profile_id)
  *   surfaces as "already_invited" from the DB unique constraint.
- * - Email: best-effort via Resend — errors are caught and never rethrown.
+ * - Email: best-effort via Resend — gated on the seeker's emailOnInvite
+ *   preference, and errors are caught and never rethrown.
  *
  * userId ALWAYS from auth().userId — never decoded from a token.
  */
@@ -126,7 +178,8 @@ async function createInviteForCurrentHost(
 
 	revalidatePath("/host/invites")
 
-	// Best-effort email notification — errors are caught and never rethrown.
+	// Best-effort email notification — gated on the seeker's emailOnInvite pref;
+	// errors are caught and never rethrown.
 	try {
 		const seekerClerkUserId = await getSeekerClerkIdByProfileId(
 			token,
@@ -134,24 +187,36 @@ async function createInviteForCurrentHost(
 		).catch(() => null)
 
 		if (seekerClerkUserId) {
-			const contact = await getClerkContact(seekerClerkUserId)
-			if (contact.email) {
-				const hostName = hostProfile.companyName || "A host"
-				const listingTitle = ownedListing.title
-				const listingLocation =
-					ownedListing.location_display ?? "Location not specified"
-				const html = inviteEmail({
-					hostName,
-					listingTitle,
-					listingLocation,
-					message: message ?? null,
-					inviteUrl: absoluteUrl("/invites"),
-				})
-				await sendEmail({
-					to: contact.email,
-					subject: `${hostName} invited you to apply to ${listingTitle}`,
-					html,
-				})
+			// Cross-user prefs read (host token, seeker userId) may fail under RLS;
+			// degrade to sending rather than dropping the invite notification.
+			let prefs = null
+			try {
+				prefs = await getNotificationPrefs(token, seekerClerkUserId)
+			} catch {
+				// Cross-user read failed; skip the notification prefs check.
+			}
+
+			if (prefs === null || prefs.emailOnInvite) {
+				const contact = await getClerkContact(seekerClerkUserId)
+				if (contact.email) {
+					const hostName = hostProfile.companyName || "A host"
+					const listingTitle = ownedListing.title
+					const listingLocation =
+						ownedListing.location_display ?? "Location not specified"
+					const html = inviteEmail({
+						hostName,
+						listingTitle,
+						listingLocation,
+						message: message ?? null,
+						inviteUrl: absoluteUrl("/invites"),
+					})
+					await sendEmail({
+						to: contact.email,
+						subject: `${hostName} invited you to apply to ${listingTitle}`,
+						html,
+						template: "inviteEmail",
+					})
+				}
 			}
 		}
 	} catch (err) {
