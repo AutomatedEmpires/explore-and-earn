@@ -74,6 +74,39 @@ export async function getHostProfile(
   };
 }
 
+export type HostSubscriptionTier =
+  | "none"
+  | "starter"
+  | "professional"
+  | "enterprise";
+
+export async function getHostSubscriptionTier(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<HostSubscriptionTier> {
+  const db = untypedClient(clerkToken);
+  const { data, error } = await db
+    .from("host_profiles")
+    .select("subscription_tier")
+    .eq("clerk_user_id", clerkUserId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`getHostSubscriptionTier: ${error.message}`);
+  }
+
+  const tier = (data as { subscription_tier?: string } | null)?.subscription_tier;
+  if (
+    tier === "starter" ||
+    tier === "professional" ||
+    tier === "enterprise"
+  ) {
+    return tier;
+  }
+
+  return "none";
+}
+
 export async function updateHostProfileDetails(
   clerkToken: string,
   clerkUserId: string,

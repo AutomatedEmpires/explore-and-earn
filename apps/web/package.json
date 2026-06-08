@@ -4,7 +4,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev",
-		"build": "next build",
+		"build": "next build && node ../../tools/scripts/repair-client-reference-manifests.mjs",
 		"lint": "eslint .",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test:e2e": "playwright test --config tests/playwright.config.mjs"
@@ -22,6 +22,7 @@
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0",
 		"react-map-gl": "^7.1.7",
+		"stripe": "^22.2.0",
 		"svix": "^1.42.0"
 	}
 }

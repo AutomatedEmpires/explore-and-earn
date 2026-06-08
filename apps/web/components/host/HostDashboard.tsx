@@ -268,6 +268,10 @@ export function HostDashboard({
           <Icon name="nav.messages" size={20} aria-hidden />
           <span>Messages</span>
         </Link>
+        <Link className={styles.quickLink} href="/host/billing">
+          <Icon name="system.info" size={20} aria-hidden />
+          <span>Billing</span>
+        </Link>
       </nav>
 
       {/* Recent activity */}

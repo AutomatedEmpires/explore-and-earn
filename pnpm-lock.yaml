@@ -82,6 +82,9 @@ importers:
       react-map-gl:
         specifier: ^7.1.7
         version: 7.1.9(mapbox-gl@3.24.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      stripe:
+        specifier: ^22.2.0
+        version: 22.2.0(@types/node@24.12.4)
       svix:
         specifier: ^1.42.0
         version: 1.95.1
@@ -2164,6 +2167,15 @@ packages:
   strip-json-comments@3.1.1:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
+
+  stripe@22.2.0:
+    resolution: {integrity: sha512-WFGpMOom9QZqso1kcnSwJsCdC1QHDlMoCOxBZRf3JraMzhkfw7dgSdD2a1CFZrqC+mzAfqeEtYILrZhWKIDruA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==}
@@ -4450,6 +4462,10 @@ snapshots:
   strip-bom@3.0.0: {}
 
   strip-json-comments@3.1.1: {}
+
+  stripe@22.2.0(@types/node@24.12.4):
+    optionalDependencies:
+      '@types/node': 24.12.4
 
   styled-jsx@5.1.6(@babel/core@7.29.7)(react@19.2.6):
     dependencies:

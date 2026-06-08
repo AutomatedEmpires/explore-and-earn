@@ -6,6 +6,7 @@ export interface HostProfileDetailsInput {
     websiteUrl?: string | null;
     photoUrl?: string | null;
 }
+export type HostSubscriptionTier = "none" | "starter" | "professional" | "enterprise";
 export declare function getHostProfile(clerkToken: string, clerkUserId: string): Promise<{
     id: string;
     companyName: string;
@@ -13,6 +14,7 @@ export declare function getHostProfile(clerkToken: string, clerkUserId: string):
     primaryLocationName: string | null;
     photoUrl: string | null;
 } | null>;
+export declare function getHostSubscriptionTier(clerkToken: string, clerkUserId: string): Promise<HostSubscriptionTier>;
 export declare function updateHostProfileDetails(clerkToken: string, clerkUserId: string, fields: HostProfileDetailsInput): Promise<{
     ok: boolean;
     error?: string;

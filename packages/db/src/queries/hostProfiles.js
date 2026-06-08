@@ -44,6 +44,25 @@ export async function getHostProfile(clerkToken, clerkUserId) {
         photoUrl: row.photo_url ?? null,
     };
 }
+export async function getHostSubscriptionTier(clerkToken, clerkUserId) {
+    const db = untypedClient(clerkToken);
+    const { data, error } = await db
+        .from("host_profiles")
+        .select("subscription_tier")
+        .eq("clerk_user_id", clerkUserId)
+        .maybeSingle();
+    if (error)
+        throw new Error(`getHostSubscriptionTier: ${error.message}`);
+    const value = data?.subscription_tier;
+    switch (value) {
+        case "starter":
+        case "professional":
+        case "enterprise":
+            return value;
+        default:
+            return "none";
+    }
+}
 export async function updateHostProfileDetails(clerkToken, clerkUserId, fields) {
     const patch = {};
     if (fields.companyName !== undefined) {
