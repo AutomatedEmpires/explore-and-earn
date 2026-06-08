@@ -1,3 +1,0 @@
--- 017_seeker_profile_fields.sql (stub)
--- Content moved to 018_seeker_profile_fields.sql to maintain correct sequence
--- after 017_storage_buckets.sql (feature/image-uploads).
