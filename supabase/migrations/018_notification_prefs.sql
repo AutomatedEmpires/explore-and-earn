@@ -1,4 +1,0 @@
--- 018_notification_prefs.sql (stub)
--- Content moved to 019_notification_prefs.sql to maintain correct sequence after
--- 017_storage_buckets.sql (feature/image-uploads) and 018_seeker_profile_fields.sql
--- (feature/seeker-onboarding).
