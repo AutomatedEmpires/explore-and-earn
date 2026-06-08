@@ -11,7 +11,8 @@
  * in Vercel's Production environment.
  *
  * Handled Clerk events:
- *   - user.created  -> inserts rows into users_profile_shadow + seeker_profiles
+ *   - user.created  -> inserts rows into users_profile_shadow + seeker_profiles,
+ *                      then sends a best-effort welcome email (seeker or host)
  *   - user.updated  -> updates the cached email on users_profile_shadow
  *   - user.deleted  -> soft-deletes (sets deleted_at) on users_profile_shadow
  *
@@ -23,6 +24,9 @@ import { createClient } from "@supabase/supabase-js"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { Webhook } from "svix"
+
+import { absoluteUrl, sendEmail } from "../../../../lib/email"
+import { welcomeHostEmail, welcomeSeekerEmail } from "../../../../lib/emails"
 
 export const runtime = "nodejs"
 
@@ -38,6 +42,8 @@ interface ClerkUserPayload {
 	readonly created_at?: number
 	readonly email_addresses?: ReadonlyArray<ClerkEmailAddress>
 	readonly primary_email_address_id?: string | null
+	readonly first_name?: string | null
+	readonly public_metadata?: { readonly role?: string | null } | null
 }
 
 interface ClerkWebhookEvent {
@@ -78,21 +84,46 @@ function createdAtForUser(user: ClerkUserPayload): string {
 		: new Date().toISOString()
 }
 
-async function verifyClerkEvent(payload: string): Promise<ClerkWebhookEvent> {
-	const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
+/**
+ * Best-effort welcome email on user.created. Picks the seeker vs host template
+ * from Clerk public_metadata.role. The transport (sendEmail) already swallows
+ * its own errors; this only guards the role/email plumbing and never throws.
+ */
+async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
+	const email = primaryEmailForUser(user)
+	if (!email) return
 
-	if (!webhookSecret) {
-		throw new Error("Missing CLERK_WEBHOOK_SECRET for Clerk webhook verification.")
+	const role =
+		typeof user.public_metadata?.role === "string"
+			? user.public_metadata.role
+			: null
+	const firstName =
+		typeof user.first_name === "string" && user.first_name.trim().length > 0
+			? user.first_name.trim()
+			: null
+
+	if (role === "host") {
+		await sendEmail({
+			to: email,
+			subject: "Your host account is ready",
+			html: welcomeHostEmail({
+				name: firstName,
+				createListingUrl: absoluteUrl("/host"),
+			}),
+			template: "welcomeHost",
+		})
+		return
 	}
 
-	const headerStore = await headers()
-	const webhook = new Webhook(webhookSecret)
-
-	return webhook.verify(payload, {
-		"svix-id": headerStore.get("svix-id") ?? "",
-		"svix-timestamp": headerStore.get("svix-timestamp") ?? "",
-		"svix-signature": headerStore.get("svix-signature") ?? "",
-	}) as ClerkWebhookEvent
+	await sendEmail({
+		to: email,
+		subject: "Welcome to Explore & Earn",
+		html: welcomeSeekerEmail({
+			name: firstName,
+			exploreUrl: absoluteUrl("/swipe"),
+		}),
+		template: "welcomeSeeker",
+	})
 }
 
 async function syncUserCreated(user: ClerkUserPayload): Promise<void> {
@@ -171,6 +202,14 @@ export async function POST(request: Request) {
 		switch (event.type) {
 			case "user.created":
 				await syncUserCreated(event.data)
+				try {
+					await sendWelcomeEmail(event.data)
+				} catch (welcomeError) {
+					console.error(
+						"Clerk welcome email failed (non-fatal)",
+						welcomeError,
+					)
+				}
 				break
 			case "user.updated":
 				await syncUserUpdated(event.data)
@@ -191,4 +230,21 @@ export async function POST(request: Request) {
 	}
 
 	return NextResponse.json({ received: true }, { status: 200 })
+}
+
+async function verifyClerkEvent(payload: string): Promise<ClerkWebhookEvent> {
+	const webhookSecret = process.env.CLERK_WEBHOOK_SECRET
+
+	if (!webhookSecret) {
+		throw new Error("Missing CLERK_WEBHOOK_SECRET for Clerk webhook verification.")
+	}
+
+	const headerStore = await headers()
+	const webhook = new Webhook(webhookSecret)
+
+	return webhook.verify(payload, {
+		"svix-id": headerStore.get("svix-id") ?? "",
+		"svix-timestamp": headerStore.get("svix-timestamp") ?? "",
+		"svix-signature": headerStore.get("svix-signature") ?? "",
+	}) as ClerkWebhookEvent
 }

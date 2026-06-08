@@ -4,9 +4,7 @@
 
 ## What Explore&Earn is
 
-A **lifestyle-driven opportunity marketplace** — mobile-first, card-first, premium. It connects seekers with seasonal/lifestyle work that bundles **housing, meals, and pay** in scenic working landscapes.
-
-**It is NOT** a generic job board, an HR tool, or a corporate SaaS dashboard.
+A **built by seekers, for seekers discovery marketplace that rewards real-world exploration.** It is mobile-first, card-first, and premium, and it keeps **housing, meals, and pay** visible from the start.
 
 ## North-star feel
 

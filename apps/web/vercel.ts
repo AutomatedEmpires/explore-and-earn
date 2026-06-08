@@ -42,7 +42,7 @@ export const config = {
             // Mapbox tiles are served from various *.mapbox.com subdomains; api.mapbox.com alone is not enough.
             "img-src 'self' data: blob: https://img.clerk.com https://*.supabase.co https://*.mapbox.com",
             "font-src 'self' data:",
-            "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.supabase.co wss://*.supabase.co https://us.posthog.com https://eu.posthog.com https://*.ingest.sentry.io https://sentry.io https://api.mapbox.com https://events.mapbox.com https://*.mapbox.com",
+            "connect-src 'self' https://*.clerk.com https://*.clerk.accounts.dev https://*.supabase.co wss://*.supabase.co https://us.posthog.com https://us.i.posthog.com https://eu.posthog.com https://*.ingest.sentry.io https://sentry.io https://api.mapbox.com https://events.mapbox.com https://*.mapbox.com",
             "frame-src https://accounts.clerk.dev https://*.clerk.accounts.dev https://accounts.google.com https://challenges.cloudflare.com",
             "frame-ancestors 'none'",
             "object-src 'none'",

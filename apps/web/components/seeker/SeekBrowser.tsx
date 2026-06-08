@@ -44,7 +44,7 @@ const BENEFIT_FILTERS: readonly {
 
 const SORTS: readonly { readonly key: SortKey; readonly label: string }[] = [
 	{ key: "match", label: "Best match" },
-	{ key: "title", label: "A\u2013Z" },
+	{ key: "title", label: "A–Z" },
 ];
 
 const SEARCH_DEBOUNCE_MS = 400;
@@ -61,17 +61,19 @@ export interface SeekBrowserProps {
 	readonly meals?: boolean;
 	readonly location?: string;
 	readonly payMin?: number;
+	readonly startAfter?: string;
+	readonly startBefore?: string;
 }
 
 /**
- * SeekBrowser \u2014 the browsable Seek tab. All filter state (text query, category,
- * housing/meals, location, pay floor) lives in the URL query string: the server
- * page parses it, runs searchListings, and hands the already-filtered listings
- * here. The controls below only navigate \u2014 toggling a chip or typing in the
- * search box pushes a new URL, which re-renders the server page, so a filtered
- * view is shareable and bookmarkable. Sort is a client-only reordering of the
- * returned rows. The drawers (QuickPeek / HostProfile / BenefitBucket / Report)
- * are unchanged.
+ * SeekBrowser — the browsable Seek tab. All filter state (text query, category,
+ * housing/meals, location, pay floor, start-date range) lives in the URL query
+ * string: the server page parses it, runs searchListings, and hands the
+ * already-filtered listings here. The controls below only navigate — toggling a
+ * chip, typing in the search box, or picking a start-date pushes a new URL,
+ * which re-renders the server page, so a filtered view is shareable and
+ * bookmarkable. Sort is a client-only reordering of the returned rows. The
+ * drawers (QuickPeek / HostProfile / BenefitBucket / Report) are unchanged.
  */
 export function SeekBrowser({
 	listings,
@@ -81,6 +83,8 @@ export function SeekBrowser({
 	meals = false,
 	location,
 	payMin,
+	startAfter,
+	startBefore,
 }: SeekBrowserProps) {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -116,6 +120,8 @@ export function SeekBrowser({
 			} else {
 				next.delete("q");
 			}
+			// A new search resets to the first page.
+			next.delete("page");
 			const queryString = next.toString();
 			router.replace(queryString ? `${pathname}?${queryString}` : pathname);
 		}, SEARCH_DEBOUNCE_MS);
@@ -128,6 +134,10 @@ export function SeekBrowser({
 			next.delete(key);
 		} else {
 			next.set(key, value);
+		}
+		// Any filter change resets pagination to the first page.
+		if (key !== "page") {
+			next.delete("page");
 		}
 		const queryString = next.toString();
 		router.push(queryString ? `${pathname}?${queryString}` : pathname);
@@ -178,7 +188,9 @@ export function SeekBrowser({
 		housing ||
 		meals ||
 		Boolean(location) ||
-		payMin != null;
+		payMin != null ||
+		Boolean(startAfter) ||
+		Boolean(startBefore);
 
 	const countLabel = `${results.length} ${
 		results.length === 1 ? "opportunity" : "opportunities"
@@ -189,7 +201,7 @@ export function SeekBrowser({
 			<header className={styles.header}>
 				<h1 className={styles.heading}>Seek opportunities</h1>
 				<p className={styles.subheading}>
-					Browse every open work-travel opportunity \u2014 housing, meals, and pay
+					Browse every open work-travel opportunity — housing, meals, and pay
 					from hosts worldwide.
 				</p>
 			</header>
@@ -200,7 +212,7 @@ export function SeekBrowser({
 					<input
 						type="search"
 						className={styles.sortSelect}
-						placeholder="Search opportunities, locations\u2026"
+						placeholder="Search opportunities, locations…"
 						value={searchText}
 						onChange={(event) => setSearchText(event.target.value)}
 						aria-label="Search opportunities"
@@ -265,6 +277,39 @@ export function SeekBrowser({
 					})}
 				</div>
 
+				<div
+					className={styles.filterGroup}
+					role="group"
+					aria-label="Filter by start date"
+				>
+					<label className={styles.dateField}>
+						<span className={styles.dateLabel}>Starts after</span>
+						<input
+							type="date"
+							className={styles.dateInput}
+							value={startAfter ?? ""}
+							max={startBefore || undefined}
+							onChange={(event) =>
+								pushParam("start_after", event.target.value || null)
+							}
+							aria-label="Starts on or after"
+						/>
+					</label>
+					<label className={styles.dateField}>
+						<span className={styles.dateLabel}>Starts before</span>
+						<input
+							type="date"
+							className={styles.dateInput}
+							value={startBefore ?? ""}
+							min={startAfter || undefined}
+							onChange={(event) =>
+								pushParam("start_before", event.target.value || null)
+							}
+							aria-label="Starts on or before"
+						/>
+					</label>
+				</div>
+
 				<label className={styles.sort}>
 					<span className={styles.sortLabel}>Sort</span>
 					<select
@@ -289,7 +334,7 @@ export function SeekBrowser({
 				<div className={styles.emptyWrap}>
 					<EmptyState
 						title={
-							query ? `No listings match \u201c${query}\u201d` : "No matches with those filters"
+							query ? `No listings match “${query}”` : "No matches with those filters"
 						}
 						message={
 							query

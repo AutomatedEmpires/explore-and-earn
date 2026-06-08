@@ -5,6 +5,7 @@ import {
 	applyToListing,
 	getListingHostContact,
 	getSeekerApplicationIds,
+	withdrawApplication,
 	type ApplyResult,
 } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
@@ -13,14 +14,17 @@ import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
 import { applicationReceivedEmail } from "../../lib/emails"
 import { checkRateLimit } from "../../lib/rateLimit"
+import { reportError } from "../../lib/sentry"
 
-/**
- * Server action: apply the authenticated seeker to a listing.
- *
- * Auth is enforced here (Clerk) before any DB work; the Supabase JWT is minted
- * via the "supabase" Clerk JWT template and handed to the db layer.
- */
-export async function applyToListingAction(
+async function currentUserId(): Promise<string | undefined> {
+	try {
+		return (await auth()).userId ?? undefined
+	} catch {
+		return undefined
+	}
+}
+
+async function applyToListingActionImpl(
 	listingId: string,
 	coverMessage?: string,
 ): Promise<ApplyResult> {
@@ -29,8 +33,6 @@ export async function applyToListingAction(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	// Rate limit: 5 applications per hour per user. Checked after auth, before any
-	// DB work. Never throws — degrades to a friendly error code.
 	const { allowed } = checkRateLimit(`apply:${userId}`, 5, 60 * 60 * 1000)
 	if (!allowed) {
 		return { ok: false, error: "rate_limit_exceeded" }
@@ -47,8 +49,6 @@ export async function applyToListingAction(
 		return { ok: false, error: "You cannot apply to your own listing." }
 	}
 
-	// Best-effort: email the host that a new application arrived. This must never
-	// block or fail the apply result, so all of it is guarded and swallowed.
 	if (result.ok) {
 		try {
 			const listingContact = await getListingHostContact(token, listingId)
@@ -68,11 +68,12 @@ export async function applyToListingAction(
 							listingTitle,
 							reviewUrl: absoluteUrl("/host/applicants"),
 						}),
+						template: "applicationReceived",
 					})
 				}
 			}
-		} catch (e) {
-			console.error("[email] application notification failed:", e);
+		} catch (error) {
+			console.error("[email] application notification failed:", error)
 		}
 	}
 
@@ -80,8 +81,22 @@ export async function applyToListingAction(
 	return result
 }
 
-/** Server action: listing ids the authenticated seeker has applied to. */
-export async function getSeekerApplicationIdsAction(): Promise<string[]> {
+export async function applyToListingAction(
+	listingId: string,
+	coverMessage?: string,
+): Promise<ApplyResult> {
+	try {
+		return await applyToListingActionImpl(listingId, coverMessage)
+	} catch (error) {
+		reportError(error, {
+			action: "applyToListingAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
+}
+
+async function getSeekerApplicationIdsActionImpl(): Promise<string[]> {
 	const { userId, getToken } = await auth()
 	if (!userId) {
 		return []
@@ -93,4 +108,50 @@ export async function getSeekerApplicationIdsAction(): Promise<string[]> {
 	}
 
 	return getSeekerApplicationIds(token, userId)
+}
+
+export async function getSeekerApplicationIdsAction(): Promise<string[]> {
+	try {
+		return await getSeekerApplicationIdsActionImpl()
+	} catch (error) {
+		reportError(error, {
+			action: "getSeekerApplicationIdsAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
+}
+
+async function withdrawApplicationActionImpl(
+	applicationId: string,
+): Promise<{ ok: boolean; error?: string }> {
+	const { userId, getToken } = await auth()
+	if (!userId) {
+		return { ok: false, error: "unauthenticated" }
+	}
+
+	const token = await getToken({ template: "supabase" })
+	if (!token) {
+		return { ok: false, error: "unauthenticated" }
+	}
+
+	const result = await withdrawApplication(token, userId, applicationId)
+	if (result.ok) {
+		revalidatePath("/applied")
+	}
+	return result
+}
+
+export async function withdrawApplicationAction(
+	applicationId: string,
+): Promise<{ ok: boolean; error?: string }> {
+	try {
+		return await withdrawApplicationActionImpl(applicationId)
+	} catch (error) {
+		reportError(error, {
+			action: "withdrawApplicationAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
 }

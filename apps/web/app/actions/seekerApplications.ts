@@ -4,9 +4,19 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { updateApplicationStatusBySeeker } from "@explore-and-earn/db";
 
+import { reportError } from "../../lib/sentry";
+
 export interface OfferActionResult {
   readonly ok: boolean;
   readonly error?: string;
+}
+
+async function currentUserId(): Promise<string | undefined> {
+  try {
+    return (await auth()).userId ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function setOfferStatus(
@@ -38,7 +48,15 @@ async function setOfferStatus(
 export async function acceptOfferAction(
   applicationId: string,
 ): Promise<OfferActionResult> {
-  return setOfferStatus(applicationId, "accepted");
+  try {
+    return await setOfferStatus(applicationId, "accepted");
+  } catch (error) {
+    reportError(error, {
+      action: "acceptOfferAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
 }
 
 /**
@@ -47,5 +65,13 @@ export async function acceptOfferAction(
 export async function declineOfferAction(
   applicationId: string,
 ): Promise<OfferActionResult> {
-  return setOfferStatus(applicationId, "not_selected");
+  try {
+    return await setOfferStatus(applicationId, "not_selected");
+  } catch (error) {
+    reportError(error, {
+      action: "declineOfferAction",
+      userId: await currentUserId(),
+    });
+    throw error;
+  }
 }

@@ -6,6 +6,7 @@ import "../styles/tokens.css";
 import "../styles/primitives.css";
 import { CookieBanner } from "../components/CookieBanner";
 import { SiteFooter } from "../components/SiteFooter";
+import { SentryUserProvider } from "../components/providers/SentryUserProvider";
 import { AppShell } from "../components/shell";
 import { Providers } from "./providers";
 
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 		<ClerkProvider>
 			<html lang="en">
 				<body>
+					<SentryUserProvider />
 					<Providers>
 						<AppShell>{children}</AppShell>
 						<SiteFooter />

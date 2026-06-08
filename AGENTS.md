@@ -6,7 +6,7 @@
 
 ## 1. What this project is
 
-Explore&Earn is a **mobile-first, lifestyle-driven opportunity marketplace** — *built by seekers for seekers*. It is **not** a generic job board. Think Airbnb × Patagonia × National Geographic: premium adventure, warm working landscapes, operational efficiency, card-first, zero bloat.
+Explore&Earn is a **built by seekers, for seekers discovery marketplace that rewards real-world exploration.** It keeps **housing, meals, and pay** upfront, and it still aims for premium adventure, warm working landscapes, operational efficiency, card-first UX, and zero bloat.
 
 Every opportunity must answer three questions, always, as a first-class triad:
 

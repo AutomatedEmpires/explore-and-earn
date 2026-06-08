@@ -6,7 +6,7 @@ export function generateMetadata(): Metadata {
 	return {
 		title: "About",
 		description:
-			"Explore & Earn is a lifestyle-driven opportunity marketplace built for seekers \u2014 every opportunity answers three questions: housing, meals, and pay.",
+			"Explore & Earn is a built by seekers, for seekers discovery marketplace that rewards real-world exploration.",
 	};
 }
 
@@ -15,9 +15,9 @@ export default function AboutPage() {
 		<>
 			<h1>About Explore & Earn</h1>
 			<p>
-				Explore & Earn is a lifestyle-driven opportunity marketplace built for
-				seekers — people who want work that comes with a place to live, food to
-				eat, and pay in their pocket, in places worth waking up in.
+				Explore & Earn is a built by seekers, for seekers discovery marketplace
+				that rewards real-world exploration while keeping housing, meals, and pay
+				up front for seekers who want opportunities in places worth waking up in.
 			</p>
 
 			<h2>The three questions</h2>
