@@ -1,0 +1,33 @@
+{
+  "$comment": "Authoritative allocation registry for supabase/migrations numeric prefixes. Consumed by tools/scripts/check-migration-prefixes.mjs. To add a NEW migration you must FIRST reserve its number here in its own reviewed change; the guard fails any migration whose number is not listed. See docs/ci/migration-prefix-guard.md and docs/migrations/migration-ledger.md.",
+  "migrationsDir": "supabase/migrations",
+  "highestApplied": "021",
+  "allocations": {
+    "001": { "slug": "extensions_and_functions", "owner": "historical", "status": "applied" },
+    "002": { "slug": "users_profile_shadow", "owner": "historical", "status": "applied" },
+    "003": { "slug": "profiles", "owner": "historical", "status": "applied" },
+    "004": { "slug": "seeker_resume", "owner": "historical", "status": "applied" },
+    "005": { "slug": "media", "owner": "historical", "status": "applied" },
+    "006": { "slug": "listings", "owner": "historical", "status": "applied" },
+    "007": { "slug": "applications_invites_offers", "owner": "historical", "status": "applied" },
+    "008": { "slug": "notifications_events", "owner": "historical", "status": "applied" },
+    "009": { "slug": "clerk_user_sync_schema", "owner": "historical", "status": "applied" },
+    "010": { "slug": "messages", "owner": "historical", "status": "applied" },
+    "011": { "slug": "conversations_unique_fix", "owner": "historical", "status": "applied" },
+    "012": { "slug": "host_profiles_clerk_user_id", "owner": "historical", "status": "applied" },
+    "013": { "slug": "rls_policies", "owner": "historical", "status": "applied" },
+    "014": { "slug": "notifications_clerk_user_id", "owner": "historical", "status": "applied" },
+    "015": { "slug": "rls_remaining_tables", "owner": "historical", "status": "applied" },
+    "016": { "slug": "lock_down_security_definer_functions", "owner": "lane-a-security", "status": "applied" },
+    "017": { "slug": "storage_buckets", "owner": "historical", "status": "applied" },
+    "018": { "slug": "seeker_profile_fields", "owner": "historical", "status": "applied" },
+    "019": { "slug": "notification_prefs", "owner": "historical", "status": "applied" },
+    "020": { "slug": "composite_indexes", "owner": "historical", "status": "applied" },
+    "021": { "slug": "rls_complete", "owner": "historical", "status": "applied" },
+    "022": { "slug": null, "owner": "UNASSIGNED-CONTESTED", "status": "contested", "note": "Three open PRs each introduced a different 022_* migration (search index, email log, listing expiry). The founder must assign 022 to exactly ONE lane; the other two must renumber before merge. See docs/migrations/migration-ledger.md." },
+    "023": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
+    "024": { "slug": null, "owner": "lane-b-migration-integrity", "status": "reserved", "note": "Reserved for Lane B. Unused by this PR; present so the guard recognizes a future 024_* migration owned by this lane." },
+    "025": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
+    "026": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" }
+  }
+}
