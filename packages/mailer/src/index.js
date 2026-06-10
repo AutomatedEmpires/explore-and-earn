@@ -40,6 +40,16 @@ function resolveFrom(override) {
  *
  * Dev mode: when `NODE_ENV !== "production"` and `RESEND_API_KEY` is not set,
  * the email body is logged to the console and `{ ok: true }` is returned.
+ *
+ * @example
+ * // Success
+ * const r = await sendMail({ to: "u@example.com", subject: "Hi", html: "<p>Hi</p>",
+ *                             idempotencyKey: "event:123" });
+ * // r.ok === true (or isDuplicate === true on a retry)
+ *
+ * // Failure — never throws
+ * const r = await sendMail({ to: "bad", subject: "Hi", html: "<p>Hi</p>" });
+ * // r.ok === false; r.error contains the reason
  */
 export async function sendMail(opts) {
     const { to, subject, html, idempotencyKey } = opts;

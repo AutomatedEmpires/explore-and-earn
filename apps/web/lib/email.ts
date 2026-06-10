@@ -120,7 +120,9 @@ export async function sendEmail(
     idempotencyKey,
   });
 
-  // Skip the audit log for deduplicated (already-logged) sends.
+  // Deduplicated sends: the original send was already logged. Skipping the
+  // audit write avoids a spurious second row that would inflate send counts
+  // in the email_log table and misrepresent actual Resend API calls made.
   if (result.isDuplicate) {
     return { ok: true };
   }

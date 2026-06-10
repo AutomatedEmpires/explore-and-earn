@@ -39,7 +39,7 @@ describe("sendMail", () => {
     expect(result.ok).toBe(true);
     expect(result.isDuplicate).toBeFalsy();
     expect(infoSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[mailer:dev]"),
+      expect.stringMatching(/\[mailer:dev\].*dev@example\.com.*Hello/s),
     );
     expect(mockFetch).not.toHaveBeenCalled();
   });
