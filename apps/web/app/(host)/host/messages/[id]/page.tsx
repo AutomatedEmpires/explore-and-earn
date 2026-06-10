@@ -60,7 +60,7 @@ export default async function HostMessageThreadPage({
   // Load the transcript, the host's conversations (to resolve the seeker name),
   // and mark inbound messages as read — all in parallel so a failed mark-read
   // never blocks the page render.
-  const [messages, conversations] = await Promise.all([
+  const [messages, conversations, _markRead] = await Promise.all([
     getMessages(token, userId, id),
     getConversations(token, userId, "host"),
     markMessagesReadAction(id),

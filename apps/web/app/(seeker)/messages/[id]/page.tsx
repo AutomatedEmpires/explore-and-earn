@@ -48,7 +48,7 @@ export default async function SeekerMessageThreadPage({
 
 	// Fetch messages and mark inbound ones as read in parallel; a failed mark-read
 	// must not block the page render.
-	const [messages] = await Promise.all([
+	const [messages, _markRead] = await Promise.all([
 		getMessages(token, userId, id),
 		markMessagesReadAction(id),
 	]);
