@@ -32,7 +32,7 @@ export interface ListingRow {
 export declare function rowToDiscoveryFields(row: ListingRow): {
     id: string;
     title: string;
-    category: OpportunityCategory;
+    category: "seasonal" | "farm" | "maritime" | "remote" | "mix";
     location: string;
     opportunityWindow: string;
     begins: string | undefined;
@@ -45,10 +45,10 @@ export declare function rowToDiscoveryFields(row: ListingRow): {
     };
     benefits: {
         housing: {
-            provision: BenefitProvision;
+            provision: "provided" | "not_provided";
         };
         meals: {
-            provision: BenefitProvision;
+            provision: "provided" | "not_provided";
         };
         pay: {
             provision: BenefitProvision;
@@ -58,7 +58,7 @@ export declare function rowToDiscoveryFields(row: ListingRow): {
     payInsight: {
         minCents: number | undefined;
         maxCents: number | undefined;
-        unit: any;
+        unit: "other" | "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | null;
         currency: string;
     } | undefined;
     visaSupport: boolean;
