@@ -7,6 +7,7 @@ export interface SeekerInvite {
     readonly status: string;
     readonly message: string | null;
     readonly createdAt: string;
+    readonly expiresAt: string | null;
 }
 export interface InviteListing {
     readonly id: string;

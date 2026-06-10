@@ -17,20 +17,40 @@ const ERROR_TEXT: Record<string, string> = {
 
 export interface InviteActionsProps {
   readonly inviteId: string;
+  /** ISO 8601 timestamp from `invites.expires_at`; null when not yet set. */
+  readonly expiresAt?: string | null;
+}
+
+/** Returns true if the supplied ISO timestamp is in the past. */
+function isExpired(expiresAt: string): boolean {
+  return new Date(expiresAt) < new Date();
+}
+
+/** Returns true if the invite expires within the next 48 hours. */
+function isExpiringSoon(expiresAt: string): boolean {
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  return ms > 0 && ms < 48 * 60 * 60 * 1000;
 }
 
 /**
  * Accept / Decline controls for a single invite card. Mirrors the host-side
  * StatusActions pattern (useTransition + an aria-live status line) and composes
  * only the shared @explore-and-earn/ui Button primitive.
+ *
+ * When `expiresAt` is provided and the invite is already past its expiry the
+ * action buttons are replaced with a plain status message so the seeker is
+ * never left clicking a button that will always fail.
  */
-export function InviteActions({ inviteId }: InviteActionsProps) {
+export function InviteActions({ inviteId, expiresAt }: InviteActionsProps) {
   const [isPending, startTransition] = useTransition();
   const [pending, setPending] = useState<InviteResponse | null>(null);
   const [message, setMessage] = useState<{
     readonly ok: boolean;
     readonly text: string;
   } | null>(null);
+
+  const expired = expiresAt ? isExpired(expiresAt) : false;
+  const expiringSoon = !expired && expiresAt ? isExpiringSoon(expiresAt) : false;
 
   function handleRespond(response: InviteResponse) {
     setMessage(null);
@@ -57,8 +77,28 @@ export function InviteActions({ inviteId }: InviteActionsProps) {
     });
   }
 
+  if (expired) {
+    return (
+      <div className={styles.actions}>
+        <p className={styles.error} role="status">
+          This invite has expired.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.actions}>
+      {expiringSoon && expiresAt ? (
+        <p className={styles.expiry} role="note">
+          Expires{" "}
+          {new Date(expiresAt).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+          })}
+          .
+        </p>
+      ) : null}
       <div className={styles.buttons}>
         <Button
           variant="primary"

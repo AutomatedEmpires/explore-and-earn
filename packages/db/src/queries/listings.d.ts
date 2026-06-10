@@ -32,7 +32,7 @@ export interface ListingRow {
 export declare function rowToDiscoveryFields(row: ListingRow): {
     id: string;
     title: string;
-    category: "farm" | "maritime" | "remote" | "seasonal" | "mix";
+    category: "seasonal" | "farm" | "maritime" | "remote" | "mix";
     location: string;
     opportunityWindow: string;
     begins: string | undefined;
@@ -58,7 +58,7 @@ export declare function rowToDiscoveryFields(row: ListingRow): {
     payInsight: {
         minCents: number | undefined;
         maxCents: number | undefined;
-        unit: "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | "other" | null;
+        unit: "other" | "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | null;
         currency: string;
     } | undefined;
     visaSupport: boolean;
@@ -113,6 +113,10 @@ export declare function getLiveListingsWithCoords(clerkToken?: string): Promise<
  * Filters accepted by {@link searchListings}. Every field is optional; an empty
  * filter object returns the newest live listings (the same set as
  * getPublicListings, capped by `limit`).
+ *
+ * startDateAfter / startDateBefore filter on the listing `begins_at` column
+ * (ISO date or timestamp strings). `offset` opts into range-based pagination;
+ * when omitted the query falls back to a simple `.limit(limit)`.
  */
 export interface SearchFilters {
     query?: string;
@@ -124,7 +128,10 @@ export interface SearchFilters {
     payMin?: number;
     payUnit?: CompensationUnit;
     location?: string;
+    startDateAfter?: string;
+    startDateBefore?: string;
     limit?: number;
+    offset?: number;
 }
 export declare function searchListings(filters: SearchFilters): Promise<ListingRow[]>;
 export declare function getHostListings(clerkToken: string, clerkUserId: string): Promise<ListingRow[]>;
