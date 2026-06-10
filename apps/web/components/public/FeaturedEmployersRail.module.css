@@ -1,0 +1,459 @@
+/*
+ * FeaturedEmployersRail — warm paper / field-journal aesthetic.
+ *
+ * Key design principles (AGENTS.md):
+ *   - Photos sit inside a hand-drawn mat frame — no overlays on the photo itself.
+ *   - Paper surfaces: parchment section panel + warm card surface.
+ *   - Pencil-stamp circular badges at the image / body seam.
+ *   - Ink borders throughout; no generic SaaS shadows.
+ *
+ * Badge geometry:
+ *   diameter  = 90px
+ *   half      = 45px
+ *   position  = bottom: -45px on .imageSection → straddles frame bottom edge
+ *
+ * Mat geometry:
+ *   .imageSection margin = 14px 14px 0  →  image inset from card edges
+ *   .imageFrame border                  →  ink frame around photo
+ *   .body padding-top = 60px            →  clears 45px badge + 15px air
+ */
+
+/* ─── Section shell ─────────────────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-24);
+  background: var(--color-parchment);
+  border: 1.5px solid var(--border-ink-warm);
+  border-radius: var(--radius-modal);
+  box-shadow:
+    0 4px 20px rgba(25, 21, 14, 0.07),
+    0 1px 4px  rgba(25, 21, 14, 0.04);
+}
+
+/* ─── Section header ────────────────────────────────────────────────────── */
+
+.sectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.sparkle {
+  font-size: 0.8em;
+  color: var(--color-gold);
+  line-height: 1;
+}
+
+.viewAll {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.viewAll:hover {
+  color: var(--text-primary);
+}
+
+/* ─── Rail wrapper ──────────────────────────────────────────────────────── */
+
+.railOuter {
+  position: relative;
+}
+
+.rail {
+  display: flex;
+  gap: var(--space-12);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* bottom padding lets the badge shadow clear cleanly */
+  padding-bottom: var(--space-4);
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+.railItem {
+  flex-shrink: 0;
+}
+
+/* ─── Next button ───────────────────────────────────────────────────────── */
+
+.nextBtn {
+  position: absolute;
+  right: -14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-ink-warm);
+  background: var(--color-card-warm);
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(25, 21, 14, 0.12);
+  transition:
+    transform  var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+  z-index: 2;
+}
+
+.nextBtn:hover {
+  transform: translateY(calc(-50% - 1px));
+  box-shadow: 0 4px 14px rgba(25, 21, 14, 0.18);
+}
+
+/* ─── Individual card ───────────────────────────────────────────────────── */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 18rem;          /* 288px */
+  min-width: 264px;
+  border: 1.5px solid rgba(25, 21, 14, 0.22);
+  border-radius: var(--radius-card);
+  background: var(--color-card-warm);
+  color: inherit;
+  text-decoration: none;
+  scroll-snap-align: start;
+  overflow: visible;     /* badge protrudes below imageSection */
+  transition:
+    transform  var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(25, 21, 14, 0.10);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--border-ink-warm);
+  outline-offset: 3px;
+}
+
+/* ─── Image section (mat wrapper) ───────────────────────────────────────── */
+
+/*
+ * .imageSection creates the mat effect:
+ *   14px left/right/top margin → photo is inset from card edges.
+ *   .imageFrame holds the ink border + overflow clipping.
+ *   .badge is a sibling of .imageFrame — it is NOT clipped by imageFrame's
+ *   overflow: hidden, and protrudes 45px below .imageSection's bottom edge.
+ */
+
+.imageSection {
+  position: relative;
+  margin: 14px 14px 0;
+  /* height derived from .imageFrame's aspect-ratio — no explicit height needed */
+}
+
+.imageFrame {
+  aspect-ratio: 3 / 2;
+  border: 1.5px solid rgba(25, 21, 14, 0.30);
+  border-radius: 14px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-parchment) 60%, var(--color-card-warm));
+}
+
+/* Category fallback tints when no photo is available */
+.imageFrame_farm     { background: var(--accent-farm-bg); }
+.imageFrame_maritime { background: var(--accent-maritime-bg); }
+.imageFrame_remote   { background: var(--accent-remote-bg); }
+.imageFrame_seasonal { background: var(--accent-seasonal-bg); }
+.imageFrame_mix      { background: var(--accent-mix-bg); }
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  /* No scrim — AGENTS.md: frame-not-filter. Never overlay on host photos. */
+  transition: transform 360ms var(--ease-standard);
+}
+
+.card:hover .image {
+  transform: scale(1.03);
+}
+
+/* ─── Circular employer badge ───────────────────────────────────────────── */
+
+/*
+ * Positioned relative to .imageSection.
+ * bottom: -45px  →  badge center sits exactly on imageSection's bottom edge
+ *                   (half badge inside frame zone, half inside body zone).
+ * left: 0        →  aligned with imageSection left edge (inside the mat margin).
+ */
+
+.badge {
+  position: absolute;
+  bottom: -45px;
+  left: 0;
+  z-index: 2;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+
+  /* Double-ring pencil stamp: ink outer → warm-white gap → ink inner → tinted fill */
+  border: 2px solid var(--border-ink-warm);
+  box-shadow:
+    0 0 0 3px var(--color-card-warm),
+    0 0 0 5px var(--border-ink-warm),
+    0 3px 8px rgba(25, 21, 14, 0.18);
+
+  background: var(--color-card-warm);
+  user-select: none;
+}
+
+/* Category-tinted badge fills */
+.badge_farm     { background: color-mix(in srgb, var(--accent-farm-bg) 55%, var(--color-card-warm)); }
+.badge_maritime { background: color-mix(in srgb, var(--accent-maritime-bg) 55%, var(--color-card-warm)); }
+.badge_remote   { background: color-mix(in srgb, var(--accent-remote-bg) 55%, var(--color-card-warm)); }
+.badge_seasonal { background: color-mix(in srgb, var(--accent-seasonal-bg) 55%, var(--color-card-warm)); }
+.badge_mix      { background: color-mix(in srgb, var(--accent-mix-bg) 55%, var(--color-card-warm)); }
+
+.badgeMark {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: var(--font-weight-regular);
+  line-height: 1;
+  color: var(--palette-ink-warm);
+  letter-spacing: 0.04em;
+}
+
+.badgeRule {
+  display: block;
+  width: 28px;
+  height: 1px;
+  background: rgba(25, 21, 14, 0.25);
+  flex-shrink: 0;
+}
+
+.badgeLabel {
+  font-family: var(--font-ui);
+  font-size: 0.45rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+/* ─── Card body ─────────────────────────────────────────────────────────── */
+
+/*
+ * padding-top: 60px = 45px badge protrusion + 15px air gap.
+ * This ensures name text starts below the badge regardless of card width.
+ */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: 60px var(--space-16) var(--space-16);
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.employerName {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: 1.15;
+  color: var(--palette-ink-warm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.verifiedIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--color-cta);
+}
+
+.location {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.locationDot {
+  font-size: 0.38em;
+  color: var(--color-cta, var(--palette-ink-warm));
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* ─── Chips row ─────────────────────────────────────────────────────────── */
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 1.625rem;
+  padding: 0 var(--space-10);
+  border: 1px solid rgba(25, 21, 14, 0.18);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-parchment) 60%, var(--color-card-warm));
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.chipHiring {
+  border-color: color-mix(in srgb, var(--status-success-fg) 30%, transparent);
+  background: color-mix(in srgb, var(--status-success-bg) 55%, var(--color-card-warm));
+  color: var(--status-success-fg);
+}
+
+.hiringDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ─── Tagline ───────────────────────────────────────────────────────────── */
+
+.tagline {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 639px) {
+  .section {
+    padding: var(--space-16) var(--space-14);
+  }
+
+  .nextBtn {
+    display: none;
+  }
+
+  .card {
+    width: 15.5rem;
+    min-width: 248px;
+  }
+
+  .badge {
+    width: 78px;
+    height: 78px;
+    bottom: -39px;
+  }
+
+  .body {
+    padding-top: 54px; /* 39px badge + 15px air */
+  }
+}
+
+/* ─── Reduced motion ────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .nextBtn,
+  .viewAll,
+  .image {
+    transition: none;
+  }
+
+  .card:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .card:hover .image {
+    transform: none;
+  }
+}

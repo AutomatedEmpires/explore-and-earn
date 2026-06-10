@@ -8,7 +8,8 @@ import {
   getUnreadNotificationCount,
 } from "@explore-and-earn/db";
 
-import { SeekerBottomNav, SeekerHeader } from "../../components/seeker";
+import { GlobalHeader } from "../../components/global";
+import { SeekerBottomNav } from "../../components/seeker";
 import styles from "./layout.module.css";
 
 /**
@@ -37,6 +38,7 @@ interface SeekerShellState {
   readonly unreadCount: number;
   readonly clerkUserId: string | null;
   readonly needsOnboarding: boolean;
+	readonly seekerName: string | null;
 }
 
 /**
@@ -55,11 +57,21 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
   try {
     const { userId, getToken } = await auth();
     if (!userId) {
-      return { unreadCount: 0, clerkUserId: null, needsOnboarding: false };
+			return {
+				unreadCount: 0,
+				clerkUserId: null,
+				needsOnboarding: false,
+				seekerName: null,
+			};
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-      return { unreadCount: 0, clerkUserId: userId, needsOnboarding: false };
+			return {
+				unreadCount: 0,
+				clerkUserId: userId,
+				needsOnboarding: false,
+				seekerName: null,
+			};
     }
     const [unreadCount, profile] = await Promise.all([
       getUnreadNotificationCount(token, userId),
@@ -69,9 +81,15 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
       unreadCount,
       clerkUserId: userId,
       needsOnboarding: profile !== null && !profile.onboardingComplete,
+			seekerName: profile?.displayName?.trim() || null,
     };
   } catch {
-    return { unreadCount: 0, clerkUserId: null, needsOnboarding: false };
+		return {
+			unreadCount: 0,
+			clerkUserId: null,
+			needsOnboarding: false,
+			seekerName: null,
+		};
   }
 }
 
@@ -80,7 +98,7 @@ export default async function SeekerLayout({
 }: {
   children: ReactNode;
 }) {
-  const { unreadCount, clerkUserId, needsOnboarding } =
+  const { unreadCount, clerkUserId, needsOnboarding, seekerName } =
     await resolveSeekerShellState();
 
   // redirect() throws to interrupt rendering, so it must run OUTSIDE the
@@ -91,7 +109,13 @@ export default async function SeekerLayout({
 
   return (
     <div className={styles.shell}>
-      <SeekerHeader unreadCount={unreadCount} clerkUserId={clerkUserId} />
+      <GlobalHeader
+        scope="seeker"
+        isAuthenticated={!!clerkUserId}
+        userName={seekerName}
+        unreadCount={unreadCount}
+        clerkUserId={clerkUserId}
+      />
       <main className={styles.main}>{children}</main>
       <SeekerBottomNav />
     </div>
