@@ -194,13 +194,7 @@ export async function searchListings(filters) {
         .eq("status", "live");
     const term = filters.query ? sanitizeSearchTerm(filters.query) : "";
     if (term) {
-        // Full-text path: query the generated `search_vector` tsvector (migration
-        // 022) via plainto_tsquery. The non-text paths below (location ilike,
-        // category, benefits, pay, date range) still apply for empty/null queries.
-        builder = builder.textSearch("search_vector", term, {
-            type: "plain",
-            config: "english",
-        });
+        builder = builder.or(`title.ilike.%${term}%,description.ilike.%${term}%,location_display.ilike.%${term}%`);
     }
     const categories = (filters.categories ?? []).filter((category) => MARKETPLACE_CATEGORIES.includes(category));
     if (categories.length > 0) {
@@ -230,19 +224,10 @@ export async function searchListings(filters) {
     const location = filters.location ? sanitizeSearchTerm(filters.location) : "";
     if (location)
         builder = builder.ilike("location_display", `%${location}%`);
-    if (filters.startDateAfter) {
-        builder = builder.gte("begins_at", filters.startDateAfter);
-    }
-    if (filters.startDateBefore) {
-        builder = builder.lte("begins_at", filters.startDateBefore);
-    }
     const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;
-    const ordered = builder.order("published_at", { ascending: false });
-    const hasOffset = filters.offset != null && Number.isFinite(filters.offset) && filters.offset >= 0;
-    const paginated = hasOffset
-        ? ordered.range(filters.offset, filters.offset + limit - 1)
-        : ordered.limit(limit);
-    const { data, error } = await paginated;
+    const { data, error } = await builder
+        .order("published_at", { ascending: false })
+        .limit(limit);
     if (error)
         throw new Error(`searchListings: ${error.message}`);
     return (data ?? []).map(toListingRow);

@@ -167,6 +167,7 @@ export async function getSeekerClerkIdByProfileId(clerkToken, seekerProfileId) {
         return null;
     }
 }
+
 /**
  * Resolve a host's Clerk user id from their host_profiles.id. Used by the
  * invite-accept server action to address the "invite accepted" email to the
@@ -181,12 +182,11 @@ export async function getHostClerkIdByProfileId(clerkToken, hostProfileId) {
         return null;
     }
 }
+
 /**
  * Count the messages in a conversation. Used by the message server action to
- * detect the FIRST message in a thread (count === 1) so only the opening
- * message triggers a notification email, never subsequent replies. Best-effort:
- * returns 0 on any failure (which suppresses the notification rather than
- * misfiring it).
+ * detect the first message in a thread so only the opening message triggers a
+ * notification email. Best-effort: returns 0 on any failure.
  */
 export async function countConversationMessages(clerkToken, conversationId) {
     if (!conversationId)

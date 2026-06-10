@@ -13,6 +13,7 @@ export interface HostProfileDetailsInput {
     photoUrl?: string | null;
     socialLinks?: SocialLinks;
 }
+export type HostSubscriptionTier = "none" | "starter" | "professional" | "enterprise";
 export interface HostProfile {
     id: string;
     companyName: string;
@@ -26,10 +27,9 @@ export interface HostProfile {
     categoryScopes: string[];
     housingOfferedGenerally: boolean;
     mealsOfferedGenerally: boolean;
-    subscriptionTier: "none" | "starter" | "professional" | "enterprise";
+    subscriptionTier: HostSubscriptionTier;
 }
 export declare function getHostProfile(clerkToken: string, clerkUserId: string): Promise<HostProfile | null>;
-export type HostSubscriptionTier = "none" | "starter" | "professional" | "enterprise";
 export declare function getHostSubscriptionTier(clerkToken: string, clerkUserId: string): Promise<HostSubscriptionTier>;
 export declare function updateHostProfileDetails(clerkToken: string, clerkUserId: string, fields: HostProfileDetailsInput): Promise<{
     ok: boolean;
