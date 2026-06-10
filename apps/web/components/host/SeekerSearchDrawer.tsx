@@ -11,6 +11,7 @@ import { Button, Icon } from "@explore-and-earn/ui";
 import type { SeekerSearchResult } from "@explore-and-earn/db/client";
 
 import { searchSeekersAction, sendInviteAction } from "../../app/actions/invites";
+import { PopupShell } from "../overlay/PopupShell";
 import styles from "./SeekerSearchDrawer.module.css";
 
 export interface SeekerSearchDrawerProps {
@@ -99,31 +100,24 @@ export function SeekerSearchDrawer({
   if (!isOpen) return null;
 
   return (
-    <div
-      className={styles.backdrop}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Invite a seeker"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) handleClose();
-      }}
+    <PopupShell
+      open={isOpen}
+      onClose={handleClose}
+      title="Invite a seeker"
+      eyebrow={
+        <>
+          <Icon name="action.forward" size={16} aria-hidden />
+          <span>Host outreach</span>
+        </>
+      }
+      headerMeta={
+        <span>
+          Listing · <strong>{listingTitle}</strong>
+        </span>
+      }
+      size="compact"
+      closeLabel="Close invite popup"
     >
-      <div className={styles.drawer}>
-        <header className={styles.header}>
-          <h2 className={styles.heading}>Invite a seeker</h2>
-          <p className={styles.subheading}>
-            Sending invite for: <strong>{listingTitle}</strong>
-          </p>
-          <button
-            type="button"
-            className={styles.close}
-            onClick={handleClose}
-            aria-label="Close invite drawer"
-          >
-            <Icon name="action.close" size={20} aria-hidden />
-          </button>
-        </header>
-
         <form className={styles.search} onSubmit={handleSearch}>
           <input
             ref={searchRef}
@@ -237,7 +231,6 @@ export function SeekerSearchDrawer({
             Invite sent successfully!
           </p>
         ) : null}
-      </div>
-    </div>
+    </PopupShell>
   );
 }

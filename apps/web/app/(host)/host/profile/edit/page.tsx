@@ -35,20 +35,19 @@ export default async function HostProfileEditPage() {
     getHostListings(token, userId).catch(() => []),
   ]);
 
-  // Company name + verification come from the host_profiles embed on the host's
-  // own listings (same merge the profile page uses). About + location come from
-  // the host_profiles row. Host name + tagline have no backing column yet, so
-  // they are left blank and rendered read-only in the form.
   const realHost = listingRows
     .map((row) => rowToDiscoveryFields(row).host)
     .find((host) => host.name && host.name !== "Unknown Host");
 
   const profile: HostProfileSummary = {
-    hostName: "",
+    hostName: hostProfile?.hostName ?? "",
     orgName: realHost?.name ?? hostProfile?.companyName ?? "",
+    tagline: hostProfile?.tagline ?? undefined,
     location: hostProfile?.primaryLocationName ?? undefined,
     bio: hostProfile?.about ?? undefined,
     verified: realHost?.verified ?? false,
+    websiteUrl: hostProfile?.websiteUrl ?? undefined,
+    instagram: hostProfile?.socialLinks.instagram ?? undefined,
   };
 
   return (

@@ -1,13 +1,24 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { getPublicHostProfile, getPublicListingsByHost } from "@explore-and-earn/db";
 import { VerifiedHostBadge, Icon } from "@explore-and-earn/ui";
+
 import { PublicListingCard } from "../../../components/host/PublicListingCard";
+import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com";
+
+const CATEGORY_LABEL: Record<string, string> = {
+  farm: "Farm",
+  maritime: "Maritime",
+  remote: "Remote",
+  seasonal: "Seasonal",
+  mix: "Multi-category",
+};
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -19,9 +30,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!host) return { title: "Host not found" };
 
+  const tagline = host.tagline ?? host.about?.slice(0, 100);
   const title = `${host.companyName} · Explore & Earn`;
-  const description = host.about
-    ? host.about.slice(0, 155)
+  const description = tagline
+    ? tagline.slice(0, 155)
     : `View open opportunities from ${host.companyName} on Explore & Earn.`;
 
   const canonical = `${baseUrl}/host/${id}`;
@@ -39,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [{ url: ogImage, width: 1200, height: 630, alt: host.companyName }],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title,
       description,
       images: [ogImage],
@@ -60,225 +72,182 @@ export default async function PublicHostProfilePage({ params }: Props) {
     ? new Date(host.createdAt).getFullYear()
     : null;
 
-  const aboutIsLong = (host.about?.length ?? 0) > 200;
+  const verified = host.attestationStatus === "attested";
+  const hasListings = listings.length > 0;
 
   return (
-    <main
-      style={{
-        backgroundColor: "var(--color-paper)",
-        minHeight: "100vh",
-        padding: "var(--space-gutter)",
-      }}
-    >
-      <div style={{ maxWidth: "56rem", margin: "0 auto" }}>
-        {/* Hero */}
-        <div style={{ marginBottom: "var(--space-section)" }}>
-          {/* Photo + company */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-16)",
-              marginBottom: "var(--space-16)",
-            }}
-          >
-            {host.photoUrl ? (
-              <div
-                style={{
-                  position: "relative",
-                  width: "80px",
-                  height: "80px",
-                  borderRadius: "var(--radius-image)",
-                  border: "3px solid var(--border-ink)",
-                  backgroundColor: "var(--color-surface)",
-                  overflow: "hidden",
-                  padding: "4px",
-                }}
-              >
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    borderRadius: "calc(var(--radius-image) - 4px)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <Image
-                    src={host.photoUrl}
-                    alt={host.companyName}
-                    fill
-                    style={{ objectFit: "cover" }}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div
-                style={{
-                  width: "80px",
-                  height: "80px",
-                  borderRadius: "var(--radius-image)",
-                  border: "3px solid var(--border-ink)",
-                  backgroundColor: "var(--color-surface)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Icon name="nav.profile" size={24} aria-hidden />
-              </div>
-            )}
-
-            <div style={{ flex: 1 }}>
-              <h1
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "var(--type-page-size)",
-                  lineHeight: "var(--type-page-lh)",
-                  color: "var(--text-primary)",
-                  margin: 0,
-                  marginBottom: "var(--space-4)",
-                }}
-              >
-                {host.companyName}
-              </h1>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-8)",
-                  flexWrap: "wrap",
-                }}
-              >
-                {host.primaryLocationName && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "var(--space-4)",
-                      fontSize: "var(--type-meta-size)",
-                      color: "var(--text-secondary)",
-                    }}
-                  >
-                    <Icon name="nav.map" size={16} aria-hidden />
-                    <span>{host.primaryLocationName}</span>
-                  </div>
-                )}
-                {host.attestationStatus === "attested" && <VerifiedHostBadge />}
-                {hostingSinceYear && (
-                  <span
-                    style={{
-                      fontSize: "var(--type-meta-size)",
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    Hosting since {hostingSinceYear}
-                  </span>
-                )}
-              </div>
+    <main className={styles.page}>
+      {/* ── Hero band ───────────────────────────────────────────── */}
+      <section className={styles.hero}>
+        {/* Profile photo */}
+        <div className={styles.heroAvatar}>
+          {host.photoUrl ? (
+            <div className={styles.avatarFrame}>
+              <Image
+                src={host.photoUrl}
+                alt={host.companyName}
+                fill
+                style={{ objectFit: "cover" }}
+                priority
+              />
             </div>
-          </div>
-
-          {/* About */}
-          {host.about && (
-            <div style={{ marginTop: "var(--space-16)" }}>
-              {aboutIsLong ? (
-                <details>
-                  <summary
-                    style={{
-                      fontFamily: "var(--font-ui)",
-                      fontSize: "var(--type-body-size)",
-                      color: "var(--text-secondary)",
-                      cursor: "pointer",
-                      listStyle: "none",
-                    }}
-                  >
-                    <span>{host.about.slice(0, 200)}…</span>
-                    <span
-                      style={{
-                        color: "var(--text-primary)",
-                        fontWeight: "var(--font-weight-medium)",
-                        marginLeft: "var(--space-4)",
-                      }}
-                    >
-                      Read more
-                    </span>
-                  </summary>
-                  <p
-                    style={{
-                      fontFamily: "var(--font-ui)",
-                      fontSize: "var(--type-body-size)",
-                      color: "var(--text-secondary)",
-                      marginTop: "var(--space-12)",
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {host.about}
-                  </p>
-                </details>
-              ) : (
-                <p
-                  style={{
-                    fontFamily: "var(--font-ui)",
-                    fontSize: "var(--type-body-size)",
-                    color: "var(--text-secondary)",
-                    margin: 0,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {host.about}
-                </p>
-              )}
+          ) : (
+            <div className={styles.avatarPlaceholder}>
+              <Icon name="nav.profile" size={24} aria-hidden />
             </div>
           )}
         </div>
 
-        {/* Listings */}
-        <section>
-          <h2
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "var(--type-section-size)",
-              lineHeight: "var(--type-section-lh)",
-              color: "var(--text-primary)",
-              marginBottom: "var(--space-16)",
-            }}
-          >
-            Open opportunities
-          </h2>
+        {/* Identity block */}
+        <div className={styles.heroIdentity}>
+          <div className={styles.heroNameRow}>
+            <h1 className={styles.heroName}>{host.companyName}</h1>
+            {verified && <VerifiedHostBadge />}
+          </div>
 
-          {listings.length === 0 ? (
-            <div
-              style={{
-                padding: "var(--space-32)",
-                textAlign: "center",
-                backgroundColor: "var(--color-surface-raised)",
-                borderRadius: "var(--radius-card)",
-                border: "1px solid var(--border-soft)",
-              }}
-            >
-              <p
-                style={{
-                  fontFamily: "var(--font-ui)",
-                  fontSize: "var(--type-body-size)",
-                  color: "var(--text-secondary)",
-                  margin: 0,
-                }}
-              >
-                No open opportunities right now. Check back soon.
-              </p>
+          {host.hostName ? (
+            <p className={styles.heroHostName}>Hosted by {host.hostName}</p>
+          ) : null}
+
+          {host.tagline ? (
+            <p className={styles.heroTagline}>{host.tagline}</p>
+          ) : null}
+
+          <div className={styles.heroPills}>
+            {host.primaryLocationName ? (
+              <span className={styles.heroPill}>
+                <Icon name="nav.map" size={16} aria-hidden />
+                {host.primaryLocationName}
+              </span>
+            ) : null}
+            {hostingSinceYear ? (
+              <span className={styles.heroPill}>
+                <Icon name="status.open" size={16} aria-hidden />
+                Hosting since {hostingSinceYear}
+              </span>
+            ) : null}
+            {hasListings ? (
+              <span className={styles.heroPill}>
+                <Icon name="category.mix" size={16} aria-hidden />
+                {listings.length} open {listings.length === 1 ? "opportunity" : "opportunities"}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Category scopes */}
+          {host.categoryScopes.length > 0 ? (
+            <div className={styles.heroCategoryScopes}>
+              {host.categoryScopes.map((scope) => (
+                <span key={scope} className={styles.categoryChip}>
+                  {CATEGORY_LABEL[scope] ?? scope}
+                </span>
+              ))}
             </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                gap: "var(--space-16)",
-              }}
+          ) : null}
+
+          {/* Benefit signals */}
+          {(host.housingOfferedGenerally || host.mealsOfferedGenerally) ? (
+            <div className={styles.benefitChips}>
+              {host.housingOfferedGenerally ? (
+                <span className={styles.benefitChip}>
+                  <Icon name="category.seasonal" size={16} aria-hidden />
+                  Housing offered
+                </span>
+              ) : null}
+              {host.mealsOfferedGenerally ? (
+                <span className={styles.benefitChip}>
+                  <Icon name="category.farm" size={16} aria-hidden />
+                  Meals offered
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Social links */}
+        <div className={styles.heroLinks}>
+          {host.websiteUrl ? (
+            <a
+              className={styles.socialLink}
+              href={host.websiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${host.companyName} website`}
             >
+              <Icon name="action.forward" size={16} aria-hidden />
+              <span>Website</span>
+            </a>
+          ) : null}
+          {host.socialLinks.instagram ? (
+            <a
+              className={styles.socialLink}
+              href={`https://instagram.com/${host.socialLinks.instagram.replace(/^@/, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+            >
+              <Icon name="action.share" size={16} aria-hidden />
+              <span>Instagram</span>
+            </a>
+          ) : null}
+          {host.socialLinks.twitter ? (
+            <a
+              className={styles.socialLink}
+              href={`https://x.com/${host.socialLinks.twitter.replace(/^@/, "")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="X (Twitter)"
+            >
+              <Icon name="action.share" size={16} aria-hidden />
+              <span>X</span>
+            </a>
+          ) : null}
+        </div>
+      </section>
+
+      {/* ── Content grid ────────────────────────────────────────── */}
+      <div className={styles.body}>
+        {/* About */}
+        {host.about ? (
+          <section className={styles.aboutSection} aria-labelledby="about-heading">
+            <h2 id="about-heading" className={styles.sectionHeading}>
+              About
+            </h2>
+            <div className={styles.aboutCard}>
+              <p className={styles.aboutText}>{host.about}</p>
+            </div>
+          </section>
+        ) : null}
+
+        {/* Open opportunities */}
+        <section aria-labelledby="listings-heading">
+          <div className={styles.listingsHead}>
+            <h2 id="listings-heading" className={styles.sectionHeading}>
+              Open opportunities
+            </h2>
+            <Link className={styles.seekLink} href="/seek">
+              Browse all
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
+          </div>
+
+          {hasListings ? (
+            <div className={styles.listingsGrid}>
               {listings.map((listing) => (
                 <PublicListingCard key={listing.id} listing={listing} />
               ))}
+            </div>
+          ) : (
+            <div className={styles.emptyListings}>
+              <span className={styles.emptyIcon}>
+                <Icon name="category.mix" size={24} aria-hidden />
+              </span>
+              <p className={styles.emptyTitle}>No open opportunities right now</p>
+              <p className={styles.emptyNote}>Check back soon or browse other hosts.</p>
+              <Link className={styles.seekLink} href="/seek">
+                Explore all listings
+                <Icon name="action.forward" size={16} aria-hidden />
+              </Link>
             </div>
           )}
         </section>

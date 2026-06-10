@@ -1,0 +1,26 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.pending,
+.success,
+.error {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.pending {
+  color: var(--text-secondary);
+}
+
+.success {
+  color: var(--text-primary);
+}
+
+.error {
+  color: var(--status-warning-fg);
+}

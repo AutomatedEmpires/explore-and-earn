@@ -150,10 +150,10 @@ export function AdminListingsTable({
                         <Button
                           variant="secondary"
                           onClick={() =>
-                            router.push(`/listing/${listing.id}`)
+                            router.push(`/admin/listings/${listing.id}`)
                           }
                         >
-                          View
+                          Review
                         </Button>
                       </div>
                     </td>

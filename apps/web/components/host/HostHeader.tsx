@@ -1,8 +1,13 @@
 import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 
-import { HOST_PROFILE, HOST_THREADS } from "./fixtures";
 import styles from "./HostHeader.module.css";
+
+export interface HostHeaderProps {
+  readonly hostName?: string | null;
+  readonly orgName?: string | null;
+  readonly unreadMessages?: number;
+}
 
 /**
  * Host context header (greeting + scope + secondary quick links).
@@ -13,14 +18,23 @@ import styles from "./HostHeader.module.css";
  * not reuse the generic app-shell tab set. The header carries only secondary
  * quick links (messages, profile).
  */
-export function HostHeader() {
-  const unreadMessages = HOST_THREADS.filter((thread) => thread.unread).length;
+export function HostHeader({
+	hostName,
+	orgName,
+	unreadMessages = 0,
+}: HostHeaderProps) {
+  const greeting = hostName?.trim() ? `Hi, ${hostName.trim()}` : "Host dashboard";
+  const orgLabel = orgName?.trim() || null;
 
   return (
     <header className={styles.header}>
       <div className={styles.identity}>
-        <span className={styles.greeting}>Hi, {HOST_PROFILE.hostName}</span>
-        <span className={styles.scope}>Host · {HOST_PROFILE.orgName}</span>
+        <Link className={styles.home} href="/host" aria-label="Explore and Earn host dashboard">
+          <span className={styles.brand}>Explore&amp;Earn</span>
+          <span className={styles.greeting}>{greeting}</span>
+        </Link>
+        <span className={styles.scopePill}>Host</span>
+        {orgLabel ? <span className={styles.orgChip}>{orgLabel}</span> : null}
       </div>
       <nav className={styles.actions} aria-label="Host quick links">
         <Link className={styles.iconLink} href="/host/messages" aria-label="Messages">
