@@ -15,6 +15,7 @@ export default function Loading() {
         description="Conversations with applicants and confirmed crew, unread first."
       />
       <div className={styles.list}>
+        {/* Index keys are safe here: static, fixed-count skeleton — never reordered. */}
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className={styles.item}>
             <span className={styles.avatar}>

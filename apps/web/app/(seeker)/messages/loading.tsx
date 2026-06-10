@@ -11,6 +11,7 @@ export default function Loading() {
 	return (
 		<BucketPage title="Messages">
 			<ul className={styles.list} role="status" aria-label="Loading messages">
+				{/* Index keys are safe here: static, fixed-count skeleton — never reordered. */}
 				{Array.from({ length: 4 }).map((_, i) => (
 				<li key={i} className={styles.item}>
 						<span className={styles.icon}>
