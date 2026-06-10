@@ -6,6 +6,7 @@ import {
   rowToDiscoveryFields,
   SWIPE_BATCH_SIZE,
 } from "@explore-and-earn/db";
+import { DISCOVERY_FIXTURES } from "./fixtures";
 import type { DiscoveryListing } from "./listing";
 
 /**
@@ -20,7 +21,15 @@ import type { DiscoveryListing } from "./listing";
  */
 
 /** All discoverable live opportunities. */
+const hasPublicDataConfig =
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
 export async function getDiscoveryListings(): Promise<DiscoveryListing[]> {
+  if (!hasPublicDataConfig) {
+    return [...DISCOVERY_FIXTURES];
+  }
+
   const rows = await getPublicListings();
   return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
 }
@@ -29,6 +38,10 @@ export async function getDiscoveryListings(): Promise<DiscoveryListing[]> {
 export async function getDiscoveryListingById(
   id: string,
 ): Promise<DiscoveryListing | null> {
+  if (!hasPublicDataConfig) {
+    return DISCOVERY_FIXTURES.find((listing) => listing.id === id) ?? null;
+  }
+
   const row = await getPublicListingById(id);
   if (!row) return null;
   return rowToDiscoveryFields(row) as DiscoveryListing;
@@ -38,6 +51,12 @@ export async function getDiscoveryListingById(
 export async function getDiscoveryListingsWithCoords(): Promise<
   DiscoveryListing[]
 > {
+  if (!hasPublicDataConfig) {
+    return DISCOVERY_FIXTURES.filter(
+      (listing): listing is DiscoveryListing => Boolean(listing.coordinates),
+    );
+  }
+
   const rows = await getLiveListingsWithCoords();
   return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
 }

@@ -4,172 +4,125 @@ import { auth } from "@clerk/nextjs/server"
 import {
 	applyToListing,
 	getListingHostContact,
-	"use server"
+	getSeekerApplicationIds,
+	withdrawApplication,
+	type ApplyResult,
+} from "@explore-and-earn/db"
+import { revalidatePath } from "next/cache"
 
-	import { auth } from "@clerk/nextjs/server"
-	import {
-		applyToListing,
-		getListingHostContact,
-		getSeekerApplicationIds,
-		withdrawApplication,
-		type ApplyResult,
-	} from "@explore-and-earn/db"
-	import { revalidatePath } from "next/cache"
+import { getClerkContact } from "../../lib/clerkUser"
+import { absoluteUrl, sendEmail } from "../../lib/email"
+import { applicationReceivedEmail } from "../../lib/emails"
+import { checkRateLimit } from "../../lib/rateLimit"
+import { reportError } from "../../lib/sentry"
 
-	import { getClerkContact } from "../../lib/clerkUser"
-	import { absoluteUrl, sendEmail } from "../../lib/email"
-	import { applicationReceivedEmail } from "../../lib/emails"
-	import { checkRateLimit } from "../../lib/rateLimit"
-	import { reportError } from "../../lib/sentry"
+async function currentUserId(): Promise<string | undefined> {
+	try {
+		return (await auth()).userId ?? undefined
+	} catch {
+		return undefined
+	}
+}
 
-	/** Best-effort current Clerk user id for error attribution (catch paths only). */
-	async function currentUserId(): Promise<string | undefined> {
-		try {
-			return (await auth()).userId ?? undefined
-		} catch {
-			return undefined
-		}
+async function applyToListingActionImpl(
+	listingId: string,
+	coverMessage?: string,
+): Promise<ApplyResult> {
+	const { userId, getToken } = await auth()
+	if (!userId) {
+		return { ok: false, error: "unauthenticated" }
 	}
 
-	/**
-	 * Server action: apply the authenticated seeker to a listing.
-	 *
-	 * Auth is enforced here (Clerk) before any DB work; the Supabase JWT is minted
-	 * via the "supabase" Clerk JWT template and handed to the db layer.
-	 */
-	async function applyToListingActionImpl(
-		listingId: string,
-		coverMessage?: string,
-	): Promise<ApplyResult> {
-		const { userId, getToken } = await auth()
-		if (!userId) {
-			return { ok: false, error: "unauthenticated" }
-		}
+	const { allowed } = checkRateLimit(`apply:${userId}`, 5, 60 * 60 * 1000)
+	if (!allowed) {
+		return { ok: false, error: "rate_limit_exceeded" }
+	}
 
-		// Rate limit: 5 applications per hour per user. Checked after auth, before any
-		// DB work. Never throws — degrades to a friendly error code.
-		const { allowed } = checkRateLimit(`apply:${userId}`, 5, 60 * 60 * 1000)
-		if (!allowed) {
-			return { ok: false, error: "rate_limit_exceeded" }
-		}
+	const token = await getToken({ template: "supabase" })
+	if (!token) {
+		return { ok: false, error: "unauthenticated" }
+	}
 
-		const token = await getToken({ template: "supabase" })
-		if (!token) {
-			return { ok: false, error: "unauthenticated" }
-		}
+	const result = await applyToListing(token, userId, listingId, coverMessage)
 
-		const result = await applyToListing(token, userId, listingId, coverMessage)
+	if (result.error === "cannot_apply_to_own_listing") {
+		return { ok: false, error: "You cannot apply to your own listing." }
+	}
 
-		if (result.error === "cannot_apply_to_own_listing") {
-			return { ok: false, error: "You cannot apply to your own listing." }
-		}
-
-		// Best-effort: email the host that a new application arrived. This must never
-		// block or fail the apply result, so all of it is guarded and swallowed.
-		// Hosts have no notification-prefs flag for this, so it is always sent.
-		if (result.ok) {
-			try {
-				const listingContact = await getListingHostContact(token, listingId)
-				if (listingContact?.hostClerkUserId) {
-					const [hostContact, seekerContact] = await Promise.all([
-						getClerkContact(listingContact.hostClerkUserId),
-						getClerkContact(userId),
-					])
-					if (hostContact.email) {
-						const seekerName = seekerContact.name ?? "A seeker"
-						const listingTitle = listingContact.listingTitle || "your listing"
-						await sendEmail({
-							to: hostContact.email,
-							subject: `${seekerName} applied to ${listingTitle}`,
-							html: applicationReceivedEmail({
-								seekerName,
-								listingTitle,
-								reviewUrl: absoluteUrl("/host/applicants"),
-							}),
-							template: "applicationReceived",
-						})
-					}
+	if (result.ok) {
+		try {
+			const listingContact = await getListingHostContact(token, listingId)
+			if (listingContact?.hostClerkUserId) {
+				const [hostContact, seekerContact] = await Promise.all([
+					getClerkContact(listingContact.hostClerkUserId),
+					getClerkContact(userId),
+				])
+				if (hostContact.email) {
+					const seekerName = seekerContact.name ?? "A seeker"
+					const listingTitle = listingContact.listingTitle || "your listing"
+					await sendEmail({
+						to: hostContact.email,
+						subject: `${seekerName} applied to ${listingTitle}`,
+						html: applicationReceivedEmail({
+							seekerName,
+							listingTitle,
+							reviewUrl: absoluteUrl("/host/applicants"),
+						}),
+						template: "applicationReceived",
+					})
 				}
-			} catch (e) {
-				console.error("[email] application notification failed:", e)
 			}
-		}
-
-		revalidatePath(`/listing/${listingId}`)
-		return result
-	}
-
-	export async function applyToListingAction(
-		listingId: string,
-		coverMessage?: string,
-	): Promise<ApplyResult> {
-		try {
-			return await applyToListingActionImpl(listingId, coverMessage)
 		} catch (error) {
-			reportError(error, {
-				action: "applyToListingAction",
-				userId: await currentUserId(),
-			})
-			throw error
+			console.error("[email] application notification failed:", error)
 		}
 	}
 
-	/** Server action: listing ids the authenticated seeker has applied to. */
-	async function getSeekerApplicationIdsActionImpl(): Promise<string[]> {
-		const { userId, getToken } = await auth()
-		if (!userId) {
-			return []
-		}
+	revalidatePath(`/listing/${listingId}`)
+	return result
+}
 
-		const token = await getToken({ template: "supabase" })
-		if (!token) {
-			return []
-		}
+export async function applyToListingAction(
+	listingId: string,
+	coverMessage?: string,
+): Promise<ApplyResult> {
+	try {
+		return await applyToListingActionImpl(listingId, coverMessage)
+	} catch (error) {
+		reportError(error, {
+			action: "applyToListingAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
+}
 
-		return getSeekerApplicationIds(token, userId)
+async function getSeekerApplicationIdsActionImpl(): Promise<string[]> {
+	const { userId, getToken } = await auth()
+	if (!userId) {
+		return []
 	}
 
-	export async function getSeekerApplicationIdsAction(): Promise<string[]> {
-		try {
-			return await getSeekerApplicationIdsActionImpl()
-		} catch (error) {
-			reportError(error, {
-				action: "getSeekerApplicationIdsAction",
-				userId: await currentUserId(),
-			})
-			throw error
-		}
+	const token = await getToken({ template: "supabase" })
+	if (!token) {
+		return []
 	}
 
-	/**
-	 * Server action: withdraw the authed seeker's own application.
-	 *
-	 * Auth is enforced here; ownership and the `applied`-only status guard are
-	 * enforced in the db layer. Returns a typed result rather than throwing.
-	 */
-	export async function withdrawApplicationAction(
-		applicationId: string,
-	): Promise<{ ok: boolean; error?: string }> {
-		const { userId, getToken } = await auth()
-		if (!userId) {
-			return { ok: false, error: "unauthenticated" }
-		}
+	return getSeekerApplicationIds(token, userId)
+}
 
-		const token = await getToken({ template: "supabase" })
-		if (!token) {
-			return { ok: false, error: "unauthenticated" }
-		}
-
-		const result = await withdrawApplication(token, userId, applicationId)
-		if (result.ok) {
-			revalidatePath("/applied")
-		}
-		return result
+export async function getSeekerApplicationIdsAction(): Promise<string[]> {
+	try {
+		return await getSeekerApplicationIdsActionImpl()
+	} catch (error) {
+		reportError(error, {
+			action: "getSeekerApplicationIdsAction",
+			userId: await currentUserId(),
+		})
+		throw error
 	}
- * Auth is enforced here; ownership and the `applied`-only status guard are
- * enforced in the db layer. Returns a typed result rather than throwing.
- */
-export async function withdrawApplicationAction(
+}
+
+async function withdrawApplicationActionImpl(
 	applicationId: string,
 ): Promise<{ ok: boolean; error?: string }> {
 	const { userId, getToken } = await auth()
@@ -187,4 +140,18 @@ export async function withdrawApplicationAction(
 		revalidatePath("/applied")
 	}
 	return result
+}
+
+export async function withdrawApplicationAction(
+	applicationId: string,
+): Promise<{ ok: boolean; error?: string }> {
+	try {
+		return await withdrawApplicationActionImpl(applicationId)
+	} catch (error) {
+		reportError(error, {
+			action: "withdrawApplicationAction",
+			userId: await currentUserId(),
+		})
+		throw error
+	}
 }

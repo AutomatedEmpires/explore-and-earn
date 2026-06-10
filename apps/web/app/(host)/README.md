@@ -10,10 +10,11 @@ Profile) is owned by this lane and wired in `layout.tsx` via `<HostBottomNav>`.
 
 ## Status
 
-UI-complete and hardened. Every surface renders from local fixtures; there is
-**no backend**. Matching, hiring decisions, persistence, and payments are
-founder-gated and intentionally not implemented here (tracked by issues 46, 47,
-and 48).
+Host routes now mix live backend data with a few still-inert form surfaces.
+Dashboard, listings, applicants, messages, profile, and billing all render in
+the real app; Stripe checkout and the Stripe billing portal are now exposed at
+`/host/billing`, with webhook sync writing the mirrored tier back to
+`host_profiles.subscription_tier`.
 
 ## Routes
 
@@ -30,6 +31,7 @@ and 48).
 | `/host/messages/[id]` | Message thread |
 | `/host/profile` | Host profile |
 | `/host/profile/edit` | Edit profile (inert, UI-only form) |
+| `/host/billing` | Stripe-hosted subscription checkout and billing portal |
 
 ## Resilience
 
@@ -57,8 +59,9 @@ and 48).
   `index.ts`. Data lives in `models.ts` (types + pure derivations) and
   `fixtures.ts` (sample data). Counts and stats are **derived, never
   hardcoded** (`deriveHostStats`, `countByStage`, `countListingsByState`).
-- Forms are uncontrolled and inert (no submit handlers); boards and filters are
-  read-only / presentational. No stage mutation or hiring-decision logic.
+- Some forms remain inert, but billing is now wired to real Stripe checkout and
+  webhook flows. Boards and filters remain read-only / presentational where no
+  server mutations exist yet.
 - Styling uses **semantic tokens only** and **canonical icon keys** only; the
   frozen design-system foundation (`packages/ui`, `packages/contracts`,
   `styles/tokens.css`, `styles/primitives.css`) is never edited from this lane.

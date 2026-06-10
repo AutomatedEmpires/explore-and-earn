@@ -49,3 +49,16 @@ export declare function getMessageEmailContext(clerkToken: string, callerClerkUs
  * Best-effort: returns null when the profile cannot be resolved.
  */
 export declare function getSeekerClerkIdByProfileId(clerkToken: string, seekerProfileId: string): Promise<string | null>;
+/**
+ * Resolve a host's Clerk user id from their host_profiles.id. Used by the
+ * invite-accept server action to address the "invite accepted" email to the
+ * host. Best-effort: returns null when the profile cannot be resolved.
+ */
+export declare function getHostClerkIdByProfileId(clerkToken: string, hostProfileId: string): Promise<string | null>;
+/**
+ * Count the messages in a conversation. Used by the message server action to
+ * detect the FIRST message in a thread so only the opening message triggers a
+ * notification email, never subsequent replies. Best-effort: returns 0 on any
+ * failure.
+ */
+export declare function countConversationMessages(clerkToken: string, conversationId: string): Promise<number>;

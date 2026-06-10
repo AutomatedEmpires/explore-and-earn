@@ -1,0 +1,119 @@
+"use server";
+
+import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getHostProfile } from "@explore-and-earn/db";
+
+import { getClerkContact } from "../../lib/clerkUser";
+import {
+  createBillingPortalSession,
+  createCheckoutSession,
+  isBillingInterval,
+  isHostSubscriptionTier,
+} from "../../services/stripe";
+
+const BILLING_PATH = "/host/billing";
+
+interface HostAuth {
+  userId: string;
+  token: string;
+}
+
+async function resolveHostAuth(): Promise<
+  { ok: true; auth: HostAuth } | { ok: false; error: string }
+> {
+  const { userId, getToken } = await auth();
+  if (!userId) {
+    return { ok: false, error: "unauthenticated" };
+  }
+
+  const token = await getToken({ template: "supabase" });
+  if (!token) {
+    return { ok: false, error: "expired_session" };
+  }
+
+  return { ok: true, auth: { userId, token } };
+}
+
+function absoluteUrl(path: string): string {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") ||
+    "https://exploreandearn.com";
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${suffix}`;
+}
+
+function billingRedirect(error: string): never {
+  redirect(`${BILLING_PATH}?error=${encodeURIComponent(error)}`);
+}
+
+export async function startHostCheckoutAction(formData: FormData): Promise<never> {
+  const tierValue = formData.get("tier");
+  const intervalValue = formData.get("interval");
+
+  if (typeof tierValue !== "string" || !isHostSubscriptionTier(tierValue)) {
+    billingRedirect("invalid_plan");
+  }
+
+  if (typeof intervalValue !== "string" || !isBillingInterval(intervalValue)) {
+    billingRedirect("invalid_interval");
+  }
+
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) {
+    billingRedirect(authResult.error);
+  }
+
+  const hostProfile = await getHostProfile(
+    authResult.auth.token,
+    authResult.auth.userId,
+  ).catch(() => null);
+  if (!hostProfile) {
+    billingRedirect("host_profile_missing");
+  }
+
+  try {
+    const contact = await getClerkContact(authResult.auth.userId);
+    const session = await createCheckoutSession({
+      clerkUserId: authResult.auth.userId,
+      customerEmail: contact.email,
+      customerName: contact.name,
+      companyName:
+        hostProfile.companyName && hostProfile.companyName.trim().length > 0
+          ? hostProfile.companyName
+          : "Explore & Earn host",
+      subscriptionTier: tierValue,
+      billingInterval: intervalValue,
+      successUrl: absoluteUrl(`${BILLING_PATH}?checkout=success`),
+      cancelUrl: absoluteUrl(`${BILLING_PATH}?checkout=canceled`),
+    });
+
+    revalidatePath(BILLING_PATH);
+    redirect(session.url ?? `${BILLING_PATH}?error=missing_checkout_url`);
+  } catch (error) {
+    console.error("[stripe] checkout session creation failed", error);
+    billingRedirect("checkout_failed");
+  }
+}
+
+export async function startHostBillingPortalAction(): Promise<never> {
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) {
+    billingRedirect(authResult.error);
+  }
+
+  try {
+    const contact = await getClerkContact(authResult.auth.userId);
+    const session = await createBillingPortalSession({
+      clerkUserId: authResult.auth.userId,
+      customerEmail: contact.email,
+      returnUrl: absoluteUrl(BILLING_PATH),
+    });
+
+    redirect(session.url);
+  } catch (error) {
+    console.error("[stripe] billing portal session creation failed", error);
+    billingRedirect("portal_unavailable");
+  }
+}

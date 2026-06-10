@@ -153,7 +153,7 @@ export async function duplicateListing(
     return { ok: false, error: "Listing not found or you do not have access to it." };
   }
 
-  const row = source as Record<string, unknown>;
+  const row = source as unknown as Record<string, unknown>;
   const baseTitle =
     typeof row.title === "string" && row.title.trim().length > 0
       ? row.title

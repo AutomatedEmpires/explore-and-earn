@@ -142,7 +142,7 @@ export default async function AppliedDetailPage({ params }: Props) {
               {listing ? (
                 <Icon
                   name={CATEGORY_ICON[listing.category]}
-                  size={28}
+                  size={24}
                   aria-hidden
                 />
               ) : null}
