@@ -26,12 +26,20 @@ function untypedClient(clerkToken: string): SupabaseClient {
   return authedClient(clerkToken) as unknown as SupabaseClient;
 }
 
+export interface SocialLinks {
+  instagram?: string | null;
+  twitter?: string | null;
+}
+
 export interface HostProfileDetailsInput {
   companyName?: string;
+  hostName?: string | null;
+  tagline?: string | null;
   about?: string | null;
   primaryLocationName?: string | null;
   websiteUrl?: string | null;
   photoUrl?: string | null;
+  socialLinks?: SocialLinks;
 }
 
 function normalizeOptional(value: string | null | undefined): string | null | undefined {
@@ -40,38 +48,69 @@ function normalizeOptional(value: string | null | undefined): string | null | un
   return trimmed === "" ? null : trimmed;
 }
 
-export async function getHostProfile(
-  clerkToken: string,
-  clerkUserId: string,
-): Promise<{
+export interface HostProfile {
   id: string;
   companyName: string;
+  hostName: string | null;
+  tagline: string | null;
   about: string | null;
   primaryLocationName: string | null;
   photoUrl: string | null;
-} | null> {
+  websiteUrl: string | null;
+  socialLinks: SocialLinks;
+  categoryScopes: string[];
+  housingOfferedGenerally: boolean;
+  mealsOfferedGenerally: boolean;
+  subscriptionTier: "none" | "starter" | "professional" | "enterprise";
+}
+
+const HOST_PROFILE_SELECT =
+  "id,company_name,host_name,tagline,about,primary_location_name,photo_url," +
+  "website_url,social_links,category_scopes,housing_offered_generally," +
+  "meals_offered_generally,subscription_tier";
+
+function rowToHostProfile(row: Record<string, unknown>): HostProfile {
+  const raw = row.social_links as Record<string, unknown> | null;
+  return {
+    id: String(row.id),
+    companyName: typeof row.company_name === "string" ? row.company_name : "",
+    hostName: typeof row.host_name === "string" ? row.host_name : null,
+    tagline: typeof row.tagline === "string" ? row.tagline : null,
+    about: typeof row.about === "string" ? row.about : null,
+    primaryLocationName:
+      typeof row.primary_location_name === "string" ? row.primary_location_name : null,
+    photoUrl: typeof row.photo_url === "string" ? row.photo_url : null,
+    websiteUrl: typeof row.website_url === "string" ? row.website_url : null,
+    socialLinks: {
+      instagram: typeof raw?.instagram === "string" ? raw.instagram : null,
+      twitter: typeof raw?.twitter === "string" ? raw.twitter : null,
+    },
+    categoryScopes: Array.isArray(row.category_scopes)
+      ? (row.category_scopes as string[])
+      : [],
+    housingOfferedGenerally: row.housing_offered_generally === true,
+    mealsOfferedGenerally: row.meals_offered_generally === true,
+    subscriptionTier: (["none", "starter", "professional", "enterprise"].includes(
+      String(row.subscription_tier),
+    )
+      ? row.subscription_tier
+      : "none") as HostProfile["subscriptionTier"],
+  };
+}
+
+export async function getHostProfile(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<HostProfile | null> {
   const db = untypedClient(clerkToken);
   const { data, error } = await db
     .from("host_profiles")
-    .select("id, company_name, about, primary_location_name, photo_url")
+    .select(HOST_PROFILE_SELECT)
     .eq("clerk_user_id", clerkUserId)
     .maybeSingle();
   if (error) throw new Error(`getHostProfile: ${error.message}`);
   if (!data) return null;
-  const row = data as {
-    id: string;
-    company_name: string | null;
-    about: string | null;
-    primary_location_name: string | null;
-    photo_url: string | null;
-  };
-  return {
-    id: row.id,
-    companyName: row.company_name ?? "",
-    about: row.about ?? null,
-    primaryLocationName: row.primary_location_name ?? null,
-    photoUrl: row.photo_url ?? null,
-  };
+  return rowToHostProfile(data as unknown as Record<string, unknown>);
 }
 
 export type HostSubscriptionTier =
@@ -112,13 +151,15 @@ export async function updateHostProfileDetails(
   clerkUserId: string,
   fields: HostProfileDetailsInput,
 ): Promise<{ ok: boolean; error?: string }> {
-  const patch: Record<string, string | null> = {};
+  const patch: Record<string, unknown> = {};
 
   if (fields.companyName !== undefined) {
     const companyName = fields.companyName.trim();
     if (companyName === "") return { ok: false, error: "name_required" };
     patch.company_name = companyName;
   }
+  if (fields.hostName !== undefined) patch.host_name = normalizeOptional(fields.hostName) ?? null;
+  if (fields.tagline !== undefined) patch.tagline = normalizeOptional(fields.tagline) ?? null;
   if (fields.about !== undefined) patch.about = normalizeOptional(fields.about) ?? null;
   if (fields.primaryLocationName !== undefined)
     patch.primary_location_name = normalizeOptional(fields.primaryLocationName) ?? null;
@@ -126,6 +167,12 @@ export async function updateHostProfileDetails(
     patch.website_url = normalizeOptional(fields.websiteUrl) ?? null;
   if (fields.photoUrl !== undefined)
     patch.photo_url = normalizeOptional(fields.photoUrl) ?? null;
+  if (fields.socialLinks !== undefined) {
+    patch.social_links = {
+      instagram: normalizeOptional(fields.socialLinks.instagram) ?? null,
+      twitter: normalizeOptional(fields.socialLinks.twitter) ?? null,
+    };
+  }
 
   if (Object.keys(patch).length === 0) return { ok: true };
 
@@ -178,12 +225,24 @@ export async function createHostProfile(
 export interface PublicHostProfile {
   id: string;
   companyName: string;
+  hostName: string | null;
+  tagline: string | null;
   about: string | null;
   primaryLocationName: string | null;
   photoUrl: string | null;
+  websiteUrl: string | null;
+  socialLinks: SocialLinks;
+  categoryScopes: string[];
+  housingOfferedGenerally: boolean;
+  mealsOfferedGenerally: boolean;
   attestationStatus: string;
   createdAt: string | null;
 }
+
+const PUBLIC_PROFILE_SELECT =
+  "id,company_name,host_name,tagline,about,primary_location_name,photo_url," +
+  "website_url,social_links,category_scopes,housing_offered_generally," +
+  "meals_offered_generally,attestation_status,created_at";
 
 /**
  * Fetch a host's public profile by host_profiles.id. Anon client — no auth
@@ -195,32 +254,35 @@ export async function getPublicHostProfile(
   const db = anonClient() as unknown as SupabaseClient;
   const { data, error } = await db
     .from("host_profiles")
-    .select(
-      "id, company_name, about, primary_location_name, photo_url, attestation_status, created_at",
-    )
+    .select(PUBLIC_PROFILE_SELECT)
     .eq("id", hostProfileId)
     .maybeSingle();
 
   if (error) throw new Error(`getPublicHostProfile: ${error.message}`);
   if (!data) return null;
 
-  const row = data as Record<string, unknown>;
+  const row = data as unknown as Record<string, unknown>;
+  const raw = row.social_links as Record<string, unknown> | null;
   return {
     id: String(row.id),
-    companyName:
-      typeof row.company_name === "string" ? row.company_name : "",
+    companyName: typeof row.company_name === "string" ? row.company_name : "",
+    hostName: typeof row.host_name === "string" ? row.host_name : null,
+    tagline: typeof row.tagline === "string" ? row.tagline : null,
     about: typeof row.about === "string" ? row.about : null,
     primaryLocationName:
-      typeof row.primary_location_name === "string"
-        ? row.primary_location_name
-        : null,
+      typeof row.primary_location_name === "string" ? row.primary_location_name : null,
     photoUrl: typeof row.photo_url === "string" ? row.photo_url : null,
+    websiteUrl: typeof row.website_url === "string" ? row.website_url : null,
+    socialLinks: {
+      instagram: typeof raw?.instagram === "string" ? raw.instagram : null,
+      twitter: typeof raw?.twitter === "string" ? raw.twitter : null,
+    },
+    categoryScopes: Array.isArray(row.category_scopes) ? (row.category_scopes as string[]) : [],
+    housingOfferedGenerally: row.housing_offered_generally === true,
+    mealsOfferedGenerally: row.meals_offered_generally === true,
     attestationStatus:
-      typeof row.attestation_status === "string"
-        ? row.attestation_status
-        : "not_attested",
-    createdAt:
-      typeof row.created_at === "string" ? row.created_at : null,
+      typeof row.attestation_status === "string" ? row.attestation_status : "not_attested",
+    createdAt: typeof row.created_at === "string" ? row.created_at : null,
   };
 }
 

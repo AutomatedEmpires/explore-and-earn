@@ -1,51 +1,86 @@
+/* ── Transcript wrapper ───────────────────────────────── */
+
 .wrap {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--space-16);
+	min-height: 0;
 }
 
 .transcript {
 	list-style: none;
 	margin: 0;
-	padding: 0;
+	padding: var(--space-16) 0;
 	display: flex;
 	flex-direction: column;
-	gap: 0.75rem;
+	gap: var(--space-12);
 }
+
+/* ── Message item ─────────────────────────────────────── */
 
 .message {
 	display: flex;
 	flex-direction: column;
-	gap: 0.25rem;
-	max-width: 80%;
+	gap: var(--space-4);
+	max-width: 78%;
 	align-self: flex-start;
 }
 
 .mine {
 	align-self: flex-end;
-	text-align: right;
+	align-items: flex-end;
 }
 
 .pending {
 	opacity: 0.6;
 }
 
-.sender {
-	font-size: 0.75rem;
-	font-weight: 600;
-	opacity: 0.7;
-}
+/* ── Sender & timestamp ───────────────────────────────── */
 
-.body {
-	margin: 0;
-	white-space: pre-wrap;
-	word-break: break-word;
+.sender {
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-muted);
+	padding: 0 var(--space-12);
 }
 
 .time {
-	font-size: 0.7rem;
-	opacity: 0.55;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-muted);
+	padding: 0 var(--space-12);
 }
+
+/* ── Message bubble ───────────────────────────────────── */
+
+.body {
+	margin: 0;
+	padding: var(--space-12) var(--space-14);
+	border-radius: var(--radius-card) var(--radius-card) var(--radius-card) var(--radius-input);
+	background: color-mix(in srgb, var(--color-parchment) 80%, var(--color-surface-raised));
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 20%, transparent);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+	white-space: pre-wrap;
+	word-break: break-word;
+	box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+
+.mine .body {
+	background: var(--palette-sky);
+	border-color: color-mix(in srgb, var(--palette-sky) 80%, var(--palette-ink) 20%);
+	border-radius: var(--radius-card) var(--radius-card) var(--radius-input) var(--radius-card);
+	color: #ffffff;
+}
+
+/* ── Scroll anchor ────────────────────────────────────── */
 
 .anchor {
 	list-style: none;
@@ -54,8 +89,12 @@
 	padding: 0;
 }
 
+/* ── Send error ───────────────────────────────────────── */
+
 .sendError {
 	margin: 0;
-	font-size: 0.8rem;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
 	color: var(--status-danger-fg, #b00020);
 }

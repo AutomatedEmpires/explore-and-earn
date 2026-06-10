@@ -26,13 +26,31 @@ const hasClerkMiddlewareConfig =
   Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) &&
   Boolean(process.env.CLERK_SECRET_KEY);
 
+const isPreviewDeployment = process.env.VERCEL_ENV === "preview";
+
+if (process.env.NODE_ENV === "production" && !hasClerkMiddlewareConfig && !isPreviewDeployment) {
+  throw new Error(
+    "Clerk env vars (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY) must be set in production.",
+  );
+}
+
 export default hasClerkMiddlewareConfig
   ? clerkMiddleware(async (auth, request) => {
       if (!isPublicRoute(request)) {
         await auth.protect();
       }
     })
-  : function authlessPreviewMiddleware() {
+  : function authFallbackMiddleware(request: Request) {
+      if (isPreviewDeployment) {
+        return NextResponse.next();
+      }
+
+      if (!isPublicRoute(request as Parameters<typeof isPublicRoute>[0])) {
+        return new NextResponse("Unauthorized — Clerk not configured", {
+          status: 401,
+        });
+      }
+
       return NextResponse.next();
     };
 

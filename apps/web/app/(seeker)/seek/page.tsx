@@ -5,11 +5,23 @@ import {
 	rowToDiscoveryFields,
 	searchListings,
 } from "@explore-and-earn/db";
-import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
+import {
+	type CompensationUnit,
+	MARKETPLACE_CATEGORIES,
+} from "@explore-and-earn/contracts";
 
-import type { DiscoveryListing } from "../../../components/discovery";
+import {
+	DISCOVERY_FIXTURES,
+	type DiscoveryListing,
+} from "../../../components/discovery";
+import {
+	canUseDiscoveryFixtureFallback,
+	hasDiscoveryPublicDataConfig,
+	warnIfDiscoveryDataMissingInProduction,
+} from "../../../components/discovery/data";
 import { SeekBrowser } from "../../../components/seeker";
 import styles from "./page.module.css";
+import { buildFeaturedEmployers } from "../../../lib/employer-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +29,6 @@ export const metadata: Metadata = {
 	title: "Seek",
 };
 
-/** Results returned per Seek page (matches the DB default search limit). */
 const PAGE_SIZE = 48;
 
 type SeekSearchParams = {
@@ -42,6 +53,23 @@ function parsePayMin(value: string | string[] | undefined): number | undefined {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function parseStartRange(
+	value: string | string[] | undefined,
+): 1 | 3 | 6 | undefined {
+	const raw = firstValue(value);
+	if (raw === "1" || raw === "3" || raw === "6") {
+		return Number(raw) as 1 | 3 | 6;
+	}
+	return undefined;
+}
+
+function parsePayUnit(
+	value: string | string[] | undefined,
+): CompensationUnit | undefined {
+	const raw = firstValue(value);
+	return raw === "hour" || raw === "day" ? raw : undefined;
+}
+
 function parseCategory(
 	value: string | string[] | undefined,
 ): string | undefined {
@@ -51,7 +79,6 @@ function parseCategory(
 		: undefined;
 }
 
-/** Accept only YYYY-MM-DD so a junk ?start_after never reaches the query. */
 function parseDate(value: string | string[] | undefined): string | undefined {
 	const raw = firstValue(value);
 	return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
@@ -64,18 +91,93 @@ function parsePage(value: string | string[] | undefined): number {
 	return Number.isFinite(parsed) && parsed > 1 ? parsed : 1;
 }
 
+function beginsWithinRange(
+	listing: DiscoveryListing,
+	startRangeMonths: 1 | 3 | 6 | undefined,
+): boolean {
+	if (!startRangeMonths) {
+		return true;
+	}
+
+	if (!listing.begins) {
+		return false;
+	}
+
+	const beginsDate = new Date(listing.begins);
+	if (Number.isNaN(beginsDate.getTime())) {
+		return false;
+	}
+
+	const now = new Date();
+	now.setHours(0, 0, 0, 0);
+	const cutoff = new Date(now);
+	cutoff.setMonth(cutoff.getMonth() + startRangeMonths);
+	return beginsDate >= now && beginsDate <= cutoff;
+}
+
+function matchesLocalFilters(
+	listing: DiscoveryListing,
+	filters: SearchFilters,
+): boolean {
+	const query = filters.query?.toLowerCase().trim();
+	if (query) {
+		const haystack = [listing.title, listing.location, listing.host.name]
+			.join(" ")
+			.toLowerCase();
+		if (!haystack.includes(query)) {
+			return false;
+		}
+	}
+
+	if (filters.categories?.length && !filters.categories.includes(listing.category)) {
+		return false;
+	}
+
+	if (filters.hasHousing && listing.benefits.housing.provision === "not_provided") {
+		return false;
+	}
+
+	if (filters.hasMeals && listing.benefits.meals.provision === "not_provided") {
+		return false;
+	}
+
+	if (filters.visaSupport && !listing.visaSupport) {
+		return false;
+	}
+
+	if (filters.payUnit && listing.payInsight?.unit !== filters.payUnit) {
+		return false;
+	}
+
+	if (
+		filters.payMin != null &&
+		Number.isFinite(filters.payMin) &&
+		filters.payMin > 0
+	) {
+		const min = listing.payInsight?.minCents;
+		if (min == null || min < Math.round(filters.payMin * 100)) {
+			return false;
+		}
+	}
+
+	if (
+		filters.location &&
+		!listing.location.toLowerCase().includes(filters.location.toLowerCase())
+	) {
+		return false;
+	}
+
+	return beginsWithinRange(listing, filters.startRangeMonths);
+}
+
 /**
- * Seek \u2014 the seeker-scope opportunity feed, backed by a real server-side
+ * Seek \u2014 the seeker-scope opportunity feed, now backed by a real server-side
  * search. All filter state lives in the URL query (q / category / housing /
- * meals / pay_min / location / start_after / start_before / page) so a filtered
- * view is shareable, bookmarkable, and re-rendered on the server. This page
- * parses the URL into SearchFilters, runs searchListings against live listings,
- * and maps the rows into the DiscoveryListing view-model; SeekBrowser renders
- * the controls + the canonical DiscoveryCard grid and drives the URL.
- *
- * Pagination is server-side and stateless: we request PAGE_SIZE + 1 rows so a
- * single round-trip tells us whether a next page exists, then render plain
- * <a> prev/next links that only mutate the ?page param.
+ * meals / pay_min / location) so a filtered view is shareable, bookmarkable,
+ * and re-rendered on the server. This page parses the URL into SearchFilters,
+ * runs searchListings against live listings, and maps the rows into the
+ * DiscoveryListing view-model; SeekBrowser renders the controls + the canonical
+ * DiscoveryCard grid and drives the URL.
  */
 export default async function SeekPage({
 	searchParams,
@@ -88,7 +190,10 @@ export default async function SeekPage({
 	const category = parseCategory(params.category);
 	const housing = parseBoolean(params.housing);
 	const meals = parseBoolean(params.meals);
+	const visaSupport = parseBoolean(params.visa);
+	const startRangeMonths = parseStartRange(params.start_range);
 	const payMin = parsePayMin(params.pay_min);
+	const payUnit = parsePayUnit(params.pay_unit);
 	const location = firstValue(params.location);
 	const startAfter = parseDate(params.start_after);
 	const startBefore = parseDate(params.start_before);
@@ -100,20 +205,44 @@ export default async function SeekPage({
 		categories: category ? [category] : undefined,
 		hasHousing: housing,
 		hasMeals: meals,
+		visaSupport,
+		startRangeMonths,
 		payMin,
+		payUnit,
 		location,
 		startDateAfter: startAfter,
 		startDateBefore: startBefore,
 		limit: PAGE_SIZE + 1,
 		offset,
 	};
+	const hasPublicDataConfig = hasDiscoveryPublicDataConfig();
+	const canUseFixtures = canUseDiscoveryFixtureFallback();
 
-	const rows = await searchListings(filters);
-	const hasNextPage = rows.length > PAGE_SIZE;
-	const pageRows = hasNextPage ? rows.slice(0, PAGE_SIZE) : rows;
-	const listings = pageRows.map(
-		(row) => rowToDiscoveryFields(row) as DiscoveryListing,
-	);
+	let hasNextPage = false;
+	let listings: DiscoveryListing[] = [];
+
+	if (hasPublicDataConfig) {
+		const rows = await searchListings(filters);
+		hasNextPage = rows.length > PAGE_SIZE;
+		const pageRows = hasNextPage ? rows.slice(0, PAGE_SIZE) : rows;
+		listings = pageRows.map(
+			(row) => rowToDiscoveryFields(row) as DiscoveryListing,
+		);
+	} else if (canUseFixtures) {
+		const filtered = DISCOVERY_FIXTURES.filter((listing) =>
+			matchesLocalFilters(listing, filters),
+		);
+		const pageRows = filtered.slice(offset, offset + PAGE_SIZE + 1);
+		hasNextPage = pageRows.length > PAGE_SIZE;
+		listings = pageRows.slice(0, PAGE_SIZE);
+	} else {
+		warnIfDiscoveryDataMissingInProduction("seek/page");
+	}
+
+	// Featured employers are always built from the full fixture set so the
+	// promotional rail is populated regardless of active search filters.
+	// TODO(paid-boost): replace with getFeaturedEmployers() against a boost table.
+	const featuredEmployers = buildFeaturedEmployers(DISCOVERY_FIXTURES);
 
 	const buildPageHref = (targetPage: number): string => {
 		const sp = new URLSearchParams();
@@ -121,7 +250,10 @@ export default async function SeekPage({
 		if (category) sp.set("category", category);
 		if (housing) sp.set("housing", "1");
 		if (meals) sp.set("meals", "1");
+		if (visaSupport) sp.set("visa", "1");
+		if (startRangeMonths) sp.set("start_range", String(startRangeMonths));
 		if (payMin != null) sp.set("pay_min", String(payMin));
+		if (payUnit) sp.set("pay_unit", payUnit);
 		if (location) sp.set("location", location);
 		if (startAfter) sp.set("start_after", startAfter);
 		if (startBefore) sp.set("start_before", startBefore);
@@ -136,23 +268,21 @@ export default async function SeekPage({
 		<>
 			<SeekBrowser
 				listings={listings}
+				featuredEmployers={featuredEmployers}
 				query={query}
 				category={category}
 				housing={housing}
 				meals={meals}
+				visaSupport={visaSupport}
+				startRangeMonths={startRangeMonths}
 				location={location}
 				payMin={payMin}
-				startAfter={startAfter}
-				startBefore={startBefore}
+				payUnit={payUnit}
 			/>
 			{showPagination ? (
 				<nav className={styles.pagination} aria-label="Search results pages">
 					{page > 1 ? (
-						<a
-							className={styles.pageLink}
-							href={buildPageHref(page - 1)}
-							rel="prev"
-						>
+						<a className={styles.pageLink} href={buildPageHref(page - 1)} rel="prev">
 							Previous
 						</a>
 					) : (
@@ -165,11 +295,7 @@ export default async function SeekPage({
 					)}
 					<span className={styles.pageStatus}>Page {page}</span>
 					{hasNextPage ? (
-						<a
-							className={styles.pageLink}
-							href={buildPageHref(page + 1)}
-							rel="next"
-						>
+						<a className={styles.pageLink} href={buildPageHref(page + 1)} rel="next">
 							Next
 						</a>
 					) : (

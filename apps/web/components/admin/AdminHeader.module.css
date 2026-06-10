@@ -4,33 +4,47 @@
   justify-content: space-between;
   gap: var(--space-12);
   padding: var(--space-gutter);
-  border-bottom: 1px solid var(--border-soft);
-  background: var(--color-surface-raised);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fdf5e3 96%, var(--color-surface-raised)) 0%, color-mix(in srgb, #f9efda 92%, var(--color-surface)) 100%);
+  flex-wrap: wrap;
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-8);
+  gap: var(--space-10);
   text-decoration: none;
   color: var(--text-primary);
+  border-radius: var(--radius-input);
+}
+
+.brand:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
 }
 
 .wordmark {
   font-family: var(--font-display);
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
+  font-size: clamp(1.55rem, 2.4vw, 2.15rem);
+  line-height: 1;
   color: var(--text-primary);
 }
 
 .scope {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
-  color: var(--text-secondary);
-  padding: var(--space-2) var(--space-8);
-  border: 1px solid var(--border-soft);
+  color: var(--text-primary);
+  min-height: 2.5rem;
+  padding: 0 var(--space-14);
+  border: 1px solid color-mix(in srgb, var(--border-ink) 20%, transparent);
   border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-raised) 88%, white 12%);
 }

@@ -1,7 +1,15 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import { Badge, DiscoveryCard, Icon } from "@explore-and-earn/ui";
 
-import { CATEGORY_LABEL, toDiscoveryCardData } from "../discovery";
+import {
+  BenefitTrustModal,
+  CATEGORY_LABEL,
+  toDiscoveryCardData,
+  type BenefitKind,
+} from "../discovery";
 import {
   APPLICANT_STAGE_ICON,
   APPLICANT_STAGE_LABEL,
@@ -11,7 +19,18 @@ import {
   type ApplicantStage,
   type HostApplicantItem,
   type HostListingItem,
+  type HostListingState,
 } from "./models";
+
+/** Map host listing management state to the canonical card state badge. */
+function hostStateToCardState(
+  state: HostListingState,
+): "draft" | "filled" | "paused" | undefined {
+  if (state === "draft") return "draft";
+  if (state === "filled") return "filled";
+  if (state === "closed") return "paused";
+  return undefined;
+}
 import styles from "./HostListingDetail.module.css";
 
 export interface HostListingDetailProps {
@@ -48,6 +67,7 @@ export function HostListingDetail({
   const { listing, state } = item;
   const stages = countByStage(applicants);
   const pipelineId = `pipeline-${listing.id}`;
+  const [editBenefit, setEditBenefit] = useState<BenefitKind | null>(null);
 
   return (
     <div className={styles.wrap}>
@@ -95,7 +115,17 @@ export function HostListingDetail({
         <DiscoveryCard
           data={toDiscoveryCardData(listing)}
           surface="discovery_feed"
+          cardState={hostStateToCardState(state)}
           actions={<span className={styles.previewNote}>Preview only</span>}
+          onHousingClick={() => setEditBenefit("housing")}
+          onMealsClick={() => setEditBenefit("meals")}
+        />
+        <BenefitTrustModal
+          mode="edit"
+          open={editBenefit !== null}
+          kind={editBenefit ?? "housing"}
+          onClose={() => setEditBenefit(null)}
+          listingId={listing.id}
         />
       </section>
 

@@ -8,6 +8,15 @@ export type {
   BenefitBucket,
   BenefitBucketDrawerProps,
 } from "./BenefitBucketDrawer";
+export { BenefitTrustModal } from "./BenefitTrustModal";
+export type {
+  BenefitKind,
+  BenefitTrustModalProps,
+  BenefitTrustModalEditProps,
+  BenefitTrustModalViewProps,
+} from "./BenefitTrustModal";
+export { PayDetailsDrawer } from "./PayDetailsDrawer";
+export type { PayDetailsDrawerProps } from "./PayDetailsDrawer";
 export { HostProfilePopup } from "./HostProfilePopup";
 export type { HostProfilePopupProps } from "./HostProfilePopup";
 export { ReportListingDrawer } from "./ReportListingDrawer";
@@ -17,8 +26,13 @@ export {
   CATEGORY_LABEL,
   resolveCoverImage,
   toDiscoveryCardData,
+  seekerApplicationListingToCardData,
 } from "./listing";
-export type { DiscoveryListing, DiscoveryListingHost } from "./listing";
+export type {
+  DiscoveryListing,
+  DiscoveryListingHost,
+  DiscoveryListingPayInsight,
+} from "./listing";
 export { DISCOVERY_FIXTURES } from "./fixtures";
 export { QuickPeekDrawer } from "./QuickPeekDrawer";
 export type { QuickPeekDrawerProps } from "./QuickPeekDrawer";

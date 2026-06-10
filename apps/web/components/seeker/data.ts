@@ -32,6 +32,27 @@ import {
   scoreListingForSeeker,
 } from "@explore-and-earn/db";
 
+const allowFixtureFallback = process.env.NODE_ENV !== "production";
+
+const EMPTY_SEEKER_STATUS: SeekerStatusSummary = {
+  seekerName: "Seeker",
+  resumeCompletion: 0,
+  savedCount: 0,
+  appliedCount: 0,
+  offersCount: 0,
+  acceptedUpcoming: undefined,
+  unreadNotifications: 0,
+};
+
+export function getSeekerStatusFallback(
+  fallbackName?: string | null,
+): SeekerStatusSummary {
+  const seekerName = fallbackName?.trim() || EMPTY_SEEKER_STATUS.seekerName;
+  return allowFixtureFallback
+    ? { ...SEEKER_STATUS, seekerName }
+    : { ...EMPTY_SEEKER_STATUS, seekerName };
+}
+
 /**
  * Seeker lifecycle data-access boundary: the single fetch seam for the seeker's
  * own application state (status, saved, applied, invites, offers, accepted,
@@ -146,8 +167,9 @@ export async function getSeekerStatus(
   clerkUserId?: string | null,
   fallbackName?: string | null,
 ): Promise<SeekerStatusSummary> {
+  const fallback = getSeekerStatusFallback(fallbackName);
   if (!token || !clerkUserId) {
-    return SEEKER_STATUS;
+		return fallback;
   }
   try {
     const [profile, savedIds, applications, acceptedWithListings, unread, resume] =
@@ -163,7 +185,7 @@ export async function getSeekerStatus(
     const seekerName =
       profile?.displayName?.trim() ||
       fallbackName?.trim() ||
-      SEEKER_STATUS.seekerName;
+			fallback.seekerName;
     const offersCount = applications.filter(
       (application) => application.status === "offered",
     ).length;
@@ -181,18 +203,18 @@ export async function getSeekerStatus(
       unreadNotifications: unread,
     };
   } catch {
-    return SEEKER_STATUS;
+		return fallback;
   }
 }
 
 /** Saved opportunities the seeker wants to revisit. */
 export function getSavedItems(): Promise<SavedItem[]> {
-  return Promise.resolve([...SAVED_ITEMS]);
+	return Promise.resolve(allowFixtureFallback ? [...SAVED_ITEMS] : []);
 }
 
 /** Applications the seeker has submitted. */
 export function getAppliedItems(): Promise<AppliedItem[]> {
-  return Promise.resolve([...APPLIED_ITEMS]);
+	return Promise.resolve(allowFixtureFallback ? [...APPLIED_ITEMS] : []);
 }
 
 /**
@@ -246,7 +268,7 @@ export async function getMatchedListings(
   clerkUserId?: string | null,
 ): Promise<DiscoveryListing[]> {
   if (!token || !clerkUserId) {
-    return [...MATCHED_LISTINGS];
+		return allowFixtureFallback ? [...MATCHED_LISTINGS] : [];
   }
 
   try {
@@ -303,7 +325,7 @@ export async function getMatchedListings(
       .slice(0, 20)
       .map((item) => item.listing);
   } catch {
-    return [...MATCHED_LISTINGS];
+		return allowFixtureFallback ? [...MATCHED_LISTINGS] : [];
   }
 }
 

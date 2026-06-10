@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
 	BENEFIT_KINDS,
@@ -38,6 +39,7 @@ const BENEFIT_LABELS: Record<BenefitKind, string> = {
 };
 
 export function SearchView() {
+	const router = useRouter();
 	const [filters, setFilters] = useState<SearchFilters>(EMPTY_FILTERS);
 
 	const results = useMemo(
@@ -164,6 +166,9 @@ export function SearchView() {
 								<DiscoveryCard
 									data={toDiscoveryCardData(listing)}
 									surface={SEARCH_SURFACE}
+									onOpen={(id) => router.push(`/listing/${id}`)}
+									onApply={(id) => router.push(`/listing/${id}`)}
+									onLocationClick={(id) => router.push(`/map?focus=${id}`)}
 								/>
 							</li>
 						))}

@@ -1,4 +1,5 @@
 import "server-only";
+import type { SeekerApplicationListing } from "./applications";
 /** Marketplace-wide counts for the founder admin dashboard. */
 export interface MarketplaceStats {
     readonly totalListings: number;
@@ -83,6 +84,12 @@ export declare function adminCloseListing(serviceRoleToken: string, listingId: s
     ok: boolean;
     error?: string;
 }>;
+/**
+ * Fetch a single listing by ID for the admin moderation detail view, bypassing
+ * RLS via the service-role client. Returns null when the listing does not exist
+ * or the query fails.
+ */
+export declare function getAdminListingDetail(serviceRoleToken: string, listingId: string): Promise<SeekerApplicationListing | null>;
 /**
  * Set a host's attestation_status to 'attested' or 'not_attested'.
  *

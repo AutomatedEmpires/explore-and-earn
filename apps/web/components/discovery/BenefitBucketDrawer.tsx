@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Button, Icon, type IconKey } from "@explore-and-earn/ui";
+import { useMemo } from "react";
+import {
+	Button,
+	Icon,
+	type IconKey,
+} from "@explore-and-earn/ui";
 import type { BenefitProvision } from "@explore-and-earn/contracts";
+import { PopupShell } from "../overlay/PopupShell";
 
 import { type DiscoveryListing } from "./listing";
 import styles from "./BenefitBucketDrawer.module.css";
@@ -42,9 +46,6 @@ const PROVISION_LABEL: Record<BenefitProvision, string> = {
 	not_provided: "Not provided",
 };
 
-const FOCUSABLE_SELECTOR =
-	'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 export interface BenefitBucketDrawerProps {
 	readonly listing: DiscoveryListing | null;
 	readonly bucket: BenefitBucket | null;
@@ -68,149 +69,108 @@ export function BenefitBucketDrawer({
 	bucket,
 	onClose,
 }: BenefitBucketDrawerProps) {
-	const titleId = useId();
-	const panelRef = useRef<HTMLDivElement>(null);
-	const restoreFocusRef = useRef<HTMLElement | null>(null);
-	const [mounted, setMounted] = useState(false);
-
-	useEffect(() => {
-		setMounted(true);
-	}, []);
-
 	const open = Boolean(listing && bucket);
-
-	useEffect(() => {
-		if (!open) {
-			return;
-		}
-		restoreFocusRef.current = document.activeElement as HTMLElement | null;
-		const panel = panelRef.current;
-		const focusables = () =>
-			panel
-				? Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-				: [];
-		focusables()[0]?.focus();
-
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
-				event.preventDefault();
-				onClose();
-				return;
-			}
-			if (event.key !== "Tab") {
-				return;
-			}
-			const items = focusables();
-			if (items.length === 0) {
-				return;
-			}
-			const first = items[0];
-			const last = items[items.length - 1];
-			if (event.shiftKey && document.activeElement === first) {
-				event.preventDefault();
-				last.focus();
-			} else if (!event.shiftKey && document.activeElement === last) {
-				event.preventDefault();
-				first.focus();
-			}
-		};
-
-		document.addEventListener("keydown", onKeyDown);
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
-
-		return () => {
-			document.removeEventListener("keydown", onKeyDown);
-			document.body.style.overflow = previousOverflow;
-			restoreFocusRef.current?.focus();
-		};
-	}, [open, onClose]);
 
 	const meta = useMemo(() => (bucket ? BUCKET_META[bucket] : null), [bucket]);
 
-	if (!mounted || !listing || !bucket || !meta) {
+	if (!listing || !bucket || !meta) {
 		return null;
 	}
 
 	const info = listing.benefits[bucket];
 
-	return createPortal(
-		<div
-			className={styles.scrim}
-			onClick={(event) => {
-				if (event.target === event.currentTarget) {
-					onClose();
-				}
-			}}
-		>
-			<div
-				ref={panelRef}
-				className={styles.panel}
-				role="dialog"
-				aria-modal={true}
-				aria-labelledby={titleId}
-			>
-				<div className={styles.topbar}>
-					<span className={styles.eyebrow}>
-						<Icon name={meta.icon} size={16} aria-hidden />
+	if (info.provision === "not_provided") {
+		return null;
+	}
+
+	return (
+		<PopupShell
+			open={open}
+			onClose={onClose}
+			title={`${meta.label} details`}
+			headerIcon={<Icon name={meta.icon} size={24} aria-hidden />}
+			headerMeta={<span>{listing.host.name} · {listing.location}</span>}
+			hero={
+				listing.coverImageUrl ? (
+					<img className={styles.heroImage} src={listing.coverImageUrl} alt="" />
+				) : (
+					<div className={styles.heroFallback} aria-hidden>
+						<Icon name={meta.icon} size={24} aria-hidden />
 						<span>{meta.label}</span>
+					</div>
+				)
+			}
+			heroFooter={
+				<div className={styles.heroBadge}>
+					<span className={styles.heroBadgeLabel}>
+						{PROVISION_LABEL[info.provision]}
 					</span>
-					<Button
-						variant="ghost"
-						onClick={onClose}
-						aria-label={`Close ${meta.label.toLowerCase()} details`}
-					>
+				</div>
+			}
+			footer={
+				<div className={styles.footer}>
+					<Button variant="secondary" onClick={onClose}>
 						Close
 					</Button>
 				</div>
-
-				<div className={styles.body}>
-					<header className={styles.header}>
-						<h2 id={titleId} className={styles.title}>
-							{meta.label}
-						</h2>
-						<p className={styles.meta}>
-							{listing.host.name} · {listing.location}
-						</p>
-					</header>
-
-					<section
-						className={styles.section}
-						aria-label={`${meta.label} details`}
-					>
-						<h3 className={styles.sectionLabel}>{"What's provided"}</h3>
-						<div className={styles.benefit}>
-							<div className={styles.benefitHead}>
-								<span className={styles.benefitLabel}>
-									<Icon name={meta.icon} size={16} aria-hidden />
-									<span>{meta.label}</span>
-								</span>
-								<span className={styles.benefitProvision}>
-									{PROVISION_LABEL[info.provision]}
-								</span>
-							</div>
-							<p className={styles.benefitValue}>
-								{info.summary ?? PROVISION_LABEL[info.provision]}
-							</p>
-						</div>
-					</section>
-
-					<section
-						className={styles.section}
-						aria-label={`${meta.label} photos`}
-					>
-						<h3 className={styles.sectionLabel}>Photos</h3>
-						<div className={styles.empty}>
-							<span className={styles.emptyIcon} aria-hidden>
-								<Icon name={meta.icon} size={24} />
-							</span>
-							<p className={styles.emptyTitle}>{meta.emptyTitle}</p>
-							<p className={styles.emptyBody}>{meta.emptyBody}</p>
-						</div>
-					</section>
+			}
+			size="compact"
+			closeLabel={`Close ${meta.label.toLowerCase()} details`}
+		>
+			<section className={styles.summaryCard} aria-label={`${meta.label} summary`}>
+				<span className={styles.summaryLabel}>What's provided</span>
+				<div className={styles.benefit}>
+					<div className={styles.benefitHead}>
+						<span className={styles.benefitLabel}>
+							<Icon name={meta.icon} size={16} aria-hidden />
+							<span>{meta.label}</span>
+						</span>
+						<span className={styles.benefitProvision}>
+							{PROVISION_LABEL[info.provision]}
+						</span>
+					</div>
+					<p className={styles.benefitValue}>
+						{info.summary ?? PROVISION_LABEL[info.provision]}
+					</p>
 				</div>
+				<div className={styles.factGrid}>
+					<div className={styles.factCard}>
+						<span className={styles.factLabel}>Listing</span>
+						<p className={styles.factValue}>{listing.title}</p>
+					</div>
+					<div className={styles.factCard}>
+						<span className={styles.factLabel}>Status</span>
+						<p className={styles.factValue}>{PROVISION_LABEL[info.provision]}</p>
+					</div>
+				</div>
+			</section>
+
+			<section
+				className={styles.section}
+				aria-label={`${meta.label} evidence`}
+			>
+				<h3 className={styles.sectionLabel}>Evidence bucket</h3>
+				<div className={styles.empty}>
+					<span className={styles.emptyIcon} aria-hidden>
+						<Icon name={meta.icon} size={24} />
+					</span>
+					<span className={styles.emptyKicker}>No uploaded media yet</span>
+					<p className={styles.emptyTitle}>{meta.emptyTitle}</p>
+					<p className={styles.emptyBody}>{meta.emptyBody}</p>
+				</div>
+				<div className={styles.noteCard}>
+					<p className={styles.noteText}>
+						Only listing-specific {meta.label.toLowerCase()} uploads belong here. This drawer stays empty until that exact evidence exists.
+					</p>
+				</div>
+			</section>
+
+			<div className={styles.disclaimer} role="note">
+				<Icon name="system.info" size={16} aria-hidden />
+				<p className={styles.disclaimerText}>
+					Photos and details shown are provided by the host and are not verified or guaranteed by Explore &amp; Earn. Confirm arrangements directly with the host before accepting.
+				</p>
 			</div>
-		</div>,
-		document.body,
+		</PopupShell>
 	);
 }

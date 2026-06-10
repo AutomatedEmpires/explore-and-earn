@@ -49,17 +49,16 @@ export type VerifiedHostQualifier = typeof VERIFIED_HOST_QUALIFIER
  * (product-principles.md #2, #6). Canon: "Surfaces."
  */
 export const DISCOVERY_CARD_SURFACES = [
-	"homepage",
 	"discovery_feed",
 	"swipe",
 	"map",
 	"saved",
 	"applied",
-	"featured",
+	"offered",
 	"matched",
 	"host_applicant_review",
-	"community",
 	"invites",
+	"admin_review",
 ] as const
 export type DiscoveryCardSurface = (typeof DISCOVERY_CARD_SURFACES)[number]
 
@@ -96,10 +95,12 @@ export const DISCOVERY_CARD_ACTION_DESTINATIONS: Record<DiscoveryCardAction, str
  * Badges shown CONDITIONALLY, in addition to the always-on category badge and
  * the Verified-Host badge. "boosted" treatment must stay subtle and never
  * read as an ad (product-principles.md #5, zero dark patterns).
+ *
+ * "featured" has been removed — the platform does not use a featured concept.
+ * "seasonal" is a category, not a conditional badge; included for legacy compat.
  */
 export const DISCOVERY_CARD_CONDITIONAL_BADGES = [
 	"seasonal",
-	"featured",
 	"boosted",
 ] as const
 export type DiscoveryCardConditionalBadge =

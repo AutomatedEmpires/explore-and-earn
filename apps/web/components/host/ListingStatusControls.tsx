@@ -13,6 +13,7 @@ import {
 import styles from "./ListingStatusControls.module.css";
 
 type StatusBadgeVariant = "neutral" | "info" | "success" | "seasonal";
+type HostManageableListingStatus = Parameters<typeof updateListingStatusAction>[1];
 
 const STATUS_LABEL: Record<ListingStatus, string> = {
   draft: "Draft",
@@ -44,9 +45,9 @@ const STATUS_VARIANT: Record<ListingStatus, StatusBadgeVariant> = {
 
 // Mirrors the authoritative server gate in @explore-and-earn/db
 // (canTransitionListing). Buttons render only for these target states.
-const NEXT_STATES: Record<ListingStatus, readonly ListingStatus[]> = {
-  draft: ["under_review"],
-  under_review: ["draft"],
+const NEXT_STATES: Record<ListingStatus, readonly HostManageableListingStatus[]> = {
+  draft: [],
+  under_review: [],
   live: ["paused", "archived"],
   paused: ["live", "archived"],
   closed: [],
@@ -78,7 +79,7 @@ export function ListingStatusControls({
 
   const nextStates = NEXT_STATES[currentStatus] ?? [];
 
-  function changeStatus(target: ListingStatus) {
+  function changeStatus(target: HostManageableListingStatus) {
     setError(null);
     startTransition(async () => {
       const result = await updateListingStatusAction(listingId, target);

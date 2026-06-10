@@ -1,171 +1,218 @@
 /**
- * Design tokens — V1 (LOCKED).
+ * Design tokens — V2 "Trail & Sky" (founder-directed 2026-06-09).
  *
- * Canon: docs/design/design-system-v1.md (founder-locked 2026-05-30), sourced
- * from Notion "Design Tokens & Visual System — V1 Direction".
+ * Palette shift: warm cream/earth → cool blue-white / steel / ocean.
+ * Blues, greens, silver-chrome, grey. Surfaces are light and airy;
+ * interactive chrome and category accents carry the colour.
  *
- * DO NOT invent values. Two-tier by design: TIER 1 primitives (raw palette) feed
- * TIER 2 semantic tokens. Feature code references SEMANTIC tokens only — never
- * raw hex and never the primitives directly (drift rule #1).
- *
- * Dark mode is out of scope for V1; the semantic layer exists so it can be added
- * later (re-point semantics to a dark palette) without refactoring feature code.
- *
- * Typed contract mirror: packages/ui/src/tokens.ts
+ * Governance: TIER 1 primitives feed TIER 2 semantics. Feature code
+ * references SEMANTIC tokens only. Custom property names are stable —
+ * only values changed from V1 so every existing component updates
+ * automatically without touching its own CSS.
  */
 
 :root {
   /* =============================================================== */
-  /* TIER 1 — PRIMITIVES (raw palette; never reference directly)     */
+  /* TIER 1 — PRIMITIVES                                             */
   /* =============================================================== */
 
-  /* foundation */
-  --palette-paper: #F6F3EC;
-  --palette-surface: #FBF9F3;
-  --palette-white: #FFFFFF;
-  --palette-line: #E7E1D3;
-  --palette-ink-stroke: #33312B;
-  --palette-ink: #24221E;
-  --palette-ink-soft: #6E685D;
-  --palette-ink-muted: #9A9486;
+  /* Foundation — cool blue-white surfaces */
+  --palette-paper:        #EEF3F8;   /* page bg — cool steel blue-white     */
+  --palette-surface:      #F7FAFC;   /* card surface — near-white            */
+  --palette-white:        #FFFFFF;
+  --palette-line:         #C8D5E3;   /* border hairlines — cool blue-grey    */
+  --palette-ink-stroke:   #28404F;   /* border ink — dark steel              */
+  --palette-ink:          #1A2B3C;   /* primary text — deep navy             */
+  --palette-ink-soft:     #486070;   /* secondary text — steel blue-grey     */
+  --palette-ink-muted:    #7A8E9E;   /* muted text — cool grey               */
 
-  /* category accents (chip bg / ink fg) */
-  --palette-farm-bg: #EDE3CF;      --palette-farm-fg: #6B5326;
-  --palette-maritime-bg: #D6E6E9;  --palette-maritime-fg: #2E5E6B;
-  --palette-remote-bg: #DEE0F2;    --palette-remote-fg: #3F4A87;
-  --palette-seasonal-bg: #DCEBD6;  --palette-seasonal-fg: #41663A;
-  --palette-mix-bg: #E7E2EE;       --palette-mix-fg: #5B5172;
+  /* Category accents (chip bg / ink fg) */
+  --palette-farm-bg:      #DDF0D4;   --palette-farm-fg:      #2E5E1A;
+  --palette-maritime-bg:  #C8E0F2;   --palette-maritime-fg:  #1A4E72;
+  --palette-remote-bg:    #D4D8F4;   --palette-remote-fg:    #303898;
+  --palette-seasonal-bg:  #C4EAD4;   --palette-seasonal-fg:  #1A5E38;
+  --palette-mix-bg:       #CDD8EC;   --palette-mix-fg:       #2A3E6A;
 
-  /* benefit triad (chip bg / ink fg) — HOUSING / MEALS / PAY */
-  --palette-housing-bg: #DCEBD6;   --palette-housing-fg: #41663A;
-  --palette-meals-bg: #F3DFD3;     --palette-meals-fg: #9A5B3C;
-  --palette-pay-bg: #DAE4F0;       --palette-pay-fg: #3F5687;
+  /* Benefit triad (chip bg / ink fg) — HOUSING / MEALS / PAY */
+  --palette-housing-bg:   #C4E8DC;   --palette-housing-fg:   #185848;
+  --palette-meals-bg:     #F2DFCC;   --palette-meals-fg:     #8A3E28;
+  --palette-pay-bg:       #C0DCF4;   --palette-pay-fg:       #184878;
 
-  /* status / system (chip bg / ink fg) */
-  --palette-boosted-bg: #F3E6CC;   --palette-boosted-fg: #8A6516;
-  --palette-match-bg: #E0E0F4;     --palette-match-fg: #4A47A0;
-  --palette-featured-bg: #E7E1F2;  --palette-featured-fg: #6A55A0;
-  --palette-verified-bg: #DBEAE2;  --palette-verified-fg: #2E6B57;
-  --palette-founding-bg: #EFE0D6;  --palette-founding-fg: #8A4B2A;
-  --palette-success-bg: #DBEFE1;   --palette-success-fg: #2E7D54;
-  --palette-warning-bg: #F4E8CC;   --palette-warning-fg: #9A6B12;
-  --palette-error-bg: #F1DAD3;     --palette-error-fg: #A3402F;
+  /* Status / system (chip bg / ink fg) */
+  --palette-boosted-bg:   #EEE4B8;   --palette-boosted-fg:   #7A5808;
+  --palette-match-bg:     #C8D0F0;   --palette-match-fg:     #2A3898;
+  --palette-featured-bg:  #D8CCF0;   --palette-featured-fg:  #5038A8;
+  --palette-verified-bg:  #C0E4D8;   --palette-verified-fg:  #185848;
+  --palette-founding-bg:  #F0DCCC;   --palette-founding-fg:  #8A3818;
+  --palette-success-bg:   #C0E8D0;   --palette-success-fg:   #186040;
+  --palette-warning-bg:   #F0E4BC;   --palette-warning-fg:   #7A5808;
+  --palette-error-bg:     #F0CCCA;   --palette-error-fg:     #881818;
 
   /* =============================================================== */
   /* TIER 2 — SEMANTIC TOKENS (reference these in feature code)      */
   /* =============================================================== */
 
+  /* Warm paper — field-journal surfaces (employer cards, framed photos) */
+  --palette-parchment:   #F0EAE0;   /* warm panel background */
+  --palette-card-warm:   #FAF8F4;   /* warm card surface */
+  --palette-ink-warm:    #19150E;   /* warm near-black ink for paper borders */
+  --palette-gold:        #B8860B;   /* warm gold for star/sparkle marks */
+
   /* surfaces / text / borders */
-  --color-paper: var(--palette-paper);
-  --color-surface: var(--palette-surface);
+  --color-paper:          var(--palette-paper);
+  --color-surface:        var(--palette-surface);
   --color-surface-raised: var(--palette-white);
-  --border-soft: var(--palette-line);
-  --border-ink: var(--palette-ink-stroke);
-  --text-primary: var(--palette-ink);
-  --text-secondary: var(--palette-ink-soft);
-  --text-muted: var(--palette-ink-muted);
+  --color-ink:            var(--palette-ink);    /* backward compat alias */
+  --color-parchment:      var(--palette-parchment);
+  --color-card-warm:      var(--palette-card-warm);
+  --color-gold:           var(--palette-gold);
+  --border-soft:          var(--palette-line);
+  --border-ink:           var(--palette-ink-stroke);
+  --border-ink-warm:      var(--palette-ink-warm);
+  --text-primary:         var(--palette-ink);
+  --text-secondary:       var(--palette-ink-soft);
+  --text-muted:           var(--palette-ink-muted);
 
   /* category accents */
-  --accent-farm-bg: var(--palette-farm-bg);          --accent-farm-fg: var(--palette-farm-fg);
-  --accent-maritime-bg: var(--palette-maritime-bg);  --accent-maritime-fg: var(--palette-maritime-fg);
-  --accent-remote-bg: var(--palette-remote-bg);      --accent-remote-fg: var(--palette-remote-fg);
-  --accent-seasonal-bg: var(--palette-seasonal-bg);  --accent-seasonal-fg: var(--palette-seasonal-fg);
-  --accent-mix-bg: var(--palette-mix-bg);            --accent-mix-fg: var(--palette-mix-fg);
+  --accent-farm-bg:       var(--palette-farm-bg);       --accent-farm-fg:      var(--palette-farm-fg);
+  --accent-maritime-bg:   var(--palette-maritime-bg);   --accent-maritime-fg:  var(--palette-maritime-fg);
+  --accent-remote-bg:     var(--palette-remote-bg);     --accent-remote-fg:    var(--palette-remote-fg);
+  --accent-seasonal-bg:   var(--palette-seasonal-bg);   --accent-seasonal-fg:  var(--palette-seasonal-fg);
+  --accent-mix-bg:        var(--palette-mix-bg);        --accent-mix-fg:       var(--palette-mix-fg);
 
   /* benefit triad */
-  --benefit-housing-bg: var(--palette-housing-bg);   --benefit-housing-fg: var(--palette-housing-fg);
-  --benefit-meals-bg: var(--palette-meals-bg);       --benefit-meals-fg: var(--palette-meals-fg);
-  --benefit-pay-bg: var(--palette-pay-bg);           --benefit-pay-fg: var(--palette-pay-fg);
+  --benefit-housing-bg:   var(--palette-housing-bg);    --benefit-housing-fg:  var(--palette-housing-fg);
+  --benefit-meals-bg:     var(--palette-meals-bg);      --benefit-meals-fg:    var(--palette-meals-fg);
+  --benefit-pay-bg:       var(--palette-pay-bg);        --benefit-pay-fg:      var(--palette-pay-fg);
 
   /* status / system */
-  --status-boosted-bg: var(--palette-boosted-bg);         --status-boosted-fg: var(--palette-boosted-fg);
-  --status-match-bg: var(--palette-match-bg);             --status-match-fg: var(--palette-match-fg);
-  --status-featured-bg: var(--palette-featured-bg);       --status-featured-fg: var(--palette-featured-fg);
-  --status-verified_host-bg: var(--palette-verified-bg);  --status-verified_host-fg: var(--palette-verified-fg);
-  --status-founding_host-bg: var(--palette-founding-bg);  --status-founding_host-fg: var(--palette-founding-fg);
-  --status-success-bg: var(--palette-success-bg);         --status-success-fg: var(--palette-success-fg);
-  --status-warning-bg: var(--palette-warning-bg);         --status-warning-fg: var(--palette-warning-fg);
-  --status-error-bg: var(--palette-error-bg);             --status-error-fg: var(--palette-error-fg);
+  --status-boosted-bg:        var(--palette-boosted-bg);  --status-boosted-fg:       var(--palette-boosted-fg);
+  --status-match-bg:          var(--palette-match-bg);    --status-match-fg:         var(--palette-match-fg);
+  --status-featured-bg:       var(--palette-featured-bg); --status-featured-fg:      var(--palette-featured-fg);
+  --status-verified_host-bg:  var(--palette-verified-bg); --status-verified_host-fg: var(--palette-verified-fg);
+  --status-founding_host-bg:  var(--palette-founding-bg); --status-founding_host-fg: var(--palette-founding-fg);
+  --status-success-bg:        var(--palette-success-bg);  --status-success-fg:       var(--palette-success-fg);
+  --status-warning-bg:        var(--palette-warning-bg);  --status-warning-fg:       var(--palette-warning-fg);
+  --status-error-bg:          var(--palette-error-bg);    --status-error-fg:         var(--palette-error-fg);
 
-  /* spacing scale (4px base) */
-  --space-2: 2px;
-  --space-4: 4px;
-  --space-8: 8px;
+  /* spacing scale (2px base) */
+  --space-2:  2px;
+  --space-4:  4px;
+  --space-6:  6px;
+  --space-8:  8px;
+  --space-10: 10px;
   --space-12: 12px;
+  --space-14: 14px;
   --space-16: 16px;
+  --space-18: 18px;
   --space-20: 20px;
   --space-24: 24px;
   --space-32: 32px;
   --space-40: 40px;
   --space-48: 48px;
-  /* named spacing */
-  --space-card: 16px;       /* card padding */
-  --space-row-gap: 12px;    /* row gap */
-  --space-section: 24px;    /* section spacing */
-  --space-gutter: 16px;     /* screen gutter */
-  --size-bottom-nav: 64px;  /* bottom nav height */
+  --space-card:     16px;
+  --space-row-gap:  12px;
+  --space-section:  24px;
+  --space-gutter:   16px;
+  --size-bottom-nav: 64px;
 
   /* radius */
-  --radius-pill: 999px;
-  --radius-input: 12px;
+  --radius-pill:   999px;
+  --radius-input:  12px;
   --radius-button: 16px;
-  --radius-cell: 16px;
-  --radius-image: 16px;
-  --radius-card: 24px;
-  --radius-modal: 28px;
+  --radius-cell:   16px;
+  --radius-image:  16px;
+  --radius-card:   24px;
+  --radius-modal:  28px;
 
-  /* elevation — borders-first; cards/rows have NO shadow (flat) */
-  --elevation-overlay: 0 8px 24px rgba(40, 38, 34, 0.12);
-  --elevation-pin: 0 2px 6px rgba(40, 38, 34, 0.18);
+  /* elevation */
+  --elevation-overlay: 0 8px 24px rgba(26, 43, 60, 0.12);
+  --elevation-pin:     0 2px 6px  rgba(26, 43, 60, 0.18);
 
-  /* motion — no bounce; honor reduced-motion in feature code */
-  --motion-fast: 120ms;
-  --motion-base: 200ms;
+  /* motion */
+  --motion-fast:   120ms;
+  --motion-base:   200ms;
   --motion-drawer: 320ms;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
 
-  /* breakpoints (reference values; CSS media queries restate them) */
-  --bp-sm: 640px;
-  --bp-md: 768px;
-  --bp-lg: 1024px;
-  --bp-xl: 1280px;
+  /* breakpoints */
+  --bp-sm:  640px;
+  --bp-md:  768px;
+  --bp-lg:  1024px;
+  --bp-xl:  1280px;
 
   /* icon sizing */
-  --icon-sm: 16px;
-  --icon-md: 20px;
-  --icon-lg: 24px;
-  --icon-chip: 40px;
+  --icon-sm:           16px;
+  --icon-md:           20px;
+  --icon-lg:           24px;
+  --icon-chip:         40px;
   --icon-chip-compact: 36px;
 
-  /* typography — families (self-hosted OFL) */
-  --font-display: "Patrick Hand", ui-rounded, cursive;        /* display/brand, min 18px */
-  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; /* body/UI */
-  --font-accent: "Cabin Sketch", "Patrick Hand", cursive;     /* marketing only, not product UI */
+  /* typography */
+  /* Cabin Sketch = display/title (adventure headers); Patrick Hand = UI body (handwritten, approachable) */
+  --font-display: var(--font-cabin-sketch, "Cabin Sketch"), cursive;
+  --font-ui:      var(--font-patrick-hand, "Patrick Hand"), cursive;
+  --font-accent:  var(--font-cabin-sketch, "Cabin Sketch"), cursive;
 
-  /* typography — role sizes (size / line-height) */
   --type-display-size: 30px;  --type-display-lh: 1.15;
-  --type-page-size: 26px;     --type-page-lh: 1.2;
+  --type-page-size:    26px;  --type-page-lh:    1.2;
   --type-section-size: 22px;  --type-section-lh: 1.2;
-  --type-card-size: 20px;     --type-card-lh: 1.25;
-  --type-body-size: 16px;     --type-body-lh: 1.5;
-  --type-meta-size: 14px;     --type-meta-lh: 1.45;
+  --type-card-size:    20px;  --type-card-lh:    1.25;
+  --type-body-size:    16px;  --type-body-lh:    1.5;
+  --type-meta-size:    14px;  --type-meta-lh:    1.45;
   --type-caption-size: 12px;  --type-caption-lh: 1.4;
-  --type-button-size: 15px;   --type-button-lh: 1;
-  --type-label-size: 12px;    --type-label-lh: 1;
-  --type-label-tracking: 0.06em; /* uppercase labels/badges only */
+  --type-button-size:  15px;  --type-button-lh:  1;
+  --type-label-size:   12px;  --type-label-lh:   1;
+  --type-label-tracking: 0.06em;
 
-  /* typography — weights (canon: 400/500/600) */
-  --font-weight-regular: 400;
-  --font-weight-medium: 500;
+  --font-weight-regular:  400;
+  --font-weight-medium:   500;
   --font-weight-semibold: 600;
 
   /* =============================================================== */
-  /* DEPRECATED — Sprint Zero stub aliases. Do not use in new code;  */
-  /* retained so any early placeholder markup keeps resolving.       */
+  /* V2 — INTERACTIVE / CHROME TOKENS                                */
+  /* Blues, silver, teal, chrome. Header, CTAs, badges.             */
   /* =============================================================== */
-  --surface-default: var(--color-surface-raised);
-  --surface-raised: var(--color-surface);
-  --border-default: var(--border-soft);
-  --radius-md: var(--radius-button);
-  --space-md: var(--space-16);
+
+  /* Header — deep ocean navy */
+  --palette-header:     #152840;
+  --palette-header-mid: #1E3C5A;
+
+  /* Sky blue — primary CTA, active links, interactive */
+  --palette-sky:        #1A8ECE;
+  --palette-sky-light:  #BEE4F8;
+  --palette-sky-dark:   #1268A0;
+
+  /* Teal — secondary CTA, housing/success tones */
+  --palette-teal:       #0C9486;
+  --palette-teal-light: #B4E8E2;
+
+  /* Silver / chrome — borders, badges, metallic accents */
+  --palette-silver:     #A8BED0;
+  --palette-chrome:     #C8D8E8;
+  --palette-steel:      #E0EAF4;
+
+  /* Warm amber — retained as optional highlight, used sparingly */
+  --palette-amber:      #D48C18;
+  --palette-amber-light:#FFE8B4;
+
+  /* Semantic aliases */
+  --color-header-bg:  var(--palette-header);
+  --color-cta:        var(--palette-sky);
+  --color-cta-text:   #FFFFFF;
+  --color-teal:       var(--palette-teal);
+  --color-gold:       var(--palette-amber);
+  --color-gold-text:  #FFFFFF;
+  --color-silver:     var(--palette-silver);
+  --color-chrome:     var(--palette-chrome);
+  --color-steel:      var(--palette-steel);
+
+  /* =============================================================== */
+  /* DEPRECATED — Sprint Zero stub aliases                           */
+  /* =============================================================== */
+  --surface-default:  var(--color-surface-raised);
+  --surface-raised:   var(--color-surface);
+  --border-default:   var(--border-soft);
+  --radius-md:        var(--radius-button);
+  --space-md:         var(--space-16);
 }

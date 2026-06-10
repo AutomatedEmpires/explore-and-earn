@@ -1,10 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
-import { getHostProfile } from "@explore-and-earn/db";
+import { getHostProfile, getUnreadMessageCount } from "@explore-and-earn/db";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { HostBottomNav, HostHeader } from "../../components/host";
+import { GlobalHeader } from "../../components/global";
+import { HostBottomNav } from "../../components/host";
 import styles from "./layout.module.css";
 
 /**
@@ -48,14 +49,22 @@ export default async function HostLayout({
   if (!token) {
     redirect("/sign-in");
   }
-  const hostProfile = await getHostProfile(token, userId);
+  const [hostProfile, unreadMessages] = await Promise.all([
+    getHostProfile(token, userId),
+    getUnreadMessageCount(token, userId),
+  ]);
   if (!hostProfile) {
     redirect("/host/onboarding");
   }
 
   return (
     <div className={styles.shell}>
-      <HostHeader />
+      <GlobalHeader
+        scope="host"
+        isAuthenticated={true}
+        userName={hostProfile.companyName ?? null}
+        unreadCount={unreadMessages}
+      />
       <main className={styles.main}>{children}</main>
       <HostBottomNav />
     </div>

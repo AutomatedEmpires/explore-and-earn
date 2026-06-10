@@ -14,4 +14,6 @@
   max-width: var(--bp-lg);
   margin: 0 auto;
   padding: var(--space-gutter);
+  /* Clear the fixed bottom nav (height + iOS safe area) */
+  padding-bottom: calc(var(--size-bottom-nav) + env(safe-area-inset-bottom) + var(--space-gutter));
 }

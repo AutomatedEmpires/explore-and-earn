@@ -23,7 +23,7 @@ Every card answers, as first-class fields with icon + label + value:
 | Media | full-bleed scenic/lifestyle photo | `3:2`, framed (see `photo-language.md`) |
 | Identity | host avatar | tap → host profile |
 | Badge | **Verified Host badge (mandatory)** | self-declared qualifier (G22) |
-| Badge | seasonal / featured / category badges | badge stack, top of card |
+| Badge | category badge + optional promoted/status badge | never render a second category-style badge; `featured` / `boosted` / match or host-status context can occupy the secondary badge slot |
 | Title | host name + job title | Patrick Hand card title |
 | Metadata | location | tap → map view |
 | Metadata | begins / ends dates | Inter metadata |
@@ -63,6 +63,21 @@ Hybrid sketchbook/product UI · soft hand-drawn card edges (ink border, radius `
 - **Boosted** — subtle premium treatment; **never** spammy/ad-like.
 - **Host dashboard** — adds status, role fill, applicant count, boost CTA, quick-peek analytics, edit/pause/close.
 - **Admin review** — adds report count, trust signal, moderation status, quick actions.
+
+## Locked variant decisions
+
+- **Badge stack** — the lane/category badge is always singular and always present. The secondary slot is for promoted/status context only: `featured`, `boosted`, match context, listing status, or host analytics context. A listing must never render two category-style badges.
+- **Seeker browse surfaces** — `seek`, `swipe`, `map`, homepage discovery, and seeker lifecycle buckets all keep the same core skeleton. Lifecycle surfaces remove `Quick Apply` and replace the secondary badge/action treatment with the relevant application state.
+- **Host listings surface** — the bottom CTA becomes `Edit listing`. The secondary badge slot can hold quick-peek analytics or boosted/featured state. If a listing is promoted, the analytics pill stacks under the category badge instead of displacing it.
+- **Host applicant review surface** — this is still the same card system, but it needs seeker-shaped data instead of listing-shaped data. The identity control becomes the seeker avatar and opens a seeker profile popup; card-body open becomes the seeker resume popup; the bottom action row becomes `Skip` / `Save` / `Schedule`; the lower-right media control becomes host messaging entry instead of listing report.
+- **Host applicant popup stack** — seeker profile popup carries avatar, short bio, location, work-ready range, visa info, licence/certs, and resume handoff. Reporting a seeker belongs in that host-side seeker popup flow, routed separately to admin, not on the card face.
+- **Host/seeker shared rule** — keep one canonical card renderer. Differences come from variant props + data adapters, not separate card implementations.
+
+## Next build pack
+
+- Add a `host_listing_review` variant contract so host listings can swap `Quick Apply` for `Edit listing` and show analytics context in the secondary badge slot.
+- Add a seeker-shaped adapter for `host_applicant_review`; the current host applicant surface still feeds listing-shaped data through the card wrapper and cannot yet support seeker avatar, seeker resume open, or host messaging from the card media controls.
+- Add host-side seeker popups: `SeekerProfilePopup`, `SeekerResumePopup`, and `ReportSeekerPopup`, all on the shared popup shell.
 
 ## Responsive
 

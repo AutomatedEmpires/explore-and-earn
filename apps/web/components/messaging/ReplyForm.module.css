@@ -1,40 +1,101 @@
+/* ── Form ─────────────────────────────────────────────── */
+
 .form {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
-	margin-top: 1rem;
+	gap: var(--space-8);
+	padding-top: var(--space-12);
+	border-top: 1px solid var(--border-soft);
 }
+
+/* ── Textarea ─────────────────────────────────────────── */
 
 .input {
 	width: 100%;
 	resize: vertical;
-	font: inherit;
-	padding: 0.75rem;
-	border-radius: 0.5rem;
-	border: 1px solid currentColor;
-	background: transparent;
+	min-height: 4.5rem;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+	padding: var(--space-12);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 44%, transparent);
+	border-radius: var(--radius-input);
+	background: color-mix(in srgb, var(--color-parchment) 60%, var(--color-surface-raised));
+	transition: border-color var(--motion-fast) var(--ease-standard);
 }
+
+.input::placeholder {
+	color: var(--text-muted);
+}
+
+.input:focus {
+	outline: 2px solid color-mix(in srgb, var(--color-cta) 60%, transparent);
+	outline-offset: 2px;
+	border-color: var(--color-cta);
+}
+
+.input:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+/* ── Validation error ─────────────────────────────────── */
 
 .error {
 	margin: 0;
-	font-size: 0.8rem;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--status-danger-fg, #b00020);
 }
+
+/* ── Actions row ──────────────────────────────────────── */
 
 .actions {
 	display: flex;
 	justify-content: flex-end;
 }
 
+/* ── Send button ──────────────────────────────────────── */
+
 .send {
-	font: inherit;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--space-10) var(--space-24);
+	border: none;
+	border-radius: var(--radius-button);
+	background: var(--color-cta);
+	color: #ffffff;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
 	cursor: pointer;
-	padding: 0.5rem 1.25rem;
-	border-radius: 999px;
-	border: 1px solid currentColor;
-	background: transparent;
+	transition:
+		background var(--motion-fast) var(--ease-standard),
+		transform var(--motion-fast) var(--ease-standard);
+}
+
+.send:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--color-cta) 84%, var(--palette-ink));
+	transform: translateY(-1px);
+}
+
+.send:active:not(:disabled) {
+	transform: scale(0.97);
+}
+
+.send:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 3px;
 }
 
 .send:disabled {
-	opacity: 0.5;
+	opacity: 0.45;
 	cursor: not-allowed;
+	transform: none;
 }

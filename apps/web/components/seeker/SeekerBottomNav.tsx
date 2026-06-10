@@ -13,7 +13,7 @@ interface SeekerTab {
 }
 
 /**
- * Locked seeker-scope bottom navigation: Swipe · Map · Seek · Profile.
+ * Locked seeker-scope bottom navigation: Seek · Map · Swipe · Profile.
  *
  * Navigation is scoped per user type — there is no single global bottom nav. The
  * seeker lane owns this nav inside the (seeker) route group. The tab set and
@@ -23,9 +23,9 @@ interface SeekerTab {
  * and every tab carries a permanent text label.
  */
 const SEEKER_TABS: readonly SeekerTab[] = [
-	{ href: "/swipe", label: "Swipe", icon: "nav.swipe" },
-	{ href: "/map", label: "Map", icon: "nav.map" },
 	{ href: "/seek", label: "Seek", icon: "nav.seek" },
+	{ href: "/map", label: "Map", icon: "nav.map" },
+	{ href: "/swipe", label: "Swipe", icon: "nav.swipe" },
 	{ href: "/profile", label: "Profile", icon: "nav.profile" },
 ];
 

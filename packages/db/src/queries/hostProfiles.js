@@ -24,25 +24,46 @@ function normalizeOptional(value) {
     const trimmed = value.trim();
     return trimmed === "" ? null : trimmed;
 }
+const HOST_PROFILE_SELECT = "id,company_name,host_name,tagline,about,primary_location_name,photo_url," +
+    "website_url,social_links,category_scopes,housing_offered_generally," +
+    "meals_offered_generally,subscription_tier";
+function rowToHostProfile(row) {
+    const raw = row.social_links;
+    return {
+        id: String(row.id),
+        companyName: typeof row.company_name === "string" ? row.company_name : "",
+        hostName: typeof row.host_name === "string" ? row.host_name : null,
+        tagline: typeof row.tagline === "string" ? row.tagline : null,
+        about: typeof row.about === "string" ? row.about : null,
+        primaryLocationName: typeof row.primary_location_name === "string" ? row.primary_location_name : null,
+        photoUrl: typeof row.photo_url === "string" ? row.photo_url : null,
+        websiteUrl: typeof row.website_url === "string" ? row.website_url : null,
+        socialLinks: {
+            instagram: typeof raw?.instagram === "string" ? raw.instagram : null,
+            twitter: typeof raw?.twitter === "string" ? raw.twitter : null,
+        },
+        categoryScopes: Array.isArray(row.category_scopes)
+            ? row.category_scopes
+            : [],
+        housingOfferedGenerally: row.housing_offered_generally === true,
+        mealsOfferedGenerally: row.meals_offered_generally === true,
+        subscriptionTier: (["none", "starter", "professional", "enterprise"].includes(String(row.subscription_tier))
+            ? row.subscription_tier
+            : "none"),
+    };
+}
 export async function getHostProfile(clerkToken, clerkUserId) {
     const db = untypedClient(clerkToken);
     const { data, error } = await db
         .from("host_profiles")
-        .select("id, company_name, about, primary_location_name, photo_url")
+        .select(HOST_PROFILE_SELECT)
         .eq("clerk_user_id", clerkUserId)
         .maybeSingle();
     if (error)
         throw new Error(`getHostProfile: ${error.message}`);
     if (!data)
         return null;
-    const row = data;
-    return {
-        id: row.id,
-        companyName: row.company_name ?? "",
-        about: row.about ?? null,
-        primaryLocationName: row.primary_location_name ?? null,
-        photoUrl: row.photo_url ?? null,
-    };
+    return rowToHostProfile(data);
 }
 export async function getHostSubscriptionTier(clerkToken, clerkUserId) {
     const db = untypedClient(clerkToken);
@@ -71,6 +92,10 @@ export async function updateHostProfileDetails(clerkToken, clerkUserId, fields) 
             return { ok: false, error: "name_required" };
         patch.company_name = companyName;
     }
+    if (fields.hostName !== undefined)
+        patch.host_name = normalizeOptional(fields.hostName) ?? null;
+    if (fields.tagline !== undefined)
+        patch.tagline = normalizeOptional(fields.tagline) ?? null;
     if (fields.about !== undefined)
         patch.about = normalizeOptional(fields.about) ?? null;
     if (fields.primaryLocationName !== undefined)
@@ -79,6 +104,12 @@ export async function updateHostProfileDetails(clerkToken, clerkUserId, fields) 
         patch.website_url = normalizeOptional(fields.websiteUrl) ?? null;
     if (fields.photoUrl !== undefined)
         patch.photo_url = normalizeOptional(fields.photoUrl) ?? null;
+    if (fields.socialLinks !== undefined) {
+        patch.social_links = {
+            instagram: normalizeOptional(fields.socialLinks.instagram) ?? null,
+            twitter: normalizeOptional(fields.socialLinks.twitter) ?? null,
+        };
+    }
     if (Object.keys(patch).length === 0)
         return { ok: true };
     try {
@@ -116,6 +147,9 @@ export async function createHostProfile(clerkToken, clerkUserId, companyName) {
     }
     return { ok: true, id: data.id };
 }
+const PUBLIC_PROFILE_SELECT = "id,company_name,host_name,tagline,about,primary_location_name,photo_url," +
+    "website_url,social_links,category_scopes,housing_offered_generally," +
+    "meals_offered_generally,attestation_status,created_at";
 /**
  * Fetch a host's public profile by host_profiles.id. Anon client — no auth
  * required. Returns null when the profile does not exist.
@@ -124,7 +158,7 @@ export async function getPublicHostProfile(hostProfileId) {
     const db = anonClient();
     const { data, error } = await db
         .from("host_profiles")
-        .select("id, company_name, about, primary_location_name, photo_url, attestation_status, created_at")
+        .select(PUBLIC_PROFILE_SELECT)
         .eq("id", hostProfileId)
         .maybeSingle();
     if (error)
@@ -132,17 +166,24 @@ export async function getPublicHostProfile(hostProfileId) {
     if (!data)
         return null;
     const row = data;
+    const raw = row.social_links;
     return {
         id: String(row.id),
         companyName: typeof row.company_name === "string" ? row.company_name : "",
+        hostName: typeof row.host_name === "string" ? row.host_name : null,
+        tagline: typeof row.tagline === "string" ? row.tagline : null,
         about: typeof row.about === "string" ? row.about : null,
-        primaryLocationName: typeof row.primary_location_name === "string"
-            ? row.primary_location_name
-            : null,
+        primaryLocationName: typeof row.primary_location_name === "string" ? row.primary_location_name : null,
         photoUrl: typeof row.photo_url === "string" ? row.photo_url : null,
-        attestationStatus: typeof row.attestation_status === "string"
-            ? row.attestation_status
-            : "not_attested",
+        websiteUrl: typeof row.website_url === "string" ? row.website_url : null,
+        socialLinks: {
+            instagram: typeof raw?.instagram === "string" ? raw.instagram : null,
+            twitter: typeof raw?.twitter === "string" ? raw.twitter : null,
+        },
+        categoryScopes: Array.isArray(row.category_scopes) ? row.category_scopes : [],
+        housingOfferedGenerally: row.housing_offered_generally === true,
+        mealsOfferedGenerally: row.meals_offered_generally === true,
+        attestationStatus: typeof row.attestation_status === "string" ? row.attestation_status : "not_attested",
         createdAt: typeof row.created_at === "string" ? row.created_at : null,
     };
 }

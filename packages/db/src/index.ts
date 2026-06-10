@@ -1,7 +1,12 @@
 export * from "./client";
 export * from "./types.gen";
 export * from "./queries/listings";
-export * from "./queries/listingLifecycle";
+export {
+	canTransitionListing,
+	duplicateListing,
+	type DuplicateListingResult,
+	type UpdateListingStatusResult,
+} from "./queries/listingLifecycle";
 export * from "./queries/savedListings";
 export * from "./queries/applications";
 export * from "./queries/seekerApplicationsRich";

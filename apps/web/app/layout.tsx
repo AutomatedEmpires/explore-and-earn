@@ -1,9 +1,31 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { Patrick_Hand, Cabin_Sketch, Inter } from "next/font/google";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "../styles/tokens.css";
 import "../styles/primitives.css";
+
+const patrickHand = Patrick_Hand({
+	weight: "400",
+	subsets: ["latin"],
+	variable: "--font-patrick-hand",
+	display: "swap",
+});
+
+const cabinSketch = Cabin_Sketch({
+	weight: ["400", "700"],
+	subsets: ["latin"],
+	variable: "--font-cabin-sketch",
+	display: "swap",
+});
+
+const inter = Inter({
+	weight: ["400", "500", "600"],
+	subsets: ["latin"],
+	variable: "--font-inter",
+	display: "swap",
+});
 import { CookieBanner } from "../components/CookieBanner";
 import { SiteFooter } from "../components/SiteFooter";
 import { SentryUserProvider } from "../components/providers/SentryUserProvider";
@@ -25,7 +47,7 @@ import { Providers } from "./providers";
 export const metadata: Metadata = {
 	title: { default: "Explore & Earn", template: "%s | Explore & Earn" },
 	description:
-		"Discover lifestyle work opportunities \u2014 housing, meals, and pay included. Farm, maritime, remote, and seasonal.",
+		"Discover lifestyle work opportunities — housing, meals, and pay included. Farm, maritime, remote, and seasonal.",
 	openGraph: {
 		siteName: "Explore & Earn",
 		type: "website",
@@ -36,10 +58,18 @@ export const metadata: Metadata = {
 	),
 };
 
+function AuthBoundary({ children }: { children: ReactNode }) {
+	if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+		return <>{children}</>;
+	}
+
+	return <ClerkProvider>{children}</ClerkProvider>;
+}
+
 export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
-		<ClerkProvider>
-			<html lang="en">
+		<AuthBoundary>
+			<html lang="en" className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable}`}>
 				<body>
 					<SentryUserProvider />
 					<Providers>
@@ -49,6 +79,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 					</Providers>
 				</body>
 			</html>
-		</ClerkProvider>
+		</AuthBoundary>
 	);
 }

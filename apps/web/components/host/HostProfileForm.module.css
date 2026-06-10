@@ -154,6 +154,65 @@
   color: var(--status-warning-fg);
 }
 
+/* ── Field group (links section) ─────────────────────────────────── */
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+}
+
+.fieldGroupHeading {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* ── Prefix input (@ handle) ─────────────────────────────────────── */
+
+.inputPrefix {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  overflow: hidden;
+}
+
+.prefix {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-10);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+  background: var(--color-surface-raised);
+  border-right: 1px solid var(--border-soft);
+  user-select: none;
+}
+
+.inputWithPrefix {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+}
+
+.inputWithPrefix:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.inputPrefix:focus-within {
+  outline: 2px solid var(--text-primary);
+  outline-offset: -1px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .submit {
     transition: none;

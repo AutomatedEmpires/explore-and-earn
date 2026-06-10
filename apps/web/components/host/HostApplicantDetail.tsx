@@ -202,7 +202,7 @@ export function HostApplicantDetail({
           {CATEGORY_LABEL[listing.category]} · {listing.location}
         </p>
         <DiscoveryCard
-          data={toDiscoveryCardData(listing)}
+          data={{ ...toDiscoveryCardData(listing), skills: skills.slice(0, 3) }}
           surface="host_applicant_review"
           actions={
             <Link

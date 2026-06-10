@@ -52,7 +52,7 @@ export default async function SwipePage() {
 			title="Swipe"
 			description="Drag through opportunities \u2014 pass, save, or apply. Use the buttons or arrow keys."
 		>
-			<SwipeDeck listings={listings} initialCursor={initialCursor} />
+			<SwipeDeck listings={listings} initialCursor={initialCursor} isAuthenticated={!!userId} />
 		</BucketPage>
 	);
 }

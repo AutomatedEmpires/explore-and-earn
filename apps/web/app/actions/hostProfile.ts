@@ -1,7 +1,7 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
-import { createHostProfile, updateHostProfileDetails } from "@explore-and-earn/db"
+import { createHostProfile, updateHostProfileDetails, type SocialLinks } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
 
 import { reportError } from "../../lib/sentry"
@@ -80,10 +80,13 @@ export async function createHostProfileAction(
 /** Editable host profile fields submitted from the host profile edit form. */
 export interface UpdateHostProfileInput {
 	companyName?: string
+	hostName?: string | null
+	tagline?: string | null
 	about?: string | null
 	primaryLocationName?: string | null
 	websiteUrl?: string | null
 	photoUrl?: string | null
+	socialLinks?: SocialLinks
 }
 
 /**

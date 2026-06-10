@@ -26,6 +26,10 @@ export interface HostProfileSummary {
   readonly bio?: string;
   /** Self-declared verified host (G22). Rendered via VerifiedHostBadge. */
   readonly verified: boolean;
+  /** Host website URL. */
+  readonly websiteUrl?: string;
+  /** Instagram handle (without @). */
+  readonly instagram?: string;
 }
 
 export type HostListingState =

@@ -14,6 +14,7 @@ import { getSeekerApplicationIds } from "./applications";
 
 export interface ListingRow {
   id: string;
+  host_profile_id: string | null;
   title: string;
   category: OpportunityCategory;
   description: string | null;
@@ -23,6 +24,7 @@ export interface ListingRow {
   status: string;
   housing_included: boolean;
   meals_included: boolean;
+  visa_support: boolean;
   compensation_summary: string | null;
   compensation_min_cents: number | null;
   compensation_max_cents: number | null;
@@ -41,6 +43,7 @@ export interface ListingRow {
 
 type RawListingRow = {
   id: string;
+  host_profile_id: string | null;
   title: string;
   category: string;
   description: string | null;
@@ -50,6 +53,7 @@ type RawListingRow = {
   status: string;
   housing_included: boolean;
   meals_included: boolean;
+  visa_support: boolean;
   compensation_summary: string | null;
   compensation_min_cents: number | null;
   compensation_max_cents: number | null;
@@ -123,8 +127,14 @@ export function rowToDiscoveryFields(row: ListingRow) {
     category: row.category,
     location: row.location_display ?? "Location not specified",
     opportunityWindow: formatOpportunityWindow(row),
+    begins: row.begins_at ?? undefined,
+    ends: row.ends_at ?? undefined,
     status: row.status as "live" | "draft" | "paused" | "closed" | "archived" | "under_review",
-    host: { name: hostName, verified },
+    host: {
+      id: row.host_profile_id ?? undefined,
+      name: hostName,
+      verified,
+    },
     benefits: {
       housing: { provision: housingProvision },
       meals: { provision: mealsProvision },
@@ -133,6 +143,16 @@ export function rowToDiscoveryFields(row: ListingRow) {
         summary: buildCompensationSummary(row),
       },
     },
+    payInsight:
+      row.compensation_min_cents != null || row.compensation_max_cents != null
+        ? {
+            minCents: row.compensation_min_cents ?? undefined,
+            maxCents: row.compensation_max_cents ?? undefined,
+            unit: (row.compensation_unit as CompensationUnit | null) ?? null,
+            currency: row.compensation_currency,
+          }
+        : undefined,
+    visaSupport: row.visa_support,
     coverImageUrl: row.cover_photo_url ?? undefined,
     coordinates:
       row.latitude != null && row.longitude != null
@@ -142,7 +162,7 @@ export function rowToDiscoveryFields(row: ListingRow) {
 }
 
 const LISTING_COLUMNS =
-  "id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,host_profiles(company_name,attestation_status)";
+  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,host_profiles(company_name,attestation_status)";
 
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;
@@ -279,7 +299,10 @@ export interface SearchFilters {
   categories?: string[];
   hasHousing?: boolean;
   hasMeals?: boolean;
+  visaSupport?: boolean;
+  startRangeMonths?: 1 | 3 | 6;
   payMin?: number;
+  payUnit?: CompensationUnit;
   location?: string;
   startDateAfter?: string;
   startDateBefore?: string;
@@ -319,9 +342,24 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
 
   if (filters.hasHousing) builder = builder.eq("housing_included", true);
   if (filters.hasMeals) builder = builder.eq("meals_included", true);
+  if (filters.visaSupport) builder = builder.eq("visa_support", true);
 
   if (filters.payMin != null && Number.isFinite(filters.payMin) && filters.payMin > 0) {
     builder = builder.gte("compensation_min_cents", Math.round(filters.payMin * 100));
+  }
+
+  if (filters.payUnit === "hour" || filters.payUnit === "day") {
+    builder = builder.eq("compensation_unit", filters.payUnit);
+  }
+
+  if (filters.startRangeMonths) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const cutoff = new Date(now);
+    cutoff.setMonth(cutoff.getMonth() + filters.startRangeMonths);
+    builder = builder
+      .gte("begins_at", now.toISOString())
+      .lte("begins_at", cutoff.toISOString());
   }
 
   const location = filters.location ? sanitizeSearchTerm(filters.location) : "";
@@ -512,6 +550,31 @@ export async function updateListing(
   const { data, error } = await untyped
     .from("listings")
     .update(patch)
+    .eq("id", listingId)
+    .eq("host_profile_id", hostProfileId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "Listing not found or you do not have access to it." };
+  return { ok: true };
+}
+
+export async function updateListingStatus(
+  clerkToken: string,
+  clerkUserId: string,
+  listingId: string,
+  status: "live" | "paused" | "archived",
+): Promise<{ ok: boolean; error?: string }> {
+  if (!listingId) return { ok: false, error: "Missing listing id." };
+
+  const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
+  if (!hostProfileId) return { ok: false, error: "No host profile found for your account." };
+
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await untyped
+    .from("listings")
+    .update({ status })
     .eq("id", listingId)
     .eq("host_profile_id", hostProfileId)
     .select("id")

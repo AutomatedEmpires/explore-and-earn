@@ -14,9 +14,10 @@ import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
   type CompensationUnit,
-  type ListingStatus,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
+
+type HostManageableListingStatus = "live" | "paused" | "archived";
 
 interface HostAuth {
   userId: string;
@@ -200,8 +201,8 @@ export async function updateListingAction(
 
 export async function updateListingStatusAction(
   listingId: string,
-  newStatus: ListingStatus,
-): Promise<{ ok: boolean; status?: ListingStatus; error?: string }> {
+  newStatus: HostManageableListingStatus,
+): Promise<{ ok: boolean; status?: HostManageableListingStatus; error?: string }> {
   if (!listingId) {
     return { ok: false, error: "Missing listing id." };
   }
@@ -224,6 +225,27 @@ export async function updateListingStatusAction(
   revalidatePath("/host/listings");
   revalidatePath(`/host/listings/${listingId}`);
   return result;
+}
+
+export async function pauseListingAction(
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await updateListingStatusAction(listingId, "paused");
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+export async function resumeListingAction(
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await updateListingStatusAction(listingId, "live");
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+export async function archiveListingAction(
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await updateListingStatusAction(listingId, "archived");
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
 }
 
 export async function duplicateListingAction(

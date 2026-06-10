@@ -1,6 +1,7 @@
 import type {
   BenefitProvision,
   BenefitTriad,
+  CompensationUnit,
   DiscoveryCardConditionalBadge,
   ImageSelection,
   ListingStatus,
@@ -8,6 +9,7 @@ import type {
   ResponsiveImage,
 } from "@explore-and-earn/contracts";
 import type { DiscoveryCardData, IconKey } from "@explore-and-earn/ui";
+import type { SeekerApplicationListing } from "@explore-and-earn/db";
 
 /**
  * Discovery & Feed lane — LOCAL fixture/view model.
@@ -25,12 +27,15 @@ import type { DiscoveryCardData, IconKey } from "@explore-and-earn/ui";
  * that card's DiscoveryCardData via toDiscoveryCardData below.
  */
 export interface DiscoveryListingHost {
+  readonly id?: string;
   readonly name: string;
   /**
    * Self-declared verified host. The badge always renders the exact qualifier
    * "Self-Declared by Host" (G22) via the VerifiedHostBadge primitive.
    */
   readonly verified: boolean;
+  /** Short employer tagline for the featured employer rail (1–2 punchy sentences). */
+  readonly tagline?: string;
 }
 
 /**
@@ -45,6 +50,15 @@ export interface DiscoveryListingCoordinates {
   readonly lon: number;
 }
 
+export interface DiscoveryListingPayInsight {
+  readonly meterValue?: number;
+  readonly note?: string;
+  readonly minCents?: number;
+  readonly maxCents?: number;
+  readonly unit?: CompensationUnit | null;
+  readonly currency?: string;
+}
+
 export interface DiscoveryListing {
   readonly id: string;
   /** Display title; rendered in the display font. */
@@ -54,6 +68,8 @@ export interface DiscoveryListing {
   readonly location: string;
   /** Human-readable opportunity window, e.g. "Aug\u2013Oct 2026". */
   readonly opportunityWindow: string;
+  readonly begins?: string;
+  readonly ends?: string;
   readonly status: ListingStatus;
   readonly host: DiscoveryListingHost;
   /** The always-visible Housing / Meals / Pay triad. */
@@ -74,6 +90,9 @@ export interface DiscoveryListing {
   readonly matchScore?: number;
   /** Whether to surface the founding-program countdown. */
   readonly founding?: boolean;
+  /** Optional pay summary + meter content for the pay popup. */
+  readonly payInsight?: DiscoveryListingPayInsight;
+  readonly visaSupport?: boolean;
   /**
    * Geocoded marker position for the /map surface. Optional: listings without
    * coordinates are omitted from the map (see DiscoveryListingCoordinates).
@@ -124,6 +143,44 @@ function benefitDisplay(info: {
   return info.summary ?? PROVISION_LABEL[info.provision];
 }
 
+function inferHousingOccupancy(
+  summary: string | undefined,
+): "solo" | "shared" | undefined {
+  if (!summary) {
+    return undefined;
+  }
+
+  const normalized = summary.toLowerCase();
+  if (
+    normalized.includes("shared") ||
+    normalized.includes("bunk") ||
+    normalized.includes("dorm") ||
+    normalized.includes("berth") ||
+    normalized.includes("communal") ||
+    normalized.includes("multiple") ||
+    normalized.includes("roommate") ||
+    normalized.includes("co-ed") ||
+    normalized.includes("mixed")
+  ) {
+    return "shared";
+  }
+
+  if (
+    normalized.includes("private") ||
+    normalized.includes("solo") ||
+    normalized.includes("single") ||
+    normalized.includes("own room") ||
+    normalized.includes("your own") ||
+    normalized.includes("individual") ||
+    normalized.includes("ensuite") ||
+    normalized.includes("en-suite")
+  ) {
+    return "solo";
+  }
+
+  return undefined;
+}
+
 /**
  * Pure mapper: local DiscoveryListing view-model -> the canonical
  * @explore-and-earn/ui DiscoveryCardData. The richer provision/summary benefit
@@ -139,11 +196,12 @@ export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardDat
   return {
     id: listing.id,
     title: listing.title,
-    positionTitle: listing.title,
     hostName: listing.host.name,
     category: listing.category,
     location: listing.location,
     opportunityWindow: listing.opportunityWindow,
+    begins: listing.begins,
+    ends: listing.ends,
     coverImageUrl: listing.coverImageUrl,
     triad: {
       housing: benefitDisplay(listing.benefits.housing),
@@ -155,8 +213,58 @@ export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardDat
       meals: listing.benefits.meals.provision,
       pay: listing.benefits.pay.provision,
     },
+    housingOccupancy: inferHousingOccupancy(listing.benefits.housing.summary),
     verifiedHost: listing.host.verified,
     conditionalBadges: listing.conditionalBadges,
     matchScore: listing.matchScore,
+  };
+}
+
+/**
+ * Maps a DB-fetched `SeekerApplicationListing` (returned by
+ * `getApplicationsForSeekerWithListings`) to `DiscoveryCardData`.
+ *
+ * Used by lifecycle bucket pages (accepted / not-selected / withdrawn) that
+ * fetch applications directly from the DB rather than through the discovery
+ * feed. Centralises the construction so changes to the shape propagate to all
+ * three pages automatically.
+ */
+export function seekerApplicationListingToCardData(
+  listing: SeekerApplicationListing,
+): DiscoveryCardData {
+  const housingText = listing.benefits.housing.provision === "provided"
+    ? "Included"
+    : listing.benefits.housing.provision === "partial"
+    ? "Partial"
+    : "Not included";
+  const mealsText = listing.benefits.meals.provision === "provided"
+    ? "Included"
+    : listing.benefits.meals.provision === "partial"
+    ? "Partial"
+    : "Not included";
+  const payText = listing.benefits.pay.summary ?? (
+    listing.benefits.pay.provision === "provided"
+      ? "Included"
+      : listing.benefits.pay.provision === "partial"
+      ? "Partial"
+      : "Not included"
+  );
+
+  return {
+    id: listing.id,
+    title: listing.title,
+    hostName: listing.host.name,
+    category: listing.category,
+    location: listing.location,
+    opportunityWindow: listing.opportunityWindow,
+    coverImageUrl: listing.coverImageUrl ?? undefined,
+    triad: { housing: housingText, meals: mealsText, pay: payText },
+    benefitProvision: {
+      housing: listing.benefits.housing.provision,
+      meals: listing.benefits.meals.provision,
+      pay: listing.benefits.pay.provision,
+    },
+    housingOccupancy: inferHousingOccupancy(listing.benefits.housing.summary),
+    verifiedHost: listing.host.verified,
   };
 }

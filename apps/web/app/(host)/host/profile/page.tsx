@@ -10,7 +10,6 @@ import {
 } from "@explore-and-earn/db";
 
 import {
-  HOST_PROFILE,
   HostProfilePanel,
   HostSectionHeading,
   dbStatusToHostState,
@@ -67,23 +66,24 @@ export default async function HostProfilePage() {
   // company name + verification come from the host_profiles embed on the host's
   // own listings (rowToDiscoveryFields); about + location come straight from the
   // host_profiles row. Contact name + tagline have no backing column yet, so
-  // they gracefully fall back to the fixture profile.
+  // the page uses neutral placeholders instead of sample fixture content.
   const realHost = listings
     .map((item) => item.listing.host)
     .find((host) => host.name && host.name !== "Unknown Host");
 
-  // Safety guard: the host layout already redirects unauthenticated users, so a
-  // null profile here means an authed user without an onboarded host profile.
-  // Fall back to the fixture profile so the page still renders.
   const profile: HostProfileSummary = hostProfile
     ? {
-        ...HOST_PROFILE,
-        orgName: realHost?.name ?? hostProfile.companyName ?? HOST_PROFILE.orgName,
-        location: hostProfile.primaryLocationName ?? HOST_PROFILE.location,
-        bio: hostProfile.about ?? HOST_PROFILE.bio,
-        verified: realHost?.verified ?? HOST_PROFILE.verified,
+        hostName: "Host",
+        orgName: realHost?.name ?? hostProfile.companyName ?? "Your organization",
+        location: hostProfile.primaryLocationName ?? undefined,
+        bio: hostProfile.about ?? undefined,
+        verified: realHost?.verified ?? false,
       }
-    : HOST_PROFILE;
+    : {
+        hostName: "Host",
+        orgName: realHost?.name ?? "Your organization",
+        verified: realHost?.verified ?? false,
+      };
 
   return (
     <section className={styles.block}>

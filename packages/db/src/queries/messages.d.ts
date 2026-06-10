@@ -64,6 +64,13 @@ export declare function getMessages(clerkToken: string, clerkUserId: string, con
  */
 export declare function sendMessage(clerkToken: string, clerkUserId: string, conversationId: string, body: string): Promise<SendMessageResult>;
 /**
+ * Count of unread messages for the caller acting as a host — i.e. messages in
+ * conversations the caller hosts that were sent by the seeker and not yet read.
+ * Resilient by design: returns 0 on any failure so a transient error never breaks
+ * the host shell header badge.
+ */
+export declare function getUnreadMessageCount(clerkToken: string, clerkUserId: string): Promise<number>;
+/**
  * Returns the existing seeker<->host conversation (optionally scoped to an
  * application) or creates one. Used when a host saves/contacts an applicant.
  *

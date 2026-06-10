@@ -1,0 +1,16 @@
+.back {
+  display: inline-block;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--text-primary);
+}
+
+.cardWrap {
+  max-width: 22rem;
+}

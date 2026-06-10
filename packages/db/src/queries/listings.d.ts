@@ -2,6 +2,7 @@ import "server-only";
 import type { BenefitProvision, CompensationUnit, ListingStatus, OpportunityCategory } from "@explore-and-earn/contracts";
 export interface ListingRow {
     id: string;
+    host_profile_id: string | null;
     title: string;
     category: OpportunityCategory;
     description: string | null;
@@ -11,6 +12,7 @@ export interface ListingRow {
     status: string;
     housing_included: boolean;
     meals_included: boolean;
+    visa_support: boolean;
     compensation_summary: string | null;
     compensation_min_cents: number | null;
     compensation_max_cents: number | null;
@@ -33,8 +35,11 @@ export declare function rowToDiscoveryFields(row: ListingRow): {
     category: "farm" | "maritime" | "remote" | "seasonal" | "mix";
     location: string;
     opportunityWindow: string;
+    begins: string | undefined;
+    ends: string | undefined;
     status: "live" | "draft" | "paused" | "closed" | "archived" | "under_review";
     host: {
+        id: string | undefined;
         name: string;
         verified: boolean;
     };
@@ -50,6 +55,13 @@ export declare function rowToDiscoveryFields(row: ListingRow): {
             summary: string;
         };
     };
+    payInsight: {
+        minCents: number | undefined;
+        maxCents: number | undefined;
+        unit: "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | "other" | null;
+        currency: string;
+    } | undefined;
+    visaSupport: boolean;
     coverImageUrl: string | undefined;
     coordinates: {
         lat: number;
@@ -107,7 +119,10 @@ export interface SearchFilters {
     categories?: string[];
     hasHousing?: boolean;
     hasMeals?: boolean;
+    visaSupport?: boolean;
+    startRangeMonths?: 1 | 3 | 6;
     payMin?: number;
+    payUnit?: CompensationUnit;
     location?: string;
     limit?: number;
 }
@@ -136,6 +151,10 @@ export declare function createListing(clerkToken: string, clerkUserId: string, f
     error?: string;
 }>;
 export declare function updateListing(clerkToken: string, clerkUserId: string, listingId: string, fields: ListingWriteFields): Promise<{
+    ok: boolean;
+    error?: string;
+}>;
+export declare function updateListingStatus(clerkToken: string, clerkUserId: string, listingId: string, status: "live" | "paused" | "archived"): Promise<{
     ok: boolean;
     error?: string;
 }>;

@@ -13,30 +13,15 @@ import styles from "./HostProfileForm.module.css";
 
 export interface HostProfileFormProps {
   readonly profile: HostProfileSummary;
-  /** Owning host profile id \u2014 required to enable the profile photo upload. */
   readonly hostProfileId?: string;
-  /** Current stored profile photo URL, if any. */
   readonly photoUrl?: string;
 }
 
-/**
- * Map db-layer error codes to short, human-readable status text. Unknown codes
- * fall back to a generic failure message so we never surface a raw SQLSTATE or
- * PostgREST message to the host.
- */
 const ERROR_TEXT: Record<string, string> = {
   name_required: "Organization name is required.",
   unauthenticated: "You must be signed in to save your profile.",
 };
 
-/**
- * Host profile edit form. Submits the fields backed by real `host_profiles`
- * columns (`company_name`, `primary_location_name`, `about`, `photo_url`) via
- * `updateHostProfileAction`. Host name and tagline have no backing column yet,
- * so they are shown read-only and are not submitted. Verified status is shown
- * read-only \u2014 host verification is a trust signal owned by the (founder-gated)
- * verification flow, not a self-served toggle.
- */
 export function HostProfileForm({
   profile,
   hostProfileId,
@@ -52,11 +37,11 @@ export function HostProfileForm({
 
   async function uploadPhoto(file: File): Promise<string> {
     if (!hostProfileId) {
-      throw new Error("Missing host profile \u2014 reload the page and try again.");
+      throw new Error("Missing host profile — reload the page and try again.");
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-      throw new Error("Your session has expired \u2014 sign in again.");
+      throw new Error("Your session has expired — sign in again.");
     }
     return uploadProfilePhoto(token, hostProfileId, file, "host");
   }
@@ -64,12 +49,24 @@ export function HostProfileForm({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+
+    const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
+    const twitter = String(formData.get("twitter") ?? "").trim().replace(/^@/, "");
+
     const fields = {
       companyName: String(formData.get("orgName") ?? ""),
-      primaryLocationName: String(formData.get("location") ?? ""),
-      about: String(formData.get("bio") ?? ""),
+      hostName: String(formData.get("hostName") ?? "") || null,
+      tagline: String(formData.get("tagline") ?? "") || null,
+      primaryLocationName: String(formData.get("location") ?? "") || null,
+      about: String(formData.get("bio") ?? "") || null,
       photoUrl: photoUrl.length > 0 ? photoUrl : null,
+      websiteUrl: String(formData.get("websiteUrl") ?? "") || null,
+      socialLinks: {
+        instagram: instagram || null,
+        twitter: twitter || null,
+      },
     };
+
     setMessage(null);
     startTransition(async () => {
       const result = await updateHostProfileAction(fields);
@@ -125,7 +122,6 @@ export function HostProfileForm({
             type="text"
             defaultValue={profile.hostName}
             placeholder="Maya"
-            readOnly
           />
         </div>
         <div className={styles.field}>
@@ -154,7 +150,6 @@ export function HostProfileForm({
           type="text"
           defaultValue={profile.tagline ?? ""}
           placeholder="Family orchard hiring seasonal crews since 1998."
-          readOnly
         />
       </div>
 
@@ -170,6 +165,59 @@ export function HostProfileForm({
           defaultValue={profile.bio ?? ""}
           placeholder="Tell seekers about your farm, crew, and what a season looks like."
         />
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <p className={styles.fieldGroupHeading}>Links</p>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="profile-website">
+            Website
+          </label>
+          <input
+            className={styles.input}
+            id="profile-website"
+            name="websiteUrl"
+            type="url"
+            defaultValue={profile.websiteUrl ?? ""}
+            placeholder="https://yourfarm.com"
+          />
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-instagram">
+              Instagram
+            </label>
+            <div className={styles.inputPrefix}>
+              <span className={styles.prefix}>@</span>
+              <input
+                className={`${styles.input} ${styles.inputWithPrefix}`}
+                id="profile-instagram"
+                name="instagram"
+                type="text"
+                defaultValue={profile.instagram ?? ""}
+                placeholder="yourhandle"
+              />
+            </div>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-twitter">
+              X (Twitter)
+            </label>
+            <div className={styles.inputPrefix}>
+              <span className={styles.prefix}>@</span>
+              <input
+                className={`${styles.input} ${styles.inputWithPrefix}`}
+                id="profile-twitter"
+                name="twitter"
+                type="text"
+                defaultValue=""
+                placeholder="yourhandle"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className={styles.verification}>
@@ -189,7 +237,7 @@ export function HostProfileForm({
       <div className={styles.actions}>
         <button className={styles.submit} type="submit" disabled={isPending}>
           <Icon name="action.forward" size={20} aria-hidden />
-          <span>{isPending ? "Saving\u2026" : "Save changes"}</span>
+          <span>{isPending ? "Saving…" : "Save changes"}</span>
         </button>
         <Link className={styles.cancel} href="/host/profile">
           Cancel

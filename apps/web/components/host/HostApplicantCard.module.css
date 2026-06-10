@@ -28,6 +28,16 @@
   color: var(--text-primary);
 }
 
+.nameLink {
+	text-decoration: none;
+}
+
+.nameLink:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+	border-radius: var(--radius-pill);
+}
+
 .applied {
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
@@ -43,34 +53,14 @@
   color: var(--text-primary);
 }
 
-.action {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-ink);
-  background: var(--color-surface);
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-lh);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: border-color var(--motion-fast) var(--ease-standard);
+.actionRow {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--space-8);
 }
 
-.action:hover {
-  border-color: var(--text-primary);
-}
-
-.action:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .action {
-    transition: none;
-  }
+@media (max-width: 639px) {
+	.actionRow {
+		grid-template-columns: 1fr;
+	}
 }

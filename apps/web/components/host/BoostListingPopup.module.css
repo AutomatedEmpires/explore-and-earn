@@ -1,0 +1,103 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-16);
+  text-align: center;
+  padding: var(--space-8) 0 var(--space-4);
+}
+
+.iconRing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--status-boosted-bg, #fef3c7) 80%, white 20%);
+  border: 1.5px solid color-mix(in srgb, var(--status-boosted-fg, #d97706) 20%, transparent);
+  color: var(--status-boosted-fg, #d97706);
+  flex-shrink: 0;
+}
+
+.intro {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: 1.6;
+  color: var(--text-secondary);
+  max-width: 28ch;
+}
+
+.listingName {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.perks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.perk {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.perkIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-cell);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+}
+
+.note {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 var(--space-24);
+  border: 1px solid var(--border-ink);
+  border-radius: var(--radius-pill);
+  background: var(--text-primary);
+  color: var(--color-surface-raised);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: opacity var(--motion-base) var(--ease-standard);
+}
+
+.closeBtn:hover {
+  opacity: 0.85;
+}
+
+.closeBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}

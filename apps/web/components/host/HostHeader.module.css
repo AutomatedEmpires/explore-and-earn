@@ -4,30 +4,81 @@
   justify-content: space-between;
   gap: var(--space-12);
   padding: var(--space-gutter);
-  border-bottom: 1px solid var(--border-soft);
-  background: var(--color-surface-raised);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, #fdf5e3 96%, var(--color-surface-raised)) 0%, color-mix(in srgb, #f9efda 92%, var(--color-surface)) 100%);
+  flex-wrap: wrap;
 }
 
 .identity {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-10);
+  flex-wrap: wrap;
 }
 
-.greeting {
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-input);
+}
+
+.home:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.brand {
   font-family: var(--font-display);
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
+  font-size: clamp(1.55rem, 2.6vw, 2.2rem);
+  line-height: 1;
   color: var(--text-primary);
 }
 
-.scope {
+.greeting {
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.scopePill,
+.orgChip {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.scopePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 var(--space-14);
+  border: 1px solid color-mix(in srgb, var(--border-ink) 20%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-raised) 88%, white 12%);
+  color: var(--text-primary);
+}
+
+.orgChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 var(--space-14);
+  border: 1px dashed color-mix(in srgb, var(--border-ink) 18%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-raised) 90%, var(--color-surface-raised));
   color: var(--text-secondary);
 }
 
@@ -45,8 +96,8 @@
   width: var(--icon-chip-compact);
   height: var(--icon-chip-compact);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border-soft);
-  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 92%, white 8%);
   color: var(--text-primary);
   text-decoration: none;
   transition: border-color var(--motion-fast) var(--ease-standard);
@@ -82,5 +133,15 @@
 @media (prefers-reduced-motion: reduce) {
   .iconLink {
     transition: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .header {
+    justify-content: flex-start;
+  }
+
+  .actions {
+    margin-left: auto;
   }
 }

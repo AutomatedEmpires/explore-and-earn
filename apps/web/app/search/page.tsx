@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
-
-import { SearchView } from "../../components/search/SearchView";
-
-import "../../components/search/search.css";
+import { permanentRedirect } from "next/navigation";
 
 export const metadata: Metadata = {
-	title: "Search · Explore&Earn",
+	title: "Seek",
 	description:
-		"Search and filter Explore&Earn opportunities by lane and benefits.",
+		"Legacy search route redirected to the canonical seek lane.",
+	robots: { index: false, follow: false },
 };
 
 export default function SearchPage() {
-	return <SearchView />;
+	permanentRedirect("/seek");
 }

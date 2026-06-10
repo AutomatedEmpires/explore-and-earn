@@ -206,6 +206,84 @@ export async function adminCloseListing(serviceRoleToken, listingId, reason) {
     }
     return { ok: true };
 }
+const ADMIN_LISTING_DETAIL_SELECT = "id, title, category, location_display, status, " +
+    "housing_included, meals_included, compensation_summary, " +
+    "compensation_min_cents, compensation_max_cents, compensation_unit, " +
+    "compensation_currency, timeline_summary, cover_photo_url, " +
+    "host_profiles!host_profile_id(company_name, attestation_status)";
+/**
+ * Fetch a single listing by ID for the admin moderation detail view, bypassing
+ * RLS via the service-role client. Returns null when the listing does not exist
+ * or the query fails.
+ */
+export async function getAdminListingDetail(serviceRoleToken, listingId) {
+    const db = adminClient(serviceRoleToken);
+    const { data, error } = await db
+        .from("listings")
+        .select(ADMIN_LISTING_DETAIL_SELECT)
+        .eq("id", listingId)
+        .single();
+    if (error || !data)
+        return null;
+    const row = data;
+    const hostRaw = firstOf(row.host_profiles);
+    const hostName = hostRaw &&
+        typeof hostRaw.company_name === "string" &&
+        hostRaw.company_name.length > 0
+        ? hostRaw.company_name
+        : "Unknown Host";
+    const verified = hostRaw ? hostRaw.attestation_status === "attested" : false;
+    const housingProvision = row.housing_included === true ? "provided" : "not_provided";
+    const mealsProvision = row.meals_included === true ? "provided" : "not_provided";
+    let paySummary;
+    if (typeof row.compensation_summary === "string" &&
+        row.compensation_summary.length > 0) {
+        paySummary = row.compensation_summary;
+    }
+    else if (typeof row.compensation_min_cents === "number") {
+        const fmt = (cents) => new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 0,
+        }).format(cents / 100);
+        const min = fmt(row.compensation_min_cents);
+        const maxCents = typeof row.compensation_max_cents === "number"
+            ? row.compensation_max_cents
+            : null;
+        const range = maxCents != null ? `${min}–${fmt(maxCents)}` : `From ${min}`;
+        const unit = typeof row.compensation_unit === "string" ? row.compensation_unit : null;
+        paySummary = unit ? `${range}/${unit}` : range;
+    }
+    else {
+        paySummary = "Unpaid / exchange";
+    }
+    const opportunityWindow = typeof row.timeline_summary === "string" &&
+        row.timeline_summary.length > 0
+        ? row.timeline_summary
+        : "Open";
+    return {
+        id: String(row.id),
+        title: typeof row.title === "string" ? row.title : "",
+        category: (typeof row.category === "string"
+            ? row.category
+            : "mix"),
+        location: typeof row.location_display === "string" &&
+            row.location_display.length > 0
+            ? row.location_display
+            : "Location not specified",
+        opportunityWindow,
+        status: (typeof row.status === "string"
+            ? row.status
+            : "live"),
+        host: { name: hostName, verified },
+        benefits: {
+            housing: { provision: housingProvision },
+            meals: { provision: mealsProvision },
+            pay: { provision: "provided", summary: paySummary },
+        },
+        coverImageUrl: typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
+    };
+}
 /**
  * Set a host's attestation_status to 'attested' or 'not_attested'.
  *

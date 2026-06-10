@@ -1,0 +1,587 @@
+/* ══════════════════════════════════════════════════════════════════
+   Public host profile page — page.module.css
+   Trail & Sky palette. Mobile-first. Sidebar on desktop.
+   ══════════════════════════════════════════════════════════════════ */
+
+.page {
+  min-height: 100dvh;
+  background: var(--color-paper);
+  padding-bottom: var(--space-48);
+}
+
+/* ── Quick facts strip ─────────────────────────────────────────── */
+/* Horizontal scroll on mobile; centered wrap on desktop           */
+
+.factsStrip {
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.facts {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-12) var(--space-16);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  max-width: 1060px;
+  margin: 0 auto;
+}
+
+.facts::-webkit-scrollbar { display: none; }
+
+@media (min-width: 680px) {
+  .facts {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    padding: var(--space-14) var(--space-32);
+    gap: var(--space-8);
+  }
+}
+
+/* Individual fact card — field-tag aesthetic */
+.fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-input);
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-top: 1px solid transparent;
+  border-right: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+  background: var(--color-surface);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.factBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.factValue {
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.factLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Color variants */
+.factBlue {
+  border-left-color: var(--palette-sky);
+  background: color-mix(in srgb, var(--palette-sky) 5%, var(--color-surface-raised));
+}
+
+.factGreen {
+  border-left-color: var(--benefit-housing-fg);
+  background: color-mix(in srgb, var(--benefit-housing-bg) 60%, var(--color-surface-raised));
+}
+
+.factOrange {
+  border-left-color: var(--benefit-meals-fg);
+  background: color-mix(in srgb, var(--benefit-meals-bg) 60%, var(--color-surface-raised));
+}
+
+.factCategory {
+  border-left-color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 5%, var(--color-surface-raised));
+}
+
+.factMuted {
+  border-left-color: var(--border-ink);
+  background: var(--color-surface);
+}
+
+/* ── Layout: content grid ──────────────────────────────────────── */
+
+.contentGrid,
+.contentSingle {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: var(--space-32) var(--space-16);
+  box-sizing: border-box;
+}
+
+.contentSingle {
+  display: block;
+}
+
+.contentGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-32);
+}
+
+@media (min-width: 680px) {
+  .contentGrid,
+  .contentSingle {
+    padding: var(--space-40) var(--space-32);
+  }
+}
+
+@media (min-width: 860px) {
+  .contentGrid {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-32);
+  }
+}
+
+.mainCol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-32);
+}
+
+/* Sidebar — sticky on desktop, stacks after main on mobile */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+@media (min-width: 860px) {
+  .sidebar {
+    width: 272px;
+    flex-shrink: 0;
+    position: sticky;
+    top: var(--space-24);
+    align-self: flex-start;
+  }
+}
+
+/* ── Section commons ──────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionHeading {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.browseCta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-cta);
+  text-decoration: none;
+  transition: opacity var(--motion-fast) ease;
+}
+
+.browseCta:hover { opacity: 0.8; }
+
+/* ── About section ─────────────────────────────────────────────── */
+
+.aboutCard {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  padding: var(--space-24);
+}
+
+.aboutText {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: 1.65;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: pre-wrap;
+  max-width: 65ch;
+}
+
+/* ── Listings grid ─────────────────────────────────────────────── */
+
+.listingsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-16);
+}
+
+@media (min-width: 480px) { .listingsGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 860px) { .listingsGrid { grid-template-columns: 1fr; } }
+@media (min-width: 960px) { .listingsGrid { grid-template-columns: repeat(2, 1fr); } }
+
+/* Listing article — warm paper card with ink border on hover */
+.listingArticle {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+  transition: border-color var(--motion-fast) var(--ease-standard),
+              box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.listingArticle:hover {
+  border-color: var(--border-ink);
+  box-shadow: var(--elevation-pin);
+}
+
+.listingLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Cover photo */
+.listingCover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--color-steel);
+}
+
+.listingCoverImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 300ms var(--ease-standard);
+}
+
+.listingArticle:hover .listingCoverImg {
+  transform: scale(1.025);
+}
+
+.listingCoverEmpty {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(135deg, var(--color-steel) 0%, var(--color-chrome) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+/* Listing card body */
+.listingBody {
+  padding: var(--space-16);
+}
+
+.listingCategory {
+  margin-bottom: var(--space-8);
+}
+
+.listingTitle {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-8);
+}
+
+.listingLocation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-10);
+}
+
+.listingBenefits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.listingBenefitHousing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--benefit-housing-bg);
+  color: var(--benefit-housing-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.listingBenefitMeals {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--benefit-meals-bg);
+  color: var(--benefit-meals-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.listingPay {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--benefit-pay-bg);
+  color: var(--benefit-pay-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+
+.emptyListings {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-12);
+  padding: var(--space-48) var(--space-24);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+}
+
+.emptyIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-steel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.emptyTitle {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.emptyNote {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ── Location map card ─────────────────────────────────────────── */
+/* Clean placeholder — no paid API. SVG-pattern topographic surface. */
+
+.mapCard {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* Topographic map surface — purely CSS / decorative */
+.mapSurface {
+  position: relative;
+  height: 120px;
+  overflow: hidden;
+  background: linear-gradient(
+    155deg,
+    var(--palette-steel) 0%,
+    var(--palette-chrome) 50%,
+    var(--palette-sky-light) 100%
+  );
+}
+
+/* Contour rings — centered on the pin */
+.mapContours {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-radial-gradient(
+      ellipse at 50% 70%,
+      transparent,
+      transparent 20px,
+      rgba(26, 142, 206, 0.08) 20px,
+      rgba(26, 142, 206, 0.08) 21px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 24px,
+      rgba(200, 216, 232, 0.28) 24px,
+      rgba(200, 216, 232, 0.28) 25px
+    );
+}
+
+/* Pin centered horizontally, anchored at bottom */
+.mapPin {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-cta);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(26, 142, 206, 0.4), 0 0 0 4px rgba(26, 142, 206, 0.15);
+}
+
+.mapBody {
+  padding: var(--space-16);
+  border-top: 1px solid var(--border-soft);
+}
+
+.mapTitle {
+  font-family: var(--font-display);
+  font-size: var(--type-body-size);
+  line-height: 1;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-8);
+}
+
+.mapLocation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-12);
+}
+
+.mapLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-cta);
+  text-decoration: none;
+  transition: opacity var(--motion-fast) ease;
+}
+
+.mapLink:hover { opacity: 0.8; }
+
+/* ── Housing + meals benefit card ─────────────────────────────── */
+
+.benefitCard {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  padding: var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.benefitCardTitle {
+  font-family: var(--font-display);
+  font-size: var(--type-body-size);
+  line-height: 1;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.benefitRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+}
+
+.benefitRowIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-input);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.benefitRowIcon[data-kind="housing"] {
+  background: var(--benefit-housing-bg);
+  color: var(--benefit-housing-fg);
+}
+
+.benefitRowIcon[data-kind="meals"] {
+  background: var(--benefit-meals-bg);
+  color: var(--benefit-meals-fg);
+}
+
+.benefitRowLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2);
+}
+
+.benefitRowNote {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.benefitCardLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-cta);
+  text-decoration: none;
+  border-top: 1px solid var(--border-soft);
+  padding-top: var(--space-14);
+  margin-top: var(--space-4);
+  transition: opacity var(--motion-fast) ease;
+}
+
+.benefitCardLink:hover { opacity: 0.8; }
+
+/* ── Motion — respect reduced-motion ─────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .listingArticle,
+  .listingCoverImg,
+  .ctaPrimary,
+  .mapLink,
+  .browseCta,
+  .benefitCardLink { transition: none; }
+  .listingArticle:hover .listingCoverImg { transform: none; }
+}
