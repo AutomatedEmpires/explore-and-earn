@@ -19,6 +19,7 @@ export {
   uploadListingMedia,
   uploadProfilePhoto,
   deleteStorageObject,
+  deleteListingMedia,
 } from "./storage";
 
 // Type-only re-exports needed by client components.

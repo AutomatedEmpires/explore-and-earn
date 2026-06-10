@@ -6,7 +6,11 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useAuth } from "@clerk/nextjs";
 
 import { Button } from "@explore-and-earn/ui";
-import { uploadListingMedia } from "@explore-and-earn/db/client";
+import {
+  uploadListingMedia,
+  deleteListingMedia,
+  LISTING_MEDIA_BUCKET,
+} from "@explore-and-earn/db/client";
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
@@ -15,6 +19,7 @@ import {
 } from "@explore-and-earn/contracts";
 
 import { ImageUpload } from "../ImageUpload";
+import { MediaGalleryUpload, type GalleryItem } from "./MediaGalleryUpload";
 import { createListingAction, updateListingAction } from "../../app/actions/listings";
 import styles from "./ListingForm.module.css";
 
@@ -38,6 +43,7 @@ export interface ListingFormInitialValues {
   readonly summary?: string;
   readonly startDate?: string;
   readonly coverPhotoUrl?: string;
+  readonly galleryUrls?: ReadonlyArray<string>;
 }
 
 export interface ListingFormProps {
@@ -81,6 +87,13 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
   const [error, setError] = useState<string | null>(null);
 
   const [coverPhotoUrl, setCoverPhotoUrl] = useState(initial?.coverPhotoUrl ?? "");
+  const [galleryImages, setGalleryImages] = useState<ReadonlyArray<GalleryItem>>(() =>
+    (initial?.galleryUrls ?? []).map((url, i) => ({
+      id: `gallery-${i}`,
+      url,
+      bucket: "cover_photo" as const,
+    })),
+  );
   const [title, setTitle] = useState(initial?.title ?? "");
   const [category, setCategory] = useState<MarketplaceCategory>(
     initial?.category ?? MARKETPLACE_CATEGORIES[0],
@@ -114,6 +127,33 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
     return uploadListingMedia(token, hostProfileId, file, "cover");
   }
 
+  async function uploadGallerySlot(file: File, slotIndex: number): Promise<string> {
+    if (!hostProfileId) {
+      throw new Error("Missing host profile \u2014 reload the page and try again.");
+    }
+    const token = await getToken({ template: "supabase" });
+    if (!token) {
+      throw new Error("Your session has expired \u2014 sign in again.");
+    }
+    return uploadListingMedia(token, hostProfileId, file, slotIndex);
+  }
+
+  async function removeGalleryImage(url: string): Promise<void> {
+    if (!hostProfileId) return;
+    const token = await getToken({ template: "supabase" });
+    if (!token) return;
+    try {
+      const { pathname } = new URL(url);
+      const prefix = `/storage/v1/object/public/${LISTING_MEDIA_BUCKET}/`;
+      if (pathname.startsWith(prefix)) {
+        const path = pathname.slice(prefix.length);
+        await deleteListingMedia(token, hostProfileId, parseInt(path.split("/")[1] ?? "-1", 10));
+      }
+    } catch {
+      // Non-fatal: if deletion fails the DB update is still the source of truth.
+    }
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -135,6 +175,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
     formData.set("summary", summary.trim());
     formData.set("startDate", startDate.trim());
     formData.set("coverPhotoUrl", coverPhotoUrl);
+    formData.set("galleryUrls", JSON.stringify(galleryImages.map((img) => img.url)));
 
     startTransition(async () => {
       if (mode === "edit" && listingId) {
@@ -179,6 +220,24 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
             disabled={isPending}
           />
           <input type="hidden" name="coverPhotoUrl" value={coverPhotoUrl} />
+        </div>
+      ) : null}
+
+      {hostProfileId ? (
+        <div className={styles.field}>
+          <span className={styles.label}>Gallery photos</span>
+          <MediaGalleryUpload
+            images={galleryImages}
+            onChange={setGalleryImages}
+            uploader={uploadGallerySlot}
+            remover={removeGalleryImage}
+            disabled={isPending}
+          />
+          <input
+            type="hidden"
+            name="galleryUrls"
+            value={JSON.stringify(galleryImages.map((img) => img.url))}
+          />
         </div>
       ) : null}
 
