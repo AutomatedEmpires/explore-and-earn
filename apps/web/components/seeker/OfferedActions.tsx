@@ -18,6 +18,7 @@ const ERROR_TEXT: Record<string, string> = {
 
 /** Days remaining before the expiry timestamp (null when no expiry set). */
 function daysUntilExpiry(expiresAt: string | null): number | null {
+	if (!expiresAt) return null;
 	const diff = new Date(expiresAt).getTime() - Date.now();
 	return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
