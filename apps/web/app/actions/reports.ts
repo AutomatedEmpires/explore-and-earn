@@ -1,4 +1,4 @@
-"use server"
+"use server";
 
 import { auth } from "@clerk/nextjs/server"
 import { insertReport, type ReportReason } from "@explore-and-earn/db"
