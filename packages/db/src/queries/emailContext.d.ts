@@ -57,8 +57,9 @@ export declare function getSeekerClerkIdByProfileId(clerkToken: string, seekerPr
 export declare function getHostClerkIdByProfileId(clerkToken: string, hostProfileId: string): Promise<string | null>;
 /**
  * Count the messages in a conversation. Used by the message server action to
- * detect the FIRST message in a thread so only the opening message triggers a
- * notification email, never subsequent replies. Best-effort: returns 0 on any
- * failure.
+ * detect the FIRST message in a thread (count === 1) so only the opening
+ * message triggers a notification email, never subsequent replies. Best-effort:
+ * returns 0 on any failure (which suppresses the notification rather than
+ * misfiring it).
  */
 export declare function countConversationMessages(clerkToken: string, conversationId: string): Promise<number>;
