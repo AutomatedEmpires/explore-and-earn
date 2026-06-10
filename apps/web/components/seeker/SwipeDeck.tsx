@@ -11,6 +11,7 @@ import {
 	type PointerEvent as ReactPointerEvent,
 } from "react";
 
+import Link from "next/link";
 import { Button, DiscoveryCard, Icon, Meter } from "@explore-and-earn/ui";
 
 import {
@@ -43,6 +44,8 @@ export interface SwipeDeckProps {
 	readonly listings: readonly DiscoveryListing[];
 	/** published_at of the last server row, or null when there is no next page. */
 	readonly initialCursor?: string | null;
+	/** False for unauthenticated visitors — shows the first card but gates all swipe actions. */
+	readonly isAuthenticated?: boolean;
 }
 
 /**
@@ -67,7 +70,7 @@ export interface SwipeDeckProps {
  * (failures are swallowed so the deck never blocks). Pass/apply persistence and
  * the match algorithm still arrive with the gated data layer.
  */
-export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
+export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = true }: SwipeDeckProps) {
 	const [deck, setDeck] = useState<DiscoveryListing[]>(() => [...listings]);
 	const [cursor, setCursor] = useState<string | null>(initialCursor);
 	const [loadingMore, setLoadingMore] = useState(false);
@@ -78,10 +81,14 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 	const [dragging, setDragging] = useState(false);
 	const [leaving, setLeaving] = useState<SwipeAction | null>(null);
 	const [reducedMotion, setReducedMotion] = useState(false);
+	const [feedback, setFeedback] = useState<"pass" | "save" | null>(null);
+
+	const [showAuthGate, setShowAuthGate] = useState(false);
 
 	const startRef = useRef<{ x: number; y: number } | null>(null);
 	const pointerIdRef = useRef<number | null>(null);
 	const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const deckRef = useRef<DiscoveryListing[]>(deck);
 	const loadingRef = useRef(false);
 
@@ -104,6 +111,9 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 		return () => {
 			if (leaveTimer.current) {
 				clearTimeout(leaveTimer.current);
+			}
+			if (feedbackTimer.current) {
+				clearTimeout(feedbackTimer.current);
 			}
 		};
 	}, []);
@@ -147,6 +157,10 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 
 	const triggerLeave = useCallback(
 		(action: SwipeAction) => {
+			if (!isAuthenticated) {
+				setShowAuthGate(true);
+				return;
+			}
 			if (leaving) {
 				return;
 			}
@@ -167,6 +181,13 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 			setDecisions((prev) => [...prev, { id: card.id, action }]);
 			setDragging(false);
 			setLeaving(action);
+			if (action === "pass" || action === "save") {
+				setFeedback(action);
+				if (feedbackTimer.current) {
+					clearTimeout(feedbackTimer.current);
+				}
+				feedbackTimer.current = setTimeout(() => setFeedback(null), reducedMotion ? 0 : 900);
+			}
 			setOffset(
 				action === "apply"
 					? { x: 0, y: -720 }
@@ -188,7 +209,7 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 	);
 
 	const undo = useCallback(() => {
-		if (leaving) {
+		if (!isAuthenticated || leaving) {
 			return;
 		}
 		setDecisions((prev) => (prev.length === 0 ? prev : prev.slice(0, -1)));
@@ -208,6 +229,10 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
 		if (!current) {
+			return;
+		}
+		if (!isAuthenticated) {
+			setShowAuthGate(true);
 			return;
 		}
 		switch (event.key) {
@@ -233,6 +258,10 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 	};
 
 	const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+		if (!isAuthenticated) {
+			setShowAuthGate(true);
+			return;
+		}
 		if (leaving || !current) {
 			return;
 		}
@@ -378,7 +407,7 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 							{isTop ? (
 								<>
 									<span className={`${styles.overlay} ${styles.overlayPass}`} style={passOverlayStyle} aria-hidden>
-										<Icon name="action.close" size={20} aria-hidden /> Pass
+										<Icon name="action.close" size={20} aria-hidden /> Skip
 									</span>
 									<span className={`${styles.overlay} ${styles.overlaySave}`} style={saveOverlayStyle} aria-hidden>
 										<Icon name="action.save" size={20} aria-hidden /> Save
@@ -392,14 +421,52 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 						</div>
 					);
 				})}
+
+				{showAuthGate && (
+					<div className={styles.authGate} role="dialog" aria-modal="true" aria-label="Sign in to swipe">
+						<button
+							className={styles.authGateDismiss}
+							onClick={() => setShowAuthGate(false)}
+							aria-label="Dismiss"
+						>
+							<Icon name="action.close" size={16} aria-hidden />
+						</button>
+						<div className={styles.authGateContent}>
+							<Icon name="nav.seek" size={24} aria-hidden />
+							<p className={styles.authGateHeading}>Sign in to start swiping</p>
+							<p className={styles.authGateBody}>
+								Save opportunities, track applications, and get matched with roles that fit your life.
+							</p>
+							<div className={styles.authGateActions}>
+								<Link href="/sign-in" className={styles.authGatePrimary}>Sign in</Link>
+								<Link href="/sign-up" className={styles.authGateSecondary}>Create account</Link>
+							</div>
+						</div>
+					</div>
+				)}
 			</div>
+
+			{feedback ? (
+				<div
+					className={feedback === "save" ? `${styles.feedbackToast} ${styles.feedbackSave}` : `${styles.feedbackToast} ${styles.feedbackPass}`}
+					role="status"
+					aria-live="polite"
+				>
+					<Icon
+						name={feedback === "save" ? "action.save" : "action.close"}
+						size={16}
+						aria-hidden
+					/>
+					{feedback === "save" ? "Saved" : "Skipped"}
+				</div>
+			) : null}
 
 			<div className={styles.controls}>
 				<Button variant="ghost" icon="action.back" onClick={undo} disabled={decisions.length === 0}>
 					Undo
 				</Button>
 				<Button variant="secondary" icon="action.close" onClick={() => triggerLeave("pass")}>
-					Pass
+					Skip
 				</Button>
 				<Button variant="secondary" icon="action.save" onClick={() => triggerLeave("save")}>
 					Save
@@ -410,7 +477,7 @@ export function SwipeDeck({ listings, initialCursor = null }: SwipeDeckProps) {
 			</div>
 
 			<p className={styles.hint}>
-				Drag a card, tap a button, or use \u2190 Pass \u00b7 \u2192 Save \u00b7 \u2191 Apply \u00b7 Backspace to undo.
+				Drag a card, tap a button, or use \u2190 Skip \u00b7 \u2192 Save \u00b7 \u2191 Apply \u00b7 Backspace to undo.
 			</p>
 
 			<span className={styles.srOnly} role="status" aria-live="polite">

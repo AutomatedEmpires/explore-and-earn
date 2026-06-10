@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import { DiscoveryCard, Icon } from "@explore-and-earn/ui";
 
 import {
-	BenefitBucketDrawer,
+	BenefitTrustModal,
 	EmptyState,
 	HostProfilePopup,
 	QuickPeekDrawer,
 	ReportListingDrawer,
 	toDiscoveryCardData,
-	type BenefitBucket,
+	type BenefitKind,
 	type DiscoveryListing,
 } from "../discovery";
 import { MAPPIN_ICON } from "./mappin";
@@ -76,7 +76,7 @@ export function OpportunityMap({ listings, initialFocusId }: OpportunityMapProps
 	const [activeHostId, setActiveHostId] = useState<string | null>(null);
 	const [activeBenefit, setActiveBenefit] = useState<{
 		readonly id: string;
-		readonly bucket: BenefitBucket;
+		readonly bucket: BenefitKind;
 	} | null>(null);
 	const [reportId, setReportId] = useState<string | null>(null);
 	const activeListing = useMemo(
@@ -162,7 +162,7 @@ export function OpportunityMap({ listings, initialFocusId }: OpportunityMapProps
 				}}
 			/>
 
-			<BenefitBucketDrawer
+			<BenefitTrustModal
 				listing={activeBenefitListing}
 				bucket={activeBenefit?.bucket ?? null}
 				onClose={() => setActiveBenefit(null)}

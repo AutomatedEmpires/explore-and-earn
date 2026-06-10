@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 
 import { CATEGORY_ICON, EmptyState } from "../discovery";
@@ -25,25 +26,27 @@ export function MessageList({ threads }: MessageListProps) {
 	return (
 		<ul className={styles.list}>
 			{threads.map((thread) => (
-				<li
-					key={thread.id}
-					className={thread.unread ? `${styles.item} ${styles.unread}` : styles.item}
-				>
-					<span className={styles.icon}>
-						<Icon name={CATEGORY_ICON[thread.category]} size={24} aria-hidden />
-					</span>
-					<span className={styles.body}>
-						<span className={styles.titleRow}>
-							<span className={styles.host}>
-								{thread.unread ? <span className={styles.srOnly}>Unread: </span> : null}
-								{thread.hostName}
-							</span>
-							<span className={styles.time}>{thread.timeAgo}</span>
+				<li key={thread.id}>
+					<Link
+						className={thread.unread ? `${styles.item} ${styles.unread}` : styles.item}
+						href={`/messages/${thread.id}`}
+					>
+						<span className={styles.icon}>
+							<Icon name={CATEGORY_ICON[thread.category]} size={24} aria-hidden />
 						</span>
-						<span className={styles.context}>{thread.listingTitle}</span>
-						<span className={styles.preview}>{thread.preview}</span>
-					</span>
-					{thread.unread ? <span className={styles.dot} aria-hidden /> : null}
+						<span className={styles.body}>
+							<span className={styles.titleRow}>
+								<span className={styles.host}>
+									{thread.unread ? <span className={styles.srOnly}>Unread: </span> : null}
+									{thread.hostName}
+								</span>
+								<span className={styles.time}>{thread.timeAgo}</span>
+							</span>
+							<span className={styles.context}>{thread.listingTitle}</span>
+							<span className={styles.preview}>{thread.preview}</span>
+						</span>
+						{thread.unread ? <span className={styles.dot} aria-hidden /> : null}
+					</Link>
 				</li>
 			))}
 		</ul>

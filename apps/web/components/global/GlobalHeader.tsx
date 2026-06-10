@@ -42,6 +42,8 @@ export interface GlobalHeaderProps {
   readonly unreadCount?: number;
   readonly clerkUserId?: string | null;
   readonly userName?: string | null;
+  /** Unread community activity count — shows a dot on the Feed tab when > 0. */
+  readonly unreadCommunity?: number;
 }
 
 export function GlobalHeader({
@@ -50,6 +52,7 @@ export function GlobalHeader({
   unreadCount = 0,
   clerkUserId,
   userName,
+  unreadCommunity = 0,
 }: GlobalHeaderProps) {
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
@@ -122,6 +125,12 @@ export function GlobalHeader({
             >
               <Icon name="nav.feed" size={16} aria-hidden />
               Feed
+              {unreadCommunity > 0 && communityTab !== "feed" ? (
+                <span
+                  className={styles.communityTabDot}
+                  aria-label={`${unreadCommunity} unread`}
+                />
+              ) : null}
             </Link>
             <Link
               className={`${styles.communityTab}${communityTab === "photos" ? ` ${styles.communityTabActive}` : ""}`}

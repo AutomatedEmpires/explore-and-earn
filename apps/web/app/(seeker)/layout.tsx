@@ -38,7 +38,10 @@ interface SeekerShellState {
   readonly unreadCount: number;
   readonly clerkUserId: string | null;
   readonly needsOnboarding: boolean;
-	readonly seekerName: string | null;
+  readonly seekerName: string | null;
+  // TODO(community-unreads): replace with real query against community_post_views
+  // once the community_posts table exists. Zero until then.
+  readonly unreadCommunity: number;
 }
 
 /**
@@ -57,21 +60,11 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
   try {
     const { userId, getToken } = await auth();
     if (!userId) {
-			return {
-				unreadCount: 0,
-				clerkUserId: null,
-				needsOnboarding: false,
-				seekerName: null,
-			};
+      return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0 };
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-			return {
-				unreadCount: 0,
-				clerkUserId: userId,
-				needsOnboarding: false,
-				seekerName: null,
-			};
+      return { unreadCount: 0, clerkUserId: userId, needsOnboarding: false, seekerName: null, unreadCommunity: 0 };
     }
     const [unreadCount, profile] = await Promise.all([
       getUnreadNotificationCount(token, userId),
@@ -81,15 +74,11 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
       unreadCount,
       clerkUserId: userId,
       needsOnboarding: profile !== null && !profile.onboardingComplete,
-			seekerName: profile?.displayName?.trim() || null,
+      seekerName: profile?.displayName?.trim() || null,
+      unreadCommunity: 0,
     };
   } catch {
-		return {
-			unreadCount: 0,
-			clerkUserId: null,
-			needsOnboarding: false,
-			seekerName: null,
-		};
+    return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0 };
   }
 }
 
@@ -98,7 +87,7 @@ export default async function SeekerLayout({
 }: {
   children: ReactNode;
 }) {
-  const { unreadCount, clerkUserId, needsOnboarding, seekerName } =
+  const { unreadCount, clerkUserId, needsOnboarding, seekerName, unreadCommunity } =
     await resolveSeekerShellState();
 
   // redirect() throws to interrupt rendering, so it must run OUTSIDE the
@@ -114,6 +103,7 @@ export default async function SeekerLayout({
         isAuthenticated={!!clerkUserId}
         userName={seekerName}
         unreadCount={unreadCount}
+        unreadCommunity={unreadCommunity}
         clerkUserId={clerkUserId}
       />
       <main className={styles.main}>{children}</main>

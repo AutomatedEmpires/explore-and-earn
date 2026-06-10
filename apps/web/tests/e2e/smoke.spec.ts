@@ -17,17 +17,19 @@ function hostNav(page: Page) {
 }
 
 test.describe("shell ownership smoke", () => {
-  test("/ renders without seeker or host nav", async ({ page }) => {
+  test("/ renders seeker nav and no host nav", async ({ page }) => {
     await expectRouteToLoad("/", page);
 
-    await expect(seekerNav(page)).toHaveCount(0);
+    await expect(seekerNav(page)).toHaveCount(1);
+    await expect(seekerNav(page)).toBeVisible();
     await expect(hostNav(page)).toHaveCount(0);
   });
 
-  test("/search renders without seeker or host nav", async ({ page }) => {
+  test("/search resolves into seeker nav and no host nav", async ({ page }) => {
     await expectRouteToLoad("/search", page);
 
-    await expect(seekerNav(page)).toHaveCount(0);
+    await expect(seekerNav(page)).toHaveCount(1);
+    await expect(seekerNav(page)).toBeVisible();
     await expect(hostNav(page)).toHaveCount(0);
   });
 

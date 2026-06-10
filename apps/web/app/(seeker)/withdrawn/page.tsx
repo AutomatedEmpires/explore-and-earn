@@ -8,61 +8,61 @@ import { EmptyState, seekerApplicationListingToCardData } from "../../../compone
 import styles from "../../../components/seeker/LifecycleList.module.css";
 
 export const metadata: Metadata = {
-	title: "Not selected",
+	title: "Withdrawn",
 };
 
-// Per-seeker application data must never be statically cached.
 export const dynamic = "force-dynamic";
 
-export default async function NotSelectedPage() {
+export default async function WithdrawnPage() {
 	const { userId, getToken } = await auth();
 	const token = userId ? await getToken({ template: "supabase" }) : null;
 
 	if (!userId || !token) {
 		return (
 			<BucketPage
-				title="Not selected"
-				description="Closure without the noise — explore similar opportunities."
+				title="Withdrawn"
+				description="Applications you withdrew from."
 			>
 				<EmptyState
-					title="Sign in to see your applications"
-					message="Sign in to see the applications that have closed."
+					title="Sign in to see your withdrawn applications"
+					message="Sign in to see the applications you have withdrawn from."
 				/>
 			</BucketPage>
 		);
 	}
 
 	const applications = await getApplicationsForSeekerWithListings(token, userId).catch(() => []);
-	const notSelected = applications
-		.filter(
-			(app) =>
-				(app.status === "not_selected" || app.status === "rejected") &&
-				app.listing !== null,
-		)
-		.map((app) =>
-			app.status === "rejected" ? { ...app, status: "not_selected" } : app,
-		);
+	const withdrawn = applications.filter(
+		(app) => app.status === "withdrawn" && app.listing !== null,
+	);
 
 	return (
 		<BucketPage
-			title="Not selected"
-			description="Closure without the noise — explore similar opportunities."
+			title="Withdrawn"
+			description="Applications you withdrew from."
 		>
-			{notSelected.length > 0 ? (
+			{withdrawn.length > 0 ? (
 				<div className={styles.grid}>
-					{notSelected.map((application) => {
+					{withdrawn.map((application) => {
 						const { listing } = application;
 						if (!listing) return null;
+						const withdrawnOn = application.submittedAt
+							? new Date(application.submittedAt).toLocaleDateString("en-US", {
+								month: "long",
+								day: "numeric",
+							})
+							: null;
 						return (
 							<DiscoveryCard
 								key={application.id}
 								data={seekerApplicationListingToCardData(listing)}
 								surface="applied"
-								cardState="not_selected"
+								cardState="withdrawn"
 								actions={
 									<CardStatus
 										icon="action.close"
-										label="Not selected"
+										label="Withdrawn"
+										detail={withdrawnOn ? `Applied ${withdrawnOn}` : undefined}
 									/>
 								}
 							/>
@@ -71,8 +71,8 @@ export default async function NotSelectedPage() {
 				</div>
 			) : (
 				<EmptyState
-					title="Nothing here"
-					message="Roles that didn't work out will be listed here, quietly and respectfully. Keep exploring opportunities under Seek."
+					title="No withdrawn applications"
+					message="Applications you pull back from will appear here. Keep exploring opportunities under Seek."
 				/>
 			)}
 		</BucketPage>

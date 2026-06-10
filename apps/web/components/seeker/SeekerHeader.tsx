@@ -1,11 +1,14 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Icon } from "@explore-and-earn/ui";
 
-import { SEEKER_STATUS } from "./fixtures";
 import { UnreadBadge } from "./UnreadBadge";
 import styles from "./SeekerHeader.module.css";
 
 export interface SeekerHeaderProps {
+	readonly seekerName?: string | null;
   /**
    * Unread notification count for the badge. Provided by the (seeker) layout,
    * which resolves it from getUnreadNotificationCount for the authed seeker.
@@ -34,13 +37,39 @@ export interface SeekerHeaderProps {
  * child keeps it current via realtime. The badge caps the displayed value at
  * 99+ to stay within the chip.
  */
-export function SeekerHeader({ unreadCount = 0, clerkUserId }: SeekerHeaderProps) {
+export function SeekerHeader({
+	seekerName,
+	unreadCount = 0,
+	clerkUserId,
+}: SeekerHeaderProps) {
+	const pathname = usePathname();
+	const greetingName = seekerName?.trim() || "Seeker";
+	const profileInitial = greetingName.charAt(0).toUpperCase();
+	const exploreActive = !pathname?.startsWith("/community");
+
   return (
     <header className={styles.header}>
-      <Link className={styles.home} href="/home" aria-label="Seeker home">
-        <span className={styles.greeting}>Hi, {SEEKER_STATUS.seekerName}</span>
-        <span className={styles.scope}>Seeker</span>
-      </Link>
+      <div className={styles.identity}>
+        <Link className={styles.home} href="/home" aria-label="Explore and Earn home">
+          <span className={styles.brand}>Explore&amp;Earn</span>
+          <span className={styles.greeting}>Hi, {greetingName}</span>
+        </Link>
+        <span className={styles.scopePill}>Seeker</span>
+      </div>
+      <nav className={styles.sectionNav} aria-label="Explore and community sections">
+        <Link
+          className={exploreActive ? `${styles.sectionLink} ${styles.sectionLinkActive}` : styles.sectionLink}
+          href="/home"
+        >
+          Explore
+        </Link>
+        <Link
+          className={!exploreActive ? `${styles.sectionLink} ${styles.sectionLinkActive}` : styles.sectionLink}
+          href="/community"
+        >
+          Community
+        </Link>
+      </nav>
       <nav className={styles.actions} aria-label="Seeker quick links">
         <Link
           className={styles.iconLink}
@@ -51,7 +80,7 @@ export function SeekerHeader({ unreadCount = 0, clerkUserId }: SeekerHeaderProps
               : "Notifications"
           }
         >
-          <Icon name="system.info" size={20} aria-hidden />
+          <Icon name="action.message" size={20} aria-hidden />
           <UnreadBadge
             initialCount={unreadCount}
             clerkUserId={clerkUserId}
@@ -59,11 +88,14 @@ export function SeekerHeader({ unreadCount = 0, clerkUserId }: SeekerHeaderProps
           />
         </Link>
         <Link
-          className={styles.iconLink}
-          href="/resume"
-          aria-label="Resume and profile"
+          className={styles.profileLink}
+          href="/profile"
+          aria-label="Profile"
         >
-          <Icon name="nav.profile" size={20} aria-hidden />
+          <span className={styles.profileAvatar} aria-hidden>
+            {profileInitial}
+          </span>
+          <span className={styles.profileLabel}>Profile</span>
         </Link>
       </nav>
     </header>

@@ -1,11 +1,22 @@
+/* ── Base (mobile-first) ──────────────────────────────── */
+
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-12);
   padding: var(--space-gutter);
   border-bottom: 1px solid var(--border-soft);
   background: var(--color-surface-raised);
+  box-shadow: 0 1px 0 var(--border-soft);
+  flex-wrap: wrap;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  flex-wrap: wrap;
 }
 
 .home {
@@ -22,14 +33,14 @@
   box-shadow: var(--ui-focus-ring);
 }
 
-.greeting {
+.brand {
   font-family: var(--font-display);
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
+  font-size: clamp(1.55rem, 2.6vw, 2.2rem);
+  line-height: 1;
   color: var(--text-primary);
 }
 
-.scope {
+.greeting {
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
@@ -39,10 +50,74 @@
   color: var(--text-secondary);
 }
 
+.scopePill,
+.sectionLink,
+.profileLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.scopePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 var(--space-14);
+  border: 1px solid color-mix(in srgb, var(--border-ink) 20%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-raised) 88%, white 12%);
+  color: var(--text-primary);
+}
+
+.sectionNav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
+  border-radius: calc(var(--radius-pill) + 0.15rem);
+  background: color-mix(in srgb, var(--color-surface-raised) 90%, var(--color-surface-raised));
+  /* mobile: full-width second row */
+  order: 3;
+  width: 100%;
+  justify-content: stretch;
+}
+
+.sectionLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* mobile: tabs fill available width */
+  flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.sectionLinkActive {
+  background: color-mix(in srgb, var(--color-surface) 86%, white 14%);
+  color: var(--text-primary);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--color-ink) 10%, transparent);
+}
+
 .actions {
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  margin-left: auto;
+}
+
+/* mobile: hide name label, show avatar only */
+.profileLabel {
+  display: none;
 }
 
 .iconLink {
@@ -69,6 +144,38 @@
   box-shadow: var(--ui-focus-ring);
 }
 
+.profileLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: 0 var(--space-10);
+  min-height: var(--icon-chip-compact);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.profileLink:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.profileAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-ink) 88%, #3a2b18 12%);
+  color: white;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .badge {
   position: absolute;
   top: calc(-1 * var(--space-4));
@@ -86,6 +193,43 @@
   font-size: var(--type-label-size);
   font-weight: var(--font-weight-semibold);
 }
+
+/* ── ≥641px: show profile name label ──────────────────── */
+
+@media (min-width: 641px) {
+  .profileLabel {
+    display: inline;
+  }
+
+  .identity {
+    flex-wrap: nowrap;
+  }
+}
+
+/* ── ≥768px: single-row desktop layout ────────────────── */
+
+@media (min-width: 768px) {
+  .header {
+    justify-content: space-between;
+  }
+
+  .sectionNav {
+    order: initial;
+    width: auto;
+    justify-content: initial;
+  }
+
+  .sectionLink {
+    flex: initial;
+    min-width: 8rem;
+  }
+
+  .actions {
+    margin-left: initial;
+  }
+}
+
+/* ── Reduced motion ───────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   .iconLink {

@@ -229,6 +229,18 @@
   border-bottom-color: var(--color-cta);
 }
 
+/* Unread activity dot — shown on Feed tab when there is unread community content */
+.communityTabDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-cta);
+  margin-left: 2px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.4);
+}
+
 /* ─── Col 3 — auth ───────────────────────────────────────────────────────── */
 
 .authArea {

@@ -84,6 +84,7 @@ export default async function AppliedPage() {
         surface="applied"
         items={appliedItems.map((item) => ({
           listing: item.listing,
+          cardState: "applied" as const,
           actions: (
             <CardStatus
               icon="action.apply"

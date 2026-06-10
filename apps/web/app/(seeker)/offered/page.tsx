@@ -5,9 +5,8 @@ import { getSeekerApplicationsWithListings } from "@explore-and-earn/db";
 
 import {
   BucketPage,
-  CardStatus,
   LifecycleList,
-  OFFER_STATE_LABEL,
+  OfferedActions,
 } from "../../../components/seeker";
 import { EmptyState } from "../../../components/discovery";
 
@@ -41,9 +40,8 @@ export default async function OfferedPage() {
       ? [
           {
             listing: offer.listing,
-            actions: (
-              <CardStatus icon="status.match" label={OFFER_STATE_LABEL.offered} />
-            ),
+            cardState: "offered" as const,
+            actions: <OfferedActions applicationId={offer.id} />,
           },
         ]
       : [],
@@ -52,7 +50,7 @@ export default async function OfferedPage() {
   return (
     <BucketPage title="Offered" description="Offers and next steps from hosts.">
       <LifecycleList
-        surface="applied"
+        surface="offered"
         items={items}
         emptyTitle="No offers yet"
         emptyMessage="Offers from hosts will appear here once you start applying. Keep exploring opportunities under Seek."

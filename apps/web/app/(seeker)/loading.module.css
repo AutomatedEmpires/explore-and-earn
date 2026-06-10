@@ -1,5 +1,4 @@
-/* Shared seeker loading skeleton. Mirrors the Seek card grid; semantic tokens
-   only; px appears only in 1px hairlines and breakpoint media queries. */
+/* Shared seeker loading skeleton. Mirrors the Seek card grid. */
 
 .wrap {
 	display: flex;
@@ -20,10 +19,11 @@
 	width: min(18ch, 70%);
 }
 
+/* use --type-*-size (px values) not --type-*-lh (unitless multipliers) */
 .headingLine :global(.ui-skeleton) {
 	display: block;
 	width: 100%;
-	height: var(--type-page-lh);
+	height: calc(var(--type-page-size) * 1.2);
 	border-radius: var(--radius-input);
 }
 
@@ -34,7 +34,7 @@
 .subheadingLine :global(.ui-skeleton) {
 	display: block;
 	width: 100%;
-	height: var(--type-body-lh);
+	height: calc(var(--type-body-size) * 1.5);
 	border-radius: var(--radius-input);
 }
 
@@ -51,7 +51,7 @@
 .chip :global(.ui-skeleton) {
 	display: block;
 	width: 100%;
-	height: calc(var(--type-label-lh) + var(--space-16));
+	height: calc(var(--type-label-size) + var(--space-16));
 	border-radius: var(--radius-pill);
 }
 
@@ -59,44 +59,6 @@
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-section);
-}
-
-.card {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-12);
-	padding: var(--space-card);
-	border: 1px solid var(--border-soft);
-	border-radius: var(--radius-card);
-	background: var(--color-surface);
-}
-
-.cover {
-	width: 100%;
-	aspect-ratio: 16 / 9;
-}
-
-.cover :global(.ui-skeleton) {
-	display: block;
-	width: 100%;
-	height: 100%;
-	border-radius: var(--radius-image);
-}
-
-.cardLineWide {
-	width: 80%;
-}
-
-.cardLine {
-	width: 60%;
-}
-
-.cardLineWide :global(.ui-skeleton),
-.cardLine :global(.ui-skeleton) {
-	display: block;
-	width: 100%;
-	height: var(--type-body-lh);
-	border-radius: var(--radius-input);
 }
 
 .srOnly {

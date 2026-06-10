@@ -40,53 +40,8 @@
 	gap: var(--space-12);
 }
 
-.filterGroup {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--space-8);
-}
-
-.chip {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-4);
-	padding: var(--space-8) var(--space-12);
-	border-radius: var(--radius-pill);
-	border: 1px solid var(--border-soft);
-	background: var(--color-surface);
-	color: var(--text-primary);
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	line-height: var(--type-label-lh);
-	font-weight: var(--font-weight-semibold);
-	cursor: pointer;
-	transition: border-color var(--motion-fast) var(--ease-standard),
-		background var(--motion-fast) var(--ease-standard),
-		color var(--motion-fast) var(--ease-standard);
-}
-
-.chip:hover {
-	border-color: var(--border-ink);
-}
-
-.chip:focus-visible {
-	outline: none;
-	box-shadow: var(--ui-focus-ring);
-}
-
-.chipSelected {
-	background: var(--text-primary);
-	border-color: var(--text-primary);
-	color: var(--color-surface-raised);
-}
-
-.chipLabel {
-	white-space: nowrap;
-}
-
-.sort {
-	display: inline-flex;
-	align-items: center;
+.search {
+	display: grid;
 	gap: var(--space-8);
 }
 
@@ -100,7 +55,7 @@
 	color: var(--text-secondary);
 }
 
-.sortSelect {
+.searchInput {
 	padding: var(--space-8) var(--space-12);
 	border-radius: var(--radius-input);
 	border: 1px solid var(--border-soft);
@@ -109,12 +64,88 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	line-height: var(--type-body-lh);
+}
+
+.searchInput:focus-visible,
+.controlButton:focus-visible,
+.clearButton:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.controlRow {
+	display: flex;
+	gap: var(--space-8);
+	flex-wrap: wrap;
+}
+
+.controlButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-8);
+	min-height: 2.75rem;
+	padding: var(--space-10) var(--space-14);
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
 	cursor: pointer;
 }
 
-.sortSelect:focus-visible {
-	outline: none;
-	box-shadow: var(--ui-focus-ring);
+.controlLabel {
+	white-space: nowrap;
+}
+
+.controlCount {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.4rem;
+	height: 1.4rem;
+	padding: 0 var(--space-6);
+	border-radius: var(--radius-pill);
+	background: var(--text-primary);
+	color: var(--color-surface-raised);
+	font-size: var(--type-meta-size);
+	line-height: 1;
+}
+
+.activeBar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+	align-items: center;
+}
+
+.activeChip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	padding: var(--space-6) var(--space-10);
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--border-soft) 88%, transparent);
+	background: color-mix(in srgb, var(--color-surface-raised) 92%, white);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-primary);
+}
+
+.clearButton {
+	padding: var(--space-6) var(--space-10);
+	border: none;
+	background: transparent;
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
 }
 
 .count {
@@ -146,6 +177,41 @@
 	box-shadow: var(--ui-focus-ring);
 	border-radius: var(--radius-input);
 }
+
+/* ─── Listing sections (featured / all) ─────────────────────────────────── */
+
+.listingSection {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+}
+
+.listingSectionHead {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-12);
+	flex-wrap: wrap;
+}
+
+.listingSectionTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
+	font-weight: var(--font-weight-regular);
+	color: var(--text-primary);
+}
+
+.listingSectionCount {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+/* ─── Card grid ─────────────────────────────────────────────────────────── */
 
 .grid {
 	display: grid;

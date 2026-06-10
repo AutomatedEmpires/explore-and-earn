@@ -6,8 +6,8 @@ import { getSeekerApplications, getSeekerResume } from "@explore-and-earn/db";
 import {
 	BucketPage,
 	ProfileHub,
-	SEEKER_STATUS,
 	computeResumeCompletion,
+	getSeekerStatusFallback,
 	type SeekerStatusSummary,
 } from "../../../components/seeker";
 
@@ -23,18 +23,16 @@ export const dynamic = "force-dynamic";
  * pipeline snapshot, resume readiness, and links to every seeker surface.
  *
  * Shows the signed-in seeker's real name (Clerk), real application count, and
- * real resume completion (Supabase). Fields without a real source yet
- * (saved/offer counts, notifications) fall back to the SEEKER_STATUS fixture,
- * and the whole page degrades to the fixture if Clerk/DB reads fail — it must
- * render, not crash.
+ * real resume completion (Supabase). When those reads are unavailable, the page
+ * degrades safely; fixture values stay dev-only and never ship in production.
  */
 export default async function ProfilePage() {
 	const { userId, getToken } = await auth();
 
-	let status: SeekerStatusSummary = SEEKER_STATUS;
+	let status: SeekerStatusSummary = getSeekerStatusFallback();
 
 	if (userId) {
-		let seekerName = SEEKER_STATUS.seekerName;
+		let seekerName = status.seekerName;
 		try {
 			const user = await currentUser();
 			const fullName = user?.fullName?.trim();
@@ -43,13 +41,13 @@ export default async function ProfilePage() {
 					? fullName
 					: user?.firstName?.trim() ||
 						user?.username?.trim() ||
-						SEEKER_STATUS.seekerName;
+						status.seekerName;
 		} catch {
 			// currentUser() failed — keep the fixture name rather than crash.
 		}
 
-		let appliedCount = SEEKER_STATUS.appliedCount;
-		let resumeCompletion = SEEKER_STATUS.resumeCompletion;
+		let appliedCount = status.appliedCount;
+		let resumeCompletion = status.resumeCompletion;
 		try {
 			const token = await getToken({ template: "supabase" });
 			if (token) {
@@ -62,7 +60,7 @@ export default async function ProfilePage() {
 			// Pipeline / resume reads unavailable — keep the fixture values.
 		}
 
-		status = { ...SEEKER_STATUS, seekerName, appliedCount, resumeCompletion };
+		status = { ...status, seekerName, appliedCount, resumeCompletion };
 	}
 
 	return (

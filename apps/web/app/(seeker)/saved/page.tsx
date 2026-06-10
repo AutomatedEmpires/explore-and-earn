@@ -1,20 +1,14 @@
 import type { Metadata } from "next";
 
 import { auth } from "@clerk/nextjs/server";
-import { DiscoveryCard } from "@explore-and-earn/ui";
 import {
 	getPublicListingsByIds,
 	getSavedListingIds,
 	rowToDiscoveryFields,
 } from "@explore-and-earn/db";
 
-import {
-	EmptyState,
-	toDiscoveryCardData,
-	type DiscoveryListing,
-} from "../../../components/discovery";
-import { BucketPage } from "../../../components/seeker";
-import styles from "./page.module.css";
+import { EmptyState, type DiscoveryListing } from "../../../components/discovery";
+import { BucketPage, SavedCardGrid } from "../../../components/seeker";
 
 export const metadata: Metadata = {
 	title: "Saved",
@@ -76,15 +70,7 @@ export default async function SavedPage() {
 					message="Swipe right or tap Save on an opportunity to keep it here for later."
 				/>
 			) : (
-				<div className={styles.grid}>
-					{listings.map((listing) => (
-						<DiscoveryCard
-							key={listing.id}
-							data={toDiscoveryCardData(listing)}
-							surface="discovery_feed"
-						/>
-					))}
-				</div>
+				<SavedCardGrid listings={listings} />
 			)}
 		</BucketPage>
 	);

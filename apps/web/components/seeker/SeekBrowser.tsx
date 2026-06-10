@@ -3,64 +3,104 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { OpportunityCategory } from "@explore-and-earn/contracts";
+import type {
+	CompensationUnit,
+	OpportunityCategory,
+} from "@explore-and-earn/contracts";
 import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
 
 import {
-	BenefitBucketDrawer,
+	BenefitTrustModal,
 	CATEGORY_ICON,
 	CATEGORY_LABEL,
 	EmptyState,
 	HostProfilePopup,
+	PayDetailsDrawer,
 	QuickPeekDrawer,
 	ReportListingDrawer,
 	toDiscoveryCardData,
-	type BenefitBucket,
+	type BenefitKind,
 	type DiscoveryListing,
 } from "../discovery";
+import {
+	FeaturedEmployersRail,
+	type FeaturedEmployer,
+} from "../public/FeaturedEmployersRail";
 import styles from "./SeekBrowser.module.css";
+import { SeekFilterPopup, type SeekFilterPopupValue } from "./SeekFilterPopup";
+import { SeekSortPopup } from "./SeekSortPopup";
 
-type BenefitToggleKey = "housing" | "meals";
-type SortKey = "match" | "title";
+type StartRangeMonths = 1 | 3 | 6;
+type PayUnit = Extract<CompensationUnit, "hour" | "day">;
 
-const CATEGORY_ORDER: readonly OpportunityCategory[] = [
-	"farm",
-	"maritime",
-	"remote",
-	"seasonal",
-	"mix",
-];
+type ActiveBenefit = { readonly id: string; readonly bucket: BenefitKind };
 
-const SORT_KEYS: readonly SortKey[] = ["match", "title"];
-
-const BENEFIT_FILTERS: readonly {
-	readonly key: BenefitToggleKey;
-	readonly label: string;
-	readonly icon: IconKey;
-}[] = [
-	{ key: "housing", label: "Housing", icon: "benefit.housing" },
-	{ key: "meals", label: "Meals", icon: "benefit.meals" },
-];
-
-const SORTS: readonly { readonly key: SortKey; readonly label: string }[] = [
-	{ key: "match", label: "Best match" },
-	{ key: "title", label: "A\u2013Z" },
-];
+/** Extracted to avoid duplicating the 30-line DiscoveryCard map block. */
+function ListingSection({
+	id,
+	title,
+	listings,
+	styles: s,
+	onOpen,
+	onHostClick,
+	onBenefit,
+	onPay,
+	onLocation,
+	onReport,
+}: {
+	id: string;
+	title: string;
+	listings: readonly DiscoveryListing[];
+	styles: Record<string, string>;
+	onOpen: (id: string) => void;
+	onHostClick: (id: string) => void;
+	onBenefit: (v: ActiveBenefit) => void;
+	onPay: (id: string) => void;
+	onLocation: (id: string) => void;
+	onReport: (id: string) => void;
+}) {
+	return (
+		<section className={s.listingSection} aria-labelledby={id}>
+			<header className={s.listingSectionHead}>
+				<h2 id={id} className={s.listingSectionTitle}>{title}</h2>
+				<p className={s.listingSectionCount}>
+					{listings.length}&nbsp;{listings.length === 1 ? "opportunity" : "opportunities"}
+				</p>
+			</header>
+			<div className={s.grid}>
+				{listings.map((listing) => (
+					<DiscoveryCard
+						key={listing.id}
+						data={toDiscoveryCardData(listing)}
+						surface="discovery_feed"
+						onOpen={onOpen}
+						onHostClick={onHostClick}
+						onHousingClick={(lid) => onBenefit({ id: lid, bucket: "housing" })}
+						onMealsClick={(lid) => onBenefit({ id: lid, bucket: "meals" })}
+						onPayClick={onPay}
+						onLocationClick={onLocation}
+						onReport={onReport}
+					/>
+				))}
+			</div>
+		</section>
+	);
+}
 
 const SEARCH_DEBOUNCE_MS = 400;
 
-function parseSort(value: string | undefined): SortKey {
-	return SORT_KEYS.includes(value as SortKey) ? (value as SortKey) : "match";
-}
-
 export interface SeekBrowserProps {
 	readonly listings: readonly DiscoveryListing[];
+	readonly featuredEmployers?: readonly FeaturedEmployer[];
 	readonly query?: string;
 	readonly category?: string;
 	readonly housing?: boolean;
 	readonly meals?: boolean;
+	readonly visaSupport?: boolean;
+	readonly startRangeMonths?: StartRangeMonths;
 	readonly location?: string;
 	readonly payMin?: number;
+	readonly payUnit?: CompensationUnit;
 }
 
 /**
@@ -75,27 +115,28 @@ export interface SeekBrowserProps {
  */
 export function SeekBrowser({
 	listings,
+	featuredEmployers = [],
 	query,
 	category,
 	housing = false,
 	meals = false,
+	visaSupport = false,
+	startRangeMonths,
 	location,
 	payMin,
+	payUnit,
 }: SeekBrowserProps) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const searchParams = useSearchParams();
 
 	const [searchText, setSearchText] = useState<string>(query ?? "");
-	const [sort, setSort] = useState<SortKey>(() =>
-		parseSort(searchParams.get("sort") ?? undefined),
-	);
+	const [filterOpen, setFilterOpen] = useState(false);
+	const [sortOpen, setSortOpen] = useState(false);
 	const [activeId, setActiveId] = useState<string | null>(null);
 	const [activeHostId, setActiveHostId] = useState<string | null>(null);
-	const [activeBenefit, setActiveBenefit] = useState<{
-		readonly id: string;
-		readonly bucket: BenefitBucket;
-	} | null>(null);
+	const [activeBenefit, setActiveBenefit] = useState<ActiveBenefit | null>(null);
+	const [activePayId, setActivePayId] = useState<string | null>(null);
 	const [reportId, setReportId] = useState<string | null>(null);
 
 	const currentQuery = query ?? "";
@@ -133,24 +174,27 @@ export function SeekBrowser({
 		router.push(queryString ? `${pathname}?${queryString}` : pathname);
 	};
 
-	const toggleCategory = (key: OpportunityCategory) => {
-		pushParam("category", category === key ? null : key);
-	};
+	const results = listings;
 
-	const toggleBenefit = (key: BenefitToggleKey) => {
-		const isOn = key === "housing" ? housing : meals;
-		pushParam(key, isOn ? null : "1");
-	};
-
-	const results = useMemo(() => {
-		const sorted = [...listings];
-		if (sort === "match") {
-			sorted.sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
-		} else {
-			sorted.sort((a, b) => a.title.localeCompare(b.title));
-		}
-		return sorted;
-	}, [listings, sort]);
+	// Split results into featured (boosted / verified hosts) and the rest.
+	// Only shown when no active filters; when filtering, a single flat grid
+	// is more useful than an artificial featured/all split.
+	const featuredResults = useMemo(
+		() =>
+			results.filter(
+				(l) =>
+					l.conditionalBadges?.includes("boosted") || l.host.verified,
+			),
+		[results],
+	);
+	const restResults = useMemo(
+		() =>
+			results.filter(
+				(l) =>
+					!l.conditionalBadges?.includes("boosted") && !l.host.verified,
+			),
+		[results],
+	);
 
 	const activeListing = useMemo(
 		() => listings.find((listing) => listing.id === activeId) ?? null,
@@ -167,6 +211,11 @@ export function SeekBrowser({
 		[listings, activeBenefit],
 	);
 
+	const activePayListing = useMemo(
+		() => listings.find((listing) => listing.id === activePayId) ?? null,
+		[listings, activePayId],
+	);
+
 	const activeReportListing = useMemo(
 		() => listings.find((listing) => listing.id === reportId) ?? null,
 		[listings, reportId],
@@ -177,8 +226,63 @@ export function SeekBrowser({
 		Boolean(category) ||
 		housing ||
 		meals ||
+		visaSupport ||
+		Boolean(startRangeMonths) ||
 		Boolean(location) ||
-		payMin != null;
+		payMin != null ||
+		Boolean(payUnit);
+
+	const activeFilterChips = useMemo(() => {
+		const chips: { label: string; icon: IconKey }[] = [];
+		if (startRangeMonths) {
+			chips.push({ label: `${startRangeMonths} mo`, icon: "system.info" });
+		}
+		if (visaSupport) {
+			chips.push({ label: "Visa", icon: "system.info" });
+		}
+		if (housing) {
+			chips.push({ label: "Housing", icon: "benefit.housing" });
+		}
+		if (meals) {
+			chips.push({ label: "Meals", icon: "benefit.meals" });
+		}
+		if (payMin != null && payMin > 0) {
+			chips.push({
+				label: `$${payMin}${payUnit ? `/${payUnit}` : ""}`,
+				icon: "benefit.pay",
+			});
+		}
+		if (location) {
+			chips.push({ label: location, icon: "nav.map" });
+		}
+		return chips;
+	}, [housing, location, meals, payMin, payUnit, startRangeMonths, visaSupport]);
+
+	const filterCount = activeFilterChips.length;
+
+	const applyFilters = (value: SeekFilterPopupValue) => {
+		const next = new URLSearchParams(searchParams.toString());
+		if (value.housing) next.set("housing", "1");
+		else next.delete("housing");
+		if (value.meals) next.set("meals", "1");
+		else next.delete("meals");
+		if (value.visaSupport) next.set("visa", "1");
+		else next.delete("visa");
+		if (value.startRangeMonths) next.set("start_range", String(value.startRangeMonths));
+		else next.delete("start_range");
+		if (value.payMin && value.payMin > 0) next.set("pay_min", String(value.payMin));
+		else next.delete("pay_min");
+		if (value.payUnit) next.set("pay_unit", value.payUnit);
+		else next.delete("pay_unit");
+		const queryString = next.toString();
+		router.push(queryString ? `${pathname}?${queryString}` : pathname);
+		setFilterOpen(false);
+	};
+
+	const applySort = (nextCategory: OpportunityCategory | null) => {
+		pushParam("category", nextCategory);
+		setSortOpen(false);
+	};
 
 	const countLabel = `${results.length} ${
 		results.length === 1 ? "opportunity" : "opportunities"
@@ -195,11 +299,11 @@ export function SeekBrowser({
 			</header>
 
 			<div className={styles.filters}>
-				<label className={styles.sort}>
+				<label className={styles.search}>
 					<span className={styles.sortLabel}>Search</span>
 					<input
 						type="search"
-						className={styles.sortSelect}
+						className={styles.searchInput}
 						placeholder="Search opportunities, locations\u2026"
 						value={searchText}
 						onChange={(event) => setSearchText(event.target.value)}
@@ -207,120 +311,169 @@ export function SeekBrowser({
 					/>
 				</label>
 
-				<div
-					className={styles.filterGroup}
-					role="group"
-					aria-label="Filter by category"
-				>
+				<div className={styles.controlRow}>
 					<button
 						type="button"
-						className={
-							!category ? `${styles.chip} ${styles.chipSelected}` : styles.chip
-						}
-						aria-pressed={!category}
-						onClick={() => pushParam("category", null)}
+						className={styles.controlButton}
+						onClick={() => setFilterOpen(true)}
 					>
-						<span className={styles.chipLabel}>All</span>
+						<Icon name="action.filter" size={16} aria-hidden />
+						<span className={styles.controlLabel}>Filter</span>
+						{filterCount > 0 ? (
+							<span className={styles.controlCount}>{filterCount}</span>
+						) : null}
 					</button>
-					{CATEGORY_ORDER.map((key) => {
-						const isSelected = category === key;
-						return (
-							<button
-								key={key}
-								type="button"
-								className={
-									isSelected ? `${styles.chip} ${styles.chipSelected}` : styles.chip
-								}
-								aria-pressed={isSelected}
-								onClick={() => toggleCategory(key)}
-							>
-								<Icon name={CATEGORY_ICON[key]} size={16} aria-hidden />
-								<span className={styles.chipLabel}>{CATEGORY_LABEL[key]}</span>
-							</button>
-						);
-					})}
-				</div>
-
-				<div
-					className={styles.filterGroup}
-					role="group"
-					aria-label="Filter by what is provided"
-				>
-					{BENEFIT_FILTERS.map(({ key, label, icon }) => {
-						const isSelected = key === "housing" ? housing : meals;
-						return (
-							<button
-								key={key}
-								type="button"
-								className={
-									isSelected ? `${styles.chip} ${styles.chipSelected}` : styles.chip
-								}
-								aria-pressed={isSelected}
-								onClick={() => toggleBenefit(key)}
-							>
-								<Icon name={icon} size={16} aria-hidden />
-								<span className={styles.chipLabel}>{label} provided</span>
-							</button>
-						);
-					})}
-				</div>
-
-				<label className={styles.sort}>
-					<span className={styles.sortLabel}>Sort</span>
-					<select
-						className={styles.sortSelect}
-						value={sort}
-						onChange={(event) => setSort(event.target.value as SortKey)}
+					<button
+						type="button"
+						className={styles.controlButton}
+						onClick={() => setSortOpen(true)}
 					>
-						{SORTS.map((option) => (
-							<option key={option.key} value={option.key}>
-								{option.label}
-							</option>
+						<Icon
+							name={
+								category ? CATEGORY_ICON[category as OpportunityCategory] : "action.sort"
+							}
+							size={16}
+							aria-hidden
+						/>
+						<span className={styles.controlLabel}>
+							{category ? CATEGORY_LABEL[category as OpportunityCategory] : "Sort"}
+						</span>
+					</button>
+				</div>
+
+				{category || activeFilterChips.length > 0 ? (
+					<div className={styles.activeBar}>
+						{category ? (
+							<span className={styles.activeChip}>
+								<Icon name={CATEGORY_ICON[category as OpportunityCategory]} size={16} aria-hidden />
+								{CATEGORY_LABEL[category as OpportunityCategory]}
+							</span>
+						) : null}
+						{activeFilterChips.map((chip) => (
+							<span key={`${chip.icon}-${chip.label}`} className={styles.activeChip}>
+								<Icon name={chip.icon} size={16} aria-hidden />
+								{chip.label}
+							</span>
 						))}
-					</select>
-				</label>
+						<button
+							type="button"
+							className={styles.clearButton}
+							onClick={() => {
+								const next = new URLSearchParams(searchParams.toString());
+								next.delete("category");
+								next.delete("housing");
+								next.delete("meals");
+								next.delete("visa");
+								next.delete("start_range");
+								next.delete("pay_min");
+								next.delete("pay_unit");
+								next.delete("location");
+								const queryString = next.toString();
+								router.push(queryString ? `${pathname}?${queryString}` : pathname);
+							}}
+						>
+							Clear
+						</button>
+					</div>
+				) : null}
 			</div>
 
-			<p className={styles.count} role="status" aria-live="polite">
-				{countLabel}
-			</p>
+			{/* \u2500\u2500 Featured Employers Rail \u2014 always above the listings \u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+			{featuredEmployers.length > 0 ? (
+				<FeaturedEmployersRail employers={featuredEmployers} />
+			) : null}
 
-			{results.length === 0 ? (
+			{/* \u2500\u2500 Listing sections \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+			{hasActiveFilters ? (
+				/* \u2500\u2500 Filtered view: single flat grid \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+				<>
+					<p className={styles.count} role="status" aria-live="polite">
+						{countLabel}
+					</p>
+					{results.length === 0 ? (
+						<div className={styles.emptyWrap}>
+							<EmptyState
+								title={
+									query
+										? `No listings match \u201c${query}\u201d`
+										: "No matches with those filters"
+								}
+								message={
+									query
+										? "Try a different search term or clear your filters to see more opportunities."
+										: "Try removing a filter to see more opportunities."
+								}
+							/>
+							<Link className={styles.clearLink} href="/seek">
+								Clear filters
+							</Link>
+						</div>
+					) : (
+						<div className={styles.grid}>
+							{results.map((listing) => (
+								<DiscoveryCard
+									key={listing.id}
+									data={toDiscoveryCardData(listing)}
+									surface="discovery_feed"
+									onOpen={(id) => setActiveId(id)}
+									onHostClick={(id) => setActiveHostId(id)}
+									onHousingClick={(id) => setActiveBenefit({ id, bucket: "housing" })}
+									onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
+									onPayClick={(id) => setActivePayId(id)}
+									onLocationClick={(id) => router.push(`/map?focus=${id}`)}
+									onReport={(id) => setReportId(id)}
+								/>
+							))}
+						</div>
+					)}
+				</>
+			) : results.length === 0 ? (
 				<div className={styles.emptyWrap}>
 					<EmptyState
-						title={
-							query ? `No listings match \u201c${query}\u201d` : "No matches with those filters"
-						}
-						message={
-							query
-								? "Try a different search term or clear your filters to see more opportunities."
-								: "Try removing a filter to see more opportunities."
-						}
+						title="No opportunities yet"
+						message="Check back soon — new roles are added regularly."
 					/>
-					{hasActiveFilters ? (
-						<Link className={styles.clearLink} href="/seek">
-							Clear filters
-						</Link>
-					) : null}
 				</div>
+			) : featuredResults.length > 0 && restResults.length > 0 ? (
+				<>
+					<ListingSection
+						id="featured-listings-heading"
+						title="Featured listings"
+						listings={featuredResults}
+						styles={styles}
+						onOpen={setActiveId}
+						onHostClick={setActiveHostId}
+						onBenefit={setActiveBenefit}
+						onPay={setActivePayId}
+						onLocation={(id) => router.push(`/map?focus=${id}`)}
+						onReport={setReportId}
+					/>
+					<ListingSection
+						id="all-listings-heading"
+						title="All listings"
+						listings={restResults}
+						styles={styles}
+						onOpen={setActiveId}
+						onHostClick={setActiveHostId}
+						onBenefit={setActiveBenefit}
+						onPay={setActivePayId}
+						onLocation={(id) => router.push(`/map?focus=${id}`)}
+						onReport={setReportId}
+					/>
+				</>
 			) : (
-				<div className={styles.grid}>
-					{results.map((listing) => (
-						<DiscoveryCard
-							key={listing.id}
-							data={toDiscoveryCardData(listing)}
-							surface="discovery_feed"
-							onOpen={(id) => setActiveId(id)}
-							onHostClick={(id) => setActiveHostId(id)}
-							onHousingClick={(id) =>
-								setActiveBenefit({ id, bucket: "housing" })
-							}
-							onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
-							onLocationClick={(id) => router.push(`/map?focus=${id}`)}
-							onReport={(id) => setReportId(id)}
-						/>
-					))}
-				</div>
+				<ListingSection
+					id="all-listings-heading"
+					title={featuredResults.length === results.length ? "Featured listings" : "All listings"}
+					listings={results}
+					styles={styles}
+					onOpen={setActiveId}
+					onHostClick={setActiveHostId}
+					onBenefit={setActiveBenefit}
+					onPay={setActivePayId}
+					onLocation={(id) => router.push(`/map?focus=${id}`)}
+					onReport={setReportId}
+				/>
 			)}
 
 			<QuickPeekDrawer
@@ -338,15 +491,44 @@ export function SeekBrowser({
 				}}
 			/>
 
-			<BenefitBucketDrawer
+			<BenefitTrustModal
 				listing={activeBenefitListing}
 				bucket={activeBenefit?.bucket ?? null}
 				onClose={() => setActiveBenefit(null)}
 			/>
 
+			<PayDetailsDrawer
+				listing={activePayListing}
+				onClose={() => setActivePayId(null)}
+			/>
+
 			<ReportListingDrawer
 				listing={activeReportListing}
 				onClose={() => setReportId(null)}
+			/>
+
+			<SeekFilterPopup
+				open={filterOpen}
+				onClose={() => setFilterOpen(false)}
+				value={{
+					housing,
+					meals,
+					visaSupport,
+					startRangeMonths,
+					payMin,
+					payUnit:
+						payUnit === "hour" || payUnit === "day"
+							? (payUnit as PayUnit)
+							: undefined,
+				}}
+				onApply={applyFilters}
+			/>
+
+			<SeekSortPopup
+				open={sortOpen}
+				onClose={() => setSortOpen(false)}
+				category={category}
+				onApply={applySort}
 			/>
 		</section>
 	);

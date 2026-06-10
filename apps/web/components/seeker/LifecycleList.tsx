@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
-import { DiscoveryCard } from "@explore-and-earn/ui";
+import { DiscoveryCard, type DiscoveryCardProps } from "@explore-and-earn/ui";
 
 import { EmptyState, toDiscoveryCardData, type DiscoveryListing } from "../discovery";
 import styles from "./LifecycleList.module.css";
@@ -9,6 +9,8 @@ export interface LifecycleListItem {
   readonly listing: DiscoveryListing;
   /** Surface-specific status/actions rendered in the card's action slot. */
   readonly actions?: ReactNode;
+  /** Lifecycle state forwarded to the card's badge and CTA logic. */
+  readonly cardState?: DiscoveryCardProps["cardState"];
 }
 
 export interface LifecycleListProps {
@@ -38,6 +40,7 @@ export function LifecycleList({
           key={item.listing.id}
           data={toDiscoveryCardData(item.listing)}
           surface={surface}
+          cardState={item.cardState}
           actions={item.actions}
         />
       ))}

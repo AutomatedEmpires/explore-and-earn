@@ -41,6 +41,7 @@ export default async function InvitesPage() {
       ? [
           {
             listing: entry.listing,
+            cardState: "invited" as const,
             actions: <InviteActions inviteId={entry.invite.id} />,
           },
         ]
