@@ -17,6 +17,7 @@ const isPublicRoute = createRouteMatcher([
   "/about",
   "/sitemap.xml",
   "/robots.txt",
+  "/benefit-preview",
   // Seeker onboarding is auth-required, but excluded from the post-auth gate so
   // the (seeker) layout's onboarding redirect never loops back on itself.
   "/onboarding",
