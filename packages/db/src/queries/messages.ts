@@ -281,6 +281,44 @@ export async function sendMessage(
 }
 
 /**
+ * Count of unread messages for the caller acting as a host — i.e. messages in
+ * conversations the caller hosts that were sent by the seeker and not yet read.
+ * Resilient by design: returns 0 on any failure so a transient error never breaks
+ * the host shell header badge.
+ */
+export async function getUnreadMessageCount(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<number> {
+  try {
+    if (!clerkUserId) return 0;
+    const db = untypedClient(clerkToken);
+    const hostProfileId = await resolveHostProfileId(db, clerkUserId);
+    if (!hostProfileId) return 0;
+
+    const { data: convData } = await db
+      .from("conversations")
+      .select("id")
+      .eq("host_profile_id", hostProfileId);
+    const convIds = ((convData ?? []) as Record<string, unknown>[]).map((r) =>
+      asString(r.id),
+    );
+    if (convIds.length === 0) return 0;
+
+    const { count, error } = await db
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .in("conversation_id", convIds)
+      .eq("sender_type", "seeker")
+      .is("read_at", null);
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Returns the existing seeker<->host conversation (optionally scoped to an
  * application) or creates one. Used when a host saves/contacts an applicant.
  *

@@ -1,18 +1,34 @@
 import "server-only";
+export interface SocialLinks {
+    instagram?: string | null;
+    twitter?: string | null;
+}
 export interface HostProfileDetailsInput {
     companyName?: string;
+    hostName?: string | null;
+    tagline?: string | null;
     about?: string | null;
     primaryLocationName?: string | null;
     websiteUrl?: string | null;
     photoUrl?: string | null;
+    socialLinks?: SocialLinks;
 }
-export declare function getHostProfile(clerkToken: string, clerkUserId: string): Promise<{
+export interface HostProfile {
     id: string;
     companyName: string;
+    hostName: string | null;
+    tagline: string | null;
     about: string | null;
     primaryLocationName: string | null;
     photoUrl: string | null;
-} | null>;
+    websiteUrl: string | null;
+    socialLinks: SocialLinks;
+    categoryScopes: string[];
+    housingOfferedGenerally: boolean;
+    mealsOfferedGenerally: boolean;
+    subscriptionTier: "none" | "starter" | "professional" | "enterprise";
+}
+export declare function getHostProfile(clerkToken: string, clerkUserId: string): Promise<HostProfile | null>;
 export declare function updateHostProfileDetails(clerkToken: string, clerkUserId: string, fields: HostProfileDetailsInput): Promise<{
     ok: boolean;
     error?: string;
@@ -25,9 +41,16 @@ export declare function createHostProfile(clerkToken: string, clerkUserId: strin
 export interface PublicHostProfile {
     id: string;
     companyName: string;
+    hostName: string | null;
+    tagline: string | null;
     about: string | null;
     primaryLocationName: string | null;
     photoUrl: string | null;
+    websiteUrl: string | null;
+    socialLinks: SocialLinks;
+    categoryScopes: string[];
+    housingOfferedGenerally: boolean;
+    mealsOfferedGenerally: boolean;
     attestationStatus: string;
     createdAt: string | null;
 }

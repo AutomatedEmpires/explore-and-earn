@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import {
   createListing as createListingRow,
   updateListing as updateListingRow,
+  updateListingStatus as updateListingStatusRow,
   type ListingWriteFields,
 } from "@explore-and-earn/db";
 import {
@@ -193,4 +194,58 @@ export async function updateListingAction(
   revalidatePath("/host/listings");
   revalidatePath(`/host/listings/${listingId}`);
   return result;
+}
+
+export async function pauseListingAction(
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!listingId) return { ok: false, error: "Missing listing id." };
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) return { ok: false, error: authResult.error };
+  const result = await updateListingStatusRow(
+    authResult.auth.token,
+    authResult.auth.userId,
+    listingId,
+    "paused",
+  );
+  if (!result.ok) return result;
+  revalidatePath("/host/listings");
+  revalidatePath(`/host/listings/${listingId}`);
+  return { ok: true };
+}
+
+export async function resumeListingAction(
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!listingId) return { ok: false, error: "Missing listing id." };
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) return { ok: false, error: authResult.error };
+  const result = await updateListingStatusRow(
+    authResult.auth.token,
+    authResult.auth.userId,
+    listingId,
+    "live",
+  );
+  if (!result.ok) return result;
+  revalidatePath("/host/listings");
+  revalidatePath(`/host/listings/${listingId}`);
+  return { ok: true };
+}
+
+export async function archiveListingAction(
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!listingId) return { ok: false, error: "Missing listing id." };
+  const authResult = await resolveHostAuth();
+  if (!authResult.ok) return { ok: false, error: authResult.error };
+  const result = await updateListingStatusRow(
+    authResult.auth.token,
+    authResult.auth.userId,
+    listingId,
+    "archived",
+  );
+  if (!result.ok) return result;
+  revalidatePath("/host/listings");
+  revalidatePath(`/host/listings/${listingId}`);
+  return { ok: true };
 }
