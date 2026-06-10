@@ -88,7 +88,7 @@ export function MediaGalleryUpload({
     try {
       const url = await uploader(file, slotIndex);
       const newItem: GalleryItem = {
-        id: `gallery-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: crypto.randomUUID(),
         url,
         bucket,
       };

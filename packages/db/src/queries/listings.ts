@@ -453,7 +453,7 @@ type ListingColumnPatch = {
   housing_included?: boolean;
   meals_included?: boolean;
   cover_photo_url?: string | null;
-  gallery_photo_urls?: string[] | null;
+  gallery_photo_urls?: string[];
 };
 
 function toCentsOrNull(amount: number | null | undefined): number | null {
@@ -506,7 +506,7 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
     patch.cover_photo_url = trimmed.length > 0 ? trimmed : null;
   }
   if (fields.galleryUrls !== undefined) {
-    patch.gallery_photo_urls = fields.galleryUrls ?? null;
+    patch.gallery_photo_urls = fields.galleryUrls ?? [];
   }
 
   return patch;

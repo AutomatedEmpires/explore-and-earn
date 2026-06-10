@@ -146,8 +146,13 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
       const { pathname } = new URL(url);
       const prefix = `/storage/v1/object/public/${LISTING_MEDIA_BUCKET}/`;
       if (pathname.startsWith(prefix)) {
-        const path = pathname.slice(prefix.length);
-        await deleteListingMedia(token, hostProfileId, parseInt(path.split("/")[1] ?? "-1", 10));
+        const segments = pathname.slice(prefix.length).split("/");
+        // Path structure: {hostProfileId}/{slot} — slot is the last segment.
+        const slotSegment = segments[1];
+        const slot = slotSegment !== undefined ? parseInt(slotSegment, 10) : NaN;
+        if (Number.isInteger(slot) && slot >= 0) {
+          await deleteListingMedia(token, hostProfileId, slot);
+        }
       }
     } catch {
       // Non-fatal: if deletion fails the DB update is still the source of truth.
