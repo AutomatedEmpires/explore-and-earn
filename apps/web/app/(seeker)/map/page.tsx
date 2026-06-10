@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 
-import { BucketPage } from "../../../components/seeker";
 import { getDiscoveryListingsWithCoords } from "../../../components/discovery/data";
 import { MapView } from "../../../components/map";
 
@@ -35,15 +34,5 @@ export default async function MapPage({
 		searchParams,
 		getDiscoveryListingsWithCoords(),
 	]);
-	return (
-		<BucketPage
-			title="Map"
-			description="Explore open opportunities by location."
-		>
-			<MapView
-				listings={listings}
-				initialFocusId={firstValue(params.focus)}
-			/>
-		</BucketPage>
-	);
+	return <MapView listings={listings} initialFocusId={firstValue(params.focus)} />;
 }

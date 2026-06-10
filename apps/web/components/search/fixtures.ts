@@ -102,7 +102,7 @@ export const SEARCH_FIXTURES: readonly SearchListing[] = [
 			pay: { provision: "provided", summary: "$21/hr + season pass" },
 		},
 		verifiedHost: true,
-		conditionalBadges: ["seasonal", "featured"],
+		conditionalBadges: ["seasonal", "boosted"],
 	},
 	{
 		id: "mix-eco-retreat-host",

@@ -1,0 +1,392 @@
+/* ── Divider anchored to chrome bottom ───────────────────── */
+
+.rule {
+	border: 0;
+	border-top: 1px solid color-mix(in srgb, var(--border-ink) 20%, transparent);
+	margin: calc(-1 * var(--space-4)) 0 0;
+}
+
+/* ── Benchmark headline — pill container for emphasis ────── */
+
+.snapshotHeadline {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-10) var(--space-16);
+	border-radius: var(--radius-pill);
+	border: 1.5px solid color-mix(in srgb, #d4a832 32%, transparent);
+	background: color-mix(in srgb, #fff3d8 84%, var(--color-surface-raised));
+	box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.72);
+	font-family: var(--font-ui);
+	font-size: clamp(0.88rem, 2.2vw, 1.02rem);
+	line-height: 1.25;
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+/* ── Pay card ────────────────────────────────────────────── */
+
+.payCard {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-14);
+	padding: var(--space-14);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 22%, transparent);
+	border-radius: var(--radius-card);
+	background: color-mix(in srgb, var(--color-surface-raised) 90%, white 10%);
+	box-shadow:
+		inset 0 0 0 1px color-mix(in srgb, white 38%, transparent),
+		0 2px 12px color-mix(in srgb, var(--color-ink) 5%, transparent);
+}
+
+.payHeroRow {
+	display: grid;
+	grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.9fr);
+	gap: var(--space-12);
+	align-items: stretch;
+}
+
+.payHeadlineBlock {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: var(--space-6);
+	min-width: 0;
+}
+
+.amountValue {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: clamp(2.1rem, 6vw, 3.1rem);
+	line-height: 0.90;
+	letter-spacing: -0.01em;
+	color: var(--text-primary);
+	text-shadow: 0 1px 0 rgba(255,255,255,0.58);
+}
+
+.amountLabel {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+/* ── Inline artwork ──────────────────────────────────────── */
+
+.inlineArtwork {
+	overflow: hidden;
+	border: 1px solid color-mix(in srgb, var(--border-ink) 20%, transparent);
+	border-radius: var(--radius-card);
+	min-height: 5.5rem;
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, white 30%, transparent);
+}
+
+.inlineArtworkImage {
+	width: 100%;
+	height: 100%;
+	display: block;
+	object-fit: cover;
+	filter: saturate(0.88) contrast(1.06);
+}
+
+.inlineArtworkFallback {
+	width: 100%;
+	height: 100%;
+	min-height: 5.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: color-mix(in srgb, white 60%, transparent);
+}
+
+.inlineArtworkFallback.farm {
+	background: linear-gradient(145deg, #8aac70 0%, #547844 100%);
+}
+
+.inlineArtworkFallback.maritime {
+	background: linear-gradient(145deg, #4a80a8 0%, #2c6082 100%);
+}
+
+.inlineArtworkFallback.remote {
+	background: linear-gradient(145deg, #7a8aa8 0%, #4c5c7c 100%);
+}
+
+.inlineArtworkFallback.seasonal {
+	background: linear-gradient(145deg, #c8a870 0%, #8c6c40 100%);
+}
+
+.inlineArtworkFallback.mix {
+	background: linear-gradient(145deg, #a8a870 0%, #6a6845 100%);
+}
+
+/* ── Benchmark scale ─────────────────────────────────────── */
+
+.scaleWrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+}
+
+/*
+ * scaleBand is the positioning ancestor for the floating star marker.
+ * The marker lives here — NOT inside scaleBar — so the bar's
+ * overflow:hidden never clips it.
+ */
+.scaleBand {
+	position: relative;
+}
+
+.scaleBar {
+	position: relative;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	height: 1.35rem;
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 28%, transparent);
+	border-radius: 999px;
+	overflow: hidden;
+	background: color-mix(in srgb, var(--color-surface-raised) 88%, white 12%);
+}
+
+.scaleSegment {
+	display: block;
+	height: 100%;
+}
+
+/* Inset shadow on right edge creates a visible tick at each segment boundary */
+.scaleLow {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, #e87840 88%, #f5c4a0 12%),
+		color-mix(in srgb, #d46030 88%, #f0a888 12%)
+	);
+	box-shadow: inset -1.5px 0 0 color-mix(in srgb, var(--border-ink) 38%, transparent);
+}
+
+.scaleMid {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, #e8c858 88%, #f5e0a0 12%),
+		color-mix(in srgb, #d4b040 84%, #f0d070 16%)
+	);
+	box-shadow: inset -1.5px 0 0 color-mix(in srgb, var(--border-ink) 38%, transparent);
+}
+
+.scaleHigh {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, #78b870 88%, #c8e8c0 12%),
+		color-mix(in srgb, #5a9850 88%, #b0e0a8 12%)
+	);
+}
+
+/*
+ * Star marker — floats above the bar on the scaleBand coordinate system.
+ * top: 50% centers it on the bar's mid-line; transform pulls it back by
+ * half its own height. z-index keeps it above the segments.
+ */
+@keyframes markerGlow {
+	0%, 100% {
+		box-shadow:
+			0 3px 10px rgba(26,43,60,0.18),
+			inset 0 1px 0 rgba(255,255,255,0.66);
+	}
+	50% {
+		box-shadow:
+			0 4px 18px rgba(26,43,60,0.24),
+			0 0 14px rgba(212,168,50,0.38),
+			inset 0 1px 0 rgba(255,255,255,0.66);
+	}
+}
+
+.scaleMarker {
+	position: absolute;
+	top: 50%;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	transform: translate(-50%, -50%);
+	border-radius: 999px;
+	border: 2px solid color-mix(in srgb, var(--border-ink) 86%, #20160d 14%);
+	background:
+		radial-gradient(circle at 38% 28%, rgba(255,255,255,0.78), transparent 56%),
+		linear-gradient(180deg, #fff9ec 0%, #f5e8c8 100%);
+	font-size: 0.85rem;
+	line-height: 1;
+	color: color-mix(in srgb, #c08820 92%, #8a5c00 8%);
+	font-family: var(--font-ui);
+	animation: markerGlow 2.8s ease-in-out infinite;
+}
+
+.scaleLabels {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+	text-align: center;
+}
+
+/* ── Empty state (no meterValue available) ───────────────── */
+
+.emptyState {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+	padding: var(--space-12);
+	border: 1px dashed color-mix(in srgb, var(--border-ink) 22%, transparent);
+	border-radius: var(--radius-cell);
+	background: color-mix(in srgb, var(--color-surface-raised) 88%, white 12%);
+}
+
+.emptyKicker {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.note {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+/* ── Category benchmark chip rail ────────────────────────── */
+
+.categoryRail {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+.categoryChip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-pill);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 22%, transparent);
+	background: color-mix(in srgb, var(--color-surface-raised) 84%, white 16%);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+	white-space: nowrap;
+}
+
+/* Active chip: warm amber — embossed to match chipActive in forms */
+.categoryChipActive {
+	border-color: color-mix(in srgb, var(--border-ink) 72%, #20160d 28%);
+	background: color-mix(in srgb, #fff3d8 86%, var(--color-surface));
+	color: var(--text-primary);
+	box-shadow:
+		inset 0 1.5px 0 rgba(255,255,255,0.82),
+		inset 0 -1px 0 rgba(26,43,60,0.06),
+		0 0 0 1px color-mix(in srgb, #d4a832 22%, transparent),
+		0 2px 8px rgba(212,168,50,0.20);
+}
+
+/* ── Benchmark source note ───────────────────────────────── */
+
+.benchmarkNote {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-8);
+	padding-top: var(--space-6);
+	border-top: 1px solid color-mix(in srgb, var(--border-ink) 14%, transparent);
+	color: var(--text-secondary);
+}
+
+.caption {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+/* ── Optional host pay note ──────────────────────────────── */
+
+.noteCard {
+	padding: var(--space-12);
+	border: 1px solid color-mix(in srgb, var(--border-ink) 16%, transparent);
+	border-radius: var(--radius-cell);
+	background: color-mix(in srgb, var(--color-surface-raised) 84%, white 16%);
+}
+
+/* ── Full-width CTA button — sky-blue ────────────────────── */
+
+.ctaButton {
+	width: 100%;
+	background:
+		linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.06) 100%),
+		var(--color-cta);
+	color: #ffffff;
+	border-color: color-mix(in srgb, var(--color-cta) 52%, var(--palette-ink) 48%);
+	box-shadow:
+		4px 5px 0 rgba(26,43,60,0.28),
+		inset 0 2px 0 rgba(255,255,255,0.18),
+		inset 0 -2px 0 rgba(0,0,0,0.10);
+}
+
+.ctaButton:hover:not(:disabled) {
+	background:
+		linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.04) 100%),
+		color-mix(in srgb, var(--color-cta) 86%, var(--palette-ink) 14%);
+	transform: translateY(-1px);
+	box-shadow:
+		5px 6px 0 rgba(26,43,60,0.30),
+		inset 0 2px 0 rgba(255,255,255,0.18),
+		inset 0 -2px 0 rgba(0,0,0,0.10);
+}
+
+.ctaButton:active:not(:disabled) {
+	transform: translateY(1px) scale(0.985);
+	box-shadow:
+		2px 3px 0 rgba(26,43,60,0.22),
+		inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+/* ── Disclaimer ──────────────────────────────────────────── */
+
+.disclaimer {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-8);
+	color: var(--text-secondary);
+}
+
+.disclaimerText {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: color-mix(in srgb, var(--text-secondary) 70%, transparent);
+}
+
+/* ── Mobile ──────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+	.inlineArtwork {
+		min-height: 4rem;
+	}
+}

@@ -1,4 +1,5 @@
 import type { DiscoveryListing } from "./listing";
+import { cloudinaryPhoto } from "@explore-and-earn/ui";
 
 /**
  * Typed Discovery fixtures — NO backend (Sprint Zero). Every entry conforms to
@@ -19,8 +20,10 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     location: "Wenatchee, Washington",
     coordinates: { lat: 47.4235, lon: -120.3103 },
     opportunityWindow: "Aug–Oct 2026",
+    begins: "Aug 12, 2026",
+    ends: "Oct 28, 2026",
     status: "live",
-    host: { name: "Cascade Bloom Orchards", verified: true },
+    host: { name: "Cascade Bloom Orchards", verified: true, tagline: "Family orchards in the Wenatchee valley. Harvest season with bunkhouse and farm-fresh meals." },
     benefits: {
       housing: { provision: "provided", summary: "Shared bunkhouse" },
       meals: { provision: "partial", summary: "Lunch on shift" },
@@ -39,8 +42,17 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     conditionalBadges: ["seasonal"],
+    coverImageUrl: cloudinaryPhoto("farm", "annie-spratt-jmjnnq2xfoy", "hero"),
     matchScore: 88,
     founding: true,
+    payInsight: {
+      meterValue: 68,
+      minCents: 1700,
+      maxCents: 1700,
+      unit: "hour",
+      currency: "USD",
+      note: "Mid-range hourly pay with shared housing already covered.",
+    },
   },
   {
     id: "lst_deckhand_sitka",
@@ -49,8 +61,10 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     location: "Sitka, Alaska",
     coordinates: { lat: 57.0531, lon: -135.33 },
     opportunityWindow: "Jun–Aug 2026",
+    begins: "Jun 3, 2026",
+    ends: "Aug 29, 2026",
     status: "live",
-    host: { name: "North Pacific Fisheries Co-op", verified: true },
+    host: { name: "North Pacific Fisheries Co-op", verified: true, tagline: "Commercial salmon fishing on the Alaskan coast. Big seas, full board, bigger pay." },
     benefits: {
       housing: { provision: "provided", summary: "Cabin berth aboard" },
       meals: { provision: "provided", summary: "All meals aboard" },
@@ -68,8 +82,18 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
         sortOrder: 0,
       },
     },
-    conditionalBadges: ["featured"],
+    conditionalBadges: ["boosted"],
+    coverImageUrl: cloudinaryPhoto("maritime", "adam-gonzales-7rc7hb1acog", "hero"),
     founding: false,
+    visaSupport: true,
+    payInsight: {
+      meterValue: 84,
+      minCents: 22000,
+      maxCents: 22000,
+      unit: "day",
+      currency: "USD",
+      note: "High day-rate plus catch-share upside during peak season.",
+    },
   },
   {
     id: "lst_remote_community",
@@ -77,8 +101,9 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     category: "remote",
     location: "Remote · Worldwide",
     opportunityWindow: "Year-round",
+    begins: "Rolling",
     status: "live",
-    host: { name: "Driftwork Collective", verified: false },
+    host: { name: "Driftwork Collective", verified: false, tagline: "Fully remote operations. Build community from anywhere — no office, no commute." },
     benefits: {
       housing: { provision: "not_provided", summary: "Not included" },
       meals: { provision: "not_provided", summary: "Not included" },
@@ -97,6 +122,16 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     matchScore: 72,
+    coverImageUrl: cloudinaryPhoto("remote", "altumcode-iymqiblxk-8", "hero"),
+    visaSupport: true,
+    payInsight: {
+      meterValue: 73,
+      minCents: 2400,
+      maxCents: 2400,
+      unit: "hour",
+      currency: "USD",
+      note: "Stable remote hourly rate; housing and meals are handled separately.",
+    },
   },
   {
     id: "lst_ski_resort_breck",
@@ -105,8 +140,10 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     location: "Breckenridge, Colorado",
     coordinates: { lat: 39.4817, lon: -106.0384 },
     opportunityWindow: "Nov 2026–Apr 2027",
+    begins: "Nov 14, 2026",
+    ends: "Apr 18, 2027",
     status: "live",
-    host: { name: "Summit Pass Hospitality", verified: true },
+    host: { name: "Summit Pass Hospitality", verified: true, tagline: "Mountain resort operations in the Colorado Rockies. Ski season with dorm housing and cafeteria." },
     benefits: {
       housing: { provision: "provided", summary: "Staff dorm room" },
       meals: { provision: "partial", summary: "Staff cafeteria" },
@@ -125,7 +162,16 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     conditionalBadges: ["seasonal", "boosted"],
+    coverImageUrl: cloudinaryPhoto("seasonal", "aleksandra-sapozhnikova-nbcribslxkq", "hero"),
     founding: false,
+    payInsight: {
+      meterValue: 71,
+      minCents: 1900,
+      maxCents: 1900,
+      unit: "hour",
+      currency: "USD",
+      note: "Solid hourly base with dorm housing and cafeteria access.",
+    },
   },
   {
     id: "lst_eco_hostel_lisbon",
@@ -134,8 +180,9 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     location: "Lisbon, Portugal",
     coordinates: { lat: 38.7223, lon: -9.1393 },
     opportunityWindow: "Flexible · 3+ months",
+    begins: "Flexible",
     status: "live",
-    host: { name: "Tejo Green House", verified: true },
+    host: { name: "Tejo Green House", verified: true, tagline: "Lisbon eco-hostel life. Communal dinners, vibrant guests, private room included." },
     benefits: {
       housing: { provision: "provided", summary: "Private room" },
       meals: { provision: "provided", summary: "Communal dinner daily" },
@@ -154,6 +201,13 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     matchScore: 65,
+    visaSupport: true,
+    payInsight: {
+      meterValue: 54,
+      unit: "stipend",
+      currency: "EUR",
+      note: "Lower direct cash, offset by room and communal meals.",
+    },
   },
   {
     id: "lst_vineyard_napa",
@@ -162,12 +216,23 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     location: "Napa, California",
     coordinates: { lat: 38.2975, lon: -122.2869 },
     opportunityWindow: "Sep–Nov 2026",
+    begins: "Sep 8, 2026",
+    ends: "Nov 21, 2026",
     status: "live",
-    host: { name: "Stone Hollow Vineyard", verified: false },
+    host: { name: "Stone Hollow Vineyard", verified: false, tagline: "Boutique vineyard in Napa wine country. Harvest season under California sun." },
     benefits: {
       housing: { provision: "partial", summary: "Tent platform site" },
       meals: { provision: "not_provided", summary: "Not included" },
       pay: { provision: "provided", summary: "$20/hr" },
     },
+    payInsight: {
+      meterValue: 62,
+      minCents: 2000,
+      maxCents: 2000,
+      unit: "hour",
+      currency: "USD",
+      note: "Strong hourly pay, but food and full housing are not included.",
+    },
+    coverImageUrl: cloudinaryPhoto("farm", "annika-treial-e4wuwbcur7y", "hero"),
   },
 ];

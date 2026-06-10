@@ -6,6 +6,7 @@ import {
   rowToDiscoveryFields,
   SWIPE_BATCH_SIZE,
 } from "@explore-and-earn/db";
+import { DISCOVERY_FIXTURES } from "./fixtures";
 import type { DiscoveryListing } from "./listing";
 
 /**
@@ -19,27 +20,111 @@ import type { DiscoveryListing } from "./listing";
  * view-models do not need changes when the backing data changes.
  */
 
+const hasPublicDataConfig =
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+  Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const allowFixtureFallback = process.env.NODE_ENV !== "production";
+
+function reportDiscoveryFallback(context: string, error: unknown) {
+  const detail = error instanceof Error ? error.message : String(error);
+  console.warn(`[discovery] ${context}: falling back to fixtures in local dev. ${detail}`);
+}
+
+function reportMissingProductionDiscoveryConfig(context: string) {
+  if (!hasPublicDataConfig && !allowFixtureFallback) {
+    console.error(
+      `[discovery] ${context}: public Supabase config is missing in production; fixture fallback is disabled.`,
+    );
+  }
+}
+
 /** All discoverable live opportunities. */
 export async function getDiscoveryListings(): Promise<DiscoveryListing[]> {
-  const rows = await getPublicListings();
-  return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
+  if (!hasPublicDataConfig) {
+    if (allowFixtureFallback) {
+      return [...DISCOVERY_FIXTURES];
+    }
+
+    reportMissingProductionDiscoveryConfig("getDiscoveryListings");
+    return [];
+  }
+
+  try {
+    const rows = await getPublicListings();
+    return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
+  } catch (error) {
+    if (allowFixtureFallback) {
+      reportDiscoveryFallback("getDiscoveryListings", error);
+      return [...DISCOVERY_FIXTURES];
+    }
+
+    throw error;
+  }
 }
 
 /** A single live opportunity by id, or null when not found. */
 export async function getDiscoveryListingById(
   id: string,
 ): Promise<DiscoveryListing | null> {
-  const row = await getPublicListingById(id);
-  if (!row) return null;
-  return rowToDiscoveryFields(row) as DiscoveryListing;
+  if (!hasPublicDataConfig) {
+    if (allowFixtureFallback) {
+      return DISCOVERY_FIXTURES.find((listing) => listing.id === id) ?? null;
+    }
+
+    reportMissingProductionDiscoveryConfig("getDiscoveryListingById");
+    return null;
+  }
+
+  try {
+    const row = await getPublicListingById(id);
+    if (!row) return null;
+    return rowToDiscoveryFields(row) as DiscoveryListing;
+  } catch (error) {
+    if (allowFixtureFallback) {
+      reportDiscoveryFallback("getDiscoveryListingById", error);
+      return DISCOVERY_FIXTURES.find((listing) => listing.id === id) ?? null;
+    }
+
+    throw error;
+  }
 }
 
 /** Live opportunities that carry coordinates — backs the /map surface. */
 export async function getDiscoveryListingsWithCoords(): Promise<
   DiscoveryListing[]
 > {
-  const rows = await getLiveListingsWithCoords();
-  return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
+  if (!hasPublicDataConfig) {
+    if (allowFixtureFallback) {
+      return DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
+    }
+
+    reportMissingProductionDiscoveryConfig("getDiscoveryListingsWithCoords");
+    return [];
+  }
+
+  try {
+    const rows = await getLiveListingsWithCoords();
+    return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
+  } catch (error) {
+    if (allowFixtureFallback) {
+      reportDiscoveryFallback("getDiscoveryListingsWithCoords", error);
+      return DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
+    }
+
+    throw error;
+  }
+}
+
+export function canUseDiscoveryFixtureFallback(): boolean {
+  return !hasPublicDataConfig && allowFixtureFallback;
+}
+
+export function hasDiscoveryPublicDataConfig(): boolean {
+  return hasPublicDataConfig;
+}
+
+export function warnIfDiscoveryDataMissingInProduction(context: string) {
+  reportMissingProductionDiscoveryConfig(context);
 }
 
 /**

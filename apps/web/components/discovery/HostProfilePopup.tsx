@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { Button, Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
+import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { Badge, Button, Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
+import { PopupShell } from "../overlay/PopupShell";
 
 import {
 	CATEGORY_ICON,
@@ -11,9 +12,6 @@ import {
 	type DiscoveryListingHost,
 } from "./listing";
 import styles from "./HostProfilePopup.module.css";
-
-const FOCUSABLE_SELECTOR =
-	'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export interface HostProfilePopupProps {
 	/** The host whose profile to show, or null when closed. */
@@ -45,177 +43,205 @@ export function HostProfilePopup({
 	onClose,
 	onSelectListing,
 }: HostProfilePopupProps) {
-	const titleId = useId();
-	const panelRef = useRef<HTMLDivElement>(null);
-	const restoreFocusRef = useRef<HTMLElement | null>(null);
-	const [mounted, setMounted] = useState(false);
-
-	useEffect(() => {
-		setMounted(true);
-	}, []);
-
-	useEffect(() => {
-		if (!host) {
-			return;
-		}
-		restoreFocusRef.current = document.activeElement as HTMLElement | null;
-		const panel = panelRef.current;
-		const focusables = () =>
-			panel
-				? Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-				: [];
-		focusables()[0]?.focus();
-
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
-				event.preventDefault();
-				onClose();
-				return;
-			}
-			if (event.key !== "Tab") {
-				return;
-			}
-			const items = focusables();
-			if (items.length === 0) {
-				return;
-			}
-			const first = items[0];
-			const last = items[items.length - 1];
-			if (event.shiftKey && document.activeElement === first) {
-				event.preventDefault();
-				last.focus();
-			} else if (!event.shiftKey && document.activeElement === last) {
-				event.preventDefault();
-				first.focus();
-			}
-		};
-
-		document.addEventListener("keydown", onKeyDown);
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
-
-		return () => {
-			document.removeEventListener("keydown", onKeyDown);
-			document.body.style.overflow = previousOverflow;
-			restoreFocusRef.current?.focus();
-		};
-	}, [host, onClose]);
-
+	const router = useRouter();
 	const hostListings = useMemo(
 		() =>
 			host
-				? listings.filter((listing) => listing.host.name === host.name)
+				? listings.filter((listing) => listing.host.id === host.id)
 				: [],
 		[host, listings],
 	);
-
-	if (!mounted || !host) {
+	if (!host) {
 		return null;
 	}
 
+	const leadListing = hostListings[0] ?? null;
+	const categories = Array.from(
+		new Set(hostListings.map((listing) => listing.category)),
+	);
+	const hostId = host?.id ?? null;
+	const location = leadListing?.location ?? "Location to be announced";
 	const roleWord = hostListings.length === 1 ? "opportunity" : "opportunities";
-	const trustNote = host.verified
-		? "This host has a verified badge. Verification is self-declared by the host."
-		: "This host hasn't added a verified badge yet.";
+	const yearsOnPlatform = hostListings.length > 0 ? "Active now" : "New host";
 
-	return createPortal(
-		<div
-			className={styles.scrim}
-			onClick={(event) => {
-				if (event.target === event.currentTarget) {
-					onClose();
-				}
-			}}
-		>
-			<div
-				ref={panelRef}
-				className={styles.panel}
-				role="dialog"
-				aria-modal={true}
-				aria-labelledby={titleId}
-			>
-				<div className={styles.topbar}>
-					<span className={styles.eyebrow}>
-						<Icon name="nav.profile" size={16} aria-hidden />
-						<span>Host profile</span>
-					</span>
-					<Button
-						variant="ghost"
-						onClick={onClose}
-						aria-label="Close host profile"
-					>
-						Close
-					</Button>
+	function handleOpenLeadListing() {
+		if (leadListing?.id && onSelectListing) {
+			onSelectListing(leadListing.id);
+			return;
+		}
+		if (hostId) {
+			router.push(`/host/${hostId}`);
+			onClose();
+		}
+	}
+
+	function handleViewProfile() {
+		if (!hostId) {
+			return;
+		}
+		router.push(`/host/${hostId}`);
+		onClose();
+	}
+
+	return (
+		<PopupShell
+			open={Boolean(host)}
+			onClose={onClose}
+			title={host.name}
+			headerIcon={<Icon name="nav.profile" size={24} aria-hidden />}
+			headerMeta={
+				<span>
+					{hostListings.length} open {roleWord} · {yearsOnPlatform}
+				</span>
+			}
+			headerTags={
+				<>
+					{host.verified ? <VerifiedHostBadge /> : null}
+					{categories.map((category) => (
+						<Badge
+							key={category}
+							label={CATEGORY_LABEL[category]}
+							icon={CATEGORY_ICON[category]}
+						/>
+					))}
+				</>
+			}
+			hero={
+				<div className={styles.heroScene}>
+					{leadListing?.coverImageUrl ? (
+						<img
+							className={styles.heroImage}
+							src={leadListing.coverImageUrl}
+							alt=""
+						/>
+					) : (
+						<div className={styles.heroFallback} aria-hidden>
+							<Icon
+								name={leadListing ? CATEGORY_ICON[leadListing.category] : "nav.profile"}
+								size={24}
+								aria-hidden
+							/>
+							<span>
+								{leadListing ? CATEGORY_LABEL[leadListing.category] : "Host"}
+							</span>
+						</div>
+					)}
 				</div>
-
-				<div className={styles.body}>
-					<header className={styles.identity}>
+			}
+			heroFooter={
+				<div className={styles.heroBadge}>
+					<div className={styles.medallion}>
 						<span className={styles.avatar} aria-hidden>
 							<Icon name="nav.profile" size={24} aria-hidden />
 						</span>
-						<div className={styles.identityText}>
-							<h2 id={titleId} className={styles.name}>
-								{host.name}
-							</h2>
-							{host.verified ? <VerifiedHostBadge /> : null}
-						</div>
-					</header>
-
-					<p className={styles.trust}>{trustNote}</p>
-
-					<section
-						className={styles.section}
-						aria-label="Open opportunities from this host"
-					>
-						<h3 className={styles.sectionLabel}>
-							{hostListings.length} open {roleWord}
-						</h3>
-						<ul className={styles.list}>
-							{hostListings.map((listing) =>
-								onSelectListing ? (
-									<li key={listing.id}>
-										<button
-											type="button"
-											className={styles.role}
-											onClick={() => onSelectListing(listing.id)}
-										>
-											<Icon
-												name={CATEGORY_ICON[listing.category]}
-												size={20}
-												aria-hidden
-											/>
-											<span className={styles.roleText}>
-												<span className={styles.roleTitle}>{listing.title}</span>
-												<span className={styles.roleMeta}>
-													{CATEGORY_LABEL[listing.category]} \u00b7 {listing.location}{" "}
-													\u00b7 {listing.opportunityWindow}
-												</span>
-											</span>
-											<Icon name="action.forward" size={20} aria-hidden />
-										</button>
-									</li>
-								) : (
-									<li key={listing.id} className={styles.role}>
-										<Icon
-											name={CATEGORY_ICON[listing.category]}
-											size={20}
-											aria-hidden
-										/>
-										<span className={styles.roleText}>
-											<span className={styles.roleTitle}>{listing.title}</span>
-											<span className={styles.roleMeta}>
-												{CATEGORY_LABEL[listing.category]} \u00b7 {listing.location}{" "}
-												\u00b7 {listing.opportunityWindow}
-											</span>
-										</span>
-									</li>
-								),
-							)}
-						</ul>
-					</section>
+						{host.verified ? (
+							<span className={styles.medallionCheck} aria-hidden>
+								<Icon name="trust.verified_host" size={16} aria-hidden />
+							</span>
+						) : null}
+					</div>
 				</div>
-			</div>
-		</div>,
-		document.body,
+			}
+			footer={
+				<div className={styles.footer}>
+					{leadListing ? (
+						<Button variant="secondary" onClick={handleOpenLeadListing}>
+							Open roles
+						</Button>
+					) : null}
+					{hostId ? (
+						<Button variant="primary" onClick={handleViewProfile}>
+							View full profile
+						</Button>
+					) : null}
+				</div>
+			}
+			closeLabel="Close host profile"
+		>
+			<section className={styles.summaryCard} aria-label="Host summary">
+				<div className={styles.identityText}>
+					<h3 className={styles.name}>{host.name}</h3>
+					<p className={styles.trust}>
+						{host.verified
+							? "This host has completed Explore & Earn's verification process."
+							: "This host has not yet completed verification."}
+					</p>
+				</div>
+				<dl className={styles.facts}>
+					<div className={styles.fact}>
+						<dt>Open roles</dt>
+						<dd>{hostListings.length}</dd>
+					</div>
+					<div className={styles.fact}>
+						<dt>Hiring status</dt>
+						<dd>{hostListings.length > 0 ? "Hiring now" : "Awaiting roles"}</dd>
+					</div>
+					<div className={styles.fact}>
+						<dt>Activity</dt>
+						<dd>{yearsOnPlatform}</dd>
+					</div>
+				</dl>
+			</section>
+
+			<section className={styles.locationBand} aria-label="Primary location">
+				<div className={styles.locationCopy}>
+					<span className={styles.locationLabel}>
+						<Icon name="nav.map" size={16} aria-hidden />
+						<span>Location</span>
+					</span>
+					<p className={styles.locationValue}>{location}</p>
+				</div>
+				<div className={styles.locationArt} aria-hidden />
+			</section>
+
+			<section
+				className={styles.section}
+				aria-label="Open opportunities from this host"
+			>
+				<h3 className={styles.sectionLabel}>
+					{hostListings.length} open {roleWord}
+				</h3>
+				<ul className={styles.list}>
+					{hostListings.map((listing) =>
+						onSelectListing ? (
+							<li key={listing.id}>
+								<button
+									type="button"
+									className={styles.role}
+									onClick={() => onSelectListing(listing.id)}
+								>
+									<Icon
+										name={CATEGORY_ICON[listing.category]}
+										size={20}
+										aria-hidden
+									/>
+									<span className={styles.roleText}>
+										<span className={styles.roleTitle}>{listing.title}</span>
+										<span className={styles.roleMeta}>
+											{CATEGORY_LABEL[listing.category]} · {listing.location} · {listing.opportunityWindow}
+										</span>
+									</span>
+									<Icon name="action.forward" size={20} aria-hidden />
+								</button>
+							</li>
+						) : (
+							<li key={listing.id} className={styles.role}>
+								<Icon
+									name={CATEGORY_ICON[listing.category]}
+									size={20}
+									aria-hidden
+								/>
+								<span className={styles.roleText}>
+									<span className={styles.roleTitle}>{listing.title}</span>
+									<span className={styles.roleMeta}>
+										{CATEGORY_LABEL[listing.category]} · {listing.location} · {listing.opportunityWindow}
+									</span>
+								</span>
+							</li>
+						),
+					)}
+				</ul>
+			</section>
+		</PopupShell>
 	);
 }

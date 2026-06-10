@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
 	Badge,
 	Button,
@@ -14,6 +14,8 @@ import type {
 	BenefitProvision,
 	DiscoveryCardConditionalBadge,
 } from "@explore-and-earn/contracts";
+import { saveListingAction } from "../../app/actions/swipe";
+import { PopupShell } from "../overlay/PopupShell";
 
 import { CATEGORY_ICON, CATEGORY_LABEL, type DiscoveryListing } from "./listing";
 import styles from "./QuickPeekDrawer.module.css";
@@ -41,21 +43,12 @@ const CONDITIONAL_BADGE_META: Record<
 	{
 		readonly label: string;
 		readonly icon: IconKey;
-		readonly variant: "seasonal" | "featured" | "boosted";
+		readonly variant: "seasonal" | "boosted";
 	}
 > = {
 	seasonal: { label: "Seasonal", icon: "category.seasonal", variant: "seasonal" },
-	featured: {
-		label: "Featured",
-		icon: "trust.featured_employer",
-		variant: "featured",
-	},
 	boosted: { label: "Boosted", icon: "status.boosted", variant: "boosted" },
 };
-
-const FOCUSABLE_SELECTOR =
-	'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 export interface QuickPeekDrawerProps {
 	readonly listing: DiscoveryListing | null;
 	readonly onClose: () => void;
@@ -71,139 +64,162 @@ export interface QuickPeekDrawerProps {
  * Save / Quick Apply remain presentational until the data layer lands.
  */
 export function QuickPeekDrawer({ listing, onClose }: QuickPeekDrawerProps) {
-	const titleId = useId();
-	const panelRef = useRef<HTMLDivElement>(null);
-	const restoreFocusRef = useRef<HTMLElement | null>(null);
-	const [mounted, setMounted] = useState(false);
-
-	useEffect(() => {
-		setMounted(true);
-	}, []);
-
-	useEffect(() => {
-		if (!listing) {
-			return;
-		}
-		restoreFocusRef.current = document.activeElement as HTMLElement | null;
-		const panel = panelRef.current;
-		const focusables = () =>
-			panel
-				? Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-				: [];
-		focusables()[0]?.focus();
-
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") {
-				event.preventDefault();
-				onClose();
-				return;
-			}
-			if (event.key !== "Tab") {
-				return;
-			}
-			const items = focusables();
-			if (items.length === 0) {
-				return;
-			}
-			const first = items[0];
-			const last = items[items.length - 1];
-			if (event.shiftKey && document.activeElement === first) {
-				event.preventDefault();
-				last.focus();
-			} else if (!event.shiftKey && document.activeElement === last) {
-				event.preventDefault();
-				first.focus();
-			}
-		};
-
-		document.addEventListener("keydown", onKeyDown);
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = "hidden";
-
-		return () => {
-			document.removeEventListener("keydown", onKeyDown);
-			document.body.style.overflow = previousOverflow;
-			restoreFocusRef.current?.focus();
-		};
-	}, [listing, onClose]);
+	const router = useRouter();
+	const [saved, setSaved] = useState(false);
+	const [saving, setSaving] = useState(false);
 
 	const conditionalBadges = useMemo(
 		() => listing?.conditionalBadges ?? [],
 		[listing],
 	);
+	const signals = useMemo(
+		() =>
+			[
+				listing?.founding ? "Founding program" : null,
+				listing?.visaSupport ? "Visa support" : null,
+			].filter((value): value is string => value !== null),
+		[listing],
+	);
+	const windowFacts = useMemo(
+		() =>
+			listing?.begins && listing?.ends
+				? [
+					{ label: "Begins", value: listing.begins },
+					{ label: "Ends", value: listing.ends },
+				]
+				: listing
+					? [{ label: "Window", value: listing.opportunityWindow }]
+					: [],
+		[listing],
+	);
 
-	if (!mounted || !listing) {
+	async function handleSave() {
+		if (!listing || saved || saving) return;
+		setSaving(true);
+		const result = await saveListingAction(listing.id).catch(() => ({ ok: false, alreadySaved: false }));
+		setSaving(false);
+		if (result.ok || result.alreadySaved) {
+			setSaved(true);
+		}
+	}
+
+	function handleApply() {
+		if (!listing) return;
+		router.push(`/listing/${listing.id}`);
+		onClose();
+	}
+
+	if (!listing) {
 		return null;
 	}
 
-	return createPortal(
-		<div
-			className={styles.scrim}
-			onClick={(event) => {
-				if (event.target === event.currentTarget) {
-					onClose();
-				}
-			}}
-		>
-			<div
-				ref={panelRef}
-				className={styles.panel}
-				role="dialog"
-				aria-modal={true}
-				aria-labelledby={titleId}
-			>
-				<div className={styles.topbar}>
-					<span className={styles.eyebrow}>
-						<Icon name={CATEGORY_ICON[listing.category]} size={16} aria-hidden />
-						<span>{CATEGORY_LABEL[listing.category]}</span>
-					</span>
+	return (
+		<PopupShell
+			open={Boolean(listing)}
+			onClose={onClose}
+			title={listing.title}
+			headerIcon={<Icon name={CATEGORY_ICON[listing.category]} size={24} aria-hidden />}
+			eyebrow={
+				<>
+					<Icon name="action.forward" size={16} aria-hidden />
+					<span>Quick peek</span>
+				</>
+			}
+			headerMeta={
+				<span>
+					{listing.host.name} · {listing.location} · {listing.opportunityWindow}
+				</span>
+			}
+			headerTags={
+				<div className={styles.badges}>
+					<Badge
+						label={CATEGORY_LABEL[listing.category]}
+						icon={CATEGORY_ICON[listing.category]}
+					/>
+					{listing.host.verified ? <VerifiedHostBadge /> : null}
+					{conditionalBadges.map((badge) => (
+						<Badge
+							key={badge}
+							label={CONDITIONAL_BADGE_META[badge].label}
+							icon={CONDITIONAL_BADGE_META[badge].icon}
+							variant={CONDITIONAL_BADGE_META[badge].variant}
+						/>
+					))}
+				</div>
+			}
+			hero={
+				<div className={styles.cover}>
+					{listing.coverImageUrl ? (
+						<img
+							className={styles.coverImage}
+							src={listing.coverImageUrl}
+							alt=""
+						/>
+					) : (
+						<div className={styles.coverFallback} aria-hidden={true}>
+							<Icon name={CATEGORY_ICON[listing.category]} size={24} aria-hidden />
+							<span>{CATEGORY_LABEL[listing.category]}</span>
+						</div>
+					)}
+				</div>
+			}
+			heroFooter={
+				<div className={styles.heroBadge}>
+					<span className={styles.heroBadgeLabel}>{listing.host.name}</span>
+				</div>
+			}
+			footer={
+				<div className={styles.footer}>
 					<Button
-						variant="ghost"
-						onClick={onClose}
-						aria-label="Close opportunity details"
+						variant="secondary"
+						icon="action.save"
+						onClick={handleSave}
+						disabled={saved || saving}
 					>
-						Close
+						{saved ? "Saved" : saving ? "Saving…" : "Save"}
+					</Button>
+					<Button variant="primary" icon="action.apply" onClick={handleApply}>
+						View &amp; Apply
 					</Button>
 				</div>
-
-				<div className={styles.cover} aria-hidden={true}>
-					<Icon name={CATEGORY_ICON[listing.category]} size={24} aria-hidden />
-				</div>
-
-				<div className={styles.body}>
-					<div className={styles.badges}>
-						<Badge
-							label={CATEGORY_LABEL[listing.category]}
-							icon={CATEGORY_ICON[listing.category]}
-						/>
-						{listing.host.verified ? <VerifiedHostBadge /> : null}
-						{conditionalBadges.map((badge) => (
-							<Badge
-								key={badge}
-								label={CONDITIONAL_BADGE_META[badge].label}
-								icon={CONDITIONAL_BADGE_META[badge].icon}
-								variant={CONDITIONAL_BADGE_META[badge].variant}
-							/>
+			}
+			closeLabel="Close opportunity details"
+		>
+			{signals.length > 0 ? (
+				<section className={styles.section} aria-label="Opportunity signals">
+					<h3 className={styles.sectionLabel}>Signals</h3>
+					<div className={styles.signalRail}>
+						{signals.map((signal) => (
+							<span key={signal} className={styles.signalChip}>
+								{signal}
+							</span>
 						))}
 					</div>
+				</section>
+			) : null}
 
-					<header className={styles.header}>
-						<h2 id={titleId} className={styles.title}>
-							{listing.title}
-						</h2>
-						<p className={styles.meta}>
-							{listing.host.name} \u00b7 {listing.location} \u00b7{" "}
-							{listing.opportunityWindow}
-						</p>
-					</header>
+			<section className={styles.overviewCard} aria-label="Opportunity summary card">
+				<div className={styles.infoStack}>
+					<div className={styles.infoRow}>
+						<Icon name="action.apply" size={16} aria-hidden />
+						<span>{listing.title}</span>
+					</div>
+					<div className={styles.infoRow}>
+						<Icon name="nav.map" size={16} aria-hidden />
+						<span>{listing.location}</span>
+					</div>
+				</div>
 
-					{listing.founding ? (
-						<p className={styles.founding}>Founding program opportunity</p>
-					) : null}
+				<div className={styles.dateRail}>
+					{windowFacts.map((fact) => (
+						<div key={fact.label} className={styles.dateCard}>
+							<span className={styles.dateLabel}>{fact.label}</span>
+							<p className={styles.dateValue}>{fact.value}</p>
+						</div>
+					))}
+				</div>
 
-					<section className={styles.section} aria-label="What is provided">
-						<h3 className={styles.sectionLabel}>Housing \u00b7 Meals \u00b7 Pay</h3>
-						<dl className={styles.triad}>
+				<dl className={styles.triadGrid}>
 							{BENEFIT_META.map(({ key, label, icon }) => {
 								const info = listing.benefits[key];
 								return (
@@ -223,26 +239,23 @@ export function QuickPeekDrawer({ listing, onClose }: QuickPeekDrawerProps) {
 									</div>
 								);
 							})}
-						</dl>
-					</section>
+					</dl>
+			</section>
 
-					{typeof listing.matchScore === "number" ? (
-						<div className={styles.match}>
-							<Meter value={listing.matchScore} label="Match" />
-						</div>
-					) : null}
-
-					<div className={styles.footer}>
-						<Button variant="secondary" icon="action.save">
-							Save
-						</Button>
-						<Button variant="primary" icon="action.apply">
-							Quick Apply
-						</Button>
+			{listing.payInsight?.note ? (
+				<section className={styles.section} aria-label="Compensation note">
+					<h3 className={styles.sectionLabel}>Compensation note</h3>
+					<div className={styles.noteCard}>
+						<p className={styles.noteText}>{listing.payInsight.note}</p>
 					</div>
+				</section>
+			) : null}
+
+			{typeof listing.matchScore === "number" ? (
+				<div className={styles.match}>
+					<Meter value={listing.matchScore} label="Match" />
 				</div>
-			</div>
-		</div>,
-		document.body,
+			) : null}
+		</PopupShell>
 	);
 }

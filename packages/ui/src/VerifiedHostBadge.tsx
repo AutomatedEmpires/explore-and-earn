@@ -5,7 +5,6 @@ export function VerifiedHostBadge() {
     <span className="ui-badge ui-badge--verified" data-icon="trust.verified_host">
       <Icon aria-hidden name="trust.verified_host" size={16} />
       <span>Verified Host</span>
-      <span className="ui-badge__qualifier">Self-Declared by Host</span>
     </span>
   );
 }

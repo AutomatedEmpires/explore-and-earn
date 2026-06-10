@@ -1,0 +1,502 @@
+/* ── Subtitle ───────────────────────────────────────────── */
+
+.subtitle {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+	text-align: center;
+}
+
+/* ── Photo grid ─────────────────────────────────────────── */
+
+.photoSection {
+	display: flex;
+	flex-direction: column;
+}
+
+.photoGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-10);
+}
+
+.photoSlot {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+	transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.photoArea {
+	position: relative;
+	aspect-ratio: 4 / 3;
+	overflow: hidden;
+	border-radius: var(--radius-card);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 44%, transparent);
+	background: linear-gradient(165deg, #d4b898 0%, #c49878 60%, #a87848 100%);
+	box-shadow:
+		inset 0 0 0 1px rgba(255,255,252,0.24),
+		inset 0 3px 10px rgba(26,43,60,0.12);
+	transition:
+		border-color var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+/* Edge vignette — recessed frame feel */
+.photoArea::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(ellipse 90% 88% at 50% 50%, transparent 32%, rgba(26,43,60,0.22) 100%);
+	pointer-events: none;
+	border-radius: inherit;
+}
+
+/* ── Housing slot atmospheres ───────────────────────────── */
+
+.outside .photoArea {
+	background:
+		radial-gradient(ellipse 90% 55% at 50% -2%, rgba(178,215,242,0.62) 0%, transparent 54%),
+		radial-gradient(ellipse 62% 42% at 50% 108%, rgba(52,88,32,0.28) 0%, transparent 58%),
+		linear-gradient(165deg, #b2d0a8 0%, #84be74 46%, #62a04c 100%);
+}
+
+.inside .photoArea {
+	background:
+		radial-gradient(ellipse 70% 55% at 50% 22%, rgba(255,214,126,0.54) 0%, transparent 58%),
+		radial-gradient(ellipse 58% 42% at 50% 108%, rgba(60,28,6,0.22) 0%, transparent 56%),
+		linear-gradient(165deg, #ead8b0 0%, #d0b468 48%, #b08840 100%);
+}
+
+.bathroom .photoArea {
+	background:
+		radial-gradient(ellipse 82% 46% at 50% -2%, rgba(194,224,255,0.58) 0%, transparent 54%),
+		radial-gradient(ellipse 52% 40% at 50% 108%, rgba(26,48,80,0.18) 0%, transparent 56%),
+		linear-gradient(165deg, #bcccd8 0%, #9cb0bc 48%, #7e94a8 100%);
+}
+
+.housingMisc .photoArea {
+	background:
+		radial-gradient(ellipse 78% 50% at 50% -2%, rgba(220,198,152,0.52) 0%, transparent 54%),
+		radial-gradient(ellipse 52% 40% at 50% 108%, rgba(40,22,6,0.18) 0%, transparent 56%),
+		linear-gradient(165deg, #ccc0a8 0%, #b09878 48%, #8a7858 100%);
+}
+
+/* ── Meals slot atmospheres ─────────────────────────────── */
+
+.kitchen .photoArea {
+	background:
+		radial-gradient(ellipse 80% 48% at 56% -2%, rgba(198,225,178,0.58) 0%, transparent 54%),
+		radial-gradient(ellipse 56% 40% at 50% 108%, rgba(28,48,18,0.22) 0%, transparent 58%),
+		linear-gradient(165deg, #c0d0b0 0%, #94b87e 46%, #729660 100%);
+}
+
+.prepared .photoArea {
+	background:
+		radial-gradient(ellipse 75% 52% at 50% 18%, rgba(255,218,130,0.56) 0%, transparent 58%),
+		radial-gradient(ellipse 56% 42% at 50% 108%, rgba(62,28,6,0.22) 0%, transparent 56%),
+		linear-gradient(165deg, #e8d0a8 0%, #d4a870 48%, #b87840 100%);
+}
+
+.dining .photoArea {
+	background:
+		radial-gradient(ellipse 78% 48% at 50% 8%, rgba(220,200,166,0.54) 0%, transparent 56%),
+		radial-gradient(ellipse 52% 40% at 50% 108%, rgba(40,22,8,0.18) 0%, transparent 56%),
+		linear-gradient(165deg, #ccbea8 0%, #b09880 48%, #8a7860 100%);
+}
+
+.mealsMisc .photoArea {
+	background:
+		radial-gradient(ellipse 80% 46% at 50% -2%, rgba(190,210,222,0.48) 0%, transparent 54%),
+		radial-gradient(ellipse 52% 38% at 50% 108%, rgba(28,38,52,0.16) 0%, transparent 56%),
+		linear-gradient(165deg, #b8c4c8 0%, #9aaab0 48%, #7a9098 100%);
+}
+
+/* ── Slot hover (edit + view) ───────────────────────────── */
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+	.photoSlot:hover {
+		transform: translateY(-2px);
+	}
+
+	.photoSlot:hover .photoArea {
+		border-color: color-mix(in srgb, var(--border-ink) 72%, transparent);
+		box-shadow:
+			inset 0 0 0 1.5px rgba(255,255,252,0.32),
+			inset 0 3px 10px rgba(26,43,60,0.10),
+			0 6px 20px rgba(26,43,60,0.16);
+	}
+}
+
+/* ── Camera button (edit mode only) ────────────────────── */
+
+.cameraButton {
+	position: absolute;
+	top: var(--space-8);
+	right: var(--space-8);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* 44px minimum touch target */
+	width: 2.75rem;
+	height: 2.75rem;
+	border-radius: var(--radius-pill);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 56%, transparent);
+	background: color-mix(in srgb, #fff8ea 90%, var(--color-surface-raised));
+	color: var(--text-primary);
+	cursor: pointer;
+	box-shadow: 0 2px 10px rgba(26,43,60,0.16);
+	z-index: 1;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.cameraButton:hover {
+	transform: scale(1.10);
+	background: color-mix(in srgb, #fff1d0 94%, var(--color-surface-raised));
+	box-shadow: 0 4px 14px rgba(26,43,60,0.22);
+}
+
+.cameraButton:active {
+	transform: scale(0.94);
+	box-shadow: 0 1px 4px rgba(26,43,60,0.12);
+}
+
+.cameraButton:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* Field-journal slot labels */
+.slotLabel {
+	font-family: var(--font-display);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-regular);
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	text-align: center;
+	color: var(--text-secondary);
+}
+
+/* ── View mode: provision + summary ─────────────────────── */
+
+.viewSummary {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-10);
+	align-items: flex-start;
+	padding: var(--space-12) var(--space-14);
+	border: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
+	border-radius: var(--radius-card);
+	background: color-mix(in srgb, var(--color-surface-raised) 88%, white 12%);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, white 36%, transparent);
+}
+
+.provisionBadge {
+	display: inline-flex;
+	align-items: center;
+	padding: var(--space-6) var(--space-12);
+	border-radius: var(--radius-pill);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 30%, transparent);
+	background: color-mix(in srgb, #fff3d8 82%, var(--color-surface));
+	color: var(--text-primary);
+}
+
+.provided {
+	border-color: color-mix(in srgb, #5a9850 52%, transparent);
+	background: color-mix(in srgb, #d8f0d0 80%, var(--color-surface));
+	color: color-mix(in srgb, #2a5c1a 96%, #000 4%);
+}
+
+.partial {
+	border-color: color-mix(in srgb, #d4a832 48%, transparent);
+	background: color-mix(in srgb, #fff3d8 82%, var(--color-surface));
+	color: color-mix(in srgb, #8a5c00 96%, #000 4%);
+}
+
+.not_provided {
+	border-color: color-mix(in srgb, var(--border-ink) 32%, transparent);
+	background: color-mix(in srgb, var(--color-surface-raised) 88%, white 12%);
+	color: var(--text-secondary);
+}
+
+.summaryText {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
+/* ── Form fields (edit mode only) ───────────────────────── */
+
+.fieldRow {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-10);
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+}
+
+.fieldLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.select {
+	appearance: none;
+	width: 100%;
+	padding: var(--space-10) 2.25rem var(--space-10) var(--space-12);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 56%, transparent);
+	border-radius: var(--radius-cell);
+	background-color: color-mix(in srgb, var(--color-surface-raised) 92%, var(--color-surface));
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23503d2b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right var(--space-10) center;
+	background-size: 1rem;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+	cursor: pointer;
+	box-shadow: inset 0 1.5px 3px rgba(26,43,60,0.06);
+	transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.select:focus {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+	border-color: color-mix(in srgb, var(--border-ink) 80%, var(--text-primary) 20%);
+}
+
+/* ── Chips (edit mode only) ─────────────────────────────── */
+
+.chipSection {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.chipLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	padding: var(--space-8) var(--space-12);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 44%, transparent);
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--color-surface-raised) 90%, var(--color-surface));
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		border-color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		transform var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.chip:hover {
+	border-color: color-mix(in srgb, var(--border-ink) 64%, var(--text-primary) 36%);
+	background: color-mix(in srgb, #fff3d8 88%, var(--color-surface));
+}
+
+.chip:active {
+	transform: scale(0.97);
+}
+
+.chip:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* Active: embossed amber catch-light */
+.chipActive {
+	border-color: color-mix(in srgb, var(--border-ink) 74%, var(--text-primary) 26%);
+	background: color-mix(in srgb, #fdefc8 88%, var(--color-surface));
+	box-shadow:
+		inset 0 1.5px 0 rgba(255,255,255,0.82),
+		inset 0 -1px 0 rgba(26,43,60,0.06),
+		0 0 0 1px color-mix(in srgb, #d4a832 22%, transparent),
+		0 2px 8px rgba(212,168,50,0.18);
+}
+
+/* Add chip — dashed to signal intent */
+.chipAdd {
+	border-style: dashed;
+	border-color: color-mix(in srgb, var(--border-ink) 36%, transparent);
+	color: var(--text-secondary);
+}
+
+.chipAdd:hover {
+	border-style: dashed;
+	color: var(--text-primary);
+}
+
+/* ── Trust note ──────────────────────────────────────────── */
+
+.trustNote {
+	display: flex;
+	align-items: center;
+	gap: var(--space-12);
+	padding: var(--space-12) var(--space-14);
+	border: 1.5px solid color-mix(in srgb, #d4a832 40%, color-mix(in srgb, var(--border-ink) 24%, transparent));
+	border-left: 3.5px solid color-mix(in srgb, #d4a832 70%, var(--border-ink) 30%);
+	border-radius: var(--radius-card);
+	background: linear-gradient(
+		135deg,
+		color-mix(in srgb, #fef8ec 90%, var(--color-surface-raised)) 0%,
+		color-mix(in srgb, #f8f0d8 88%, var(--color-surface)) 100%
+	);
+	position: relative;
+	overflow: hidden;
+}
+
+/* Housing trust note: tree silhouette */
+.trustNote[data-kind="housing"]::after {
+	content: "";
+	position: absolute;
+	right: -0.5rem;
+	bottom: -0.25rem;
+	width: 6.5rem;
+	height: 3rem;
+	background:
+		radial-gradient(ellipse 16% 58% at 18% 100%, color-mix(in srgb, #6a9458 52%, transparent) 0%, transparent 72%),
+		radial-gradient(ellipse 13% 48% at 36% 100%, color-mix(in srgb, #4e7836 46%, transparent) 0%, transparent 68%),
+		radial-gradient(ellipse 18% 62% at 58% 100%, color-mix(in srgb, #6a9458 48%, transparent) 0%, transparent 74%),
+		radial-gradient(ellipse 14% 50% at 78% 100%, color-mix(in srgb, #4e7836 42%, transparent) 0%, transparent 68%),
+		radial-gradient(ellipse 12% 44% at 92% 100%, color-mix(in srgb, #5a8444 38%, transparent) 0%, transparent 65%);
+	pointer-events: none;
+	opacity: 0.48;
+}
+
+/* Meals trust note: wheat/harvest silhouette */
+.trustNote[data-kind="meals"]::after {
+	content: "";
+	position: absolute;
+	right: -0.5rem;
+	bottom: -0.25rem;
+	width: 6.5rem;
+	height: 3rem;
+	background:
+		radial-gradient(ellipse 14% 52% at 16% 100%, color-mix(in srgb, #c4a040 48%, transparent) 0%, transparent 70%),
+		radial-gradient(ellipse 11% 44% at 30% 100%, color-mix(in srgb, #d4b040 42%, transparent) 0%, transparent 68%),
+		radial-gradient(ellipse 16% 58% at 50% 100%, color-mix(in srgb, #c4a040 44%, transparent) 0%, transparent 72%),
+		radial-gradient(ellipse 12% 46% at 68% 100%, color-mix(in srgb, #d4b040 40%, transparent) 0%, transparent 68%),
+		radial-gradient(ellipse 10% 42% at 84% 100%, color-mix(in srgb, #bca030 36%, transparent) 0%, transparent 64%);
+	pointer-events: none;
+	opacity: 0.44;
+}
+
+.trustIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	color: var(--color-cta);
+}
+
+.trustText {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
+/* ── Footer ──────────────────────────────────────────────── */
+
+.footerRow {
+	display: grid;
+	grid-template-columns: 1fr 2fr;
+	gap: var(--space-8);
+}
+
+/* Sky-blue CTA — shared by save (edit) and "Got it" (view) */
+.saveBtn {
+	background:
+		linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.06) 100%),
+		var(--color-cta);
+	color: #ffffff;
+	border-color: color-mix(in srgb, var(--color-cta) 52%, var(--palette-ink) 48%);
+	box-shadow:
+		4px 5px 0 rgba(26,43,60,0.30),
+		inset 0 2px 0 rgba(255,255,255,0.18),
+		inset 0 -2px 0 rgba(0,0,0,0.10);
+}
+
+.saveBtn:hover:not(:disabled) {
+	background:
+		linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.04) 100%),
+		color-mix(in srgb, var(--color-cta) 86%, var(--palette-ink) 14%);
+	transform: translateY(-1px);
+	box-shadow:
+		5px 6px 0 rgba(26,43,60,0.32),
+		inset 0 2px 0 rgba(255,255,255,0.18),
+		inset 0 -2px 0 rgba(0,0,0,0.10);
+}
+
+.saveBtn:active:not(:disabled) {
+	transform: translateY(1px) scale(0.985);
+	box-shadow:
+		2px 3px 0 rgba(26,43,60,0.22),
+		inset 0 1px 0 rgba(255,255,255,0.10);
+}
+
+/* ── Mobile ──────────────────────────────────────────────── */
+
+@media (max-width: 639px) {
+	.fieldRow {
+		grid-template-columns: 1fr;
+	}
+
+	.footerRow {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.photoSlot,
+	.photoArea,
+	.cameraButton,
+	.chip {
+		transition: none;
+	}
+}
