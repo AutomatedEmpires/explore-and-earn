@@ -28,6 +28,7 @@
     "023": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
     "024": { "slug": null, "owner": "lane-b-migration-integrity", "status": "reserved", "note": "Reserved for Lane B. Unused by this PR; present so the guard recognizes a future 024_* migration owned by this lane." },
     "025": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
-    "026": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" }
+    "026": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
+    "027": { "slug": "reports", "owner": "alpha/reports-table-and-flow", "status": "review-only", "note": "Adds reports table with RLS for the seeker moderation flow (issue #47). REVIEW-ONLY — not applied to any live database." }
   }
 }

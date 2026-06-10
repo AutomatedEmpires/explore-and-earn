@@ -23,3 +23,4 @@ export * from "./adminClient";
 export * from "./queries/admin";
 export * from "./lib/matchScore";
 export * from "./hostAnalytics";
+export * from "./queries/reports";
