@@ -69,6 +69,16 @@ function parseDate(value: string | string[] | undefined): string | undefined {
 // view-model. Housing and meals provision come from the boolean DB columns;
 // summaries are generated because the DB projection does not carry them.
 
+const HOUSING_SUMMARIES = {
+	provided: "Housing included",
+	not_provided: "No housing",
+} as const;
+
+const MEALS_SUMMARIES = {
+	provided: "Meals included",
+	not_provided: "No meals",
+} as const;
+
 function rowToSearchListing(row: ListingRow): SearchListing {
 	const fields = rowToDiscoveryFields(row);
 	const { housing, meals, pay } = fields.benefits;
@@ -82,13 +92,11 @@ function rowToSearchListing(row: ListingRow): SearchListing {
 		benefits: {
 			housing: {
 				provision: housing.provision,
-				summary:
-					housing.provision === "provided" ? "Housing included" : "No housing",
+				summary: HOUSING_SUMMARIES[housing.provision],
 			},
 			meals: {
 				provision: meals.provision,
-				summary:
-					meals.provision === "provided" ? "Meals included" : "No meals",
+				summary: MEALS_SUMMARIES[meals.provision],
 			},
 			pay: {
 				provision: pay.provision,

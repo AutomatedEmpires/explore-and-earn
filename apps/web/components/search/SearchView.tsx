@@ -252,6 +252,10 @@ export function SearchView({
 								value={payUnitValue}
 								onChange={(event) => setPayUnitValue(event.target.value)}
 							>
+								{/* Intentionally limited to the two time-rate units that are
+								    meaningful as search filters. Other CompensationUnit values
+								    (week, month, year, stipend, exchange, other) are not
+								    commonly used as filter criteria. */}
 								<option value="">Any</option>
 								<option value="hour">Hour</option>
 								<option value="day">Day</option>
