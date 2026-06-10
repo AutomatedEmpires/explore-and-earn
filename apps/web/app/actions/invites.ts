@@ -121,6 +121,7 @@ async function respondToInviteActionImpl(
 								applicantsUrl: absoluteUrl("/host/applicants"),
 							}),
 							template: "inviteAccepted",
+							idempotencyKey: `inviteAccepted:${inviteId}`,
 						})
 					}
 				}
@@ -252,6 +253,9 @@ async function createInviteForCurrentHost(
 						subject: `${hostName} invited you to apply to ${listingTitle}`,
 						html,
 						template: "inviteEmail",
+						idempotencyKey: result.inviteId
+							? `inviteEmail:${result.inviteId}`
+							: undefined,
 					})
 				}
 			}

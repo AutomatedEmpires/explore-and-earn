@@ -102,6 +102,7 @@ async function sendMessageActionImpl(
 								conversationUrl: absoluteUrl(conversationPath),
 							}),
 							template: "newMessage",
+							idempotencyKey: `newMessage:${conversationId}`,
 						});
 					}
 				}

@@ -95,6 +95,7 @@ async function updateApplicationStatusActionImpl(
                 dashboardUrl: absoluteUrl("/applied"),
               }),
               template: "applicationStatus",
+              idempotencyKey: `applicationStatus:${applicationId}:${newStatus}`,
             });
           }
         }

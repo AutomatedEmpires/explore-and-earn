@@ -1,30 +1,25 @@
 /**
- * Transactional email sender (Resend).
+ * Transactional email sender — thin app-layer wrapper over @explore-and-earn/mailer.
  *
- * Best-effort by contract: this NEVER throws and returns { ok: false } on any
- * failure, so a notification send can never break the user-facing action that
- * triggered it.
+ * Responsibilities here (vs. in packages/mailer):
+ *   • Accept the app-level `SendEmailOptions` (adds `template` + `idempotencyKey`).
+ *   • Write a fire-and-forget audit row to email_log via the service-role client.
+ *   • Delegate the actual transport (Resend API call, idempotency guard) to
+ *     `sendMail` in packages/mailer, which never throws.
  *
- * Transport: we call the Resend REST API directly with fetch rather than taking
- * a hard dependency on an SDK. This keeps the web app email-capable without a
- * new package to install in the monorepo, and remains a drop-in for the
- * `resend` SDK later if desired. (Brief asked for `@resend/node`; the published
- * package is `resend` — see PR notes.)
+ * Contract: sendEmail NEVER throws and returns { ok: false } on any failure so
+ * a notification send can never break the user-facing action that triggered it.
  *
- * DEV MODE: when NODE_ENV !== "production" and no RESEND_API_KEY is set, the
- * email is logged to the console instead of being sent, so local development
- * works without any Resend setup.
- *
- * AUDIT LOG: every real send attempt is recorded fire-and-forget in the
- * email_log table via the Supabase service-role client (adminClient). The log
- * write is best-effort and never blocks or fails a send. In dev (no service
- * role key) the write is skipped silently.
+ * Dev mode: when RESEND_API_KEY is absent and NODE_ENV !== "production", the
+ * mailer logs to the console instead of sending.
  *
  * Env:
  *   - RESEND_API_KEY    (required to actually send) server-only; never exposed
  *   - RESEND_FROM_EMAIL (optional) From header override
  *   - NEXT_PUBLIC_APP_URL (optional) base URL used by absoluteUrl()
  */
+
+import { sendMail } from "@explore-and-earn/mailer";
 
 import { adminClient } from "@explore-and-earn/db";
 
@@ -39,20 +34,15 @@ export interface SendEmailOptions {
    * and fall back to the subject line for the audit log.
    */
   readonly template?: string;
-}
-
-const RESEND_ENDPOINT = "https://api.resend.com/emails";
-
-/**
- * Default From address. Uses the product sender once the domain is verified in
- * Resend; override with RESEND_FROM_EMAIL (e.g. noreply@automatedempires.com)
- * until exploreandearn.com is configured.
- */
-const DEFAULT_FROM = "Explore & Earn <notifications@exploreandearn.com>";
-
-function resolveFrom(): string {
-  const fromEnv = process.env.RESEND_FROM_EMAIL;
-  return fromEnv && fromEnv.trim().length > 0 ? fromEnv : DEFAULT_FROM;
+  /**
+   * Optional idempotency key forwarded to the mailer transport. When set,
+   * duplicate sends within the 5-minute dedup window are silently dropped so
+   * retried server actions do not double-email recipients.
+   *
+   * Use a stable string that identifies the send event uniquely, e.g.
+   * `"applicationStatus:<applicationId>:<newStatus>"`.
+   */
+  readonly idempotencyKey?: string;
 }
 
 /**
@@ -107,75 +97,40 @@ async function insertEmailLog(entry: EmailLogEntry): Promise<void> {
   }
 }
 
+/**
+ * Send a transactional email.
+ *
+ * Contract: NEVER throws; returns { ok: false } on any failure so a broken
+ * send can never crash the server action that triggered it.
+ *
+ * Delegates transport to `sendMail` from @explore-and-earn/mailer, which
+ * handles the Resend API call, error catching, and idempotency dedup. This
+ * layer adds the email_log audit write on top.
+ */
 export async function sendEmail(
   opts: SendEmailOptions,
 ): Promise<{ ok: boolean }> {
-  const { to, subject, html } = opts;
+  const { to, subject, idempotencyKey } = opts;
   const templateName = opts.template ?? subject;
-  const apiKey = process.env.RESEND_API_KEY;
 
-  // Local-dev fallback: no key outside production -> log instead of send.
-  if (!apiKey) {
-    if (process.env.NODE_ENV !== "production") {
-      console.info(
-        `[email:dev] would send email\n  to: ${to}\n  subject: ${subject}\n  html:\n${html}`,
-      );
-      return { ok: true };
-    }
-    // Production without a key: nothing we can do, but never throw.
-    console.error("[email] RESEND_API_KEY is not set; skipping send.");
-    void insertEmailLog({
-      templateName,
-      recipientEmail: to,
-      ok: false,
-      error: "RESEND_API_KEY is not set",
-    });
-    return { ok: false };
-  }
+  const result = await sendMail({
+    to,
+    subject,
+    html: opts.html,
+    idempotencyKey,
+  });
 
-  if (!to || to.trim().length === 0) {
-    return { ok: false };
-  }
-
-  try {
-    const response = await fetch(RESEND_ENDPOINT, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: resolveFrom(),
-        to: [to],
-        subject,
-        html,
-      }),
-    });
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      console.error(
-        `[email] Resend responded ${response.status}: ${detail.slice(0, 500)}`,
-      );
-      void insertEmailLog({
-        templateName,
-        recipientEmail: to,
-        ok: false,
-        error: `Resend ${response.status}: ${detail.slice(0, 300)}`,
-      });
-      return { ok: false };
-    }
-
-    void insertEmailLog({ templateName, recipientEmail: to, ok: true });
+  // Skip the audit log for deduplicated (already-logged) sends.
+  if (result.isDuplicate) {
     return { ok: true };
-  } catch (error) {
-    console.error("[email] send failed:", error);
-    void insertEmailLog({
-      templateName,
-      recipientEmail: to,
-      ok: false,
-      error: error instanceof Error ? error.message : "unknown",
-    });
-    return { ok: false };
   }
+
+  void insertEmailLog({
+    templateName,
+    recipientEmail: to,
+    ok: result.ok,
+    error: result.error,
+  });
+
+  return { ok: result.ok };
 }
