@@ -1,3 +1,5 @@
+"use client"
+
 import { useEffect, useState } from "react"
 import DOMPurify from "dompurify"
 import type { Config as DOMPurifyConfig } from "dompurify"
@@ -98,6 +100,9 @@ export function Icon({ name, size = 24, title, color, ...rest }: IconProps) {
 		)
 	}
 
+	// Skeleton fallback — same footprint as the real icon, no emoji bleed-through.
+	// A rounded grey slab communicates "icon goes here" without emitting
+	// platform-specific emoji glyphs that vary wildly across OS/browser combos.
 	return (
 		<span
 			role="img"
@@ -105,9 +110,12 @@ export function Icon({ name, size = 24, title, color, ...rest }: IconProps) {
 			aria-hidden={hidden}
 			data-icon={name}
 			data-streamline={entry.streamline}
-			style={{ ...baseStyle, fontSize: size, lineHeight: 1 }}
-		>
-			{entry.placeholder}
-		</span>
+			style={{
+				...baseStyle,
+				borderRadius: "30%",
+				background: "currentColor",
+				opacity: 0.12,
+			}}
+		/>
 	)
 }

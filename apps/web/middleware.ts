@@ -1,5 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
+import { NextResponse } from "next/server";
+
 const isPublicRoute = createRouteMatcher([
   "/",
   "/search",
@@ -21,11 +23,32 @@ const isPublicRoute = createRouteMatcher([
   "/onboarding/(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    await auth.protect();
-  }
-});
+const hasClerkMiddlewareConfig =
+  Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) &&
+  Boolean(process.env.CLERK_SECRET_KEY);
+
+// Fail at startup in production rather than silently bypassing auth.
+if (process.env.NODE_ENV === "production" && !hasClerkMiddlewareConfig) {
+  throw new Error(
+    "Clerk env vars (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY) must be set in production.",
+  );
+}
+
+export default hasClerkMiddlewareConfig
+  ? clerkMiddleware(async (auth, request) => {
+      if (!isPublicRoute(request)) {
+        await auth.protect();
+      }
+    })
+  : // Dev-only fallback: deny protected routes rather than failing open.
+    function middleware(request: Request) {
+      if (!isPublicRoute(request as Parameters<typeof isPublicRoute>[0])) {
+        return new NextResponse("Unauthorized — Clerk not configured", {
+          status: 401,
+        });
+      }
+      return NextResponse.next();
+    };
 
 export const config = {
   matcher: [

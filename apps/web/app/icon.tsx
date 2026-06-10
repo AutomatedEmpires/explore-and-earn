@@ -3,9 +3,9 @@ import { ImageResponse } from "next/og";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-// Matches --palette-ink and --palette-paper from styles/tokens.css
-const INK = "#24221E";
-const PAPER = "#F6F3EC";
+// Matches --palette-ink and --palette-paper from styles/tokens.css (V2 Trail & Sky)
+const INK = "#1A2B3C";
+const PAPER = "#EEF3F8";
 
 export default function Icon() {
   return new ImageResponse(

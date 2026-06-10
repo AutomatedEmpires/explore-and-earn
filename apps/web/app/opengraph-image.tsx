@@ -3,12 +3,12 @@ import { ImageResponse } from "next/og";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// Matches --palette-* values from styles/tokens.css
-const PAPER = "#F6F3EC";
-const INK = "#24221E";
-const INK_SOFT = "#6E685D";
-const INK_MUTED = "#9A9486";
-const LINE = "#E7E1D3";
+// Matches --palette-* values from styles/tokens.css (V2 Trail & Sky)
+const PAPER = "#EEF3F8";
+const INK = "#1A2B3C";
+const INK_SOFT = "#486070";
+const INK_MUTED = "#7A8E9E";
+const LINE = "#C8D5E3";
 
 export default function OgImage() {
   return new ImageResponse(

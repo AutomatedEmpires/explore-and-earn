@@ -12,13 +12,13 @@ export function GET(): Response {
 		"Allow: /",
 		// Auth-gated host dashboard
 		"Disallow: /host/",
-		// All seeker-specific surfaces (require sign-in)
+		// Seeker-specific surfaces that require sign-in
+		// Note: /seek and /map are public discovery surfaces — intentionally allowed and indexed.
 		"Disallow: /accepted",
 		"Disallow: /applied",
 		"Disallow: /home",
 		"Disallow: /invites",
 		"Disallow: /journey",
-		"Disallow: /map",
 		"Disallow: /messages",
 		"Disallow: /notifications",
 		"Disallow: /offered",
@@ -26,7 +26,6 @@ export function GET(): Response {
 		"Disallow: /resume",
 		"Disallow: /saved",
 		"Disallow: /schedule",
-		"Disallow: /seek",
 		"Disallow: /settings",
 		"Disallow: /swipe",
 		"Disallow: /travel",

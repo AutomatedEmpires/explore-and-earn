@@ -8,5 +8,6 @@ export * from "./Meter";
 export * from "./Modal";
 export * from "./Skeleton";
 export * from "./VerifiedHostBadge";
+export * from "./cloudinary";
 export * from "./icons";
 export * from "./tokens";

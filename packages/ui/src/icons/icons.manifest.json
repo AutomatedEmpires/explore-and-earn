@@ -1,275 +1,284 @@
 {
   "generated": "2026-06-08",
   "cloud": "dwiwyt9vi",
-  "base_url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload",
+  "base_url": "https://res.cloudinary.com/dwiwyt9vi/image/upload",
+  "asset_folder": "explore-and-earn/icons",
+  "note": "All 54 canonical keys now have Cloudinary assets. No emoji fallbacks remain.",
   "summary": {
     "total_canonical": 54,
-    "with_asset": 47,
-    "missing_asset": 7
+    "with_asset": 54,
+    "missing_asset": 0
   },
   "icons": {
     "category.farm": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/category/farm",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/farm"
+      "cloudinaryId": "Vegetables-Carrot--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Vegetables-Carrot--Streamline-Freehand"
     },
     "category.maritime": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/category/maritime",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/maritime"
+      "cloudinaryId": "Various-Building-Anchor--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Various-Building-Anchor--Streamline-Freehand"
     },
     "category.remote": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/category/remote",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/remote"
+      "cloudinaryId": "Laptop-Computer--Streamline-Freehand_fw3tck",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Laptop-Computer--Streamline-Freehand_fw3tck"
     },
     "category.seasonal": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/category/seasonal",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/seasonal"
+      "cloudinaryId": "Ecology-Leaf--Streamline-Freehand_zn6ay0",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Ecology-Leaf--Streamline-Freehand_zn6ay0"
     },
     "category.mix": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/category/mix",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/category/mix"
+      "cloudinaryId": "Cake-Cookie-Mix--Streamline-Freehand_aedx5r",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Cake-Cookie-Mix--Streamline-Freehand_aedx5r"
     },
     "benefit.housing": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/benefit/housing",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/housing"
+      "cloudinaryId": "Home-2--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Home-2--Streamline-Freehand"
     },
     "benefit.meals": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/benefit/meals",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/meals"
+      "cloudinaryId": "Fast-Food-Tacos--Streamline-Freehand_ny6elu",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Fast-Food-Tacos--Streamline-Freehand_ny6elu"
     },
     "benefit.pay": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/benefit/pay",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/pay"
+      "cloudinaryId": "Currency-Dollar-Symbol--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Currency-Dollar-Symbol--Streamline-Freehand"
     },
     "benefit.transport": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/benefit/transport",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/transport"
+      "cloudinaryId": "Bicycle-Travel--Streamline-Freehand_enyxpj",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Bicycle-Travel--Streamline-Freehand_enyxpj"
     },
     "benefit.wifi": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/benefit/wifi",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/benefit/wifi"
+      "cloudinaryId": "Wifi-Check-Connect--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Wifi-Check-Connect--Streamline-Freehand"
     },
     "mappin.farm": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/mappin/farm",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/farm"
+      "cloudinaryId": "Pin-1--Streamline-Freehand_ou7wy6",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Pin-1--Streamline-Freehand_ou7wy6"
     },
     "mappin.maritime": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/mappin/maritime",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/maritime"
+      "cloudinaryId": "Pin-1--Streamline-Freehand_ou7wy6",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Pin-1--Streamline-Freehand_ou7wy6"
     },
     "mappin.remote": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/mappin/remote",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/remote"
+      "cloudinaryId": "Pin-1--Streamline-Freehand_ou7wy6",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Pin-1--Streamline-Freehand_ou7wy6"
     },
     "mappin.seasonal": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/mappin/seasonal",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/seasonal"
+      "cloudinaryId": "Pin-1--Streamline-Freehand_ou7wy6",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Pin-1--Streamline-Freehand_ou7wy6"
     },
     "mappin.mix": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/mappin/mix",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/mappin/mix"
+      "cloudinaryId": "Pin-1--Streamline-Freehand_ou7wy6",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Pin-1--Streamline-Freehand_ou7wy6"
     },
     "mappin.cluster": {
-      "status": "missing",
-      "note": "stacked pins / number badge \u2014 source from Streamline Freehand"
+      "status": "uploaded",
+      "cloudinaryId": "Location-Smiley-1--Streamline-Freehand_kq9lyt",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Location-Smiley-1--Streamline-Freehand_kq9lyt"
     },
     "trust.verified_host": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/trust/verified_host",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/trust/verified_host"
+      "cloudinaryId": "Form-Validation-Check-Badge--Streamline-Freehand_wpbhf3",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Form-Validation-Check-Badge--Streamline-Freehand_wpbhf3"
     },
     "trust.founding_host": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/trust/founding_host",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/trust/founding_host"
+      "cloudinaryId": "Rating-Number-One-Badge--Streamline-Freehand_yk6u8f",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Rating-Number-One-Badge--Streamline-Freehand_yk6u8f"
     },
     "trust.featured_employer": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/trust/featured_employer",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/trust/featured_employer"
+      "cloudinaryId": "Wild-Bird-Owl-Body--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Wild-Bird-Owl-Body--Streamline-Freehand"
     },
     "status.open": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/status/open",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/status/open"
+      "cloudinaryId": "Form-Validation-Check-Circle--Streamline-Freehand_zi1ffg",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Form-Validation-Check-Circle--Streamline-Freehand_zi1ffg"
     },
     "status.partially_filled": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/status/partially_filled",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/status/partially_filled"
+      "cloudinaryId": "Loading-Blinking-Circles-1--Streamline-Freehand_ze5iqg",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Loading-Blinking-Circles-1--Streamline-Freehand_ze5iqg"
     },
     "status.filled": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/status/filled",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/status/filled"
+      "cloudinaryId": "Check-Thick--Streamline-Flex_iv2zve",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Check-Thick--Streamline-Flex_iv2zve"
     },
     "status.boosted": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/status/boosted",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/status/boosted"
+      "cloudinaryId": "Connect-Flash--Streamline-Freehand_shywaj",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Connect-Flash--Streamline-Freehand_shywaj"
     },
     "status.match": {
-      "status": "missing",
-      "note": "target / spark \u2014 source from Streamline Freehand"
+      "status": "uploaded",
+      "cloudinaryId": "Match-Fire--Streamline-Freehand_d2ltnm",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Match-Fire--Streamline-Freehand_d2ltnm"
     },
     "action.apply": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/apply",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/apply"
+      "cloudinaryId": "Send-Email-Paper-Plane-1--Streamline-Freehand_ledwtk",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Send-Email-Paper-Plane-1--Streamline-Freehand_ledwtk"
     },
     "action.save": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/save",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/save"
+      "cloudinaryId": "Love-It-Bookmark--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Love-It-Bookmark--Streamline-Freehand"
     },
     "action.share": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/share",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/share"
+      "cloudinaryId": "Share-Megaphone-1--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Share-Megaphone-1--Streamline-Freehand"
     },
     "action.report": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/report",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/report"
+      "cloudinaryId": "Flag-Plain-Wave-2--Streamline-Freehand_db4ezc",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Flag-Plain-Wave-2--Streamline-Freehand_db4ezc"
     },
     "action.message": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/message",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/message"
+      "cloudinaryId": "Conversation-Chat--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Conversation-Chat--Streamline-Freehand"
     },
     "action.filter": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/filter",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/filter"
+      "cloudinaryId": "Filter-1--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Filter-1--Streamline-Freehand"
     },
     "action.sort": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/sort",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/sort"
+      "cloudinaryId": "Time-Hourglass-Triangle--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Time-Hourglass-Triangle--Streamline-Freehand"
     },
     "action.back": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/back",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/back"
+      "cloudinaryId": "Keyboard-Arrow-Left-1--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Keyboard-Arrow-Left-1--Streamline-Freehand"
     },
     "action.forward": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/forward",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/forward"
+      "cloudinaryId": "Keyboard-Arrow-Right-1--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Keyboard-Arrow-Right-1--Streamline-Freehand"
     },
     "action.close": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/close",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/close"
+      "cloudinaryId": "Delete-Bin-2--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Delete-Bin-2--Streamline-Freehand"
     },
     "action.more": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/action/more",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/action/more"
+      "cloudinaryId": "Menu-Navigation-Horizontal-Circle--Streamline-Freehand_iy7eew",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Menu-Navigation-Horizontal-Circle--Streamline-Freehand_iy7eew"
     },
     "nav.seek": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/nav/seek",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/seek"
+      "cloudinaryId": "Business-Cash-Search--Streamline-Freehand_hhs0en",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Business-Cash-Search--Streamline-Freehand_hhs0en"
     },
     "nav.swipe": {
-      "status": "missing",
-      "note": "swipe / shuffle cards \u2014 source from Streamline Freehand"
+      "status": "uploaded",
+      "cloudinaryId": "Gesture-Swipe-Horizontal--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Gesture-Swipe-Horizontal--Streamline-Freehand"
     },
     "nav.map": {
-      "status": "missing",
-      "note": "folded map \u2014 GPS-Location-Rectangle was low-confidence, needs re-evaluation"
+      "status": "uploaded",
+      "cloudinaryId": "Maps-Pin-4--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Maps-Pin-4--Streamline-Freehand"
     },
     "nav.saved": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/nav/saved",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/saved"
+      "cloudinaryId": "Love-It-Bookmark--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Love-It-Bookmark--Streamline-Freehand"
     },
     "nav.messages": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/nav/messages",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/messages"
+      "cloudinaryId": "Conversation-Chat--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Conversation-Chat--Streamline-Freehand"
     },
     "nav.dashboard": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/nav/dashboard",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/dashboard"
+      "cloudinaryId": "Layouts-Modules-1--Streamline-Freehand_recgve",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Layouts-Modules-1--Streamline-Freehand_recgve"
     },
     "nav.profile": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/nav/profile",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/profile"
+      "cloudinaryId": "Single-Neutral--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Single-Neutral--Streamline-Freehand"
     },
     "nav.admin": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/nav/admin",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/nav/admin"
+      "cloudinaryId": "Menu-Navigation-Horizontal--Streamline-Freehand_g647mu",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Menu-Navigation-Horizontal--Streamline-Freehand_g647mu"
     },
     "analytics.meter": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/analytics/meter",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/analytics/meter"
+      "cloudinaryId": "Car-Dashboard-Speed--Streamline-Freehand_wyuaez",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Car-Dashboard-Speed--Streamline-Freehand_wyuaez"
     },
     "analytics.funnel": {
-      "status": "missing",
-      "note": "funnel chart \u2014 source from Streamline Freehand"
+      "status": "uploaded",
+      "cloudinaryId": "View-Binocular--Streamline-Freehand_legk1l",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/View-Binocular--Streamline-Freehand_legk1l"
     },
     "analytics.trend": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/analytics/trend",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/analytics/trend"
+      "cloudinaryId": "Analytics-Graph-Line-Triple--Streamline-Freehand_ch6hlw",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Analytics-Graph-Line-Triple--Streamline-Freehand_ch6hlw"
     },
     "analytics.donut": {
-      "status": "missing",
-      "note": "donut / ring chart \u2014 source from Streamline Freehand"
+      "status": "uploaded",
+      "cloudinaryId": "Analytics-Graph-Pie--Streamline-Freehand_cak0lv",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Analytics-Graph-Pie--Streamline-Freehand_cak0lv"
     },
     "analytics.source": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/analytics/source",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/analytics/source"
+      "cloudinaryId": "Analytics-Graph-Bar-Line--Streamline-Freehand_egz7ms",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Analytics-Graph-Bar-Line--Streamline-Freehand_egz7ms"
     },
     "system.info": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/system/info",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/info"
+      "cloudinaryId": "Alerts-Information-Circle--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Alerts-Information-Circle--Streamline-Freehand"
     },
     "system.success": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/system/success",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/success"
+      "cloudinaryId": "Check-Thick--Streamline-Flex_iv2zve",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Check-Thick--Streamline-Flex_iv2zve"
     },
     "system.warning": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/system/warning",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/warning"
+      "cloudinaryId": "Mood-Warning-Bubble--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Mood-Warning-Bubble--Streamline-Freehand"
     },
     "system.error": {
-      "status": "missing",
-      "note": "x-circle / error octagon \u2014 source from Streamline Freehand"
+      "status": "uploaded",
+      "cloudinaryId": "Cloud-Error-404--Streamline-Freehand_mlspst",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Cloud-Error-404--Streamline-Freehand_mlspst"
     },
     "system.lock": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/system/lock",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/lock"
+      "cloudinaryId": "Lock-Square--Streamline-Freehand",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Lock-Square--Streamline-Freehand"
     },
     "system.loading": {
       "status": "uploaded",
-      "cloudinaryId": "explore-and-earn/icons/system/loading",
-      "url": "https://res.cloudinary.com/dwiwyt9vi/raw/upload/explore-and-earn/icons/system/loading"
+      "cloudinaryId": "Loading-Spinning-Circles--Streamline-Freehand_werhkn",
+      "url": "https://res.cloudinary.com/dwiwyt9vi/image/upload/Loading-Spinning-Circles--Streamline-Freehand_werhkn"
     }
   }
 }
