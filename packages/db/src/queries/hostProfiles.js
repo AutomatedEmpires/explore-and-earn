@@ -72,17 +72,16 @@ export async function getHostSubscriptionTier(clerkToken, clerkUserId) {
         .select("subscription_tier")
         .eq("clerk_user_id", clerkUserId)
         .maybeSingle();
-    if (error)
+    if (error) {
         throw new Error(`getHostSubscriptionTier: ${error.message}`);
-    const value = data?.subscription_tier;
-    switch (value) {
-        case "starter":
-        case "professional":
-        case "enterprise":
-            return value;
-        default:
-            return "none";
     }
+    const tier = data?.subscription_tier;
+    if (tier === "starter" ||
+        tier === "professional" ||
+        tier === "enterprise") {
+        return tier;
+    }
+    return "none";
 }
 export async function updateHostProfileDetails(clerkToken, clerkUserId, fields) {
     const patch = {};

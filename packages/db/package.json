@@ -9,10 +9,14 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@explore-and-earn/contracts": "workspace:*",
     "@supabase/supabase-js": "^2.107.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.6"
   }
 }
