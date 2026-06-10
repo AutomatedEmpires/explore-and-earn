@@ -17,6 +17,8 @@ export interface ApplyResult {
 
 /** Postgres unique_violation SQLSTATE -- surfaced as the already-applied case. */
 const UNIQUE_VIOLATION = "23505";
+/** Postgres check_violation SQLSTATE -- surfaced as invalid_transition or listing_full. */
+const CHECK_VIOLATION = "23514";
 
 /**
  * Resolve seeker_profiles.id for the authed Clerk user.
@@ -307,11 +309,15 @@ export async function getApplicationCountsByListing(
   return counts;
 }
 
-const HOST_SETTABLE_STATUSES = [
+export const HOST_SETTABLE_STATUSES = [
   "reviewing",
   "saved_by_host",
   "offered",
   "not_selected",
+  // Hosts confirm acceptance of a seeker who is in 'offered' state.
+  // The lifecycle guard (trg_applications_lifecycle) enforces that only the
+  // offered -> accepted edge is valid; any other path is rejected by Postgres.
+  "accepted",
 ] as const;
 
 export type HostSettableStatus = (typeof HOST_SETTABLE_STATUSES)[number];
@@ -357,7 +363,7 @@ export async function updateApplicationStatus(
   const listingId = String((appRow as Record<string, unknown>).listing_id);
   const { data: listingRow, error: listingError } = await untyped
     .from("listings")
-    .select("id,host_profile_id")
+    .select("id,host_profile_id,remaining_role_count")
     .eq("id", listingId)
     .maybeSingle();
   if (listingError) {
@@ -372,12 +378,42 @@ export async function updateApplicationStatus(
     return { ok: false, error: "forbidden" };
   }
 
+  // Pre-check capacity before attempting to accept so callers receive a clear
+  // error instead of a raw Postgres CHECK-violation message. The DB constraint
+  // (remaining_role_count >= 0) is the authoritative guard; this check avoids
+  // the round-trip when the listing is obviously full, and provides a friendly
+  // error code in the (unlikely) race-condition case via the catch below.
+  if (newStatus === "accepted") {
+    const remaining = Number(
+      (listingRow as Record<string, unknown>).remaining_role_count ?? 0,
+    );
+    if (remaining <= 0) {
+      return { ok: false, error: "listing_full" };
+    }
+  }
+
   const { error: updateError } = await untyped
     .from("applications")
     .update({ status: newStatus })
     .eq("id", applicationId);
   if (updateError) {
-    return { ok: false, error: updateError.message };
+    // 23514 = check_violation. Two sources are possible:
+    //   a) enforce_lifecycle_transition() BEFORE trigger rejected the edge;
+    //      its message starts with "Illegal " (see 001_extensions_and_functions.sql).
+    //   b) The AFTER trigger's UPDATE of listings violated remaining_role_count >= 0
+    //      (race-condition over-accept that slipped past the pre-check above).
+    const code = (updateError as { code?: string; message?: string }).code;
+    const msg = (updateError as { message?: string }).message ?? "";
+    if (code === CHECK_VIOLATION) {
+      if (msg.startsWith("Illegal ")) {
+        return { ok: false, error: "invalid_transition" };
+      }
+      return {
+        ok: false,
+        error: newStatus === "accepted" ? "listing_full" : "invalid_transition",
+      };
+    }
+    return { ok: false, error: msg || updateError.message };
   }
 
   return { ok: true };
@@ -687,6 +723,7 @@ export async function getApplicationById(
  *  1. newStatus is in SEEKER_SETTABLE_STATUSES
  *  2. Caller owns the application (seeker_profile_id matches)
  *  3. Current application status is 'offered' (can only act on a live offer)
+ *  4. When accepting: the listing still has remaining capacity
  */
 export async function updateApplicationStatusBySeeker(
   clerkToken: string,
@@ -706,7 +743,7 @@ export async function updateApplicationStatusBySeeker(
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data: appRow, error: appError } = await untyped
     .from("applications")
-    .select("id, seeker_profile_id, status")
+    .select("id, seeker_profile_id, status, listing_id")
     .eq("id", applicationId)
     .maybeSingle();
 
@@ -722,13 +759,40 @@ export async function updateApplicationStatusBySeeker(
     return { ok: false, error: "invalid_transition" };
   }
 
+  // Pre-check capacity before accepting so seekers receive a clear error
+  // instead of a raw Postgres CHECK-violation. The DB constraint is the
+  // authoritative guard; this avoids the round-trip when obviously full.
+  if (newStatus === "accepted") {
+    const { data: listingRow, error: listingError } = await untyped
+      .from("listings")
+      .select("remaining_role_count")
+      .eq("id", String(row.listing_id))
+      .maybeSingle();
+    if (listingError) return { ok: false, error: listingError.message };
+    const remaining = Number(
+      (listingRow as Record<string, unknown> | null)?.remaining_role_count ?? 0,
+    );
+    if (remaining <= 0) {
+      return { ok: false, error: "listing_full" };
+    }
+  }
+
   const { error: updateError } = await untyped
     .from("applications")
     .update({ status: newStatus })
     .eq("id", applicationId)
     .eq("seeker_profile_id", seekerProfileId);
 
-  if (updateError) return { ok: false, error: updateError.message };
+  if (updateError) {
+    // 23514 = check_violation. Distinguish lifecycle guard (message starts with
+    // "Illegal ") from a capacity violation on the listings CHECK constraint.
+    const code = (updateError as { code?: string; message?: string }).code;
+    const msg = (updateError as { message?: string }).message ?? "";
+    if (code === CHECK_VIOLATION && !msg.startsWith("Illegal ") && newStatus === "accepted") {
+      return { ok: false, error: "listing_full" };
+    }
+    return { ok: false, error: msg || updateError.message };
+  }
   return { ok: true };
 }
 
