@@ -309,7 +309,56 @@ function HashtagChips({ tags }: { tags: readonly string[] }) {
   );
 }
 
+function PostMenu({ onClose }: { onClose: () => void }) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("mousedown", handleClick);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("mousedown", handleClick);
+    };
+  }, [onClose]);
+
+  return (
+    <div ref={menuRef} className={styles.postMenu} role="menu" aria-label="Post options">
+      <button
+        type="button"
+        className={styles.postMenuItem}
+        role="menuitem"
+        onClick={onClose}
+      >
+        Report post
+      </button>
+      <button
+        type="button"
+        className={styles.postMenuItem}
+        role="menuitem"
+        onClick={onClose}
+      >
+        Hide from feed
+      </button>
+      <button
+        type="button"
+        className={styles.postMenuItem}
+        role="menuitem"
+        onClick={onClose}
+      >
+        Copy link
+      </button>
+    </div>
+  );
+}
+
 function SeekerCard({ post }: { post: SeekerPost }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <article className={styles.seekerCard}>
       <div className={styles.cardHeader}>
@@ -324,9 +373,19 @@ function SeekerCard({ post }: { post: SeekerPost }) {
           </div>
           <span className={styles.cardTime}>{post.timestamp}</span>
         </div>
-        <button className={styles.moreBtn} type="button" aria-label="More options">
-          <Icon name="action.more" size={16} aria-hidden />
-        </button>
+        <div className={styles.postMenuWrap}>
+          <button
+            className={styles.moreBtn}
+            type="button"
+            aria-label="More options"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            onClick={() => setMenuOpen(prev => !prev)}
+          >
+            <Icon name="action.more" size={16} aria-hidden />
+          </button>
+          {menuOpen ? <PostMenu onClose={() => setMenuOpen(false)} /> : null}
+        </div>
       </div>
       <p className={styles.cardCaption}>{post.caption}</p>
       <HashtagChips tags={post.tags} />
@@ -582,6 +641,24 @@ function EmployerFeedCard({ item }: { item: FeaturedEmployerCard }) {
   );
 }
 
+function FeedEndMarker() {
+  return (
+    <div className={styles.feedEnd} aria-label="End of feed">
+      <div className={styles.feedEndRule} aria-hidden>
+        <span className={styles.feedEndIcon}>🌲</span>
+      </div>
+      <h3 className={styles.feedEndHeading}>You&rsquo;re all caught up</h3>
+      <p className={styles.feedEndSub}>
+        You&rsquo;ve seen everything in your community feed. Ready to explore new opportunities?
+      </p>
+      <Link href="/seek" className={styles.feedEndCta}>
+        Explore listings
+        <Icon name="action.forward" size={16} aria-hidden />
+      </Link>
+    </div>
+  );
+}
+
 // ─── Sidebar components ───────────────────────────────────────────────────────
 
 function WelcomeBar({ status }: { status: SeekerStatusSummary }) {
@@ -693,17 +770,26 @@ export function CommunityDashboard({ tab, status, listings, featuredEmployers = 
         <div className={styles.mainCol}>
           {mainItems.length === 0 ? (
             <div className={styles.emptyState}>
-              <p>No content yet — check back soon as your community grows.</p>
+              {tab === "photos" ? (
+                <p>No photos yet — community members share moments from the field, sunrise shifts, and life on the trail here.</p>
+              ) : tab === "announcements" ? (
+                <p>No announcements yet — hosts share seasonal openings, housing updates, and hiring news here.</p>
+              ) : (
+                <p>No content yet — check back soon as your community grows.</p>
+              )}
             </div>
           ) : (
-            mainItems.map(item => {
-              if (item.kind === "seeker") return <SeekerCard key={item.id} post={item} />;
-              if (item.kind === "announcement") return <AnnouncementCard key={item.id} post={item} />;
-              if (item.kind === "blog") return <BlogCard key={item.id} post={item} />;
-              if (item.kind === "listing") return <ListingFeedCard key={item.id} item={item} />;
-              if (item.kind === "employer") return <EmployerFeedCard key={item.id} item={item} />;
-              return null;
-            })
+            <>
+              {mainItems.map(item => {
+                if (item.kind === "seeker") return <SeekerCard key={item.id} post={item} />;
+                if (item.kind === "announcement") return <AnnouncementCard key={item.id} post={item} />;
+                if (item.kind === "blog") return <BlogCard key={item.id} post={item} />;
+                if (item.kind === "listing") return <ListingFeedCard key={item.id} item={item} />;
+                if (item.kind === "employer") return <EmployerFeedCard key={item.id} item={item} />;
+                return null;
+              })}
+              {tab === "feed" ? <FeedEndMarker /> : null}
+            </>
           )}
         </div>
 

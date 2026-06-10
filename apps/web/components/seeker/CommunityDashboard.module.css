@@ -1,5 +1,16 @@
 /* ─── Shell ──────────────────────────────────────────────────────────────────── */
 
+/*
+ * Community green palette — semantic tokens scoped to this component tree.
+ * Defined on .dashboard so they cascade to all children.
+ * AGENTS.md: never hardcode raw colors where semantic tokens exist.
+ */
+.dashboard {
+  --community-green:    #2A5724;
+  --community-green-deep: #1E4018;
+  --community-green-bg: #EDF4EC;
+}
+
 .dashboard {
   display: flex;
   flex-direction: column;
@@ -18,7 +29,7 @@
   align-items: center;
   gap: var(--space-10);
   padding: var(--space-10) var(--space-16);
-  background: #2A5724;
+  background: var(--community-green);
   border: 1.5px solid rgba(25, 21, 14, 0.25);
   border-radius: var(--radius-card);
   color: rgba(255, 255, 255, 0.95);
@@ -159,9 +170,9 @@
 }
 
 .avatarHost {
-  border-color: #2A5724;
-  background: #EDF4EC;
-  color: #2A5724;
+  border-color: var(--community-green);
+  background: var(--community-green-bg);
+  color: var(--community-green);
 }
 
 .cardMeta {
@@ -208,7 +219,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
-  color: #2A5724;
+  color: var(--community-green);
 }
 
 .hostBadge {
@@ -225,7 +236,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
-  color: #1E4018;
+  color: var(--community-green-deep);
 }
 
 .moreBtn {
@@ -277,7 +288,7 @@
   font-family: var(--font-ui);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
-  color: #2A5724;
+  color: var(--community-green);
   white-space: nowrap;
 }
 
@@ -900,7 +911,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
-  color: #2A5724;
+  color: var(--community-green);
 }
 
 .widgetListTitle {
@@ -1006,7 +1017,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 .listingVerified {
   display: inline-flex;
   align-items: center;
-  color: #2A5724;
+  color: var(--community-green);
   flex-shrink: 0;
 }
 
@@ -1324,4 +1335,157 @@ a.widgetFooter:hover { color: var(--text-primary); }
 .employerCta:hover {
   border-color: rgba(25, 21, 14, 0.55);
   background: rgba(25, 21, 14, 0.04);
+}
+
+/* ─── Reaction active state ──────────────────────────────────────────────────── */
+
+.reactionActive {
+  background: rgba(42, 87, 36, 0.06);
+}
+
+.reactionActive .reactionEmoji {
+  transform: scale(1.12);
+  transition: transform 120ms var(--ease-standard);
+}
+
+.reactionActive .reactionCount {
+  color: var(--community-green);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ─── Post more-options menu ─────────────────────────────────────────────────── */
+
+.postMenuWrap {
+  position: relative;
+}
+
+.postMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  min-width: 10rem;
+  background: var(--color-card-warm);
+  border: 1.5px solid rgba(25, 21, 14, 0.16);
+  border-radius: var(--radius-card);
+  box-shadow: 0 4px 16px rgba(25, 21, 14, 0.12), 0 1px 4px rgba(25, 21, 14, 0.08);
+  padding: var(--space-4) 0;
+  animation: menuIn 120ms var(--ease-standard);
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.postMenuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  padding: var(--space-8) var(--space-14);
+  background: transparent;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.postMenuItem:hover {
+  background: rgba(25, 21, 14, 0.05);
+}
+
+.postMenuItem:focus-visible {
+  outline: none;
+  background: rgba(25, 21, 14, 0.08);
+}
+
+/* ─── Feed end marker ────────────────────────────────────────────────────────── */
+
+.feedEnd {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-24) var(--space-16);
+  text-align: center;
+}
+
+.feedEndRule {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  color: rgba(25, 21, 14, 0.25);
+}
+
+.feedEndRule::before,
+.feedEndRule::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(25, 21, 14, 0.1);
+}
+
+.feedEndIcon {
+  font-size: 1.5rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.feedEndHeading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.feedEndSub {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--text-secondary);
+}
+
+.feedEndCta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 2.125rem;
+  padding: 0 var(--space-16);
+  border: 1.5px solid rgba(25, 21, 14, 0.28);
+  border-radius: var(--radius-input);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
+}
+
+.feedEndCta:hover {
+  border-color: rgba(25, 21, 14, 0.55);
+  background: rgba(25, 21, 14, 0.04);
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .xpFill {
+    transition: none;
+  }
+  .postMenu {
+    animation: none;
+  }
+  .reactionActive .reactionEmoji {
+    transform: none;
+    transition: none;
+  }
 }
