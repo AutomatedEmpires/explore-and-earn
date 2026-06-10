@@ -26,11 +26,13 @@ const hasClerkMiddlewareConfig =
   Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) &&
   Boolean(process.env.CLERK_SECRET_KEY);
 
-const isPreviewDeployment = process.env.VERCEL_ENV === "preview";
-
-if (process.env.NODE_ENV === "production" && !hasClerkMiddlewareConfig && !isPreviewDeployment) {
+// Clerk must be configured in EVERY deployed environment (production AND
+// preview). Preview deployments are publicly reachable, so they must enforce
+// the same auth as production. Do NOT reintroduce a `VERCEL_ENV === "preview"`
+// bypass here — it leaves preview environments fully unauthenticated.
+if (process.env.NODE_ENV === "production" && !hasClerkMiddlewareConfig) {
   throw new Error(
-    "Clerk env vars (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY) must be set in production.",
+    "Clerk env vars (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY) must be set in all deployed environments, including preview.",
   );
 }
 
@@ -41,10 +43,9 @@ export default hasClerkMiddlewareConfig
       }
     })
   : function authFallbackMiddleware(request: Request) {
-      if (isPreviewDeployment) {
-        return NextResponse.next();
-      }
-
+      // Fail closed: when Clerk is not configured (local/dev only, since
+      // production and preview throw above), protected routes are denied
+      // rather than silently opened.
       if (!isPublicRoute(request as Parameters<typeof isPublicRoute>[0])) {
         return new NextResponse("Unauthorized — Clerk not configured", {
           status: 401,
