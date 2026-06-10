@@ -10,6 +10,14 @@
   gap: var(--space-8);
 }
 
+.expiry {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
 .success {
   margin: 0;
   font-family: var(--font-ui);

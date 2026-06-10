@@ -13,17 +13,29 @@ const ERROR_TEXT: Record<string, string> = {
 	unauthenticated: "Sign in to accept or decline offers.",
 	not_found: "This offer is no longer available.",
 	invalid_status: "This offer has already been responded to.",
+	invalid_transition: "This offer has already been responded to.",
 };
+
+/** Days remaining before the expiry timestamp (null when no expiry set). */
+function daysUntilExpiry(expiresAt: string | null): number | null {
+	const diff = new Date(expiresAt).getTime() - Date.now();
+	return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
 
 export interface OfferedActionsProps {
 	readonly applicationId: string;
+	/** ISO timestamp from applications.expires_at — null when not yet set. */
+	readonly expiresAt?: string | null;
 }
 
 /**
- * Accept / Decline controls for an offered application card. Same interaction
- * pattern as InviteActions: useTransition + aria-live status line.
+ * Accept / Decline controls for an offered application card.
+ *
+ * Mirrors InviteActions: useTransition + aria-live status line. Shows an
+ * expiry warning when the offer deadline is within 2 days, per the 7-day
+ * offer expiry window defined in LIFECYCLE_EXPIRY_DAYS.
  */
-export function OfferedActions({ applicationId }: OfferedActionsProps) {
+export function OfferedActions({ applicationId, expiresAt = null }: OfferedActionsProps) {
 	const [isPending, startTransition] = useTransition();
 	const [pendingAction, setPendingAction] = useState<
 		"accepted" | "not_selected" | null
@@ -32,6 +44,17 @@ export function OfferedActions({ applicationId }: OfferedActionsProps) {
 		readonly ok: boolean;
 		readonly text: string;
 	} | null>(null);
+
+	const days = daysUntilExpiry(expiresAt);
+	// Offer expiry window is 7 days; warn when ≤ 2 days remain.
+	const expiryWarning =
+		days !== null && days <= 2
+			? days <= 0
+				? "Expires today"
+				: days === 1
+					? "Expires tomorrow"
+					: `Expires in ${days} days`
+			: null;
 
 	function handleAction(action: "accepted" | "not_selected") {
 		setMessage(null);
@@ -48,15 +71,14 @@ export function OfferedActions({ applicationId }: OfferedActionsProps) {
 						ok: true,
 						text:
 							action === "accepted"
-								? "Offer accepted!"
 								: "Offer declined.",
-					}
+						}
 					: {
 						ok: false,
 						text:
 							(result.error ? ERROR_TEXT[result.error] : undefined) ??
 							"Could not update this offer.",
-					},
+						},
 			);
 		});
 	}
@@ -85,6 +107,11 @@ export function OfferedActions({ applicationId }: OfferedActionsProps) {
 						: "Decline"}
 				</Button>
 			</div>
+			{expiryWarning ? (
+				<p className={styles.expiry} aria-live="polite">
+					{expiryWarning}
+				</p>
+			) : null}
 			{message ? (
 				<p
 					className={message.ok ? styles.success : styles.error}

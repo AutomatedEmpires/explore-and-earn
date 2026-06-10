@@ -396,6 +396,7 @@ export interface ApplicationListing {
 
 export type ApplicationWithListing = SeekerApplication & {
   readonly listing: ApplicationListing | null;
+  readonly expiresAt: string | null;
 };
 
 function embeddedCompensationSummary(row: Record<string, unknown>): string {
@@ -496,7 +497,7 @@ export async function getSeekerApplicationsWithListings(
   const { data, error } = await untyped
     .from("applications")
     .select(
-      "id, listing_id, status, submitted_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)",
+      "id, listing_id, status, submitted_at, expires_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)",
     )
     .eq("seeker_profile_id", seekerProfileId)
     .in("status", statuses)
@@ -513,6 +514,7 @@ export async function getSeekerApplicationsWithListings(
       listingId: String(r.listing_id),
       status: typeof r.status === "string" ? r.status : "applied",
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+      expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
       listing: rowToDiscoveryListing(r.listings),
     } satisfies ApplicationWithListing;
   });

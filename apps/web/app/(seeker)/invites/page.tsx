@@ -35,14 +35,19 @@ export default async function InvitesPage() {
 
   const invites = await getSeekerInvites(token, userId);
 
-  // Drop invites whose listing could not be resolved (e.g. deleted listing).
   const items = invites.flatMap((entry) =>
     entry.listing
       ? [
           {
             listing: entry.listing,
             cardState: "invited" as const,
-            actions: <InviteActions inviteId={entry.invite.id} />,
+            actions: (
+              <InviteActions
+                inviteId={entry.invite.id}
+                initialStatus={entry.invite.status}
+                expiresAt={entry.invite.expiresAt}
+              />
+            ),
           },
         ]
       : [],
