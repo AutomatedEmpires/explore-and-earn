@@ -21,6 +21,9 @@ export interface InviteActionsProps {
   readonly expiresAt?: string | null;
 }
 
+/** Warn when fewer than this many milliseconds remain on the expiry window. */
+const EXPIRY_WARNING_THRESHOLD_MS = 48 * 60 * 60 * 1000;
+
 /** Returns true if the supplied ISO timestamp is in the past. */
 function isExpired(expiresAt: string): boolean {
   return new Date(expiresAt) < new Date();
@@ -28,8 +31,9 @@ function isExpired(expiresAt: string): boolean {
 
 /** Returns true if the invite expires within the next 48 hours. */
 function isExpiringSoon(expiresAt: string): boolean {
-  const ms = new Date(expiresAt).getTime() - Date.now();
-  return ms > 0 && ms < 48 * 60 * 60 * 1000;
+  const now = Date.now();
+  const ms = new Date(expiresAt).getTime() - now;
+  return ms > 0 && ms < EXPIRY_WARNING_THRESHOLD_MS;
 }
 
 /**
