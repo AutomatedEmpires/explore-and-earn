@@ -45,6 +45,8 @@ export { HostAnalyticsDashboard } from "./HostAnalyticsDashboard";
 export type { HostAnalyticsDashboardProps } from "./HostAnalyticsDashboard";
 export { HostSettings } from "./HostSettings";
 export type { HostSettingsProps } from "./HostSettings";
+export { HostProfileHero } from "./HostProfileHero";
+export type { HostProfileHeroProps } from "./HostProfileHero";
 export { ApplicantPipelineRow } from "./ApplicantPipelineRow";
 export type { ApplicantPipelineRowProps } from "./ApplicantPipelineRow";
 export { SeekerSearchDrawer } from "./SeekerSearchDrawer";
