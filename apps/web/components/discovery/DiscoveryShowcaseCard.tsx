@@ -10,11 +10,6 @@ import styles from "./DiscoveryShowcaseCard.module.css";
 
 const CONDITIONAL_BADGES = {
 	boosted: { label: "Boosted", variant: "boosted", icon: "status.boosted" },
-	featured: {
-		label: "Featured",
-		variant: "featured",
-		icon: "trust.featured_employer",
-	},
 	seasonal: { label: "Seasonal", variant: "seasonal", icon: "category.seasonal" },
 } as const;
 
