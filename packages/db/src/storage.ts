@@ -63,6 +63,17 @@ export async function uploadProfilePhoto(
   return uploadToBucket(token, PROFILE_PHOTOS_BUCKET, `${ownerType}/${ownerId}`, file);
 }
 
+/**
+ * Delete a gallery image uploaded under `listing-media/{hostProfileId}/{slot}`.
+ */
+export async function deleteListingMedia(
+  token: string,
+  hostProfileId: string,
+  slot: "cover" | number,
+): Promise<void> {
+  return deleteStorageObject(token, LISTING_MEDIA_BUCKET, `${hostProfileId}/${slot}`);
+}
+
 /** Delete a single object from a bucket by path. */
 export async function deleteStorageObject(
   token: string,

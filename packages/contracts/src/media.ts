@@ -50,6 +50,28 @@ export type MediaSource = (typeof MEDIA_SOURCES)[number];
  */
 export type PhotoTreatment = "frame_not_filter";
 
+// ---------------------------------------------------------------------------
+// Upload validation constants
+// ---------------------------------------------------------------------------
+
+/**
+ * Allowed MIME types for user-uploaded listing media.
+ * Enforced client-side and re-validated in storage RLS.
+ */
+export const UPLOAD_ALLOWED_MIME_TYPES = [
+	"image/jpeg",
+	"image/png",
+	"image/webp",
+	"image/heic",
+] as const;
+export type UploadAllowedMimeType = (typeof UPLOAD_ALLOWED_MIME_TYPES)[number];
+
+/** Maximum size in bytes for a single uploaded file (5 MB). */
+export const UPLOAD_MAX_FILE_BYTES = 5 * 1024 * 1024;
+
+/** Maximum number of gallery images (non-cover) a host may upload per listing. */
+export const GALLERY_MAX_IMAGES = 10;
+
 /** A responsive image descriptor (one high-res master -> on-demand variants). */
 export interface ResponsiveImage {
 	/** Storage path / key for the high-res master. */

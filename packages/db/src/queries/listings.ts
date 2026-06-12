@@ -36,6 +36,7 @@ export interface ListingRow {
   ends_at: string | null;
   published_at: string | null;
   cover_photo_url: string | null;
+  gallery_photo_urls: string[] | null;
   host_profiles: {
     company_name: string;
     attestation_status: string;
@@ -65,6 +66,7 @@ type RawListingRow = {
   ends_at: string | null;
   published_at: string | null;
   cover_photo_url: string | null;
+  gallery_photo_urls: string[] | null;
   host_profiles: { company_name: string; attestation_status: string } | null;
 };
 
@@ -155,6 +157,7 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
         : undefined,
     visaSupport: row.visa_support,
     coverImageUrl: row.cover_photo_url ?? undefined,
+    galleryPhotoUrls: row.gallery_photo_urls ?? [],
     coordinates:
       row.latitude != null && row.longitude != null
         ? { lat: row.latitude, lon: row.longitude }
@@ -163,7 +166,7 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
 }
 
 const LISTING_COLUMNS =
-  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,host_profiles(company_name,attestation_status)";
+  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profiles(company_name,attestation_status)";
 
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;
@@ -434,6 +437,7 @@ export interface ListingWriteFields {
   startDate?: string | null;
   endDate?: string | null;
   coverPhotoUrl?: string | null;
+  galleryUrls?: string[] | null;
 }
 
 type ListingColumnPatch = {
@@ -450,6 +454,7 @@ type ListingColumnPatch = {
   housing_included?: boolean;
   meals_included?: boolean;
   cover_photo_url?: string | null;
+  gallery_photo_urls?: string[];
 };
 
 function toCentsOrNull(amount: number | null | undefined): number | null {
@@ -500,6 +505,9 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
   if (fields.coverPhotoUrl !== undefined) {
     const trimmed = fields.coverPhotoUrl?.trim() ?? "";
     patch.cover_photo_url = trimmed.length > 0 ? trimmed : null;
+  }
+  if (fields.galleryUrls !== undefined) {
+    patch.gallery_photo_urls = fields.galleryUrls ?? [];
   }
 
   return patch;
@@ -630,6 +638,7 @@ export interface PublicListingDetail {
   endsAt: string | null;
   publishedAt: string | null;
   coverPhotoUrl: string | null;
+  galleryPhotoUrls: string[];
   hostProfileId: string | null;
   host: PublicListingDetailHost | null;
 }
@@ -638,7 +647,7 @@ const LISTING_DETAIL_COLUMNS =
   "id,title,category,description,location_display,latitude,longitude,status," +
   "housing_included,meals_included,compensation_summary,compensation_min_cents," +
   "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
-  "begins_at,ends_at,published_at,cover_photo_url,host_profile_id," +
+  "begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profile_id," +
   "host_profiles(id,company_name,photo_url,about,primary_location_name,attestation_status)";
 
 function firstEmbed(value: unknown): Record<string, unknown> | null {
@@ -730,6 +739,11 @@ export async function getListingDetailPublic(
       typeof row.published_at === "string" ? row.published_at : null,
     coverPhotoUrl:
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
+    galleryPhotoUrls: Array.isArray(row.gallery_photo_urls)
+      ? (row.gallery_photo_urls as unknown[]).filter(
+          (u): u is string => typeof u === "string",
+        )
+      : [],
     hostProfileId:
       typeof row.host_profile_id === "string" ? row.host_profile_id : null,
     host,
