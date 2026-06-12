@@ -7,6 +7,7 @@ import type {
   CompensationUnit,
   ListingStatus,
   OpportunityCategory,
+  OpportunityListing,
 } from "@explore-and-earn/contracts";
 import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
@@ -114,7 +115,7 @@ function toListingRow(raw: RawListingRow): ListingRow {
 }
 
 /** Maps a ListingRow to the DiscoveryListing view-model fields. */
-export function rowToDiscoveryFields(row: ListingRow) {
+export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
   const hostName = row.host_profiles?.company_name ?? "Unknown Host";
   const verified = row.host_profiles?.attestation_status === "attested";
 
@@ -129,7 +130,7 @@ export function rowToDiscoveryFields(row: ListingRow) {
     opportunityWindow: formatOpportunityWindow(row),
     begins: row.begins_at ?? undefined,
     ends: row.ends_at ?? undefined,
-    status: row.status as "live" | "draft" | "paused" | "closed" | "archived" | "under_review",
+    status: row.status as ListingStatus,
     host: {
       id: row.host_profile_id ?? undefined,
       name: hostName,

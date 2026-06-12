@@ -4,7 +4,9 @@ export * from "./queries/listings";
 export {
 	canTransitionListing,
 	duplicateListing,
+	expireListings,
 	type DuplicateListingResult,
+	type ExpireListingsResult,
 	type UpdateListingStatusResult,
 } from "./queries/listingLifecycle";
 export * from "./queries/savedListings";

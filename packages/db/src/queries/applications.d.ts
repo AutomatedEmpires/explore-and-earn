@@ -35,7 +35,7 @@ export interface HostApplication {
 }
 export declare function getHostApplications(clerkToken: string, clerkUserId: string): Promise<HostApplication[]>;
 export declare function getApplicationCountsByListing(clerkToken: string, clerkUserId: string): Promise<Record<string, number>>;
-declare const HOST_SETTABLE_STATUSES: readonly ["reviewing", "saved_by_host", "offered", "not_selected"];
+export declare const HOST_SETTABLE_STATUSES: readonly ["reviewing", "saved_by_host", "offered", "not_selected", "accepted"];
 export type HostSettableStatus = (typeof HOST_SETTABLE_STATUSES)[number];
 export declare function updateApplicationStatus(clerkToken: string, clerkUserId: string, applicationId: string, newStatus: string): Promise<{
     ok: boolean;
@@ -90,6 +90,7 @@ export declare function getApplicationById(clerkToken: string, clerkUserId: stri
  *  1. newStatus is in SEEKER_SETTABLE_STATUSES
  *  2. Caller owns the application (seeker_profile_id matches)
  *  3. Current application status is 'offered' (can only act on a live offer)
+ *  4. When accepting: the listing still has remaining capacity
  */
 export declare function updateApplicationStatusBySeeker(clerkToken: string, clerkUserId: string, applicationId: string, newStatus: string): Promise<{
     ok: boolean;
