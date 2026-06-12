@@ -4,7 +4,9 @@ export * from "./queries/listings";
 export {
 	canTransitionListing,
 	duplicateListing,
+	expireListings,
 	type DuplicateListingResult,
+	type ExpireListingsResult,
 	type UpdateListingStatusResult,
 } from "./queries/listingLifecycle";
 export * from "./queries/savedListings";
@@ -23,3 +25,4 @@ export * from "./adminClient";
 export * from "./queries/admin";
 export * from "./lib/matchScore";
 export * from "./hostAnalytics";
+export * from "./queries/reports";

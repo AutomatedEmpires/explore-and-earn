@@ -134,6 +134,20 @@ function readListingFields(formData: FormData): ListingWriteFields {
     fields.coverPhotoUrl = optionalString(formData.get("coverPhotoUrl")) ?? null;
   }
 
+  if (formData.has("galleryUrls")) {
+    const raw = formData.get("galleryUrls");
+    if (typeof raw === "string") {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          fields.galleryUrls = parsed.filter((u): u is string => typeof u === "string");
+        }
+      } catch {
+        // Malformed JSON — ignore and leave galleryUrls unset.
+      }
+    }
+  }
+
   return fields;
 }
 
@@ -148,6 +162,13 @@ export async function createListingAction(
   const fields = readListingFields(formData);
   if (!isAllowedStorageUrl(fields.coverPhotoUrl)) {
     return { ok: false, error: "Invalid cover photo URL." };
+  }
+  if (fields.galleryUrls) {
+    for (const url of fields.galleryUrls) {
+      if (!isAllowedStorageUrl(url)) {
+        return { ok: false, error: "Invalid gallery photo URL." };
+      }
+    }
   }
   const result = await createListingRow(
     authResult.auth.token,
@@ -182,6 +203,13 @@ export async function updateListingAction(
   const fields = readListingFields(formData);
   if (!isAllowedStorageUrl(fields.coverPhotoUrl)) {
     return { ok: false, error: "Invalid cover photo URL." };
+  }
+  if (fields.galleryUrls) {
+    for (const url of fields.galleryUrls) {
+      if (!isAllowedStorageUrl(url)) {
+        return { ok: false, error: "Invalid gallery photo URL." };
+      }
+    }
   }
   const result = await updateListingRow(
     authResult.auth.token,

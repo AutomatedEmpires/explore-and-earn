@@ -100,7 +100,7 @@ function rowToInviteListing(listingValue, hostValue) {
         benefits,
     };
 }
-const INVITE_SELECT = "id, listing_id, host_profile_id, status, message, created_at, " +
+const INVITE_SELECT = "id, listing_id, host_profile_id, status, message, created_at, expires_at, " +
     "listings!listing_id(id, title, category, location_display, status, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, compensation_currency, timeline_summary), " +
     "host_profiles!host_profile_id(company_name, attestation_status)";
 export async function getSeekerInvites(clerkToken, clerkUserId) {
@@ -113,7 +113,7 @@ export async function getSeekerInvites(clerkToken, clerkUserId) {
         .from("invites")
         .select(INVITE_SELECT)
         .eq("seeker_profile_id", seekerProfileId)
-        .neq("status", "withdrawn")
+        .not("status", "in", '("withdrawn","expired","ignored","applied")')
         .order("created_at", { ascending: false });
     if (error) {
         throw new Error(`getSeekerInvites: ${error.message}`);
@@ -128,6 +128,7 @@ export async function getSeekerInvites(clerkToken, clerkUserId) {
                 status: typeof r.status === "string" ? r.status : "created",
                 message: typeof r.message === "string" ? r.message : null,
                 createdAt: typeof r.created_at === "string" ? r.created_at : "",
+                expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
             },
             listing: rowToInviteListing(r.listings, r.host_profiles),
         };

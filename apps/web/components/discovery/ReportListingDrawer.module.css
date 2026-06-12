@@ -219,6 +219,14 @@
 	gap: var(--space-8);
 }
 
+.submitError {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	color: var(--color-status-error, #d92d20);
+	margin: 0;
+}
+
 .confirm {
 	display: flex;
 	flex-direction: column;

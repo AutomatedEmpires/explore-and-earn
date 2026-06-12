@@ -1,0 +1,11 @@
+# Compiled outputs from tsc — the package.json exports point directly to .ts
+# sources, so these artifacts are not consumed by the build and should not be
+# committed. They are excluded here to prevent pnpm install (which triggers tsc)
+# from polluting PR diffs.
+#
+# types.gen.ts / types.gen.d.ts / types.gen.js are intentionally tracked as
+# they are generated from the Supabase schema and need explicit review.
+src/**/*.js
+src/**/*.d.ts
+!src/types.gen.d.ts
+!src/types.gen.js

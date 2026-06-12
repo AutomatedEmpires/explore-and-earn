@@ -1,0 +1,182 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* ---- Gallery list ---- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+}
+
+.thumb {
+  position: relative;
+  flex: 0 0 72px;
+  height: 56px;
+  border-radius: var(--radius-cell);
+  overflow: hidden;
+  background: var(--color-surface-raised);
+}
+
+.thumbImage {
+  object-fit: cover;
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+}
+
+.orderButton,
+.removeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.orderButton:hover,
+.removeButton:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.orderButton:focus-visible,
+.removeButton:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.orderButton:disabled,
+.removeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* ---- Upload zone ---- */
+
+.zone,
+.zoneDragging {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 96px;
+  padding: var(--space-12);
+  font: inherit;
+  color: var(--text-secondary);
+  background: var(--color-surface);
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.zoneDragging {
+  border-style: solid;
+  border-color: var(--text-primary);
+}
+
+.zone:hover,
+.zoneDragging:hover {
+  border-color: var(--text-primary);
+}
+
+.zone:focus-visible,
+.zoneDragging:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.zone:disabled,
+.zoneDragging:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.uploadingLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.placeholderLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.hint {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+/* Hidden native file input */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.error {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--status-warning-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orderButton,
+  .removeButton {
+    transition: none;
+  }
+}

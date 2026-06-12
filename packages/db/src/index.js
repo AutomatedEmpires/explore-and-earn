@@ -1,7 +1,7 @@
 export * from "./client";
 export * from "./types.gen";
 export * from "./queries/listings";
-export * from "./queries/listingLifecycle";
+export { canTransitionListing, duplicateListing, } from "./queries/listingLifecycle";
 export * from "./queries/savedListings";
 export * from "./queries/applications";
 export * from "./queries/seekerApplicationsRich";
@@ -18,3 +18,4 @@ export * from "./adminClient";
 export * from "./queries/admin";
 export * from "./lib/matchScore";
 export * from "./hostAnalytics";
+export * from "./queries/reports";

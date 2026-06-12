@@ -4,11 +4,12 @@ import Image from "next/image";
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
 import { Icon, Skeleton } from "@explore-and-earn/ui";
+import {
+  UPLOAD_ALLOWED_MIME_TYPES,
+  UPLOAD_MAX_FILE_BYTES,
+} from "@explore-and-earn/contracts";
 
 import styles from "./ImageUpload.module.css";
-
-/** Client-side ceiling — images only, 5 MB max (storage RLS is the real gate). */
-const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
 type UploadState = "idle" | "uploading" | "done" | "error";
 
@@ -55,12 +56,13 @@ export function ImageUpload({
   async function handleFile(file: File) {
     setError(null);
 
-    if (!file.type.startsWith("image/")) {
+    const allowedTypes: readonly string[] = UPLOAD_ALLOWED_MIME_TYPES;
+    if (!allowedTypes.includes(file.type)) {
       setState("error");
-      setError("Please choose an image file.");
+      setError("Please choose a JPEG, PNG, WebP, or HEIC image.");
       return;
     }
-    if (file.size > MAX_FILE_BYTES) {
+    if (file.size > UPLOAD_MAX_FILE_BYTES) {
       setState("error");
       setError("Images must be 5 MB or smaller.");
       return;
