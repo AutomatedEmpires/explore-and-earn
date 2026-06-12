@@ -17,3 +17,4 @@ export type { SeekerSearchResult } from "./queries/invites";
 export type { SavedListingDetail } from "./queries/savedListings";
 export type { NotificationPrefs, NotificationPrefsPatch } from "./queries/notificationPrefs";
 export type { HostSettableStatus } from "./queries/applications";
+export type { RichSeekerApplication } from "./queries/seekerApplicationsRich";
