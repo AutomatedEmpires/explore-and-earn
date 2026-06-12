@@ -92,15 +92,16 @@ export const DISCOVERY_CARD_ACTION_DESTINATIONS: Record<DiscoveryCardAction, str
 }
 
 /**
- * Badges shown CONDITIONALLY, in addition to the always-on category badge and
- * the Verified-Host badge. "boosted" treatment must stay subtle and never
+ * The ONLY conditional treatment a card may carry, in addition to the always-on
+ * category badge. "boosted" (aka "boost listing") must stay subtle and never
  * read as an ad (product-principles.md #5, zero dark patterns).
  *
- * "featured" has been removed — the platform does not use a featured concept.
- * "seasonal" is a category, not a conditional badge; included for legacy compat.
+ * FOUNDER DECISION: "featured" is archived (replaced by "boosted") and the
+ * legacy conditional-badging mechanism is removed. "seasonal" is a CATEGORY,
+ * never a badge — rendering it as both produced a duplicate "category" on the
+ * card, so it is intentionally NOT a valid conditional badge value.
  */
 export const DISCOVERY_CARD_CONDITIONAL_BADGES = [
-	"seasonal",
 	"boosted",
 ] as const
 export type DiscoveryCardConditionalBadge =
@@ -124,7 +125,6 @@ export const DISCOVERY_CARD_FIELDS = [
 	"pay",
 	"verified_host_badge",
 	"category_badge",
-	"seasonal_featured_badge",
 	"match_score",
 	"boosted_treatment",
 	"quick_apply",
@@ -155,7 +155,6 @@ export const DISCOVERY_CARD_FIELD_REQUIREMENT: Record<
 	pay: "required",
 	verified_host_badge: "required",
 	category_badge: "required",
-	seasonal_featured_badge: "conditional",
 	match_score: "conditional",
 	boosted_treatment: "conditional",
 	quick_apply: "required",

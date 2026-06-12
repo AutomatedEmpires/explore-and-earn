@@ -422,7 +422,7 @@ for (const { dir, category, cloudFolder } of PHOTO_CATS) {
 // ── Cleanup tmp files ─────────────────────────────────────────────────────────
 
 for (const f of tmpFiles) {
-  try { fs.unlinkSync(f) } catch {}
+  try { fs.unlinkSync(f) } catch { /* ignore cleanup errors */ }
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

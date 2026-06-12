@@ -5,6 +5,7 @@ import {
 	countConversationMessages,
 	getMessageEmailContext,
 	getNotificationPrefs,
+	markMessagesRead,
 	sendMessage,
 } from "@explore-and-earn/db";
 import { revalidatePath } from "next/cache";
@@ -130,5 +131,34 @@ export async function sendMessageAction(
 			userId: await currentUserId(),
 		});
 		throw error;
+	}
+}
+
+/**
+ * Marks all inbound (from the other participant) messages in a conversation as
+ * read for the signed-in user. Called server-side when a thread page loads so
+ * unread counts in the list view and header badge are accurate. Best-effort —
+ * silently no-ops when the caller is not authenticated or not a participant.
+ */
+export async function markMessagesReadAction(
+	conversationId: string,
+): Promise<void> {
+	try {
+		const { userId, getToken } = await auth();
+		if (!userId) return;
+		const token = await getToken({ template: "supabase" });
+		if (!token) return;
+
+		await markMessagesRead(token, userId, conversationId);
+
+		// Revalidate the list pages so unread dots and header badge update.
+		revalidatePath("/messages");
+		revalidatePath("/host/messages");
+	} catch (error) {
+		// Never throw — a failed mark-read must not break the page render.
+		reportError(error, {
+			action: "markMessagesReadAction",
+			userId: await currentUserId(),
+		});
 	}
 }

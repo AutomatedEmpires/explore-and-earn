@@ -64,6 +64,20 @@ export declare function getMessages(clerkToken: string, clerkUserId: string, con
  */
 export declare function sendMessage(clerkToken: string, clerkUserId: string, conversationId: string, body: string): Promise<SendMessageResult>;
 /**
+ * Last message for each of the given conversation ids, keyed by conversation id.
+ * Uses a single query rather than one-per-conversation so list pages avoid an
+ * N+1 round-trip. Ownership is NOT re-checked here — callers must pass only ids
+ * that have already been scoped to the requesting user.
+ */
+export declare function getLastMessagesForConversations(clerkToken: string, conversationIds: readonly string[]): Promise<Map<string, Message>>;
+/**
+ * Marks all messages in a conversation that were sent by the OTHER side as read
+ * (i.e. not sent by the caller). Safe to call on every thread open; it is a
+ * no-op when there is nothing unread. Ownership is verified — returns silently
+ * when the caller is not a participant.
+ */
+export declare function markMessagesRead(clerkToken: string, clerkUserId: string, conversationId: string): Promise<void>;
+/**
  * Count of unread messages for the caller acting as a host — i.e. messages in
  * conversations the caller hosts that were sent by the seeker and not yet read.
  * Resilient by design: returns 0 on any failure so a transient error never breaks

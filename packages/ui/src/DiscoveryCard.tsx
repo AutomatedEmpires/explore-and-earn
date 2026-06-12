@@ -142,15 +142,6 @@ const CAT_ACCENT: Record<MarketplaceCategory, string> = {
 	mix:      "#2A3E6A",    /* V2 mix fg — cool navy, not warm purple */
 }
 
-/** Per-category stamp badge ink — V2 aligned */
-const CAT_INK: Record<MarketplaceCategory, string> = {
-	farm:     "#6A4E18",    /* warm gold ink — farm */
-	maritime: "#1A4E72",    /* V2 maritime */
-	remote:   "#303898",    /* V2 remote */
-	seasonal: "#1A5E38",    /* V2 seasonal */
-	mix:      "#2A3E6A",    /* V2 mix */
-}
-
 /** Per-category ambient glow (inset bottom) — makes each card feel lit from within */
 const CAT_GLOW: Record<MarketplaceCategory, string> = {
 	farm:     "rgba(201,139,27,0.18)",
@@ -232,12 +223,6 @@ const DISPLAY_FONT = "var(--font-display)"
 const UI_FONT      = "var(--font-ui)"
 
 // ─── Static styles ────────────────────────────────────────────────────────────
-
-const srOnly: CSSProperties = {
-	position: "absolute", width: "1px", height: "1px", padding: 0,
-	margin: "-1px", overflow: "hidden", clip: "rect(0,0,0,0)",
-	whiteSpace: "nowrap", border: 0,
-}
 
 /** Parchment stamp — base for all overlay badges. No border — shadow provides definition. */
 const STAMP: CSSProperties = {
