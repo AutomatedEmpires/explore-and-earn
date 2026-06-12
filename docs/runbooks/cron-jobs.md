@@ -9,7 +9,10 @@ Archives live listings whose expiry window has passed.
 - **Endpoint:** `GET /api/cron/expire-listings`
 - **Handler:** `apps/web/app/api/cron/expire-listings/route.ts`
 - **Auth:** `Authorization: Bearer ${CRON_SECRET}` header. Missing/incorrect -> `401`.
-- **Action:** sets `status = 'archived'` (and `archived_at = now()`) for every listing where `expires_at < now()` AND `status = 'live'`, using the service-role admin client (RLS-bypassing).
+- **Action:** calls `expireListings()` from `packages/db/src/queries/listingLifecycle.ts`, which:
+  1. Asserts `canTransitionListing("live", "archived")` via the lifecycle engine (compile-time guard).
+  2. Sets `status = 'archived'` and `archived_at = now()` for every listing where `expires_at < now()` AND `status = 'live'`, using the service-role admin client (RLS-bypassing).
+  3. Is idempotent — already-archived rows are excluded by the `status = 'live'` filter, so repeated runs are safe.
 - **Response:** `{ "ok": true, "archived": <number> }` on success.
 
 ### Expiry seeding

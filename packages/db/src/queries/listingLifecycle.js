@@ -1,4 +1,5 @@
 import "server-only";
+import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
 /**
  * Host-initiated listing status transitions (Agent 3 / PR 1).
@@ -138,4 +139,42 @@ export async function duplicateListing(clerkToken, clerkUserId, listingId) {
         return { ok: false, error: insertError?.message ?? "Could not duplicate the listing." };
     }
     return { ok: true, newListingId: created.id };
+}
+/**
+ * System-initiated expiry sweep — archive every live listing whose
+ * `expires_at` timestamp has passed.
+ *
+ * Uses the service-role admin client (RLS-bypassing) so the sweep covers
+ * every host's listings without needing a Clerk token. The transition is
+ * validated against the canonical lifecycle map via `canTransitionListing`
+ * before any write is attempted.
+ *
+ * Idempotent: only listings currently in `status = 'live'` are updated, so
+ * running the sweep multiple times has no additional effect.
+ *
+ * Intended to be called exclusively by `GET /api/cron/expire-listings`.
+ */
+export async function expireListings(serviceRoleKey) {
+    // Guard: assert the lifecycle engine permits live → archived.
+    if (!canTransitionListing("live", "archived")) {
+        return {
+            ok: false,
+            archived: 0,
+            ids: [],
+            error: "invalid_transition: live → archived is not permitted by the lifecycle engine",
+        };
+    }
+    const nowIso = new Date().toISOString();
+    const db = adminClient(serviceRoleKey);
+    const { data, error } = await db
+        .from("listings")
+        .update({ status: "archived", archived_at: nowIso })
+        .lt("expires_at", nowIso)
+        .eq("status", "live")
+        .select("id");
+    if (error) {
+        return { ok: false, archived: 0, ids: [], error: error.message };
+    }
+    const ids = (data ?? []).map((row) => row.id);
+    return { ok: true, archived: ids.length, ids };
 }

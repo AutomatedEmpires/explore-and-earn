@@ -30,3 +30,24 @@ export type DuplicateListingResult = {
  * `clerkUserId` MUST come from auth().userId.
  */
 export declare function duplicateListing(clerkToken: string, clerkUserId: string, listingId: string): Promise<DuplicateListingResult>;
+export type ExpireListingsResult = {
+    ok: boolean;
+    archived: number;
+    ids: string[];
+    error?: string;
+};
+/**
+ * System-initiated expiry sweep — archive every live listing whose
+ * `expires_at` timestamp has passed.
+ *
+ * Uses the service-role admin client (RLS-bypassing) so the sweep covers
+ * every host's listings without needing a Clerk token. The transition is
+ * validated against the canonical lifecycle map via `canTransitionListing`
+ * before any write is attempted.
+ *
+ * Idempotent: only listings currently in `status = 'live'` are updated, so
+ * running the sweep multiple times has no additional effect.
+ *
+ * Intended to be called exclusively by `GET /api/cron/expire-listings`.
+ */
+export declare function expireListings(serviceRoleKey?: string): Promise<ExpireListingsResult>;
