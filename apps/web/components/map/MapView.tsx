@@ -23,7 +23,6 @@ import {
   type DiscoveryListing,
 } from "../discovery";
 import { MAPPIN_ICON } from "../seeker/mappin";
-import { MapListingCard } from "./MapListingCard";
 import styles from "./MapView.module.css";
 
 export interface MapViewProps {
@@ -319,15 +318,40 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
         <div className={styles.trayBody}>
           <div className={styles.trayList}>
             {trayListings.map((listing) => (
-              <MapListingCard
+              <div
                 key={listing.id}
-                listing={listing}
-                selected={listing.id === selectedId}
-                onSelect={(nextListing) => {
-                  focusListing(nextListing as MappedListing);
-                  setTrayOpen(true);
-                }}
-              />
+                className={
+                  listing.id === selectedId
+                    ? `${styles.trayCard} ${styles.trayCardActive}`
+                    : styles.trayCard
+                }
+              >
+                <DiscoveryCard
+                  data={toDiscoveryCardData(listing)}
+                  surface="map"
+                  onOpen={(id) => {
+                    const next = mapped.find((item) => item.id === id);
+                    if (next) {
+                      focusListing(next);
+                      setTrayOpen(true);
+                    }
+                  }}
+                  onApply={(id) => router.push(`/listing/${id}`)}
+                  onHostClick={(id) => setActiveHostId(id)}
+                  onLocationClick={(id) => {
+                    const next = mapped.find((item) => item.id === id);
+                    if (next) {
+                      focusListing(next);
+                    }
+                  }}
+                  onHousingClick={(id) =>
+                    setActiveBenefit({ id, bucket: "housing" })
+                  }
+                  onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
+                  onPayClick={(id) => setActivePayId(id)}
+                  onReport={(id) => setReportId(id)}
+                />
+              </div>
             ))}
           </div>
         </div>

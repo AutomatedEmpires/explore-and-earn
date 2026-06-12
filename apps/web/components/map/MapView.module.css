@@ -229,6 +229,15 @@
 	padding-right: var(--space-4);
 }
 
+.trayCard {
+	border-radius: var(--radius-card);
+}
+
+.trayCardActive {
+	outline: 2px solid var(--border-ink);
+	outline-offset: 2px;
+}
+
 @media (max-width: 767px) {
 	.wrap {
 		height: max(32rem, calc(100dvh - var(--size-bottom-nav) - 7.75rem));
