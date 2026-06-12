@@ -41,7 +41,12 @@ export default async function OfferedPage() {
           {
             listing: offer.listing,
             cardState: "offered" as const,
-            actions: <OfferedActions applicationId={offer.id} />,
+            actions: (
+              <OfferedActions
+                applicationId={offer.id}
+                expiresAt={offer.expiresAt}
+              />
+            ),
           },
         ]
       : [],

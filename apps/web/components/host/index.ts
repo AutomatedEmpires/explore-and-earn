@@ -18,6 +18,8 @@ export type {
   ListingFormInitialValues,
   ListingFormStatus,
 } from "./ListingForm";
+export { MediaGalleryUpload } from "./MediaGalleryUpload";
+export type { MediaGalleryUploadProps, GalleryItem } from "./MediaGalleryUpload";
 export { HostListingFilters } from "./HostListingFilters";
 export type { HostListingFiltersProps, HostListingFilter } from "./HostListingFilters";
 export { HostListingsManager } from "./HostListingsManager";

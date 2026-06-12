@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import {
 	getConversations,
-	getMessages,
+	getLastMessagesForConversations,
 	getPublicListingsByIds,
 	rowToDiscoveryFields,
 } from "@explore-and-earn/db";
@@ -68,36 +68,48 @@ export default async function MessagesPage() {
 
 	const conversations = await getConversations(token, userId, "seeker");
 
-	// Batch-fetch every conversation's listing in a single query (replaces the
-	// previous per-conversation getPublicListingById N+1), then join by id.
-	// Messages are still loaded per conversation (ownership-scoped reads).
+	if (conversations.length === 0) {
+		return (
+			<BucketPage title="Messages" description={PAGE_DESCRIPTION}>
+				<EmptyState
+					title="No messages yet"
+					message="Conversations with hosts appear here once you apply, get invited, or receive an offer."
+				/>
+			</BucketPage>
+		);
+	}
+
+	// Batch-fetch every conversation's listing and last message in two queries
+	// (replaces the previous per-conversation getMessages N+1).
 	const listingIds = conversations
 		.map((conversation) => conversation.listingId)
 		.filter((id): id is string => id !== null);
-	const listingRows = await getPublicListingsByIds(listingIds);
+	const conversationIds = conversations.map((c) => c.id);
+
+	const [listingRows, lastMessageMap] = await Promise.all([
+		getPublicListingsByIds(listingIds),
+		getLastMessagesForConversations(token, conversationIds),
+	]);
 	const listingById = new Map(listingRows.map((row) => [row.id, row] as const));
 
-	const threads: MessageThread[] = await Promise.all(
-		conversations.map(async (conversation): Promise<MessageThread> => {
-			const listingRow = conversation.listingId
-				? listingById.get(conversation.listingId) ?? null
-				: null;
-			const messages = await getMessages(token, userId, conversation.id);
-			const listing = listingRow ? rowToDiscoveryFields(listingRow) : null;
-			const lastMessage = messages[messages.length - 1];
-			return {
-				id: conversation.id,
-				hostName: listing?.host.name ?? "Host",
-				listingTitle: listing?.title ?? "Conversation",
-				category: listing?.category ?? "mix",
-				preview: lastMessage?.body ?? "No messages yet",
-				timeAgo: formatTimeAgo(conversation.lastMessageAt),
-				unread: lastMessage
-					? lastMessage.senderType !== "seeker" && !lastMessage.readAt
-					: false,
-			};
-		}),
-	);
+	const threads: MessageThread[] = conversations.map((conversation) => {
+		const listingRow = conversation.listingId
+			? listingById.get(conversation.listingId) ?? null
+			: null;
+		const listing = listingRow ? rowToDiscoveryFields(listingRow) : null;
+		const lastMessage = lastMessageMap.get(conversation.id) ?? null;
+		return {
+			id: conversation.id,
+			hostName: listing?.host.name ?? "Host",
+			listingTitle: listing?.title ?? "Conversation",
+			category: listing?.category ?? "mix",
+			preview: lastMessage?.body ?? "No messages yet",
+			timeAgo: formatTimeAgo(conversation.lastMessageAt),
+			unread: lastMessage
+				? lastMessage.senderType !== "seeker" && !lastMessage.readAt
+				: false,
+		};
+	});
 
 	return (
 		<BucketPage title="Messages" description={PAGE_DESCRIPTION}>

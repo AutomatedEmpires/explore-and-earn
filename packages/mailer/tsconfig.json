@@ -4,5 +4,6 @@
     "composite": true,
     "rootDir": "./src"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "vitest.config.ts"]
 }
