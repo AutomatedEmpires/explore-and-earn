@@ -36,6 +36,8 @@ async function setOfferStatus(
   );
 
   if (result.ok) {
+    revalidatePath("/offered");
+    revalidatePath("/accepted");
     revalidatePath("/applied");
     revalidatePath(`/applied/${applicationId}`);
   }

@@ -37,6 +37,7 @@ const STATUS_LABELS: Record<HostSettableStatus, string> = {
   saved_by_host: "Host Saved Your Profile",
   offered: "You Got an Offer! \uD83C\uDF89",
   not_selected: "Application Update",
+  accepted: "Congratulations — You\u2019re In!",
 };
 
 /**

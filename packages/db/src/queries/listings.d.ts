@@ -1,5 +1,5 @@
 import "server-only";
-import type { BenefitProvision, CompensationUnit, ListingStatus, OpportunityCategory } from "@explore-and-earn/contracts";
+import type { BenefitProvision, CompensationUnit, ListingStatus, OpportunityCategory, OpportunityListing } from "@explore-and-earn/contracts";
 export interface ListingRow {
     id: string;
     host_profile_id: string | null;
@@ -29,45 +29,7 @@ export interface ListingRow {
     } | null;
 }
 /** Maps a ListingRow to the DiscoveryListing view-model fields. */
-export declare function rowToDiscoveryFields(row: ListingRow): {
-    id: string;
-    title: string;
-    category: "seasonal" | "farm" | "maritime" | "remote" | "mix";
-    location: string;
-    opportunityWindow: string;
-    begins: string | undefined;
-    ends: string | undefined;
-    status: "live" | "draft" | "paused" | "closed" | "archived" | "under_review";
-    host: {
-        id: string | undefined;
-        name: string;
-        verified: boolean;
-    };
-    benefits: {
-        housing: {
-            provision: "provided" | "not_provided";
-        };
-        meals: {
-            provision: "provided" | "not_provided";
-        };
-        pay: {
-            provision: BenefitProvision;
-            summary: string;
-        };
-    };
-    payInsight: {
-        minCents: number | undefined;
-        maxCents: number | undefined;
-        unit: "other" | "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | null;
-        currency: string;
-    } | undefined;
-    visaSupport: boolean;
-    coverImageUrl: string | undefined;
-    coordinates: {
-        lat: number;
-        lon: number;
-    } | undefined;
-};
+export declare function rowToDiscoveryFields(row: ListingRow): OpportunityListing;
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export declare const SWIPE_BATCH_SIZE = 20;
 /** Public live listings \u2014 no auth required. */

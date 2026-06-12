@@ -42,7 +42,12 @@ export default async function InvitesPage() {
           {
             listing: entry.listing,
             cardState: "invited" as const,
-            actions: <InviteActions inviteId={entry.invite.id} />,
+            actions: (
+              <InviteActions
+                inviteId={entry.invite.id}
+                expiresAt={entry.invite.expiresAt}
+              />
+            ),
           },
         ]
       : [],
