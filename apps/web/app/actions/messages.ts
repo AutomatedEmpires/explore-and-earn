@@ -103,6 +103,11 @@ async function sendMessageActionImpl(
 								conversationUrl: absoluteUrl(conversationPath),
 							}),
 							template: "newMessage",
+							// Idempotency key scoped to the conversation: because the email is
+							// only sent when messageCount === 1 (first message), this key is
+							// unique per conversation send event and guards against retried
+							// action calls sending the same opening-message notification twice.
+							idempotencyKey: `newMessage:${conversationId}`,
 						});
 					}
 				}

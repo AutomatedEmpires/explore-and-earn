@@ -55,6 +55,9 @@ importers:
       '@explore-and-earn/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@explore-and-earn/mailer':
+        specifier: workspace:*
+        version: link:../../packages/mailer
       '@explore-and-earn/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -104,7 +107,11 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(vite@8.0.16(@types/node@24.12.4)(terser@5.48.0))
 
-  packages/mailer: {}
+  packages/mailer:
+    devDependencies:
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(vite@8.0.16(@types/node@24.12.4)(terser@5.48.0))
 
   packages/stripe-seed: {}
 
