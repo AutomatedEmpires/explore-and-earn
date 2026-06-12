@@ -1,14 +1,17 @@
 /**
- * Design tokens — V2 "Trail & Sky" (founder-directed 2026-06-09).
+ * Design tokens — V2 "Adventure Paper & Sky" (founder-locked 2026-06-10).
  *
- * Palette shift: warm cream/earth → cool blue-white / steel / ocean.
- * Blues, greens, silver-chrome, grey. Surfaces are light and airy;
- * interactive chrome and category accents carry the colour.
+ * Palette: warm paper + ink base (field-journal / adventure soul) lifted by
+ * cool sky-blue brand actions, chrome/graphite neutrals, and earthy clay/gold
+ * accents. Supersedes both the muddy V1 warm-only palette and the interim
+ * cool "Trail & Sky" tokens.
  *
  * Governance: TIER 1 primitives feed TIER 2 semantics. Feature code
  * references SEMANTIC tokens only. Custom property names are stable —
- * only values changed from V1 so every existing component updates
- * automatically without touching its own CSS.
+ * only values changed, so every existing component updates automatically
+ * without touching its own CSS.
+ *
+ * Canon: Notion "Color Palette — Locked (Adventure Paper & Sky)".
  */
 
 :root {
@@ -16,37 +19,37 @@
   /* TIER 1 — PRIMITIVES                                             */
   /* =============================================================== */
 
-  /* Foundation — cool blue-white surfaces */
-  --palette-paper:        #EEF3F8;   /* page bg — cool steel blue-white     */
-  --palette-surface:      #F7FAFC;   /* card surface — near-white            */
+  /* Foundation — warm paper surfaces */
+  --palette-paper:        #F6F1E7;   /* page bg — warm paper                 */
+  --palette-surface:      #FFFCF5;   /* card surface — warm white            */
   --palette-white:        #FFFFFF;
-  --palette-line:         #C8D5E3;   /* border hairlines — cool blue-grey    */
-  --palette-ink-stroke:   #28404F;   /* border ink — dark steel              */
-  --palette-ink:          #1A2B3C;   /* primary text — deep navy             */
-  --palette-ink-soft:     #486070;   /* secondary text — steel blue-grey     */
-  --palette-ink-muted:    #7A8E9E;   /* muted text — cool grey               */
+  --palette-line:         #DDE2E3;   /* border hairlines — cool chrome       */
+  --palette-ink-stroke:   #24221E;   /* flat card border — ink               */
+  --palette-ink:          #24221E;   /* primary text — ink                   */
+  --palette-ink-soft:     #4A5153;   /* secondary text — graphite            */
+  --palette-ink-muted:    #6E7679;   /* muted text — graphite tint           */
 
   /* Category accents (chip bg / ink fg) */
-  --palette-farm-bg:      #DDF0D4;   --palette-farm-fg:      #2E5E1A;
-  --palette-maritime-bg:  #C8E0F2;   --palette-maritime-fg:  #1A4E72;
-  --palette-remote-bg:    #D4D8F4;   --palette-remote-fg:    #303898;
-  --palette-seasonal-bg:  #C4EAD4;   --palette-seasonal-fg:  #1A5E38;
-  --palette-mix-bg:       #CDD8EC;   --palette-mix-fg:       #2A3E6A;
+  --palette-farm-bg:      #E2EAD5;   --palette-farm-fg:      #466A2E;
+  --palette-maritime-bg:  #D6E7EE;   --palette-maritime-fg:  #2F667A;
+  --palette-remote-bg:    #DEE3E4;   --palette-remote-fg:    #3C4446;
+  --palette-seasonal-bg:  #F0DEC9;   --palette-seasonal-fg:  #8A532E;
+  --palette-mix-bg:       #EFE4CE;   --palette-mix-fg:       #6B5836;
 
   /* Benefit triad (chip bg / ink fg) — HOUSING / MEALS / PAY */
-  --palette-housing-bg:   #C4E8DC;   --palette-housing-fg:   #185848;
-  --palette-meals-bg:     #F2DFCC;   --palette-meals-fg:     #8A3E28;
-  --palette-pay-bg:       #C0DCF4;   --palette-pay-fg:       #184878;
+  --palette-housing-bg:   #D6E7EE;   --palette-housing-fg:   #235260;
+  --palette-meals-bg:     #D9E8DC;   --palette-meals-fg:     #2E5E44;
+  --palette-pay-bg:       #F3E4C2;   --palette-pay-fg:       #7A5A12;
 
   /* Status / system (chip bg / ink fg) */
-  --palette-boosted-bg:   #EEE4B8;   --palette-boosted-fg:   #7A5808;
-  --palette-match-bg:     #C8D0F0;   --palette-match-fg:     #2A3898;
-  --palette-featured-bg:  #D8CCF0;   --palette-featured-fg:  #5038A8;
-  --palette-verified-bg:  #C0E4D8;   --palette-verified-fg:  #185848;
-  --palette-founding-bg:  #F0DCCC;   --palette-founding-fg:  #8A3818;
-  --palette-success-bg:   #C0E8D0;   --palette-success-fg:   #186040;
-  --palette-warning-bg:   #F0E4BC;   --palette-warning-fg:   #7A5808;
-  --palette-error-bg:     #F0CCCA;   --palette-error-fg:     #881818;
+  --palette-boosted-bg:   #F3E4C2;   --palette-boosted-fg:   #7A5A12;
+  --palette-match-bg:     #D6E7EE;   --palette-match-fg:     #2F667A;
+  --palette-featured-bg:  #F0E2C0;   --palette-featured-fg:  #6E5520;
+  --palette-verified-bg:  #D9E8DC;   --palette-verified-fg:  #2E5E44;
+  --palette-founding-bg:  #F0DEC9;   --palette-founding-fg:  #8A532E;
+  --palette-success-bg:   #D9E8DC;   --palette-success-fg:   #2E5E44;
+  --palette-warning-bg:   #F3E4C2;   --palette-warning-fg:   #7A5A12;
+  --palette-error-bg:     #F3D9D2;   --palette-error-fg:     #9A3B26;
 
   /* =============================================================== */
   /* TIER 2 — SEMANTIC TOKENS (reference these in feature code)      */
@@ -54,9 +57,9 @@
 
   /* Warm paper — field-journal surfaces (employer cards, framed photos) */
   --palette-parchment:   #F0EAE0;   /* warm panel background */
-  --palette-card-warm:   #FAF8F4;   /* warm card surface */
-  --palette-ink-warm:    #19150E;   /* warm near-black ink for paper borders */
-  --palette-gold:        #B8860B;   /* warm gold for star/sparkle marks */
+  --palette-card-warm:   #FFFCF5;   /* warm card surface */
+  --palette-ink-warm:    #24221E;   /* warm ink for paper borders */
+  --palette-gold:        #D8A84E;   /* warm gold for star/sparkle marks */
 
   /* surfaces / text / borders */
   --color-paper:          var(--palette-paper);
@@ -126,8 +129,8 @@
   --radius-modal:  28px;
 
   /* elevation */
-  --elevation-overlay: 0 8px 24px rgba(26, 43, 60, 0.12);
-  --elevation-pin:     0 2px 6px  rgba(26, 43, 60, 0.18);
+  --elevation-overlay: 0 8px 24px rgba(36, 34, 30, 0.12);
+  --elevation-pin:     0 2px 6px  rgba(36, 34, 30, 0.18);
 
   /* motion */
   --motion-fast:   120ms;
@@ -149,10 +152,10 @@
   --icon-chip-compact: 36px;
 
   /* typography */
-  /* Cabin Sketch = display/title (adventure headers); Patrick Hand = UI body (handwritten, approachable) */
-  --font-display: var(--font-cabin-sketch, "Cabin Sketch"), cursive;
-  --font-ui:      var(--font-patrick-hand, "Patrick Hand"), cursive;
-  --font-accent:  var(--font-cabin-sketch, "Cabin Sketch"), cursive;
+  /* Patrick Hand = display/title; Inter = UI/body; Cabin Sketch = marketing accent only */
+  --font-display: var(--font-patrick-hand, "Patrick Hand", ui-rounded, cursive);
+  --font-ui:      var(--font-inter, "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-accent:  var(--font-cabin-sketch, "Cabin Sketch", "Patrick Hand", cursive);
 
   --type-display-size: 30px;  --type-display-lh: 1.15;
   --type-page-size:    26px;  --type-page-lh:    1.2;
@@ -171,30 +174,30 @@
 
   /* =============================================================== */
   /* V2 — INTERACTIVE / CHROME TOKENS                                */
-  /* Blues, silver, teal, chrome. Header, CTAs, badges.             */
+  /* Sky blue, deep sky, pine, chrome/graphite. Header, CTAs, badges. */
   /* =============================================================== */
 
-  /* Header — deep ocean navy */
-  --palette-header:     #152840;
-  --palette-header-mid: #1E3C5A;
+  /* Header — deep sky */
+  --palette-header:     #2F667A;
+  --palette-header-mid: #3A7287;
 
   /* Sky blue — primary CTA, active links, interactive */
-  --palette-sky:        #1A8ECE;
-  --palette-sky-light:  #BEE4F8;
-  --palette-sky-dark:   #1268A0;
+  --palette-sky:        #2F667A;
+  --palette-sky-light:  #CFE6EF;
+  --palette-sky-dark:   #1F4858;
 
-  /* Teal — secondary CTA, housing/success tones */
-  --palette-teal:       #0C9486;
-  --palette-teal-light: #B4E8E2;
+  /* Teal / pine — secondary CTA, housing/success tones */
+  --palette-teal:       #3F7D5A;
+  --palette-teal-light: #D9E8DC;
 
   /* Silver / chrome — borders, badges, metallic accents */
-  --palette-silver:     #A8BED0;
-  --palette-chrome:     #C8D8E8;
-  --palette-steel:      #E0EAF4;
+  --palette-silver:     #B9C4C6;
+  --palette-chrome:     #DDE2E3;
+  --palette-steel:      #EAEFEF;
 
-  /* Warm amber — retained as optional highlight, used sparingly */
-  --palette-amber:      #D48C18;
-  --palette-amber-light:#FFE8B4;
+  /* Warm gold — highlight, premium, pay */
+  --palette-amber:      #D8A84E;
+  --palette-amber-light:#F3E4C2;
 
   /* Semantic aliases */
   --color-header-bg:  var(--palette-header);
@@ -202,7 +205,7 @@
   --color-cta-text:   #FFFFFF;
   --color-teal:       var(--palette-teal);
   --color-gold:       var(--palette-amber);
-  --color-gold-text:  #FFFFFF;
+  --color-gold-text:  #24221E;
   --color-silver:     var(--palette-silver);
   --color-chrome:     var(--palette-chrome);
   --color-steel:      var(--palette-steel);

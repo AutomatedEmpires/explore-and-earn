@@ -12,7 +12,6 @@ export interface MapListingCardProps {
 }
 
 const CONDITIONAL_BADGE_LABEL = {
-  featured: "Featured",
   seasonal: "Seasonal",
   boosted: "Boosted",
 } as const;
