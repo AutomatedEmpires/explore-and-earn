@@ -85,7 +85,7 @@ export async function getSeekerApplications(clerkToken, clerkUserId) {
     const untyped = authedClient(clerkToken);
     const { data, error } = await untyped
         .from("applications")
-        .select("id, listing_id, status, submitted_at")
+        .select("id, listing_id, status, submitted_at, expires_at")
         .eq("seeker_profile_id", seekerProfileId)
         .order("submitted_at", { ascending: false });
     if (error) {
@@ -96,6 +96,7 @@ export async function getSeekerApplications(clerkToken, clerkUserId) {
         listingId: row.listing_id,
         status: row.status,
         submittedAt: typeof row.submitted_at === "string" ? row.submitted_at : "",
+        expiresAt: typeof row.expires_at === "string" ? row.expires_at : null,
     }));
 }
 const HOST_APPLICATIONS_SELECT = "id,listing_id,seeker_profile_id,status,cover_message,submitted_at,listings!listing_id!inner(title,host_profile_id,host_profiles!host_profile_id!inner(clerk_user_id)),seeker_profiles!seeker_profile_id(clerk_user_id)";
@@ -373,7 +374,7 @@ export async function getSeekerApplicationsWithListings(clerkToken, clerkUserId,
     const untyped = authedClient(clerkToken);
     const { data, error } = await untyped
         .from("applications")
-        .select("id, listing_id, status, submitted_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)")
+        .select("id, listing_id, status, submitted_at, expires_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)")
         .eq("seeker_profile_id", seekerProfileId)
         .in("status", statuses)
         .order("submitted_at", { ascending: false });
@@ -387,6 +388,7 @@ export async function getSeekerApplicationsWithListings(clerkToken, clerkUserId,
             listingId: String(r.listing_id),
             status: typeof r.status === "string" ? r.status : "applied",
             submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+            expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
             listing: rowToDiscoveryListing(r.listings),
         };
     });
@@ -399,7 +401,7 @@ export async function getSeekerApplicationsWithListings(clerkToken, clerkUserId,
  * Only accept/decline a live offer. Host-settable statuses live above.
  */
 const SEEKER_SETTABLE_STATUSES = ["accepted", "not_selected"];
-const SEEKER_APPLICATION_SELECT = "id, listing_id, status, cover_message, submitted_at, " +
+const SEEKER_APPLICATION_SELECT = "id, listing_id, status, cover_message, submitted_at, expires_at, " +
     "listings!listing_id(id, title, category, location_display, status, " +
     "housing_included, meals_included, compensation_summary, " +
     "compensation_min_cents, compensation_max_cents, compensation_unit, " +
@@ -474,6 +476,7 @@ export async function getApplicationsForSeekerWithListings(clerkToken, clerkUser
             listingId: String(r.listing_id),
             status: typeof r.status === "string" ? r.status : "applied",
             submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+            expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
             coverMessage: typeof r.cover_message === "string" ? r.cover_message : null,
             listing: rowToSeekerApplicationListing(r.listings),
         };
@@ -504,6 +507,7 @@ export async function getApplicationById(clerkToken, clerkUserId, applicationId)
         listingId: String(r.listing_id),
         status: typeof r.status === "string" ? r.status : "applied",
         submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+        expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
         coverMessage: typeof r.cover_message === "string" ? r.cover_message : null,
         listing: rowToSeekerApplicationListing(r.listings),
     };

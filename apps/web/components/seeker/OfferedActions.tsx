@@ -11,19 +11,43 @@ import styles from "./InviteActions.module.css";
 
 const ERROR_TEXT: Record<string, string> = {
 	unauthenticated: "Sign in to accept or decline offers.",
+	profile_not_found: "Finish setting up your seeker profile first.",
 	not_found: "This offer is no longer available.",
-	invalid_status: "This offer has already been responded to.",
+	forbidden: "You don't have permission to respond to this offer.",
+	invalid_transition: "This offer has already been responded to or has expired.",
+	invalid_status: "This offer has already been responded to or has expired.",
 };
 
 export interface OfferedActionsProps {
 	readonly applicationId: string;
+	/** ISO 8601 timestamp from `applications.expires_at`; null when not yet set. */
+	readonly expiresAt?: string | null;
+}
+
+/** Warn when fewer than this many milliseconds remain on the expiry window. */
+const EXPIRY_WARNING_THRESHOLD_MS = 48 * 60 * 60 * 1000;
+
+/** Returns true if the supplied ISO timestamp is in the past. */
+function isExpired(expiresAt: string): boolean {
+	return new Date(expiresAt) < new Date();
+}
+
+/** Returns true if the offer expires within the next 48 hours. */
+function isExpiringSoon(expiresAt: string): boolean {
+	const now = Date.now();
+	const ms = new Date(expiresAt).getTime() - now;
+	return ms > 0 && ms < EXPIRY_WARNING_THRESHOLD_MS;
 }
 
 /**
  * Accept / Decline controls for an offered application card. Same interaction
  * pattern as InviteActions: useTransition + aria-live status line.
+ *
+ * When `expiresAt` is provided and the offer is past its expiry window, the
+ * action buttons are replaced with a status message so the seeker is never
+ * left clicking a button that will always fail.
  */
-export function OfferedActions({ applicationId }: OfferedActionsProps) {
+export function OfferedActions({ applicationId, expiresAt }: OfferedActionsProps) {
 	const [isPending, startTransition] = useTransition();
 	const [pendingAction, setPendingAction] = useState<
 		"accepted" | "not_selected" | null
@@ -32,6 +56,9 @@ export function OfferedActions({ applicationId }: OfferedActionsProps) {
 		readonly ok: boolean;
 		readonly text: string;
 	} | null>(null);
+
+	const expired = expiresAt ? isExpired(expiresAt) : false;
+	const expiringSoon = !expired && expiresAt ? isExpiringSoon(expiresAt) : false;
 
 	function handleAction(action: "accepted" | "not_selected") {
 		setMessage(null);
@@ -61,8 +88,28 @@ export function OfferedActions({ applicationId }: OfferedActionsProps) {
 		});
 	}
 
+	if (expired) {
+		return (
+			<div className={styles.actions}>
+				<p className={styles.error} role="status">
+					This offer has expired.
+				</p>
+			</div>
+		);
+	}
+
 	return (
 		<div className={styles.actions}>
+			{expiringSoon && expiresAt ? (
+				<p className={styles.expiry} role="note">
+					Offer expires{" "}
+					{new Date(expiresAt).toLocaleDateString(undefined, {
+						month: "short",
+						day: "numeric",
+					})}
+					. Respond soon.
+				</p>
+			) : null}
 			<div className={styles.buttons}>
 				<Button
 					variant="primary"

@@ -121,6 +121,7 @@ export interface SeekerApplication {
   readonly listingId: string;
   readonly status: string;
   readonly submittedAt: string;
+  readonly expiresAt: string | null;
 }
 
 export async function getSeekerApplications(
@@ -135,7 +136,7 @@ export async function getSeekerApplications(
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data, error } = await untyped
     .from("applications")
-    .select("id, listing_id, status, submitted_at")
+    .select("id, listing_id, status, submitted_at, expires_at")
     .eq("seeker_profile_id", seekerProfileId)
     .order("submitted_at", { ascending: false });
 
@@ -148,6 +149,7 @@ export async function getSeekerApplications(
     listingId: row.listing_id as string,
     status: row.status as string,
     submittedAt: typeof row.submitted_at === "string" ? row.submitted_at : "",
+    expiresAt: typeof row.expires_at === "string" ? row.expires_at : null,
   }));
 }
 
@@ -532,7 +534,7 @@ export async function getSeekerApplicationsWithListings(
   const { data, error } = await untyped
     .from("applications")
     .select(
-      "id, listing_id, status, submitted_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)",
+      "id, listing_id, status, submitted_at, expires_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)",
     )
     .eq("seeker_profile_id", seekerProfileId)
     .in("status", statuses)
@@ -549,6 +551,7 @@ export async function getSeekerApplicationsWithListings(
       listingId: String(r.listing_id),
       status: typeof r.status === "string" ? r.status : "applied",
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+      expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
       listing: rowToDiscoveryListing(r.listings),
     } satisfies ApplicationWithListing;
   });
@@ -579,7 +582,7 @@ export type SeekerApplicationWithListing = SeekerApplication & {
 };
 
 const SEEKER_APPLICATION_SELECT =
-  "id, listing_id, status, cover_message, submitted_at, " +
+  "id, listing_id, status, cover_message, submitted_at, expires_at, " +
   "listings!listing_id(id, title, category, location_display, status, " +
   "housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
@@ -673,6 +676,7 @@ export async function getApplicationsForSeekerWithListings(
       listingId: String(r.listing_id),
       status: typeof r.status === "string" ? r.status : "applied",
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+      expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
       coverMessage:
         typeof r.cover_message === "string" ? r.cover_message : null,
       listing: rowToSeekerApplicationListing(r.listings),
@@ -710,6 +714,7 @@ export async function getApplicationById(
     listingId: String(r.listing_id),
     status: typeof r.status === "string" ? r.status : "applied",
     submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+    expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
     coverMessage:
       typeof r.cover_message === "string" ? r.cover_message : null,
     listing: rowToSeekerApplicationListing(r.listings),

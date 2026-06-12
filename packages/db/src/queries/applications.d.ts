@@ -21,6 +21,7 @@ export interface SeekerApplication {
     readonly listingId: string;
     readonly status: string;
     readonly submittedAt: string;
+    readonly expiresAt: string | null;
 }
 export declare function getSeekerApplications(clerkToken: string, clerkUserId: string): Promise<SeekerApplication[]>;
 export interface HostApplication {
