@@ -6,6 +6,7 @@ import {
   getSeekerDisplayName,
 } from "@explore-and-earn/db";
 
+import { markMessagesReadAction } from "../../../../actions/messages";
 import { EmptyState } from "../../../../../components/discovery";
 import { HostSectionHeading } from "../../../../../components/host";
 import { MessageTranscript } from "../../../../../components/messaging/MessageTranscript";
@@ -56,11 +57,14 @@ export default async function HostMessageThreadPage({
     );
   }
 
-  // Load the transcript and the host's conversations together; the conversation
-  // row carries the seeker_profile_id we need to resolve the applicant's name.
-  const [messages, conversations] = await Promise.all([
+  // Load the transcript, the host's conversations (to resolve the seeker name),
+  // and mark inbound messages as read — all in parallel so a failed mark-read
+  // never blocks the page render. _markRead is void — the underscore prefix
+  // signals the intentional discard.
+  const [messages, conversations, _markRead] = await Promise.all([
     getMessages(token, userId, id),
     getConversations(token, userId, "host"),
+    markMessagesReadAction(id),
   ]);
   const conversation = conversations.find((entry) => entry.id === id) ?? null;
   const seekerName = conversation

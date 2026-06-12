@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ListingStatus } from "@explore-and-earn/contracts";
+import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
 
 /**
@@ -176,4 +177,56 @@ export async function duplicateListing(
   }
 
   return { ok: true, newListingId: (created as { id: string }).id };
+}
+
+export type ExpireListingsResult = {
+  ok: boolean;
+  archived: number;
+  ids: string[];
+  error?: string;
+};
+
+/**
+ * System-initiated expiry sweep — archive every live listing whose
+ * `expires_at` timestamp has passed.
+ *
+ * Uses the service-role admin client (RLS-bypassing) so the sweep covers
+ * every host's listings without needing a Clerk token. The transition is
+ * validated against the canonical lifecycle map via `canTransitionListing`
+ * before any write is attempted.
+ *
+ * Idempotent: only listings currently in `status = 'live'` are updated, so
+ * running the sweep multiple times has no additional effect.
+ *
+ * Intended to be called exclusively by `GET /api/cron/expire-listings`.
+ */
+export async function expireListings(
+  serviceRoleKey?: string,
+): Promise<ExpireListingsResult> {
+  // Guard: assert the lifecycle engine permits live → archived.
+  if (!canTransitionListing("live", "archived")) {
+    return {
+      ok: false,
+      archived: 0,
+      ids: [],
+      error: "invalid_transition: live → archived is not permitted by the lifecycle engine",
+    };
+  }
+
+  const nowIso = new Date().toISOString();
+  const db = adminClient(serviceRoleKey) as unknown as SupabaseClient;
+
+  const { data, error } = await db
+    .from("listings")
+    .update({ status: "archived", archived_at: nowIso })
+    .lt("expires_at", nowIso)
+    .eq("status", "live")
+    .select("id");
+
+  if (error) {
+    return { ok: false, archived: 0, ids: [], error: error.message };
+  }
+
+  const ids = (data ?? []).map((row: { id: string }) => row.id);
+  return { ok: true, archived: ids.length, ids };
 }

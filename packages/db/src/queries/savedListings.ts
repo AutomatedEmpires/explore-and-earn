@@ -170,7 +170,7 @@ export interface SavedListingDetail {
     readonly meals: SavedListingBenefit;
     readonly pay: SavedListingBenefit;
   };
-  readonly coverImageUrl: string | undefined;
+  readonly coverImageUrl?: string;
   /** True when the seeker already has a non-withdrawn application for this listing. */
   readonly alreadyApplied: boolean;
 }

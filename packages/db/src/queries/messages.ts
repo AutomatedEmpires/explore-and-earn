@@ -281,6 +281,62 @@ export async function sendMessage(
 }
 
 /**
+ * Last message for each of the given conversation ids, keyed by conversation id.
+ * Uses a single query rather than one-per-conversation so list pages avoid an
+ * N+1 round-trip. Ownership is NOT re-checked here — callers must pass only ids
+ * that have already been scoped to the requesting user.
+ */
+export async function getLastMessagesForConversations(
+  clerkToken: string,
+  conversationIds: readonly string[],
+): Promise<Map<string, Message>> {
+  const result = new Map<string, Message>();
+  if (conversationIds.length === 0) return result;
+
+  const db = untypedClient(clerkToken);
+  const { data, error } = await db
+    .from("messages")
+    .select(MESSAGE_COLUMNS)
+    .in("conversation_id", conversationIds)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`getLastMessagesForConversations: ${error.message}`);
+
+  // Keep only the first (newest) row per conversation id.
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const msg = rowToMessage(row);
+    if (!result.has(msg.conversationId)) {
+      result.set(msg.conversationId, msg);
+    }
+  }
+  return result;
+}
+
+/**
+ * Marks all messages in a conversation that were sent by the OTHER side as read
+ * (i.e. not sent by the caller). Safe to call on every thread open; it is a
+ * no-op when there is nothing unread. Ownership is verified — returns silently
+ * when the caller is not a participant.
+ */
+export async function markMessagesRead(
+  clerkToken: string,
+  clerkUserId: string,
+  conversationId: string,
+): Promise<void> {
+  const db = untypedClient(clerkToken);
+  const owned = await loadOwnedConversation(db, clerkUserId, conversationId);
+  if (!owned) return;
+
+  // The "other side" is the sender_type that is not the caller's role.
+  const otherSide: ConversationRole = owned.role === "host" ? "seeker" : "host";
+  await db
+    .from("messages")
+    .update({ read_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("sender_type", otherSide)
+    .is("read_at", null);
+}
+
+/**
  * Count of unread messages for the caller acting as a host — i.e. messages in
  * conversations the caller hosts that were sent by the seeker and not yet read.
  * Resilient by design: returns 0 on any failure so a transient error never breaks

@@ -1,0 +1,207 @@
+import "server-only";
+import { authedClient } from "../client";
+/**
+ * Read-only context resolvers for transactional email notifications.
+ *
+ * These live in the db layer so the Next server-action layer can ADDRESS
+ * notification emails (the recipient's email is fetched from Clerk in the
+ * action) WITHOUT pulling transport concerns into the core query modules. Each
+ * resolver is best-effort: it returns null/empty rather than throwing, so a
+ * notification can never break the mutation that triggered it.
+ *
+ * SECURITY / TYPES: same model as the sibling query modules — RLS is not yet
+ * enabled, so reads go through an UNTYPED authed client (the clerk_user_id
+ * columns predate the committed types.gen.ts) and the caller passes an
+ * already-verified Clerk token. Each resolver runs AFTER the triggering
+ * mutation has applied its own ownership guard (applyToListing /
+ * updateApplicationStatus / sendMessage).
+ * // types not yet generated: host_profiles.clerk_user_id, seeker_profiles.clerk_user_id
+ */
+function untypedClient(clerkToken) {
+    return authedClient(clerkToken);
+}
+async function resolveProfileId(db, table, clerkUserId) {
+    if (!clerkUserId)
+        return null;
+    const { data, error } = await db
+        .from(table)
+        .select("id")
+        .eq("clerk_user_id", clerkUserId)
+        .maybeSingle();
+    if (error || !data)
+        return null;
+    const row = data;
+    return typeof row.id === "string" ? row.id : null;
+}
+async function resolveClerkId(db, table, profileId) {
+    if (!profileId)
+        return null;
+    const { data, error } = await db
+        .from(table)
+        .select("clerk_user_id")
+        .eq("id", profileId)
+        .maybeSingle();
+    if (error || !data)
+        return null;
+    const row = data;
+    return typeof row.clerk_user_id === "string" ? row.clerk_user_id : null;
+}
+async function resolveListingTitle(db, listingId) {
+    if (!listingId)
+        return null;
+    const { data, error } = await db
+        .from("listings")
+        .select("title")
+        .eq("id", listingId)
+        .maybeSingle();
+    if (error || !data)
+        return null;
+    const row = data;
+    return typeof row.title === "string" ? row.title : null;
+}
+/**
+ * Resolve the listing title and the listing owner's Clerk user id from a listing
+ * id (listings.host_profile_id -> host_profiles.clerk_user_id). Used by the
+ * apply server action to address the "new application" email to the host.
+ * Best-effort: returns null when the listing cannot be resolved.
+ */
+export async function getListingHostContact(clerkToken, listingId) {
+    try {
+        const db = untypedClient(clerkToken);
+        const { data: listing, error } = await db
+            .from("listings")
+            .select("title, host_profile_id")
+            .eq("id", listingId)
+            .maybeSingle();
+        if (error || !listing)
+            return null;
+        const row = listing;
+        const listingTitle = typeof row.title === "string" ? row.title : "";
+        const hostClerkUserId = await resolveClerkId(db, "host_profiles", row.host_profile_id);
+        return { listingTitle, hostClerkUserId };
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Resolve the applicant's Clerk user id and listing title for an application id
+ * (applications.seeker_profile_id -> seeker_profiles.clerk_user_id,
+ * applications.listing_id -> listings.title). Used by the status-change server
+ * action (which has already passed updateApplicationStatus's ownership guard).
+ * Best-effort: returns null when the application cannot be resolved.
+ */
+export async function getApplicationSeekerContact(clerkToken, applicationId) {
+    try {
+        const db = untypedClient(clerkToken);
+        const { data: appRow, error } = await db
+            .from("applications")
+            .select("seeker_profile_id, listing_id")
+            .eq("id", applicationId)
+            .maybeSingle();
+        if (error || !appRow)
+            return null;
+        const row = appRow;
+        const seekerClerkUserId = await resolveClerkId(db, "seeker_profiles", row.seeker_profile_id);
+        const listingTitle = (await resolveListingTitle(db, row.listing_id)) ?? "";
+        return { seekerClerkUserId, listingTitle };
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Resolve the email context for a freshly-sent message: who should be notified
+ * (the OTHER participant), which side they are on, and the listing title. The
+ * caller is verified to be a participant first (defense in depth, mirroring
+ * sendMessage). Best-effort: returns null when the caller is not a participant
+ * or resolution fails. `callerClerkUserId` must come from auth().userId.
+ */
+export async function getMessageEmailContext(clerkToken, callerClerkUserId, conversationId) {
+    try {
+        const db = untypedClient(clerkToken);
+        const { data: convo, error } = await db
+            .from("conversations")
+            .select("seeker_profile_id, host_profile_id, listing_id")
+            .eq("id", conversationId)
+            .maybeSingle();
+        if (error || !convo)
+            return null;
+        const c = convo;
+        const [seekerId, hostId] = await Promise.all([
+            resolveProfileId(db, "seeker_profiles", callerClerkUserId),
+            resolveProfileId(db, "host_profiles", callerClerkUserId),
+        ]);
+        let recipientRole;
+        if (hostId && c.host_profile_id === hostId) {
+            recipientRole = "seeker";
+        }
+        else if (seekerId && c.seeker_profile_id === seekerId) {
+            recipientRole = "host";
+        }
+        else {
+            // Caller is not a participant — do not leak a recipient.
+            return null;
+        }
+        const recipientTable = recipientRole === "seeker" ? "seeker_profiles" : "host_profiles";
+        const recipientProfileId = recipientRole === "seeker" ? c.seeker_profile_id : c.host_profile_id;
+        const recipientClerkUserId = await resolveClerkId(db, recipientTable, recipientProfileId);
+        const listingTitle = await resolveListingTitle(db, c.listing_id);
+        return { recipientClerkUserId, recipientRole, listingTitle };
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Resolve a seeker's Clerk user id from their seeker_profiles.id.
+ * Used by the invite-send server action to address the invite notification email.
+ * Best-effort: returns null when the profile cannot be resolved.
+ */
+export async function getSeekerClerkIdByProfileId(clerkToken, seekerProfileId) {
+    try {
+        const db = untypedClient(clerkToken);
+        return await resolveClerkId(db, "seeker_profiles", seekerProfileId);
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Resolve a host's Clerk user id from their host_profiles.id. Used by the
+ * invite-accept server action to address the "invite accepted" email to the
+ * host. Best-effort: returns null when the profile cannot be resolved.
+ */
+export async function getHostClerkIdByProfileId(clerkToken, hostProfileId) {
+    try {
+        const db = untypedClient(clerkToken);
+        return await resolveClerkId(db, "host_profiles", hostProfileId);
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Count the messages in a conversation. Used by the message server action to
+ * detect the FIRST message in a thread (count === 1) so only the opening
+ * message triggers a notification email, never subsequent replies. Best-effort:
+ * returns 0 on any failure (which suppresses the notification rather than
+ * misfiring it).
+ */
+export async function countConversationMessages(clerkToken, conversationId) {
+    if (!conversationId)
+        return 0;
+    try {
+        const db = untypedClient(clerkToken);
+        const { count, error } = await db
+            .from("messages")
+            .select("id", { count: "exact", head: true })
+            .eq("conversation_id", conversationId);
+        if (error || typeof count !== "number")
+            return 0;
+        return count;
+    }
+    catch {
+        return 0;
+    }
+}

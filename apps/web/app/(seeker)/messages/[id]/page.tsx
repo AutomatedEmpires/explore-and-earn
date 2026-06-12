@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getMessages } from "@explore-and-earn/db";
 
+import { markMessagesReadAction } from "../../../actions/messages";
 import { EmptyState } from "../../../../components/discovery";
 import { BucketPage } from "../../../../components/seeker";
 import { MessageTranscript } from "../../../../components/messaging/MessageTranscript";
@@ -45,7 +46,13 @@ export default async function SeekerMessageThreadPage({
 		);
 	}
 
-	const messages = await getMessages(token, userId, id);
+	// Fetch messages and mark inbound ones as read in parallel; a failed mark-read
+	// must not block the page render. _markRead is void — the underscore prefix
+	// signals the intentional discard.
+	const [messages, _markRead] = await Promise.all([
+		getMessages(token, userId, id),
+		markMessagesReadAction(id),
+	]);
 
 	return (
 		<BucketPage title="Conversation" description={PAGE_DESCRIPTION}>

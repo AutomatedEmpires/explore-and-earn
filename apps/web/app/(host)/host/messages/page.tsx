@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import {
   getConversations,
-  getMessages,
+  getLastMessagesForConversations,
   getPublicListingsByIds,
   getSeekerDisplayNames,
 } from "@explore-and-earn/db";
@@ -58,43 +58,52 @@ export default async function HostMessagesPage() {
 
   const conversations = await getConversations(token, userId, "host");
 
-  // Batch-fetch every conversation's listing and seeker display name (one
-  // round-trip each) and join by id, replacing the previous per-conversation
-  // N+1 listing read and the "Applicant" name placeholder. Messages are still
-  // loaded per conversation (ownership-scoped reads).
+  if (conversations.length === 0) {
+    return (
+      <section className={styles.block}>
+        <HostSectionHeading title="Messages" description={PAGE_DESCRIPTION} />
+        <EmptyState
+          title="No messages yet"
+          message="Conversations with applicants will show up here."
+        />
+      </section>
+    );
+  }
+
+  // Batch-fetch every conversation's listing, seeker display name, and last
+  // message in three queries (replaces the previous per-conversation N+1).
   const listingIds = conversations
     .map((conversation) => conversation.listingId)
     .filter((id): id is string => id !== null);
   const seekerProfileIds = conversations.map(
     (conversation) => conversation.seekerProfileId,
   );
+  const conversationIds = conversations.map((c) => c.id);
 
-  const [listingRows, seekerDisplayNames] = await Promise.all([
+  const [listingRows, seekerDisplayNames, lastMessageMap] = await Promise.all([
     getPublicListingsByIds(listingIds),
     getSeekerDisplayNames(token, seekerProfileIds),
+    getLastMessagesForConversations(token, conversationIds),
   ]);
   const listingById = new Map(listingRows.map((row) => [row.id, row] as const));
 
-  const threads: HostMessageThread[] = await Promise.all(
-    conversations.map(async (conversation): Promise<HostMessageThread> => {
-      const listingRow = conversation.listingId
-        ? listingById.get(conversation.listingId) ?? null
-        : null;
-      const messages = await getMessages(token, userId, conversation.id);
-      const lastMessage = messages[messages.length - 1];
-      return {
-        id: conversation.id,
-        applicantName:
-          seekerDisplayNames.get(conversation.seekerProfileId) ?? "Seeker",
-        listingTitle: listingRow?.title ?? "Conversation",
-        preview: lastMessage?.body ?? "No messages yet",
-        unread: lastMessage
-          ? lastMessage.senderType !== "host" && !lastMessage.readAt
-          : false,
-        updatedOn: formatUpdatedOn(conversation.lastMessageAt),
-      };
-    }),
-  );
+  const threads: HostMessageThread[] = conversations.map((conversation) => {
+    const listingRow = conversation.listingId
+      ? listingById.get(conversation.listingId) ?? null
+      : null;
+    const lastMessage = lastMessageMap.get(conversation.id) ?? null;
+    return {
+      id: conversation.id,
+      applicantName:
+        seekerDisplayNames.get(conversation.seekerProfileId) ?? "Seeker",
+      listingTitle: listingRow?.title ?? "Conversation",
+      preview: lastMessage?.body ?? "No messages yet",
+      unread: lastMessage
+        ? lastMessage.senderType !== "host" && !lastMessage.readAt
+        : false,
+      updatedOn: formatUpdatedOn(conversation.lastMessageAt),
+    };
+  });
 
   return (
     <section className={styles.block}>

@@ -41,7 +41,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
         alt: "Sunlit apple orchard rows at harvest time",
       },
     },
-    conditionalBadges: ["seasonal"],
     coverImageUrl: cloudinaryPhoto("farm", "annie-spratt-jmjnnq2xfoy", "hero"),
     matchScore: 88,
     founding: true,
@@ -161,7 +160,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
         sortOrder: 0,
       },
     },
-    conditionalBadges: ["seasonal", "boosted"],
+    conditionalBadges: ["boosted"],
     coverImageUrl: cloudinaryPhoto("seasonal", "aleksandra-sapozhnikova-nbcribslxkq", "hero"),
     founding: false,
     payInsight: {
