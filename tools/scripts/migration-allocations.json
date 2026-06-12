@@ -29,6 +29,7 @@
     "024": { "slug": null, "owner": "lane-b-migration-integrity", "status": "reserved", "note": "Reserved for Lane B. Unused by this PR; present so the guard recognizes a future 024_* migration owned by this lane." },
     "025": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
     "026": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
-    "027": { "slug": "host_profiles_anon_column_privacy", "owner": "lane-a-security", "status": "reserved", "note": "P0 #1 - column-level SELECT lockdown for the anon role on public.host_profiles; adds the column dimension the row-level host_profiles_select_public policy (migration 013) cannot express. Authored review-only; founder-operated prod apply. See docs/runbooks/security-host-profile-anon-columns.md." }
+    "027": { "slug": "host_profiles_anon_column_privacy", "owner": "lane-a-security", "status": "reserved", "note": "P0 #1 - column-level SELECT lockdown for the anon role on public.host_profiles; adds the column dimension the row-level host_profiles_select_public policy (migration 013) cannot express. Authored review-only; founder-operated prod apply. See docs/runbooks/security-host-profile-anon-columns.md." },
+    "028": { "slug": "reports", "owner": "alpha/reports-table-and-flow", "status": "review-only", "note": "Adds reports table with RLS for the seeker moderation flow (issue #47). REVIEW-ONLY — not applied to any live database." }
   }
 }

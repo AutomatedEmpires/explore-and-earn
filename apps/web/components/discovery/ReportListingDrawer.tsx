@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Badge, Button, Icon, type IconKey } from "@explore-and-earn/ui";
 import { PopupShell } from "../overlay/PopupShell";
 
+import { submitReportAction } from "../../app/actions/reports";
 import { CATEGORY_ICON, CATEGORY_LABEL, type DiscoveryListing } from "./listing";
 import styles from "./ReportListingDrawer.module.css";
 
@@ -57,6 +58,8 @@ export function ReportListingDrawer({
 	const [reason, setReason] = useState<string | null>(null);
 	const [detail, setDetail] = useState("");
 	const [submitted, setSubmitted] = useState(false);
+	const [submitError, setSubmitError] = useState<string | null>(null);
+	const [isPending, startTransition] = useTransition();
 
 	const open = Boolean(listing);
 
@@ -65,11 +68,35 @@ export function ReportListingDrawer({
 			setReason(null);
 			setDetail("");
 			setSubmitted(false);
+			setSubmitError(null);
 		}
 	}, [listing]);
 
 	if (!listing) {
 		return null;
+	}
+
+	function handleSubmit() {
+		if (!reason || !listing) return;
+		setSubmitError(null);
+		startTransition(async () => {
+			const result = await submitReportAction(
+				listing.id,
+				reason,
+				detail.trim() || undefined,
+			);
+			if (result.ok) {
+				setSubmitted(true);
+			} else {
+				setSubmitError(
+					result.error === "unauthenticated"
+						? "You must be signed in to submit a report."
+						: result.error === "rate_limit_exceeded"
+							? "You've submitted too many reports recently. Please try again later."
+							: "Something went wrong. Please try again.",
+				);
+			}
+		});
 	}
 
 	return (
@@ -106,15 +133,15 @@ export function ReportListingDrawer({
 					</div>
 				) : (
 					<div className={styles.footer}>
-						<Button variant="secondary" onClick={onClose}>
+						<Button variant="secondary" onClick={onClose} disabled={isPending}>
 							Cancel
 						</Button>
 						<Button
 							variant="primary"
-							onClick={() => setSubmitted(true)}
-							disabled={reason === null}
+							onClick={handleSubmit}
+							disabled={reason === null || isPending}
 						>
-							Submit report
+							{isPending ? "Submitting…" : "Submit report"}
 						</Button>
 					</div>
 				)
@@ -194,6 +221,11 @@ export function ReportListingDrawer({
 								placeholder="Provide any additional details that can help us review this report..."
 							/>
 					</label>
+					{submitError && (
+						<p role="alert" className={styles.submitError}>
+							{submitError}
+						</p>
+					)}
 				</>
 				)}
 		</PopupShell>
