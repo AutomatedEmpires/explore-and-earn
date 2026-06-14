@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useOptimistic, useState, useTransition } from "react";
 
-import { BADGE_META, type SeekerBadge } from "@explore-and-earn/db";
+import { BADGE_META, type SeekerBadge } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { saveReadinessAction } from "../../app/actions/seekerProfile";
 import type { DiscoveryListing } from "../discovery";
@@ -99,7 +99,7 @@ export function ProfileHub({
     if (!seekerProfileId) return;
     startTransition(async () => {
       setOptimisticTimeline(value);
-      await saveReadinessAction(seekerProfileId, value);
+      await saveReadinessAction(value);
     });
   }
 
@@ -216,7 +216,7 @@ export function ProfileHub({
             role="listitem"
           >
             <span className={styles.statusIcon} aria-hidden="true">
-              <Icon name={resumeReady ? "status.match" : "system.warning"} size={22} />
+              <Icon name={resumeReady ? "status.match" : "system.warning"} size={20} />
             </span>
             <span className={styles.statusLabel}>
               {resumeReady ? "Can Apply" : "Can't Apply"}

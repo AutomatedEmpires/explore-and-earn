@@ -1,4 +1,5 @@
 export * from "./api"
+export * from "./badges"
 export * from "./benefits"
 export * from "./community"
 export * from "./card"
