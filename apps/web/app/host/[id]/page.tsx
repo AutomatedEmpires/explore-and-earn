@@ -48,6 +48,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 /* ── Section components (server-only, co-located for this route) ── */
 
+const catIcons: Record<string, "category.farm" | "category.maritime" | "category.remote" | "category.seasonal" | "category.mix"> = {
+  farm: "category.farm",
+  maritime: "category.maritime",
+  remote: "category.remote",
+  seasonal: "category.seasonal",
+  mix: "category.mix",
+};
+
 function QuickFacts({
   listingCount,
   housingOffered,
@@ -67,14 +75,6 @@ function QuickFacts({
     remote: "Remote",
     seasonal: "Seasonal",
     mix: "Multi-category",
-  };
-
-  const catIcons: Record<string, "category.farm" | "category.maritime" | "category.remote" | "category.seasonal" | "category.mix"> = {
-    farm: "category.farm",
-    maritime: "category.maritime",
-    remote: "category.remote",
-    seasonal: "category.seasonal",
-    mix: "category.mix",
   };
 
   return (
@@ -202,7 +202,7 @@ function ListingsSection({
                   </div>
                 ) : (
                   <div className={styles.listingCoverEmpty}>
-                    <Icon name="category.mix" size={24} aria-hidden />
+                    <Icon name={catIcons[listing.category] ?? "category.mix"} size={24} aria-hidden />
                   </div>
                 )}
 
@@ -222,13 +222,13 @@ function ListingsSection({
                   <div className={styles.listingBenefits}>
                     {listing.housingIncluded ? (
                       <span className={styles.listingBenefitHousing}>
-                        <Icon name="category.seasonal" size={16} aria-hidden />
+                        <Icon name="benefit.housing" size={16} aria-hidden />
                         Housing
                       </span>
                     ) : null}
                     {listing.mealsIncluded ? (
                       <span className={styles.listingBenefitMeals}>
-                        <Icon name="category.farm" size={16} aria-hidden />
+                        <Icon name="benefit.meals" size={16} aria-hidden />
                         Meals
                       </span>
                     ) : null}

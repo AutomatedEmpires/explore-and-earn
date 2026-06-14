@@ -258,7 +258,8 @@ async function getHostApplicationsFallback(
     .from("applications")
     .select("id,listing_id,seeker_profile_id,status,cover_message,submitted_at")
     .in("listing_id", listingIds)
-    .order("submitted_at", { ascending: false });
+    .order("submitted_at", { ascending: false })
+    .limit(500);
   if (appError) {
     throw new Error(`getHostApplications(applications): ${appError.message}`);
   }
@@ -574,6 +575,8 @@ export type SeekerSettableStatus = (typeof SEEKER_SETTABLE_STATUSES)[number];
  */
 export interface SeekerApplicationListing extends ApplicationListing {
   readonly coverImageUrl: string | null;
+  readonly beginsAt: string | null;
+  readonly endsAt: string | null;
 }
 
 export type SeekerApplicationWithListing = SeekerApplication & {
@@ -586,7 +589,7 @@ const SEEKER_APPLICATION_SELECT =
   "listings!listing_id(id, title, category, location_display, status, " +
   "housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
-  "compensation_currency, timeline_summary, cover_photo_url, " +
+  "compensation_currency, timeline_summary, cover_photo_url, begins_at, ends_at, " +
   "host_profiles(company_name, attestation_status))";
 
 function isVerifiedAttestation(value: unknown): boolean {
@@ -645,6 +648,8 @@ function rowToSeekerApplicationListing(
     benefits,
     coverImageUrl:
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
+    beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
+    endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
   };
 }
 

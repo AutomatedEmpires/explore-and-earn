@@ -10,6 +10,7 @@ import { MessageTranscript } from "../../../../components/messaging/MessageTrans
 
 export const metadata: Metadata = {
 	title: "Conversation",
+	robots: { index: false },
 };
 
 export const dynamic = "force-dynamic";
@@ -46,10 +47,8 @@ export default async function SeekerMessageThreadPage({
 		);
 	}
 
-	// Fetch messages and mark inbound ones as read in parallel; a failed mark-read
-	// must not block the page render. _markRead is void — the underscore prefix
-	// signals the intentional discard.
-	const [messages, _markRead] = await Promise.all([
+	// Fetch messages + mark-read in parallel; mark-read failure never blocks render.
+	const [messages] = await Promise.all([
 		getMessages(token, userId, id),
 		markMessagesReadAction(id),
 	]);

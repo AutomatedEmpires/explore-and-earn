@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Badge, Chip, DiscoveryCard, Icon } from "@explore-and-earn/ui";
-import type { SeekerResume, SeekerResumeExperience } from "@explore-and-earn/db";
+import { Badge, DiscoveryCard, Icon } from "@explore-and-earn/ui";
+import type { SeekerResume } from "@explore-and-earn/db";
 
 import { CATEGORY_LABEL, toDiscoveryCardData } from "../discovery";
+import { SeekerResumeCard } from "../seeker/SeekerResumeCard";
 import {
   APPLICANT_STAGE_ICON,
   APPLICANT_STAGE_LABEL,
@@ -32,33 +33,6 @@ const STAGE_FLOW: readonly ApplicantStage[] = [
   "offered",
 ];
 
-/** Format an ISO-ish date string as "Mon YYYY"; falls back to the raw value. */
-function formatResumeMonth(iso: string | null): string {
-  if (!iso) return "";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? iso
-    : date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-}
-
-/** "Mon YYYY – Mon YYYY" (or "– Present" while current), best-effort. */
-function formatExperienceRange(experience: SeekerResumeExperience): string {
-  const start = formatResumeMonth(experience.startDate);
-  const end = experience.isCurrent
-    ? "Present"
-    : formatResumeMonth(experience.endDate);
-  if (start && end) return `${start} \u2013 ${end}`;
-  return start || end || "";
-}
-
-/** "Role · Company", dropping whichever parts are missing. */
-function experienceHeadline(experience: SeekerResumeExperience): string {
-  const parts = [experience.roleTitle, experience.companyName].filter(
-    (part): part is string => Boolean(part && part.trim().length > 0),
-  );
-  return parts.join(" \u00b7 ") || "Experience";
-}
-
 /**
  * Host applicant detail — a review view for a single application. Surfaces the
  * applicant's identity, stage, cover note, resume (skills / bio / experience),
@@ -75,8 +49,7 @@ export function HostApplicantDetail({
   const currentIndex = STAGE_FLOW.indexOf(stage);
   const stageId = `applicant-stage-${applicant.id}`;
 
-  // No dedicated skills column exists yet, so resume "skills" are the unique
-  // skill_tags aggregated across the applicant's experiences.
+  // Aggregate skill_tags from experiences for the listing card skills slot
   const skills = resume
     ? Array.from(
         new Set(
@@ -84,11 +57,6 @@ export function HostApplicantDetail({
         ),
       ).filter((skill) => skill.trim().length > 0)
     : [];
-  const bio = resume?.profile?.bio ?? null;
-  const experiences = resume?.experiences ?? [];
-  const hasResumeContent =
-    resume != null &&
-    (skills.length > 0 || Boolean(bio) || experiences.length > 0);
 
   return (
     <div className={styles.wrap}>
@@ -110,39 +78,11 @@ export function HostApplicantDetail({
       {resume !== undefined ? (
         <section className={styles.section} aria-label="Applicant resume">
           <h3 className={styles.sectionTitle}>Resume</h3>
-          {hasResumeContent ? (
-            <>
-              {skills.length > 0 ? (
-                <div className={styles.chips}>
-                  {skills.map((skill) => (
-                    <Chip key={skill}>{skill}</Chip>
-                  ))}
-                </div>
-              ) : null}
-              {bio ? <p className={styles.note}>{bio}</p> : null}
-              {experiences.length > 0 ? (
-                <ul className={styles.experiences}>
-                  {experiences.map((experience) => {
-                    const range = formatExperienceRange(experience);
-                    return (
-                      <li key={experience.id} className={styles.experience}>
-                        <span className={styles.experienceTitle}>
-                          {experienceHeadline(experience)}
-                        </span>
-                        {range ? (
-                          <span className={styles.experienceMeta}>{range}</span>
-                        ) : null}
-                        {experience.summary ? (
-                          <span className={styles.experienceSummary}>
-                            {experience.summary}
-                          </span>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : null}
-            </>
+          {resume != null ? (
+            <SeekerResumeCard
+              resume={resume}
+              displayNameOverride={applicant.applicantName}
+            />
           ) : (
             <p className={styles.hint}>
               Seeker hasn&apos;t completed their resume yet
@@ -166,7 +106,7 @@ export function HostApplicantDetail({
           Stage
         </h3>
         <p className={styles.hint}>
-          Shown for reference. Hiring decisions are not wired up in this preview.
+          Hiring pipeline will be available in an upcoming release.
         </p>
         <ol className={styles.flow}>
           {STAGE_FLOW.map((flowStage, index) => {

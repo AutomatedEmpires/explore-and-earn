@@ -1,10 +1,13 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 import { getSeekerProfileForHost } from "@explore-and-earn/db";
-import { Icon, Meter, Chip, Button, type IconKey } from "@explore-and-earn/ui";
+import { Icon, Meter, Chip, type IconKey } from "@explore-and-earn/ui";
 import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
+
+import styles from "./page.module.css";
 
 export const metadata: Metadata = {
   title: "Seeker profile",
@@ -17,13 +20,28 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+function computeCompletenessScore(profile: {
+  shortBio?: string | null;
+  desiredCategories: readonly string[];
+  desiredRoles: readonly string[];
+  housingPreference?: string | null;
+  locationPref?: string | null;
+}): number {
+  let score = 0;
+  if (profile.shortBio) score += 20;
+  if (profile.desiredCategories.length > 0) score += 20;
+  if (profile.desiredRoles.length > 0) score += 20;
+  if (profile.housingPreference) score += 20;
+  if (profile.locationPref) score += 20;
+  return score;
+}
+
 export default async function SeekerPublicProfilePage({ params }: Props) {
   const { id: seekerProfileId } = await params;
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
 
   if (!userId) notFound();
 
-  const { getToken } = await auth();
   const token = await getToken({ template: "supabase" });
   if (!token) notFound();
 
@@ -32,109 +50,44 @@ export default async function SeekerPublicProfilePage({ params }: Props) {
   if (!profile || profile.visibilityStatus === "hidden") notFound();
 
   const displayName = profile.displayName ?? "Seeker";
-  const completenessScore = profile.onboardingComplete ? 85 : 40;
+  const completenessScore = computeCompletenessScore(profile);
 
   return (
-    <main
-      style={{
-        backgroundColor: "var(--color-paper)",
-        minHeight: "100vh",
-        padding: "var(--space-gutter)",
-      }}
-    >
-      <div style={{ maxWidth: "42rem", margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ marginBottom: "var(--space-section)" }}>
-          {/* Avatar placeholder (Icon nav.profile) */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-16)",
-              marginBottom: "var(--space-16)",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "var(--radius-pill)",
-                border: "2px solid var(--border-ink)",
-                backgroundColor: "var(--color-surface)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+    <main className={styles.page}>
+      <div className={styles.inner}>
+
+        {/* Header: avatar + name + bio */}
+        <header className={styles.header}>
+          <div className={styles.identity}>
+            <div className={styles.avatar} aria-hidden>
               <Icon name="nav.profile" size={24} aria-hidden />
             </div>
-
-            <div style={{ flex: 1 }}>
-              <h1
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "var(--type-page-size)",
-                  lineHeight: "var(--type-page-lh)",
-                  color: "var(--text-primary)",
-                  margin: 0,
-                  marginBottom: "var(--space-4)",
-                }}
-              >
-                {displayName}
-              </h1>
+            <div className={styles.nameGroup}>
+              <h1 className={styles.name}>{displayName}</h1>
               {profile.locationPref && (
-                <div
-                  style={{
-                    fontSize: "var(--type-meta-size)",
-                    color: "var(--text-secondary)",
-                    textTransform: "capitalize",
-                  }}
-                >
+                <span className={styles.locationPref}>
                   {profile.locationPref.replace("_", " ")}
-                </div>
+                </span>
               )}
             </div>
           </div>
 
-          {/* Short bio */}
           {profile.shortBio && (
-            <p
-              style={{
-                fontFamily: "var(--font-ui)",
-                fontSize: "var(--type-body-size)",
-                lineHeight: "var(--type-body-lh)",
-                color: "var(--text-secondary)",
-                marginBottom: "var(--space-16)",
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {profile.shortBio}
-            </p>
+            <p className={styles.bio}>{profile.shortBio}</p>
           )}
-        </div>
+        </header>
 
         {/* Desired work */}
-        {(profile.desiredCategories.length > 0 ||
-          profile.desiredRoles.length > 0) && (
-          <section style={{ marginBottom: "var(--space-section)" }}>
-            <h2
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "var(--type-section-size)",
-                lineHeight: "var(--type-section-lh)",
-                color: "var(--text-primary)",
-                marginBottom: "var(--space-12)",
-              }}
-            >
+        {(profile.desiredCategories.length > 0 || profile.desiredRoles.length > 0) && (
+          <section className={styles.section} aria-labelledby="desired-work-heading">
+            <h2 id="desired-work-heading" className={styles.sectionTitle}>
               Desired work
             </h2>
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-8)" }}>
+            <div className={styles.chips}>
               {profile.desiredCategories.map((cat) => {
-                const iconKey =
-                  (MARKETPLACE_CATEGORIES as readonly string[]).includes(cat)
-                    ? `category.${cat}`
-                    : "nav.seek";
+                const iconKey = (MARKETPLACE_CATEGORIES as readonly string[]).includes(cat)
+                  ? `category.${cat}`
+                  : "nav.seek";
                 return (
                   <Chip key={cat} icon={iconKey as IconKey}>
                     {cat}
@@ -149,59 +102,42 @@ export default async function SeekerPublicProfilePage({ params }: Props) {
         )}
 
         {/* Expectations */}
-        <section style={{ marginBottom: "var(--space-section)" }}>
-          <h2
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "var(--type-section-size)",
-              lineHeight: "var(--type-section-lh)",
-              color: "var(--text-primary)",
-              marginBottom: "var(--space-12)",
-            }}
-          >
-            Expectations
-          </h2>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-8)" }}>
-            {profile.housingPreference && (
-              <div
-                style={{
-                  fontFamily: "var(--font-ui)",
-                  fontSize: "var(--type-body-size)",
-                  color: "var(--text-secondary)",
-                }}
-              >
-                <strong style={{ color: "var(--text-primary)" }}>Housing:</strong>{" "}
+        {profile.housingPreference && (
+          <section className={styles.section} aria-labelledby="expectations-heading">
+            <h2 id="expectations-heading" className={styles.sectionTitle}>
+              Expectations
+            </h2>
+            <div className={styles.expectations}>
+              <p className={styles.expectationRow}>
+                <strong className={styles.expectationLabel}>Housing:</strong>{" "}
                 {profile.housingPreference.replace("_", " ")}
-              </div>
-            )}
-          </div>
-        </section>
+              </p>
+            </div>
+          </section>
+        )}
 
-        {/* Completeness */}
-        <section style={{ marginBottom: "var(--space-section)" }}>
+        {/* Profile completeness */}
+        <section className={styles.section} aria-labelledby="completeness-heading">
+          <h2 id="completeness-heading" className={styles.sectionTitle}>
+            Profile completeness
+          </h2>
           <Meter value={completenessScore} label="Profile completeness" />
         </section>
 
         {/* Actions */}
-        <div style={{ display: "flex", gap: "var(--space-12)" }}>
-          <Button
-            variant="primary"
-            onClick={() => {
-              window.location.href = `/host/invites?seekerProfileId=${seekerProfileId}`;
-            }}
+        <div className={styles.actions}>
+          <Link
+            className={styles.actionPrimary}
+            href={`/host/invites?seekerProfileId=${seekerProfileId}`}
           >
+            <Icon name="action.forward" size={16} aria-hidden />
             Invite this seeker
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              window.location.href = "/host/messages";
-            }}
-          >
+          </Link>
+          <Link className={styles.actionSecondary} href="/host/messages">
             Message
-          </Button>
+          </Link>
         </div>
+
       </div>
     </main>
   );

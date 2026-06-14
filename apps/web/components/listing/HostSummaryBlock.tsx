@@ -1,98 +1,42 @@
-import type { CSSProperties } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { VerifiedHostBadge } from "@explore-and-earn/ui"
+import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui"
 import type { ListingHostSummary } from "./fixtures"
-
-const sectionStyle: CSSProperties = {
-	display: "flex",
-	flexDirection: "column",
-	gap: "var(--space-12)",
-	background: "var(--color-surface-raised)",
-	borderRadius: "var(--radius-card)",
-	padding: "var(--space-card)",
-}
-
-const headerStyle: CSSProperties = {
-	display: "flex",
-	alignItems: "center",
-	gap: "var(--space-12)",
-}
-
-const avatarStyle: CSSProperties = {
-	width: "var(--space-48)",
-	height: "var(--space-48)",
-	borderRadius: "var(--radius-pill)",
-	objectFit: "cover",
-	background: "var(--color-surface)",
-}
-
-const identityStyle: CSSProperties = {
-	display: "flex",
-	flexDirection: "column",
-	gap: "var(--space-4)",
-}
-
-const nameStyle: CSSProperties = {
-	fontFamily: "var(--font-display)",
-	fontSize: "var(--type-card-size)",
-	lineHeight: "var(--type-card-lh)",
-	color: "var(--text-primary)",
-	textDecoration: "none",
-}
-
-const locationStyle: CSSProperties = {
-	fontFamily: "var(--font-ui)",
-	fontSize: "var(--type-meta-size)",
-	lineHeight: "var(--type-meta-lh)",
-	color: "var(--text-secondary)",
-}
-
-const taglineStyle: CSSProperties = {
-	margin: "0",
-	fontFamily: "var(--font-ui)",
-	fontSize: "var(--type-body-size)",
-	lineHeight: "var(--type-body-lh)",
-	color: "var(--text-secondary)",
-}
-
-const linkStyle: CSSProperties = {
-	fontFamily: "var(--font-ui)",
-	fontSize: "var(--type-button-size)",
-	lineHeight: "var(--type-body-lh)",
-	color: "var(--status-match-fg)",
-}
+import styles from "./HostSummaryBlock.module.css"
 
 export function HostSummaryBlock({ host }: { readonly host: ListingHostSummary }) {
 	const profileHref = host.id ? `/host/${host.id}` : null
 	return (
-		<section aria-label="About the host" style={sectionStyle}>
-			<div style={headerStyle}>
+		<section aria-label="About the host" className={styles.section}>
+			<div className={styles.header}>
 				{host.avatar ? (
-					<Image
-						src={host.avatar.masterPath}
-						alt={host.avatar.alt}
-						width={host.avatar.width}
-						height={host.avatar.height}
-						style={avatarStyle}
-					/>
+					<div className={styles.avatarWrap}>
+						<Image
+							src={host.avatar.masterPath}
+							alt={host.avatar.alt}
+							fill
+							className={styles.avatar}
+							sizes="48px"
+						/>
+					</div>
 				) : null}
-				<div style={identityStyle}>
+				<div className={styles.identity}>
 					{profileHref ? (
-						<Link href={profileHref} style={nameStyle}>
+						<Link href={profileHref} className={styles.name}>
 							{host.name}
 						</Link>
 					) : (
-						<span style={nameStyle}>{host.name}</span>
+						<span className={styles.name}>{host.name}</span>
 					)}
-					{host.location && <span style={locationStyle}>Based in {host.location}</span>}
+					{host.location && <span className={styles.location}>Based in {host.location}</span>}
 				</div>
 			</div>
 			{host.verified ? <VerifiedHostBadge /> : null}
-			{host.tagline ? <p style={taglineStyle}>{host.tagline}</p> : null}
+			{host.tagline ? <p className={styles.tagline}>{host.tagline}</p> : null}
 			{profileHref && (
-				<Link href={profileHref} style={linkStyle}>
-					View host profile →
+				<Link href={profileHref} className={styles.viewLink}>
+					View host profile
+					<Icon name="action.forward" size={16} aria-hidden />
 				</Link>
 			)}
 		</section>

@@ -1,0 +1,153 @@
+/* ReadinessSlider — availability status selector */
+
+.strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding: 11px var(--space-16);
+  background: linear-gradient(
+    to right,
+    var(--color-parchment) 0%,
+    var(--color-surface) 100%
+  );
+  border-bottom: 1.5px solid var(--border-soft);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.strip::-webkit-scrollbar {
+  display: none;
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pills {
+  display: flex;
+  gap: var(--space-6);
+  flex-shrink: 0;
+}
+
+/* ─── Base pill ─── */
+.pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-soft);
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background    var(--motion-fast) var(--ease-standard),
+    color         var(--motion-fast) var(--ease-standard),
+    box-shadow    var(--motion-fast) var(--ease-standard),
+    transform     var(--motion-base) var(--ease-standard);
+  user-select: none;
+}
+
+.pill:hover:not(:disabled) {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.pill:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.pill:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ─── Live pulsing dot for "now" ─── */
+.nowDot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ADE80;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+  animation: now-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes now-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+  50%  { box-shadow: 0 0 0 5px rgba(74, 222, 128, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+
+/* ─── Active states by readiness tier ─── */
+.pillActive.now {
+  border-color: #28A060;
+  background: linear-gradient(135deg, #1E8A50 0%, #2CAE6A 100%);
+  color: #fff;
+  box-shadow:
+    0 2px 12px rgba(44, 174, 106, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.pillActive.soon {
+  border-color: #B07C0A;
+  background: linear-gradient(135deg, #9A6A08 0%, #C48A14 100%);
+  color: #fff;
+  box-shadow:
+    0 2px 12px rgba(196, 138, 20, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.pillActive.later {
+  border-color: #6A5035;
+  background: linear-gradient(135deg, #5A4028 0%, #806248 100%);
+  color: #fff;
+  box-shadow:
+    0 2px 12px rgba(128, 98, 72, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+/* ─── Responsive abbreviations ─── */
+.short { display: none; }
+.full  { display: inline; }
+
+@media (max-width: 359px) {
+  .short { display: inline; }
+  .full  { display: none; }
+}
+
+/* ─── Saving indicator ─── */
+.saving {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-inline-start: auto;
+  flex-shrink: 0;
+  animation: fade-in 0.15s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

@@ -3,3 +3,20 @@
   flex-direction: column;
   gap: var(--space-12);
 }
+
+.profileNotice {
+  margin: 0;
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background: color-mix(in srgb, var(--color-surface-raised) 80%, var(--color-surface) 20%);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.profileNotice a {
+  color: var(--text-primary);
+  text-decoration: underline;
+}

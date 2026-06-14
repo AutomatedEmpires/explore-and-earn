@@ -5,7 +5,7 @@ import { getApplicationsForSeekerWithListings } from "@explore-and-earn/db";
 
 import { BucketPage, CardStatus } from "../../../components/seeker";
 import { EmptyState, seekerApplicationListingToCardData } from "../../../components/discovery";
-import styles from "../../../components/seeker/LifecycleList.module.css";
+import styles from "./withdrawn.module.css";
 
 export const metadata: Metadata = {
 	title: "Withdrawn",

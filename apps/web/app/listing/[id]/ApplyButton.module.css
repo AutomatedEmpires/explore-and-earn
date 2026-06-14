@@ -1,0 +1,22 @@
+/* ─── ApplyButton ─────────────────────────────────────────────────────────── */
+
+.appliedState {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--text-secondary);
+}
+
+.buttonRow {
+  display: flex;
+  gap: var(--space-12);
+}
+
+.modalText {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-16);
+}

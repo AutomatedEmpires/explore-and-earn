@@ -30,6 +30,10 @@
     "025": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
     "026": { "slug": null, "owner": "reserved-other-lane", "status": "reserved" },
     "027": { "slug": "host_profiles_anon_column_privacy", "owner": "lane-a-security", "status": "reserved", "note": "P0 #1 - column-level SELECT lockdown for the anon role on public.host_profiles; adds the column dimension the row-level host_profiles_select_public policy (migration 013) cannot express. Authored review-only; founder-operated prod apply. See docs/runbooks/security-host-profile-anon-columns.md." },
-    "028": { "slug": "reports", "owner": "alpha/reports-table-and-flow", "status": "review-only", "note": "Adds reports table with RLS for the seeker moderation flow (issue #47). REVIEW-ONLY — not applied to any live database." }
+    "028": { "slug": "reports", "owner": "alpha/reports-table-and-flow", "status": "review-only", "note": "Adds reports table with RLS for the seeker moderation flow (issue #47). REVIEW-ONLY — not applied to any live database." },
+    "029": { "slug": "boost_campaigns", "owner": "homepage-boost-system", "status": "review-only", "note": "Adds listing_boost_campaigns and employer_featured_campaigns tables with tier-ranked RLS for homepage paid placement. REVIEW-ONLY — not applied to any live database." },
+    "030": { "slug": "seeker_badges", "owner": "historical", "status": "review-only", "note": "Adds seeker_badges table with badge_key/awarded_at/metadata. REVIEW-ONLY — not applied to any live database." },
+    "031": { "slug": null, "owner": "UNASSIGNED-CONTESTED", "status": "contested", "note": "Two open PRs each introduced a different 031_* migration (community_phase2, seeker_profile_photo_url). The founder must assign 031 to exactly ONE lane; the other must renumber before merge." },
+    "032": { "slug": "resume_builder_fields", "owner": "seeker-resume-builder", "status": "review-only", "note": "Extends seeker_profiles (seeking_timeline, general_skill_tags), seeker_resume_experiences (location), seeker_resume_educations (location, is_current), seeker_certifications (skill_tags, does_not_expire, description) for the 5-step resume builder. REVIEW-ONLY — not applied to any live database." }
   }
 }

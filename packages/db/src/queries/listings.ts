@@ -157,7 +157,6 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
         : undefined,
     visaSupport: row.visa_support,
     coverImageUrl: row.cover_photo_url ?? undefined,
-    galleryPhotoUrls: row.gallery_photo_urls ?? [],
     coordinates:
       row.latitude != null && row.longitude != null
         ? { lat: row.latitude, lon: row.longitude }

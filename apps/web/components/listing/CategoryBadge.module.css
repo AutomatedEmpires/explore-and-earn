@@ -1,0 +1,21 @@
+/* ─── CategoryBadge ───────────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge[data-category="farm"]     { background: var(--accent-farm-bg);     color: var(--accent-farm-fg); }
+.badge[data-category="maritime"] { background: var(--accent-maritime-bg); color: var(--accent-maritime-fg); }
+.badge[data-category="remote"]   { background: var(--accent-remote-bg);   color: var(--accent-remote-fg); }
+.badge[data-category="seasonal"] { background: var(--accent-seasonal-bg); color: var(--accent-seasonal-fg); }
+.badge[data-category="mix"]      { background: var(--accent-mix-bg);      color: var(--accent-mix-fg); }

@@ -23,8 +23,14 @@ import { reportError } from "../../lib/sentry";
 export type OnboardingStepData = {
   displayName?: string | null;
   bio?: string | null;
+  openToStatement?: string | null;
   locationPref?: "remote" | "on_site" | "either" | null;
   housingPref?: "preferred" | "not_needed" | null;
+  mealsPref?: "required" | "preferred" | "not_needed" | "flexible" | null;
+  payExpectationMinCents?: number | null;
+  payExpectationMaxCents?: number | null;
+  payExpectationUnit?: "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | "other";
+  payFlexible?: boolean;
   categories?: string[];
   freeformSkills?: string[];
   complete?: boolean;
@@ -65,6 +71,24 @@ async function saveOnboardingStepImpl(
       : undefined),
     ...(stepData.housingPref !== undefined
       ? { housingPref: stepData.housingPref }
+      : undefined),
+    ...(stepData.mealsPref !== undefined
+      ? { mealsPref: stepData.mealsPref }
+      : undefined),
+    ...(stepData.openToStatement !== undefined
+      ? { openToStatement: stepData.openToStatement }
+      : undefined),
+    ...(stepData.payExpectationMinCents !== undefined
+      ? { payExpectationMinCents: stepData.payExpectationMinCents }
+      : undefined),
+    ...(stepData.payExpectationMaxCents !== undefined
+      ? { payExpectationMaxCents: stepData.payExpectationMaxCents }
+      : undefined),
+    ...(stepData.payExpectationUnit !== undefined
+      ? { payExpectationUnit: stepData.payExpectationUnit }
+      : undefined),
+    ...(stepData.payFlexible !== undefined
+      ? { payFlexible: stepData.payFlexible }
       : undefined),
     ...(stepData.categories !== undefined
       ? { categories: sanitizeCategories(stepData.categories) }

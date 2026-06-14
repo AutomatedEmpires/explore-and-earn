@@ -31,6 +31,13 @@ export default async function HostNewListingPage() {
         actionLabel="All listings"
         actionHref="/host/listings"
       />
+      {hostProfile == null && (
+        <p className={styles.profileNotice}>
+          Your host profile is still setting up. Complete your{" "}
+          <a href="/host/profile/edit">host profile</a> first, then return here
+          to create a listing.
+        </p>
+      )}
       <ListingForm mode="create" hostProfileId={hostProfile?.id} />
     </section>
   );

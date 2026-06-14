@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button, DiscoveryCard, Icon, Meter } from "@explore-and-earn/ui";
 
 import {
@@ -71,9 +72,11 @@ export interface SwipeDeckProps {
  * the match algorithm still arrive with the gated data layer.
  */
 export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = true }: SwipeDeckProps) {
+	const router = useRouter();
 	const [deck, setDeck] = useState<DiscoveryListing[]>(() => [...listings]);
 	const [cursor, setCursor] = useState<string | null>(initialCursor);
 	const [loadingMore, setLoadingMore] = useState(false);
+	const [loadError, setLoadError] = useState(false);
 	const total = deck.length;
 	const [index, setIndex] = useState(0);
 	const [decisions, setDecisions] = useState<readonly Decision[]>([]);
@@ -91,6 +94,8 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 	const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const deckRef = useRef<DiscoveryListing[]>(deck);
 	const loadingRef = useRef(false);
+	const authGateDismissRef = useRef<HTMLButtonElement | null>(null);
+	const preGateFocusRef = useRef<HTMLElement | null>(null);
 
 	useEffect(() => {
 		deckRef.current = deck;
@@ -118,6 +123,16 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		};
 	}, []);
 
+	useEffect(() => {
+		if (showAuthGate) {
+			preGateFocusRef.current = document.activeElement as HTMLElement;
+			authGateDismissRef.current?.focus();
+		} else {
+			preGateFocusRef.current?.focus();
+			preGateFocusRef.current = null;
+		}
+	}, [showAuthGate]);
+
 	const loadMore = useCallback(async () => {
 		if (loadingRef.current || cursor === null) {
 			return;
@@ -139,9 +154,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 			});
 			setCursor(batch.nextCursor);
 		} catch {
-			// Best-effort infinite load: stop paginating but keep the deck usable
-			// with whatever is already loaded.
-			setCursor(null);
+			setLoadError(true);
 		} finally {
 			loadingRef.current = false;
 			setLoadingMore(false);
@@ -201,11 +214,14 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 					setIndex((value) => value + 1);
 					setOffset({ x: 0, y: 0 });
 					setLeaving(null);
+					if (action === "apply") {
+						router.push(`/listing/${card.id}`);
+					}
 				},
 				reducedMotion ? 0 : THROW_MS,
 			);
 		},
-		[leaving, deck, index, reducedMotion],
+		[leaving, deck, index, reducedMotion, router],
 	);
 
 	const undo = useCallback(() => {
@@ -327,6 +343,28 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				</div>
 			);
 		}
+		if (loadError) {
+			return (
+				<div className={styles.deck}>
+					<EmptyState
+						title="Couldn't load more"
+						message="There was a problem fetching the next batch of opportunities. Try again or browse the full feed under Seek."
+					/>
+					<div className={styles.controls}>
+						<Button
+							variant="secondary"
+							onClick={() => {
+								setLoadError(false);
+								setCursor(initialCursor);
+								restart();
+							}}
+						>
+							Try again
+						</Button>
+					</div>
+				</div>
+			);
+		}
 		const summary =
 			savedCount > 0
 				? `You saved ${savedCount} ${savedCount === 1 ? "opportunity" : "opportunities"}. Find them under Saved, or run the deck again.`
@@ -423,8 +461,33 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				})}
 
 				{showAuthGate && (
-					<div className={styles.authGate} role="dialog" aria-modal="true" aria-label="Sign in to swipe">
+					<div
+						className={styles.authGate}
+						role="dialog"
+						aria-modal="true"
+						aria-label="Sign in to swipe"
+						onKeyDown={(e) => {
+							if (e.key !== "Tab") return;
+							const modal = e.currentTarget;
+							const focusable = Array.from(
+								modal.querySelectorAll<HTMLElement>(
+									'button, a[href], [tabindex]:not([tabindex="-1"])',
+								),
+							).filter((el) => !el.hasAttribute("disabled"));
+							if (focusable.length === 0) return;
+							const first = focusable[0];
+							const last = focusable[focusable.length - 1];
+							if (e.shiftKey && document.activeElement === first) {
+								e.preventDefault();
+								last?.focus();
+							} else if (!e.shiftKey && document.activeElement === last) {
+								e.preventDefault();
+								first?.focus();
+							}
+						}}
+					>
 						<button
+							ref={authGateDismissRef}
 							className={styles.authGateDismiss}
 							onClick={() => setShowAuthGate(false)}
 							aria-label="Dismiss"

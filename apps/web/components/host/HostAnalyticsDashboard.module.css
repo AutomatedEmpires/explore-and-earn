@@ -128,6 +128,7 @@
 
 .funnelBarFill {
   height: 100%;
+  width: var(--barFill, 0%);
   border-radius: 4px;
   background: color-mix(in srgb, var(--color-sky, #0ea5e9) 80%, var(--color-navy, #1e3a5f) 20%);
   min-width: 2px;

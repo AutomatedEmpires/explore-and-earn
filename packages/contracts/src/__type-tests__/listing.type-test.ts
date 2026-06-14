@@ -155,9 +155,9 @@ export const _allStatusesOk = _allStatuses;
 
 // ---------------------------------------------------------------- Conditional badges
 
-// The set is the narrowed post-PR-#190 set: seasonal + boosted. No "featured".
+// The set is the narrowed post-PR-#190 set: boosted only. No "featured", no "seasonal".
 export const _badgeSetIsNarrowed: Expect<
-  Equal<DiscoveryCardConditionalBadge, "seasonal" | "boosted">
+  Equal<DiscoveryCardConditionalBadge, "boosted">
 > = true;
 
 // @ts-expect-error "featured" was removed from the conditional badge set (PR #190).

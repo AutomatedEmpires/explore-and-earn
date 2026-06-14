@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import {
   getHostApplications,
   getHostListings,
+  getSeekerDisplayNames,
   rowToDiscoveryFields,
 } from "@explore-and-earn/db";
 
@@ -49,6 +50,12 @@ export default async function HostApplicantsPage({
     getHostListings(token, userId).catch(() => []),
   ]);
 
+  // Resolve seeker display names in a single batch query.
+  const displayNames = await getSeekerDisplayNames(
+    token,
+    [...new Set(applications.map((a) => a.seekerProfileId))],
+  );
+
   const listingsById = new Map<string, DiscoveryListing>(
     listingRows.map((row): [string, DiscoveryListing] => [
       row.id,
@@ -71,7 +78,7 @@ export default async function HostApplicantsPage({
     : ownedApplications;
 
   const applicants = filteredApplications.map((application) =>
-    toApplicantItem(application, listingsById),
+    toApplicantItem(application, listingsById, displayNames),
   );
 
   const filterListing = filterListingId

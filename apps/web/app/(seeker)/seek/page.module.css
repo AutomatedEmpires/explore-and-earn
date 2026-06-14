@@ -1,5 +1,23 @@
-/* Seek pagination \u2014 server-rendered prev/next links beneath the card grid.
+/* Seek page \u2014 dashboard + discovery sections.
    Semantic tokens only; no px outside breakpoints. */
+
+/* Discover section (below dashboard) */
+.discoverSection {
+  background: var(--color-paper);
+  padding-top: var(--space-section, 24px);
+  border-top: 1px solid var(--border-soft);
+}
+
+.discoverHeading {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 4.5vw, 22px);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0 var(--space-16) var(--space-12);
+}
+
+/* Pagination \u2014 server-rendered prev/next links beneath the card grid. */
 
 .pagination {
 	display: flex;
@@ -46,4 +64,16 @@
 	line-height: var(--type-label-lh);
 	font-weight: var(--font-weight-semibold);
 	color: var(--text-secondary);
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
 }

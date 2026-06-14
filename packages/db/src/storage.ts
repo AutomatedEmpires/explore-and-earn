@@ -74,6 +74,22 @@ export async function deleteListingMedia(
   return deleteStorageObject(token, LISTING_MEDIA_BUCKET, `${hostProfileId}/${slot}`);
 }
 
+/**
+ * Upload a community photo to `community-photos/{seekerProfileId}/{filename}`
+ * and return the storage path (not the full URL). The caller is responsible for
+ * generating a unique filename to prevent collisions.
+ */
+export async function uploadCommunityPhotoStorage(
+  token: string,
+  seekerProfileId: string,
+  filename: string,
+  file: File,
+): Promise<string> {
+  const path = `${seekerProfileId}/${filename}`;
+  await uploadToBucket(token, "community-photos", path, file);
+  return path;
+}
+
 /** Delete a single object from a bucket by path. */
 export async function deleteStorageObject(
   token: string,

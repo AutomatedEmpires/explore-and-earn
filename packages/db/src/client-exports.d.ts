@@ -9,7 +9,7 @@
  * `@explore-and-earn/db` entry which carries the server-only guard.
  */
 export { anonClient, authedClient } from "./client";
-export { LISTING_MEDIA_BUCKET, PROFILE_PHOTOS_BUCKET, uploadListingMedia, uploadProfilePhoto, deleteStorageObject, } from "./storage";
+export { LISTING_MEDIA_BUCKET, PROFILE_PHOTOS_BUCKET, uploadListingMedia, uploadProfilePhoto, deleteStorageObject, deleteListingMedia, } from "./storage";
 export type { Message } from "./queries/messages";
 export type { InviteResponse, HostInvite } from "./queries/invites";
 export type { ListingRow } from "./queries/listings";

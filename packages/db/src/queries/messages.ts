@@ -298,7 +298,8 @@ export async function getLastMessagesForConversations(
     .from("messages")
     .select(MESSAGE_COLUMNS)
     .in("conversation_id", conversationIds)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(Math.min(conversationIds.length * 20, 1000));
   if (error) throw new Error(`getLastMessagesForConversations: ${error.message}`);
 
   // Keep only the first (newest) row per conversation id.

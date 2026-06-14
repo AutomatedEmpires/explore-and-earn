@@ -97,52 +97,58 @@
 
 .railOuter {
   position: relative;
+  overflow: hidden;
+}
+
+/* Fade edges into the parchment section background */
+.railOuter::before,
+.railOuter::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 56px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.railOuter::before {
+  left: 0;
+  background: linear-gradient(to right, var(--color-parchment), transparent);
+}
+
+.railOuter::after {
+  right: 0;
+  background: linear-gradient(to left, var(--color-parchment), transparent);
 }
 
 .rail {
   display: flex;
   gap: var(--space-12);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
   /* bottom padding lets the badge shadow clear cleanly */
   padding-bottom: var(--space-4);
   list-style: none;
   margin: 0;
   padding-left: 0;
+  width: max-content;
+  animation: railScroll 36s linear infinite;
 }
 
-.rail::-webkit-scrollbar {
-  display: none;
+.railOuter:hover .rail {
+  animation-play-state: paused;
+}
+
+@keyframes railScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 
 .railItem {
   flex-shrink: 0;
 }
 
-/* ─── Next button ───────────────────────────────────────────────────────── */
-
-.nextBtn {
-  position: absolute;
-  right: -14px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  border: 1.5px solid var(--border-ink-warm);
-  background: var(--color-card-warm);
-  color: var(--text-primary);
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(25, 21, 14, 0.12);
-  transition:
-    transform  var(--motion-fast) var(--ease-standard),
-    box-shadow var(--motion-fast) var(--ease-standard);
-  z-index: 2;
+@media (prefers-reduced-motion: reduce) {
+  .rail { animation: none; }
 }
 
 .nextBtn:hover {
@@ -160,8 +166,9 @@
   width: 18rem;          /* 288px */
   min-width: 264px;
   border: 1.5px solid rgba(25, 21, 14, 0.22);
+  border-top: 4px solid rgba(25, 21, 14, 0.40); /* overridden per-category below */
   border-radius: var(--radius-card);
-  background: var(--color-card-warm);
+  background: linear-gradient(160deg, var(--color-card-warm) 0%, #F0E8D8 100%);
   color: inherit;
   text-decoration: none;
   scroll-snap-align: start;
@@ -169,6 +176,43 @@
   transition:
     transform  var(--motion-base) var(--ease-standard),
     box-shadow var(--motion-base) var(--ease-standard);
+}
+
+/* ─── Per-category card gradient backgrounds ────────────────────────────── */
+
+.card_farm {
+  background:
+    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(250,240,180,0.64) 0%, transparent 55%),
+    linear-gradient(160deg, #FFFAEC 0%, #F0E4AA 50%, #DECE68 100%);
+  border-top-color: #C98B1B;
+}
+
+.card_maritime {
+  background:
+    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(200,232,255,0.56) 0%, transparent 55%),
+    linear-gradient(160deg, #F0F9FF 0%, #C4DCFF 50%, #88BCE8 100%);
+  border-top-color: #1A4E72;
+}
+
+.card_remote {
+  background:
+    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(210,198,255,0.52) 0%, transparent 55%),
+    linear-gradient(160deg, #F4F0FF 0%, #D4C8F8 50%, #AE9EE4 100%);
+  border-top-color: #303898;
+}
+
+.card_seasonal {
+  background:
+    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(188,248,200,0.52) 0%, transparent 55%),
+    linear-gradient(160deg, #F0FEF4 0%, #C0E8A8 50%, #7EC460 100%);
+  border-top-color: #1A5E38;
+}
+
+.card_mix {
+  background:
+    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(248,236,215,0.58) 0%, transparent 55%),
+    linear-gradient(160deg, #FFF8F0 0%, #E8D4B0 50%, #C4A46A 100%);
+  border-top-color: #2A3E6A;
 }
 
 .card:hover {
@@ -205,12 +249,12 @@
   background: color-mix(in srgb, var(--color-parchment) 60%, var(--color-card-warm));
 }
 
-/* Category fallback tints when no photo is available */
-.imageFrame_farm     { background: var(--accent-farm-bg); }
-.imageFrame_maritime { background: var(--accent-maritime-bg); }
-.imageFrame_remote   { background: var(--accent-remote-bg); }
-.imageFrame_seasonal { background: var(--accent-seasonal-bg); }
-.imageFrame_mix      { background: var(--accent-mix-bg); }
+/* Category fallback gradients when no photo is available */
+.imageFrame_farm     { background: linear-gradient(145deg, #F0E4B0 0%, #C49030 100%); }
+.imageFrame_maritime { background: linear-gradient(145deg, #C4DCF8 0%, #4A90CC 100%); }
+.imageFrame_remote   { background: linear-gradient(145deg, #D0C8F8 0%, #7070C0 100%); }
+.imageFrame_seasonal { background: linear-gradient(145deg, #C0E8A0 0%, #48A040 100%); }
+.imageFrame_mix      { background: linear-gradient(145deg, #E4D0A8 0%, #9A7840 100%); }
 
 .image {
   display: block;
@@ -262,12 +306,42 @@
   user-select: none;
 }
 
-/* Category-tinted badge fills */
-.badge_farm     { background: color-mix(in srgb, var(--accent-farm-bg) 55%, var(--color-card-warm)); }
-.badge_maritime { background: color-mix(in srgb, var(--accent-maritime-bg) 55%, var(--color-card-warm)); }
-.badge_remote   { background: color-mix(in srgb, var(--accent-remote-bg) 55%, var(--color-card-warm)); }
-.badge_seasonal { background: color-mix(in srgb, var(--accent-seasonal-bg) 55%, var(--color-card-warm)); }
-.badge_mix      { background: color-mix(in srgb, var(--accent-mix-bg) 55%, var(--color-card-warm)); }
+/* Category-tinted badge fills — gradient fills + gap-ring matches card top color */
+.badge_farm {
+  background: linear-gradient(145deg, #F4E8B8 0%, #DEC86A 100%);
+  box-shadow:
+    0 0 0 3px #FFFAEC,
+    0 0 0 5px var(--border-ink-warm),
+    0 3px 8px rgba(25, 21, 14, 0.20);
+}
+.badge_maritime {
+  background: linear-gradient(145deg, #C8DCFF 0%, #88B8E8 100%);
+  box-shadow:
+    0 0 0 3px #F0F9FF,
+    0 0 0 5px var(--border-ink-warm),
+    0 3px 8px rgba(25, 21, 14, 0.20);
+}
+.badge_remote {
+  background: linear-gradient(145deg, #D4C8F8 0%, #A89EE0 100%);
+  box-shadow:
+    0 0 0 3px #F4F0FF,
+    0 0 0 5px var(--border-ink-warm),
+    0 3px 8px rgba(25, 21, 14, 0.20);
+}
+.badge_seasonal {
+  background: linear-gradient(145deg, #C0E8A8 0%, #78BE58 100%);
+  box-shadow:
+    0 0 0 3px #F0FEF4,
+    0 0 0 5px var(--border-ink-warm),
+    0 3px 8px rgba(25, 21, 14, 0.20);
+}
+.badge_mix {
+  background: linear-gradient(145deg, #E8D4B0 0%, #C0A468 100%);
+  box-shadow:
+    0 0 0 3px #FFF8F0,
+    0 0 0 5px var(--border-ink-warm),
+    0 3px 8px rgba(25, 21, 14, 0.20);
+}
 
 .badgeMark {
   font-family: var(--font-display);
@@ -395,6 +469,22 @@
   border-radius: 50%;
   background: currentColor;
   flex-shrink: 0;
+}
+
+/* ─── Featured (paid placement) badge ──────────────────────────────────── */
+
+.featuredBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--color-steel-100, #e8edf4);
+  color: var(--color-steel-700, #2d4a72);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.6;
 }
 
 /* ─── Tagline ───────────────────────────────────────────────────────────── */

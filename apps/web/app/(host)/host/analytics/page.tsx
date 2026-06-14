@@ -50,6 +50,10 @@ export default async function HostAnalyticsPage() {
   ]);
 
   const subscriptionTier = hostProfile?.subscriptionTier ?? "none";
+  // Gate per-listing data at the server — never send it to the DOM for unpaid tiers.
+  const gatedAnalytics = subscriptionTier === "none"
+    ? { ...analytics, perListingStats: [] }
+    : analytics;
 
   return (
     <section className={styles.block}>
@@ -57,7 +61,7 @@ export default async function HostAnalyticsPage() {
         title="Analytics"
         description="Application pipeline, invite acceptance rates, and per-listing performance across all your opportunities."
       />
-      <HostAnalyticsDashboard analytics={analytics} subscriptionTier={subscriptionTier} />
+      <HostAnalyticsDashboard analytics={gatedAnalytics} subscriptionTier={subscriptionTier} />
     </section>
   );
 }

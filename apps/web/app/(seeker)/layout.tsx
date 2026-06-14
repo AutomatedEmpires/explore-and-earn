@@ -23,7 +23,7 @@ import styles from "./layout.module.css";
  *
  * This layout also acts as the Server Component wrapper that resolves the
  * authed seeker's unread notification count and Clerk user id, and passes them
- * to <SeekerHeader> for the live unread badge. It also gates the onboarding
+ * to <GlobalHeader> for the live unread badge. It also gates the onboarding
  * redirect: if a seeker_profiles row exists with onboarding_complete false/null,
  * the seeker is redirected to /onboarding before any child page renders.
  */

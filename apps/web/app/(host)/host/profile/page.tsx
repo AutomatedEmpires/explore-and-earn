@@ -73,14 +73,14 @@ export default async function HostProfilePage() {
 
   const profile: HostProfileSummary = hostProfile
     ? {
-        hostName: "Host",
+        hostName: hostProfile.hostName ?? hostProfile.companyName ?? "Host",
         orgName: realHost?.name ?? hostProfile.companyName ?? "Your organization",
         location: hostProfile.primaryLocationName ?? undefined,
         bio: hostProfile.about ?? undefined,
         verified: realHost?.verified ?? false,
       }
     : {
-        hostName: "Host",
+        hostName: realHost?.name ?? "Host",
         orgName: realHost?.name ?? "Your organization",
         verified: realHost?.verified ?? false,
       };

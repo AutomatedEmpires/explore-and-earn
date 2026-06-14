@@ -71,6 +71,8 @@ export type SeekerSettableStatus = (typeof SEEKER_SETTABLE_STATUSES)[number];
  */
 export interface SeekerApplicationListing extends ApplicationListing {
     readonly coverImageUrl: string | null;
+    readonly beginsAt: string | null;
+    readonly endsAt: string | null;
 }
 export type SeekerApplicationWithListing = SeekerApplication & {
     readonly coverMessage: string | null;

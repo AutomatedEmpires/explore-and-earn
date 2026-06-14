@@ -1,0 +1,229 @@
+/* ─── Listing detail page ────────────────────────────────────────────────── */
+
+.page {
+  background-color: var(--color-paper);
+  min-height: 100vh;
+  padding-bottom: 80px;
+}
+
+/* ─── Cover photo ─────────────────────────────────────────────────────────── */
+
+.cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background-color: var(--color-surface);
+}
+
+.fillImg {
+  object-fit: cover;
+}
+
+/* ─── Gallery strip ───────────────────────────────────────────────────────── */
+
+.gallery {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  padding: var(--space-12) var(--space-gutter);
+  scrollbar-width: none;
+}
+
+.gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.galleryThumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 120px;
+  height: 90px;
+  border-radius: var(--radius-cell);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  background-color: var(--color-surface);
+}
+
+/* ─── Content wrapper ─────────────────────────────────────────────────────── */
+
+.content {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: var(--space-gutter);
+}
+
+.categoryBadge {
+  margin-bottom: var(--space-12);
+}
+
+/* ─── Title ───────────────────────────────────────────────────────────────── */
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--type-page-size);
+  line-height: var(--type-page-lh);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-12);
+}
+
+/* ─── Location ────────────────────────────────────────────────────────────── */
+
+.location {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--type-body-size);
+  margin-bottom: var(--space-16);
+}
+
+/* ─── Host bar (inline host summary) ─────────────────────────────────────── */
+
+.hostBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
+}
+
+.hostAvatar {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-image);
+  border: 2px solid var(--border-ink);
+  background-color: var(--color-surface);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.hostInfo {
+  flex: 1;
+}
+
+.hostNameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-bottom: var(--space-4);
+}
+
+.hostName {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.hostName:hover {
+  text-decoration: underline;
+}
+
+.hostDate {
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+/* ─── Benefit triad ───────────────────────────────────────────────────────── */
+
+.triad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-12);
+  margin-bottom: var(--space-section);
+}
+
+.triadCell {
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--cell-border);
+  background-color: var(--cell-bg);
+}
+
+.triadCellHousing {
+  --cell-bg: var(--benefit-housing-bg);
+  --cell-border: var(--benefit-housing-fg);
+  --cell-fg: var(--benefit-housing-fg);
+}
+
+.triadCellMeals {
+  --cell-bg: var(--benefit-meals-bg);
+  --cell-border: var(--benefit-meals-fg);
+  --cell-fg: var(--benefit-meals-fg);
+}
+
+.triadCellPay {
+  --cell-bg: var(--benefit-pay-bg);
+  --cell-border: var(--benefit-pay-fg);
+  --cell-fg: var(--benefit-pay-fg);
+}
+
+.triadHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.triadLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--type-label-tracking);
+  color: var(--cell-fg);
+}
+
+.triadValue {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--cell-fg);
+}
+
+/* ─── Description ─────────────────────────────────────────────────────────── */
+
+.description {
+  margin-bottom: var(--space-section);
+}
+
+.descriptionHeading {
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-12);
+}
+
+.descriptionBody {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.descriptionBody p {
+  margin-bottom: var(--space-12);
+}
+
+/* ─── Host summary block wrapper ─────────────────────────────────────────── */
+
+.hostSummaryWrapper {
+  margin-bottom: var(--space-section);
+}
+
+/* ─── Sticky action bar ───────────────────────────────────────────────────── */
+
+.actionBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: var(--color-surface-raised);
+  border-top: 1px solid var(--border-soft);
+  padding: var(--space-16);
+  display: flex;
+  justify-content: center;
+  z-index: 50;
+}

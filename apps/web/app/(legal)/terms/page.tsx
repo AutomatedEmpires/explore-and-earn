@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Icon } from "@explore-and-earn/ui";
 
 import styles from "../legal.module.css";
 
@@ -8,89 +9,181 @@ export function generateMetadata(): Metadata {
 	return {
 		title: "Terms of Service",
 		description:
-			"The terms for using Explore & Earn \u2014 an opportunity marketplace connecting seekers with hosts who offer housing, meals, and pay.",
+			"The terms for using Explore & Earn — an opportunity marketplace connecting seekers with hosts who offer housing, meals, and pay.",
 	};
 }
 
 export default function TermsPage() {
 	return (
 		<>
-			<h1>Terms of Service</h1>
-			<p className={styles.updated}>Last updated: June 2026</p>
-			<p>
-				Welcome to Explore & Earn, a product of Automated Empires. These terms
-				explain the deal between you and us when you use the platform. We have
-				tried to keep them plain.
-			</p>
+			{/* Hero */}
+			<div className={`${styles.hero} ${styles.heroTerms}`}>
+				<span className={styles.heroIcon}>
+					<Icon name="trust.verified_host" size={24} aria-hidden />
+				</span>
+				<h1 className={styles.heroTitle}>Terms of Service</h1>
+				<p className={styles.heroSub}>The deal between you and us — kept plain.</p>
+				<div className={styles.heroBadgeRow}>
+					<span className={`${styles.badge} ${styles.badgeGreen}`}>Seekers free forever</span>
+					<span className={`${styles.badge} ${styles.badgeSky}`}>Cancel anytime</span>
+					<span className={`${styles.badge} ${styles.badgeDate}`}>Updated June 2026</span>
+				</div>
+			</div>
 
-			<h2>1. Accepting these terms</h2>
-			<p>
-				By creating an account or using Explore & Earn, you agree to these
-				terms. If you don’t agree, please don’t use the platform.
-			</p>
+			{/* Key facts callout */}
+			<div className={`${styles.callout} ${styles.calloutSky}`}>
+				<span className={styles.calloutIcon}>
+					<Icon name="benefit.pay" size={16} aria-hidden />
+				</span>
+				<div className={styles.calloutBody}>
+					<p className={styles.calloutTitle}>You must be 18+ to create an account.</p>
+					<p className={styles.calloutText}>By using Explore &amp; Earn you agree to these terms. If you don&rsquo;t agree, please don&rsquo;t use the platform.</p>
+				</div>
+			</div>
 
-			<h2>2. What Explore & Earn is</h2>
-			<p>
-				Explore & Earn is an opportunity marketplace. We connect seekers with
-				hosts who post lifestyle-driven opportunities that may include housing,
-				meals, and pay. We are a marketplace and a point of introduction — we
-				are not your employer, and we are not the employer of any host or
-				seeker. Any working relationship, agreement, or arrangement is strictly
-				between the host and the seeker.
-			</p>
+			{/* What it is */}
+			<section id="what-it-is" className={styles.section}>
+				<div className={styles.sectionHead}>
+					<span className={styles.sectionIcon}>
+						<Icon name="category.mix" size={16} aria-hidden />
+					</span>
+					<h2 className={styles.sectionTitle}>What Explore &amp; Earn is</h2>
+				</div>
+				<p className={styles.body}>
+					Explore &amp; Earn is an opportunity marketplace. We connect seekers with hosts who post lifestyle-driven opportunities that may include housing, meals, and pay. We are a marketplace and a point of introduction — not your employer, and not the employer of any host or seeker.
+				</p>
+				<div className={`${styles.callout} ${styles.calloutGold}`}>
+					<span className={styles.calloutIcon}>
+						<Icon name="trust.verified_host" size={16} aria-hidden />
+					</span>
+					<div className={styles.calloutBody}>
+						<p className={styles.calloutTitle}>Any working arrangement is between host and seeker.</p>
+						<p className={styles.calloutText}>We are a marketplace — not an employment agency, staffing firm, or party to your arrangement.</p>
+					</div>
+				</div>
+			</section>
 
-			<h2>3. No guarantees</h2>
-			<p>
-				We don’t guarantee that you’ll find an opportunity, be selected, or
-				that any opportunity, host, or seeker is accurately described. Listings
-				are created by hosts and applications are submitted by seekers. We do
-				our best to keep the platform trustworthy, but we can’t promise
-				outcomes, income, placements, or the conduct of any other user. You are
-				responsible for your own due diligence before accepting or offering any
-				opportunity.
-			</p>
+			{/* Accounts */}
+			<section id="accounts" className={styles.section}>
+				<div className={styles.sectionHead}>
+					<span className={styles.sectionIcon}>
+						<Icon name="nav.profile" size={16} aria-hidden />
+					</span>
+					<h2 className={styles.sectionTitle}>Accounts &amp; eligibility</h2>
+				</div>
+				<p className={styles.body}>
+					You must provide accurate information and keep it up to date. You are responsible for keeping your login credentials secure and for all activity under your account. One person, one account — unless you operate as a host with team members, in which case your subscription tier determines access.
+				</p>
+			</section>
 
-			<h2>4. Your conduct</h2>
-			<p>
-				You agree to use Explore & Earn honestly and lawfully. You won’t post
-				false, misleading, or unlawful listings or applications; harass,
-				threaten, or harm other users; misrepresent who you are; or use the
-				platform to get around safety, payment, or verification features. Hosts
-				must describe opportunities accurately, including the housing, meals,
-				and pay involved.
-			</p>
+			{/* Billing */}
+			<section id="billing" className={styles.section}>
+				<div className={styles.sectionHead}>
+					<span className={styles.sectionIcon}>
+						<Icon name="benefit.pay" size={16} aria-hidden />
+					</span>
+					<h2 className={styles.sectionTitle}>Host subscriptions &amp; billing</h2>
+				</div>
+				<p className={styles.body}>Hosts access the platform through a paid subscription. Monthly prices:</p>
+				<div className={styles.badgeGrid}>
+					<div className={`${styles.badgeCard} ${styles.badgeCardGold}`}>
+						<Icon name="category.farm" size={20} aria-hidden />
+						<span className={styles.badgeCardLabel}>Starter</span>
+						<span className={styles.badgeCardValue}>$199/mo</span>
+					</div>
+					<div className={`${styles.badgeCard} ${styles.badgeCardSky ?? styles.badgeCardBlue}`}>
+						<Icon name="category.remote" size={20} aria-hidden />
+						<span className={styles.badgeCardLabel}>Professional</span>
+						<span className={styles.badgeCardValue}>$399/mo</span>
+					</div>
+					<div className={`${styles.badgeCard} ${styles.badgeCardBlue}`}>
+						<Icon name="category.maritime" size={20} aria-hidden />
+						<span className={styles.badgeCardLabel}>Enterprise</span>
+						<span className={styles.badgeCardValue}>$749/mo</span>
+					</div>
+				</div>
+				<div className={`${styles.callout} ${styles.calloutGold}`}>
+					<span className={styles.calloutIcon}>
+						<Icon name="status.begins" size={16} aria-hidden />
+					</span>
+					<div className={styles.calloutBody}>
+						<p className={styles.calloutTitle}>Annual plans — 2 months free.</p>
+						<p className={styles.calloutText}>Subscriptions renew automatically. Cancel anytime; access continues until the billing period ends. No refunds for unused time unless required by law.</p>
+					</div>
+				</div>
+				<div className={`${styles.callout} ${styles.calloutGreen}`}>
+					<span className={styles.calloutIcon}>
+						<Icon name="benefit.pay" size={16} aria-hidden />
+					</span>
+					<div className={styles.calloutBody}>
+						<p className={styles.calloutTitle}>Seekers are never charged.</p>
+						<p className={styles.calloutText}>Not for browsing, not for applying, not ever.</p>
+					</div>
+				</div>
+			</section>
 
-			<h2>5. Content and ownership</h2>
-			<p>
-				You keep ownership of the content you submit — your listings,
-				applications, messages, and profile. By posting it, you give us a
-				limited license to host, display, and share that content as needed to
-				run the platform. Everything else — the Explore & Earn name, design,
-				and software — belongs to Automated Empires.
-			</p>
+			{/* Conduct */}
+			<section id="conduct" className={styles.section}>
+				<div className={styles.sectionHead}>
+					<span className={styles.sectionIcon}>
+						<Icon name="trust.verified_host" size={16} aria-hidden />
+					</span>
+					<h2 className={styles.sectionTitle}>Your conduct</h2>
+				</div>
+				<p className={styles.body}>Use Explore &amp; Earn honestly and lawfully. You won&rsquo;t:</p>
+				<ul className={styles.list}>
+					<li className={styles.listItem}><span className={styles.listDot} /><span>Post false, misleading, or unlawful listings or applications.</span></li>
+					<li className={styles.listItem}><span className={styles.listDot} /><span>Harass, threaten, or harm other users.</span></li>
+					<li className={styles.listItem}><span className={styles.listDot} /><span>Misrepresent who you are or what you&rsquo;re offering.</span></li>
+					<li className={styles.listItem}><span className={styles.listDot} /><span>Use the platform to circumvent safety, payment, or verification features.</span></li>
+					<li className={styles.listItem}><span className={styles.listDot} /><span>Scrape, copy, or redistribute platform data without permission.</span></li>
+				</ul>
+				<p className={styles.body}>Hosts must describe opportunities accurately — including the housing, meals, and pay actually on offer.</p>
+			</section>
 
-			<h2>6. Account termination</h2>
-			<p>
-				You can close your account at any time. We may suspend or remove
-				accounts that violate these terms, put other users at risk, or misuse
-				the platform. Where it’s reasonable to do so, we’ll tell you why.
-			</p>
+			{/* Your content */}
+			<section id="content" className={styles.section}>
+				<div className={styles.sectionHead}>
+					<span className={styles.sectionIcon}>
+						<Icon name="action.more" size={16} aria-hidden />
+					</span>
+					<h2 className={styles.sectionTitle}>Your content</h2>
+				</div>
+				<p className={styles.body}>
+					You keep ownership of the content you submit — your listings, applications, messages, and profile. By posting it, you give us a limited license to host, display, and share that content as needed to run the platform. Everything else — the Explore &amp; Earn name, design, and software — belongs to Automated Empires.
+				</p>
+			</section>
 
-			<h2>7. Governing law</h2>
-			<p>
-				These terms are governed by the laws of the State of Delaware, without
-				regard to its conflict-of-law rules. Any disputes will be handled in the
-				courts located in Delaware.
-			</p>
+			{/* Liability */}
+			<section id="liability" className={styles.section}>
+				<div className={styles.sectionHead}>
+					<span className={styles.sectionIcon}>
+						<Icon name="status.ends" size={16} aria-hidden />
+					</span>
+					<h2 className={styles.sectionTitle}>No guarantees &amp; liability</h2>
+				</div>
+				<p className={styles.body}>
+					We don&rsquo;t guarantee that you&rsquo;ll find an opportunity, be selected, or that any listing is accurately described. You are responsible for your own due diligence before accepting or offering any opportunity.
+				</p>
+				<p className={styles.body}>
+					To the fullest extent permitted by law, Automated Empires is not liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability is limited to the greater of fees you paid us in the preceding 12 months or $100. These terms are governed by Delaware law.
+				</p>
+			</section>
 
-			<h2>8. Contact</h2>
-			<p>
-				Questions about these terms? Email us at{" "}
-				<a href="mailto:jackson@automatedempires.com">
+			{/* Contact */}
+			<section id="contact" className={styles.section}>
+				<div className={styles.sectionHead}>
+					<span className={styles.sectionIcon}>
+						<Icon name="action.forward" size={16} aria-hidden />
+					</span>
+					<h2 className={styles.sectionTitle}>Questions?</h2>
+				</div>
+				<p className={styles.body}>Email us any time.</p>
+				<a href="mailto:jackson@automatedempires.com" className={styles.contactLink}>
+					<Icon name="action.forward" size={16} aria-hidden />
 					jackson@automatedempires.com
 				</a>
-				.
-			</p>
+			</section>
 		</>
 	);
 }

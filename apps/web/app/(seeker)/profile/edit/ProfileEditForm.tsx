@@ -2,24 +2,38 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 
 import {
   MARKETPLACE_CATEGORIES,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
+import { uploadProfilePhoto } from "@explore-and-earn/db/client";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
+import { ImageUpload } from "../../../../components/ImageUpload";
 import { saveOnboardingStep } from "../../../actions/seekerOnboarding";
+import { saveProfilePhotoAction } from "../../../actions/seekerProfile";
 import styles from "./edit.module.css";
 
 type LocationPref = "remote" | "on_site" | "either";
 type HousingPref = "preferred" | "not_needed";
+type MealsPref = "required" | "preferred" | "not_needed" | "flexible";
+type PayUnit = "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | "other";
 
 export interface ProfileEditInitial {
+  readonly seekerProfileId: string | null;
+  readonly profilePhotoUrl: string;
   readonly displayName: string;
   readonly bio: string;
+  readonly openToStatement: string;
   readonly locationPref: LocationPref | null;
   readonly housingPref: HousingPref | null;
+  readonly mealsPref: MealsPref | null;
+  readonly payExpectationMinDollars: string;
+  readonly payExpectationMaxDollars: string;
+  readonly payExpectationUnit: PayUnit;
+  readonly payFlexible: boolean;
   readonly categories: string[];
   readonly freeformSkills: string[];
 }
@@ -35,6 +49,22 @@ const LOCATION_OPTIONS: ReadonlyArray<{ value: LocationPref; label: string }> = 
 const HOUSING_OPTIONS: ReadonlyArray<{ value: HousingPref; label: string }> = [
   { value: "preferred", label: "Housing preferred" },
   { value: "not_needed", label: "Not needed" },
+];
+
+const MEALS_OPTIONS: ReadonlyArray<{ value: MealsPref; label: string }> = [
+  { value: "required", label: "Meals required" },
+  { value: "preferred", label: "Meals preferred" },
+  { value: "not_needed", label: "Not needed" },
+  { value: "flexible", label: "Flexible" },
+];
+
+const PAY_UNIT_OPTIONS: ReadonlyArray<{ value: PayUnit; label: string }> = [
+  { value: "hour", label: "/ hour" },
+  { value: "day", label: "/ day" },
+  { value: "week", label: "/ week" },
+  { value: "month", label: "/ month" },
+  { value: "stipend", label: "stipend" },
+  { value: "exchange", label: "exchange" },
 ];
 
 const CATEGORY_LABEL: Record<MarketplaceCategory, string> = {
@@ -59,14 +89,22 @@ function isCategory(value: string): value is MarketplaceCategory {
 
 export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
   const router = useRouter();
+  const { getToken } = useAuth();
+  const [photoUrl, setPhotoUrl] = useState(initial.profilePhotoUrl);
   const [displayName, setDisplayName] = useState(initial.displayName);
   const [bio, setBio] = useState(initial.bio);
+  const [openToStatement, setOpenToStatement] = useState(initial.openToStatement);
   const [locationPref, setLocationPref] = useState<LocationPref | null>(
     initial.locationPref,
   );
   const [housingPref, setHousingPref] = useState<HousingPref | null>(
     initial.housingPref,
   );
+  const [mealsPref, setMealsPref] = useState<MealsPref | null>(initial.mealsPref);
+  const [payMin, setPayMin] = useState(initial.payExpectationMinDollars);
+  const [payMax, setPayMax] = useState(initial.payExpectationMaxDollars);
+  const [payUnit, setPayUnit] = useState<PayUnit>(initial.payExpectationUnit);
+  const [payFlexible, setPayFlexible] = useState(initial.payFlexible);
   const [selected, setSelected] = useState<MarketplaceCategory[]>(
     initial.categories.filter(isCategory),
   );
@@ -74,6 +112,19 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  async function uploadPhoto(file: File): Promise<string> {
+    if (!initial.seekerProfileId) {
+      throw new Error("Profile not found — reload the page and try again.");
+    }
+    const token = await getToken({ template: "supabase" });
+    if (!token) {
+      throw new Error("Your session has expired — sign in again.");
+    }
+    const url = await uploadProfilePhoto(token, initial.seekerProfileId, file, "seeker");
+    await saveProfilePhotoAction(url);
+    return url;
+  }
 
   function toggleCategory(category: MarketplaceCategory) {
     setSaved(false);
@@ -109,11 +160,19 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
 
   function save() {
     startTransition(async () => {
+      const minCents = payMin.trim() ? Math.round(Number(payMin) * 100) : undefined;
+      const maxCents = payMax.trim() ? Math.round(Number(payMax) * 100) : undefined;
       await saveOnboardingStep({
         displayName,
         bio,
+        openToStatement: openToStatement.trim() || null,
         locationPref,
         housingPref,
+        mealsPref,
+        payExpectationMinCents: Number.isFinite(minCents) ? minCents : null,
+        payExpectationMaxCents: Number.isFinite(maxCents) ? maxCents : null,
+        payExpectationUnit: payUnit,
+        payFlexible,
         categories: selected,
         freeformSkills: tags,
       });
@@ -124,12 +183,23 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
-        <h1 className={styles.heading}>Edit profile</h1>
-        <p className={styles.sub}>Update your name, bio, and preferences.</p>
-      </header>
-
       <div className={styles.form}>
+        {initial.seekerProfileId ? (
+          <div className={styles.field}>
+            <span className={styles.label}>Profile photo</span>
+            <ImageUpload
+              label="Add a profile photo"
+              currentUrl={photoUrl || undefined}
+              uploader={uploadPhoto}
+              onUpload={(url) => {
+                setPhotoUrl(url);
+                router.refresh();
+              }}
+              disabled={pending}
+            />
+          </div>
+        ) : null}
+
         <label className={styles.field}>
           <span className={styles.label}>Display name</span>
           <input
@@ -156,6 +226,62 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
             }}
           />
         </label>
+
+        <label className={styles.field}>
+          <span className={styles.label}>What I'm looking for</span>
+          <textarea
+            className={styles.textarea}
+            value={openToStatement}
+            rows={2}
+            placeholder="e.g. A farm stay in the Pacific Northwest for summer 2026"
+            onChange={(event) => {
+              setSaved(false);
+              setOpenToStatement(event.target.value);
+            }}
+          />
+        </label>
+
+        <div className={styles.field}>
+          <span className={styles.label}>Pay expectation</span>
+          <div className={styles.payRow}>
+            <input
+              className={styles.input}
+              type="number"
+              min="0"
+              step="1"
+              placeholder="Min"
+              value={payMin}
+              onChange={(event) => { setSaved(false); setPayMin(event.target.value); }}
+            />
+            <span className={styles.payDash}>–</span>
+            <input
+              className={styles.input}
+              type="number"
+              min="0"
+              step="1"
+              placeholder="Max"
+              value={payMax}
+              onChange={(event) => { setSaved(false); setPayMax(event.target.value); }}
+            />
+            <select
+              className={styles.select}
+              value={payUnit}
+              onChange={(event) => { setSaved(false); setPayUnit(event.target.value as PayUnit); }}
+            >
+              {PAY_UNIT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={payFlexible}
+              onChange={(event) => { setSaved(false); setPayFlexible(event.target.checked); }}
+            />
+            <span className={styles.checkLabel}>I'm flexible on pay</span>
+          </label>
+        </div>
 
         <div className={styles.field}>
           <span className={styles.label}>Location</span>
@@ -199,6 +325,32 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
                 onClick={() => {
                   setSaved(false);
                   setHousingPref((current) =>
+                    current === option.value ? null : option.value,
+                  );
+                }}
+              >
+                <span className={styles.optionLabel}>{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <span className={styles.label}>Meals</span>
+          <div className={styles.options}>
+            {MEALS_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={
+                  mealsPref === option.value
+                    ? styles.optionSelected
+                    : styles.option
+                }
+                aria-pressed={mealsPref === option.value}
+                onClick={() => {
+                  setSaved(false);
+                  setMealsPref((current) =>
                     current === option.value ? null : option.value,
                   );
                 }}

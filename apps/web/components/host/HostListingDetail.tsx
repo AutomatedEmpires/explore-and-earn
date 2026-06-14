@@ -136,9 +136,12 @@ export function HostListingDetail({
             {applicants.map((applicant) => (
               <li key={applicant.id} className={styles.applicant}>
                 <div className={styles.applicantWho}>
-                  <span className={styles.applicantName}>
+                  <Link
+                    href={`/host/applicants/${applicant.id}`}
+                    className={styles.applicantName}
+                  >
                     {applicant.applicantName}
-                  </span>
+                  </Link>
                   <span className={styles.applicantApplied}>
                     Applied {applicant.appliedOn}
                   </span>

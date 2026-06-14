@@ -1,0 +1,359 @@
+/* ── Page ── */
+.page {
+	position: relative;
+	min-height: 100dvh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px 16px calc(20px + var(--size-bottom-nav, 64px));
+	background:
+		radial-gradient(ellipse 260px 320px at 15% 40%, rgba(196, 149, 74, 0.055) 0%, transparent 100%),
+		radial-gradient(ellipse 320px 280px at 88% 70%, rgba(47, 102, 122, 0.05) 0%, transparent 100%),
+		radial-gradient(ellipse 180px 180px at 60% 10%, rgba(196, 149, 74, 0.035) 0%, transparent 100%),
+		var(--color-paper, #F6F1E7);
+	font-family: var(--font-ui, system-ui, sans-serif);
+}
+
+/* Decorative corner marks */
+.corner {
+	position: fixed;
+	width: 20px;
+	height: 20px;
+	pointer-events: none;
+	z-index: 0;
+	opacity: 0.30;
+}
+.cornerTL { top: 14px; left: 14px; border-top: 1.5px solid #8a6a40; border-left: 1.5px solid #8a6a40; border-radius: 3px 0 0 0; }
+.cornerTR { top: 14px; right: 14px; border-top: 1.5px solid #8a6a40; border-right: 1.5px solid #8a6a40; border-radius: 0 3px 0 0; }
+.cornerBL { bottom: 14px; left: 14px; border-bottom: 1.5px solid #8a6a40; border-left: 1.5px solid #8a6a40; border-radius: 0 0 0 3px; }
+.cornerBR { bottom: 14px; right: 14px; border-bottom: 1.5px solid #8a6a40; border-right: 1.5px solid #8a6a40; border-radius: 0 0 3px 0; }
+
+/* ── Inner layout ── */
+.inner {
+	position: relative;
+	z-index: 1;
+	width: 100%;
+	max-width: 860px;
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0;
+	background: rgba(246, 241, 231, 0.82);
+	border: 1.5px solid rgba(138, 106, 64, 0.28);
+	border-radius: 20px;
+	box-shadow:
+		0 0 0 5px rgba(246, 241, 231, 0.6),
+		0 0 0 6.5px rgba(138, 106, 64, 0.12),
+		0 12px 48px rgba(23, 19, 13, 0.12),
+		0 2px 8px rgba(23, 19, 13, 0.06);
+	overflow: hidden;
+}
+
+@media (min-width: 640px) {
+	.inner {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+@media (min-width: 780px) {
+	.inner {
+		grid-template-columns: 42% 58%;
+	}
+}
+
+/* ── Illustration ── */
+.illustration {
+	order: -1;
+	min-height: 220px;
+}
+
+@media (min-width: 640px) {
+	.illustration {
+		order: 1;
+		min-height: 340px;
+	}
+}
+
+.scene {
+	display: block;
+	width: 100%;
+	height: 100%;
+	min-height: 220px;
+}
+
+@media (min-width: 640px) {
+	.scene {
+		min-height: 340px;
+	}
+}
+
+/* ── Content ── */
+.content {
+	padding: 28px 24px 28px;
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+@media (min-width: 640px) {
+	.content {
+		padding: 36px 28px 32px;
+	}
+}
+
+/* ── Logo ── */
+.logo {
+	color: #5a3e24;
+	opacity: 0.80;
+}
+.logoSvg {
+	width: 56px;
+	height: auto;
+	display: block;
+	margin-bottom: 4px;
+}
+.logoLabel {
+	font-family: var(--font-display, 'Patrick Hand', cursive);
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	color: #3a2a14;
+	margin: 0 0 1px;
+	opacity: 0.7;
+	text-transform: lowercase;
+}
+.logoTagline {
+	font-size: 10px;
+	letter-spacing: 0.10em;
+	color: #7a6040;
+	margin: 0;
+	text-transform: uppercase;
+	opacity: 0.65;
+}
+
+.divider {
+	width: 36px;
+	height: 1.5px;
+	background: linear-gradient(90deg, rgba(196,149,74,0.5), transparent);
+	border-radius: 2px;
+	margin: 16px 0;
+}
+
+/* ── 404 number ── */
+.bigNumber {
+	font-family: var(--font-display, 'Patrick Hand', cursive);
+	font-size: clamp(56px, 12vw, 80px);
+	font-weight: 700;
+	line-height: 0.88;
+	letter-spacing: -0.02em;
+	margin: 0 0 10px;
+	color: transparent;
+	background: linear-gradient(135deg, #c4954a 0%, #2F667A 100%);
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	position: relative;
+}
+
+.bigNumber::after {
+	content: '';
+	position: absolute;
+	bottom: -4px;
+	left: 0;
+	width: 70%;
+	height: 2.5px;
+	background: linear-gradient(90deg, rgba(196,149,74,0.45), transparent);
+	border-radius: 2px;
+}
+
+/* ── Heading ── */
+.heading {
+	font-family: var(--font-display, 'Patrick Hand', cursive);
+	font-size: clamp(18px, 4vw, 22px);
+	font-weight: 700;
+	line-height: 1.25;
+	color: #1e1610;
+	margin: 0 0 4px;
+}
+
+.headingUnderline {
+	width: 100%;
+	height: 1px;
+	background: linear-gradient(90deg, rgba(196,149,74,0.30) 0%, transparent 80%);
+	margin: 10px 0 12px;
+}
+
+/* ── Body ── */
+.body {
+	font-size: 13.5px;
+	line-height: 1.6;
+	color: #4a3820;
+	margin: 0 0 16px;
+}
+
+.asterisk {
+	font-family: var(--font-display, 'Patrick Hand', cursive);
+	font-size: 16px;
+	color: #c4954a;
+	margin-right: 4px;
+	vertical-align: middle;
+}
+
+/* ── Last seen badge ── */
+.lastSeen {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: rgba(47, 102, 122, 0.09);
+	border: 1px solid rgba(47, 102, 122, 0.20);
+	border-radius: 100px;
+	padding: 5px 12px 5px 8px;
+	font-size: 12px;
+	font-weight: 600;
+	color: #2F667A;
+	margin-bottom: 20px;
+	width: fit-content;
+}
+
+.sparkleSmall {
+	font-size: 10px;
+	color: #c4954a;
+	opacity: 0.75;
+}
+
+/* ── Digest ── */
+.digest {
+	font-size: 10px;
+	color: rgba(74, 56, 32, 0.45);
+	font-family: monospace;
+	margin: -8px 0 12px;
+}
+
+/* ── Actions ── */
+.actions {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 20px;
+}
+
+.btnHome,
+.btnExplore {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 10px 18px;
+	border-radius: 100px;
+	font-size: 13.5px;
+	font-weight: 700;
+	cursor: pointer;
+	text-decoration: none;
+	transition: opacity 0.15s, transform 0.15s;
+	border: none;
+}
+
+.btnHome:active,
+.btnExplore:active {
+	transform: scale(0.97);
+}
+
+.btnHome {
+	background: linear-gradient(135deg, #3a6a2a 0%, #4a8a38 100%);
+	color: white;
+	box-shadow: 0 2px 8px rgba(58, 106, 42, 0.28);
+}
+
+.btnHome:hover {
+	opacity: 0.88;
+}
+
+.btnExplore {
+	background: linear-gradient(135deg, #2F667A 0%, #3a80a0 100%);
+	color: white;
+	box-shadow: 0 2px 8px rgba(47, 102, 122, 0.28);
+}
+
+.btnExplore:hover {
+	opacity: 0.88;
+}
+
+/* ── Footer note ── */
+.footerNote {
+	font-size: 11px;
+	color: rgba(74, 56, 32, 0.50);
+	margin: 0;
+	line-height: 1.5;
+}
+
+/* ── SVG animation classes ── */
+.ufo {
+	animation: ufoFloat 3.6s ease-in-out infinite;
+	transform-origin: center;
+}
+
+.beam {
+	animation: beamPulse 2.8s ease-in-out infinite;
+}
+
+.abducted {
+	animation: abductedFloat 2.8s ease-in-out infinite;
+}
+
+.smoke {
+	animation: smokeDrift 4s ease-in-out infinite;
+}
+
+.smoke2 {
+	animation: smokeDrift 4s ease-in-out infinite 1.2s;
+}
+
+.light1 {
+	animation: lightBlink 2.1s ease-in-out infinite;
+}
+
+.light2 {
+	animation: lightBlink 1.7s ease-in-out infinite 0.9s;
+}
+
+.star1 { animation: twinkle 2.8s ease-in-out infinite; }
+.star2 { animation: twinkle 2.1s ease-in-out infinite 0.7s; }
+.star3 { animation: twinkle 3.4s ease-in-out infinite 1.4s; }
+
+.sparkle {
+	animation: sparklePop 3.2s ease-in-out infinite;
+}
+
+@keyframes ufoFloat {
+	0%, 100% { transform: translateY(0px); }
+	50% { transform: translateY(-8px); }
+}
+
+@keyframes beamPulse {
+	0%, 100% { opacity: 0.85; }
+	50% { opacity: 0.55; }
+}
+
+@keyframes abductedFloat {
+	0%, 100% { transform: translateY(0px) rotate(-1.5deg); }
+	50% { transform: translateY(-14px) rotate(1deg); }
+}
+
+@keyframes smokeDrift {
+	0%, 100% { opacity: 0.55; transform: translateX(0); }
+	50% { opacity: 0.30; transform: translateX(3px); }
+}
+
+@keyframes lightBlink {
+	0%, 100% { opacity: 0.90; }
+	45% { opacity: 0.35; }
+	55% { opacity: 0.90; }
+}
+
+@keyframes twinkle {
+	0%, 100% { opacity: 0.85; transform: scale(1); }
+	50% { opacity: 0.30; transform: scale(0.6); }
+}
+
+@keyframes sparklePop {
+	0%, 100% { opacity: 0.70; transform: scale(1) rotate(0deg); }
+	50% { opacity: 1; transform: scale(1.15) rotate(10deg); }
+}

@@ -10,7 +10,6 @@ import styles from "./DiscoveryShowcaseCard.module.css";
 
 const CONDITIONAL_BADGES = {
 	boosted: { label: "Boosted", variant: "boosted", icon: "status.boosted" },
-	seasonal: { label: "Seasonal", variant: "seasonal", icon: "category.seasonal" },
 } as const;
 
 export interface DiscoveryShowcaseCardProps {
@@ -80,15 +79,15 @@ export function DiscoveryShowcaseCard({ listing }: DiscoveryShowcaseCardProps) {
 				<dl className={styles.triad}>
 					<div className={styles.triadItem}>
 						<dt className={styles.triadLabel}>Housing</dt>
-						<dd className={styles.triadValue}>{listing.benefits.housing.summary}</dd>
+						<dd className={styles.triadValue}>{listing.benefits.housing.summary ?? "See listing"}</dd>
 					</div>
 					<div className={styles.triadItem}>
 						<dt className={styles.triadLabel}>Meals</dt>
-						<dd className={styles.triadValue}>{listing.benefits.meals.summary}</dd>
+						<dd className={styles.triadValue}>{listing.benefits.meals.summary ?? "See listing"}</dd>
 					</div>
 					<div className={styles.triadItem}>
 						<dt className={styles.triadLabel}>Pay</dt>
-						<dd className={styles.triadValue}>{listing.benefits.pay.summary}</dd>
+						<dd className={styles.triadValue}>{listing.benefits.pay.summary ?? "See listing"}</dd>
 					</div>
 				</dl>
 

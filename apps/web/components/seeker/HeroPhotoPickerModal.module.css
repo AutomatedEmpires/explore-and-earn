@@ -1,0 +1,217 @@
+/* HeroPhotoPickerModal — hero background picker */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(24, 22, 18, 0.6);
+  z-index: 300;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+@media (min-width: 480px) {
+  .overlay {
+    align-items: center;
+  }
+}
+
+.modal {
+  background: var(--color-paper);
+  border-radius: var(--radius-large) var(--radius-large) 0 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 80dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 -4px 40px rgba(0, 0, 0, 0.18);
+}
+
+@media (min-width: 480px) {
+  .modal {
+    border-radius: var(--radius-large);
+    max-height: 70dvh;
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-16) var(--space-16);
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--type-subheading-size);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+}
+
+.closeBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  scrollbar-width: thin;
+}
+
+/* Upload */
+.uploadSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.uploadBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-medium);
+  border: 1.5px dashed var(--border-soft);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.uploadBtn:hover:not(:disabled) {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  color: var(--color-error, #C04040);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-small);
+  background: rgba(192, 64, 64, 0.08);
+  margin: 0;
+}
+
+/* Gradient grid */
+.sectionLabel {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.gradientGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-8);
+}
+
+.gradientSwatch {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-medium);
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.gradientSwatch:hover {
+  transform: scale(1.03);
+}
+
+.gradientSwatch:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.swatchSelected {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--color-accent, #5A8A32);
+}
+
+.swatchLabel {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline: 0;
+  padding: var(--space-6) var(--space-8);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65), transparent);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+}
+
+/* Remove */
+.removeBtn {
+  padding: var(--space-10) 0;
+  background: transparent;
+  border: none;
+  color: var(--color-error, #C04040);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-align: center;
+}
+
+.removeBtn:hover {
+  opacity: 0.8;
+}
+
+.removeBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}

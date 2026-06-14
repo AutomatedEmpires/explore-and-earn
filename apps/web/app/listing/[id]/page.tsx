@@ -7,6 +7,7 @@ import Link from "next/link";
 import {
   getListingDetailPublic,
   getHostProfile,
+  getSeekerProfile,
   hasApplied,
   hasSaved,
 } from "@explore-and-earn/db";
@@ -16,6 +17,7 @@ import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
 import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd } from "../../../lib/seo";
+import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -68,42 +70,43 @@ export default async function ListingDetailPage({ params }: Props) {
 
   if (!listing) notFound();
 
-  const authResult = await auth();
-  const userId = authResult.userId;
+  const { userId, getToken } = await auth();
+  const token = userId ? await getToken({ template: "supabase" }) : null;
 
   // Determine viewer role and ownership
   let viewerRole: "guest" | "seeker" | "owner" = "guest";
   let isOwner = false;
 
-  if (userId) {
-    const { getToken } = await auth();
-    const token = await getToken({ template: "supabase" });
-    if (token) {
+  if (userId && token) {
+    try {
       const hostProfile = await getHostProfile(token, userId);
       isOwner = hostProfile?.id === listing.hostProfileId;
       viewerRole = isOwner ? "owner" : "seeker";
+    } catch {
+      // Transient DB failure on host-profile lookup — authenticated user stays
+      // as seeker rather than crashing the page. The visibility guard below
+      // still protects draft listings since isOwner remains false.
+      viewerRole = "seeker";
     }
   }
 
   // Visibility rule: non-live listings are only shown to the owning host
   if (listing.status !== "live" && !isOwner) notFound();
 
-  // Fetch seeker-specific state (applied/saved) when authed
+  // Fetch seeker-specific state (applied/saved/onboarding) when authed
   let alreadyApplied = false;
   let alreadySaved = false;
   let onboardingComplete = false;
 
-  if (userId && viewerRole === "seeker") {
-    const { getToken } = await auth();
-    const token = await getToken({ template: "supabase" });
-    if (token) {
-      [alreadyApplied, alreadySaved] = await Promise.all([
-        hasApplied(token, userId, listing.id),
-        hasSaved(token, userId, listing.id),
-      ]);
-      // Onboarding status: assume complete if they have a seeker profile (hasApplied/hasSaved returned non-error)
-      onboardingComplete = true;
-    }
+  if (userId && token && viewerRole === "seeker") {
+    const [applied, saved, seekerProfile] = await Promise.all([
+      hasApplied(token, userId, listing.id),
+      hasSaved(token, userId, listing.id),
+      getSeekerProfile(token, userId),
+    ]);
+    alreadyApplied = applied;
+    alreadySaved = saved;
+    onboardingComplete = seekerProfile?.onboardingComplete === true;
   }
 
   // Build benefit triad data
@@ -134,125 +137,74 @@ export default async function ListingDetailPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd }}
       />
-      <main
-        style={{
-          backgroundColor: "var(--color-paper)",
-          minHeight: "100vh",
-          paddingBottom: "80px",
-        }}
-      >
+      <main className={styles.page}>
         {/* Cover photo */}
         {listing.coverPhotoUrl && (
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              aspectRatio: "4 / 3",
-              backgroundColor: "var(--color-surface)",
-            }}
-          >
+          <div className={styles.cover}>
             <Image
               src={listing.coverPhotoUrl}
               alt={listing.title}
               fill
-              style={{ objectFit: "cover" }}
+              className={styles.fillImg}
               priority
             />
           </div>
         )}
 
+        {/* Gallery photos */}
+        {listing.galleryPhotoUrls.length > 0 && (
+          <div className={styles.gallery}>
+            {listing.galleryPhotoUrls.map((url, idx) => (
+              <div key={url} className={styles.galleryThumb}>
+                <Image
+                  src={url}
+                  alt={`${listing.title} photo ${idx + 1}`}
+                  fill
+                  className={styles.fillImg}
+                  sizes="120px"
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Content */}
-        <div
-          style={{
-            maxWidth: "42rem",
-            margin: "0 auto",
-            padding: "var(--space-gutter)",
-          }}
-        >
+        <div className={styles.content}>
           {/* Category badge */}
-          <div style={{ marginBottom: "var(--space-12)" }}>
+          <div className={styles.categoryBadge}>
             <CategoryBadge category={listing.category} />
           </div>
 
           {/* Title */}
-          <h1
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "var(--type-page-size)",
-              lineHeight: "var(--type-page-lh)",
-              color: "var(--text-primary)",
-              margin: 0,
-              marginBottom: "var(--space-12)",
-            }}
-          >
-            {listing.title}
-          </h1>
+          <h1 className={styles.title}>{listing.title}</h1>
 
           {/* Location */}
           {listing.locationDisplay && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-4)",
-                color: "var(--text-secondary)",
-                fontSize: "var(--type-body-size)",
-                marginBottom: "var(--space-16)",
-              }}
-            >
+            <div className={styles.location}>
               <Icon name="nav.map" size={16} aria-hidden />
               <span>{listing.locationDisplay}</span>
             </div>
           )}
 
-          {/* Host summary */}
+          {/* Host bar */}
           {listing.host && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-12)",
-                marginBottom: "var(--space-16)",
-              }}
-            >
+            <div className={styles.hostBar}>
               {listing.host.photoUrl && (
-                <div
-                  style={{
-                    position: "relative",
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "var(--radius-image)",
-                    border: "2px solid var(--border-ink)",
-                    backgroundColor: "var(--color-surface)",
-                    overflow: "hidden",
-                  }}
-                >
+                <div className={styles.hostAvatar}>
                   <Image
                     src={listing.host.photoUrl}
                     alt={listing.host.companyName}
                     fill
-                    style={{ objectFit: "cover" }}
+                    className={styles.fillImg}
+                    sizes="48px"
                   />
                 </div>
               )}
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "var(--space-8)",
-                    marginBottom: "var(--space-4)",
-                  }}
-                >
+              <div className={styles.hostInfo}>
+                <div className={styles.hostNameRow}>
                   <Link
                     href={`/host/${listing.host.id}`}
-                    style={{
-                      fontFamily: "var(--font-ui)",
-                      fontSize: "var(--type-body-size)",
-                      fontWeight: "var(--font-weight-semibold)",
-                      color: "var(--text-primary)",
-                      textDecoration: "none",
-                    }}
+                    className={styles.hostName}
                   >
                     {listing.host.companyName}
                   </Link>
@@ -260,181 +212,47 @@ export default async function ListingDetailPage({ params }: Props) {
                     <VerifiedHostBadge />
                   )}
                 </div>
-                <div
-                  style={{
-                    fontSize: "var(--type-meta-size)",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  {dateLabel}
-                </div>
+                <div className={styles.hostDate}>{dateLabel}</div>
               </div>
             </div>
           )}
 
           {/* Benefit triad */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "var(--space-12)",
-              marginBottom: "var(--space-section)",
-            }}
-          >
-            {/* Housing */}
-            <div
-              style={{
-                padding: "var(--space-16)",
-                borderRadius: "var(--radius-card)",
-                backgroundColor: "var(--benefit-housing-bg)",
-                border: "1px solid var(--benefit-housing-fg)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-4)",
-                  marginBottom: "var(--space-8)",
-                }}
-              >
+          <div className={styles.triad}>
+            <div className={`${styles.triadCell} ${styles.triadCellHousing}`}>
+              <div className={styles.triadHeader}>
                 <Icon name="benefit.housing" size={16} aria-hidden />
-                <span
-                  style={{
-                    fontFamily: "var(--font-ui)",
-                    fontSize: "var(--type-label-size)",
-                    fontWeight: "var(--font-weight-semibold)",
-                    textTransform: "uppercase",
-                    letterSpacing: "var(--type-label-tracking)",
-                    color: "var(--benefit-housing-fg)",
-                  }}
-                >
-                  Housing
-                </span>
+                <span className={styles.triadLabel}>Housing</span>
               </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-ui)",
-                  fontSize: "var(--type-meta-size)",
-                  color: "var(--benefit-housing-fg)",
-                }}
-              >
-                {housingLabel}
-              </div>
+              <div className={styles.triadValue}>{housingLabel}</div>
             </div>
 
-            {/* Meals */}
-            <div
-              style={{
-                padding: "var(--space-16)",
-                borderRadius: "var(--radius-card)",
-                backgroundColor: "var(--benefit-meals-bg)",
-                border: "1px solid var(--benefit-meals-fg)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-4)",
-                  marginBottom: "var(--space-8)",
-                }}
-              >
+            <div className={`${styles.triadCell} ${styles.triadCellMeals}`}>
+              <div className={styles.triadHeader}>
                 <Icon name="benefit.meals" size={16} aria-hidden />
-                <span
-                  style={{
-                    fontFamily: "var(--font-ui)",
-                    fontSize: "var(--type-label-size)",
-                    fontWeight: "var(--font-weight-semibold)",
-                    textTransform: "uppercase",
-                    letterSpacing: "var(--type-label-tracking)",
-                    color: "var(--benefit-meals-fg)",
-                  }}
-                >
-                  Meals
-                </span>
+                <span className={styles.triadLabel}>Meals</span>
               </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-ui)",
-                  fontSize: "var(--type-meta-size)",
-                  color: "var(--benefit-meals-fg)",
-                }}
-              >
-                {mealsLabel}
-              </div>
+              <div className={styles.triadValue}>{mealsLabel}</div>
             </div>
 
-            {/* Pay */}
-            <div
-              style={{
-                padding: "var(--space-16)",
-                borderRadius: "var(--radius-card)",
-                backgroundColor: "var(--benefit-pay-bg)",
-                border: "1px solid var(--benefit-pay-fg)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "var(--space-4)",
-                  marginBottom: "var(--space-8)",
-                }}
-              >
+            <div className={`${styles.triadCell} ${styles.triadCellPay}`}>
+              <div className={styles.triadHeader}>
                 <Icon name="benefit.pay" size={16} aria-hidden />
-                <span
-                  style={{
-                    fontFamily: "var(--font-ui)",
-                    fontSize: "var(--type-label-size)",
-                    fontWeight: "var(--font-weight-semibold)",
-                    textTransform: "uppercase",
-                    letterSpacing: "var(--type-label-tracking)",
-                    color: "var(--benefit-pay-fg)",
-                  }}
-                >
-                  Pay
-                </span>
+                <span className={styles.triadLabel}>Pay</span>
               </div>
-              <div
-                style={{
-                  fontFamily: "var(--font-ui)",
-                  fontSize: "var(--type-meta-size)",
-                  color: "var(--benefit-pay-fg)",
-                }}
-              >
-                {paySummary}
-              </div>
+              <div className={styles.triadValue}>{paySummary}</div>
             </div>
           </div>
 
           {/* Description */}
           {listing.description && (
-            <section style={{ marginBottom: "var(--space-section)" }}>
-              <h2
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "var(--type-section-size)",
-                  lineHeight: "var(--type-section-lh)",
-                  color: "var(--text-primary)",
-                  marginBottom: "var(--space-12)",
-                }}
-              >
+            <section className={styles.description} aria-labelledby="listing-description">
+              <h2 id="listing-description" className={styles.descriptionHeading}>
                 About this opportunity
               </h2>
-              <div
-                style={{
-                  fontFamily: "var(--font-ui)",
-                  fontSize: "var(--type-body-size)",
-                  lineHeight: "var(--type-body-lh)",
-                  color: "var(--text-secondary)",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
+              <div className={styles.descriptionBody}>
                 {listing.description.split("\n\n").map((para, idx) => (
-                  <p key={idx} style={{ marginBottom: "var(--space-12)" }}>
-                    {para}
-                  </p>
+                  <p key={idx}>{para}</p>
                 ))}
               </div>
             </section>
@@ -442,7 +260,7 @@ export default async function ListingDetailPage({ params }: Props) {
 
           {/* Host summary block */}
           {listing.host && (
-            <div style={{ marginBottom: "var(--space-section)" }}>
+            <div className={styles.hostSummaryWrapper}>
               <HostSummaryBlock
                 host={{
                   id: listing.host.id,
@@ -466,19 +284,7 @@ export default async function ListingDetailPage({ params }: Props) {
         </div>
 
         {/* Sticky action bar */}
-        <div
-          style={{
-            position: "fixed",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            backgroundColor: "var(--color-surface-raised)",
-            borderTop: "1px solid var(--border-soft)",
-            padding: "var(--space-16)",
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
+        <div className={styles.actionBar}>
           <ApplyButton
             listingId={listing.id}
             title={listing.title}

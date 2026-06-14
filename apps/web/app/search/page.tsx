@@ -71,11 +71,13 @@ function parseDate(value: string | string[] | undefined): string | undefined {
 
 const HOUSING_SUMMARIES = {
 	provided: "Housing included",
+	partial: "Housing (partial)",
 	not_provided: "No housing",
 } as const;
 
 const MEALS_SUMMARIES = {
 	provided: "Meals included",
+	partial: "Meals (partial)",
 	not_provided: "No meals",
 } as const;
 
@@ -100,7 +102,7 @@ function rowToSearchListing(row: ListingRow): SearchListing {
 			},
 			pay: {
 				provision: pay.provision,
-				summary: pay.summary,
+				summary: pay.summary ?? "",
 			},
 		},
 		verifiedHost: fields.host.verified,

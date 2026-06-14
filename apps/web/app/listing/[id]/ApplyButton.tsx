@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { Button, Modal } from "@explore-and-earn/ui";
 import { applyToListingAction } from "../../actions/applications";
 import { saveListingAction, unsaveListingAction } from "../../actions/savedListings";
+import styles from "./ApplyButton.module.css";
 
 interface Props {
   listingId: string;
@@ -27,6 +28,7 @@ export function ApplyButton({
   const [isPending, startTransition] = useTransition();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
   const [saved, setSaved] = useState(alreadySaved);
 
   if (viewerRole === "guest") {
@@ -59,16 +61,7 @@ export function ApplyButton({
   // Seeker role
   if (alreadyApplied) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "var(--space-8)",
-          fontFamily: "var(--font-ui)",
-          fontSize: "var(--type-body-size)",
-          color: "var(--text-secondary)",
-        }}
-      >
+      <div className={styles.appliedState}>
         <span>✓</span>
         <span>Application sent</span>
       </div>
@@ -86,8 +79,21 @@ export function ApplyButton({
   const handleConfirm = () => {
     setShowConfirmModal(false);
     startTransition(async () => {
-      await applyToListingAction(listingId);
-      router.refresh();
+      try {
+        const result = await applyToListingAction(listingId);
+        if (result.ok) {
+          router.refresh();
+        } else {
+          const msg = result.error === "rate_limit_exceeded"
+            ? "You're applying too quickly. Please wait a moment and try again."
+            : result.error === "unauthenticated"
+              ? "Your session expired. Please sign in and try again."
+              : (result.error ?? "Something went wrong. Please try again.");
+          setApplyError(msg);
+        }
+      } catch {
+        setApplyError("Something went wrong. Please try again.");
+      }
     });
   };
 
@@ -105,7 +111,7 @@ export function ApplyButton({
 
   return (
     <>
-      <div style={{ display: "flex", gap: "var(--space-12)" }}>
+      <div className={styles.buttonRow}>
         <Button variant="primary" onClick={handleApply} disabled={isPending}>
           Apply
         </Button>
@@ -120,18 +126,11 @@ export function ApplyButton({
 
       {showConfirmModal && (
         <Modal heading="Apply to this listing?">
-          <p
-            style={{
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--type-body-size)",
-              color: "var(--text-secondary)",
-              marginBottom: "var(--space-16)",
-            }}
-          >
+          <p className={styles.modalText}>
             Confirm your application to <strong>{title}</strong>. The host will
             review your profile and contact you if interested.
           </p>
-          <div style={{ display: "flex", gap: "var(--space-12)" }}>
+          <div className={styles.buttonRow}>
             <Button
               variant="primary"
               onClick={handleConfirm}
@@ -152,18 +151,11 @@ export function ApplyButton({
 
       {showOnboardingModal && (
         <Modal heading="Complete your profile first">
-          <p
-            style={{
-              fontFamily: "var(--font-ui)",
-              fontSize: "var(--type-body-size)",
-              color: "var(--text-secondary)",
-              marginBottom: "var(--space-16)",
-            }}
-          >
+          <p className={styles.modalText}>
             You need to complete your seeker profile before applying to
             listings.
           </p>
-          <div style={{ display: "flex", gap: "var(--space-12)" }}>
+          <div className={styles.buttonRow}>
             <Button
               variant="primary"
               onClick={() => router.push("/onboarding")}
@@ -177,6 +169,15 @@ export function ApplyButton({
               Cancel
             </Button>
           </div>
+        </Modal>
+      )}
+
+      {applyError && (
+        <Modal heading="Could not submit application">
+          <p className={styles.modalText}>{applyError}</p>
+          <Button variant="ghost" onClick={() => setApplyError(null)}>
+            Dismiss
+          </Button>
         </Modal>
       )}
     </>

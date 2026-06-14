@@ -175,3 +175,16 @@
   border-color: color-mix(in srgb, var(--status-error-fg, #dc2626) 24%, transparent);
   background: color-mix(in srgb, var(--status-error-bg, #fee2e2) 50%, var(--color-surface) 50%);
 }
+
+/* ─── Responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 479px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

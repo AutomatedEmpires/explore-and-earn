@@ -212,7 +212,7 @@ export function HostProfileForm({
                 id="profile-twitter"
                 name="twitter"
                 type="text"
-                defaultValue=""
+                defaultValue={profile.twitter ?? ""}
                 placeholder="yourhandle"
               />
             </div>

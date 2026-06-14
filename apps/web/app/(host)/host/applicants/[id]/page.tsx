@@ -18,6 +18,7 @@ import {
 import type { DiscoveryListing } from "../../../../../components/discovery";
 import { toApplicantItem } from "../applicants-data";
 import { StatusActions } from "./StatusActions";
+import { ApplicantResumePopupButton } from "./ApplicantResumePopupButton";
 import styles from "../page.module.css";
 import detailStyles from "./page.module.css";
 
@@ -79,6 +80,13 @@ export default async function HostApplicantDetailPage({
         description="Review this application and the opportunity it targets."
         actionLabel="All applicants"
         actionHref="/host/applicants"
+      />
+      <ApplicantResumePopupButton
+        applicantName={displayName}
+        resume={resume}
+        applicationId={application.id}
+        seekerProfileId={application.seekerProfileId}
+        threadId={applicantWithName.threadId}
       />
       <HostApplicantDetail applicant={applicantWithName} resume={resume} />
       <StatusActions applicationId={application.id} />

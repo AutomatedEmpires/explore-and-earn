@@ -5,6 +5,8 @@ import { Icon } from "@explore-and-earn/ui";
 
 import styles from "./HostSettings.module.css";
 
+const SUPPORT_EMAIL = "jackson@automatedempires.com";
+
 export interface HostSettingsProps {
   readonly subscriptionTier: "none" | "starter" | "professional" | "enterprise";
   readonly companyName: string;
@@ -45,7 +47,7 @@ const PLANS: readonly TierPlan[] = [
   {
     id: "starter",
     name: "Starter",
-    price: "$29",
+    price: "$199",
     period: "per month",
     tagline: "For growing operations",
     features: [
@@ -61,7 +63,7 @@ const PLANS: readonly TierPlan[] = [
   {
     id: "professional",
     name: "Professional",
-    price: "$79",
+    price: "$399",
     period: "per month",
     tagline: "For established hosts",
     features: [
@@ -77,8 +79,8 @@ const PLANS: readonly TierPlan[] = [
   {
     id: "enterprise",
     name: "Enterprise",
-    price: "Custom",
-    period: "contact us",
+    price: "$749",
+    period: "per month",
     tagline: "Large operations & teams",
     features: [
       "Everything in Professional",
@@ -198,7 +200,7 @@ function PlanCard({
       </ul>
       <a
         className={`${styles.planCta}${current ? ` ${styles.planCtaCurrent}` : ""}`}
-        href="mailto:jackson@automatedempires.com?subject=Explore%20%26%20Earn%20Plan%20Upgrade"
+        href={`mailto:${SUPPORT_EMAIL}?subject=Explore%20%26%20Earn%20Plan%20Upgrade`}
         aria-label={`${plan.cta} — ${plan.name}`}
       >
         {plan.cta}
@@ -226,8 +228,8 @@ function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProp
         <Icon name="system.info" size={16} aria-hidden />
         <span>
           Billing is managed manually during early access. Reach out to{" "}
-          <a href="mailto:jackson@automatedempires.com" className={styles.inlineLink}>
-            jackson@automatedempires.com
+          <a href={`mailto:${SUPPORT_EMAIL}`} className={styles.inlineLink}>
+            {SUPPORT_EMAIL}
           </a>{" "}
           to upgrade or discuss custom pricing.
         </span>
@@ -282,7 +284,7 @@ function TeamPanel({ subscriptionTier, companyName }: { subscriptionTier: HostSe
           </p>
           <a
             className={styles.gateBlockBtn}
-            href="mailto:jackson@automatedempires.com?subject=Enterprise%20Plan%20Inquiry"
+            href={`mailto:${SUPPORT_EMAIL}?subject=Enterprise%20Plan%20Inquiry`}
           >
             Contact sales
           </a>
@@ -294,6 +296,7 @@ function TeamPanel({ subscriptionTier, companyName }: { subscriptionTier: HostSe
 
 function FaqRow({ item }: { item: FaqItem }) {
   const [open, setOpen] = useState(false);
+  const answerId = `faq-${item.question.slice(0, 24).toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return (
     <div className={styles.faqItem}>
       <button
@@ -301,11 +304,12 @@ function FaqRow({ item }: { item: FaqItem }) {
         className={styles.faqQuestion}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
+        aria-controls={answerId}
       >
         <span>{item.question}</span>
         <Icon name={open ? "action.close" : "action.forward"} size={16} aria-hidden />
       </button>
-      {open ? <p className={styles.faqAnswer}>{item.answer}</p> : null}
+      {open ? <p className={styles.faqAnswer} id={answerId}>{item.answer}</p> : null}
     </div>
   );
 }
@@ -324,7 +328,7 @@ function SupportPanel() {
       <div className={styles.supportGrid}>
         <a
           className={styles.supportCard}
-          href="mailto:jackson@automatedempires.com?subject=Host%20Support%20Request"
+          href={`mailto:${SUPPORT_EMAIL}?subject=Host%20Support%20Request`}
         >
           <span className={styles.supportIcon}>
             <Icon name="action.message" size={20} aria-hidden />
@@ -334,27 +338,23 @@ function SupportPanel() {
         </a>
         <a
           className={styles.supportCard}
-          href="https://exploreandearn.com/help"
-          target="_blank"
-          rel="noopener noreferrer"
+          href={`mailto:${SUPPORT_EMAIL}?subject=Help%20Center%20Request`}
         >
           <span className={styles.supportIcon}>
             <Icon name="system.info" size={20} aria-hidden />
           </span>
           <span className={styles.supportCardLabel}>Help center</span>
-          <span className={styles.supportCardDesc}>Guides for hosts and seekers</span>
+          <span className={styles.supportCardDesc}>Coming soon — contact us for now</span>
         </a>
         <a
           className={styles.supportCard}
-          href="https://exploreandearn.com/community"
-          target="_blank"
-          rel="noopener noreferrer"
+          href={`mailto:${SUPPORT_EMAIL}?subject=Community%20Request`}
         >
           <span className={styles.supportIcon}>
             <Icon name="nav.feed" size={20} aria-hidden />
           </span>
           <span className={styles.supportCardLabel}>Community</span>
-          <span className={styles.supportCardDesc}>Tips and stories from the network</span>
+          <span className={styles.supportCardDesc}>Coming soon — contact us for now</span>
         </a>
       </div>
 
@@ -384,6 +384,7 @@ function AccountPanel({
       setDeleteStep("confirm");
       return;
     }
+    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=Account%20Deletion%20Request&body=Please%20delete%20my%20host%20account%20(${encodeURIComponent(companyName || "unknown")}).%20I%20understand%20this%20is%20permanent%20and%20cannot%20be%20undone.`;
     setDeleteStep("sent");
   }
 

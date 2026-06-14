@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 
 import { auth } from "@clerk/nextjs/server";
 import {
-  getSeekerApplicationsRich,
+  getSeekerApplicationRichById,
   type RichSeekerApplication,
 } from "@explore-and-earn/db";
 import {
@@ -19,14 +19,26 @@ import { BucketPage } from "../../../../components/seeker";
 import { CATEGORY_ICON } from "../../../../components/discovery";
 import styles from "./detail.module.css";
 
-export const metadata: Metadata = {
-  title: "Application",
-};
-
 export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const { userId, getToken } = await auth();
+  if (!userId) return { title: "Application" };
+  const token = await getToken({ template: "supabase" });
+  if (!token) return { title: "Application" };
+  const application = await getSeekerApplicationRichById(token, userId, id).catch(() => null);
+  const title = application?.listing?.title
+    ? `Application — ${application.listing.title}`
+    : "Application";
+  return {
+    title,
+    robots: { index: false },
+  };
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -106,8 +118,7 @@ export default async function AppliedDetailPage({ params }: Props) {
     notFound();
   }
 
-  const applications = await getSeekerApplicationsRich(token, userId);
-  const application = applications.find((a) => a.id === id);
+  const application = await getSeekerApplicationRichById(token, userId, id);
 
   if (!application) {
     notFound();
@@ -124,7 +135,8 @@ export default async function AppliedDetailPage({ params }: Props) {
       description="Where your application stands."
     >
       <Link className={styles.back} href="/applied">
-        ← Back to applications
+        <Icon name="action.back" size={16} aria-hidden />
+        Back to applications
       </Link>
 
       <article className={styles.summary}>

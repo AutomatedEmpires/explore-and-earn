@@ -1,5 +1,5 @@
 import type { HostAnalytics, HostPerListingStats } from "@explore-and-earn/db";
-import { Icon } from "@explore-and-earn/ui";
+import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import styles from "./HostAnalyticsDashboard.module.css";
 
@@ -46,7 +46,7 @@ function StatCard({
 }: {
   label: string;
   value: string;
-  icon: React.ComponentProps<typeof Icon>["name"];
+  icon: IconKey;
   note?: string;
 }) {
   return (
@@ -90,7 +90,7 @@ function ApplicationFunnel({
             <div className={styles.funnelBarTrack}>
               <div
                 className={styles.funnelBarFill}
-                style={{ width: `${pct}%` }}
+                style={{ "--barFill": `${pct}%` } as React.CSSProperties}
                 aria-label={`${count} — ${Math.round(pct)}%`}
               />
             </div>

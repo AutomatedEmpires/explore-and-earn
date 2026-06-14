@@ -77,7 +77,7 @@ export function rowToDiscoveryFields(row) {
             : undefined,
     };
 }
-const LISTING_COLUMNS = "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,host_profiles(company_name,attestation_status)";
+const LISTING_COLUMNS = "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profiles(company_name,attestation_status)";
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;
 /** Public live listings \u2014 no auth required. */
@@ -320,6 +320,9 @@ function buildListingColumnPatch(fields) {
         const trimmed = fields.coverPhotoUrl?.trim() ?? "";
         patch.cover_photo_url = trimmed.length > 0 ? trimmed : null;
     }
+    if (fields.galleryUrls !== undefined) {
+        patch.gallery_photo_urls = fields.galleryUrls ?? [];
+    }
     return patch;
 }
 export async function createListing(clerkToken, clerkUserId, fields) {
@@ -390,7 +393,7 @@ export async function updateListingStatus(clerkToken, clerkUserId, listingId, st
 const LISTING_DETAIL_COLUMNS = "id,title,category,description,location_display,latitude,longitude,status," +
     "housing_included,meals_included,compensation_summary,compensation_min_cents," +
     "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
-    "begins_at,ends_at,published_at,cover_photo_url,host_profile_id," +
+    "begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profile_id," +
     "host_profiles(id,company_name,photo_url,about,primary_location_name,attestation_status)";
 function firstEmbed(value) {
     const candidate = Array.isArray(value) ? value[0] : value;
@@ -462,6 +465,9 @@ export async function getListingDetailPublic(listingId) {
         endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
         publishedAt: typeof row.published_at === "string" ? row.published_at : null,
         coverPhotoUrl: typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
+        galleryPhotoUrls: Array.isArray(row.gallery_photo_urls)
+            ? row.gallery_photo_urls.filter((u) => typeof u === "string")
+            : [],
         hostProfileId: typeof row.host_profile_id === "string" ? row.host_profile_id : null,
         host,
     };

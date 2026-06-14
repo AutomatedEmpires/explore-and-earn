@@ -17,12 +17,15 @@ export interface SettingsActionResult {
   readonly error?: string;
 }
 
-const SCHEDULE_STATUSES = ["available", "flexible", "not_available"] as const;
+// Values must match DB CHECK constraint: available_now | date_range | flexible | unavailable
+const SCHEDULE_STATUSES = ["available_now", "date_range", "flexible", "unavailable"] as const;
+// Values must match DB CHECK constraint: local_only | willing_to_travel | ready_to_relocate | remote_only | flexible
 const TRAVEL_READINESS = [
-  "ready_now",
+  "local_only",
+  "willing_to_travel",
+  "ready_to_relocate",
+  "remote_only",
   "flexible",
-  "planning",
-  "not_looking",
 ] as const;
 
 async function currentUserId(): Promise<string | undefined> {
@@ -156,11 +159,9 @@ async function updateScheduleActionImpl(
   return result;
 }
 
-export async function updateScheduleAction(
-  formData: FormData,
-): Promise<SettingsActionResult> {
+export async function updateScheduleAction(formData: FormData): Promise<void> {
   try {
-    return await updateScheduleActionImpl(formData);
+    await updateScheduleActionImpl(formData);
   } catch (error) {
     reportError(error, {
       action: "updateScheduleAction",
@@ -199,11 +200,9 @@ async function updateTravelActionImpl(
   return result;
 }
 
-export async function updateTravelAction(
-  formData: FormData,
-): Promise<SettingsActionResult> {
+export async function updateTravelAction(formData: FormData): Promise<void> {
   try {
-    return await updateTravelActionImpl(formData);
+    await updateTravelActionImpl(formData);
   } catch (error) {
     reportError(error, {
       action: "updateTravelAction",

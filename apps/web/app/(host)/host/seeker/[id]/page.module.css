@@ -1,0 +1,201 @@
+.page {
+  background: var(--color-paper);
+  min-height: 100vh;
+  padding: var(--space-gutter);
+}
+
+.inner {
+  max-width: 42rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-section);
+}
+
+/* ─── Header: avatar + name ─────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--border-ink);
+  background: var(--color-surface);
+}
+
+.nameGroup {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-page-size);
+  line-height: var(--type-page-lh);
+  color: var(--text-primary);
+}
+
+.locationPref {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.bio {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* ─── Sections ──────────────────────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  color: var(--text-primary);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+/* ─── Expectations ──────────────────────────────────────────────────────── */
+
+.expectations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.expectationRow {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+.expectationLabel {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ─── Actions ───────────────────────────────────────────────────────────── */
+
+.actions {
+  display: flex;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.actionPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  height: var(--ui-btn-height);
+  padding: 0 var(--space-20);
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--color-cta);
+  color: var(--color-on-cta);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--motion-base) var(--ease-standard);
+}
+
+.actionPrimary:hover {
+  background: var(--color-cta-hover, var(--color-cta));
+  filter: brightness(0.92);
+}
+
+.actionPrimary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.actionSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  height: var(--ui-btn-height);
+  padding: 0 var(--space-20);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-ink);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard);
+}
+
+.actionSecondary:hover {
+  background: var(--color-surface-raised);
+}
+
+.actionSecondary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────────── */
+
+@media (max-width: 639px) {
+  .page {
+    padding: var(--space-16) var(--space-14);
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .actionPrimary,
+  .actionSecondary {
+    justify-content: center;
+    width: 100%;
+  }
+}

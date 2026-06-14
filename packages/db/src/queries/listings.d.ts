@@ -23,6 +23,7 @@ export interface ListingRow {
     ends_at: string | null;
     published_at: string | null;
     cover_photo_url: string | null;
+    gallery_photo_urls: string[] | null;
     host_profiles: {
         company_name: string;
         attestation_status: string;
@@ -113,6 +114,7 @@ export interface ListingWriteFields {
     startDate?: string | null;
     endDate?: string | null;
     coverPhotoUrl?: string | null;
+    galleryUrls?: string[] | null;
 }
 export declare function createListing(clerkToken: string, clerkUserId: string, fields: ListingWriteFields): Promise<{
     ok: boolean;
@@ -166,6 +168,7 @@ export interface PublicListingDetail {
     endsAt: string | null;
     publishedAt: string | null;
     coverPhotoUrl: string | null;
+    galleryPhotoUrls: string[];
     hostProfileId: string | null;
     host: PublicListingDetailHost | null;
 }

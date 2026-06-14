@@ -20,6 +20,14 @@ export interface RichSeekerApplication {
  * host, including reviewed_at / decided_at for the status timeline.
  */
 export declare function getSeekerApplicationsRich(clerkToken: string, clerkUserId: string): Promise<RichSeekerApplication[]>;
+/**
+ * Single rich application lookup for the authed seeker.
+ *
+ * Ownership is enforced via seeker_profile_id equality — callers receive null
+ * for any id that does not belong to them (including non-existent ids), so no
+ * separate 403/404 distinction is needed at the page level.
+ */
+export declare function getSeekerApplicationRichById(clerkToken: string, clerkUserId: string, applicationId: string): Promise<RichSeekerApplication | null>;
 export interface WithdrawApplicationResult {
     readonly ok: boolean;
     readonly error?: string;

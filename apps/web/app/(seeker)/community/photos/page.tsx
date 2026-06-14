@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { getFeedPhotos, getPhotoReactionsBatch } from "@explore-and-earn/db";
 
 import {
 	CommunityDashboard,
@@ -35,12 +36,25 @@ export default async function CommunityPhotosPage() {
 
 	const featuredEmployers = buildFeaturedEmployers(matchedListings);
 
+	let serverPhotos: Awaited<ReturnType<typeof getFeedPhotos>> | undefined;
+	if (token) {
+		try {
+			serverPhotos = await getFeedPhotos(token);
+			if (serverPhotos?.length && userId) {
+				const rxMap = await getPhotoReactionsBatch(serverPhotos.map(p => p.id), userId).catch(() => new Map());
+				serverPhotos = serverPhotos.map(p => ({ ...p, reactionCounts: rxMap.get(p.id) ?? p.reactionCounts }));
+			}
+		} catch { /* degrade gracefully */ }
+	}
+
 	return (
 		<CommunityDashboard
 			tab="photos"
 			status={status}
 			listings={matchedListings}
 			featuredEmployers={featuredEmployers}
+			serverPhotos={serverPhotos}
+			completionScore={status.resumeCompletion}
 		/>
 	);
 }

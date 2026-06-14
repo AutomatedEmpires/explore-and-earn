@@ -20,7 +20,7 @@ export const SEARCH_FIXTURES: readonly SearchListing[] = [
 			pay: { provision: "provided", summary: "$22/hr" },
 		},
 		verifiedHost: true,
-		conditionalBadges: ["seasonal"],
+		conditionalBadges: ["boosted"],
 	},
 	{
 		id: "farm-dairy-morning-crew",
@@ -102,7 +102,7 @@ export const SEARCH_FIXTURES: readonly SearchListing[] = [
 			pay: { provision: "provided", summary: "$21/hr + season pass" },
 		},
 		verifiedHost: true,
-		conditionalBadges: ["seasonal", "boosted"],
+		conditionalBadges: ["boosted"],
 	},
 	{
 		id: "mix-eco-retreat-host",

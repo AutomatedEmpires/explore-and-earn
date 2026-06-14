@@ -1,0 +1,19 @@
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-12) var(--space-16);
+	background: var(--color-cta);
+	color: #fff;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	font-weight: var(--font-weight-semibold);
+	border: none;
+	border-radius: var(--radius-button);
+	cursor: pointer;
+	transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.btn:hover {
+	opacity: 0.88;
+}

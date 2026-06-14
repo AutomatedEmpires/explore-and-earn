@@ -15,7 +15,7 @@ export default async function SettingsPage() {
 	return (
 		<BucketPage
 			title="Settings"
-			description="Account, privacy, and notification preferences."
+			description="Manage email notifications for invites, status changes, and messages."
 		>
 			<NotificationPrefsForm initialPrefs={prefs} />
 		</BucketPage>

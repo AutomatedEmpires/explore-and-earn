@@ -18,22 +18,24 @@ import type { SeekerResume } from "@explore-and-earn/db";
  * 100%, so the value is one of 0 / 33 / 67 / 100.
  */
 
-const RESUME_SIGNAL_COUNT = 3;
-
 function hasBio(resume: SeekerResume): boolean {
 	const bio = resume.profile?.bio;
 	return typeof bio === "string" && bio.trim().length > 0;
 }
 
-/** Resume completion as a 0..100 percentage (bio / experience / education). */
+/**
+ * Resume completion — weighted:
+ *   bio: 40 pts, experience: 40 pts, education: 15 pts, certifications: 5 pts
+ * Bio + experience alone = 80%, which unlocks applying. Education and certs
+ * push toward 100% for stronger match confidence.
+ */
 export function computeResumeCompletion(resume: SeekerResume): number {
-	const signals = [
-		hasBio(resume),
-		resume.experiences.length > 0,
-		resume.educations.length > 0,
-	];
-	const filled = signals.filter(Boolean).length;
-	return Math.round((filled / RESUME_SIGNAL_COUNT) * 100);
+	let score = 0;
+	if (hasBio(resume)) score += 40;
+	if (resume.experiences.length > 0) score += 40;
+	if (resume.educations.length > 0) score += 15;
+	if (resume.certifications.length > 0) score += 5;
+	return Math.min(100, score);
 }
 
 /** Map a live resume into the ResumeProgress shape ResumePanel renders. */
@@ -41,6 +43,7 @@ export function toResumeProgress(resume: SeekerResume): ResumeProgress {
 	const completion = computeResumeCompletion(resume);
 	const experienceCount = resume.experiences.length;
 	const educationCount = resume.educations.length;
+	const certCount = resume.certifications.length;
 
 	const sections: readonly ResumeSection[] = [
 		{
@@ -58,9 +61,7 @@ export function toResumeProgress(resume: SeekerResume): ResumeProgress {
 			status: experienceCount > 0 ? "complete" : "incomplete",
 			detail:
 				experienceCount > 0
-					? `${experienceCount} experience ${
-							experienceCount === 1 ? "card" : "cards"
-						}`
+					? `${experienceCount} experience ${experienceCount === 1 ? "card" : "cards"}`
 					: "Add at least one experience",
 			required: true,
 		},
@@ -70,10 +71,18 @@ export function toResumeProgress(resume: SeekerResume): ResumeProgress {
 			status: educationCount > 0 ? "complete" : "optional",
 			detail:
 				educationCount > 0
-					? `${educationCount} education ${
-							educationCount === 1 ? "card" : "cards"
-						}`
+					? `${educationCount} education ${educationCount === 1 ? "card" : "cards"}`
 					: "Add education to boost match confidence",
+			required: false,
+		},
+		{
+			id: "certifications",
+			title: "Certifications",
+			status: certCount > 0 ? "complete" : "optional",
+			detail:
+				certCount > 0
+					? `${certCount} certification${certCount === 1 ? "" : "s"}`
+					: "PADI, CPR, food handler — boosts host confidence",
 			required: false,
 		},
 	];

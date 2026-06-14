@@ -95,10 +95,8 @@ const INK       = "#1A2B3C"
 const INK_SOFT  = "rgba(26,43,60,0.46)"
 const PAPER     = "#FEFAF4"
 
-/** Benefit accent inks — aligned with V2 benefit token fg values */
-const H_INK = "#185848"
-const M_INK = "#8A3E28"
-const P_INK = "#184878"
+const H_INK = "#185848"   /* green  — housing/meals available */
+const P_INK = "#184878"   /* blue   — pay */
 
 /** Per-category card body — top-lit, atmospheric, inviting */
 const CAT_CARD: Record<MarketplaceCategory, string> = {
@@ -151,6 +149,15 @@ const CAT_GLOW: Record<MarketplaceCategory, string> = {
 	mix:      "rgba(42,62,106,0.13)",
 }
 
+/** Per-category info-cell bg — tinted gradient pulls each cell into the card's color identity */
+const CAT_CELL_BG: Record<MarketplaceCategory, string> = {
+	farm:     "linear-gradient(180deg, rgba(250,240,200,0.64) 0%, rgba(238,215,130,0.48) 100%)",
+	maritime: "linear-gradient(180deg, rgba(234,244,255,0.68) 0%, rgba(180,210,244,0.52) 100%)",
+	remote:   "linear-gradient(180deg, rgba(240,234,255,0.66) 0%, rgba(196,180,244,0.50) 100%)",
+	seasonal: "linear-gradient(180deg, rgba(234,250,224,0.66) 0%, rgba(180,220,152,0.50) 100%)",
+	mix:      "linear-gradient(180deg, rgba(245,236,215,0.64) 0%, rgba(214,193,155,0.48) 100%)",
+}
+
 const CAT_LABEL: Record<MarketplaceCategory, string> = {
 	farm: "Farm", maritime: "Maritime", remote: "Remote", seasonal: "Seasonal", mix: "Mix",
 }
@@ -166,47 +173,31 @@ const MAPPIN: Record<MarketplaceCategory, IconKey> = {
 }
 
 // ─── Benefit helpers ──────────────────────────────────────────────────────────
+//
+// Housing & Meals share a green/red signal: provided = green, not_provided = light red.
+// Pay is always blue — it always has a dollar value so it never reads as "unavailable".
 
-function bBorder(b: "housing" | "meals" | "pay", p: BenefitProvision | undefined): string {
-	const ink = b === "housing" ? H_INK : b === "meals" ? M_INK : P_INK
-	if (p === "provided") return `2px solid ${ink}`
-	if (p === "partial")  return `1.5px solid color-mix(in srgb, ${ink} 50%, rgba(23,19,13,0.3))`
-	return `1.5px solid rgba(23,19,13,0.18)`
-}
+const RED_INK = "rgba(180,44,28,0.72)"
 
-function bBg(b: "housing" | "meals" | "pay", p: BenefitProvision | undefined): string {
-	if (p === "provided") {
-		if (b === "housing") return "linear-gradient(180deg, rgba(228,248,240,0.97) 0%, rgba(196,232,220,0.94) 100%)"
-		if (b === "meals")   return "linear-gradient(180deg, rgba(252,242,228,0.97) 0%, rgba(242,223,204,0.94) 100%)"
-		return "linear-gradient(180deg, rgba(222,240,252,0.97) 0%, rgba(192,220,244,0.94) 100%)"
-	}
-	if (p === "partial") {
-		if (b === "housing") return "rgba(196,232,220,0.48)"
-		if (b === "meals")   return "rgba(242,223,204,0.48)"
-		return "rgba(192,220,244,0.48)"
-	}
-	return PAPER
-}
+// Housing / Meals
+const HM_GREEN_BG     = "linear-gradient(180deg, rgba(228,248,240,0.97) 0%, rgba(196,232,220,0.94) 100%)"
+const HM_GREEN_BORDER = `2px solid ${H_INK}`
+const HM_GREEN_SHADOW = `inset 0 1.5px 0 rgba(255,255,255,0.82), 0 3px 8px rgba(24,88,72,0.22), 0 1px 3px rgba(24,88,72,0.14)`
+const HM_RED_BG       = "linear-gradient(180deg, rgba(255,240,238,0.97) 0%, rgba(252,222,218,0.93) 100%)"
+const HM_RED_BORDER   = `1.5px solid rgba(180,44,28,0.28)`
+const HM_RED_SHADOW   = "inset 0 1.5px 3px rgba(180,44,28,0.07), inset 0 1px 0 rgba(255,255,255,0.55)"
 
-function bColor(b: "housing" | "meals" | "pay", p: BenefitProvision | undefined): string {
-	if (p === "provided" || p === "partial") {
-		if (b === "housing") return H_INK
-		if (b === "meals")   return M_INK
-		return P_INK
-	}
-	return INK_SOFT
-}
+// partial is treated identically to provided — "available" is the single signal
+function hmBg(p: BenefitProvision | undefined):     string { return (p === "provided" || p === "partial") ? HM_GREEN_BG     : HM_RED_BG     }
+function hmBorder(p: BenefitProvision | undefined): string { return (p === "provided" || p === "partial") ? HM_GREEN_BORDER : HM_RED_BORDER }
+function hmColor(p: BenefitProvision | undefined):  string { return (p === "provided" || p === "partial") ? H_INK           : RED_INK       }
+function hmShadow(p: BenefitProvision | undefined): string { return (p === "provided" || p === "partial") ? HM_GREEN_SHADOW : HM_RED_SHADOW }
 
-function bShadow(b: "housing" | "meals" | "pay", p: BenefitProvision | undefined): string {
-	if (p === "provided") {
-		const glow = b === "housing" ? "24,88,72" : b === "meals" ? "138,62,40" : "24,72,120"
-		return `inset 0 1.5px 0 rgba(255,255,255,0.82), 0 3px 8px rgba(${glow},0.22), 0 1px 3px rgba(${glow},0.14)`
-	}
-	if (p === "partial") {
-		return "inset 0 1.5px 0 rgba(255,255,255,0.60), 0 1px 4px rgba(26,43,60,0.09)"
-	}
-	return "inset 0 1.5px 3px rgba(26,43,60,0.08), inset 0 1px 0 rgba(0,0,0,0.04)"
-}
+// Pay — always blue regardless of provision
+const PAY_BG     = "linear-gradient(180deg, rgba(222,240,252,0.97) 0%, rgba(192,220,244,0.94) 100%)"
+const PAY_BORDER = `2px solid ${P_INK}`
+const PAY_COLOR  = P_INK
+const PAY_SHADOW = `inset 0 1.5px 0 rgba(255,255,255,0.82), 0 3px 8px rgba(24,72,120,0.22), 0 1px 3px rgba(24,72,120,0.14)`
 
 // ─── Fill bar helpers ─────────────────────────────────────────────────────────
 
@@ -319,6 +310,9 @@ export function DiscoveryCard({
 }: DiscoveryCardProps) {
 	const cat      = data.category
 	const roleText = data.positionTitle ?? data.title
+	const cellBg          = CAT_CELL_BG[cat]
+	const ROW_CELL_CAT:   CSSProperties = { ...ROW_CELL,   background: cellBg }
+	const STRIP_CELL_CAT: CSSProperties = { ...STRIP_CELL, background: cellBg }
 	const verified = data.verifiedHost === true
 	const isDisabled            = variant === "disabled"
 	const isApplicantReview     = surface === "host_applicant_review"
@@ -328,7 +322,6 @@ export function DiscoveryCard({
 
 	const hp = data.benefitProvision?.housing
 	const mp = data.benefitProvision?.meals
-	const pp = data.benefitProvision?.pay
 
 	const canOpenHousing = Boolean(onHousingClick && hp !== "not_provided")
 	const canOpenMeals   = Boolean(onMealsClick   && mp !== "not_provided")
@@ -493,24 +486,34 @@ export function DiscoveryCard({
 
 	const housingCell: CSSProperties = {
 		...BENEFIT_CELL,
-		border: bBorder("housing", hp), background: bBg("housing", hp), color: bColor("housing", hp),
-		boxShadow: bShadow("housing", hp),
+		border: hmBorder(hp), background: hmBg(hp), color: hmColor(hp),
+		boxShadow: hmShadow(hp),
 		...(canOpenHousing ? { cursor: "pointer", width: "100%" } : {}),
 	}
 	const mealsCell: CSSProperties = {
 		...BENEFIT_CELL,
-		border: bBorder("meals", mp), background: bBg("meals", mp), color: bColor("meals", mp),
-		boxShadow: bShadow("meals", mp),
+		border: hmBorder(mp), background: hmBg(mp), color: hmColor(mp),
+		boxShadow: hmShadow(mp),
 		...(canOpenMeals ? { cursor: "pointer", width: "100%" } : {}),
 	}
 	const payCell: CSSProperties = {
 		...BENEFIT_CELL,
-		border: bBorder("pay", pp), background: bBg("pay", pp), color: bColor("pay", pp),
-		boxShadow: bShadow("pay", pp),
+		border: PAY_BORDER, background: PAY_BG, color: PAY_COLOR,
+		boxShadow: PAY_SHADOW,
 		...(onPayClick ? { cursor: "pointer", width: "100%" } : {}),
 	}
 
 	return (
+		<>
+		{/* Hover expand for interactive benefit cells — scoped by component class */}
+		<style>{`
+			.ui-card--discovery .dc-benefit-btn {
+				transition: transform 120ms ease, box-shadow 120ms ease;
+			}
+			.ui-card--discovery .dc-benefit-btn:hover {
+				transform: scale(1.05) translateY(-1px);
+			}
+		`}</style>
 		<article
 			className="ui-card--discovery"
 			style={cardStyle}
@@ -745,23 +748,23 @@ export function DiscoveryCard({
 
 				{/* 2. HOST NAME */}
 				{titleHandler ? (
-					<button type="button" style={{ ...ROW_CELL, width: "100%", cursor: "pointer" }} onClick={titleHandler}>
+					<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={titleHandler}>
 						<span style={hostNameText}>{data.hostName}</span>
 					</button>
 				) : (
-					<div style={ROW_CELL}>
+					<div style={ROW_CELL_CAT}>
 						<span style={hostNameText}>{data.hostName}</span>
 					</div>
 				)}
 
 				{/* 3. JOB TITLE */}
 				{onOpen ? (
-					<button type="button" style={{ ...ROW_CELL, width: "100%", cursor: "pointer" }} onClick={() => onOpen(data.id)}>
+					<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={() => onOpen(data.id)}>
 						<Icon name={CAT_ICON[cat]} size={20} aria-hidden />
 						<span style={jobTitleText}>{roleText}</span>
 					</button>
 				) : (
-					<div style={ROW_CELL}>
+					<div style={ROW_CELL_CAT}>
 						<Icon name={CAT_ICON[cat]} size={20} aria-hidden />
 						<span style={jobTitleText}>{roleText}</span>
 					</div>
@@ -769,12 +772,12 @@ export function DiscoveryCard({
 
 				{/* 4. LOCATION */}
 				{onLocationClick ? (
-					<button type="button" style={{ ...ROW_CELL, width: "100%", cursor: "pointer" }} onClick={() => onLocationClick(data.id)}>
+					<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={() => onLocationClick(data.id)}>
 						<Icon name={MAPPIN[cat]} size={20} aria-hidden />
 						<span style={locationText}>{data.location}</span>
 					</button>
 				) : (
-					<div style={ROW_CELL}>
+					<div style={ROW_CELL_CAT}>
 						<Icon name={MAPPIN[cat]} size={20} aria-hidden />
 						<span style={locationText}>{data.location}</span>
 					</div>
@@ -782,14 +785,14 @@ export function DiscoveryCard({
 
 				{/* 5. BEGINS | ENDS — own 2-column row, never collapses */}
 				<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
-					<div style={STRIP_CELL}>
+					<div style={STRIP_CELL_CAT}>
 						<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
 							<Icon name="status.begins" size={16} aria-hidden />
 							<span style={stripLabel}>Begins</span>
 						</span>
 						<span style={stripValue}>{data.begins ?? "—"}</span>
 					</div>
-					<div style={STRIP_CELL}>
+					<div style={STRIP_CELL_CAT}>
 						<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
 							<Icon name="status.ends" size={16} aria-hidden />
 							<span style={stripLabel}>Ends</span>
@@ -819,7 +822,7 @@ export function DiscoveryCard({
 					/* Standard H/M/P row — icon+label for housing/meals, icon+rate for pay */
 					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
 						{canOpenHousing ? (
-							<button type="button" style={housingCell} onClick={() => onHousingClick!(data.id)} aria-label={`Housing: ${data.triad.housing}`}>
+							<button type="button" className="dc-benefit-btn" style={housingCell} onClick={() => onHousingClick!(data.id)} aria-label={`Housing: ${data.triad.housing}`}>
 								<Icon name="benefit.housing" size={16} aria-hidden />
 								<span style={stripLabel}>{data.housingOccupancy === "solo" ? "Private" : data.housingOccupancy === "shared" ? "Shared" : "Housing"}</span>
 							</button>
@@ -831,7 +834,7 @@ export function DiscoveryCard({
 						)}
 
 						{canOpenMeals ? (
-							<button type="button" style={mealsCell} onClick={() => onMealsClick!(data.id)} aria-label={`Meals: ${data.triad.meals}`}>
+							<button type="button" className="dc-benefit-btn" style={mealsCell} onClick={() => onMealsClick!(data.id)} aria-label={`Meals: ${data.triad.meals}`}>
 								<Icon name="benefit.meals" size={16} aria-hidden />
 								<span style={stripLabel}>Meals</span>
 							</button>
@@ -843,7 +846,7 @@ export function DiscoveryCard({
 						)}
 
 						{onPayClick ? (
-							<button type="button" style={payCell} onClick={() => onPayClick(data.id)} aria-label={`Pay: ${data.triad.pay}`}>
+							<button type="button" className="dc-benefit-btn" style={payCell} onClick={() => onPayClick(data.id)} aria-label={`Pay: ${data.triad.pay}`}>
 								<Icon name="benefit.pay" size={16} aria-hidden />
 								<span style={stripValue}>{data.triad.pay}</span>
 							</button>
@@ -1005,5 +1008,6 @@ export function DiscoveryCard({
 				)}
 			</div>
 		</article>
+		</>
 	)
 }

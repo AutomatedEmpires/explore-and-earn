@@ -1,28 +1,88 @@
 .footer {
+  background: var(--color-parchment);
+  border-top: 1.5px solid var(--border-ink-warm);
+  /* Clear the fixed bottom nav so footer isn't hidden underneath */
+  padding-bottom: calc(var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom, 0px));
+}
+
+.inner {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-16);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-32) var(--space-24) var(--space-20);
+  text-align: center;
+}
+
+/* ── Row 1: social icons ─────────────────────────────────────────────────────── */
+
+.social {
+  display: flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-24);
+}
+
+.socialLink {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  transition: color var(--motion-base) var(--ease-standard);
+}
+
+.socialLink:hover {
+  color: var(--text-primary);
+}
+
+/* ── Row 2: legal nav ────────────────────────────────────────────────────────── */
+
+.legalNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: var(--space-8);
-  padding: var(--space-24) var(--space-gutter);
-  border-top: 1px solid var(--border-soft);
-  background: var(--color-paper);
-  font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-lh);
-  color: var(--text-muted);
 }
 
-.sep {
-  color: var(--text-muted);
+.legalItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
 }
 
-.link {
+.legalLink {
+  font-family: var(--font-display);
+  font-size: var(--type-body-size);
   color: var(--text-secondary);
   text-decoration: none;
 }
 
-.link:hover {
+.legalLink:hover {
   color: var(--text-primary);
   text-decoration: underline;
+}
+
+.dot {
+  font-family: var(--font-display);
+  font-size: var(--type-body-size);
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* ── Row 3: wordmark + copyright ─────────────────────────────────────────────── */
+
+.copy {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  /* gradient text */
+  background: linear-gradient(135deg, #c4954a 0%, #2f667a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }

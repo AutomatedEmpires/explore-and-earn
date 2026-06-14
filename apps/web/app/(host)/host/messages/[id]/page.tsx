@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
 import {
   getConversations,
   getMessages,
   getSeekerDisplayName,
+  markMessagesRead,
 } from "@explore-and-earn/db";
-
-import { markMessagesReadAction } from "../../../../actions/messages";
 import { EmptyState } from "../../../../../components/discovery";
 import { HostSectionHeading } from "../../../../../components/host";
 import { MessageTranscript } from "../../../../../components/messaging/MessageTranscript";
@@ -57,15 +57,13 @@ export default async function HostMessageThreadPage({
     );
   }
 
-  // Load the transcript, the host's conversations (to resolve the seeker name),
-  // and mark inbound messages as read — all in parallel so a failed mark-read
-  // never blocks the page render. _markRead is void — the underscore prefix
-  // signals the intentional discard.
-  const [messages, conversations, _markRead] = await Promise.all([
+  // Fetch transcript + conversations in parallel; mark-read failure never blocks render.
+  const [messages, conversations] = await Promise.all([
     getMessages(token, userId, id),
     getConversations(token, userId, "host"),
-    markMessagesReadAction(id),
+    markMessagesRead(token, userId, id).catch(() => null),
   ]);
+  revalidatePath("/host/messages");
   const conversation = conversations.find((entry) => entry.id === id) ?? null;
   const seekerName = conversation
     ? await getSeekerDisplayName(token, userId, conversation.seekerProfileId)

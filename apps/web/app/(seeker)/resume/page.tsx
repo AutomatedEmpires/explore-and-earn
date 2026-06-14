@@ -6,18 +6,17 @@ import { getSeekerResume } from "@explore-and-earn/db";
 import { EmptyState } from "../../../components/discovery";
 import {
 	BucketPage,
-	ResumePanel,
-	toResumeProgress,
+	ResumeBuilder,
+	computeResumeCompletion,
 } from "../../../components/seeker";
 
 export const metadata: Metadata = {
 	title: "Resume",
 };
 
-// Resume data is per-user, so this page must never be statically cached.
 export const dynamic = "force-dynamic";
 
-const RESUME_DESCRIPTION = "Your visual, tag-based compatibility profile.";
+const RESUME_DESCRIPTION = "Build your compatibility profile — hosts see this when you apply.";
 
 function SignedOutResume() {
 	return (
@@ -43,11 +42,11 @@ export default async function ResumePage() {
 	}
 
 	const resume = await getSeekerResume(token, userId);
-	const progress = toResumeProgress(resume);
+	const completion = computeResumeCompletion(resume);
 
 	return (
 		<BucketPage title="Resume" description={RESUME_DESCRIPTION}>
-			<ResumePanel progress={progress} />
+			<ResumeBuilder resume={resume} completion={completion} />
 		</BucketPage>
 	);
 }

@@ -1,0 +1,175 @@
+/* FeaturedEmployerStrip — compact horizontal employer discovery rail */
+
+.section {
+  background: var(--color-paper);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 20px var(--space-16) 10px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 5vw, 22px);
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.1;
+}
+
+.seeAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-cta, #2F667A);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.seeAll:hover { text-decoration: underline; }
+
+/* ─── Horizontal scroll rail ─── */
+.rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px var(--space-16) 16px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.rail::-webkit-scrollbar { display: none; }
+
+.rail > * { scroll-snap-align: start; }
+
+/* ─── Employer card — landscape ratio ─── */
+.card {
+  position: relative;
+  width: 175px;
+  height: 100px;
+  border-radius: var(--radius-cell);
+  overflow: hidden;
+  display: flex;
+  text-decoration: none;
+  flex-shrink: 0;
+  box-shadow:
+    0 1px 4px rgba(36, 34, 30, 0.10),
+    0 4px 16px rgba(36, 34, 30, 0.12);
+  transition:
+    transform   var(--motion-fast) var(--ease-standard),
+    box-shadow  var(--motion-fast) var(--ease-standard);
+}
+
+.card:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow:
+    0 4px 12px rgba(36, 34, 30, 0.14),
+    0 12px 36px rgba(36, 34, 30, 0.16);
+}
+
+.card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 102, 122, 0.45);
+}
+
+@media (min-width: 480px) {
+  .card { width: 210px; height: 114px; }
+}
+
+.cardBg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+  transition: transform var(--motion-base) var(--ease-standard);
+}
+
+.card:hover .cardBg { transform: scale(1.07); }
+
+.cardScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    155deg,
+    rgba(0, 0, 0, 0.12) 0%,
+    rgba(0, 0, 0, 0.72) 100%
+  );
+  z-index: 1;
+}
+
+.cardContent {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.logoChip {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.cardMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hostName {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+}
+
+.openingCount {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+}
+
+.verifiedBadge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(45, 122, 58, 0.85);
+  border: 1px solid rgba(80, 180, 100, 0.5);
+  color: #fff;
+  flex-shrink: 0;
+}

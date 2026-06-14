@@ -1,35 +1,44 @@
 import type { Metadata } from "next";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getSeekerApplications, getSeekerResume } from "@explore-and-earn/db";
-
 import {
-	BucketPage,
+	getSeekerApplications,
+	getSeekerBadges,
+	getSeekerProfile,
+	getSeekerResume,
+	type SeekerBadge,
+} from "@explore-and-earn/db";
+
+import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+import {
 	ProfileHub,
 	computeResumeCompletion,
 	getSeekerStatusFallback,
 	type SeekerStatusSummary,
 } from "../../../components/seeker";
+import { getMatchedListings } from "../../../components/seeker/data";
+import { buildFeaturedEmployers } from "../../../lib/employer-utils";
 
 export const metadata: Metadata = {
 	title: "Profile",
 };
 
-// Identity + pipeline counts are per-user, so this page must never be cached.
 export const dynamic = "force-dynamic";
 
-/**
- * Profile — founder-locked seeker-nav tab. The unified profile hub: identity,
- * pipeline snapshot, resume readiness, and links to every seeker surface.
- *
- * Shows the signed-in seeker's real name (Clerk), real application count, and
- * real resume completion (Supabase). When those reads are unavailable, the page
- * degrades safely; fixture values stay dev-only and never ship in production.
- */
 export default async function ProfilePage() {
 	const { userId, getToken } = await auth();
 
 	let status: SeekerStatusSummary = getSeekerStatusFallback();
+	let badges: SeekerBadge[] = [];
+	let profilePhotoUrl: string | null = null;
+	let heroCoverUrl: string | null = null;
+	let seekingTimeline: string | null = null;
+	let preferredCategories: string[] = [];
+	let bio: string | null = null;
+	let seekerProfileId: string | null = null;
+	let matchedListings: Awaited<ReturnType<typeof getMatchedListings>> = [];
+
+	const featuredEmployers = buildFeaturedEmployers(DISCOVERY_FIXTURES);
 
 	if (userId) {
 		let seekerName = status.seekerName;
@@ -43,7 +52,7 @@ export default async function ProfilePage() {
 						user?.username?.trim() ||
 						status.seekerName;
 		} catch {
-			// currentUser() failed — keep the fixture name rather than crash.
+			// currentUser() failed — keep fixture name
 		}
 
 		let appliedCount = status.appliedCount;
@@ -51,24 +60,47 @@ export default async function ProfilePage() {
 		try {
 			const token = await getToken({ template: "supabase" });
 			if (token) {
-				appliedCount = (await getSeekerApplications(token, userId)).length;
-				resumeCompletion = computeResumeCompletion(
-					await getSeekerResume(token, userId),
-				);
+				const [apps, resume, earnedBadges, profile, matched] = await Promise.all([
+					getSeekerApplications(token, userId),
+					getSeekerResume(token, userId),
+					getSeekerBadges(token, userId),
+					getSeekerProfile(token, userId),
+					getMatchedListings(token, userId),
+				]);
+
+				appliedCount = apps.length;
+				resumeCompletion = computeResumeCompletion(resume);
+				badges = earnedBadges;
+				matchedListings = matched.slice(0, 12);
+
+				if (profile) {
+					profilePhotoUrl = profile.profilePhotoUrl ?? null;
+					heroCoverUrl = profile.heroCoverUrl ?? null;
+					seekingTimeline = profile.seekingTimeline ?? null;
+					preferredCategories = profile.preferredCategories ?? [];
+					bio = profile.bio ?? null;
+					seekerProfileId = profile.id ?? null;
+				}
 			}
 		} catch {
-			// Pipeline / resume reads unavailable — keep the fixture values.
+			// DB unavailable — keep fixture values
 		}
 
 		status = { ...status, seekerName, appliedCount, resumeCompletion };
 	}
 
 	return (
-		<BucketPage
-			title="Profile"
-			description="Your seeker profile, resume, and account settings."
-		>
-			<ProfileHub status={status} />
-		</BucketPage>
+		<ProfileHub
+			status={status}
+			badges={badges}
+			profilePhotoUrl={profilePhotoUrl}
+			heroCoverUrl={heroCoverUrl}
+			seekingTimeline={seekingTimeline}
+			preferredCategories={preferredCategories}
+			bio={bio}
+			seekerProfileId={seekerProfileId}
+			matchedListings={matchedListings}
+			featuredEmployers={featuredEmployers}
+		/>
 	);
 }

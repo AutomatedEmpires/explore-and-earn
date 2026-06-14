@@ -1,5 +1,6 @@
 export * from "./api"
 export * from "./benefits"
+export * from "./community"
 export * from "./card"
 export * from "./categories"
 export * from "./enums"

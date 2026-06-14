@@ -5,6 +5,8 @@ import { Icon } from "@explore-and-earn/ui";
 import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 import { CategoryBadge } from "../listing/CategoryBadge";
 
+import styles from "./PublicListingCard.module.css";
+
 interface Props {
   listing: PublicHostListing;
 }
@@ -21,28 +23,9 @@ export function PublicListingCard({ listing }: Props) {
       : "See listing");
 
   return (
-    <Link
-      href={`/listing/${listing.id}`}
-      style={{
-        display: "block",
-        backgroundColor: "var(--color-surface-raised)",
-        borderRadius: "var(--radius-card)",
-        border: "1px solid var(--border-soft)",
-        overflow: "hidden",
-        textDecoration: "none",
-        transition: "border-color var(--motion-fast) var(--ease-standard)",
-      }}
-    >
-      {/* Cover */}
+    <Link href={`/listing/${listing.id}`} className={styles.card}>
       {listing.coverPhotoUrl && (
-        <div
-          style={{
-            position: "relative",
-            width: "100%",
-            aspectRatio: "4 / 3",
-            backgroundColor: "var(--color-surface)",
-          }}
-        >
+        <div className={styles.cover}>
           <Image
             src={listing.coverPhotoUrl}
             alt={listing.title}
@@ -52,53 +35,21 @@ export function PublicListingCard({ listing }: Props) {
         </div>
       )}
 
-      <div style={{ padding: "var(--space-16)" }}>
-        {/* Category badge */}
-        <div style={{ marginBottom: "var(--space-8)" }}>
+      <div className={styles.body}>
+        <div className={styles.categoryRow}>
           <CategoryBadge category={listing.category as MarketplaceCategory} />
         </div>
 
-        {/* Title */}
-        <h3
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "var(--type-card-size)",
-            lineHeight: "var(--type-card-lh)",
-            color: "var(--text-primary)",
-            margin: 0,
-            marginBottom: "var(--space-8)",
-          }}
-        >
-          {listing.title}
-        </h3>
+        <h3 className={styles.title}>{listing.title}</h3>
 
-        {/* Location */}
         {listing.locationDisplay && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-4)",
-              fontSize: "var(--type-meta-size)",
-              color: "var(--text-secondary)",
-              marginBottom: "var(--space-8)",
-            }}
-          >
+          <div className={styles.location}>
             <Icon name="nav.map" size={16} aria-hidden />
             <span>{listing.locationDisplay}</span>
           </div>
         )}
 
-        {/* Pay */}
-        <div
-          style={{
-            fontSize: "var(--type-meta-size)",
-            fontWeight: "var(--font-weight-medium)",
-            color: "var(--text-primary)",
-          }}
-        >
-          {paySummary}
-        </div>
+        <div className={styles.pay}>{paySummary}</div>
       </div>
     </Link>
   );

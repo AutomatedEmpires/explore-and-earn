@@ -1,14 +1,22 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useTransition } from "react";
 import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
-import type { OpportunityCategory } from "@explore-and-earn/contracts";
+import type { OpportunityCategory, ReactionKey } from "@explore-and-earn/contracts";
+import type {
+  CommunityPhoto,
+  HostAnnouncement as ContractAnnouncement,
+  ReactionCounts,
+} from "@explore-and-earn/contracts";
+import { PostEngagement } from "../community/PostEngagement";
 
 import type { DiscoveryListing } from "../discovery";
 import { CATEGORY_LABEL } from "../discovery";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import type { SeekerStatusSummary } from "./models";
+import { HostAnnouncementComposer } from "../host/HostAnnouncementComposer";
+import { uploadCommunityPhotoAction } from "../../app/actions/community";
 import styles from "./CommunityDashboard.module.css";
 
 // ─── Feed item types ──────────────────────────────────────────────────────────
@@ -22,6 +30,9 @@ type SeekerPost = {
   readonly tags: readonly string[];
   readonly coverUrl?: string;
   readonly reactions: readonly [number, number, number, number, number];
+  readonly dbId?: string;
+  readonly userReactions?: readonly ReactionKey[];
+  readonly commentCount?: number;
 };
 
 type HostAnnouncement = {
@@ -33,6 +44,9 @@ type HostAnnouncement = {
   readonly coverUrls: readonly string[];
   readonly reactions: readonly [number, number, number, number, number];
   readonly hostId?: string;
+  readonly dbId?: string;
+  readonly userReactions?: readonly ReactionKey[];
+  readonly commentCount?: number;
 };
 
 type BlogPost = {
@@ -68,11 +82,20 @@ interface CommunityDashboardProps {
   readonly status: SeekerStatusSummary;
   readonly listings: readonly DiscoveryListing[];
   readonly featuredEmployers?: readonly FeaturedEmployer[];
+  // Real DB data — when provided, merged into the feed and tabs
+  readonly serverPhotos?: readonly CommunityPhoto[];
+  readonly serverAnnouncements?: readonly ContractAnnouncement[];
+  // Seeker profile gate
+  readonly completionScore?: number;
+  // Host context (for announcement composer)
+  readonly isHost?: boolean;
+  readonly hostTier?: string;
+  readonly hostUsedThisMonth?: number;
+  readonly hostDraftAnnouncementId?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const REACTIONS = ["😄", "❤️", "💯", "🙌", "✨"] as const;
 
 const SEEKER_NAMES = ["Maya R.", "Ethan W.", "Jessica L.", "Sam K.", "Alex M."] as const;
 
@@ -90,7 +113,6 @@ const BLOG_POST_BASE = {
   reactions: [89, 67, 54, 41, 38] as [number, number, number, number, number],
 };
 
-// Employer badge abbreviations — mirrors FeaturedEmployersRail, not exported from there
 const CATEGORY_ABBR: Record<OpportunityCategory, string> = {
   farm:     "FARM",
   maritime: "SEA",
@@ -99,30 +121,66 @@ const CATEGORY_ABBR: Record<OpportunityCategory, string> = {
   mix:      "MIX",
 };
 
-// ─── Strategic feed slot template ─────────────────────────────────────────────
-//
-// Design rules:
-//   - First 2 slots always organic seeker posts (hook before monetization)
-//   - Monetized slots (listing, employer) never adjacent
-//   - Seeker posts must buffer every monetized slot
-//   - Photos dominate: 7/12 slots (~58%)
-//   - Listing: 1 slot, Employer: 1 slot, Blog: 1 slot, Announcements: 2 slots
-//   - If a bucket is exhausted, falls back to seeker posts
-//
 const FEED_SLOT_TEMPLATE: readonly FeedSlotType[] = [
-  "seeker",        // 0 — hook with organic content
-  "seeker",        // 1 — photo dominant
-  "blog",          // 2 — E&E platform content
-  "seeker",        // 3
-  "announcement",  // 4 — first semi-social break
-  "seeker",        // 5 — buffer
-  "seeker",        // 6 — photo dominant
-  "listing",       // 7 — highest-match or boosted listing
-  "seeker",        // 8 — buffer after monetized
-  "announcement",  // 9 — second round
-  "seeker",        // 10
-  "employer",      // 11 — featured employer closes the visible feed
+  "seeker",
+  "seeker",
+  "blog",
+  "seeker",
+  "announcement",
+  "seeker",
+  "seeker",
+  "listing",
+  "seeker",
+  "announcement",
+  "seeker",
+  "employer",
 ];
+
+// ─── Tab navigation ───────────────────────────────────────────────────────────
+
+const COMMUNITY_TABS = [
+  { id: "feed" as const, label: "Feed", href: "/community", icon: "nav.feed" as const },
+  { id: "photos" as const, label: "Photos", href: "/community/photos", icon: "nav.photos" as const },
+  { id: "announcements" as const, label: "Announcements", href: "/community/announcements", icon: "nav.announcements" as const },
+] as const;
+
+function CommunityTabNav({ tab }: { readonly tab: "feed" | "photos" | "announcements" }) {
+  return (
+    <nav className={styles.tabNav} aria-label="Community sections">
+      {COMMUNITY_TABS.map(t => (
+        <Link
+          key={t.id}
+          href={t.href}
+          className={`${styles.tabLink}${tab === t.id ? ` ${styles.tabLinkActive}` : ""}`}
+          aria-current={tab === t.id ? "page" : undefined}
+        >
+          <Icon name={t.icon} size={16} aria-hidden />
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+// ─── Toast hook ───────────────────────────────────────────────────────────────
+
+type ToastItem = { readonly id: string; readonly message: string };
+
+function useToasts() {
+  const [toasts, setToasts] = useState<readonly ToastItem[]>([]);
+
+  const add = useCallback((message: string) => {
+    const id = performance.now().toString(36) + Math.random().toString(36).slice(2);
+    setToasts(prev => [...prev, { id, message }]);
+    const timer = window.setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3200);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return { toasts, add };
+}
+
 
 // ─── Fixture generation ───────────────────────────────────────────────────────
 
@@ -165,7 +223,6 @@ function buildStrategicFeedItems(
   listings: readonly DiscoveryListing[],
   featuredEmployers: readonly FeaturedEmployer[],
 ): FeedItem[] {
-  // ── Seeker posts: photo-first ordering ──
   const sortedListings = [...listings].sort(
     (a, b) => (b.coverImageUrl ? 1 : 0) - (a.coverImageUrl ? 1 : 0),
   );
@@ -180,7 +237,6 @@ function buildStrategicFeedItems(
     reactions: [Math.max(50, 156 - i * 3), Math.max(40, 123 - i * 2), Math.max(35, 101 - i), 82, 71],
   }));
 
-  // ── Host announcements: one per host (first listing per host) ──
   const seenHosts = new Set<string>();
   const announcementBucket: HostAnnouncement[] = [];
   listings.forEach((listing, i) => {
@@ -198,7 +254,6 @@ function buildStrategicFeedItems(
     });
   });
 
-  // ── Match-ranked listing cards: boosted || matchScore ≥ 60, best-first ──
   const listingBucket: BoostedListing[] = [...listings]
     .filter(l =>
       l.conditionalBadges?.includes("boosted") ||
@@ -214,7 +269,6 @@ function buildStrategicFeedItems(
       isBoosted: Boolean(l.conditionalBadges?.includes("boosted")),
     }));
 
-  // ── Featured employer cards ──
   const employerBucket: FeaturedEmployerCard[] = featuredEmployers.slice(0, 2).map(
     (emp, i): FeaturedEmployerCard => ({
       kind: "employer",
@@ -223,13 +277,11 @@ function buildStrategicFeedItems(
     }),
   );
 
-  // ── Blog ──
   const blogBucket: BlogPost[] = [{
     ...BLOG_POST_BASE,
     coverUrl: sortedListings.find(l => l.coverImageUrl)?.coverImageUrl,
   }];
 
-  // ── Slot-template fill ──
   const buckets: Record<FeedSlotType, FeedItem[]> = {
     seeker: seekerBucket,
     blog: blogBucket,
@@ -247,8 +299,172 @@ function buildStrategicFeedItems(
       result.push(buckets.seeker.shift()!);
     }
   }
-
   return result;
+}
+
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `${Math.max(1, mins)}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function reactionCountsToArray(counts?: ReactionCounts): readonly [number, number, number, number, number] {
+  if (!counts) return [0, 0, 0, 0, 0];
+  return [counts.smile, counts.heart, counts.hundred, counts.clap, counts.sparkle];
+}
+
+function photosToSeekerPosts(photos: readonly CommunityPhoto[]): SeekerPost[] {
+  return photos.map((p): SeekerPost => ({
+    kind: "seeker",
+    id: `photo-${p.id}`,
+    authorName: p.authorName,
+    timestamp: formatRelativeTime(p.createdAt),
+    caption: p.caption ?? "",
+    tags: p.locationTag ? [p.locationTag] : [],
+    coverUrl: p.storageUrl,
+    reactions: reactionCountsToArray(p.reactionCounts),
+    dbId: p.id,
+    userReactions: p.reactionCounts?.userReactions,
+    commentCount: p.commentCount,
+  }));
+}
+
+function announcementsToFeedItems(anns: readonly ContractAnnouncement[]): HostAnnouncement[] {
+  return anns.map((a): HostAnnouncement => ({
+    kind: "announcement",
+    id: `real-ann-${a.id}`,
+    hostName: a.hostName,
+    timestamp: formatRelativeTime(a.createdAt),
+    text: a.title ? `${a.title} — ${a.body}` : a.body,
+    coverUrls: [],
+    reactions: reactionCountsToArray(a.reactionCounts),
+    hostId: a.hostProfileId,
+    dbId: a.id,
+    userReactions: a.reactionCounts?.userReactions,
+    commentCount: a.commentCount,
+  }));
+}
+
+// ─── Photo upload form ────────────────────────────────────────────────────────
+
+function PhotoUploadForm({
+  completionScore,
+  onSuccess,
+  onToast,
+}: {
+  readonly completionScore: number;
+  readonly onSuccess: (photoId: string) => void;
+  readonly onToast: (msg: string) => void;
+}) {
+  const [caption, setCaption]       = useState("");
+  const [locationTag, setLocationTag] = useState("");
+  const [fileError, setFileError]   = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  if (completionScore < 80) {
+    return (
+      <div className={styles.photoGate}>
+        <Icon name="trust.verified_host" size={20} aria-hidden />
+        <div className={styles.photoGateText}>
+          <p className={styles.photoGateHeading}>Complete your profile to post photos</p>
+          <p className={styles.photoGateSub}>
+            You need 80% profile completion to post (currently {completionScore}%).
+            Add your bio and experience to unlock.
+          </p>
+          <div
+            className={styles.photoGateTrack}
+            role="progressbar"
+            aria-valuenow={completionScore}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Profile ${completionScore}% complete`}
+          >
+            <div className={styles.photoGateFill} style={{ width: `${completionScore}%` }} />
+          </div>
+          <Link href="/profile/edit" className={styles.photoGateCta}>
+            Complete profile <Icon name="action.forward" size={16} aria-hidden />
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setFileError(null);
+    const fd = new FormData(e.currentTarget);
+    const file = fileRef.current?.files?.[0];
+    if (!file) { setFileError("Please select a photo."); return; }
+    if (file.size > 10 * 1024 * 1024) { setFileError("Photo must be under 10 MB."); return; }
+    startTransition(async () => {
+      const result = await uploadCommunityPhotoAction(fd);
+      if (result.ok) {
+        onSuccess(result.photoId);
+        onToast("Photo posted!");
+        setCaption("");
+        setLocationTag("");
+        if (fileRef.current) fileRef.current.value = "";
+      } else if (result.reason === "incomplete_profile") {
+        onToast(`Profile at ${result.score ?? completionScore}% — need 80% to post.`);
+      } else {
+        onToast("Upload failed — please try again.");
+      }
+    });
+  }
+
+  return (
+    <form className={styles.photoUploadForm} onSubmit={handleSubmit}>
+      <label className={styles.photoFileField}>
+        <span className={styles.photoFileLabel}>
+          <Icon name="nav.announcements" size={20} aria-hidden />
+          Choose a photo
+        </span>
+        <input
+          ref={fileRef}
+          name="photo"
+          type="file"
+          accept="image/jpeg,image/webp,image/png"
+          className={styles.photoFileInput}
+          disabled={isPending}
+          required
+        />
+      </label>
+      <label className={styles.photoField}>
+        <span className={styles.photoFieldLabel}>Caption <span>(max 280 chars)</span></span>
+        <textarea
+          name="caption"
+          className={styles.photoCaption}
+          value={caption}
+          onChange={e => setCaption(e.target.value)}
+          maxLength={280}
+          rows={3}
+          placeholder="What's the story behind this shot?"
+          disabled={isPending}
+        />
+        <span className={styles.photoCharCount}>{caption.length}/280</span>
+      </label>
+      <label className={styles.photoField}>
+        <span className={styles.photoFieldLabel}>Location <span>(optional)</span></span>
+        <input
+          name="location_tag"
+          className={styles.photoLocationInput}
+          value={locationTag}
+          onChange={e => setLocationTag(e.target.value)}
+          maxLength={100}
+          placeholder="Tillamook, OR"
+          disabled={isPending}
+        />
+      </label>
+      {fileError && <p className={styles.photoError}>{fileError}</p>}
+      <button className={styles.photoSubmitBtn} type="submit" disabled={isPending}>
+        {isPending ? "Posting…" : "Post Photo"}
+      </button>
+    </form>
+  );
 }
 
 function parseDate(str?: string): { mon: string; day: string } | null {
@@ -261,58 +477,48 @@ function parseDate(str?: string): { mon: string; day: string } | null {
   };
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Toast stack ─────────────────────────────────────────────────────────────
 
-function ReactionBar({ reactions }: { reactions: readonly [number, number, number, number, number] }) {
-  const [active, setActive] = useState<ReadonlySet<number>>(new Set());
-
-  function toggle(i: number) {
-    setActive(prev => {
-      const next = new Set(prev);
-      if (next.has(i)) next.delete(i); else next.add(i);
-      return next;
-    });
-  }
-
+function ToastStack({ toasts }: { readonly toasts: readonly ToastItem[] }) {
+  if (!toasts.length) return null;
   return (
-    <div className={styles.reactionBar} role="group" aria-label="Post reactions">
-      {REACTIONS.map((emoji, i) => {
-        const isActive = active.has(i);
-        const count = (reactions[i] ?? 0) + (isActive ? 1 : 0);
-        return (
-          <button
-            key={emoji}
-            type="button"
-            className={`${styles.reaction}${isActive ? ` ${styles.reactionActive}` : ""}`}
-            aria-label={`React with ${emoji}${isActive ? " — you reacted" : ""}`}
-            aria-pressed={isActive}
-            onClick={() => toggle(i)}
-          >
-            <span className={styles.reactionEmoji} aria-hidden>{emoji}</span>
-            <span className={styles.reactionCount}>{count}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function HashtagChips({ tags }: { tags: readonly string[] }) {
-  if (!tags.length) return null;
-  return (
-    <div className={styles.hashRow}>
-      {tags.map(tag => (
-        <span key={tag} className={styles.hashChip}>
-          <span className={styles.hashSign} aria-hidden>#</span>
-          {tag}
-        </span>
+    <div className={styles.toastStack} role="status" aria-live="polite" aria-atomic="false">
+      {toasts.map(t => (
+        <div key={t.id} className={styles.toast}>{t.message}</div>
       ))}
     </div>
   );
 }
 
-function PostMenu({ onClose }: { onClose: () => void }) {
+
+// ─── Hashtag chips ────────────────────────────────────────────────────────────
+
+function HashtagChips({ tags }: { readonly tags: readonly string[] }) {
+  if (!tags.length) return null;
+  return (
+    <div className={styles.hashRow}>
+      {tags.map(tag => (
+        <Link key={tag} href={`/seek?q=${encodeURIComponent(tag)}`} className={styles.hashChip}>
+          <span className={styles.hashSign} aria-hidden>#</span>
+          {tag}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ─── Post more-options menu ───────────────────────────────────────────────────
+
+interface PostMenuProps {
+  readonly postId: string;
+  readonly onClose: () => void;
+  readonly onHide: () => void;
+  readonly onToast: (msg: string) => void;
+}
+
+function PostMenu({ postId, onClose, onHide, onToast }: PostMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [reported, setReported] = useState(false);
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -329,37 +535,66 @@ function PostMenu({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
+  // Auto-close after reporting
+  useEffect(() => {
+    if (!reported) return;
+    const timer = window.setTimeout(onClose, 1800);
+    return () => window.clearTimeout(timer);
+  }, [reported, onClose]);
+
+  function handleCopy() {
+    const url = `${window.location.href.split("#")[0]}#${postId}`;
+    navigator.clipboard.writeText(url).then(
+      () => onToast("Link copied to clipboard"),
+      () => onToast("Couldn't copy link — try manually"),
+    );
+    onClose();
+  }
+
+  function handleReport() {
+    setReported(true);
+    onToast("Thanks for reporting — we'll review this post");
+  }
+
+  function handleHide() {
+    onHide();
+    onToast("Post hidden from your feed");
+    onClose();
+  }
+
   return (
     <div ref={menuRef} className={styles.postMenu} role="menu" aria-label="Post options">
-      <button
-        type="button"
-        className={styles.postMenuItem}
-        role="menuitem"
-        onClick={onClose}
-      >
-        Report post
-      </button>
-      <button
-        type="button"
-        className={styles.postMenuItem}
-        role="menuitem"
-        onClick={onClose}
-      >
-        Hide from feed
-      </button>
-      <button
-        type="button"
-        className={styles.postMenuItem}
-        role="menuitem"
-        onClick={onClose}
-      >
-        Copy link
-      </button>
+      {reported ? (
+        <div className={styles.postMenuConfirm}>
+          <span className={styles.postMenuConfirmIcon} aria-hidden>✓</span>
+          Thanks — we'll review this soon
+        </div>
+      ) : (
+        <>
+          <button type="button" className={styles.postMenuItem} role="menuitem" onClick={handleReport}>
+            Report post
+          </button>
+          <button type="button" className={styles.postMenuItem} role="menuitem" onClick={handleHide}>
+            Hide from feed
+          </button>
+          <button type="button" className={styles.postMenuItem} role="menuitem" onClick={handleCopy}>
+            Copy link
+          </button>
+        </>
+      )}
     </div>
   );
 }
 
-function SeekerCard({ post }: { post: SeekerPost }) {
+// ─── Seeker post card ─────────────────────────────────────────────────────────
+
+interface SeekerCardProps {
+  readonly post: SeekerPost;
+  readonly onHide: () => void;
+  readonly onToast: (msg: string) => void;
+}
+
+function SeekerCard({ post, onHide, onToast }: SeekerCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <article className={styles.seekerCard}>
@@ -386,7 +621,14 @@ function SeekerCard({ post }: { post: SeekerPost }) {
           >
             <Icon name="action.more" size={16} aria-hidden />
           </button>
-          {menuOpen ? <PostMenu onClose={() => setMenuOpen(false)} /> : null}
+          {menuOpen ? (
+            <PostMenu
+              postId={post.id}
+              onClose={() => setMenuOpen(false)}
+              onHide={onHide}
+              onToast={onToast}
+            />
+          ) : null}
         </div>
       </div>
       <p className={styles.cardCaption}>{post.caption}</p>
@@ -398,12 +640,21 @@ function SeekerCard({ post }: { post: SeekerPost }) {
           </div>
         </div>
       ) : null}
-      <ReactionBar reactions={post.reactions} />
+      <PostEngagement
+        postId={post.id}
+        dbId={post.dbId}
+        targetType="photo"
+        initialReactions={post.reactions}
+        initialUserReactions={post.userReactions}
+        commentCount={post.commentCount}
+      />
     </article>
   );
 }
 
-function AnnouncementCard({ post }: { post: HostAnnouncement }) {
+// ─── Host announcement card ───────────────────────────────────────────────────
+
+function AnnouncementCard({ post }: { readonly post: HostAnnouncement }) {
   const hostHref = post.hostId ? `/host/${post.hostId}` : "/community";
   return (
     <article className={styles.announcementCard}>
@@ -442,12 +693,21 @@ function AnnouncementCard({ post }: { post: HostAnnouncement }) {
           ))}
         </div>
       ) : null}
-      <ReactionBar reactions={post.reactions} />
+      <PostEngagement
+        postId={post.id}
+        dbId={post.dbId}
+        targetType="announcement"
+        initialReactions={post.reactions}
+        initialUserReactions={post.userReactions}
+        commentCount={post.commentCount}
+      />
     </article>
   );
 }
 
-function BlogCard({ post }: { post: BlogPost }) {
+// ─── Blog post card ───────────────────────────────────────────────────────────
+
+function BlogCard({ post }: { readonly post: BlogPost }) {
   return (
     <article className={styles.blogCard}>
       <div className={post.coverUrl ? styles.blogLayout : styles.blogLayoutFull}>
@@ -462,7 +722,7 @@ function BlogCard({ post }: { post: BlogPost }) {
           <h3 className={styles.blogTitle}>{post.title}</h3>
           <div className={styles.blogTreeRule} aria-hidden>&#x25C4;&#x2022;&#x2022;&#x2022;&#x25BA;</div>
           <p className={styles.blogExcerpt}>{post.excerpt}</p>
-          <Link className={styles.readMoreBtn} href="/blog">
+          <Link className={styles.readMoreBtn} href="/help">
             Read more
             <Icon name="action.forward" size={16} aria-hidden />
           </Link>
@@ -475,14 +735,14 @@ function BlogCard({ post }: { post: BlogPost }) {
           </div>
         ) : null}
       </div>
-      <ReactionBar reactions={post.reactions} />
+      <PostEngagement postId={post.id} initialReactions={post.reactions} />
     </article>
   );
 }
 
-// ─── ListingFeedCard ──────────────────────────────────────────────────────────
+// ─── Listing feed card ────────────────────────────────────────────────────────
 
-function BenefitPill({ icon, label }: { icon: string; label: string }) {
+function BenefitPill({ icon, label }: { readonly icon: string; readonly label: string }) {
   return (
     <span className={styles.benefitPill}>
       <Icon name={icon as Parameters<typeof Icon>[0]["name"]} size={16} aria-hidden />
@@ -491,7 +751,7 @@ function BenefitPill({ icon, label }: { icon: string; label: string }) {
   );
 }
 
-function ListingFeedCard({ item }: { item: BoostedListing }) {
+function ListingFeedCard({ item }: { readonly item: BoostedListing }) {
   const { listing, matchScore, isBoosted } = item;
   const matchPct = matchScore ?? 0;
   return (
@@ -571,9 +831,9 @@ function ListingFeedCard({ item }: { item: BoostedListing }) {
   );
 }
 
-// ─── EmployerFeedCard ─────────────────────────────────────────────────────────
+// ─── Featured employer feed card ──────────────────────────────────────────────
 
-function EmployerBadgeMini({ name, category }: { name: string; category: OpportunityCategory }) {
+function EmployerBadgeMini({ name, category }: { readonly name: string; readonly category: OpportunityCategory }) {
   const words = name.trim().split(/\s+/);
   const initials = words.slice(0, 3).map(w => w[0] ?? "").join("").toUpperCase();
   return (
@@ -585,7 +845,7 @@ function EmployerBadgeMini({ name, category }: { name: string; category: Opportu
   );
 }
 
-function EmployerFeedCard({ item }: { item: FeaturedEmployerCard }) {
+function EmployerFeedCard({ item }: { readonly item: FeaturedEmployerCard }) {
   const { employer } = item;
   const href = employer.hostId ? `/host/${employer.hostId}` : "/community";
   return (
@@ -595,7 +855,6 @@ function EmployerFeedCard({ item }: { item: FeaturedEmployerCard }) {
         <span>Featured employer</span>
         <span className={styles.employerStar} aria-hidden>✦</span>
       </div>
-      {/* Photo section — badge straddles the seam */}
       <div className={styles.employerImageSection}>
         <div className={styles.employerImageWrap}>
           <div className={styles.cardImageMat}>
@@ -613,7 +872,6 @@ function EmployerFeedCard({ item }: { item: FeaturedEmployerCard }) {
         </div>
         <EmployerBadgeMini name={employer.hostName} category={employer.category} />
       </div>
-      {/* Body — padding-top clears the protruding badge */}
       <div className={styles.employerBody}>
         <div className={styles.employerNameRow}>
           <span className={styles.employerName}>{employer.hostName}</span>
@@ -643,6 +901,8 @@ function EmployerFeedCard({ item }: { item: FeaturedEmployerCard }) {
   );
 }
 
+// ─── Feed end marker ──────────────────────────────────────────────────────────
+
 function FeedEndMarker() {
   return (
     <div className={styles.feedEnd} aria-label="End of feed">
@@ -661,32 +921,191 @@ function FeedEndMarker() {
   );
 }
 
+// ─── Share composer CTA ───────────────────────────────────────────────────────
+
+function ShareComposer({ seekerInitial }: { readonly seekerInitial: string }) {
+  return (
+    <div className={styles.composerCta}>
+      <div className={styles.composerCtaAvatar} aria-hidden>{seekerInitial}</div>
+      <div className={styles.composerCtaBody}>
+        <p className={styles.composerCtaPrompt}>Share your adventure with the community</p>
+        <p className={styles.composerCtaSub}>Photos, sunrise shifts, trail moments — all welcome.</p>
+      </div>
+      <Link href="/community/photos" className={styles.composerCtaBtn} aria-label="Add a photo">
+        <Icon name="nav.photos" size={16} aria-hidden />
+        Add photo
+      </Link>
+    </div>
+  );
+}
+
+// ─── Photo lightbox ───────────────────────────────────────────────────────────
+
+function PhotoLightbox({ url, caption, onClose }: { readonly url: string; readonly caption: string; readonly onClose: () => void }) {
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className={styles.lightbox}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Photo viewer"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        className={styles.lightboxClose}
+        aria-label="Close photo"
+        onClick={onClose}
+      >
+        <Icon name="action.more" size={16} aria-hidden />
+      </button>
+      <figure className={styles.lightboxFigure} onClick={e => e.stopPropagation()}>
+        <img className={styles.lightboxImg} src={url} alt={caption} />
+        {caption ? <figcaption className={styles.lightboxCaption}>{caption}</figcaption> : null}
+      </figure>
+    </div>
+  );
+}
+
+// ─── Photo masonry grid ───────────────────────────────────────────────────────
+
+function PhotoMasonryGrid({ photos }: { readonly photos: SeekerPost[] }) {
+  const [lightboxPost, setLightboxPost] = useState<SeekerPost | null>(null);
+
+  if (!photos.length) {
+    return (
+      <div className={styles.emptyState}>
+        <p>No photos yet — community members share moments from the field, sunrise shifts, and life on the trail here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className={styles.photoMasonry} aria-label="Community photos">
+        {photos.map((post, i) => (
+          <button
+            key={post.id}
+            type="button"
+            className={styles.polaroidCard}
+            style={{ "--polaroid-index": String(i) } as React.CSSProperties}
+            onClick={() => setLightboxPost(post)}
+            aria-label={`View photo by ${post.authorName}: ${post.caption}`}
+          >
+            <div className={styles.polaroidFrame}>
+              <img
+                className={styles.polaroidImg}
+                src={post.coverUrl}
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <div className={styles.polaroidMeta}>
+              <span className={styles.polaroidAuthor}>{post.authorName}</span>
+              <span className={styles.polaroidTime}>{post.timestamp}</span>
+            </div>
+            <p className={styles.polaroidCaption}>{post.caption.split(".")[0]}.</p>
+          </button>
+        ))}
+      </div>
+      {lightboxPost?.coverUrl ? (
+        <PhotoLightbox
+          url={lightboxPost.coverUrl}
+          caption={lightboxPost.caption}
+          onClose={() => setLightboxPost(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 // ─── Sidebar components ───────────────────────────────────────────────────────
 
-function WelcomeBar({ status }: { status: SeekerStatusSummary }) {
+function WelcomeBar({ status }: { readonly status: SeekerStatusSummary }) {
   const level = Math.max(1, Math.ceil(status.resumeCompletion / 20));
-  const xp = status.resumeCompletion * 10;  // 0–1000 range matching xpMax
+  const xp = status.resumeCompletion * 10;
   const xpMax = 1000;
-  const fillPct = status.resumeCompletion;  // resumeCompletion IS the 0–100 percentage
+  const fillPct = status.resumeCompletion;
   return (
     <div className={styles.welcomeBar}>
-      <span className={styles.welcomeTree} aria-hidden>🌲</span>
-      <div className={styles.welcomeTextGroup}>
-        Welcome back, <strong>{status.seekerName}</strong>! 👋
-      </div>
-      <div className={styles.xpGroup}>
-        <span className={styles.xpLabel}>Explorer Level {level}</span>
-        <div
-          className={styles.xpTrack}
-          role="progressbar"
-          aria-valuenow={xp}
-          aria-valuemax={xpMax}
-          aria-label="XP progress"
-        >
-          <div className={styles.xpFill} style={{ width: `${fillPct}%` }} />
+      <div className={styles.welcomeBarInner}>
+        <div className={styles.welcomeAvatar} aria-hidden>
+          {status.seekerName.charAt(0).toUpperCase() || "S"}
         </div>
-        <span className={styles.xpCount}>{xp.toLocaleString()} / {xpMax.toLocaleString()} XP</span>
+        <div className={styles.welcomeTextGroup}>
+          <p className={styles.welcomeGreeting}>
+            Welcome back, <strong>{status.seekerName || "adventurer"}</strong>
+          </p>
+          <p className={styles.welcomeTagline}>Explorer · Level {level}</p>
+        </div>
+        <div className={styles.xpGroup}>
+          <div className={styles.xpLevelBadge} aria-hidden>
+            <span className={styles.xpLevelNum}>{level}</span>
+            <span className={styles.xpLevelWord}>LVL</span>
+          </div>
+          <div className={styles.xpDetails}>
+            <div
+              className={styles.xpTrack}
+              role="progressbar"
+              aria-valuenow={xp}
+              aria-valuemax={xpMax}
+              aria-label={`${xp} of ${xpMax} XP`}
+            >
+              <div className={styles.xpFill} style={{ width: `${fillPct}%` }} />
+            </div>
+            <span className={styles.xpCount}>{xp.toLocaleString()} / {xpMax.toLocaleString()} XP</span>
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function MobileProfileStrip({ status, listings }: {
+  readonly status: SeekerStatusSummary;
+  readonly listings: readonly DiscoveryListing[];
+}) {
+  const level = Math.max(1, Math.ceil(status.resumeCompletion / 20));
+  return (
+    <div className={styles.mobileStrip}>
+      <div className={styles.mobileStripProfile}>
+        <div className={styles.mobileStripAvatar} aria-hidden>
+          {status.seekerName.charAt(0).toUpperCase() || "S"}
+        </div>
+        <div className={styles.mobileStripMeta}>
+          <span className={styles.mobileStripName}>{status.seekerName || "Adventurer"}</span>
+          <span className={styles.mobileStripLevel}>Level {level} Explorer</span>
+        </div>
+        <Link href="/profile" className={styles.mobileStripEdit}>
+          Edit profile
+        </Link>
+      </div>
+      {listings.length > 0 ? (
+        <div className={styles.mobileStripListings}>
+          {listings.slice(0, 3).map(l => (
+            <Link key={l.id} href={`/listing/${l.id}`} className={styles.mobileStripListing}>
+              <span className={styles.mobileStripListingTitle}>{l.host.name}</span>
+              <span className={styles.mobileStripListingLoc}>
+                <Icon name="mappin.location" size={16} aria-hidden />
+                {l.location.split(",")[0]}
+              </span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -700,7 +1119,7 @@ function PopularTagsWidget() {
       </h3>
       <div className={styles.widgetTagGrid}>
         {POPULAR_TAGS.map(tag => (
-          <button key={tag} type="button" className={styles.widgetTag}>#{tag}</button>
+          <Link key={tag} href={`/seek?q=${encodeURIComponent(tag)}`} className={styles.widgetTag}>#{tag}</Link>
         ))}
       </div>
       <span className={styles.widgetFooter}>Explore more in Photos &rarr;</span>
@@ -708,7 +1127,7 @@ function PopularTagsWidget() {
   );
 }
 
-function UpcomingListingsWidget({ listings }: { listings: readonly DiscoveryListing[] }) {
+function UpcomingListingsWidget({ listings }: { readonly listings: readonly DiscoveryListing[] }) {
   const upcoming = listings.slice(0, 3);
   if (!upcoming.length) return null;
   return (
@@ -749,32 +1168,130 @@ function UpcomingListingsWidget({ listings }: { listings: readonly DiscoveryList
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export function CommunityDashboard({ tab, status, listings, featuredEmployers = [] }: CommunityDashboardProps) {
-  const feedItems = buildStrategicFeedItems(listings, featuredEmployers);
+export function CommunityDashboard({
+  tab,
+  status,
+  listings,
+  featuredEmployers = [],
+  serverPhotos,
+  serverAnnouncements,
+  completionScore = 0,
+  isHost = false,
+  hostTier = "none",
+  hostUsedThisMonth = 0,
+  hostDraftAnnouncementId = null,
+}: CommunityDashboardProps) {
+  const { toasts, add: addToast } = useToasts();
+  const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(new Set());
 
-  const photoItems = feedItems.filter(
-    (item): item is SeekerPost => item.kind === "seeker" && Boolean(item.coverUrl),
-  );
-  const announcementItems = feedItems.filter(
-    (item): item is HostAnnouncement => item.kind === "announcement",
-  );
+  // Hydrate hidden posts from localStorage after mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ee_hidden_posts");
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) setHiddenIds(new Set(parsed as string[]));
+      }
+    } catch { /* storage unavailable */ }
+  }, []);
 
-  const mainItems: FeedItem[] =
+  function hidePost(id: string) {
+    setHiddenIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      try { localStorage.setItem("ee_hidden_posts", JSON.stringify([...next])); } catch { /* ignore */ }
+      return next;
+    });
+  }
+
+  // Merge real DB data into feed: real items override fixture items of the same type
+  const hasRealPhotos = Boolean(serverPhotos?.length);
+  const hasRealAnnouncements = Boolean(serverAnnouncements?.length);
+
+  const realSeekerPosts = hasRealPhotos ? photosToSeekerPosts(serverPhotos!) : [];
+  const realAnnouncementItems = hasRealAnnouncements ? announcementsToFeedItems(serverAnnouncements!) : [];
+
+  const fixtureFeed = buildStrategicFeedItems(listings, featuredEmployers);
+
+  // For the feed tab: inject real items at the front of their respective slots, rest is fixtures
+  const feedItems: FeedItem[] = (() => {
+    if (!hasRealPhotos && !hasRealAnnouncements) return fixtureFeed;
+    const realSeeker = [...realSeekerPosts];
+    const realAnn    = [...realAnnouncementItems];
+    return fixtureFeed.map(item => {
+      if (item.kind === "seeker" && realSeeker.length > 0) return realSeeker.shift()!;
+      if (item.kind === "announcement" && realAnn.length > 0) return realAnn.shift()!;
+      return item;
+    }).concat(realSeeker, realAnn);
+  })();
+
+  const photoItems: SeekerPost[] = hasRealPhotos
+    ? realSeekerPosts
+    : fixtureFeed.filter((item): item is SeekerPost => item.kind === "seeker" && Boolean(item.coverUrl));
+
+  const announcementItems: HostAnnouncement[] = hasRealAnnouncements
+    ? realAnnouncementItems
+    : fixtureFeed.filter((item): item is HostAnnouncement => item.kind === "announcement");
+
+  const mainItems: FeedItem[] = (
     tab === "photos" ? photoItems :
     tab === "announcements" ? announcementItems :
-    feedItems;
+    feedItems
+  ).filter(item => !hiddenIds.has(item.id));
+
+  const seekerInitial = status.seekerName.charAt(0).toUpperCase() || "S";
 
   return (
     <div className={styles.dashboard}>
       <WelcomeBar status={status} />
+      <CommunityTabNav tab={tab} />
+      <MobileProfileStrip status={status} listings={listings} />
 
       <div className={styles.layout}>
         <div className={styles.mainCol}>
-          {mainItems.length === 0 ? (
+          {tab === "feed" ? (
+            <ShareComposer seekerInitial={seekerInitial} />
+          ) : null}
+
+          {tab === "photos" ? (
+            <>
+              <PhotoUploadForm
+                completionScore={completionScore}
+                onSuccess={() => { /* server revalidation handles grid refresh */ }}
+                onToast={addToast}
+              />
+              <PhotoMasonryGrid photos={photoItems} />
+            </>
+          ) : tab === "announcements" && isHost ? (
+            <>
+              <HostAnnouncementComposer
+                subscriptionTier={hostTier}
+                usedThisMonth={hostUsedThisMonth}
+                draftAnnouncementId={hostDraftAnnouncementId}
+              />
+              {mainItems.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <p>No announcements yet — your posts will appear here after publishing.</p>
+                </div>
+              ) : (
+                <>
+                  {mainItems.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className={styles.feedItem}
+                      style={{ "--card-delay": `${index * 55}ms` } as React.CSSProperties}
+                    >
+                      {item.kind === "announcement" ? (
+                        <AnnouncementCard post={item} />
+                      ) : null}
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          ) : mainItems.length === 0 ? (
             <div className={styles.emptyState}>
-              {tab === "photos" ? (
-                <p>No photos yet — community members share moments from the field, sunrise shifts, and life on the trail here.</p>
-              ) : tab === "announcements" ? (
+              {tab === "announcements" ? (
                 <p>No announcements yet — hosts share seasonal openings, housing updates, and hiring news here.</p>
               ) : (
                 <p>No content yet — check back soon as your community grows.</p>
@@ -782,14 +1299,29 @@ export function CommunityDashboard({ tab, status, listings, featuredEmployers = 
             </div>
           ) : (
             <>
-              {mainItems.map(item => {
-                if (item.kind === "seeker") return <SeekerCard key={item.id} post={item} />;
-                if (item.kind === "announcement") return <AnnouncementCard key={item.id} post={item} />;
-                if (item.kind === "blog") return <BlogCard key={item.id} post={item} />;
-                if (item.kind === "listing") return <ListingFeedCard key={item.id} item={item} />;
-                if (item.kind === "employer") return <EmployerFeedCard key={item.id} item={item} />;
-                return null;
-              })}
+              {mainItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  className={styles.feedItem}
+                  style={{ "--card-delay": `${index * 55}ms` } as React.CSSProperties}
+                >
+                  {item.kind === "seeker" ? (
+                    <SeekerCard
+                      post={item}
+                      onHide={() => hidePost(item.id)}
+                      onToast={addToast}
+                    />
+                  ) : item.kind === "announcement" ? (
+                    <AnnouncementCard post={item} />
+                  ) : item.kind === "blog" ? (
+                    <BlogCard post={item} />
+                  ) : item.kind === "listing" ? (
+                    <ListingFeedCard item={item} />
+                  ) : item.kind === "employer" ? (
+                    <EmployerFeedCard item={item} />
+                  ) : null}
+                </div>
+              ))}
               {tab === "feed" ? <FeedEndMarker /> : null}
             </>
           )}
@@ -799,10 +1331,10 @@ export function CommunityDashboard({ tab, status, listings, featuredEmployers = 
           <section className={styles.widget}>
             <div className={styles.welcomeWidget}>
               <div className={styles.welcomeWidgetAvatar} aria-hidden>
-                {status.seekerName.charAt(0).toUpperCase()}
+                {seekerInitial}
               </div>
               <div>
-                <p className={styles.welcomeWidgetName}>Welcome back, {status.seekerName}!</p>
+                <p className={styles.welcomeWidgetName}>Welcome back, {status.seekerName || "adventurer"}!</p>
                 <p className={styles.welcomeWidgetSub}>Keep exploring, connecting, and earning together.</p>
               </div>
             </div>
@@ -850,6 +1382,8 @@ export function CommunityDashboard({ tab, status, listings, featuredEmployers = 
           </section>
         </aside>
       </div>
+
+      <ToastStack toasts={toasts} />
     </div>
   );
 }

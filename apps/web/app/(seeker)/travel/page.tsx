@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { authedClient, getSeekerProfile } from "@explore-and-earn/db";
+import { getSeekerTravelPrefs } from "@explore-and-earn/db";
 
 import { updateTravelAction } from "../../actions/seekerSettings";
 import { EmptyState } from "../../../components/discovery";
@@ -13,59 +12,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
-
-type TravelReadiness = "ready_now" | "flexible" | "planning" | "not_looking";
-
-interface TravelValues {
-  readonly travelReadiness: TravelReadiness;
-  readonly locationPref: string;
-}
-
-const DEFAULT_TRAVEL: TravelValues = {
-  travelReadiness: "planning",
-  locationPref: "",
-};
-
-async function getTravelValues(
-  token: string,
-  userId: string,
-): Promise<TravelValues> {
-  const profile = await getSeekerProfile(token, userId);
-
-  try {
-    const db = authedClient(token) as unknown as SupabaseClient;
-    const { data, error } = await db
-      .from("seeker_profiles")
-      .select("travel_readiness, location_pref")
-      .eq("clerk_user_id", userId)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (error || !data) {
-      return { ...DEFAULT_TRAVEL, locationPref: profile?.locationPref ?? "" };
-    }
-
-    const row = data as Record<string, unknown>;
-    const rawReadiness = row.travel_readiness;
-    const travelReadiness =
-      rawReadiness === "ready_now" ||
-      rawReadiness === "flexible" ||
-      rawReadiness === "planning" ||
-      rawReadiness === "not_looking"
-        ? rawReadiness
-        : DEFAULT_TRAVEL.travelReadiness;
-
-    return {
-      travelReadiness,
-      locationPref:
-        typeof row.location_pref === "string"
-          ? row.location_pref
-          : profile?.locationPref ?? "",
-    };
-  } catch {
-    return { ...DEFAULT_TRAVEL, locationPref: profile?.locationPref ?? "" };
-  }
-}
 
 export default async function TravelPage() {
   const { userId, getToken } = await auth();
@@ -85,14 +31,14 @@ export default async function TravelPage() {
     );
   }
 
-  const travel = await getTravelValues(token, userId);
+  const travel = await getSeekerTravelPrefs(token, userId);
 
   return (
     <BucketPage
       title="Travel preferences"
       description="Share where you're open to going and how soon you can move."
     >
-      <form className={styles.form} action={async (fd: FormData) => { await updateTravelAction(fd); }}>
+      <form className={styles.form} action={updateTravelAction}>
         <label className={styles.field}>
           <span className={styles.label}>Travel readiness</span>
           <select
@@ -100,10 +46,11 @@ export default async function TravelPage() {
             name="travel_readiness"
             defaultValue={travel.travelReadiness}
           >
-            <option value="ready_now">Ready now</option>
+            <option value="local_only">Local only</option>
+            <option value="willing_to_travel">Willing to travel</option>
+            <option value="ready_to_relocate">Ready to relocate</option>
+            <option value="remote_only">Remote / online only</option>
             <option value="flexible">Flexible</option>
-            <option value="planning">Planning</option>
-            <option value="not_looking">Not looking</option>
           </select>
         </label>
 

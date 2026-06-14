@@ -1,0 +1,62 @@
+.card {
+  display: block;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.card:hover {
+  border-color: var(--border-ink);
+}
+
+.card:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--color-surface);
+}
+
+.body {
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.categoryRow {
+  line-height: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.location {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.pay {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}

@@ -427,6 +427,8 @@ export async function getAdminListingDetail(
     },
     coverImageUrl:
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
+    beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
+    endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
   };
 }
 

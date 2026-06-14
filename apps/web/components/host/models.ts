@@ -30,6 +30,8 @@ export interface HostProfileSummary {
   readonly websiteUrl?: string;
   /** Instagram handle (without @). */
   readonly instagram?: string;
+  /** X (Twitter) handle (without @). */
+  readonly twitter?: string | null;
 }
 
 export type HostListingState =

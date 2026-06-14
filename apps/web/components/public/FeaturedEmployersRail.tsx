@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
 import { Icon } from "@explore-and-earn/ui";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 
@@ -17,6 +16,8 @@ export interface FeaturedEmployer {
   readonly tagline?: string;
   readonly coverImageUrl?: string;
   readonly category: OpportunityCategory;
+  /** True when this employer holds an active paid featured campaign. */
+  readonly isBoosted?: boolean;
 }
 
 const CATEGORY_ABBR: Record<OpportunityCategory, string> = {
@@ -84,23 +85,75 @@ function EmployerSkeleton() {
   );
 }
 
+function EmployerCard({ employer }: { employer: FeaturedEmployer }) {
+  const href = employer.hostId
+    ? `/host/${employer.hostId}`
+    : `/listing/${employer.listingId}`;
+
+  return (
+    <Link
+      className={`${styles.card} ${styles[`card_${employer.category}`]}`}
+      href={href}
+      aria-label={`${employer.hostName} — ${employer.location}`}
+    >
+      <div className={styles.imageSection}>
+        <div className={`${styles.imageFrame} ${styles[`imageFrame_${employer.category}`]}`}>
+          {employer.coverImageUrl ? (
+            <img
+              className={styles.image}
+              src={employer.coverImageUrl}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+            />
+          ) : null}
+        </div>
+        <EmployerBadge name={employer.hostName} category={employer.category} />
+      </div>
+
+      <div className={styles.body}>
+        <div className={styles.nameRow}>
+          <span className={styles.employerName}>{employer.hostName}</span>
+          {employer.verified && (
+            <span className={styles.verifiedIcon} aria-label="Verified host">
+              <Icon name="trust.verified_host" size={16} aria-hidden />
+            </span>
+          )}
+        </div>
+        {employer.isBoosted ? (
+          <span className={styles.featuredBadge} aria-label="Featured employer">Featured</span>
+        ) : null}
+        <p className={styles.location}>
+          <span className={styles.locationDot} aria-hidden="true">●</span>
+          {employer.location}
+        </p>
+        <div className={styles.chips}>
+          <span className={styles.chip}>
+            <Icon name="status.open" size={16} aria-hidden />
+            {employer.listingCount}&thinsp;listing{employer.listingCount === 1 ? "" : "s"}
+          </span>
+          <span className={`${styles.chip} ${styles.chipHiring}`}>
+            <span className={styles.hiringDot} aria-hidden="true" />
+            Hiring now
+          </span>
+        </div>
+        {employer.tagline ? <p className={styles.tagline}>{employer.tagline}</p> : null}
+      </div>
+    </Link>
+  );
+}
+
 export function FeaturedEmployersRail({
   employers,
 }: {
   employers: readonly FeaturedEmployer[];
 }) {
-  const railRef = useRef<HTMLUListElement>(null);
-
-  const scrollNext = () => {
-    railRef.current?.scrollBy({ left: 308, behavior: "smooth" });
-  };
-
   return (
     <section
       className={styles.section}
       aria-labelledby="featured-employers-heading"
     >
-      {/* ── Section header ──────────────────────────────────────────────── */}
       <div className={styles.sectionHead}>
         <div className={styles.titleGroup}>
           <p className={styles.eyebrow}>Employers</p>
@@ -115,106 +168,32 @@ export function FeaturedEmployersRail({
         </Link>
       </div>
 
-      {/* ── Rail ────────────────────────────────────────────────────────── */}
+      {/* ── Rail — auto-scrolls, loops seamlessly ────────────────────── */}
       <div className={styles.railOuter}>
-        <ul className={styles.rail} ref={railRef} role="list">
+        <ul className={styles.rail} role="list">
           {employers.length === 0 ? (
             <>
               <EmployerSkeleton />
               <EmployerSkeleton />
               <EmployerSkeleton />
             </>
-          ) : null}
-          {employers.map((employer) => {
-            const href = employer.hostId
-              ? `/host/${employer.hostId}`
-              : `/listing/${employer.listingId}`;
-
-            return (
-              <li
-                key={`${employer.hostName}-${employer.listingId}`}
-                className={styles.railItem}
-              >
-                <Link
-                  className={styles.card}
-                  href={href}
-                  aria-label={`${employer.hostName} — ${employer.location}`}
-                >
-                  {/* Image section: mat inset + ink-bordered frame + badge */}
-                  <div className={styles.imageSection}>
-                    <div
-                      className={`${styles.imageFrame} ${styles[`imageFrame_${employer.category}`]}`}
-                    >
-                      {employer.coverImageUrl ? (
-                        <img
-                          className={styles.image}
-                          src={employer.coverImageUrl}
-                          alt=""
-                          aria-hidden="true"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                      ) : null}
-                    </div>
-
-                    {/* Circular employer badge — straddles image/body seam */}
-                    <EmployerBadge
-                      name={employer.hostName}
-                      category={employer.category}
-                    />
-                  </div>
-
-                  {/* Card body */}
-                  <div className={styles.body}>
-                    <div className={styles.nameRow}>
-                      <span className={styles.employerName}>
-                        {employer.hostName}
-                      </span>
-                      {employer.verified && (
-                        <span
-                          className={styles.verifiedIcon}
-                          aria-label="Verified host"
-                        >
-                          <Icon name="trust.verified_host" size={16} aria-hidden />
-                        </span>
-                      )}
-                    </div>
-
-                    <p className={styles.location}>
-                      <span className={styles.locationDot} aria-hidden="true">●</span>
-                      {employer.location}
-                    </p>
-
-                    <div className={styles.chips}>
-                      <span className={styles.chip}>
-                        <Icon name="status.open" size={16} aria-hidden />
-                        {employer.listingCount}&thinsp;listing{employer.listingCount === 1 ? "" : "s"}
-                      </span>
-                      <span className={`${styles.chip} ${styles.chipHiring}`}>
-                        <span className={styles.hiringDot} aria-hidden="true" />
-                        Hiring now
-                      </span>
-                    </div>
-
-                    {employer.tagline ? (
-                      <p className={styles.tagline}>{employer.tagline}</p>
-                    ) : null}
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
+          ) : (
+            <>
+              {/* Primary items — interactive */}
+              {employers.map((employer) => (
+                <li key={`${employer.hostName}-${employer.listingId}`} className={styles.railItem}>
+                  <EmployerCard employer={employer} />
+                </li>
+              ))}
+              {/* Duplicate items — decorative, for seamless loop */}
+              {employers.map((employer) => (
+                <li key={`${employer.hostName}-${employer.listingId}-2`} className={styles.railItem} aria-hidden="true">
+                  <EmployerCard employer={employer} />
+                </li>
+              ))}
+            </>
+          )}
         </ul>
-
-        {/* Scroll-next button — desktop only */}
-        <button
-          className={styles.nextBtn}
-          onClick={scrollNext}
-          aria-label="Scroll to see more employers"
-          type="button"
-        >
-          <Icon name="action.forward" size={20} aria-hidden />
-        </button>
       </div>
     </section>
   );

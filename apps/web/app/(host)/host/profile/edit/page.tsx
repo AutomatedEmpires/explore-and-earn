@@ -48,6 +48,7 @@ export default async function HostProfileEditPage() {
     verified: realHost?.verified ?? false,
     websiteUrl: hostProfile?.websiteUrl ?? undefined,
     instagram: hostProfile?.socialLinks.instagram ?? undefined,
+    twitter: hostProfile?.socialLinks.twitter ?? undefined,
   };
 
   return (

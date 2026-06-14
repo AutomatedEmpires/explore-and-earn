@@ -1,8 +1,12 @@
 import "server-only";
 
 import Stripe from "stripe";
-import { adminClient } from "@explore-and-earn/db";
-import { FOUNDER_LOCKED_PRICING } from "@explore-and-earn/contracts";
+import { adminClient, insertHostAnnouncement } from "@explore-and-earn/db";
+import {
+  ANNOUNCEMENT_PRICING,
+  FOUNDER_LOCKED_PRICING,
+  type AnnouncementDuration,
+} from "@explore-and-earn/contracts";
 
 const APP_INFO = {
   name: "Explore & Earn",
@@ -210,9 +214,51 @@ function resolveSubscriptionTier(
   return resolveTierFromPriceId(priceId)?.tier ?? null;
 }
 
+async function syncAnnouncementPurchase(
+  session: Stripe.Checkout.Session,
+): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
+  const clerkUserId = session.metadata?.clerkUserId ?? null;
+  const hostProfileId = session.metadata?.hostProfileId ?? null;
+  const durationRaw = session.metadata?.durationDays;
+  const durationDays = durationRaw ? parseInt(durationRaw, 10) : null;
+
+  if (!clerkUserId || !hostProfileId || !durationDays) {
+    return { action: "ignored_missing_announcement_metadata", clerkUserId, tier: null };
+  }
+
+  const validDurations: AnnouncementDuration[] = [7, 14, 28];
+  if (!validDurations.includes(durationDays as AnnouncementDuration)) {
+    return { action: "ignored_invalid_announcement_duration", clerkUserId, tier: null };
+  }
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + durationDays);
+
+  const paymentIntentId =
+    typeof session.payment_intent === "string" ? session.payment_intent : null;
+
+  await insertHostAnnouncement({
+    hostProfileId,
+    title:                  "",
+    body:                   "",
+    kind:                   "general",
+    expiresAt:              expiresAt.toISOString(),
+    status:                 "draft",
+    stripePaymentIntentId:  paymentIntentId,
+    purchaseDurationDays:   durationDays,
+    purchaseAmountCents:    ANNOUNCEMENT_PRICING[durationDays as AnnouncementDuration],
+  });
+
+  return { action: "created_announcement_draft", clerkUserId, tier: null };
+}
+
 async function syncCheckoutCompleted(
   session: Stripe.Checkout.Session,
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
+  if (session.metadata?.productType === "announcement") {
+    return syncAnnouncementPurchase(session);
+  }
+
   if (session.mode !== "subscription") {
     return {
       action: "ignored_non_subscription_checkout",
@@ -396,6 +442,41 @@ export async function createCheckoutSession(params: {
         message: params.companyName,
       },
     },
+  });
+}
+
+const ANNOUNCEMENT_PRICE_ENV: Record<AnnouncementDuration, string> = {
+  7:  "STRIPE_PRICE_ANNOUNCEMENT_7D",
+  14: "STRIPE_PRICE_ANNOUNCEMENT_14D",
+  28: "STRIPE_PRICE_ANNOUNCEMENT_28D",
+};
+
+function absoluteAppUrl(path: string): string {
+  const base =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") || "https://exploreandearn.com";
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export async function createAnnouncementCheckoutSession(params: {
+  clerkUserId: string;
+  hostProfileId: string;
+  durationDays: AnnouncementDuration;
+}): Promise<Stripe.Checkout.Session> {
+  const stripe = getStripeClient();
+  const priceId = requireEnv(ANNOUNCEMENT_PRICE_ENV[params.durationDays]);
+
+  return stripe.checkout.sessions.create({
+    mode: "payment",
+    client_reference_id: params.clerkUserId,
+    success_url: absoluteAppUrl("/community?tab=announcements&purchased=1"),
+    cancel_url:  absoluteAppUrl("/community?tab=announcements"),
+    metadata: {
+      productType:   "announcement",
+      hostProfileId: params.hostProfileId,
+      clerkUserId:   params.clerkUserId,
+      durationDays:  String(params.durationDays),
+    },
+    line_items: [{ price: priceId, quantity: 1 }],
   });
 }
 

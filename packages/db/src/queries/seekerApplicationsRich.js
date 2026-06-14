@@ -103,6 +103,8 @@ function rowToSeekerApplicationListing(value) {
         host: { name: hostName, verified },
         benefits,
         coverImageUrl: typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
+        beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
+        endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
     };
 }
 const RICH_SEEKER_APPLICATION_SELECT = "id, listing_id, status, cover_message, submitted_at, reviewed_at, " +
@@ -141,6 +143,41 @@ export async function getSeekerApplicationsRich(clerkToken, clerkUserId) {
             listing: rowToSeekerApplicationListing(r.listings),
         };
     });
+}
+/**
+ * Single rich application lookup for the authed seeker.
+ *
+ * Ownership is enforced via seeker_profile_id equality — callers receive null
+ * for any id that does not belong to them (including non-existent ids), so no
+ * separate 403/404 distinction is needed at the page level.
+ */
+export async function getSeekerApplicationRichById(clerkToken, clerkUserId, applicationId) {
+    const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
+    if (!seekerProfileId)
+        return null;
+    const untyped = authedClient(clerkToken);
+    const { data, error } = await untyped
+        .from("applications")
+        .select(RICH_SEEKER_APPLICATION_SELECT)
+        .eq("id", applicationId)
+        .eq("seeker_profile_id", seekerProfileId)
+        .maybeSingle();
+    if (error) {
+        throw new Error(`getSeekerApplicationRichById: ${error.message}`);
+    }
+    if (!data)
+        return null;
+    const r = data;
+    return {
+        id: String(r.id),
+        listingId: String(r.listing_id),
+        status: typeof r.status === "string" ? r.status : "applied",
+        submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+        reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
+        decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
+        coverMessage: typeof r.cover_message === "string" ? r.cover_message : null,
+        listing: rowToSeekerApplicationListing(r.listings),
+    };
 }
 /**
  * Withdraw the authed seeker's own application.

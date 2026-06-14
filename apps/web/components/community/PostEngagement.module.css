@@ -1,0 +1,270 @@
+/* ─── Engagement wrapper ──────────────────────────────────────────────────── */
+
+.engagement {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ─── Reaction bar ────────────────────────────────────────────────────────── */
+
+.reactionBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-8) 0 0;
+}
+
+.reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-secondary);
+  transition: border-color 120ms, background 120ms, transform 80ms;
+  line-height: 1;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.reaction:hover:not(.reactionActive) {
+  border-color: color-mix(in srgb, var(--color-cta) 40%, transparent);
+  background: color-mix(in srgb, var(--color-cta) 4%, var(--color-surface));
+}
+
+.reaction:active {
+  transform: scale(0.93);
+}
+
+.reactionActive {
+  border-color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 10%, var(--color-surface));
+  color: var(--color-cta);
+}
+
+.reactionEmoji {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.reactionCount {
+  font-variant-numeric: tabular-nums;
+  min-width: 1ch;
+}
+
+/* ─── Comments toggle button ──────────────────────────────────────────────── */
+
+.commentsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-secondary);
+  transition: border-color 120ms, background 120ms;
+  margin-left: var(--space-4);
+}
+
+.commentsBtn:hover {
+  border-color: color-mix(in srgb, var(--color-cta) 40%, transparent);
+  background: color-mix(in srgb, var(--color-cta) 4%, var(--color-surface));
+}
+
+.commentsBtnOpen {
+  border-color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 8%, var(--color-surface));
+  color: var(--color-cta);
+}
+
+.commentsBtnIcon {
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+.commentsBtnLabel {
+  font-size: var(--font-size-xs);
+}
+
+/* ─── Comment thread ──────────────────────────────────────────────────────── */
+
+.commentThread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-12) 0 0;
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-8);
+}
+
+.commentLoading {
+  font-size: var(--font-size-sm);
+  color: var(--color-ink-tertiary);
+  padding: var(--space-8) 0;
+}
+
+.commentEmpty {
+  font-size: var(--font-size-sm);
+  color: var(--color-ink-tertiary);
+  margin: 0;
+}
+
+.commentList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+/* ─── Single comment ──────────────────────────────────────────────────────── */
+
+.comment {
+  display: flex;
+  gap: var(--space-8);
+  align-items: flex-start;
+  transition: opacity 200ms;
+}
+
+.commentRemoving {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.commentAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-cta) 15%, var(--color-surface));
+  color: var(--color-cta);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.commentBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.commentMeta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  margin-bottom: var(--space-2);
+}
+
+.commentAuthor {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-ink);
+}
+
+.commentTime {
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-tertiary);
+}
+
+.commentDelete {
+  margin-left: auto;
+  background: none;
+  border: none;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-ink-tertiary);
+  cursor: pointer;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  transition: color 120ms, background 120ms;
+}
+
+.commentDelete:hover {
+  color: var(--color-error, #ef4444);
+  background: color-mix(in srgb, var(--color-error, #ef4444) 8%, transparent);
+}
+
+.commentText {
+  font-size: var(--font-size-sm);
+  color: var(--color-ink-secondary);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ─── Comment form ────────────────────────────────────────────────────────── */
+
+.commentForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+
+.commentInput {
+  width: 100%;
+  padding: var(--space-8) var(--space-10);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-ink);
+  resize: none;
+  transition: border-color 150ms;
+  min-height: 60px;
+}
+
+.commentInput:focus {
+  outline: none;
+  border-color: var(--color-cta);
+}
+
+.commentFormFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.commentCharCount {
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-tertiary);
+}
+
+.commentSubmit {
+  padding: var(--space-6) var(--space-14);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: opacity 150ms;
+}
+
+.commentSubmit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.commentError {
+  font-size: var(--font-size-xs);
+  color: var(--color-error, #ef4444);
+  margin: 0;
+}
+
+.commentSignIn {
+  font-size: var(--font-size-xs);
+  color: var(--color-ink-tertiary);
+  margin: 0;
+}

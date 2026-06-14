@@ -12,8 +12,7 @@ export function PublicEntryHeader() {
 						<Icon name="category.mix" size={20} aria-hidden />
 					</span>
 					<span className={styles.brandWordmark}>
-						<span className={styles.brandMark}>Explore</span>
-						<span className={styles.brandMarkAccent}>&amp;Earn</span>
+						explore&amp;earn
 					</span>
 				</Link>
 				<span className={styles.scopePill}>Seeker</span>

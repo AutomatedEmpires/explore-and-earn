@@ -82,10 +82,11 @@ function minimalListing(application: HostApplication): DiscoveryListing {
 export function toApplicantItem(
   application: HostApplication,
   listingsById: ReadonlyMap<string, DiscoveryListing>,
+  displayNames?: ReadonlyMap<string, string>,
 ): HostApplicantItem {
   return {
     id: application.id,
-    applicantName: applicantLabel(application),
+    applicantName: displayNames?.get(application.seekerProfileId) ?? applicantLabel(application),
     listing: listingsById.get(application.listingId) ?? minimalListing(application),
     stage: statusToStage(application.status),
     appliedOn: formatAppliedOn(application.submittedAt),

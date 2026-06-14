@@ -157,6 +157,17 @@
   line-height: var(--type-meta-lh);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
+  text-decoration: none;
+}
+
+.applicantName:hover {
+  text-decoration: underline;
+}
+
+.applicantName:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+  border-radius: 2px;
 }
 
 .applicantApplied {

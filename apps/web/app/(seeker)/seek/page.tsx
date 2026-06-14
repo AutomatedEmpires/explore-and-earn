@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { auth, currentUser } from "@clerk/nextjs/server";
 
 import {
 	type SearchFilters,
@@ -20,8 +21,11 @@ import {
 	warnIfDiscoveryDataMissingInProduction,
 } from "../../../components/discovery/data";
 import { SeekBrowser } from "../../../components/seeker";
-import styles from "./page.module.css";
+import { SeekerDashboard } from "../../../components/seeker/SeekerDashboard";
+import { getSeekerStatus, getMatchedListings } from "../../../components/seeker/data";
+import { getSeekerProfile } from "@explore-and-earn/db";
 import { buildFeaturedEmployers } from "../../../lib/employer-utils";
+import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -95,18 +99,11 @@ function beginsWithinRange(
 	listing: DiscoveryListing,
 	startRangeMonths: 1 | 3 | 6 | undefined,
 ): boolean {
-	if (!startRangeMonths) {
-		return true;
-	}
-
-	if (!listing.begins) {
-		return false;
-	}
+	if (!startRangeMonths) return true;
+	if (!listing.begins) return false;
 
 	const beginsDate = new Date(listing.begins);
-	if (Number.isNaN(beginsDate.getTime())) {
-		return false;
-	}
+	if (Number.isNaN(beginsDate.getTime())) return false;
 
 	const now = new Date();
 	now.setHours(0, 0, 0, 0);
@@ -124,30 +121,14 @@ function matchesLocalFilters(
 		const haystack = [listing.title, listing.location, listing.host.name]
 			.join(" ")
 			.toLowerCase();
-		if (!haystack.includes(query)) {
-			return false;
-		}
+		if (!haystack.includes(query)) return false;
 	}
 
-	if (filters.categories?.length && !filters.categories.includes(listing.category)) {
-		return false;
-	}
-
-	if (filters.hasHousing && listing.benefits.housing.provision === "not_provided") {
-		return false;
-	}
-
-	if (filters.hasMeals && listing.benefits.meals.provision === "not_provided") {
-		return false;
-	}
-
-	if (filters.visaSupport && !listing.visaSupport) {
-		return false;
-	}
-
-	if (filters.payUnit && listing.payInsight?.unit !== filters.payUnit) {
-		return false;
-	}
+	if (filters.categories?.length && !filters.categories.includes(listing.category)) return false;
+	if (filters.hasHousing && listing.benefits.housing.provision === "not_provided") return false;
+	if (filters.hasMeals && listing.benefits.meals.provision === "not_provided") return false;
+	if (filters.visaSupport && !listing.visaSupport) return false;
+	if (filters.payUnit && listing.payInsight?.unit !== filters.payUnit) return false;
 
 	if (
 		filters.payMin != null &&
@@ -155,9 +136,7 @@ function matchesLocalFilters(
 		filters.payMin > 0
 	) {
 		const min = listing.payInsight?.minCents;
-		if (min == null || min < Math.round(filters.payMin * 100)) {
-			return false;
-		}
+		if (min == null || min < Math.round(filters.payMin * 100)) return false;
 	}
 
 	if (
@@ -170,15 +149,6 @@ function matchesLocalFilters(
 	return beginsWithinRange(listing, filters.startRangeMonths);
 }
 
-/**
- * Seek \u2014 the seeker-scope opportunity feed, now backed by a real server-side
- * search. All filter state lives in the URL query (q / category / housing /
- * meals / pay_min / location) so a filtered view is shareable, bookmarkable,
- * and re-rendered on the server. This page parses the URL into SearchFilters,
- * runs searchListings against live listings, and maps the rows into the
- * DiscoveryListing view-model; SeekBrowser renders the controls + the canonical
- * DiscoveryCard grid and drives the URL.
- */
 export default async function SeekPage({
 	searchParams,
 }: {
@@ -186,6 +156,11 @@ export default async function SeekPage({
 }) {
 	const params = await searchParams;
 
+	// Auth — optional; dashboard only renders when signed in
+	const { userId, getToken } = await auth();
+	const token = userId ? await getToken({ template: "supabase" }) : null;
+
+	// Parse discovery filters from URL
 	const query = firstValue(params.q);
 	const category = parseCategory(params.category);
 	const housing = parseBoolean(params.housing);
@@ -215,6 +190,7 @@ export default async function SeekPage({
 		limit: PAGE_SIZE + 1,
 		offset,
 	};
+
 	const hasPublicDataConfig = hasDiscoveryPublicDataConfig();
 	const canUseFixtures = canUseDiscoveryFixtureFallback();
 
@@ -225,9 +201,7 @@ export default async function SeekPage({
 		const rows = await searchListings(filters);
 		hasNextPage = rows.length > PAGE_SIZE;
 		const pageRows = hasNextPage ? rows.slice(0, PAGE_SIZE) : rows;
-		listings = pageRows.map(
-			(row) => rowToDiscoveryFields(row) as DiscoveryListing,
-		);
+		listings = pageRows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
 	} else if (canUseFixtures) {
 		const filtered = DISCOVERY_FIXTURES.filter((listing) =>
 			matchesLocalFilters(listing, filters),
@@ -239,9 +213,6 @@ export default async function SeekPage({
 		warnIfDiscoveryDataMissingInProduction("seek/page");
 	}
 
-	// Featured employers are always built from the full fixture set so the
-	// promotional rail is populated regardless of active search filters.
-	// TODO(paid-boost): replace with getFeaturedEmployers() against a boost table.
 	const featuredEmployers = buildFeaturedEmployers(DISCOVERY_FIXTURES);
 
 	const buildPageHref = (targetPage: number): string => {
@@ -264,45 +235,76 @@ export default async function SeekPage({
 
 	const showPagination = page > 1 || hasNextPage;
 
+	// Dashboard data — only fetched when signed in
+	let dashboardProps = null;
+	if (userId && token) {
+		const clerkUser = await currentUser();
+		const fallbackName =
+			clerkUser?.firstName
+				? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
+				: "Seeker";
+
+		const [status, matchedListings, profile] = await Promise.all([
+			getSeekerStatus(token, userId, fallbackName),
+			getMatchedListings(token, userId),
+			getSeekerProfile(token, userId),
+		]);
+
+		dashboardProps = {
+			profile,
+			status,
+			matchedListings: matchedListings.slice(0, 12),
+			seekerName: status.seekerName,
+			featuredEmployers,
+		};
+	}
+
 	return (
 		<>
-			<SeekBrowser
-				listings={listings}
-				featuredEmployers={featuredEmployers}
-				query={query}
-				category={category}
-				housing={housing}
-				meals={meals}
-				visaSupport={visaSupport}
-				startRangeMonths={startRangeMonths}
-				location={location}
-				payMin={payMin}
-				payUnit={payUnit}
-			/>
+			{dashboardProps && (
+				<SeekerDashboard {...dashboardProps} />
+			)}
+
+			<div className={dashboardProps ? styles.discoverSection : undefined}>
+				{dashboardProps && (
+					<h2 className={styles.discoverHeading}>Discover Opportunities</h2>
+				)}
+				<SeekBrowser
+					listings={listings}
+					featuredEmployers={featuredEmployers}
+					query={query}
+					category={category}
+					housing={housing}
+					meals={meals}
+					visaSupport={visaSupport}
+					startRangeMonths={startRangeMonths}
+					location={location}
+					payMin={payMin}
+					payUnit={payUnit}
+				/>
+			</div>
+
 			{showPagination ? (
 				<nav className={styles.pagination} aria-label="Search results pages">
+					<p className={styles.srOnly} aria-live="polite" aria-atomic="true">
+						{`Page ${page}${hasNextPage ? "" : ", last page"}`}
+					</p>
 					{page > 1 ? (
 						<a className={styles.pageLink} href={buildPageHref(page - 1)} rel="prev">
 							Previous
 						</a>
 					) : (
-						<span
-							className={`${styles.pageLink} ${styles.pageLinkDisabled}`}
-							aria-disabled="true"
-						>
+						<span className={`${styles.pageLink} ${styles.pageLinkDisabled}`} aria-disabled="true">
 							Previous
 						</span>
 					)}
-					<span className={styles.pageStatus}>Page {page}</span>
+					<span className={styles.pageStatus} aria-current="page">Page {page}</span>
 					{hasNextPage ? (
 						<a className={styles.pageLink} href={buildPageHref(page + 1)} rel="next">
 							Next
 						</a>
 					) : (
-						<span
-							className={`${styles.pageLink} ${styles.pageLinkDisabled}`}
-							aria-disabled="true"
-						>
+						<span className={`${styles.pageLink} ${styles.pageLinkDisabled}`} aria-disabled="true">
 							Next
 						</span>
 					)}

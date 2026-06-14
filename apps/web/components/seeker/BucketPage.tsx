@@ -13,7 +13,7 @@ export interface BucketPageProps {
 export function BucketPage({ title, description, children }: BucketPageProps) {
   return (
     <section className={styles.section}>
-      <SectionHeading title={title} description={description} />
+      <SectionHeading as="h1" title={title} description={description} />
       {children}
     </section>
   );

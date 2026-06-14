@@ -48,8 +48,6 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         // Supabase Storage (avatars, listing media, etc.)
-        // *.supabase.co covers any project ref (staging → production swap
-        // requires only an env var change, not a code change).
         protocol: "https",
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/**"
@@ -58,6 +56,12 @@ const nextConfig: NextConfig = {
         // Clerk-hosted user avatars
         protocol: "https",
         hostname: "img.clerk.com",
+        pathname: "/**"
+      },
+      {
+        // Cloudinary — curated photo library, icon CDN, transformed assets
+        protocol: "https",
+        hostname: "res.cloudinary.com",
         pathname: "/**"
       }
     ]

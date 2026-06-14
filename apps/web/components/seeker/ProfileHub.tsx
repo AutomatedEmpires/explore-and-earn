@@ -1,106 +1,329 @@
+"use client";
+
+import Image from "next/image";
 import Link from "next/link";
+import { useOptimistic, useState, useTransition } from "react";
 
-import { Icon, Meter, type IconKey } from "@explore-and-earn/ui";
-
-import { SectionHeading } from "./SectionHeading";
-import { StatusStrip } from "./StatusStrip";
+import { BADGE_META, type SeekerBadge } from "@explore-and-earn/db";
+import { Icon, type IconKey } from "@explore-and-earn/ui";
+import { saveReadinessAction } from "../../app/actions/seekerProfile";
+import type { DiscoveryListing } from "../discovery";
+import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
+import { DashboardNav } from "./DashboardNav";
+import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
+import { MatchCardRail } from "./MatchCardRail";
+import { ReadinessSlider } from "./ReadinessSlider";
 import { RESUME_APPLY_THRESHOLD, type SeekerStatusSummary } from "./models";
 import styles from "./ProfileHub.module.css";
 
-export interface ProfileHubProps {
-	readonly status: SeekerStatusSummary;
-}
+const CATEGORY_GRADIENTS: Record<string, string> = {
+  maritime: "linear-gradient(155deg, #072944 0%, #0E4F80 38%, #1874AC 70%, #3A96C6 100%)",
+  farm:     "linear-gradient(155deg, #2A1608 0%, #5C3610 35%, #96601C 68%, #CC9440 100%)",
+  remote:   "linear-gradient(155deg, #0A1422 0%, #182A40 35%, #2A4668 68%, #4268A0 100%)",
+  seasonal: "linear-gradient(155deg, #0C1E08 0%, #204015 35%, #38701E 68%, #76B03A 100%)",
+  mix:      "linear-gradient(155deg, #18082A 0%, #341256 38%, #64228C 70%, #A44060 100%)",
+};
+const DEFAULT_GRADIENT = "linear-gradient(155deg, #1A2030 0%, #2C3E58 38%, #406080 70%, #6090B0 100%)";
 
-interface ProfileLink {
-	readonly href: string;
-	readonly icon: IconKey;
-	readonly label: string;
-	readonly detail: string;
-}
+const CATEGORY_LABELS: Record<string, string> = {
+  maritime: "Maritime",
+  farm:     "Farm",
+  remote:   "Remote",
+  seasonal: "Seasonal",
+  mix:      "Mix",
+};
 
-/**
- * Unified seeker profile hub. Composes existing lane pieces (StatusStrip, the
- * Meter primitive, SectionHeading) and links out to every seeker surface, so
- * the founder-locked Profile tab is a real home base instead of a dead end.
- */
-const PROFILE_LINKS: readonly ProfileLink[] = [
-	{ href: "/profile/edit", icon: "nav.profile", label: "Edit profile", detail: "Update your name, bio, and preferences." },
-	{ href: "/resume", icon: "nav.profile", label: "Resume", detail: "Edit your tag-based compatibility profile." },
-	{ href: "/saved", icon: "nav.saved", label: "Saved", detail: "Opportunities you have bookmarked." },
-	{ href: "/applied", icon: "action.apply", label: "Applications", detail: "Track every application status." },
-	{ href: "/offered", icon: "status.match", label: "Offers", detail: "Review offers sent by hosts." },
-	{ href: "/invites", icon: "status.boosted", label: "Invites", detail: "Host invitations to apply." },
-	{ href: "/journey", icon: "analytics.trend", label: "Journey", detail: "Your adventure timeline." },
-	{ href: "/messages", icon: "nav.messages", label: "Messages", detail: "Conversations with hosts." },
-	{ href: "/notifications", icon: "action.message", label: "Notifications", detail: "Updates, reminders, and check-ins." },
-	{ href: "/travel", icon: "mappin.cluster", label: "Travel", detail: "Plan travel for accepted roles." },
-	{ href: "/schedule", icon: "category.seasonal", label: "Schedule", detail: "Upcoming shifts and check-ins." },
-	{ href: "/settings", icon: "system.lock", label: "Settings", detail: "Account, privacy, and preferences." },
-	{ href: "/help", icon: "system.info", label: "Help", detail: "Guides and support." },
+const MANAGE_LINKS: ReadonlyArray<{ href: string; icon: string; label: string; detail: string }> = [
+  { href: "/profile/edit", icon: "nav.profile",      label: "Edit profile",  detail: "Name, bio, preferences" },
+  { href: "/resume",       icon: "nav.profile",      label: "Resume",        detail: "Tag-based profile" },
+  { href: "/saved",        icon: "action.save",      label: "Saved",         detail: "Bookmarked roles" },
+  { href: "/applied",      icon: "action.apply",     label: "Applications",  detail: "Track status" },
+  { href: "/offered",      icon: "status.match",     label: "Offers",        detail: "Review host offers" },
+  { href: "/invites",      icon: "action.message",   label: "Invites",       detail: "Host invitations" },
+  { href: "/journey",      icon: "analytics.trend",  label: "Journey",       detail: "Adventure timeline" },
+  { href: "/messages",     icon: "action.message",   label: "Messages",      detail: "Host conversations" },
+  { href: "/travel",       icon: "mappin.cluster",   label: "Travel",        detail: "Plan travel" },
+  { href: "/schedule",     icon: "category.seasonal",label: "Schedule",      detail: "Shifts & check-ins" },
+  { href: "/settings",     icon: "system.lock",      label: "Settings",      detail: "Account & privacy" },
+  { href: "/help",         icon: "system.info",      label: "Help",          detail: "Guides & support" },
 ];
 
-export function ProfileHub({ status }: ProfileHubProps) {
-	const initial = status.seekerName.trim().charAt(0).toUpperCase() || "S";
-	const resumeReady = status.resumeCompletion >= RESUME_APPLY_THRESHOLD;
-	const badgeClass = resumeReady
-		? styles.badge
-		: `${styles.badge} ${styles.badgePriority}`;
-	const badgeLabel = resumeReady
-		? "Ready to apply"
-		: `Resume ${status.resumeCompletion}%`;
-	const resumeNote = resumeReady
-		? "Your resume is ready — you can apply to any opportunity."
-		: `Reach ${RESUME_APPLY_THRESHOLD}% to unlock applications.`;
+function formatBadgeDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
-	return (
-		<div className={styles.hub}>
-			<header className={styles.identity}>
-				<span className={styles.avatar} aria-hidden>
-					{initial}
-				</span>
-				<div className={styles.identityText}>
-					<h2 className={styles.name}>{status.seekerName}</h2>
-					<p className={styles.identityMeta}>Seeker scope</p>
-				</div>
-				<span className={badgeClass}>{badgeLabel}</span>
-			</header>
+export interface ProfileHubProps {
+  readonly status: SeekerStatusSummary;
+  readonly badges?: readonly SeekerBadge[];
+  readonly profilePhotoUrl?: string | null;
+  readonly heroCoverUrl?: string | null;
+  readonly seekingTimeline?: string | null;
+  readonly preferredCategories?: readonly string[];
+  readonly bio?: string | null;
+  readonly seekerProfileId?: string | null;
+  readonly matchedListings?: readonly DiscoveryListing[];
+  readonly featuredEmployers?: readonly FeaturedEmployer[];
+}
 
-			<StatusStrip status={status} />
+export function ProfileHub({
+  status,
+  badges = [],
+  profilePhotoUrl,
+  heroCoverUrl,
+  seekingTimeline,
+  preferredCategories = [],
+  bio,
+  seekerProfileId,
+  matchedListings = [],
+  featuredEmployers = [],
+}: ProfileHubProps) {
+  const [navOpen, setNavOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [optimisticTimeline, setOptimisticTimeline] = useOptimistic(seekingTimeline ?? null);
 
-			<section className={styles.section}>
-				<SectionHeading
-					title="Resume"
-					description="Your visual, tag-based compatibility profile."
-					actionLabel="Manage"
-					actionHref="/resume"
-				/>
-				<div className={styles.resumeCard}>
-					<Meter value={status.resumeCompletion} label="Resume completion" />
-					<p className={styles.resumeNote}>{resumeNote}</p>
-				</div>
-			</section>
+  const initials = status.seekerName
+    .trim()
+    .split(" ")
+    .map((n) => n[0] ?? "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "SE";
 
-			<section className={styles.section}>
-				<SectionHeading
-					title="Manage"
-					description="Jump to any part of your seeker experience."
-				/>
-				<ul className={styles.grid}>
-					{PROFILE_LINKS.map((link) => (
-						<li key={link.href}>
-							<Link className={styles.tile} href={link.href}>
-								<span className={styles.tileIcon} aria-hidden>
-									<Icon name={link.icon} size={20} aria-hidden />
-								</span>
-								<span className={styles.tileText}>
-									<span className={styles.tileLabel}>{link.label}</span>
-									<span className={styles.tileDetail}>{link.detail}</span>
-								</span>
-							</Link>
-						</li>
-					))}
-				</ul>
-			</section>
-		</div>
-	);
+  const resumeReady = status.resumeCompletion >= RESUME_APPLY_THRESHOLD;
+  const isPhoto = heroCoverUrl && (heroCoverUrl.startsWith("http") || heroCoverUrl.startsWith("/"));
+  const heroBg = isPhoto
+    ? undefined
+    : (CATEGORY_GRADIENTS[preferredCategories[0] ?? ""] ?? DEFAULT_GRADIENT);
+
+  function handleReadinessChange(value: string) {
+    if (!seekerProfileId) return;
+    startTransition(async () => {
+      setOptimisticTimeline(value);
+      await saveReadinessAction(seekerProfileId, value);
+    });
+  }
+
+  return (
+    <>
+      <DashboardNav
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
+        seekerName={status.seekerName}
+        avatarUrl={profilePhotoUrl}
+        unreadCount={status.unreadNotifications}
+      />
+
+      <div className={styles.page}>
+
+        {/* ── Full-bleed cover photo ── */}
+        <section
+          className={styles.hero}
+          style={heroBg ? { background: heroBg } : undefined}
+          aria-label="Profile cover"
+        >
+          {isPhoto && heroCoverUrl && (
+            <Image
+              src={heroCoverUrl}
+              alt=""
+              fill
+              sizes="100vw"
+              className={styles.heroBg}
+              priority
+            />
+          )}
+          <div className={styles.heroOverlay} aria-hidden="true" />
+
+          <div className={styles.topBar}>
+            <button
+              type="button"
+              className={styles.menuBtn}
+              onClick={() => setNavOpen(true)}
+              aria-label="Open navigation"
+            >
+              <Icon name="action.more" size={20} />
+            </button>
+            <Link href="/seek" className={styles.editBtn} aria-label="Change cover photo on Seek">
+              <Icon name="action.more" size={16} />
+              <span>Cover</span>
+            </Link>
+          </div>
+        </section>
+
+        {/* ── Avatar + identity: avatar straddles the hero/content boundary ── */}
+        <div className={styles.identityBar}>
+          {/* Avatar — top half over hero photo, bottom half in content area */}
+          <div className={styles.avatarWrap} aria-hidden="true">
+            {profilePhotoUrl ? (
+              <Image
+                src={profilePhotoUrl}
+                alt=""
+                width={88}
+                height={88}
+                className={styles.avatarImg}
+              />
+            ) : (
+              <div className={styles.avatarInitials}>{initials}</div>
+            )}
+          </div>
+
+          {/* Text: pushed into the content area beside the avatar's bottom half */}
+          <div className={styles.identityContent}>
+            <div className={styles.nameRow}>
+              <h1 className={styles.seekerName}>{status.seekerName}</h1>
+              <span className={styles.seekerBadge}>
+                <span className={styles.seekerDot} aria-hidden="true" />
+                Seeker
+              </span>
+            </div>
+
+            {preferredCategories.length > 0 && (
+              <div className={styles.catPills}>
+                {preferredCategories.slice(0, 3).map((cat) => (
+                  <span
+                    key={cat}
+                    className={`${styles.catPill} ${styles[`cat_${cat}` as keyof typeof styles] ?? ""}`}
+                  >
+                    {CATEGORY_LABELS[cat] ?? cat}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {bio ? (
+              <p className={styles.bio}>{bio}</p>
+            ) : (
+              <Link href="/profile/edit" className={styles.bioAdd}>
+                + Add a bio
+              </Link>
+            )}
+          </div>
+        </div>
+
+        {/* ── Seeking / readiness timeline ── */}
+        <div className={styles.readinessWrap}>
+          <ReadinessSlider
+            value={optimisticTimeline}
+            onChange={handleReadinessChange}
+            saving={isPending}
+          />
+        </div>
+
+        {/* ── Application status + quick stats ── */}
+        <div className={styles.statsRow} role="list" aria-label="Your activity">
+          <Link
+            href="/resume"
+            className={`${styles.statusCell} ${resumeReady ? styles.statusGreen : styles.statusAmber}`}
+            role="listitem"
+          >
+            <span className={styles.statusIcon} aria-hidden="true">
+              <Icon name={resumeReady ? "status.match" : "system.warning"} size={22} />
+            </span>
+            <span className={styles.statusLabel}>
+              {resumeReady ? "Can Apply" : "Can't Apply"}
+            </span>
+            <span className={styles.statusSub}>
+              {resumeReady
+                ? "Resume ready"
+                : `${status.resumeCompletion}% — need ${RESUME_APPLY_THRESHOLD}%`}
+            </span>
+          </Link>
+
+          <Link href="/resume" className={styles.miniStat} role="listitem">
+            <span className={styles.miniVal}>{status.resumeCompletion}%</span>
+            <span className={styles.miniLabel}>Resume</span>
+          </Link>
+          <Link href="/saved" className={styles.miniStat} role="listitem">
+            <span className={styles.miniVal}>{status.savedCount}</span>
+            <span className={styles.miniLabel}>Saved</span>
+          </Link>
+          <Link href="/applied" className={styles.miniStat} role="listitem">
+            <span className={styles.miniVal}>{status.appliedCount}</span>
+            <span className={styles.miniLabel}>Applied</span>
+          </Link>
+          {status.offersCount > 0 && (
+            <Link href="/offered" className={`${styles.miniStat} ${styles.miniStatUrgent}`} role="listitem">
+              <span className={styles.miniVal}>{status.offersCount}</span>
+              <span className={styles.miniLabel}>Offers</span>
+            </Link>
+          )}
+        </div>
+
+        {/* ── Matched for you ── */}
+        {matchedListings.length > 0 && (
+          <MatchCardRail listings={matchedListings} title="Matched for You" />
+        )}
+
+        {/* ── Featured employers ── */}
+        {featuredEmployers.length > 0 && (
+          <FeaturedEmployerStrip employers={featuredEmployers} />
+        )}
+
+        {/* ── Resume completion callout ── */}
+        {!resumeReady && (
+          <Link href="/resume" className={styles.resumeCallout} aria-label="Complete your resume">
+            <div className={styles.resumeCalloutLeft}>
+              <span className={styles.resumeCalloutTitle}>Finish your resume</span>
+              <span className={styles.resumeCalloutSub}>
+                {status.resumeCompletion}% done — reach {RESUME_APPLY_THRESHOLD}% to unlock applications
+              </span>
+              <div className={styles.resumeTrack}>
+                <div
+                  className={styles.resumeFill}
+                  style={{ width: `${status.resumeCompletion}%` }}
+                />
+              </div>
+            </div>
+            <span className={styles.resumeCalloutArrow} aria-hidden="true">→</span>
+          </Link>
+        )}
+
+        {/* ── Badges ── */}
+        {badges.length > 0 && (
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Badges</h2>
+            <ul className={styles.badgeList}>
+              {badges.map((b) => {
+                const meta = BADGE_META[b.badgeKey];
+                return (
+                  <li key={b.id} className={styles.badgeItem}>
+                    <span className={styles.badgeIcon} aria-hidden="true">
+                      <Icon name={meta.icon as IconKey} size={20} />
+                    </span>
+                    <div className={styles.badgeInfo}>
+                      <span className={styles.badgeName}>{meta.label}</span>
+                      <span className={styles.badgeDesc}>{meta.description}</span>
+                    </div>
+                    <time className={styles.badgeDate} dateTime={b.awardedAt}>
+                      {formatBadgeDate(b.awardedAt)}
+                    </time>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
+        {/* ── Manage links ── */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Manage</h2>
+          <ul className={styles.manageGrid}>
+            {MANAGE_LINKS.map((link) => (
+              <li key={link.href}>
+                <Link className={styles.manageTile} href={link.href}>
+                  <span className={styles.tileIcon} aria-hidden="true">
+                    <Icon name={link.icon as Parameters<typeof Icon>[0]["name"]} size={20} />
+                  </span>
+                  <span className={styles.tileText}>
+                    <span className={styles.tileLabel}>{link.label}</span>
+                    <span className={styles.tileDetail}>{link.detail}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+      </div>
+    </>
+  );
 }
