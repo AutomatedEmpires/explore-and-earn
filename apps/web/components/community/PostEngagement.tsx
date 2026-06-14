@@ -5,7 +5,6 @@ import { useUser } from "@clerk/nextjs";
 import {
   REACTION_KEYS,
   REACTION_EMOJIS,
-  ZERO_REACTIONS,
   type CommunityComment,
   type ReactionCounts,
   type ReactionKey,

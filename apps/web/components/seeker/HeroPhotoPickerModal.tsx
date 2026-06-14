@@ -41,7 +41,6 @@ export function HeroPhotoPickerModal({
   onSelect,
   currentUrl,
   seekerProfileId,
-  category,
 }: HeroPhotoPickerModalProps) {
   const { getToken } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
