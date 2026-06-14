@@ -77,8 +77,8 @@ export default async function ProfilePage() {
 					profilePhotoUrl = profile.profilePhotoUrl ?? null;
 					heroCoverUrl = profile.heroCoverUrl ?? null;
 					seekingTimeline = profile.seekingTimeline ?? null;
-					preferredCategories = profile.preferredCategories ?? [];
-					bio = profile.bio ?? null;
+					preferredCategories = profile.desiredCategories ?? [];
+					bio = profile.shortBio ?? null;
 					seekerProfileId = profile.id ?? null;
 				}
 			}
