@@ -1,4 +1,4 @@
--- 022_email_log.sql
+-- 033_email_log.sql
 -- Audit log for transactional email send attempts (the Resend pipeline in
 -- apps/web/lib/email.ts).
 --

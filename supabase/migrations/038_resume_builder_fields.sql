@@ -1,4 +1,4 @@
--- Migration 032: Resume builder field extensions
+-- Migration 038: Resume builder field extensions
 --
 -- Adds schema fields required by the 5-step seeker resume builder:
 --   • seeker_profiles  — seeking_timeline, general_skill_tags

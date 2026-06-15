@@ -96,3 +96,28 @@ The original mission said "renumber the duplicate filenames." In practice there 
 ## 5. Reserving a new migration number
 
 Numbers are claimed in `tools/scripts/migration-allocations.json` **before** the migration file is added. The guard rejects any migration whose number is absent from the registry, so a lane cannot silently claim a number. Reserved today: `022` (contested), `023`/`025`/`026` (other lanes), **`024` (Lane B / migration-integrity)**.
+
+## 6. Resolution log
+
+### 2026-06-15 — Duplicate prefix resolution (022 / 024 / 031 / 032)
+
+A clean `supabase start` failed with `duplicate key ... schema_migrations_pkey (version)=(022)`
+because four files shared prefix `022` and others shared `024` / `031` / `032` (the contested
+numbers tracked in §4.3 / §5). Resolved by keeping the dependency-critical file at each contested
+number and renumbering the rest to the next free block `033`–`039`:
+
+| Kept at original | Renumbered to |
+| --- | --- |
+| `022_host_profile_enhancements` (027 needs `tagline`/`host_name`) | `022_email_log` → `033_email_log` |
+| `024_application_role_counts` | `022_listing_expiry` → `034_listing_expiry` |
+| `031_community_phase2` (032 depends on its tables) | `022_search_index` → `035_search_index` |
+| `032_community_phase3` (depends on 031) | `024_gallery_photo_urls` → `036_gallery_photo_urls` |
+| | `031_seeker_profile_photo_url` → `037_seeker_profile_photo_url` |
+| | `032_resume_builder_fields` → `038_resume_builder_fields` |
+| | `032_seeker_dashboard_fields` → `039_seeker_dashboard_fields` |
+
+All seven renumbered migrations are idempotent (`IF NOT EXISTS` / `create or replace` /
+`drop ... if exists`), so re-applying them where the old prefixes were already recorded is a safe
+no-op. `tools/scripts/migration-allocations.json` updated to match; `check-migration-prefixes`
+passes (37 files, 37 unique prefixes). Applied cleanly to the local stack via `supabase start`.
+**Remote staging/prod reconciliation still required** before the next migration merge per §4.

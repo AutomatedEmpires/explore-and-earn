@@ -1,4 +1,4 @@
--- 024_gallery_photo_urls.sql
+-- 036_gallery_photo_urls.sql
 -- Additive migration: adds an ordered gallery URL array to the listings table.
 --
 -- INTENT: store the public Supabase Storage URLs for listing gallery images

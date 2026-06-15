@@ -1,4 +1,4 @@
--- 022_search_index.sql
+-- 035_search_index.sql
 -- Additive, non-destructive. Logged in docs/source-of-truth/founder-approval-queue.md
 -- (row A-SEARCH-IDX-022, approved in-thread). No data loss, no column drops, no
 -- RLS changes, no backfill risk (a STORED generated column populates itself).

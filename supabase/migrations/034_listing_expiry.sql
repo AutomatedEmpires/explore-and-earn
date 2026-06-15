@@ -1,4 +1,4 @@
--- 022_listing_expiry.sql
+-- 034_listing_expiry.sql
 -- Listing expiry (Agent 3 / PR 1 — Listing Lifecycle Controls).
 --
 -- ADDITIVE ONLY: adds listings.expires_at, an index, a BEFORE INSERT default

@@ -1,4 +1,4 @@
--- Migration 032: Seeker dashboard and resume expansion fields
+-- Migration 039: Seeker dashboard and resume expansion fields
 -- Adds columns referenced by the updated seekerResume.ts and SeekerDashboard UI.
 -- All new columns use IF NOT EXISTS so applying to a partially-migrated DB is safe.
 
