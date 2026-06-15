@@ -65,6 +65,10 @@ function requireEnv(name) {
 }
 
 function parseRef(url) {
+  // Local Supabase stack (supabase start) has no project ref; treat the
+  // loopback host as the reserved ref "local" so an operator can still name
+  // the exact target via SEED_TARGET_REF=local.
+  if (/https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?/i.test(url)) return "local";
   const m = /https?:\/\/([a-z0-9]+)\.supabase\.co/i.exec(url);
   return m ? m[1] : null;
 }
