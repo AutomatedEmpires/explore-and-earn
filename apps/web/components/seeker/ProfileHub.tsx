@@ -2,17 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 
 import { BADGE_META, type SeekerBadge } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { saveReadinessAction } from "../../app/actions/seekerProfile";
 import type { DiscoveryListing } from "../discovery";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
-import { DashboardNav } from "./DashboardNav";
 import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
 import { MatchCardRail } from "./MatchCardRail";
 import { ReadinessSlider } from "./ReadinessSlider";
+import { SeekerDirectory } from "./SeekerDirectory";
 import { RESUME_APPLY_THRESHOLD, type SeekerStatusSummary } from "./models";
 import styles from "./ProfileHub.module.css";
 
@@ -34,23 +34,52 @@ const CATEGORY_LABELS: Record<string, string> = {
   mix:      "Mix",
 };
 
-const MANAGE_LINKS: ReadonlyArray<{ href: string; icon: string; label: string; detail: string }> = [
-  { href: "/profile/edit", icon: "nav.profile",      label: "Edit profile",  detail: "Name, bio, preferences" },
-  { href: "/resume",       icon: "nav.profile",      label: "Resume",        detail: "Tag-based profile" },
-  { href: "/saved",        icon: "action.save",      label: "Saved",         detail: "Bookmarked roles" },
-  { href: "/applied",      icon: "action.apply",     label: "Applications",  detail: "Track status" },
-  { href: "/offered",      icon: "status.match",     label: "Offers",        detail: "Review host offers" },
-  { href: "/invites",      icon: "action.message",   label: "Invites",       detail: "Host invitations" },
-  { href: "/journey",      icon: "analytics.trend",  label: "Journey",       detail: "Adventure timeline" },
-  { href: "/messages",     icon: "action.message",   label: "Messages",      detail: "Host conversations" },
-  { href: "/travel",       icon: "mappin.cluster",   label: "Travel",        detail: "Plan travel" },
-  { href: "/schedule",     icon: "category.seasonal",label: "Schedule",      detail: "Shifts & check-ins" },
-  { href: "/settings",     icon: "system.lock",      label: "Settings",      detail: "Account & privacy" },
-  { href: "/help",         icon: "system.info",      label: "Help",          detail: "Guides & support" },
-];
-
 function formatBadgeDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** A single tappable status cell composed on the shared `ui-stat` primitive. */
+interface StatCell {
+  readonly href: string;
+  readonly label: string;
+  readonly value: string;
+  readonly icon: IconKey;
+  readonly mod?: "primary" | "soon";
+}
+
+/** The one next-best-action surfaced above the fold. Always resolves to one. */
+interface NextAction {
+  readonly tone: "primary" | "soon" | "calm";
+  readonly title: string;
+  readonly sub: string;
+  readonly href: string;
+  readonly progress?: number;
+}
+
+function resolveNextAction(status: SeekerStatusSummary, resumeReady: boolean): NextAction {
+  if (status.offersCount > 0) {
+    return {
+      tone: "primary",
+      title: status.offersCount === 1 ? "You have an offer" : `You have ${status.offersCount} offers`,
+      sub: "Review and respond before they expire.",
+      href: "/offered",
+    };
+  }
+  if (!resumeReady) {
+    return {
+      tone: "soon",
+      title: "Finish your resume",
+      sub: `${status.resumeCompletion}% — reach ${RESUME_APPLY_THRESHOLD}% to unlock applications.`,
+      href: "/resume",
+      progress: status.resumeCompletion,
+    };
+  }
+  return {
+    tone: "calm",
+    title: "You're ready to apply",
+    sub: "Keep exploring opportunities matched to you.",
+    href: "/seek",
+  };
 }
 
 export interface ProfileHubProps {
@@ -78,23 +107,50 @@ export function ProfileHub({
   matchedListings = [],
   featuredEmployers = [],
 }: ProfileHubProps) {
-  const [navOpen, setNavOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [optimisticTimeline, setOptimisticTimeline] = useOptimistic(seekingTimeline ?? null);
 
-  const initials = status.seekerName
-    .trim()
-    .split(" ")
-    .map((n) => n[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase() || "SE";
+  const initials =
+    status.seekerName
+      .trim()
+      .split(" ")
+      .map((n) => n[0] ?? "")
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "SE";
 
   const resumeReady = status.resumeCompletion >= RESUME_APPLY_THRESHOLD;
-  const isPhoto = heroCoverUrl && (heroCoverUrl.startsWith("http") || heroCoverUrl.startsWith("/"));
+  const isPhoto = Boolean(heroCoverUrl && (heroCoverUrl.startsWith("http") || heroCoverUrl.startsWith("/")));
   const heroBg = isPhoto
     ? undefined
     : (CATEGORY_GRADIENTS[preferredCategories[0] ?? ""] ?? DEFAULT_GRADIENT);
+
+  const stats: readonly StatCell[] = [
+    {
+      href: "/resume",
+      label: "Resume",
+      value: `${status.resumeCompletion}%`,
+      icon: "profile.resume",
+      mod: !resumeReady && status.offersCount === 0 ? "soon" : undefined,
+    },
+    { href: "/saved", label: "Saved", value: String(status.savedCount), icon: "nav.saved" },
+    { href: "/applied", label: "Applied", value: String(status.appliedCount), icon: "action.apply" },
+    {
+      href: "/offered",
+      label: "Offers",
+      value: String(status.offersCount),
+      icon: "status.match",
+      mod: status.offersCount > 0 ? "primary" : undefined,
+    },
+    {
+      href: "/accepted",
+      label: "Upcoming",
+      value: status.acceptedUpcoming ? "1" : "—",
+      icon: "status.accepted",
+    },
+  ];
+
+  const nextAction = resolveNextAction(status, resumeReady);
 
   function handleReadinessChange(value: string) {
     if (!seekerProfileId) return;
@@ -105,180 +161,117 @@ export function ProfileHub({
   }
 
   return (
-    <>
-      <DashboardNav
-        open={navOpen}
-        onClose={() => setNavOpen(false)}
-        seekerName={status.seekerName}
-        avatarUrl={profilePhotoUrl}
-        unreadCount={status.unreadNotifications}
-      />
+    <div className={styles.page}>
+      {/* ── Full-bleed cover ── */}
+      <section
+        className={styles.hero}
+        style={heroBg ? { background: heroBg } : undefined}
+        aria-label="Profile cover"
+      >
+        {isPhoto && heroCoverUrl && (
+          <Image src={heroCoverUrl} alt="" fill sizes="100vw" className={styles.heroBg} priority />
+        )}
+        <div className={styles.heroOverlay} aria-hidden="true" />
 
-      <div className={styles.page}>
+        <div className={styles.topBar}>
+          <Link href="/profile/edit" className={styles.editBtn} aria-label="Edit profile and cover">
+            <Icon name="action.edit" size={16} aria-hidden />
+            <span>Edit</span>
+          </Link>
+        </div>
+      </section>
 
-        {/* ── Full-bleed cover photo ── */}
-        <section
-          className={styles.hero}
-          style={heroBg ? { background: heroBg } : undefined}
-          aria-label="Profile cover"
-        >
-          {isPhoto && heroCoverUrl && (
-            <Image
-              src={heroCoverUrl}
-              alt=""
-              fill
-              sizes="100vw"
-              className={styles.heroBg}
-              priority
-            />
+      {/* ── Identity: avatar straddles the hero/content boundary ── */}
+      <div className={styles.identityBar}>
+        <div className={styles.avatarWrap} aria-hidden="true">
+          {profilePhotoUrl ? (
+            <Image src={profilePhotoUrl} alt="" width={88} height={88} className={styles.avatarImg} />
+          ) : (
+            <div className={styles.avatarInitials}>{initials}</div>
           )}
-          <div className={styles.heroOverlay} aria-hidden="true" />
+        </div>
 
-          <div className={styles.topBar}>
-            <button
-              type="button"
-              className={styles.menuBtn}
-              onClick={() => setNavOpen(true)}
-              aria-label="Open navigation"
-            >
-              <Icon name="action.more" size={20} />
-            </button>
-            <Link href="/seek" className={styles.editBtn} aria-label="Change cover photo on Seek">
-              <Icon name="action.more" size={16} />
-              <span>Cover</span>
-            </Link>
-          </div>
-        </section>
-
-        {/* ── Avatar + identity: avatar straddles the hero/content boundary ── */}
-        <div className={styles.identityBar}>
-          {/* Avatar — top half over hero photo, bottom half in content area */}
-          <div className={styles.avatarWrap} aria-hidden="true">
-            {profilePhotoUrl ? (
-              <Image
-                src={profilePhotoUrl}
-                alt=""
-                width={88}
-                height={88}
-                className={styles.avatarImg}
-              />
-            ) : (
-              <div className={styles.avatarInitials}>{initials}</div>
-            )}
+        <div className={styles.identityContent}>
+          <div className={styles.nameRow}>
+            <h1 className={styles.seekerName}>{status.seekerName}</h1>
+            <span className={styles.seekerBadge}>
+              <span className={styles.seekerDot} aria-hidden="true" />
+              Seeker
+            </span>
           </div>
 
-          {/* Text: pushed into the content area beside the avatar's bottom half */}
-          <div className={styles.identityContent}>
-            <div className={styles.nameRow}>
-              <h1 className={styles.seekerName}>{status.seekerName}</h1>
-              <span className={styles.seekerBadge}>
-                <span className={styles.seekerDot} aria-hidden="true" />
-                Seeker
-              </span>
+          {preferredCategories.length > 0 && (
+            <div className={styles.catPills}>
+              {preferredCategories.slice(0, 3).map((cat) => (
+                <span
+                  key={cat}
+                  className={`${styles.catPill} ${styles[`cat_${cat}` as keyof typeof styles] ?? ""}`}
+                >
+                  {CATEGORY_LABELS[cat] ?? cat}
+                </span>
+              ))}
             </div>
+          )}
 
-            {preferredCategories.length > 0 && (
-              <div className={styles.catPills}>
-                {preferredCategories.slice(0, 3).map((cat) => (
-                  <span
-                    key={cat}
-                    className={`${styles.catPill} ${styles[`cat_${cat}` as keyof typeof styles] ?? ""}`}
-                  >
-                    {CATEGORY_LABELS[cat] ?? cat}
-                  </span>
-                ))}
-              </div>
-            )}
+          {bio ? (
+            <p className={styles.bio}>{bio}</p>
+          ) : (
+            <Link href="/profile/edit" className={styles.bioAdd}>
+              + Add a bio
+            </Link>
+          )}
+        </div>
+      </div>
 
-            {bio ? (
-              <p className={styles.bio}>{bio}</p>
-            ) : (
-              <Link href="/profile/edit" className={styles.bioAdd}>
-                + Add a bio
+      {/* ── Availability / readiness ── */}
+      <div className={styles.readinessWrap}>
+        <ReadinessSlider value={optimisticTimeline} onChange={handleReadinessChange} saving={isPending} />
+      </div>
+
+      {/* ── Status — tappable cells on the shared ui-stat primitive ── */}
+      <ul className={styles.statusRow} aria-label="Your activity">
+        {stats.map((stat) => {
+          const mod =
+            stat.mod === "primary" ? "ui-stat--primary" : stat.mod === "soon" ? "ui-stat--soon" : "";
+          return (
+            <li key={stat.href}>
+              <Link href={stat.href} className={`${styles.statCell} ui-stat ${mod}`}>
+                <span className="ui-stat__label">
+                  <Icon name={stat.icon} size={16} aria-hidden /> {stat.label}
+                </span>
+                <span className="ui-stat__value">{stat.value}</span>
               </Link>
-            )}
-          </div>
-        </div>
+            </li>
+          );
+        })}
+      </ul>
 
-        {/* ── Seeking / readiness timeline ── */}
-        <div className={styles.readinessWrap}>
-          <ReadinessSlider
-            value={optimisticTimeline}
-            onChange={handleReadinessChange}
-            saving={isPending}
-          />
-        </div>
-
-        {/* ── Application status + quick stats ── */}
-        <div className={styles.statsRow} role="list" aria-label="Your activity">
-          <Link
-            href="/resume"
-            className={`${styles.statusCell} ${resumeReady ? styles.statusGreen : styles.statusAmber}`}
-            role="listitem"
-          >
-            <span className={styles.statusIcon} aria-hidden="true">
-              <Icon name={resumeReady ? "status.match" : "system.warning"} size={20} />
-            </span>
-            <span className={styles.statusLabel}>
-              {resumeReady ? "Can Apply" : "Can't Apply"}
-            </span>
-            <span className={styles.statusSub}>
-              {resumeReady
-                ? "Resume ready"
-                : `${status.resumeCompletion}% — need ${RESUME_APPLY_THRESHOLD}%`}
-            </span>
-          </Link>
-
-          <Link href="/resume" className={styles.miniStat} role="listitem">
-            <span className={styles.miniVal}>{status.resumeCompletion}%</span>
-            <span className={styles.miniLabel}>Resume</span>
-          </Link>
-          <Link href="/saved" className={styles.miniStat} role="listitem">
-            <span className={styles.miniVal}>{status.savedCount}</span>
-            <span className={styles.miniLabel}>Saved</span>
-          </Link>
-          <Link href="/applied" className={styles.miniStat} role="listitem">
-            <span className={styles.miniVal}>{status.appliedCount}</span>
-            <span className={styles.miniLabel}>Applied</span>
-          </Link>
-          {status.offersCount > 0 && (
-            <Link href="/offered" className={`${styles.miniStat} ${styles.miniStatUrgent}`} role="listitem">
-              <span className={styles.miniVal}>{status.offersCount}</span>
-              <span className={styles.miniLabel}>Offers</span>
-            </Link>
+      {/* ── One next-best-action ── */}
+      <Link href={nextAction.href} className={`${styles.callout} ${styles[nextAction.tone]}`}>
+        <div className={styles.calloutText}>
+          <span className={styles.calloutTitle}>{nextAction.title}</span>
+          <span className={styles.calloutSub}>{nextAction.sub}</span>
+          {nextAction.progress != null && (
+            <div className={styles.progressTrack} aria-hidden="true">
+              <div className={styles.progressFill} style={{ width: `${nextAction.progress}%` }} />
+            </div>
           )}
         </div>
+        <Icon name="action.forward" size={20} aria-hidden />
+      </Link>
 
-        {/* ── Matched for you ── */}
+      {/* ── Lower stack: matched · featured · directory · badges ── */}
+      <div className={styles.stack}>
         {matchedListings.length > 0 && (
-          <MatchCardRail listings={matchedListings} title="Matched for You" />
+          <MatchCardRail listings={matchedListings} title="Matched for you" />
         )}
 
-        {/* ── Featured employers ── */}
-        {featuredEmployers.length > 0 && (
-          <FeaturedEmployerStrip employers={featuredEmployers} />
-        )}
+        {featuredEmployers.length > 0 && <FeaturedEmployerStrip employers={featuredEmployers} />}
 
-        {/* ── Resume completion callout ── */}
-        {!resumeReady && (
-          <Link href="/resume" className={styles.resumeCallout} aria-label="Complete your resume">
-            <div className={styles.resumeCalloutLeft}>
-              <span className={styles.resumeCalloutTitle}>Finish your resume</span>
-              <span className={styles.resumeCalloutSub}>
-                {status.resumeCompletion}% done — reach {RESUME_APPLY_THRESHOLD}% to unlock applications
-              </span>
-              <div className={styles.resumeTrack}>
-                <div
-                  className={styles.resumeFill}
-                  style={{ width: `${status.resumeCompletion}%` }}
-                />
-              </div>
-            </div>
-            <span className={styles.resumeCalloutArrow} aria-hidden="true">→</span>
-          </Link>
-        )}
+        <div className={styles.directoryWrap}>
+          <SeekerDirectory status={status} />
+        </div>
 
-        {/* ── Badges ── */}
         {badges.length > 0 && (
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Badges</h2>
@@ -303,28 +296,7 @@ export function ProfileHub({
             </ul>
           </section>
         )}
-
-        {/* ── Manage links ── */}
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Manage</h2>
-          <ul className={styles.manageGrid}>
-            {MANAGE_LINKS.map((link) => (
-              <li key={link.href}>
-                <Link className={styles.manageTile} href={link.href}>
-                  <span className={styles.tileIcon} aria-hidden="true">
-                    <Icon name={link.icon as Parameters<typeof Icon>[0]["name"]} size={20} />
-                  </span>
-                  <span className={styles.tileText}>
-                    <span className={styles.tileLabel}>{link.label}</span>
-                    <span className={styles.tileDetail}>{link.detail}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-
       </div>
-    </>
+    </div>
   );
 }

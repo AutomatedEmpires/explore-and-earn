@@ -20,7 +20,6 @@ export interface SeekerHeroProps {
   readonly seekerProfileId: string | null;
   readonly onReadinessChange: (value: string) => void;
   readonly onHeroCoverChange: (url: string | null) => void;
-  readonly onNavOpen: () => void;
   readonly readinessSaving?: boolean;
 }
 
@@ -65,7 +64,6 @@ export function SeekerHero({
   seekerProfileId,
   onReadinessChange,
   onHeroCoverChange,
-  onNavOpen,
   readinessSaving,
 }: SeekerHeroProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -95,15 +93,6 @@ export function SeekerHero({
 
         {/* Top bar */}
         <div className={styles.topBar}>
-          <button
-            type="button"
-            className={styles.menuBtn}
-            onClick={onNavOpen}
-            aria-label="Open navigation menu"
-          >
-            <Icon name="action.more" size={20} />
-          </button>
-
           {seekerProfileId && (
             <button
               type="button"

@@ -94,6 +94,8 @@ export function GlobalHeader({
   const onCommunity = communityTab !== null;
   const scopeLabel = onCommunity ? "Community" : scope === "host" ? "Host" : scope === "seeker" ? "Seeker" : null;
   const homeHref = scope === "host" ? "/host/listings" : "/";
+  // Seekers' "Explore" should open the discovery feed, not the marketing root.
+  const exploreHref = scope === "seeker" ? "/seek" : homeHref;
   const profileHref = scope === "host" ? "/host/profile" : "/profile";
   const userInitial = userName?.trim().charAt(0).toUpperCase() ?? (scopeLabel?.charAt(0) ?? "E");
 
@@ -153,7 +155,7 @@ export function GlobalHeader({
           <nav className={styles.sectionNav} aria-label="Primary sections">
             <Link
               className={styles.navLink}
-              href={homeHref}
+              href={exploreHref}
             >
               Explore
             </Link>

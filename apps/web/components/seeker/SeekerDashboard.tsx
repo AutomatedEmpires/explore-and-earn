@@ -8,7 +8,6 @@ import type { SeekerProfileRecord } from "@explore-and-earn/db";
 import { saveReadinessAction } from "../../app/actions/seekerProfile";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import type { DiscoveryListing } from "../discovery";
-import { DashboardNav } from "./DashboardNav";
 import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
 import { JourneyPipeline } from "./JourneyPipeline";
 import { MatchCardRail } from "./MatchCardRail";
@@ -208,7 +207,6 @@ export function SeekerDashboard({
   featuredEmployers,
   seekerName,
 }: SeekerDashboardProps) {
-  const [navOpen, setNavOpen] = useState(false);
   const [heroCoverUrl, setHeroCoverUrl] = useState<string | null>(
     profile?.heroCoverUrl ?? null,
   );
@@ -242,15 +240,6 @@ export function SeekerDashboard({
 
   return (
     <div className={styles.dashboard}>
-      {/* Mobile overlay drawer */}
-      <DashboardNav
-        open={navOpen}
-        onClose={() => setNavOpen(false)}
-        seekerName={seekerName}
-        avatarUrl={profile?.profilePhotoUrl}
-        unreadCount={status.unreadNotifications}
-      />
-
       {/* Desktop persistent sidebar (hidden on mobile via CSS) */}
       <SeekerSidebar
         seekerName={seekerName}
@@ -272,7 +261,6 @@ export function SeekerDashboard({
           seekerProfileId={profile?.id ?? null}
           onReadinessChange={handleReadinessChange}
           onHeroCoverChange={handleHeroCoverChange}
-          onNavOpen={() => setNavOpen(true)}
           readinessSaving={isPending}
         />
 

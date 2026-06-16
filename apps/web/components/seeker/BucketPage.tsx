@@ -1,20 +1,41 @@
 import type { ReactNode } from "react";
 
-import { SectionHeading } from "./SectionHeading";
-import styles from "./BucketPage.module.css";
+import { SeekerPage } from "./SeekerPage";
 
 export interface BucketPageProps {
   readonly title: string;
   readonly description?: string;
+  /** Optional "up to hub" affordance (e.g. "/profile"). */
+  readonly backHref?: string;
+  readonly backLabel?: string;
+  readonly actionLabel?: string;
+  readonly actionHref?: string;
   readonly children: ReactNode;
 }
 
-/** Shared scaffold for the lifecycle bucket routes (heading + content). */
-export function BucketPage({ title, description, children }: BucketPageProps) {
+/**
+ * Lifecycle/account bucket scaffold. Thin wrapper over the shared `SeekerPage`
+ * template so every bucket page inherits one header treatment + section rhythm.
+ */
+export function BucketPage({
+  title,
+  description,
+  backHref,
+  backLabel,
+  actionLabel,
+  actionHref,
+  children,
+}: BucketPageProps) {
   return (
-    <section className={styles.section}>
-      <SectionHeading as="h1" title={title} description={description} />
+    <SeekerPage
+      title={title}
+      description={description}
+      backHref={backHref}
+      backLabel={backLabel}
+      actionLabel={actionLabel}
+      actionHref={actionHref}
+    >
       {children}
-    </section>
+    </SeekerPage>
   );
 }

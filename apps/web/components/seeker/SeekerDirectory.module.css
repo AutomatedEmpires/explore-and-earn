@@ -1,0 +1,112 @@
+/* SeekerDirectory — one organized nav: three labelled groups of cell rows. */
+.directory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-section);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.groupTitle {
+  margin: 0;
+  padding-inline: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.card {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: var(--tap-min);
+  padding: var(--space-12) var(--space-14);
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.card > li:last-child .row {
+  border-bottom: none;
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--color-paper) 55%, transparent);
+}
+
+.row:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+  border-radius: var(--radius-cell);
+}
+
+.icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-chip-compact);
+  height: var(--icon-chip-compact);
+  border-radius: calc(var(--radius-cell) - 6px);
+  background: color-mix(in srgb, var(--color-paper) 72%, white 28%);
+  color: var(--text-primary);
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.meta {
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.metaBadge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  background: var(--status-match-bg);
+  color: var(--status-match-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.chevron {
+  flex-shrink: 0;
+  display: flex;
+  color: var(--text-muted);
+}
