@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/coverage/**",
       "**/.turbo/**",
+      "**/.remember/**",
       "**/*.d.ts",
       "pnpm-lock.yaml"
     ]
