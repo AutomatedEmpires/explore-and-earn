@@ -72,8 +72,11 @@ export default async function AcceptedPage() {
 				</div>
 			) : (
 				<EmptyState
+					illustration="empty.accepted"
 					title="No accepted roles yet"
 					message="When you accept an offer, your upcoming role will live here. Keep exploring opportunities under Seek."
+					actionLabel="Explore opportunities"
+					actionHref="/seek"
 				/>
 			)}
 		</BucketPage>

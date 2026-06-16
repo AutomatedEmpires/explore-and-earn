@@ -10,12 +10,24 @@
   gap: var(--space-8);
 }
 
+/* Equal-weight, ≥44px targets; full-width stack on the smallest phones. */
+.buttons > * {
+  flex: 1 1 auto;
+  min-height: var(--tap-min);
+}
+
+@media (max-width: 380px) {
+  .buttons { flex-direction: column; }
+  .buttons > * { width: 100%; }
+}
+
 .expiry {
   margin: 0;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
-  color: var(--status-warning-fg);
+  font-weight: var(--font-weight-medium);
+  color: var(--state-soon-fg);
 }
 
 .success {
@@ -31,5 +43,6 @@
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
-  color: var(--status-warning-fg);
+  font-weight: var(--font-weight-medium);
+  color: var(--status-error-fg);
 }

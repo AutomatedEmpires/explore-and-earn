@@ -1,3 +1,5 @@
+/* StatusStrip — grid layout over the shared ui-stat primitive.
+   Cells, hierarchy, and colors come from ui-stat / ui-stat--* (primitives.css). */
 .strip {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -7,39 +9,11 @@
   list-style: none;
 }
 
-.item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-12);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-cell);
-  background: var(--color-surface-raised);
-}
-
-.priority {
-  border-color: var(--status-warning-fg);
-  background: var(--status-warning-bg);
-}
-
-.label {
+/* ui-stat__label is text-only in the primitive; align its leading icon here. */
+.strip :global(.ui-stat__label) {
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-lh);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--type-label-tracking);
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.value {
-  font-family: var(--font-display);
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
-  color: var(--text-primary);
 }
 
 @media (min-width: 640px) {

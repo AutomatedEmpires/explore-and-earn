@@ -130,7 +130,7 @@
   height: 100%;
   width: var(--barFill, 0%);
   border-radius: 4px;
-  background: color-mix(in srgb, var(--color-sky, #0ea5e9) 80%, var(--color-navy, #1e3a5f) 20%);
+  background: color-mix(in srgb, var(--palette-sky) 82%, var(--palette-sky-dark) 18%);
   min-width: 2px;
   transition: width var(--motion-base) var(--ease-standard);
 }

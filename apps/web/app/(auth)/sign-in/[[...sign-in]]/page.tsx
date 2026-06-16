@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { SignIn } from "@clerk/nextjs";
 
 import styles from "../../auth.module.css";
+import { clerkAppearance } from "../../clerk-appearance";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -14,7 +16,13 @@ export default async function SignInPage({ searchParams }: Props) {
 
   return (
     <main className={styles.authPage}>
-      <SignIn forceRedirectUrl={redirect_url} />
+      <div className={styles.authInner}>
+        <Link href="/" className={styles.brand} aria-label="Explore and Earn — home">
+          Explore<span className={styles.brandAmp}>&amp;</span>Earn
+        </Link>
+        <p className={styles.tagline}>Welcome back, seeker.</p>
+        <SignIn appearance={clerkAppearance} forceRedirectUrl={redirect_url} />
+      </div>
     </main>
   );
 }

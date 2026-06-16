@@ -99,6 +99,7 @@ export function OpportunityMap({ listings, initialFocusId }: OpportunityMapProps
 	if (listings.length === 0) {
 		return (
 			<EmptyState
+				illustration="empty.map"
 				title="No opportunities on the map yet"
 				message="As hosts post roles, they'll appear here grouped by location."
 			/>

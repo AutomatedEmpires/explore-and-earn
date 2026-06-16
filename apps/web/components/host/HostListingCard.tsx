@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Badge, Icon } from "@explore-and-earn/ui";
+import { Icon } from "@explore-and-earn/ui";
 
 import {
   pauseListingAction,
@@ -12,7 +12,6 @@ import {
 } from "../../app/actions/listings";
 import { CATEGORY_LABEL } from "../discovery";
 import {
-  HOST_LISTING_STATE_ICON,
   HOST_LISTING_STATE_LABEL,
   type HostListingItem,
 } from "./models";
@@ -75,46 +74,76 @@ export function HostListingCard({ item }: HostListingCardProps) {
     });
   }
 
+  const benefits = [
+    { key: "housing", label: "Housing", provided: listing.benefits.housing.provision !== "not_provided" },
+    { key: "meals", label: "Meals", provided: listing.benefits.meals.provision !== "not_provided" },
+    { key: "pay", label: "Pay", provided: listing.benefits.pay.provision !== "not_provided" },
+  ] as const;
+
   return (
     <>
       <article className={`${styles.card}${isPending ? ` ${styles.cardPending}` : ""}`}>
         <div className={styles.head}>
           <div className={styles.titleGroup}>
+            <span className={styles.category}>{CATEGORY_LABEL[listing.category]}</span>
             <span className={styles.title}>{listing.title}</span>
             <span className={styles.location}>
+              <Icon name="status.open" size={16} aria-hidden />
               {listing.location} · {listing.opportunityWindow}
             </span>
           </div>
-          <Badge
-            label={HOST_LISTING_STATE_LABEL[state]}
-            icon={HOST_LISTING_STATE_ICON[state]}
-          />
+          <span className="host-status" data-state={state}>
+            {HOST_LISTING_STATE_LABEL[state]}
+          </span>
         </div>
-        <dl className={styles.stats}>
-          <div className={styles.stat}>
-            <dt className={styles.statLabel}>Category</dt>
-            <dd className={styles.statValue}>{CATEGORY_LABEL[listing.category]}</dd>
-          </div>
-          <div className={styles.stat}>
-            <dt className={styles.statLabel}>Applicants</dt>
-            <dd className={styles.statValue}>{applicantCount}</dd>
-          </div>
-          <div className={styles.stat}>
-            <dt className={styles.statLabel}>New</dt>
-            <dd className={styles.statValue}>{newApplicantCount}</dd>
-          </div>
-        </dl>
+
+        {/* Housing / Meals / Pay — product-law triad, never collapsed */}
+        <div className={styles.benefits}>
+          {benefits.map((b) => (
+            <span
+              key={b.key}
+              className={styles.benefit}
+              data-provided={b.provided ? "true" : "false"}
+            >
+              <Icon name={b.provided ? "system.success" : "action.close"} size={16} aria-hidden />
+              {b.label}
+            </span>
+          ))}
+        </div>
+
+        {/* Applicant summary — "new" emphasized */}
+        <div className={styles.applicantRow}>
+          <span className={styles.applicantCount}>
+            <strong>{applicantCount}</strong> applicant{applicantCount === 1 ? "" : "s"}
+          </span>
+          {newApplicantCount > 0 ? (
+            <span className="host-status" data-state="new">
+              {newApplicantCount} new
+            </span>
+          ) : null}
+        </div>
+
         {actionError ? (
           <p className={styles.errorMsg} role="alert">
             {actionError}
           </p>
         ) : null}
+
         <div className={styles.actions}>
           <Link className={styles.manageLink} href={`/host/listings/${listing.id}`}>
-            <Icon name="action.forward" size={20} aria-hidden />
             <span>Manage</span>
+            <Icon name="action.forward" size={16} aria-hidden />
           </Link>
           <div className={styles.quickActions}>
+            <button
+              type="button"
+              className={styles.boostBtn}
+              onClick={() => setBoostOpen(true)}
+              aria-label="Boost listing"
+            >
+              <Icon name="status.boosted" size={16} aria-hidden />
+              <span>Boost</span>
+            </button>
             {canPause ? (
               <button
                 type="button"
@@ -139,15 +168,6 @@ export function HostListingCard({ item }: HostListingCardProps) {
                 <Icon name="status.open" size={16} aria-hidden />
               </button>
             ) : null}
-            <button
-              type="button"
-              className={`${styles.quickBtn} ${styles.quickBtnBoost}`}
-              onClick={() => setBoostOpen(true)}
-              aria-label="Boost listing"
-              title="Boost"
-            >
-              <Icon name="status.boosted" size={16} aria-hidden />
-            </button>
             {canArchive ? (
               <button
                 type="button"

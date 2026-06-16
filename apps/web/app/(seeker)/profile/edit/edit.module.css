@@ -79,17 +79,23 @@
 	flex-direction: column;
 	gap: var(--space-8);
 	text-align: left;
+	min-height: var(--tap-min);
 	padding: var(--space-12);
-	border: none;
+	border: 1px solid var(--border-soft);
 	border-radius: var(--radius-card);
 	background: var(--color-surface-raised);
 	color: var(--text-primary);
 	cursor: pointer;
-	flex: 1 1 0;
+	flex: 1 1 140px;
+	transition:
+		background var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard);
 }
 
 .optionSelected {
-	outline: 2px solid var(--text-primary);
+	border-color: var(--color-cta);
+	background: var(--status-match-bg);
+	box-shadow: inset 0 0 0 1px var(--color-cta);
 }
 
 .optionLabel {
@@ -109,18 +115,24 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-8);
+	min-height: var(--tap-min);
 	padding: var(--space-8) var(--space-12);
-	border: none;
-	border-radius: var(--radius-cell);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
 	background: var(--color-surface-raised);
 	color: var(--text-primary);
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	cursor: pointer;
+	transition:
+		background var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard);
 }
 
 .tagSelected {
-	outline: 2px solid var(--text-primary);
+	border-color: var(--color-cta);
+	background: var(--status-match-bg);
+	color: var(--status-match-fg);
 }
 
 .tagRow {
@@ -151,8 +163,9 @@
 	font-size: var(--type-body-size);
 	color: var(--text-primary);
 	background: var(--color-surface-raised);
-	border: none;
+	border: 1px solid var(--border-soft);
 	border-radius: var(--radius-cell);
+	min-height: var(--tap-min);
 	padding: var(--space-12);
 	flex-shrink: 0;
 }
@@ -179,13 +192,38 @@
 
 .primaryButton {
 	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
-	color: var(--color-paper);
-	background: var(--text-primary);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	min-height: var(--tap-min);
+	color: var(--color-cta-text);
+	background: var(--color-cta);
 	border: none;
-	border-radius: var(--radius-cell);
+	border-radius: var(--radius-button);
 	padding: var(--space-12) var(--space-section);
 	cursor: pointer;
+	transition: filter var(--motion-fast) var(--ease-standard);
+}
+
+.primaryButton:hover {
+	filter: brightness(1.06) saturate(1.04);
+}
+
+/* Stack pay row, tag row, and footer on small phones so inputs never crush. */
+@media (max-width: 480px) {
+	.payRow {
+		flex-wrap: wrap;
+	}
+	.tagRow {
+		flex-direction: column;
+		align-items: stretch;
+	}
+	.footer {
+		flex-direction: column-reverse;
+		align-items: stretch;
+	}
+	.footer .primaryButton {
+		width: 100%;
+	}
 }
 
 .primaryButton:disabled {

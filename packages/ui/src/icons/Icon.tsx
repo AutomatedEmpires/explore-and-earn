@@ -69,9 +69,11 @@ export interface IconProps {
 	title?: string
 	/** Override CSS color for tinting — used by mappin.* for category accent colors. */
 	color?: string
+	/** Optional class on the rendered span (used by AppIcon to forward styling). */
+	className?: string
 }
 
-export function Icon({ name, size = 24, title, color, ...rest }: IconProps) {
+export function Icon({ name, size = 24, title, color, className, ...rest }: IconProps) {
 	const entry = getIcon(name)
 	const label = title ?? entry.label
 	const hidden = rest["aria-hidden"]
@@ -94,6 +96,7 @@ export function Icon({ name, size = 24, title, color, ...rest }: IconProps) {
 				aria-label={hidden ? undefined : label}
 				aria-hidden={hidden}
 				data-icon={name}
+				className={className}
 				style={{ ...baseStyle, lineHeight: 0 }}
 				dangerouslySetInnerHTML={{ __html: svgText }}
 			/>
@@ -110,6 +113,7 @@ export function Icon({ name, size = 24, title, color, ...rest }: IconProps) {
 			aria-hidden={hidden}
 			data-icon={name}
 			data-streamline={entry.streamline}
+			className={className}
 			style={{
 				...baseStyle,
 				borderRadius: "30%",

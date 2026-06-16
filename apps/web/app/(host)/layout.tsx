@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { GlobalHeader } from "../../components/global";
 import { HostBottomNav } from "../../components/host";
+import "../../styles/host.css";
 import styles from "./layout.module.css";
 
 /**

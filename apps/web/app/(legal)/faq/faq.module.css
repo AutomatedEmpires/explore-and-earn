@@ -1,0 +1,51 @@
+/* FAQ Q&A items — token-driven, mobile-first. Reuses legal.module.css for the
+   hero + section chrome; this file only styles the question/answer pairs. */
+
+.list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	margin-top: var(--space-12);
+}
+
+.item {
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-cell);
+	background: var(--color-surface-raised);
+	padding: var(--space-16);
+	box-shadow: var(--elevation-card);
+}
+
+.q {
+	margin: 0 0 var(--space-8);
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	color: var(--text-primary);
+}
+
+.a {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.a a {
+	color: var(--color-cta);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.a a:focus-visible {
+	outline: none;
+	border-radius: var(--radius-input);
+	box-shadow: 0 0 0 2px var(--color-surface-raised), 0 0 0 4px var(--color-cta);
+}
+
+@media (min-width: 640px) {
+	.item {
+		padding: var(--space-20);
+	}
+}

@@ -12,7 +12,8 @@
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	min-height: 15rem;
+	/* responsive — was a fixed 15rem that overflowed a phone viewport */
+	min-height: clamp(11rem, 38vw, 15rem);
 	padding: var(--space-16);
 	justify-content: space-between;
 	overflow: hidden;

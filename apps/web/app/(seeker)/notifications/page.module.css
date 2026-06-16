@@ -5,8 +5,8 @@
 }
 
 .button {
-	min-height: 40px;
-	padding: var(--space-8) var(--space-12);
+	min-height: var(--tap-min);
+	padding: var(--space-8) var(--space-16);
 	border: 1px solid var(--border-ink);
 	border-radius: var(--radius-pill);
 	background: var(--color-surface-raised);

@@ -24,16 +24,17 @@ export interface SeekerHeroProps {
   readonly readinessSaving?: boolean;
 }
 
+// Category atmospheres are tokenized in styles/tokens.css — every "maritime"
+// surface renders the same blue. Never inline category hex here again.
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  maritime: "linear-gradient(155deg, #072944 0%, #0E4F80 38%, #1874AC 70%, #3A96C6 100%)",
-  farm:     "linear-gradient(155deg, #2A1608 0%, #5C3610 35%, #96601C 68%, #CC9440 100%)",
-  remote:   "linear-gradient(155deg, #0A1422 0%, #182A40 35%, #2A4668 68%, #4268A0 100%)",
-  seasonal: "linear-gradient(155deg, #0C1E08 0%, #204015 35%, #38701E 68%, #76B03A 100%)",
-  mix:      "linear-gradient(155deg, #18082A 0%, #341256 38%, #64228C 70%, #A44060 100%)",
+  maritime: "var(--gradient-category-maritime)",
+  farm:     "var(--gradient-category-farm)",
+  remote:   "var(--gradient-category-remote)",
+  seasonal: "var(--gradient-category-seasonal)",
+  mix:      "var(--gradient-category-mix)",
 };
 
-const DEFAULT_GRADIENT =
-  "linear-gradient(155deg, #1A2030 0%, #2C3E58 38%, #406080 70%, #6090B0 100%)";
+const DEFAULT_GRADIENT = "var(--gradient-category-default)";
 
 const CATEGORY_LABELS: Record<string, string> = {
   maritime: "Maritime",

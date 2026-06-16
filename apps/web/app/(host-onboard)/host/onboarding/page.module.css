@@ -51,11 +51,25 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	line-height: var(--type-body-lh);
+	min-height: var(--tap-min);
 	padding: var(--space-12);
-	border-radius: var(--radius-cell);
-	border: none;
-	background: var(--color-paper);
+	border-radius: var(--radius-input);
+	border: 1px solid var(--field-border);
+	background: var(--field-bg);
 	color: var(--text-primary);
+	transition:
+		border-color var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.input::placeholder {
+	color: var(--field-placeholder);
+}
+
+.input:focus-visible {
+	outline: none;
+	border-color: var(--field-border-focus);
+	box-shadow: var(--ui-focus-ring);
 }
 
 .error {

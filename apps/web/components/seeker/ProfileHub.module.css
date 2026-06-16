@@ -220,7 +220,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #6AE89A;
+  background: var(--state-live-dot);
   flex-shrink: 0;
   box-shadow: 0 0 6px rgba(106, 232, 154, 0.8);
   animation: dotPulse 3s ease-in-out infinite;
@@ -252,11 +252,11 @@
   text-transform: capitalize;
 }
 
-.cat_maritime { background: rgba(15, 80, 128, 0.1);  border-color: rgba(24, 116, 172, 0.3); color: #0E4F80; }
-.cat_farm     { background: rgba(94, 60, 18, 0.1);   border-color: rgba(150, 96, 28, 0.3);  color: #5C3610; }
-.cat_remote   { background: rgba(30, 50, 78, 0.1);   border-color: rgba(42, 70, 104, 0.3);  color: #2A4668; }
-.cat_seasonal { background: rgba(37, 74, 26, 0.1);   border-color: rgba(56, 112, 30, 0.3);  color: #204015; }
-.cat_mix      { background: rgba(90, 34, 106, 0.1);  border-color: rgba(100, 34, 140, 0.3); color: #341256; }
+.cat_maritime { background: var(--accent-maritime-bg); border-color: var(--accent-maritime-fg); color: var(--accent-maritime-fg); }
+.cat_farm     { background: var(--accent-farm-bg);     border-color: var(--accent-farm-fg);     color: var(--accent-farm-fg); }
+.cat_remote   { background: var(--accent-remote-bg);   border-color: var(--accent-remote-fg);   color: var(--accent-remote-fg); }
+.cat_seasonal { background: var(--accent-seasonal-bg); border-color: var(--accent-seasonal-fg); color: var(--accent-seasonal-fg); }
+.cat_mix      { background: var(--accent-mix-bg);      border-color: var(--accent-mix-fg);      color: var(--accent-mix-fg); }
 
 .bio {
   font-family: var(--font-ui);
@@ -347,17 +347,17 @@
 .statusGreen {
   background: linear-gradient(135deg, rgba(45, 122, 58, 0.1) 0%, rgba(45, 122, 58, 0.05) 100%);
 }
-.statusGreen .statusIcon  { color: #2D7A3A; }
-.statusGreen .statusLabel { color: #2D7A3A; }
-.statusGreen .statusSub   { color: #2D7A3A; }
+.statusGreen .statusIcon  { color: var(--state-ready-fg); }
+.statusGreen .statusLabel { color: var(--state-ready-fg); }
+.statusGreen .statusSub   { color: var(--state-ready-fg); }
 
 /* Amber = not ready */
 .statusAmber {
   background: linear-gradient(135deg, rgba(196, 138, 24, 0.1) 0%, rgba(196, 138, 24, 0.05) 100%);
 }
-.statusAmber .statusIcon  { color: #C48A18; }
-.statusAmber .statusLabel { color: #C48A18; }
-.statusAmber .statusSub   { color: #9A6A10; }
+.statusAmber .statusIcon  { color: var(--state-soon-fg); }
+.statusAmber .statusLabel { color: var(--state-soon-fg); }
+.statusAmber .statusSub   { color: var(--state-soon-fg); }
 
 /* Minor stat cells */
 .miniStat {
@@ -378,6 +378,18 @@
 .miniStat:last-child { border-right: none; }
 .miniStat:hover { background: rgba(0, 0, 0, 0.04); }
 
+/* Small phones — stack the prominent status cell above a 4-up mini-stat row
+   so nothing crushes below 380px. */
+@media (max-width: 380px) {
+  .statsRow { flex-wrap: wrap; }
+  .statusCell {
+    flex: 1 0 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .miniStat { flex: 1 0 25%; }
+}
+
 .miniVal {
   font-family: var(--font-display);
   font-size: 20px;
@@ -396,8 +408,8 @@
   line-height: 1;
 }
 
-.miniStatUrgent .miniVal   { color: #C48A18; }
-.miniStatUrgent .miniLabel { color: #C48A18; }
+.miniStatUrgent .miniVal   { color: var(--state-soon-fg); }
+.miniStatUrgent .miniLabel { color: var(--state-soon-fg); }
 
 /* ── Resume completion callout ── */
 .resumeCallout {
@@ -427,13 +439,13 @@
   font-family: var(--font-ui);
   font-size: 14px;
   font-weight: 700;
-  color: #8B6B10;
+  color: var(--state-soon-fg);
 }
 
 .resumeCalloutSub {
   font-family: var(--font-ui);
   font-size: 12px;
-  color: #A07A20;
+  color: var(--benefit-pay-fg);
   line-height: 1.35;
 }
 
@@ -447,7 +459,7 @@
 .resumeFill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #C48A18 0%, #E6A820 100%);
+  background: var(--gradient-state-soon);
   transition: width 0.4s ease;
 }
 
@@ -455,7 +467,7 @@
   font-family: var(--font-ui);
   font-size: 20px;
   font-weight: 600;
-  color: #C48A18;
+  color: var(--state-soon-fg);
   flex-shrink: 0;
   opacity: 0.8;
 }
@@ -536,26 +548,25 @@
 /* ── Manage grid ── */
 .manageGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-8);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-12);
   margin: 0 var(--space-16);
   padding: 0;
   list-style: none;
 }
 
-@media (min-width: 480px) {
-  .manageGrid { grid-template-columns: repeat(3, 1fr); }
-}
-
-@media (min-width: 768px) {
-  .manageGrid { grid-template-columns: repeat(4, 1fr); }
+.manageGrid > li {
+  height: 100%;
 }
 
 .manageTile {
   display: flex;
+  flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-8);
-  padding: var(--space-card);
+  justify-content: space-between;
+  gap: var(--space-16);
+  min-height: 10.5rem;
+  padding: var(--space-16);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-cell);
   background: var(--color-surface-raised);
@@ -580,14 +591,19 @@
 .tileIcon {
   flex-shrink: 0;
   display: flex;
-  padding-top: 2px;
-  color: var(--text-secondary);
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: calc(var(--radius-cell) - 8px);
+  background: color-mix(in srgb, var(--color-paper) 74%, white 26%);
+  color: var(--text-primary);
 }
 
 .tileText {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-6);
   min-width: 0;
 }
 

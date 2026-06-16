@@ -47,7 +47,7 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-caption-size);
 	line-height: var(--type-caption-lh);
-	color: var(--status-danger-fg, #b00020);
+	color: var(--status-error-fg);
 }
 
 /* ── Actions row ──────────────────────────────────────── */
@@ -67,7 +67,7 @@
 	border: none;
 	border-radius: var(--radius-button);
 	background: var(--color-cta);
-	color: #ffffff;
+	color: var(--color-cta-text);
 	font-family: var(--font-ui);
 	font-size: var(--type-label-size);
 	line-height: var(--type-label-lh);

@@ -30,16 +30,23 @@
 
 .action {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-12);
+  margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-12));
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   font-weight: var(--font-weight-semibold);
   color: var(--status-match-fg);
   text-decoration: none;
-  border-radius: var(--radius-input);
+  border-radius: var(--radius-pill);
+  transition: background var(--motion-fast) var(--ease-standard);
 }
 
 .action:hover {
-  text-decoration: underline;
+  background: var(--status-match-bg);
 }
 
 .action:focus-visible {

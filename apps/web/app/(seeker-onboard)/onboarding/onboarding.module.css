@@ -16,12 +16,22 @@
 .progressDotActive {
 	height: 6px;
 	flex: 1 1 0;
-	border-radius: var(--radius-cell);
+	border-radius: var(--radius-pill);
 	background: var(--color-surface-raised);
+	border: 1px solid var(--border-soft);
+	transition: background var(--motion-base) var(--ease-standard);
 }
 
 .progressDotActive {
-	background: var(--text-primary);
+	background: var(--gradient-sky);
+	border-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.progressDot,
+	.progressDotActive {
+		transition: none;
+	}
 }
 
 .header {
@@ -72,19 +82,35 @@
 .input,
 .textarea {
 	width: 100%;
+	min-height: var(--tap-min);
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	line-height: var(--type-body-lh);
 	color: var(--text-primary);
-	background: var(--color-surface-raised);
-	border: none;
-	border-radius: var(--radius-cell);
+	background: var(--field-bg);
+	border: 1px solid var(--field-border);
+	border-radius: var(--radius-input);
 	padding: var(--space-12);
+	transition:
+		border-color var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+	color: var(--field-placeholder);
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+	outline: none;
+	border-color: var(--field-border-focus);
+	box-shadow: var(--ui-focus-ring);
 }
 
 .textarea {
 	resize: vertical;
-	min-height: var(--space-section);
+	min-height: calc(var(--tap-min) * 2);
 }
 
 .options {
@@ -100,16 +126,33 @@
 	gap: var(--space-8);
 	text-align: left;
 	width: 100%;
-	padding: var(--space-12);
-	border: none;
+	min-height: var(--tap-min);
+	padding: var(--space-14);
+	border: 1.5px solid var(--border-soft);
 	border-radius: var(--radius-card);
 	background: var(--color-surface-raised);
 	color: var(--text-primary);
 	cursor: pointer;
+	transition:
+		border-color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.option:hover {
+	border-color: var(--border-ink);
+}
+
+.option:focus-visible,
+.optionSelected:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
 .optionSelected {
-	outline: 2px solid var(--text-primary);
+	border-color: var(--status-match-fg);
+	background: var(--status-match-bg);
+	box-shadow: var(--elevation-card);
 }
 
 .optionLabel {
@@ -135,18 +178,36 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-8);
-	padding: var(--space-8) var(--space-12);
-	border: none;
-	border-radius: var(--radius-cell);
+	min-height: 40px;
+	padding: var(--space-8) var(--space-14);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
 	background: var(--color-surface-raised);
 	color: var(--text-primary);
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	cursor: pointer;
+	transition:
+		border-color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.tag:hover {
+	border-color: var(--border-ink);
+}
+
+.tag:focus-visible,
+.tagSelected:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
 .tagSelected {
-	outline: 2px solid var(--text-primary);
+	border-color: var(--status-match-fg);
+	background: var(--status-match-bg);
+	color: var(--status-match-fg);
+	font-weight: var(--font-weight-semibold);
 }
 
 .tagRow {
@@ -164,27 +225,55 @@
 
 .primaryButton {
 	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
-	color: var(--color-paper);
-	background: var(--text-primary);
-	border: none;
-	border-radius: var(--radius-cell);
-	padding: var(--space-12) var(--space-section);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta-text);
+	background: var(--color-cta);
+	border: 1px solid transparent;
+	border-radius: var(--radius-button);
+	min-height: var(--tap-min);
+	padding: var(--space-12) var(--space-24);
 	cursor: pointer;
+	transition:
+		filter var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.primaryButton:hover:not(:disabled) {
+	filter: brightness(1.06);
+}
+
+.primaryButton:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
 .primaryButton:disabled {
-	opacity: 0.6;
-	cursor: default;
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 .linkButton {
 	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-medium);
 	color: var(--text-secondary);
 	background: transparent;
 	border: none;
+	border-radius: var(--radius-button);
+	min-height: var(--tap-min);
+	padding: var(--space-8) var(--space-12);
 	cursor: pointer;
+	transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.linkButton:hover {
+	color: var(--text-primary);
+}
+
+.linkButton:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
 .doneCard {

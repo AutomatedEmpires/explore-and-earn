@@ -17,6 +17,7 @@ export function MessageList({ threads }: MessageListProps) {
 	if (threads.length === 0) {
 		return (
 			<EmptyState
+				illustration="empty.messages"
 				title="No messages yet"
 				message="Conversations with hosts appear here once you apply, get invited, or receive an offer."
 			/>

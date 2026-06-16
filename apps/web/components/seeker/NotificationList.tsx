@@ -11,6 +11,7 @@ export function NotificationList({ items }: NotificationListProps) {
 	if (items.length === 0) {
 		return (
 			<EmptyState
+				illustration="empty.notifications"
 				title="You're all caught up"
 				message="New invites, offers, and updates will show up here."
 			/>

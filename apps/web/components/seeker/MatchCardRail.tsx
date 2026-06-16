@@ -21,15 +21,16 @@ export interface MatchCardRailProps {
   readonly title?: string;
 }
 
+// Tokenized category atmospheres (shared with hero/profile/featured surfaces).
 const CATEGORY_COLORS: Record<string, string> = {
-  maritime: "linear-gradient(160deg, #0D3B5E 0%, #4A9CC9 100%)",
-  farm: "linear-gradient(160deg, #3D2B14 0%, #C49A50 100%)",
-  remote: "linear-gradient(160deg, #1B2838 0%, #5B7FA8 100%)",
-  seasonal: "linear-gradient(160deg, #2D4A1E 0%, #C4A84A 100%)",
-  mix: "linear-gradient(160deg, #2D1A3E 0%, #C47060 100%)",
+  maritime: "var(--gradient-category-maritime)",
+  farm: "var(--gradient-category-farm)",
+  remote: "var(--gradient-category-remote)",
+  seasonal: "var(--gradient-category-seasonal)",
+  mix: "var(--gradient-category-mix)",
 };
 
-const DEFAULT_COLOR = "linear-gradient(160deg, #2A3040 0%, #8A9EB8 100%)";
+const DEFAULT_COLOR = "var(--gradient-category-default)";
 
 function ScoreBadge({ score }: { score: number }) {
   if (score <= 0) return null;
@@ -74,13 +75,13 @@ function MatchCard({ listing }: { listing: DiscoveryListing }) {
 
         <div className={styles.cardBenefits}>
           {hasHousing && (
-            <span className={styles.benefit} title="Housing included">
-              <Icon name="action.more" size={16} />
+            <span className={styles.benefit} title="Housing included" aria-label="Housing included">
+              <Icon name="benefit.housing" size={16} />
             </span>
           )}
           {hasMeals && (
-            <span className={styles.benefit} title="Meals included">
-              <Icon name="action.more" size={16} />
+            <span className={styles.benefit} title="Meals included" aria-label="Meals included">
+              <Icon name="benefit.meals" size={16} />
             </span>
           )}
           {listing.payInsight && formatPay(listing.payInsight) && (

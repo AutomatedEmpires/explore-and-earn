@@ -80,7 +80,7 @@
 
 .stepBtnActive {
 	background: var(--color-cta);
-	color: #fff;
+	color: var(--color-cta-text);
 }
 
 .stepBtnDone {
@@ -178,7 +178,7 @@
 
 .segmentActive {
 	background: var(--color-cta);
-	color: #fff;
+	color: var(--color-cta-text);
 }
 
 /* ── Section head ─────────────────────────────────────────────────────────── */
@@ -215,7 +215,7 @@
 	align-items: center;
 	padding: 2px var(--space-8);
 	border-radius: var(--radius-pill);
-	background: var(--color-action-soft, #EAF2F5);
+	background: var(--status-match-bg);
 	color: var(--color-cta);
 	font-family: var(--font-ui);
 	font-size: 10px;
@@ -422,7 +422,7 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	font-weight: var(--font-weight-semibold);
-	color: #fff;
+	color: var(--color-cta-text);
 	background: var(--color-cta);
 	border: none;
 	border-radius: var(--radius-cell);
@@ -474,8 +474,8 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 28px;
-	height: 28px;
+	width: var(--tap-min);
+	height: var(--tap-min);
 	background: transparent;
 	border: none;
 	border-radius: var(--radius-cell);
@@ -489,7 +489,7 @@
 
 .iconBtnDanger {
 	composes: iconBtn;
-	color: var(--text-error, var(--text-secondary));
+	color: var(--status-error-fg);
 }
 
 .iconBtnDanger:hover {
@@ -664,6 +664,23 @@
 	gap: var(--space-12);
 	padding-top: var(--space-section);
 	border-top: 1px solid var(--border-soft);
+}
+
+/* On phones the Prev/Next controls stick to the bottom so they stay reachable
+   on long steps (e.g. Experience with several saved cards). */
+@media (max-width: 640px) {
+	.stepFooter {
+		position: sticky;
+		bottom: 0;
+		z-index: 5;
+		margin: var(--space-16) calc(-1 * var(--space-gutter)) 0;
+		padding: var(--space-12) var(--space-gutter)
+			calc(var(--space-12) + env(safe-area-inset-bottom));
+		background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		box-shadow: var(--elevation-card);
+	}
 }
 
 .stepCounter {

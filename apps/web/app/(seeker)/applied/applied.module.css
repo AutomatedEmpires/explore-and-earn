@@ -142,6 +142,19 @@
 	margin: 0;
 }
 
+/* On the smallest phones, stack the triad so values never crush/clip. */
+@media (max-width: 380px) {
+	.triad {
+		grid-template-columns: 1fr;
+	}
+	.triadItem {
+		flex-direction: row;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: var(--space-8);
+	}
+}
+
 .triadItem {
 	display: flex;
 	flex-direction: column;

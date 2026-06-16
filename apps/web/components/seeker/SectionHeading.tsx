@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Icon } from "@explore-and-earn/ui";
 import styles from "./SectionHeading.module.css";
 
 export interface SectionHeadingProps {
@@ -28,6 +29,7 @@ export function SectionHeading({
       {actionLabel && actionHref ? (
         <Link className={styles.action} href={actionHref}>
           {actionLabel}
+          <Icon name="action.forward" size={16} aria-hidden />
         </Link>
       ) : null}
     </div>

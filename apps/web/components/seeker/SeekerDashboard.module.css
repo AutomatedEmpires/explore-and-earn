@@ -37,20 +37,28 @@
   display: flex;
   align-items: center;
   gap: var(--space-12);
-  padding: 12px var(--space-16);
-  background: linear-gradient(to right, #F5E6C0, #FBF3E2);
-  border-bottom: 1px solid #E5C87A;
+  padding: var(--space-12) var(--space-16);
+  background: linear-gradient(
+    to right,
+    var(--palette-amber-light),
+    color-mix(in srgb, var(--palette-amber-light) 45%, var(--color-surface-raised))
+  );
+  border-bottom: 1px solid color-mix(in srgb, var(--palette-amber) 55%, transparent);
   text-decoration: none;
   transition: background var(--motion-fast) var(--ease-standard);
 }
 
 .resumeCallout:hover {
-  background: linear-gradient(to right, #EDD98C, #F5E6C0);
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--palette-amber) 35%, var(--palette-amber-light)),
+    var(--palette-amber-light)
+  );
 }
 
 .resumeCallout:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px #C4961A;
+  box-shadow: var(--ui-focus-ring);
 }
 
 .calloutRing { flex-shrink: 0; }
@@ -59,27 +67,27 @@
 
 .calloutTitle {
   font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 700;
-  color: #6B4E10;
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--status-warning-fg);
   margin: 0;
 }
 
 .calloutSub {
   font-family: var(--font-ui);
-  font-size: 11px;
-  color: #9A7030;
+  font-size: var(--type-caption-size);
+  color: color-mix(in srgb, var(--status-warning-fg) 80%, var(--text-secondary));
   margin: 0;
 }
 
 .calloutCta {
   flex-shrink: 0;
   font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 700;
-  color: #8A5E14;
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--status-warning-fg);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--type-label-tracking);
   white-space: nowrap;
 }
 
@@ -125,7 +133,7 @@
 
 .resumeChip:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(47, 102, 122, 0.3);
+  box-shadow: var(--ui-focus-ring);
 }
 
 /* Stat chip */
@@ -154,16 +162,16 @@
 
 .statChip:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(47, 102, 122, 0.3);
+  box-shadow: var(--ui-focus-ring);
 }
 
 .statHighlight {
-  border-color: #2F667A;
-  background: #EEF6FA;
-  box-shadow: 0 0 0 1px #2F667A;
+  border-color: var(--status-match-fg);
+  background: color-mix(in srgb, var(--status-match-bg) 55%, var(--color-surface-raised));
+  box-shadow: 0 0 0 1px var(--status-match-fg), var(--elevation-card);
 }
 
-.statHighlight .statValue { color: #1F4858; }
+.statHighlight .statValue { color: var(--palette-sky-dark); }
 
 .statValue {
   font-family: var(--font-display);
@@ -229,23 +237,27 @@
 .teaserCard:hover {
   border-color: var(--border-ink);
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(36, 34, 30, 0.08);
+  box-shadow: var(--elevation-hover);
 }
 
 .teaserCard:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(47, 102, 122, 0.3);
+  box-shadow: var(--ui-focus-ring);
 }
 
 .teaserHighlight {
-  border-color: #2F667A;
-  background: linear-gradient(to bottom, #EEF6FA, #F4FBFF);
-  box-shadow: 0 0 0 1px #2F667A;
+  border-color: var(--status-match-fg);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--status-match-bg) 55%, var(--color-surface-raised)),
+    color-mix(in srgb, var(--status-match-bg) 25%, var(--color-surface-raised))
+  );
+  box-shadow: 0 0 0 1px var(--status-match-fg), var(--elevation-card);
 }
 
 .teaserHighlight .teaserIcon {
-  background: #2F667A;
-  color: #fff;
+  background: var(--status-match-fg);
+  color: var(--color-cta-text);
 }
 
 .teaserIcon {
@@ -287,9 +299,16 @@
   height: 22px;
   padding: 0 var(--space-6);
   border-radius: var(--radius-pill);
-  background: #2F667A;
-  color: #fff;
+  background: var(--status-match-fg);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Mobile: collapse the 3-up lifecycle grid so cards stay tappable */
+@media (max-width: 380px) {
+  .teaserRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

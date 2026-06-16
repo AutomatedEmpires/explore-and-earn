@@ -329,6 +329,414 @@
 }
 
 /* =================================================================== */
+/* Card elevation — opt-in *whisper* lift (borders-first stays default) */
+/* =================================================================== */
+.ui-card--raised {
+  box-shadow: var(--elevation-card);
+}
+
+/* Interactive card — soft lift on hover, reduced-motion safe */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .ui-card--interactive {
+    transition:
+      box-shadow var(--motion-base) var(--ease-standard),
+      transform var(--motion-base) var(--ease-standard);
+  }
+  .ui-card--interactive:hover {
+    box-shadow: var(--elevation-hover);
+    transform: translateY(-2px);
+  }
+}
+
+/* =================================================================== */
+/* Form fields — the single shared input system. Feature CSS modules   */
+/* may add the `ui-*` class alongside their own classes; states come   */
+/* for free. Token-driven; never hardcode field colors again.          */
+/* =================================================================== */
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.ui-label {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ui-input,
+.ui-textarea,
+.ui-select {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-12) var(--space-12);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-input);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-primary);
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.ui-textarea {
+  min-height: calc(var(--tap-min) * 2);
+  resize: vertical;
+}
+
+.ui-select {
+  appearance: none;
+  -webkit-appearance: none;
+  /* chevron drawn with a tokenized graphite stroke */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - var(--space-18)) center,
+    calc(100% - var(--space-12)) center;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: var(--space-32);
+}
+
+.ui-input::placeholder,
+.ui-textarea::placeholder {
+  color: var(--field-placeholder);
+}
+
+.ui-input:focus-visible,
+.ui-textarea:focus-visible,
+.ui-select:focus-visible {
+  outline: none;
+  border-color: var(--field-border-focus);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.ui-input:disabled,
+.ui-textarea:disabled,
+.ui-select:disabled {
+  background: var(--field-disabled-bg);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* invalid state — set on the field wrapper or the control directly */
+.ui-field--invalid .ui-input,
+.ui-field--invalid .ui-textarea,
+.ui-field--invalid .ui-select,
+.ui-input[aria-invalid="true"],
+.ui-textarea[aria-invalid="true"],
+.ui-select[aria-invalid="true"] {
+  border-color: var(--field-border-error);
+}
+
+.ui-help {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-muted);
+}
+
+.ui-error {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-medium);
+  color: var(--status-error-fg);
+}
+
+/* =================================================================== */
+/* Section header — one rhythm for every surface's section titles      */
+/* =================================================================== */
+.ui-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-16);
+}
+
+.ui-section-head__eyebrow {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--status-match-fg);
+}
+
+.ui-section-head__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.ui-section-head__sub {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* =================================================================== */
+/* Empty state — friendly, consistent across rails & screens           */
+/* =================================================================== */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-8);
+  padding: clamp(var(--space-24), 8vw, var(--space-48)) var(--space-16);
+  background: var(--gradient-paper-warm);
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-card);
+}
+
+.ui-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-chip);
+  height: var(--icon-chip);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--status-match-fg);
+}
+
+.ui-empty__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.ui-empty__body {
+  max-width: 32ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* =================================================================== */
+/* Stat — dashboard summary cell with a primary-emphasis modifier      */
+/* =================================================================== */
+.ui-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: var(--space-12) var(--space-14);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+}
+
+.ui-stat__value {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.ui-stat__label {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* primary stat — promotes the one number that matters */
+.ui-stat--primary {
+  background: var(--status-match-bg);
+  border-color: var(--status-match-fg);
+  box-shadow: var(--elevation-card);
+}
+.ui-stat--primary .ui-stat__value { color: var(--status-match-fg); }
+.ui-stat--primary .ui-stat__label { color: var(--status-match-fg); }
+
+/* =================================================================== */
+/* Category badge — one class replaces per-component data-category CSS  */
+/* Set data-category="farm|maritime|remote|seasonal|mix" on the node.   */
+/* =================================================================== */
+.ui-category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.ui-category-badge[data-category="farm"]     { background: var(--accent-farm-bg);     color: var(--accent-farm-fg); }
+.ui-category-badge[data-category="maritime"] { background: var(--accent-maritime-bg); color: var(--accent-maritime-fg); }
+.ui-category-badge[data-category="remote"]   { background: var(--accent-remote-bg);   color: var(--accent-remote-fg); }
+.ui-category-badge[data-category="seasonal"] { background: var(--accent-seasonal-bg); color: var(--accent-seasonal-fg); }
+.ui-category-badge[data-category="mix"]      { background: var(--accent-mix-bg);      color: var(--accent-mix-fg); }
+
+/* =================================================================== */
+/* Category surface — apply a tokenized category atmosphere via         */
+/* data-category. One class replaces the per-component hex gradient     */
+/* maps in hero/profile/rail components.                                */
+/* =================================================================== */
+.ui-cat-surface[data-category="farm"]     { background: var(--gradient-category-farm); }
+.ui-cat-surface[data-category="maritime"] { background: var(--gradient-category-maritime); }
+.ui-cat-surface[data-category="remote"]   { background: var(--gradient-category-remote); }
+.ui-cat-surface[data-category="seasonal"] { background: var(--gradient-category-seasonal); }
+.ui-cat-surface[data-category="mix"]      { background: var(--gradient-category-mix); }
+.ui-cat-surface                            { background: var(--gradient-category-default); }
+
+/* =================================================================== */
+/* Avatar — circle with gradient initials fallback. Size via            */
+/* --ui-avatar-size (default 48px); set data-category for a themed      */
+/* initials fill, else the sky gradient.                                */
+/* =================================================================== */
+.ui-avatar {
+  --ui-avatar-size: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--ui-avatar-size);
+  height: var(--ui-avatar-size);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  object-fit: cover;
+}
+.ui-avatar--initials {
+  background: var(--gradient-progress);
+  color: var(--color-cta-text);
+  font-family: var(--font-display);
+  font-size: calc(var(--ui-avatar-size) * 0.4);
+  line-height: 1;
+  text-transform: uppercase;
+}
+.ui-avatar--initials[data-category="farm"]     { background: var(--gradient-category-farm); }
+.ui-avatar--initials[data-category="maritime"] { background: var(--gradient-category-maritime); }
+.ui-avatar--initials[data-category="remote"]   { background: var(--gradient-category-remote); }
+.ui-avatar--initials[data-category="seasonal"] { background: var(--gradient-category-seasonal); }
+.ui-avatar--initials[data-category="mix"]      { background: var(--gradient-category-mix); }
+
+/* =================================================================== */
+/* Stat state modifiers — extend ui-stat with lifecycle accents.        */
+/* (ui-stat / ui-stat--primary already defined above.)                  */
+/* =================================================================== */
+.ui-stat--ready  { background: var(--state-ready-bg);  border-color: var(--state-ready-fg); }
+.ui-stat--ready  .ui-stat__value, .ui-stat--ready  .ui-stat__label { color: var(--state-ready-fg); }
+.ui-stat--soon   { background: var(--state-soon-bg);   border-color: var(--state-soon-fg); }
+.ui-stat--soon   .ui-stat__value, .ui-stat--soon   .ui-stat__label { color: var(--state-soon-fg); }
+.ui-stat--urgent { background: var(--state-urgent-bg); border-color: var(--state-urgent-fg); box-shadow: var(--elevation-card); }
+.ui-stat--urgent .ui-stat__value, .ui-stat--urgent .ui-stat__label { color: var(--state-urgent-fg); }
+
+/* =================================================================== */
+/* Rail — horizontal scroll-snap strip with an edge-fade affordance     */
+/* so off-screen content reads as "there's more". Wrap the scroller in  */
+/* .ui-rail; the fade is a ::after on the wrapper.                      */
+/* =================================================================== */
+.ui-rail {
+  position: relative;
+}
+.ui-rail__scroller {
+  display: flex;
+  gap: var(--space-12);
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: var(--space-4) var(--space-2) var(--space-12);
+}
+.ui-rail__scroller::-webkit-scrollbar { display: none; }
+.ui-rail__scroller > * { scroll-snap-align: start; flex-shrink: 0; }
+/* right edge fade — sits above the scroller, ignores pointer events */
+.ui-rail::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: var(--space-12);
+  width: var(--space-32);
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--color-paper));
+}
+
+/* =================================================================== */
+/* Response actions — Accept (primary) / Decline (secondary) pair.      */
+/* Stacks full-width below --bp-sm so both targets stay ≥44px.          */
+/* =================================================================== */
+.ui-response-actions {
+  display: flex;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+.ui-response-actions > * { flex: 1 1 auto; min-height: var(--tap-min); }
+@media (max-width: 380px) {
+  .ui-response-actions { flex-direction: column; }
+  .ui-response-actions > * { width: 100%; }
+}
+
+/* =================================================================== */
+/* Skeleton shimmer — opt-in gradient sweep (richer than opacity pulse) */
+/* =================================================================== */
+.ui-skeleton--shimmer {
+  position: relative;
+  overflow: hidden;
+  animation: none;
+  background: var(--border-soft);
+}
+.ui-skeleton--shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-surface-raised) 50%,
+    transparent 100%
+  );
+  opacity: 0.55;
+  animation: ui-skeleton-shimmer 1.4s var(--ease-standard) infinite;
+}
+
+@keyframes ui-skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
+/* =================================================================== */
+/* Global keyboard-focus fallback (WCAG 2.4.7)                          */
+/* :where() has ZERO specificity, so this guarantees a visible focus    */
+/* ring on every link/button/control that does NOT define its own       */
+/* :focus-visible style (e.g. inline links in legal/marketing prose).   */
+/* Any component rule (.ui-button:focus-visible, etc.) overrides it.    */
+/* =================================================================== */
+:where(a, button, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* =================================================================== */
 /* Reduced motion -- disable transitions/animations                    */
 /* =================================================================== */
 @media (prefers-reduced-motion: reduce) {
@@ -337,5 +745,9 @@
   .ui-skeleton {
     transition: none;
     animation: none;
+  }
+  .ui-skeleton--shimmer::after {
+    animation: none;
+    display: none;
   }
 }

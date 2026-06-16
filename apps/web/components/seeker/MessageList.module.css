@@ -62,12 +62,13 @@
 
 .context {
 	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	line-height: var(--type-label-lh);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
 	font-weight: var(--font-weight-semibold);
-	letter-spacing: var(--type-label-tracking);
-	text-transform: uppercase;
 	color: var(--text-secondary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .preview {
@@ -75,6 +76,9 @@
 	font-size: var(--type-meta-size);
 	line-height: var(--type-meta-lh);
 	color: var(--text-secondary);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .dot {

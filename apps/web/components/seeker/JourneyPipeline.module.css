@@ -30,7 +30,7 @@
 }
 
 .connectorFilled {
-  background: linear-gradient(to right, #2F667A, #5AA0BF);
+  background: var(--gradient-progress);
 }
 
 /* ─── Each step: dot + label stacked ─── */
@@ -69,15 +69,15 @@
 
 /* Active (has data) */
 .stepActive .dot {
-  border-color: #2F667A;
-  background: linear-gradient(135deg, #2F667A 0%, #4A9CC9 100%);
+  border-color: var(--color-cta);
+  background: var(--gradient-progress);
   box-shadow: 0 2px 10px rgba(47, 102, 122, 0.38);
 }
 
 /* Urgent (offers pending) — amber pulse */
 .stepUrgent .dot {
-  border-color: #B07A10;
-  background: linear-gradient(135deg, #C48A18 0%, #E0AA30 100%);
+  border-color: var(--state-soon-fg);
+  background: var(--gradient-state-soon);
   box-shadow: 0 2px 12px rgba(196, 138, 24, 0.48);
   animation: urgent-pulse 2.4s ease-in-out infinite;
 }
@@ -129,6 +129,6 @@
 }
 
 .stepUrgent .stepLabel {
-  color: #B07A10;
+  color: var(--state-soon-fg);
   font-weight: 700;
 }

@@ -71,8 +71,11 @@ export default async function NotSelectedPage() {
 				</div>
 			) : (
 				<EmptyState
-					title="Nothing here"
-					message="Roles that didn't work out will be listed here, quietly and respectfully. Keep exploring opportunities under Seek."
+					illustration="empty.notSelected"
+					title="Every 'no' gets you closer"
+					message="Roles that didn't work out will be listed here, quietly and respectfully. The right fit is still out there — keep exploring."
+					actionLabel="Explore opportunities"
+					actionHref="/seek"
 				/>
 			)}
 		</BucketPage>

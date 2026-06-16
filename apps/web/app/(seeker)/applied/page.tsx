@@ -249,6 +249,7 @@ export default async function AppliedPage() {
     >
       {applications.length === 0 ? (
         <EmptyState
+          illustration="empty.applications"
           title="No applications yet"
           message="When you apply to an opportunity, it'll show up here."
         />

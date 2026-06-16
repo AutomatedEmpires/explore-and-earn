@@ -11,12 +11,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--status-boosted-bg, #fef3c7) 80%, white 20%);
-  border: 1.5px solid color-mix(in srgb, var(--status-boosted-fg, #d97706) 20%, transparent);
-  color: var(--status-boosted-fg, #d97706);
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-gold);
+  border: 1.5px solid color-mix(in srgb, var(--status-boosted-fg) 28%, transparent);
+  color: var(--color-gold-text);
+  box-shadow: var(--elevation-card);
   flex-shrink: 0;
 }
 

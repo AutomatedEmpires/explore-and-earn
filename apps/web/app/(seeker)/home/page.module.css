@@ -59,8 +59,20 @@
 
 .routeGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--space-10);
+}
+
+@media (min-width: 480px) {
+  .routeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .routeGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .routeCard {
@@ -94,11 +106,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
-  background: color-mix(in srgb, var(--color-surface) 84%, white 16%);
+  border: 1px solid color-mix(in srgb, var(--border-ink) 14%, transparent);
+  background: var(--gradient-sky-soft);
+  color: var(--color-cta);
 }
 
 .routeText {
@@ -109,12 +122,6 @@
 
 .routeTitle {
   color: var(--text-primary);
-}
-
-@media (max-width: 768px) {
-  .routeGrid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

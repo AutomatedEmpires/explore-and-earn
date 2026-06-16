@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback, useTransition } from "react";
 import Link from "next/link";
-import { Icon } from "@explore-and-earn/ui";
+import { useRouter } from "next/navigation";
+import { Icon, AppIllustration, type IllustrationKey } from "@explore-and-earn/ui";
 import type { OpportunityCategory, ReactionKey } from "@explore-and-earn/contracts";
 import type {
   CommunityPhoto,
@@ -47,6 +48,7 @@ type HostAnnouncement = {
   readonly dbId?: string;
   readonly userReactions?: readonly ReactionKey[];
   readonly commentCount?: number;
+  readonly isPurchased?: boolean;
 };
 
 type BlogPost = {
@@ -345,6 +347,7 @@ function announcementsToFeedItems(anns: readonly ContractAnnouncement[]): HostAn
     dbId: a.id,
     userReactions: a.reactionCounts?.userReactions,
     commentCount: a.commentCount,
+    isPurchased: a.isPurchased,
   }));
 }
 
@@ -418,9 +421,18 @@ function PhotoUploadForm({
 
   return (
     <form className={styles.photoUploadForm} onSubmit={handleSubmit}>
+      <div className={styles.photoComposerHead}>
+        <span className={styles.photoComposerIcon} aria-hidden>
+          <Icon name="nav.photos" size={20} aria-hidden />
+        </span>
+        <div className={styles.photoComposerHeadText}>
+          <p className={styles.photoComposerTitle}>Share a moment</p>
+          <p className={styles.photoComposerSub}>Trails, sunrise shifts, the crew — add it to the community wall.</p>
+        </div>
+      </div>
       <label className={styles.photoFileField}>
         <span className={styles.photoFileLabel}>
-          <Icon name="nav.announcements" size={20} aria-hidden />
+          <Icon name="nav.photos" size={20} aria-hidden />
           Choose a photo
         </span>
         <input
@@ -657,7 +669,7 @@ function SeekerCard({ post, onHide, onToast }: SeekerCardProps) {
 function AnnouncementCard({ post }: { readonly post: HostAnnouncement }) {
   const hostHref = post.hostId ? `/host/${post.hostId}` : "/community";
   return (
-    <article className={styles.announcementCard}>
+    <article className={`${styles.announcementCard}${post.isPurchased ? ` ${styles.announcementCardPromoted}` : ""}`}>
       <div className={styles.tapeLeft} aria-hidden />
       <div className={styles.tapeRight} aria-hidden />
       <div className={styles.pushPin} aria-hidden />
@@ -670,6 +682,12 @@ function AnnouncementCard({ post }: { readonly post: HostAnnouncement }) {
               <Icon name="trust.verified_host" size={16} aria-hidden />
               Host
             </span>
+            {post.isPurchased ? (
+              <span className={styles.promotedBadge}>
+                <Icon name="status.featured" size={16} aria-hidden />
+                Promoted
+              </span>
+            ) : null}
           </div>
           <span className={styles.cardTime}>{post.timestamp}</span>
         </div>
@@ -921,6 +939,44 @@ function FeedEndMarker() {
   );
 }
 
+// ─── Community empty state ─────────────────────────────────────────────────────
+
+function CommunityEmptyState({
+  icon,
+  illustration,
+  heading,
+  sub,
+  ctaLabel,
+  ctaHref,
+}: {
+  readonly icon: Parameters<typeof Icon>[0]["name"];
+  readonly illustration?: IllustrationKey;
+  readonly heading: string;
+  readonly sub: string;
+  readonly ctaLabel?: string;
+  readonly ctaHref?: string;
+}) {
+  return (
+    <div className={styles.emptyState}>
+      {illustration ? (
+        <AppIllustration name={illustration} size="lg" aria-hidden />
+      ) : (
+        <span className={styles.emptyStateIcon} aria-hidden>
+          <Icon name={icon} size={24} aria-hidden />
+        </span>
+      )}
+      <p className={styles.emptyStateHeading}>{heading}</p>
+      <p className={styles.emptyStateSub}>{sub}</p>
+      {ctaLabel && ctaHref ? (
+        <Link href={ctaHref} className={styles.emptyStateCta}>
+          {ctaLabel}
+          <Icon name="action.forward" size={16} aria-hidden />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 // ─── Share composer CTA ───────────────────────────────────────────────────────
 
 function ShareComposer({ seekerInitial }: { readonly seekerInitial: string }) {
@@ -985,9 +1041,14 @@ function PhotoMasonryGrid({ photos }: { readonly photos: SeekerPost[] }) {
 
   if (!photos.length) {
     return (
-      <div className={styles.emptyState}>
-        <p>No photos yet — community members share moments from the field, sunrise shifts, and life on the trail here.</p>
-      </div>
+      <CommunityEmptyState
+        icon="nav.photos"
+        illustration="empty.photos"
+        heading="No photos yet"
+        sub="Be the first to share a moment from the field — sunrise shifts, trail views, and life on the road all belong here."
+        ctaLabel="Share a photo"
+        ctaHref="/community/photos"
+      />
     );
   }
 
@@ -1034,13 +1095,40 @@ function PhotoMasonryGrid({ photos }: { readonly photos: SeekerPost[] }) {
 
 // ─── Sidebar components ───────────────────────────────────────────────────────
 
-function WelcomeBar({ status }: { readonly status: SeekerStatusSummary }) {
+const SECTION_META: Record<"feed" | "photos" | "announcements", { eyebrow: string; blurb: string; icon: "nav.feed" | "nav.photos" | "nav.announcements" }> = {
+  feed: {
+    eyebrow: "Community Feed",
+    blurb: "Stories, photos, and announcements from seekers and hosts out on the trail.",
+    icon: "nav.feed",
+  },
+  photos: {
+    eyebrow: "Community Photos",
+    blurb: "Real moments from farms, boats, lodges, and the open road — shared by the crew.",
+    icon: "nav.photos",
+  },
+  announcements: {
+    eyebrow: "Announcements",
+    blurb: "Seasonal openings and hiring news from verified Explore & Earn hosts.",
+    icon: "nav.announcements",
+  },
+};
+
+function WelcomeBar({ status, tab }: { readonly status: SeekerStatusSummary; readonly tab: "feed" | "photos" | "announcements" }) {
   const level = Math.max(1, Math.ceil(status.resumeCompletion / 20));
   const xp = status.resumeCompletion * 10;
   const xpMax = 1000;
   const fillPct = status.resumeCompletion;
+  const section = SECTION_META[tab];
   return (
     <div className={styles.welcomeBar}>
+      <div className={styles.mastheadTop}>
+        <span className={styles.mastheadEyebrow}>
+          <Icon name={section.icon} size={16} aria-hidden />
+          Explore &amp; Earn Community
+        </span>
+        <h1 className={styles.mastheadTitle}>{section.eyebrow}</h1>
+        <p className={styles.mastheadBlurb}>{section.blurb}</p>
+      </div>
       <div className={styles.welcomeBarInner}>
         <div className={styles.welcomeAvatar} aria-hidden>
           {status.seekerName.charAt(0).toUpperCase() || "S"}
@@ -1182,6 +1270,7 @@ export function CommunityDashboard({
   hostDraftAnnouncementId = null,
 }: CommunityDashboardProps) {
   const { toasts, add: addToast } = useToasts();
+  const router = useRouter();
   const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(new Set());
 
   // Hydrate hidden posts from localStorage after mount
@@ -1243,7 +1332,7 @@ export function CommunityDashboard({
 
   return (
     <div className={styles.dashboard}>
-      <WelcomeBar status={status} />
+      <WelcomeBar status={status} tab={tab} />
       <CommunityTabNav tab={tab} />
       <MobileProfileStrip status={status} listings={listings} />
 
@@ -1257,7 +1346,7 @@ export function CommunityDashboard({
             <>
               <PhotoUploadForm
                 completionScore={completionScore}
-                onSuccess={() => { /* server revalidation handles grid refresh */ }}
+                onSuccess={() => { router.refresh(); }}
                 onToast={addToast}
               />
               <PhotoMasonryGrid photos={photoItems} />
@@ -1270,9 +1359,12 @@ export function CommunityDashboard({
                 draftAnnouncementId={hostDraftAnnouncementId}
               />
               {mainItems.length === 0 ? (
-                <div className={styles.emptyState}>
-                  <p>No announcements yet — your posts will appear here after publishing.</p>
-                </div>
+                <CommunityEmptyState
+                  icon="nav.announcements"
+                  illustration="empty.announcements"
+                  heading="No announcements yet"
+                  sub="Your published announcements will appear here. Share a seasonal opening, housing update, or event using the composer above."
+                />
               ) : (
                 <>
                   {mainItems.map((item, index) => (
@@ -1290,13 +1382,25 @@ export function CommunityDashboard({
               )}
             </>
           ) : mainItems.length === 0 ? (
-            <div className={styles.emptyState}>
-              {tab === "announcements" ? (
-                <p>No announcements yet — hosts share seasonal openings, housing updates, and hiring news here.</p>
-              ) : (
-                <p>No content yet — check back soon as your community grows.</p>
-              )}
-            </div>
+            tab === "announcements" ? (
+              <CommunityEmptyState
+                icon="nav.announcements"
+                illustration="empty.announcements"
+                heading="No announcements yet"
+                sub="Verified hosts share seasonal openings, housing updates, and hiring news here. Check back soon."
+                ctaLabel="Explore listings"
+                ctaHref="/seek"
+              />
+            ) : (
+              <CommunityEmptyState
+                icon="nav.feed"
+                illustration="empty.community"
+                heading="Your feed is just getting started"
+                sub="As seekers and hosts post photos and announcements, they'll show up right here."
+                ctaLabel="Share a photo"
+                ctaHref="/community/photos"
+              />
+            )
           ) : (
             <>
               {mainItems.map((item, index) => (
@@ -1328,7 +1432,7 @@ export function CommunityDashboard({
         </div>
 
         <aside className={styles.aside}>
-          <section className={styles.widget}>
+          <section className={`${styles.widget} ${styles.welcomeWidgetSection}`}>
             <div className={styles.welcomeWidget}>
               <div className={styles.welcomeWidgetAvatar} aria-hidden>
                 {seekerInitial}

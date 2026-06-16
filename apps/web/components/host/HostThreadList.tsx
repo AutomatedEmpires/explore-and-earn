@@ -13,6 +13,7 @@ export function HostThreadList({ threads }: HostThreadListProps) {
   if (threads.length === 0) {
     return (
       <EmptyState
+        illustration="empty.messages"
         title="No messages yet"
         message="Conversations with applicants will show up here."
       />

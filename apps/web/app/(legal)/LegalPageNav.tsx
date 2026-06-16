@@ -9,12 +9,19 @@ import styles from "./LegalPageNav.module.css";
 
 const PAGES: ReadonlyArray<{ href: string; label: string; icon: IconKey; accent: string }> = [
 	{ href: "/about",   label: "About",   icon: "category.mix",        accent: "#c4954a" },
+	{ href: "/faq",     label: "FAQ",     icon: "nav.seek",            accent: "#2f667a" },
 	{ href: "/terms",   label: "Terms",   icon: "trust.verified_host", accent: "#2f667a" },
 	{ href: "/privacy", label: "Privacy", icon: "nav.profile",         accent: "#185848" },
 	{ href: "/cookies", label: "Cookies", icon: "nav.seek",            accent: "#8a6a3a" },
 ];
 
 const SECTIONS: Record<string, ReadonlyArray<{ id: string; label: string }>> = {
+	"/faq": [
+		{ id: "seekers", label: "For seekers" },
+		{ id: "hosts",   label: "For hosts"   },
+		{ id: "trust",   label: "Trust & safety" },
+		{ id: "contact", label: "Contact"     },
+	],
 	"/about": [
 		{ id: "mission",         label: "Who we are"       },
 		{ id: "three-questions", label: "The 3 questions"  },

@@ -57,8 +57,11 @@ export default async function OfferedPage() {
       <LifecycleList
         surface="offered"
         items={items}
+        emptyIllustration="empty.offers"
         emptyTitle="No offers yet"
         emptyMessage="Offers from hosts will appear here once you start applying. Keep exploring opportunities under Seek."
+        emptyActionLabel="Explore opportunities"
+        emptyActionHref="/seek"
       />
     </BucketPage>
   );

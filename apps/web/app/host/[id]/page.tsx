@@ -8,6 +8,7 @@ import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 
 import { HostProfileHero } from "../../../components/host/HostProfileHero";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
+import { generateBreadcrumbJsonLd } from "../../../lib/seo";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -371,7 +372,17 @@ export default async function PublicHostProfilePage({ params }: Props) {
     host.housingOfferedGenerally ||
     host.mealsOfferedGenerally;
 
+  const breadcrumbJsonLd = generateBreadcrumbJsonLd([
+    { name: "Explore & Earn", url: baseUrl },
+    { name: host.companyName, url: `${baseUrl}/host/${id}` },
+  ]);
+
   return (
+    <>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }}
+    />
     <main className={styles.page}>
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <HostProfileHero
@@ -413,5 +424,6 @@ export default async function PublicHostProfilePage({ params }: Props) {
         ) : null}
       </div>
     </main>
+    </>
   );
 }

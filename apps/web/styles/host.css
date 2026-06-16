@@ -1,0 +1,440 @@
+/**
+ * Host design-system layer — global `host-*` primitives (mirrors the `ui-*`
+ * convention in primitives.css and `shell-*` in shell.css). Imported once by
+ * the (host) layout. Semantic tokens only — no raw hex/px. Builds on the
+ * foundation tokens (elevation, gradients, field, tap-min). Borders-first with
+ * whisper elevation; reduced-motion honored.
+ *
+ * Canon: docs/design/design-system-v1.md + DESIGN_RESTYLE_PLAN.md.
+ */
+
+/* =================================================================== */
+/* Page container — consistent rhythm for every host route             */
+/* =================================================================== */
+.host-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+/* =================================================================== */
+/* Panel — the canonical host surface                                  */
+/* =================================================================== */
+.host-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-card);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  color: var(--text-primary);
+}
+
+.host-panel--raised { box-shadow: var(--elevation-card); }
+
+.host-panel--flush { padding: 0; overflow: hidden; }
+
+.host-panel__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.host-panel__titles { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.host-panel__eyebrow {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--status-match-fg);
+}
+
+.host-panel__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.host-panel__action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 36px;
+  padding: var(--space-6) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  background: color-mix(in srgb, var(--palette-sky-light) 45%, transparent);
+  text-decoration: none;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+.host-panel__action:hover { background: color-mix(in srgb, var(--palette-sky-light) 75%, transparent); }
+.host-panel__action:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+/* =================================================================== */
+/* Hero — gradient identity band for the dashboard command center      */
+/* =================================================================== */
+.host-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-20);
+  border-radius: var(--radius-card);
+  background: var(--gradient-sky);
+  color: var(--color-cta-text);
+  box-shadow: var(--elevation-card);
+}
+/* subtle top catch-light */
+.host-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);
+  pointer-events: none;
+}
+.host-hero__eyebrow {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-cta-text) 78%, transparent);
+}
+.host-hero__title {
+  position: relative;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-page-size);
+  line-height: var(--type-page-lh);
+  color: var(--color-cta-text);
+}
+.host-hero__sub {
+  position: relative;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: color-mix(in srgb, var(--color-cta-text) 86%, transparent);
+}
+.host-hero__actions { position: relative; display: flex; flex-wrap: wrap; gap: var(--space-8); }
+
+/* Primary action on the hero (white pill on sky) */
+.host-hero__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-12) var(--space-20);
+  border-radius: var(--radius-button);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  background: var(--color-surface-raised);
+  color: var(--palette-sky-dark);
+  transition: transform var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
+}
+.host-hero__cta:hover { filter: brightness(1.03); transform: translateY(-1px); }
+.host-hero__cta:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-cta-text), 0 0 0 4px var(--palette-sky-dark); }
+
+.host-hero__cta--ghost {
+  background: color-mix(in srgb, var(--color-cta-text) 14%, transparent);
+  color: var(--color-cta-text);
+  border: 1px solid color-mix(in srgb, var(--color-cta-text) 38%, transparent);
+}
+.host-hero__cta--ghost:hover { background: color-mix(in srgb, var(--color-cta-text) 22%, transparent); }
+
+/* completeness meter inside the hero */
+.host-hero__meter {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.host-hero__meterTrack {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cta-text) 22%, transparent);
+  overflow: hidden;
+}
+.host-hero__meterFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-cta-text);
+}
+.host-hero__meterLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  color: color-mix(in srgb, var(--color-cta-text) 84%, transparent);
+}
+
+/* =================================================================== */
+/* KPI — compact metric card                                           */
+/* =================================================================== */
+.host-kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12);
+}
+@media (min-width: 48rem) {
+  .host-kpiGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.host-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  padding: var(--space-14);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
+}
+a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-card); }
+.host-kpi:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+.host-kpi__top { display: flex; align-items: center; gap: var(--space-6); color: var(--text-muted); }
+.host-kpi__value {
+  font-family: var(--font-display);
+  font-size: var(--type-page-size);
+  line-height: 1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.host-kpi__label {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* primary emphasis — when the metric is actionable (> 0 pending/new) */
+.host-kpi--primary {
+  background: var(--status-match-bg);
+  border-color: var(--status-match-fg);
+  box-shadow: var(--elevation-card);
+}
+.host-kpi--primary .host-kpi__value,
+.host-kpi--primary .host-kpi__label,
+.host-kpi--primary .host-kpi__top { color: var(--status-match-fg); }
+
+/* =================================================================== */
+/* Stat row — dense label/value list inside panels                     */
+/* =================================================================== */
+.host-statList { display: flex; flex-direction: column; gap: var(--space-8); margin: 0; padding: 0; }
+.host-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+.host-stat__label { display: flex; align-items: center; gap: var(--space-6); color: var(--text-secondary); }
+.host-stat__value { margin: 0; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+/* =================================================================== */
+/* Status pill — listing / application / invite states                 */
+/* set data-state="live|draft|paused|closed|archived|under_review|     */
+/*                  boosted|featured|new|reviewing|offered|accepted"    */
+/* =================================================================== */
+.host-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: var(--color-surface);
+  color: var(--text-secondary);
+}
+.host-status::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+.host-status[data-state="live"],
+.host-status[data-state="open"],
+.host-status[data-state="filled"],
+.host-status[data-state="accepted"]    { background: var(--status-success-bg);       color: var(--status-success-fg); }
+.host-status[data-state="draft"],
+.host-status[data-state="closed"]      { background: var(--color-surface);            color: var(--text-muted); }
+.host-status[data-state="paused"],
+.host-status[data-state="under_review"]{ background: var(--status-warning-bg);        color: var(--status-warning-fg); }
+.host-status[data-state="archived"]    { background: var(--status-error-bg);          color: var(--status-error-fg); }
+.host-status[data-state="boosted"],
+.host-status[data-state="featured"]    { background: var(--status-boosted-bg);        color: var(--status-boosted-fg); }
+.host-status[data-state="new"],
+.host-status[data-state="reviewing"],
+.host-status[data-state="partially_filled"],
+.host-status[data-state="offered"]     { background: var(--status-match-bg);          color: var(--status-match-fg); }
+
+/* =================================================================== */
+/* Boost badge — premium gold marker                                   */
+/* =================================================================== */
+.host-boost-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-10);
+  border-radius: var(--radius-pill);
+  background: var(--gradient-gold);
+  color: var(--color-gold-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  box-shadow: var(--elevation-card);
+}
+
+/* =================================================================== */
+/* Action tile — premium quick action (icon + label + chevron)         */
+/* =================================================================== */
+.host-actionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12);
+}
+@media (min-width: 48rem) {
+  .host-actionGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.host-action-tile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: var(--tap-min);
+  padding: var(--space-14) var(--space-16);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+.host-action-tile:hover { border-color: var(--border-ink); box-shadow: var(--elevation-hover); transform: translateY(-2px); }
+.host-action-tile:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+.host-action-tile__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px; height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  background: color-mix(in srgb, var(--palette-sky-light) 50%, var(--color-surface));
+  color: var(--status-match-fg);
+}
+.host-action-tile__label {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+.host-action-tile__chev { color: var(--text-muted); flex-shrink: 0; }
+
+/* primary tile — the host's #1 job (create listing) */
+.host-action-tile--primary {
+  background: var(--status-match-bg);
+  border-color: var(--status-match-fg);
+}
+.host-action-tile--primary .host-action-tile__icon { background: var(--status-match-fg); color: var(--color-cta-text); }
+
+/* =================================================================== */
+/* Attention row — actionable "needs review" item                      */
+/* =================================================================== */
+.host-attention {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-height: var(--tap-min);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background: var(--color-surface);
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
+}
+.host-attention:hover { border-color: var(--border-ink); background: var(--color-surface-raised); }
+.host-attention:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+.host-attention__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px; height: 28px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  background: var(--status-match-fg);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.host-attention__text { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.host-attention__title { font-family: var(--font-ui); font-size: var(--type-meta-size); font-weight: var(--font-weight-medium); color: var(--text-primary); }
+.host-attention__sub { font-family: var(--font-ui); font-size: var(--type-caption-size); color: var(--text-muted); }
+
+/* =================================================================== */
+/* Empty — host-framed empty state (wraps the foundation .ui-empty)     */
+/* =================================================================== */
+.host-empty__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  margin-top: var(--space-4);
+  padding: var(--space-10) var(--space-20);
+  border-radius: var(--radius-button);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition: filter var(--motion-fast) var(--ease-standard);
+}
+.host-empty__cta:hover { filter: brightness(1.06); }
+.host-empty__cta:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+@media (prefers-reduced-motion: reduce) {
+  .host-action-tile,
+  .host-kpi,
+  .host-hero__cta,
+  .host-attention { transition: none; }
+}

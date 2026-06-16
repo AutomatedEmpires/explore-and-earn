@@ -27,7 +27,7 @@
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-cta, #2F667A);
+  color: var(--color-cta);
   text-decoration: none;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -53,7 +53,7 @@
 /* ─── Employer card — landscape ratio ─── */
 .card {
   position: relative;
-  width: 175px;
+  width: min(70vw, 175px);
   height: 100px;
   border-radius: var(--radius-cell);
   overflow: hidden;
@@ -81,7 +81,7 @@
 }
 
 @media (min-width: 480px) {
-  .card { width: 210px; height: 114px; }
+  .card { width: min(64vw, 210px); height: 114px; }
 }
 
 .cardBg {

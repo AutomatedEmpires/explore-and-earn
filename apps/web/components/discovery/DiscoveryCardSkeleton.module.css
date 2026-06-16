@@ -4,10 +4,10 @@
 	gap: var(--space-12);
 }
 
-/* Cover photo — 3:2 aspect ratio matches DiscoveryCard cover */
+/* Cover photo — 4:3 aspect ratio matches DiscoveryCard cover (DiscoveryCard.tsx) */
 .cover {
 	width: 100%;
-	aspect-ratio: 3 / 2;
+	aspect-ratio: 4 / 3;
 	overflow: hidden;
 	border-radius: var(--radius-image);
 }

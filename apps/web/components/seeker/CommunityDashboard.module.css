@@ -34,7 +34,49 @@
   border-radius: 0;
   border: none;
   margin: 0;
-  padding: var(--space-20) var(--space-16) var(--space-24);
+  padding: var(--space-20) var(--space-16) var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* ─── Masthead (community identity + active section) ─────────────────────────── */
+
+.mastheadTop {
+  max-width: 960px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mastheadEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.mastheadTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.625rem, 6vw, 2.125rem);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.1;
+  color: #FFFFFF;
+}
+
+.mastheadBlurb {
+  margin: 0;
+  max-width: 52ch;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .welcomeBarInner {
@@ -349,7 +391,14 @@
     grid-template-columns: 1fr;
   }
 
+  /* Restore sidebar content below the feed on mobile (no content loss).
+     The welcome widget is redundant with the masthead + mobile profile strip. */
   .aside {
+    position: static;
+    top: auto;
+  }
+
+  .welcomeWidgetSection {
     display: none;
   }
 }
@@ -379,25 +428,135 @@
 }
 
 .emptyStateIcon {
-  font-size: 2rem;
-  line-height: 1;
-  opacity: 0.55;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(42, 87, 36, 0.25);
+  background: var(--community-green-bg);
+  color: var(--community-green);
   user-select: none;
 }
 
 .emptyStateHeading {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 1.25rem;
   font-weight: var(--font-weight-regular);
   color: var(--text-primary);
 }
 
 .emptyStateSub {
   margin: 0;
+  max-width: 42ch;
   font-family: var(--font-ui);
   font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
   color: var(--text-secondary);
+}
+
+.emptyStateCta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 2.25rem;
+  margin-top: var(--space-4);
+  padding: 0 var(--space-16);
+  border: 1.5px solid var(--community-green);
+  border-radius: var(--radius-pill);
+  background: var(--community-green-bg);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--community-green);
+  text-decoration: none;
+  transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+
+.emptyStateCta:hover { background: var(--community-green); color: #FFFFFF; }
+
+/* ─── Loading skeletons ──────────────────────────────────────────────────────── */
+
+@keyframes communityShimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeletonCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  background: var(--color-card-warm);
+  border: 1.5px solid rgba(25, 21, 14, 0.12);
+  border-radius: var(--radius-card);
+}
+
+.skeletonHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.skeletonAvatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.skeletonLines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  flex: 1;
+}
+
+.skeletonLine,
+.skeletonText,
+.skeletonImage,
+.skeletonAvatar {
+  background: linear-gradient(
+    100deg,
+    rgba(25, 21, 14, 0.06) 30%,
+    rgba(25, 21, 14, 0.12) 50%,
+    rgba(25, 21, 14, 0.06) 70%
+  );
+  background-size: 200% 100%;
+  animation: communityShimmer 1.4s linear infinite;
+  border-radius: var(--radius-input);
+}
+
+.skeletonLine { height: 12px; width: 60%; }
+.skeletonLineShort { width: 40%; }
+.skeletonLineTiny { width: 24%; height: 10px; }
+.skeletonText { height: 12px; width: 100%; border-radius: 6px; }
+.skeletonTextShort { width: 70%; }
+.skeletonImage { width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; }
+
+.skeletonPolaroid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  break-inside: avoid;
+  margin-bottom: var(--space-12);
+  padding: var(--space-8) var(--space-8) var(--space-16);
+  background: #FDFAF5;
+  border: 1.5px solid rgba(25, 21, 14, 0.14);
+  border-radius: 3px;
+}
+
+.skeletonPolaroid .skeletonImage { aspect-ratio: 4 / 3; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLine,
+  .skeletonText,
+  .skeletonImage,
+  .skeletonAvatar { animation: none; }
 }
 
 /* ─── Shared card base ───────────────────────────────────────────────────────── */
@@ -685,6 +844,31 @@
   border: 1.5px solid rgba(25, 21, 14, 0.4);
   box-shadow: 0 2px 5px rgba(25, 21, 14, 0.3);
   z-index: 1;
+}
+
+/* Promoted (paid-placement) announcement — gold trust treatment */
+.announcementCardPromoted {
+  background:
+    radial-gradient(ellipse 130% 90% at 100% 0%, rgba(216, 168, 78, 0.14) 0%, transparent 55%),
+    var(--color-parchment);
+  border-color: rgba(216, 168, 78, 0.5);
+}
+
+.promotedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 1.25rem;
+  padding: 0 var(--space-6);
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius-pill);
+  background: var(--palette-amber-light);
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--palette-seasonal-fg);
 }
 
 .announcementBody {
@@ -2178,101 +2362,194 @@ a.widgetFooter:hover { color: var(--text-primary); }
   max-width: 60ch;
 }
 
-/* ─── Photo upload form ──────────────────────────────────────────────────────── */
+/* ─── Photo upload form (premium composer) ───────────────────────────────────── */
 
 .photoUploadForm {
   display: flex;
   flex-direction: column;
-  gap: var(--space-14, 14px);
-  padding: var(--space-20, 20px);
-  background: var(--surface-card, var(--surface-primary));
-  border: 1.5px solid var(--border-default);
-  border-radius: var(--radius-xl);
-  margin-bottom: var(--space-16, 16px);
+  gap: var(--space-14);
+  padding: var(--space-16);
+  background:
+    radial-gradient(ellipse 120% 80% at 100% 0%, rgba(42, 87, 36, 0.05) 0%, transparent 60%),
+    var(--color-card-warm);
+  border: 1.5px solid rgba(42, 87, 36, 0.2);
+  border-left: 3px solid var(--community-green);
+  border-radius: var(--radius-card);
+  box-shadow:
+    0 2px 8px rgba(25, 21, 14, 0.06),
+    0 1px 2px rgba(25, 21, 14, 0.04);
+  margin-bottom: var(--space-4);
+}
+
+.photoComposerHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid rgba(25, 21, 14, 0.08);
+}
+
+.photoComposerIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(42, 87, 36, 0.3);
+  background: var(--community-green-bg);
+  color: var(--community-green);
+  flex-shrink: 0;
+}
+
+.photoComposerHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.photoComposerTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-regular);
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.photoComposerSub {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
 }
 
 .photoFileField {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8, 8px);
+  gap: var(--space-8);
 }
 
 .photoFileLabel {
   display: flex;
   align-items: center;
-  gap: var(--space-8, 8px);
-  font-size: var(--font-size-sm, 0.875rem);
-  font-weight: var(--font-weight-medium);
+  gap: var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
 }
 
 .photoFileInput {
-  font-size: var(--font-size-sm, 0.875rem);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
   color: var(--text-primary);
+  padding: var(--space-8);
+  border: 1.5px dashed rgba(42, 87, 36, 0.3);
+  border-radius: var(--radius-input);
+  background: var(--color-parchment);
+  cursor: pointer;
+}
+
+.photoFileInput::file-selector-button {
+  margin-right: var(--space-10);
+  padding: var(--space-6) var(--space-12);
+  border: 1.5px solid var(--community-green);
+  border-radius: var(--radius-pill);
+  background: var(--community-green-bg);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--community-green);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
+}
+
+.photoFileInput::file-selector-button:hover {
+  background: var(--community-green);
+  color: #FFFFFF;
 }
 
 .photoField {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4, 4px);
+  gap: var(--space-6);
   position: relative;
 }
 
 .photoFieldLabel {
-  font-size: var(--font-size-sm, 0.875rem);
-  font-weight: var(--font-weight-medium);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
 }
 
 .photoFieldLabel span {
-  font-weight: var(--font-weight-normal);
-  color: var(--text-tertiary);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-muted);
 }
 
 .photoCaption,
 .photoLocationInput {
   width: 100%;
-  padding: var(--space-10, 10px) var(--space-12, 12px);
-  border: 1.5px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--surface-primary);
-  font-family: var(--font-body);
-  font-size: var(--font-size-base, 1rem);
+  padding: var(--space-10) var(--space-12);
+  border: 1.5px solid var(--field-border);
+  border-radius: var(--radius-input);
+  background: var(--field-bg);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
   color: var(--text-primary);
-  transition: border-color 150ms;
+  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
   resize: vertical;
 }
+
+.photoCaption::placeholder,
+.photoLocationInput::placeholder { color: var(--field-placeholder); }
 
 .photoCaption:focus,
 .photoLocationInput:focus {
   outline: none;
-  border-color: var(--color-cta);
+  border-color: var(--field-border-focus);
+  box-shadow: 0 0 0 3px rgba(47, 102, 122, 0.15);
 }
 
 .photoCharCount {
   align-self: flex-end;
-  font-size: var(--font-size-xs, 0.75rem);
-  color: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  color: var(--text-muted);
 }
 
 .photoError {
-  font-size: var(--font-size-sm, 0.875rem);
-  color: var(--color-error, #ef4444);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--status-error-fg);
   margin: 0;
 }
 
 .photoSubmitBtn {
   align-self: flex-start;
-  padding: var(--space-10, 10px) var(--space-20, 20px);
-  background: var(--color-cta);
-  color: var(--color-cta-text, #fff);
-  border: none;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm, 0.875rem);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-10) var(--space-20);
+  background: var(--community-green);
+  color: #FFFFFF;
+  border: 1.5px solid var(--community-green-deep);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: opacity 150ms;
+  transition: filter var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
 }
+
+.photoSubmitBtn:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.photoSubmitBtn:active:not(:disabled) { transform: translateY(0); }
 
 .photoSubmitBtn:disabled {
   opacity: 0.55;
@@ -2284,56 +2561,78 @@ a.widgetFooter:hover { color: var(--text-primary); }
 .photoGate {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-16, 16px);
-  padding: var(--space-20, 20px);
-  background: var(--surface-card, var(--surface-primary));
-  border: 1.5px solid var(--border-default);
-  border-radius: var(--radius-xl);
-  margin-bottom: var(--space-16, 16px);
+  gap: var(--space-14);
+  padding: var(--space-16);
+  background:
+    radial-gradient(ellipse 100% 80% at 0% 0%, rgba(216, 168, 78, 0.1) 0%, transparent 55%),
+    var(--color-card-warm);
+  border: 1.5px solid rgba(216, 168, 78, 0.4);
+  border-left: 3px solid var(--color-gold);
+  border-radius: var(--radius-card);
+  box-shadow:
+    0 2px 8px rgba(25, 21, 14, 0.06),
+    0 1px 2px rgba(25, 21, 14, 0.04);
+  margin-bottom: var(--space-4);
   color: var(--text-secondary);
 }
+
+.photoGate > :global(svg) { color: var(--color-gold); flex-shrink: 0; margin-top: 2px; }
 
 .photoGateText {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-8, 8px);
+  gap: var(--space-8);
 }
 
 .photoGateHeading {
-  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-regular);
   color: var(--text-primary);
   margin: 0;
 }
 
 .photoGateSub {
-  font-size: var(--font-size-sm, 0.875rem);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
   margin: 0;
 }
 
 .photoGateTrack {
-  height: 6px;
-  background: var(--border-default);
-  border-radius: var(--radius-full);
+  height: 8px;
+  background: rgba(25, 21, 14, 0.1);
+  border-radius: var(--radius-pill);
   overflow: hidden;
 }
 
 .photoGateFill {
   height: 100%;
-  background: var(--color-cta);
-  border-radius: var(--radius-full);
-  transition: width 400ms ease;
+  background: var(--gradient-gold);
+  border-radius: var(--radius-pill);
+  transition: width 600ms var(--ease-standard);
 }
 
 .photoGateCta {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-4, 4px);
-  font-size: var(--font-size-sm, 0.875rem);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-cta);
+  gap: var(--space-4);
+  align-self: flex-start;
+  min-height: 2.25rem;
+  padding: 0 var(--space-14);
+  border: 1.5px solid var(--color-gold);
+  border-radius: var(--radius-pill);
+  background: var(--palette-amber-light);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--palette-seasonal-fg);
   text-decoration: none;
+  transition: filter var(--motion-fast) var(--ease-standard);
 }
+
+.photoGateCta:hover { filter: brightness(1.05); }
 
 /* ─── Reduced motion ─────────────────────────────────────────────────────────── */
 

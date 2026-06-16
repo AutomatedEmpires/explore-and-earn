@@ -44,21 +44,22 @@
   align-items: center;
   align-self: flex-start;
   gap: var(--space-8);
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-ink);
-  background: var(--color-surface);
+  min-height: var(--tap-min);
+  padding: var(--space-10) var(--space-20);
+  border-radius: var(--radius-button);
+  border: 1px solid transparent;
+  background: var(--color-cta);
   font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-lh);
+  font-size: var(--type-button-size);
+  line-height: var(--type-button-lh);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
+  color: var(--color-cta-text);
   text-decoration: none;
-  transition: border-color var(--motion-fast) var(--ease-standard);
+  transition: filter var(--motion-fast) var(--ease-standard);
 }
 
 .message:hover {
-  border-color: var(--text-primary);
+  filter: brightness(1.06);
 }
 
 .message:focus-visible {

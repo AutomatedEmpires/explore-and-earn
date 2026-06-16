@@ -39,3 +39,32 @@
   line-height: var(--type-body-lh);
   color: var(--text-secondary);
 }
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--tap-min);
+  margin-top: var(--space-4);
+  padding: var(--space-12) var(--space-20);
+  border-radius: var(--radius-button);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition:
+    filter var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .action:hover { filter: brightness(1.06) saturate(1.04); }
+  .action:active { transform: scale(0.98); }
+}
+
+.action:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}

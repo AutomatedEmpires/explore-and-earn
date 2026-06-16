@@ -8,6 +8,7 @@
 .button {
 	display: inline-flex;
 	align-items: center;
+	min-height: var(--tap-min);
 	padding: var(--space-8) var(--space-16);
 	border: 1px solid var(--border-ink);
 	border-radius: var(--radius-button);
@@ -43,5 +44,6 @@
 .error {
 	font-family: var(--font-ui);
 	font-size: var(--type-caption-size);
-	color: var(--text-secondary);
+	font-weight: var(--font-weight-medium);
+	color: var(--status-error-fg);
 }

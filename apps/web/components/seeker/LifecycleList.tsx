@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
-import { DiscoveryCard, type DiscoveryCardProps } from "@explore-and-earn/ui";
+import { DiscoveryCard, type DiscoveryCardProps, type IllustrationKey } from "@explore-and-earn/ui";
 
 import { EmptyState, toDiscoveryCardData, type DiscoveryListing } from "../discovery";
 import styles from "./LifecycleList.module.css";
@@ -18,6 +18,11 @@ export interface LifecycleListProps {
   readonly surface: DiscoveryCardSurface;
   readonly emptyTitle: string;
   readonly emptyMessage: string;
+  /** Optional spot illustration shown on the empty state. */
+  readonly emptyIllustration?: IllustrationKey;
+  /** Optional forward CTA shown on the empty state. */
+  readonly emptyActionLabel?: string;
+  readonly emptyActionHref?: string;
 }
 
 /**
@@ -29,9 +34,20 @@ export function LifecycleList({
   surface,
   emptyTitle,
   emptyMessage,
+  emptyIllustration,
+  emptyActionLabel,
+  emptyActionHref,
 }: LifecycleListProps) {
   if (items.length === 0) {
-    return <EmptyState title={emptyTitle} message={emptyMessage} />;
+    return (
+      <EmptyState
+        title={emptyTitle}
+        message={emptyMessage}
+        illustration={emptyIllustration}
+        actionLabel={emptyActionLabel}
+        actionHref={emptyActionHref}
+      />
+    );
   }
   return (
     <div className={styles.grid}>

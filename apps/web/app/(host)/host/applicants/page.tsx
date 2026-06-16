@@ -103,6 +103,7 @@ export default async function HostApplicantsPage({
         <HostPipelineBoard applicants={applicants} />
       ) : (
         <EmptyState
+          illustration="empty.hostApplicants"
           title="No applicants yet"
           message={
             filterListingId

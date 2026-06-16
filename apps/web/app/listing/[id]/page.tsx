@@ -16,7 +16,7 @@ import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
 import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
-import { generateJobPostingJsonLd } from "../../../lib/seo";
+import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../lib/seo";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -130,12 +130,23 @@ export default async function ListingDetailPage({ params }: Props) {
         : "Ongoing";
 
   const jsonLd = generateJobPostingJsonLd(listing, listing.host, baseUrl);
+  const breadcrumbJsonLd = generateBreadcrumbJsonLd([
+    { name: "Explore & Earn", url: baseUrl },
+    ...(listing.host
+      ? [{ name: listing.host.companyName, url: `${baseUrl}/host/${listing.host.id}` }]
+      : []),
+    { name: listing.title, url: `${baseUrl}/listing/${listing.id}` },
+  ]);
 
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }}
       />
       <main className={styles.page}>
         {/* Cover photo */}

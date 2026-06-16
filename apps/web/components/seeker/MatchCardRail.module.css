@@ -28,7 +28,7 @@
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-cta, #2F667A);
+  color: var(--color-cta);
   text-decoration: none;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -58,10 +58,11 @@
   flex-shrink: 0;
 }
 
-/* ─── Card — wider to give content room ─── */
+/* ─── Card — fluid width so a single card never exceeds a narrow phone,
+       and the next card always peeks (signalling the rail scrolls). ─── */
 .card {
   position: relative;
-  width: 220px;
+  width: min(78vw, 220px);
   height: 290px;
   border-radius: var(--radius-card);
   overflow: hidden;
@@ -93,7 +94,7 @@
 
 @media (min-width: 480px) {
   .card {
-    width: 260px;
+    width: min(72vw, 260px);
     height: 330px;
   }
 }
@@ -280,7 +281,7 @@
   align-items: center;
   padding: 11px var(--space-24);
   border-radius: var(--radius-pill);
-  background: var(--color-cta, #2F667A);
+  background: var(--color-cta);
   color: #fff;
   font-family: var(--font-ui);
   font-size: 14px;
@@ -299,5 +300,5 @@
 
 .emptyLink:focus-visible {
   outline: none;
-  box-shadow: var(--ui-focus-ring, 0 0 0 3px rgba(47, 102, 122, 0.4));
+  box-shadow: var(--ui-focus-ring);
 }

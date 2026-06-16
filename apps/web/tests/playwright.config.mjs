@@ -15,7 +15,9 @@ export default defineConfig({
     command: "corepack pnpm exec next dev --hostname 127.0.0.1 --port 3100",
     cwd: webRoot,
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    // next dev cold-compiles the first request; in WSL2 this can exceed the old
+    // 120s default and time out the whole run before any test executes.
+    timeout: 240000,
     url: "http://127.0.0.1:3100"
   }
 });

@@ -1,121 +1,55 @@
+/* Dashboard-specific layout only — shared surfaces live in host.css (host-*). */
+
 .dashboard {
+  /* gap/rhythm comes from .host-page; nothing extra needed here */
+}
+
+.attentionList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-24);
+  gap: var(--space-8);
 }
 
-.welcome {
+.allClear {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.welcomeHeading {
+  align-items: center;
+  gap: var(--space-6);
   margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--type-section-size);
-  line-height: var(--type-section-lh);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-}
-
-.welcomeSub {
-  margin: 0;
+  font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  color: var(--text-secondary);
+  color: var(--status-success-fg);
 }
 
-.statGrid {
+.twoCol {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-16);
 }
 
 @media (min-width: 48rem) {
-  .statGrid {
-    grid-template-columns: repeat(3, 1fr);
+  .twoCol {
+    grid-template-columns: 1fr 1fr;
   }
-}
-
-.statList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-  margin: 0 0 var(--space-12);
-  padding: 0;
-}
-
-.statRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: var(--type-meta-size);
-  color: var(--text-primary);
-}
-
-.statRow dt {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  color: var(--text-secondary);
-}
-
-.statRow dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.cardLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-cta);
-  text-decoration: none;
-  margin-top: var(--space-8);
-}
-
-.cardLink:hover {
-  text-decoration: underline;
 }
 
 .meterRow {
   display: flex;
   align-items: center;
   gap: var(--space-12);
-  padding: var(--space-12) 0;
 }
 
 .meterLabel {
-  font-size: var(--type-caption-size);
-  color: var(--text-secondary);
-}
-
-.pendingCount {
-  font-family: var(--font-display);
-  font-size: var(--type-page-size);
-  line-height: var(--type-page-lh);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  margin: 0 0 var(--space-4);
-}
-
-.pendingLabel {
   font-size: var(--type-meta-size);
   color: var(--text-secondary);
-  margin: 0 0 var(--space-12);
 }
 
-.allClear {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  font-size: var(--type-meta-size);
-  color: var(--text-secondary);
+.muted {
   margin: 0;
+  font-size: var(--type-meta-size);
+  color: var(--text-muted);
 }
 
+/* ── Per-listing performance list ────────────────────────────────── */
 .listingStatsList {
   list-style: none;
   margin: 0;
@@ -139,6 +73,7 @@
 }
 
 .listingStatsTitle {
+  font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
@@ -156,31 +91,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.quickLinks {
-  display: flex;
-  gap: var(--space-12);
-  flex-wrap: wrap;
-}
-
-.quickLink {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-8) var(--space-16);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-  text-decoration: none;
-  background-color: var(--color-surface);
-  transition: background-color 0.15s;
-}
-
-.quickLink:hover {
-  background-color: var(--color-surface-raised);
-}
-
+/* ── Recent activity timeline ────────────────────────────────────── */
 .activityList {
   list-style: none;
   margin: 0;
@@ -202,7 +113,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-secondary);
+  color: var(--status-match-fg);
   padding-top: 0.125rem;
 }
 
@@ -214,4 +125,13 @@
   color: var(--text-secondary);
   font-size: var(--type-caption-size);
   white-space: nowrap;
+}
+
+@media (max-width: 380px) {
+  .activityItem {
+    grid-template-columns: 1.5rem 1fr;
+  }
+  .activityTime {
+    grid-column: 2;
+  }
 }

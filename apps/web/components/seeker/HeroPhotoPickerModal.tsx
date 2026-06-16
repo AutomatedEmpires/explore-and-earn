@@ -23,16 +23,19 @@ interface GradientOption {
   readonly gradient: string;
 }
 
+// Gradient values are tokenized. The selected value is persisted as the
+// var() reference, which resolves to the token wherever it's applied as an
+// inline background — and previously-saved literal gradients still render.
 const GRADIENT_OPTIONS: readonly GradientOption[] = [
-  { key: "maritime", label: "Maritime", gradient: "linear-gradient(160deg, #0D3B5E 0%, #1B6B9E 50%, #4A9CC9 100%)" },
-  { key: "farm", label: "Farm", gradient: "linear-gradient(160deg, #3D2B14 0%, #7A5C28 50%, #C49A50 100%)" },
-  { key: "remote", label: "Remote", gradient: "linear-gradient(160deg, #1B2838 0%, #2D4A6B 50%, #5B7FA8 100%)" },
-  { key: "seasonal", label: "Seasonal", gradient: "linear-gradient(160deg, #2D4A1E 0%, #5A8A32 50%, #C4A84A 100%)" },
-  { key: "wilderness", label: "Wilderness", gradient: "linear-gradient(160deg, #1A1E0E 0%, #2D3A1A 50%, #5A6B3D 100%)" },
-  { key: "coastal", label: "Coastal", gradient: "linear-gradient(160deg, #1A3850 0%, #2A7090 50%, #60B8C8 100%)" },
-  { key: "mountain", label: "Mountain", gradient: "linear-gradient(160deg, #2A3040 0%, #4A5870 50%, #A0B8D0 100%)" },
-  { key: "adventure", label: "Adventure", gradient: "linear-gradient(160deg, #2A1A08 0%, #7A3A1A 50%, #E06030 100%)" },
-  { key: "sunset", label: "Sunset", gradient: "linear-gradient(160deg, #3A1A2A 0%, #8A3A5A 50%, #E88060 100%)" },
+  { key: "maritime", label: "Maritime", gradient: "var(--gradient-category-maritime)" },
+  { key: "farm", label: "Farm", gradient: "var(--gradient-category-farm)" },
+  { key: "remote", label: "Remote", gradient: "var(--gradient-category-remote)" },
+  { key: "seasonal", label: "Seasonal", gradient: "var(--gradient-category-seasonal)" },
+  { key: "wilderness", label: "Wilderness", gradient: "var(--gradient-cover-wilderness)" },
+  { key: "coastal", label: "Coastal", gradient: "var(--gradient-cover-coastal)" },
+  { key: "mountain", label: "Mountain", gradient: "var(--gradient-cover-mountain)" },
+  { key: "adventure", label: "Adventure", gradient: "var(--gradient-cover-adventure)" },
+  { key: "sunset", label: "Sunset", gradient: "var(--gradient-cover-sunset)" },
 ];
 
 export function HeroPhotoPickerModal({

@@ -105,6 +105,8 @@ export default async function SeekerHomePage() {
           surface="matched"
           emptyTitle="No matches yet"
           emptyMessage="Complete your resume and preferences to start seeing matched opportunities."
+          emptyActionLabel="Build your resume"
+          emptyActionHref="/resume"
         />
       </section>
 

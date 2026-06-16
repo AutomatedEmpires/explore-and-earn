@@ -66,8 +66,11 @@ export default async function SavedPage() {
 		<BucketPage title="Saved" description="Opportunities you saved while swiping.">
 			{listings.length === 0 ? (
 				<EmptyState
+					illustration="empty.savedListings"
 					title="No saved listings yet"
 					message="Swipe right or tap Save on an opportunity to keep it here for later."
+					actionLabel="Start swiping"
+					actionHref="/swipe"
 				/>
 			) : (
 				<SavedCardGrid listings={listings} />

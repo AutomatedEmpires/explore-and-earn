@@ -74,6 +74,14 @@ export type CanonicalIconKey =
 	| "action.forward"
 	| "action.close"
 	| "action.more"
+	| "action.edit"
+	| "action.delete"
+	| "action.search"
+	| "action.settings"
+	| "action.upload"
+	| "action.download"
+	| "action.view"
+	| "action.link"
 	// nav -- primary navigation surfaces + community dashboard tabs + admin tabs
 	| "nav.seek"
 	| "nav.swipe"
@@ -89,6 +97,30 @@ export type CanonicalIconKey =
 	| "nav.seekers"
 	| "nav.hosts"
 	| "nav.reports"
+	| "nav.notifications"
+	| "nav.settings"
+	| "nav.logout"
+	| "nav.help"
+	// status -- application / listing lifecycle states
+	| "status.applied"
+	| "status.offered"
+	| "status.accepted"
+	| "status.declined"
+	| "status.withdrawn"
+	| "status.draft"
+	| "status.paused"
+	| "status.archived"
+	// profile / resume -- seeker identity surfaces
+	| "profile.resume"
+	| "profile.skills"
+	| "profile.experience"
+	| "profile.verification"
+	// work -- finer work-type glyphs within the category lanes
+	| "work.harvest"
+	| "work.hospitality"
+	| "work.kitchen"
+	| "work.deckhand"
+	| "work.ranch"
 	// analytics -- dashboard chart glyphs
 	| "analytics.meter"
 	| "analytics.funnel"
@@ -285,6 +317,7 @@ export const ICON_REGISTRY: Record<IconKey, IconEntry> = {
 		streamline: "star",
 		placeholder: "\u{2B50}",
 		label: "Featured Employer",
+		cloudinaryId: "Pin-Star--Streamline-Freehand_tq0bkh",
 	},
 	// ---- status ----
 	"status.open": {
@@ -414,6 +447,62 @@ export const ICON_REGISTRY: Record<IconKey, IconEntry> = {
 		label: "More",
 		cloudinaryId: "Menu-Navigation-Horizontal-Circle--Streamline-Freehand_iy7eew",
 	},
+	"action.edit": {
+		key: "action.edit",
+		streamline: "pencil / clipboard-edit",
+		placeholder: "\u{270F}",
+		label: "Edit",
+		cloudinaryId: "Form-Edition-Clipboard-Edit--Streamline-Freehand_uv1w2f",
+	},
+	"action.delete": {
+		key: "action.delete",
+		streamline: "trash / bin",
+		placeholder: "\u{1F5D1}",
+		label: "Delete",
+		cloudinaryId: "Delete-Bin-2--Streamline-Freehand",
+	},
+	"action.search": {
+		key: "action.search",
+		streamline: "magnifier",
+		placeholder: "\u{1F50D}",
+		label: "Search",
+		cloudinaryId: "Search-Magnifier-1--Streamline-Freehand_pceggu",
+	},
+	"action.settings": {
+		key: "action.settings",
+		streamline: "cog / gear",
+		placeholder: "\u{2699}",
+		label: "Settings",
+		cloudinaryId: "Settings-Cog--Streamline-Freehand_v76p9n",
+	},
+	"action.upload": {
+		key: "action.upload",
+		streamline: "upload box / up arrow",
+		placeholder: "\u{2B06}",
+		label: "Upload",
+		cloudinaryId: "Upload-Box--Streamline-Freehand_czknsq",
+	},
+	"action.download": {
+		key: "action.download",
+		streamline: "download box / down arrow",
+		placeholder: "\u{2B07}",
+		label: "Download",
+		cloudinaryId: "Download-Box--Streamline-Freehand_bgu6zq",
+	},
+	"action.view": {
+		key: "action.view",
+		streamline: "eye / preview",
+		placeholder: "\u{1F441}",
+		label: "View",
+		cloudinaryId: "View-Eye-1--Streamline-Freehand_m95ozx",
+	},
+	"action.link": {
+		key: "action.link",
+		streamline: "chain / hyperlink",
+		placeholder: "\u{1F517}",
+		label: "Copy link",
+		cloudinaryId: "Link-Hyperlink-Chain--Streamline-Freehand_jgczpd",
+	},
 	// ---- nav ----
 	"nav.seek": {
 		key: "nav.seek",
@@ -513,6 +602,156 @@ export const ICON_REGISTRY: Record<IconKey, IconEntry> = {
 		label: "Reports",
 		cloudinaryId: "Mood-Warning-Bubble--Streamline-Freehand",
 	},
+	"nav.notifications": {
+		key: "nav.notifications",
+		streamline: "bell / alarm",
+		placeholder: "\u{1F514}",
+		label: "Notifications",
+		cloudinaryId: "Alert-Alarm-Bell--Streamline-Freehand_jdqyjr",
+	},
+	"nav.settings": {
+		key: "nav.settings",
+		streamline: "cog / gear",
+		placeholder: "\u{2699}",
+		label: "Settings",
+		cloudinaryId: "Settings-Cog--Streamline-Freehand_v76p9n",
+	},
+	"nav.logout": {
+		key: "nav.logout",
+		streamline: "logout / sign out",
+		placeholder: "\u{1F6AA}",
+		label: "Sign out",
+		cloudinaryId: "Logout-User--Streamline-Freehand_u13yqr",
+	},
+	"nav.help": {
+		key: "nav.help",
+		streamline: "question / help desk",
+		placeholder: "\u{2753}",
+		label: "Help",
+		cloudinaryId: "Information-Desk-Question-Help--Streamline-Freehand_pggxdz",
+	},
+	// ---- status (application / listing lifecycle) ----
+	"status.applied": {
+		key: "status.applied",
+		streamline: "clipboard check / submitted",
+		placeholder: "\u{1F4DD}",
+		label: "Applied",
+		cloudinaryId: "Task-Clipboard-Check--Streamline-Freehand_bzwdmb",
+	},
+	"status.offered": {
+		key: "status.offered",
+		streamline: "approved paper / offer",
+		placeholder: "\u{1F4C4}",
+		label: "Offer extended",
+		cloudinaryId: "Notes-Paper-Approve--Streamline-Freehand_fjiksx",
+	},
+	"status.accepted": {
+		key: "status.accepted",
+		streamline: "clapping hands / celebrate",
+		placeholder: "\u{1F44F}",
+		label: "Accepted",
+		cloudinaryId: "Clap-Hand-1--Streamline-Freehand_v52xuf",
+	},
+	"status.declined": {
+		key: "status.declined",
+		streamline: "remove circle / not selected",
+		placeholder: "\u{1F6AB}",
+		label: "Not selected",
+		cloudinaryId: "Remove-Delete-Circle--Streamline-Freehand_o9kcd6",
+	},
+	"status.withdrawn": {
+		key: "status.withdrawn",
+		streamline: "step back / left arrow",
+		placeholder: "\u{21A9}",
+		label: "Withdrawn",
+		cloudinaryId: "Arrow-Thick-Circle-Left-1--Streamline-Freehand_zrwxy8",
+	},
+	"status.draft": {
+		key: "status.draft",
+		streamline: "clipboard / draft",
+		placeholder: "\u{1F4CB}",
+		label: "Draft",
+		cloudinaryId: "Form-Edition-Clipboard--Streamline-Freehand_xxulzo",
+	},
+	"status.paused": {
+		key: "status.paused",
+		streamline: "toggle off / paused (approximate)",
+		placeholder: "\u{23F8}",
+		label: "Paused",
+		cloudinaryId: "Controls-Slider-Toggle-Left--Streamline-Freehand_ks9yk4",
+	},
+	"status.archived": {
+		key: "status.archived",
+		streamline: "floppy / archived (approximate)",
+		placeholder: "\u{1F4E6}",
+		label: "Archived",
+		cloudinaryId: "Floppy-Disk--Streamline-Freehand_izffz9",
+	},
+	// ---- profile / resume ----
+	"profile.resume": {
+		key: "profile.resume",
+		streamline: "to-do list / resume",
+		placeholder: "\u{1F4C3}",
+		label: "Resume",
+		cloudinaryId: "Task-To-Do-List--Streamline-Freehand_qz5iwz",
+	},
+	"profile.skills": {
+		key: "profile.skills",
+		streamline: "toolbox / skills",
+		placeholder: "\u{1F9F0}",
+		label: "Skills",
+		cloudinaryId: "Tools-Box-3--Streamline-Freehand_u33mdc",
+	},
+	"profile.experience": {
+		key: "profile.experience",
+		streamline: "briefcase / experience",
+		placeholder: "\u{1F4BC}",
+		label: "Experience",
+		cloudinaryId: "Job-Briefcase-Document--Streamline-Freehand_sn9udu",
+	},
+	"profile.verification": {
+		key: "profile.verification",
+		streamline: "shield check / verification",
+		placeholder: "\u{1F6E1}",
+		label: "Verification",
+		cloudinaryId: "Security-Shield-Check--Streamline-Freehand_cvdihp",
+	},
+	// ---- work (finer work-type within category lanes) ----
+	"work.harvest": {
+		key: "work.harvest",
+		streamline: "wheat / harvest",
+		placeholder: "\u{1F33E}",
+		label: "Harvest / farm work",
+		cloudinaryId: "Farming-Wheat-Grain--Streamline-Freehand_iw9geq",
+	},
+	"work.hospitality": {
+		key: "work.hospitality",
+		streamline: "bed / lodge / hospitality",
+		placeholder: "\u{1F6CF}",
+		label: "Hospitality / lodging",
+		cloudinaryId: "Hotel-Double-Bed-1--Streamline-Freehand_lr1l18",
+	},
+	"work.kitchen": {
+		key: "work.kitchen",
+		streamline: "fork-knife / kitchen",
+		placeholder: "\u{1F374}",
+		label: "Kitchen / food service",
+		cloudinaryId: "Restaurant-Fork-Knife--Streamline-Freehand_yj0wr3",
+	},
+	"work.deckhand": {
+		key: "work.deckhand",
+		streamline: "fishing rod / maritime",
+		placeholder: "\u{1F3A3}",
+		label: "Deckhand / maritime",
+		cloudinaryId: "Fishing-Rod-1--Streamline-Freehand_nypmte",
+	},
+	"work.ranch": {
+		key: "work.ranch",
+		streamline: "cow / livestock / ranch",
+		placeholder: "\u{1F404}",
+		label: "Ranch / livestock",
+		cloudinaryId: "Free-Range-Cow--Streamline-Freehand_ihmjgj",
+	},
 	// ---- analytics ----
 	"analytics.meter": {
 		key: "analytics.meter",
@@ -598,6 +837,9 @@ export const ICON_REGISTRY: Record<IconKey, IconEntry> = {
 		streamline: "star",
 		placeholder: "\u{2B50}",
 		label: "Featured (deprecated)",
+		// Wired to the same real asset as its canonical alias so existing call sites
+		// render real art; new code should use trust.featured_employer.
+		cloudinaryId: "Pin-Star--Streamline-Freehand_tq0bkh",
 		deprecated: true,
 		aliasOf: "trust.featured_employer",
 	},
@@ -670,6 +912,14 @@ export const CANONICAL_ICON_KEYS = [
 	"action.forward",
 	"action.close",
 	"action.more",
+	"action.edit",
+	"action.delete",
+	"action.search",
+	"action.settings",
+	"action.upload",
+	"action.download",
+	"action.view",
+	"action.link",
 	"nav.seek",
 	"nav.swipe",
 	"nav.map",
@@ -684,6 +934,27 @@ export const CANONICAL_ICON_KEYS = [
 	"nav.seekers",
 	"nav.hosts",
 	"nav.reports",
+	"nav.notifications",
+	"nav.settings",
+	"nav.logout",
+	"nav.help",
+	"status.applied",
+	"status.offered",
+	"status.accepted",
+	"status.declined",
+	"status.withdrawn",
+	"status.draft",
+	"status.paused",
+	"status.archived",
+	"profile.resume",
+	"profile.skills",
+	"profile.experience",
+	"profile.verification",
+	"work.harvest",
+	"work.hospitality",
+	"work.kitchen",
+	"work.deckhand",
+	"work.ranch",
 	"analytics.meter",
 	"analytics.funnel",
 	"analytics.trend",

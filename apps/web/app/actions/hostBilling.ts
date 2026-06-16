@@ -73,6 +73,7 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
     billingRedirect("host_profile_missing");
   }
 
+  let checkoutUrl: string;
   try {
     const contact = await getClerkContact(authResult.auth.userId);
     const session = await createCheckoutSession({
@@ -88,13 +89,17 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
       successUrl: absoluteUrl(`${BILLING_PATH}?checkout=success`),
       cancelUrl: absoluteUrl(`${BILLING_PATH}?checkout=canceled`),
     });
-
-    revalidatePath(BILLING_PATH);
-    redirect(session.url ?? `${BILLING_PATH}?error=missing_checkout_url`);
+    checkoutUrl = session.url ?? `${BILLING_PATH}?error=missing_checkout_url`;
   } catch (error) {
     console.error("[stripe] checkout session creation failed", error);
     billingRedirect("checkout_failed");
   }
+
+  // redirect() signals via a thrown NEXT_REDIRECT error, so it MUST run outside
+  // the try/catch above — otherwise the success redirect is swallowed by the
+  // catch and the host is sent to ?error=checkout_failed instead of Stripe.
+  revalidatePath(BILLING_PATH);
+  redirect(checkoutUrl);
 }
 
 export async function startHostBillingPortalAction(): Promise<never> {
@@ -103,6 +108,7 @@ export async function startHostBillingPortalAction(): Promise<never> {
     billingRedirect(authResult.error);
   }
 
+  let portalUrl: string;
   try {
     const contact = await getClerkContact(authResult.auth.userId);
     const session = await createBillingPortalSession({
@@ -110,10 +116,13 @@ export async function startHostBillingPortalAction(): Promise<never> {
       customerEmail: contact.email,
       returnUrl: absoluteUrl(BILLING_PATH),
     });
-
-    redirect(session.url);
+    portalUrl = session.url;
   } catch (error) {
     console.error("[stripe] billing portal session creation failed", error);
     billingRedirect("portal_unavailable");
   }
+
+  // redirect() throws NEXT_REDIRECT by design — keep it outside the try/catch
+  // so a successful portal session is not swallowed into ?error=portal_unavailable.
+  redirect(portalUrl);
 }

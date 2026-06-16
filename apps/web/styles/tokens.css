@@ -128,7 +128,9 @@
   --radius-card:   24px;
   --radius-modal:  28px;
 
-  /* elevation */
+  /* elevation — borders-first stays the rule; these are *whisper* lifts only */
+  --elevation-card:    0 1px 2px rgba(36, 34, 30, 0.05), 0 2px 8px rgba(36, 34, 30, 0.05);
+  --elevation-hover:   0 6px 18px rgba(36, 34, 30, 0.10);
   --elevation-overlay: 0 8px 24px rgba(36, 34, 30, 0.12);
   --elevation-pin:     0 2px 6px  rgba(36, 34, 30, 0.18);
 
@@ -139,10 +141,14 @@
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* breakpoints */
+  --bp-xs:  380px;   /* small phone — mobile-first collapse tier */
   --bp-sm:  640px;
   --bp-md:  768px;
   --bp-lg:  1024px;
   --bp-xl:  1280px;
+
+  /* minimum interactive target (WCAG 2.5.5) */
+  --tap-min: 44px;
 
   /* icon sizing */
   --icon-sm:           16px;
@@ -209,6 +215,64 @@
   --color-silver:     var(--palette-silver);
   --color-chrome:     var(--palette-chrome);
   --color-steel:      var(--palette-steel);
+
+  /* =============================================================== */
+  /* GRADIENTS — intentional, palette-locked. Use these, never roll  */
+  /* one-off linear-gradients with raw hex in feature CSS.           */
+  /* =============================================================== */
+  --gradient-sky:        linear-gradient(135deg, var(--palette-sky) 0%, var(--palette-teal) 100%);
+  --gradient-sky-soft:   linear-gradient(160deg, var(--palette-sky-light) 0%, var(--palette-steel) 100%);
+  --gradient-paper-warm: linear-gradient(160deg, var(--palette-parchment) 0%, var(--palette-surface) 100%);
+  --gradient-gold:       linear-gradient(135deg, var(--palette-amber) 0%, var(--palette-amber-light) 100%);
+  /* hero photo legibility scrim — bottom-weighted ink fade */
+  --gradient-hero-scrim: linear-gradient(180deg, rgba(26, 30, 34, 0) 0%, rgba(26, 30, 34, 0.18) 45%, rgba(26, 30, 34, 0.62) 100%);
+
+  /* =============================================================== */
+  /* CATEGORY ATMOSPHERES — one gradient per marketplace lane.        */
+  /* Apply via var(--gradient-category-<lane>) on hero / cover / rail */
+  /* surfaces so every "maritime" surface renders the SAME blue.      */
+  /* Never re-roll per-component category hex again (drift rule §6).  */
+  /* =============================================================== */
+  --gradient-category-maritime: linear-gradient(155deg, #072944 0%, #0E4F80 38%, #1874AC 70%, #3A96C6 100%);
+  --gradient-category-farm:     linear-gradient(155deg, #2A1608 0%, #5C3610 35%, #96601C 68%, #CC9440 100%);
+  --gradient-category-remote:   linear-gradient(155deg, #0A1422 0%, #182A40 35%, #2A4668 68%, #4268A0 100%);
+  --gradient-category-seasonal: linear-gradient(155deg, #0C1E08 0%, #204015 35%, #38701E 68%, #76B03A 100%);
+  --gradient-category-mix:      linear-gradient(155deg, #18082A 0%, #341256 38%, #64228C 70%, #A44060 100%);
+  --gradient-category-default:  linear-gradient(155deg, #1A2030 0%, #2C3E58 38%, #406080 70%, #6090B0 100%);
+
+  /* Cover-theme presets — user-selectable hero backgrounds beyond the lanes */
+  --gradient-cover-wilderness:  linear-gradient(160deg, #1A1E0E 0%, #2D3A1A 50%, #5A6B3D 100%);
+  --gradient-cover-coastal:     linear-gradient(160deg, #1A3850 0%, #2A7090 50%, #60B8C8 100%);
+  --gradient-cover-mountain:    linear-gradient(160deg, #2A3040 0%, #4A5870 50%, #A0B8D0 100%);
+  --gradient-cover-adventure:   linear-gradient(160deg, #2A1A08 0%, #7A3A1A 50%, #E06030 100%);
+  --gradient-cover-sunset:      linear-gradient(160deg, #3A1A2A 0%, #8A3A5A 50%, #E88060 100%);
+
+  /* =============================================================== */
+  /* LIFECYCLE / READINESS STATE — ready (available/can-apply/        */
+  /* accepted · pine) · soon (pending/1–3mo · amber) · later (6mo ·   */
+  /* clay) · urgent (expiring · warm red). Single source for the      */
+  /* status colors duplicated across hero/profile/pipeline/readiness. */
+  /* =============================================================== */
+  --state-ready-fg:   #2D7A3A;  --state-ready-bg:  var(--palette-teal-light);
+  --state-soon-fg:    #B07C0A;  --state-soon-bg:   var(--palette-amber-light);
+  --state-later-fg:   #6A5035;  --state-later-bg:  var(--palette-seasonal-bg);
+  --state-urgent-fg:  var(--status-error-fg);  --state-urgent-bg: var(--status-error-bg);
+  --state-live-dot:   #4ADE80;  /* pulsing "live / now" indicator */
+
+  --gradient-state-ready: linear-gradient(135deg, #1E8A50 0%, #2CAE6A 100%);
+  --gradient-state-soon:  linear-gradient(135deg, #9A6A08 0%, #C48A14 100%);
+  --gradient-state-later: linear-gradient(135deg, #5A4028 0%, #806248 100%);
+  --gradient-progress:    linear-gradient(135deg, var(--palette-sky) 0%, #5AA0BF 100%);
+
+  /* =============================================================== */
+  /* FORM FIELDS — single source of truth for inputs/textareas/etc.  */
+  /* =============================================================== */
+  --field-bg:            var(--color-surface-raised);
+  --field-border:        var(--border-soft);
+  --field-border-focus:  var(--color-cta);
+  --field-border-error:  var(--status-error-fg);
+  --field-placeholder:   var(--text-muted);
+  --field-disabled-bg:   var(--palette-steel);
 
   /* =============================================================== */
   /* DEPRECATED — Sprint Zero stub aliases                           */

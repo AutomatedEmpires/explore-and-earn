@@ -60,8 +60,11 @@ export default async function InvitesPage() {
       <LifecycleList
         surface="invites"
         items={items}
+        emptyIllustration="empty.invites"
         emptyTitle="No invites yet"
-        emptyMessage="When a host invites you to apply, it'll show up here."
+        emptyMessage="When a host invites you to apply, it'll show up here. A complete resume gets you noticed faster."
+        emptyActionLabel="Strengthen your resume"
+        emptyActionHref="/resume"
       />
     </BucketPage>
   );

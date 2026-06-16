@@ -18,6 +18,7 @@ import {
 	hasDiscoveryPublicDataConfig,
 } from "../components/discovery/data";
 import { buildFeaturedEmployers } from "../lib/employer-utils";
+import { generateOrganizationJsonLd, generateWebSiteJsonLd } from "../lib/seo";
 import { GlobalHeader } from "../components/global";
 import { FeaturedEmployersRail } from "../components/public/FeaturedEmployersRail";
 import { PublicBottomNav } from "../components/public/PublicBottomNav";
@@ -31,6 +32,8 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
+
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com";
 
 // Hero photo — swap slug/category once a dedicated hero bucket exists.
 const HERO_IMAGE_URL = cloudinaryPhoto("maritime", "adam-gonzales-7rc7hb1acog", "hero");
@@ -160,6 +163,14 @@ export default async function HomePage() {
 
 	return (
 		<>
+		<script
+			type="application/ld+json"
+			dangerouslySetInnerHTML={{ __html: generateOrganizationJsonLd(SITE_URL) }}
+		/>
+		<script
+			type="application/ld+json"
+			dangerouslySetInnerHTML={{ __html: generateWebSiteJsonLd(SITE_URL) }}
+		/>
 		<GlobalHeader scope="guest" isAuthenticated={false} />
 		<main className={styles.page}>
 

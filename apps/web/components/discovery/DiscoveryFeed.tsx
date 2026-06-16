@@ -81,7 +81,7 @@ export function DiscoveryFeed({
           ))}
         </div>
       ) : listings.length === 0 ? (
-        <EmptyState />
+        <EmptyState illustration="empty.searchNoResults" />
       ) : (
         <>
           <div className={styles.grid}>

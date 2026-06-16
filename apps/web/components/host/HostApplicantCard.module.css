@@ -6,6 +6,17 @@
   background: var(--color-surface-raised);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
+  box-shadow: var(--elevation-card);
+  transition:
+    box-shadow var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .card:hover {
+    box-shadow: var(--elevation-hover);
+    border-color: var(--border-ink);
+  }
 }
 
 .meta {
@@ -17,8 +28,31 @@
 
 .who {
   display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  min-width: 0;
+}
+
+.whoText {
+  display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-sky);
+  color: var(--color-cta-text);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: 1;
 }
 
 .name {

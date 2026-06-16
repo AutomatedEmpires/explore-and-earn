@@ -52,6 +52,7 @@ export function HostListingsManager({ listings }: HostListingsManagerProps) {
         </div>
       ) : (
         <EmptyState
+          illustration="empty.hostListings"
           title={`No ${HOST_LISTING_STATE_LABEL[
             active as HostListingState
           ].toLowerCase()} listings`}

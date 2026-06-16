@@ -4,6 +4,9 @@ import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { selectPrimaryAction, type PrimaryActionInput } from "./models";
 import styles from "./PrimaryActionCard.module.css";
 
+/** Emotional tone per action — drives the card's accent + CTA color. */
+type ActionTone = "offer" | "urgent" | "ready" | "resume" | "match" | "explore";
+
 interface PrimaryActionView {
   readonly icon: IconKey;
   readonly eyebrow: string;
@@ -12,6 +15,7 @@ interface PrimaryActionView {
   readonly message?: string;
   readonly ctaLabel: string;
   readonly ctaHref: string;
+  readonly tone: ActionTone;
 }
 
 function toView(input: PrimaryActionInput): PrimaryActionView {
@@ -28,6 +32,7 @@ function toView(input: PrimaryActionInput): PrimaryActionView {
         message: action.offer.messageFromHost,
         ctaLabel: "Review offer",
         ctaHref: "/offered",
+        tone: "offer",
       };
     case "invite_expiring":
       return {
@@ -37,6 +42,7 @@ function toView(input: PrimaryActionInput): PrimaryActionView {
         meta: `${action.invite.listing.host.name} · Expires ${action.invite.expiresOn}`,
         ctaLabel: "View invite",
         ctaHref: "/invites",
+        tone: "urgent",
       };
     case "accepted_upcoming":
       return {
@@ -49,6 +55,7 @@ function toView(input: PrimaryActionInput): PrimaryActionView {
             ? "View travel plan"
             : "Plan your arrival",
         ctaHref: "/journey",
+        tone: "ready",
       };
     case "resume_incomplete":
       return {
@@ -58,6 +65,7 @@ function toView(input: PrimaryActionInput): PrimaryActionView {
         meta: "Complete your resume to unlock applying and improve your matches.",
         ctaLabel: "Continue resume",
         ctaHref: "/resume",
+        tone: "resume",
       };
     case "strong_match":
       return {
@@ -67,6 +75,7 @@ function toView(input: PrimaryActionInput): PrimaryActionView {
         meta: `${action.listing.host.name} · ${action.listing.location}`,
         ctaLabel: "View match",
         ctaHref: "/seek",
+        tone: "match",
       };
     default:
       return {
@@ -76,6 +85,7 @@ function toView(input: PrimaryActionInput): PrimaryActionView {
         meta: "Browse housing, meals, and pay from hosts around the world.",
         ctaLabel: "Explore opportunities",
         ctaHref: "/swipe",
+        tone: "explore",
       };
   }
 }
@@ -92,7 +102,7 @@ export interface PrimaryActionCardProps {
 export function PrimaryActionCard({ input }: PrimaryActionCardProps) {
   const view = toView(input);
   return (
-    <article className={styles.card}>
+    <article className={styles.card} data-tone={view.tone}>
       <span className={styles.eyebrow}>
         <Icon name={view.icon} size={16} aria-hidden /> {view.eyebrow}
       </span>

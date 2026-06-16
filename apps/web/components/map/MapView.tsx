@@ -193,6 +193,7 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
   if (!token || errored) {
     return (
       <EmptyState
+        illustration="error.generic"
         title="Map unavailable"
         message="The map could not be loaded right now. You can still browse every opportunity from the Seek tab — please try the map again shortly."
       />
@@ -202,6 +203,7 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
   if (mapped.length === 0) {
     return (
       <EmptyState
+        illustration="empty.map"
         title="No mapped opportunities"
         message="None of the current opportunities have a fixed location yet. Head to the Seek tab to browse everything, including remote roles."
       />

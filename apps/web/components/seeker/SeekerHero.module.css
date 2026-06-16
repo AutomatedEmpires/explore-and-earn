@@ -231,7 +231,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #6AE89A;
+  background: var(--state-live-dot);
   flex-shrink: 0;
   box-shadow: 0 0 6px rgba(106, 232, 154, 0.8);
   animation: badge-pulse 3s ease-in-out infinite;

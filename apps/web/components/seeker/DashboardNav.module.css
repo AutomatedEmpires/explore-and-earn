@@ -65,8 +65,8 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--color-category-seasonal, #5A8A32);
-  color: #fff;
+  background: var(--gradient-progress);
+  color: var(--color-cta-text);
   font-family: var(--font-display);
   font-size: 16px;
   font-weight: 700;
@@ -195,7 +195,7 @@
   inset-inline-start: 0;
   width: 3px;
   border-radius: 0 2px 2px 0;
-  background: var(--color-accent, #5A8A32);
+  background: var(--color-cta);
 }
 
 .navLabel {
@@ -207,8 +207,8 @@
   height: 20px;
   padding: 0 var(--space-6);
   border-radius: var(--radius-pill);
-  background: var(--color-accent, #E05030);
-  color: #fff;
+  background: var(--color-cta);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: 11px;
   font-weight: 700;

@@ -4,6 +4,7 @@ import styles from "./SiteFooter.module.css";
 
 const LEGAL_LINKS = [
 	{ label: "About",   href: "/about"   },
+	{ label: "FAQ",     href: "/faq"     },
 	{ label: "Terms",   href: "/terms"   },
 	{ label: "Privacy", href: "/privacy" },
 	{ label: "Cookies", href: "/cookies" },

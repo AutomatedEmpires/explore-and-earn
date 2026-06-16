@@ -13,4 +13,5 @@ coverage
 node_modules/
 *.tsbuildinfo
 supabase/.temp/
+supabase/.branches/
 test-results/

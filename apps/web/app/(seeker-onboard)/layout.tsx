@@ -7,6 +7,9 @@ import styles from "./layout.module.css";
 
 export const metadata: Metadata = {
   title: "Get started",
+  description:
+    "Set up your free Explore & Earn seeker profile to browse, save, and apply to seasonal, remote, farm, maritime, and adventure opportunities.",
+  robots: { index: false },
 };
 
 /**

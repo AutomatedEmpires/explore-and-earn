@@ -71,8 +71,11 @@ export default async function WithdrawnPage() {
 				</div>
 			) : (
 				<EmptyState
+					illustration="empty.withdrawn"
 					title="No withdrawn applications"
 					message="Applications you pull back from will appear here. Keep exploring opportunities under Seek."
+					actionLabel="Explore opportunities"
+					actionHref="/seek"
 				/>
 			)}
 		</BucketPage>

@@ -1,13 +1,37 @@
 .card {
+  /* --tone-fill drives the accent bar, eyebrow, and CTA per data-tone */
+  --tone-fill: var(--color-cta);
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
   padding: var(--space-card);
-  border: 1px solid var(--border-ink);
+  padding-left: calc(var(--space-card) + var(--space-4));
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
   background: var(--color-surface-raised);
+  box-shadow: var(--elevation-card);
   color: var(--text-primary);
+  overflow: hidden;
 }
+
+/* Left accent bar — the tone's signature */
+.card::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: var(--space-4);
+  background: var(--tone-fill);
+}
+
+/* Per-tone accent colors (background gradient/scrim kept neutral for legibility) */
+.card[data-tone="offer"]   { --tone-fill: var(--state-ready-fg); }
+.card[data-tone="urgent"]  { --tone-fill: var(--state-urgent-fg); }
+.card[data-tone="ready"]   { --tone-fill: var(--state-ready-fg); }
+.card[data-tone="resume"]  { --tone-fill: var(--state-soon-fg); }
+.card[data-tone="match"]   { --tone-fill: var(--status-match-fg); }
+.card[data-tone="explore"] { --tone-fill: var(--color-cta); }
 
 .eyebrow {
   display: inline-flex;
@@ -19,7 +43,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--tone-fill);
 }
 
 .title {
@@ -58,20 +82,28 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-8);
+  min-height: var(--tap-min);
   padding: var(--space-12) var(--space-20);
   border-radius: var(--radius-button);
-  background: var(--text-primary);
-  color: var(--color-surface-raised);
+  background: var(--tone-fill);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-button-size);
   line-height: var(--type-button-lh);
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
-  transition: background var(--motion-fast) var(--ease-standard);
+  transition:
+    filter var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
-.cta:hover {
-  background: var(--border-ink);
+@media (hover: hover) {
+  .cta:hover {
+    filter: brightness(1.06) saturate(1.04);
+  }
+  .cta:active {
+    transform: scale(0.98);
+  }
 }
 
 .cta:focus-visible {

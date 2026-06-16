@@ -6,12 +6,13 @@ import { Icon } from "@explore-and-earn/ui";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import styles from "./FeaturedEmployerStrip.module.css";
 
+// Tokenized category atmospheres (shared across all seeker surfaces).
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  maritime: "linear-gradient(155deg, #0A2E4A 0%, #1874AC 100%)",
-  farm:     "linear-gradient(155deg, #2A1608 0%, #96601C 100%)",
-  remote:   "linear-gradient(155deg, #121C2A 0%, #3A5882 100%)",
-  seasonal: "linear-gradient(155deg, #0C1E08 0%, #427820 100%)",
-  mix:      "linear-gradient(155deg, #1A0A2E 0%, #7A3060 100%)",
+  maritime: "var(--gradient-category-maritime)",
+  farm:     "var(--gradient-category-farm)",
+  remote:   "var(--gradient-category-remote)",
+  seasonal: "var(--gradient-category-seasonal)",
+  mix:      "var(--gradient-category-mix)",
 };
 
 function EmployerCard({ employer }: { employer: FeaturedEmployer }) {

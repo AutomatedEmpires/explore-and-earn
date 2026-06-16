@@ -30,7 +30,7 @@ function ResumeCallout({ pct }: { pct: number }) {
   const r = 14;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
-  const ringColor = pct >= 40 ? "#C48A18" : "#A05030";
+  const ringColor = pct >= 40 ? "var(--state-soon-fg)" : "var(--accent-seasonal-fg)";
 
   return (
     <Link
@@ -48,7 +48,7 @@ function ResumeCallout({ pct }: { pct: number }) {
             strokeLinecap="round"
             transform="rotate(-90 18 18)"
           />
-          <text x="18" y="22" textAnchor="middle" fontSize="9" fontWeight="700" fill="#6B4E10">
+          <text x="18" y="22" textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--benefit-pay-fg)">
             {pct}%
           </text>
         </svg>
@@ -90,7 +90,7 @@ function ResumeRingChip({ pct }: { pct: number }) {
   const r = 14;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
-  const color = pct >= 80 ? "#2D7A3A" : pct >= 40 ? "#C48A18" : "#A05030";
+  const color = pct >= 80 ? "var(--state-ready-fg)" : pct >= 40 ? "var(--state-soon-fg)" : "var(--accent-seasonal-fg)";
 
   return (
     <Link href="/resume" className={styles.resumeChip} aria-label={`Resume: ${pct}% complete`}>

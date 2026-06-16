@@ -31,7 +31,11 @@ export function WithdrawButton({ applicationId }: WithdrawButtonProps) {
         type="button"
         className={styles.button}
         disabled={pending}
-        onClick={() =>
+        onClick={() => {
+          // Withdrawing can't be undone — confirm before firing.
+          if (!window.confirm("Withdraw this application? This can't be undone.")) {
+            return;
+          }
           startTransition(async () => {
             setError(null);
             const result = await withdrawApplicationAction(applicationId);
@@ -41,8 +45,8 @@ export function WithdrawButton({ applicationId }: WithdrawButtonProps) {
             } else {
               setError("Couldn't withdraw. Please try again.");
             }
-          })
-        }
+          });
+        }}
       >
         {pending ? "Withdrawing…" : "Withdraw"}
       </button>
