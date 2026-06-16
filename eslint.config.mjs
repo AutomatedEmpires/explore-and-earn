@@ -12,6 +12,9 @@ export default tseslint.config(
       "**/coverage/**",
       "**/.turbo/**",
       "**/.remember/**",
+      // Compiled output of packages/db (emitted next to source by `tsc -b`);
+      // every .js here has a .ts sibling — lint the source, not the build artifact.
+      "packages/db/src/**/*.js",
       "**/*.d.ts",
       "pnpm-lock.yaml"
     ]
