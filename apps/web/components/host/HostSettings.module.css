@@ -112,10 +112,10 @@
 }
 
 .planHighlighted {
-  border-color: color-mix(in srgb, var(--color-sky, #0ea5e9) 60%, transparent);
+  border-color: color-mix(in srgb, var(--palette-sky) 60%, transparent);
   background: linear-gradient(
     160deg,
-    color-mix(in srgb, var(--color-sky, #0ea5e9) 5%, var(--color-surface-raised) 95%),
+    color-mix(in srgb, var(--palette-sky) 5%, var(--color-surface-raised) 95%),
     var(--color-surface-raised)
   );
 }
@@ -213,7 +213,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--status-success-fg, #16a34a);
+  color: var(--status-success-fg);
   margin-top: 1px;
 }
 
@@ -623,9 +623,9 @@
   flex-direction: column;
   gap: var(--space-12);
   padding: var(--space-20);
-  border: 1px solid color-mix(in srgb, var(--status-error-fg, #dc2626) 24%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 24%, transparent);
   border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--status-error-bg, #fee2e2) 30%, var(--color-surface-raised) 70%);
+  background: color-mix(in srgb, var(--status-error-bg) 30%, var(--color-surface-raised) 70%);
 }
 
 .dangerTitle {
@@ -636,7 +636,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
-  color: var(--status-error-fg, #dc2626);
+  color: var(--status-error-fg);
 }
 
 .dangerRow {
@@ -671,10 +671,10 @@
   justify-content: center;
   min-height: 2.5rem;
   padding: 0 var(--space-16);
-  border: 1px solid color-mix(in srgb, var(--status-error-fg, #dc2626) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 40%, transparent);
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--status-error-fg, #dc2626);
+  color: var(--status-error-fg);
   font-family: var(--font-ui);
   font-size: var(--type-button-size);
   font-weight: var(--font-weight-semibold);
@@ -685,7 +685,7 @@
 }
 
 .dangerBtn:hover {
-  background: color-mix(in srgb, var(--status-error-fg, #dc2626) 8%, transparent);
+  background: color-mix(in srgb, var(--status-error-fg) 8%, transparent);
 }
 
 .dangerConfirm {
@@ -716,7 +716,7 @@
   padding: 0 var(--space-16);
   border: none;
   border-radius: var(--radius-pill);
-  background: var(--status-error-fg, #dc2626);
+  background: var(--status-error-fg);
   color: white;
   font-family: var(--font-ui);
   font-size: var(--type-button-size);
@@ -751,7 +751,7 @@
   font-family: var(--font-ui);
   font-size: var(--type-body-size);
   line-height: 1.6;
-  color: var(--status-success-fg, #16a34a);
+  color: var(--status-success-fg);
 }
 
 .dangerSent p {

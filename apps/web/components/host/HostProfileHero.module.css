@@ -366,7 +366,7 @@
   padding: var(--space-10) var(--space-20);
   border-radius: var(--radius-pill);
   background: var(--color-cta);
-  color: #fff;
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   font-weight: var(--font-weight-semibold);

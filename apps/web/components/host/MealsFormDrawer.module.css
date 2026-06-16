@@ -110,7 +110,7 @@
 	height: 2.75rem;
 	border-radius: var(--radius-pill);
 	border: 1.5px solid color-mix(in srgb, var(--border-ink) 56%, transparent);
-	background: color-mix(in srgb, #fff8ea 90%, var(--color-surface-raised));
+	background: color-mix(in srgb, var(--status-warning-bg) 90%, var(--color-surface-raised));
 	color: var(--text-primary);
 	cursor: pointer;
 	box-shadow: 0 2px 10px rgba(26,43,60,0.16);
@@ -123,7 +123,7 @@
 
 .cameraButton:hover {
 	transform: scale(1.10);
-	background: color-mix(in srgb, #fff1d0 94%, var(--color-surface-raised));
+	background: color-mix(in srgb, var(--status-warning-bg) 94%, var(--color-surface-raised));
 	box-shadow: 0 4px 14px rgba(26,43,60,0.22);
 }
 
@@ -246,7 +246,7 @@
 
 .chip:hover {
 	border-color: color-mix(in srgb, var(--border-ink) 64%, var(--text-primary) 36%);
-	background: color-mix(in srgb, #fff3d8 88%, var(--color-surface));
+	background: color-mix(in srgb, var(--status-warning-bg) 88%, var(--color-surface));
 }
 
 .chip:active {
@@ -261,12 +261,12 @@
 /* Active: embossed with amber catch-light */
 .chipActive {
 	border-color: color-mix(in srgb, var(--border-ink) 74%, var(--text-primary) 26%);
-	background: color-mix(in srgb, #fdefc8 88%, var(--color-surface));
+	background: color-mix(in srgb, var(--status-warning-bg) 88%, var(--color-surface));
 	box-shadow:
 		inset 0 1.5px 0 rgba(255,255,255,0.82),
 		inset 0 -1px 0 rgba(26,43,60,0.06),
-		0 0 0 1px color-mix(in srgb, #d4a832 22%, transparent),
-		0 2px 8px rgba(212,168,50,0.18);
+		0 0 0 1px color-mix(in srgb, var(--color-gold) 22%, transparent),
+		0 2px 8px color-mix(in srgb, var(--color-gold) 18%, transparent);
 }
 
 /* ── Trust note ──────────────────────────────────────── */
@@ -276,13 +276,13 @@
 	align-items: center;
 	gap: var(--space-12);
 	padding: var(--space-12) var(--space-14);
-	border: 1.5px solid color-mix(in srgb, #d4a832 40%, color-mix(in srgb, var(--border-ink) 24%, transparent));
-	border-left: 3.5px solid color-mix(in srgb, #d4a832 70%, var(--border-ink) 30%);
+	border: 1.5px solid color-mix(in srgb, var(--color-gold) 40%, color-mix(in srgb, var(--border-ink) 24%, transparent));
+	border-left: 3.5px solid color-mix(in srgb, var(--color-gold) 70%, var(--border-ink) 30%);
 	border-radius: var(--radius-card);
 	background: linear-gradient(
 		135deg,
-		color-mix(in srgb, #fef8ec 90%, var(--color-surface-raised)) 0%,
-		color-mix(in srgb, #f8f0d8 88%, var(--color-surface)) 100%
+		color-mix(in srgb, var(--status-warning-bg) 90%, var(--color-surface-raised)) 0%,
+		color-mix(in srgb, var(--status-warning-bg) 88%, var(--color-surface)) 100%
 	);
 	position: relative;
 	overflow: hidden;
@@ -335,7 +335,7 @@
 	background:
 		linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(0,0,0,0.06) 100%),
 		var(--color-cta);
-	color: #ffffff;
+	color: var(--color-cta-text);
 	border-color: color-mix(in srgb, var(--color-cta) 52%, var(--palette-ink) 48%);
 	box-shadow:
 		4px 5px 0 rgba(26,43,60,0.30),

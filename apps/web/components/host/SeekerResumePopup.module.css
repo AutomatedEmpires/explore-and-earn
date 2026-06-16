@@ -42,7 +42,7 @@
 	justify-content: center;
 	padding: var(--space-12) var(--space-16);
 	background: var(--color-cta);
-	color: #fff;
+	color: var(--color-cta-text);
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	font-weight: var(--font-weight-semibold);

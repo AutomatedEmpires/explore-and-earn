@@ -216,11 +216,11 @@
 }
 
 .pip_live {
-  color: var(--status-success-fg, #16a34a);
+  color: var(--status-success-fg);
 }
 
 .pip_paused {
-  color: var(--status-warning-fg, #d97706);
+  color: var(--status-warning-fg);
 }
 
 .pip_draft,

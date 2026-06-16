@@ -87,7 +87,7 @@
   gap: var(--space-4);
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
-  color: var(--status-success-fg, #16a34a);
+  color: var(--status-success-fg);
 }
 
 /* ─── Empty state ───────────────────────────────────────────────────────── */
@@ -188,12 +188,12 @@
   align-items: center;
   gap: var(--space-8);
   padding: var(--space-12);
-  background: color-mix(in srgb, var(--status-error-bg, #fee2e2) 70%, white 30%);
-  border: 1px solid color-mix(in srgb, var(--status-error-fg, #dc2626) 20%, transparent);
+  background: color-mix(in srgb, var(--status-error-bg) 70%, white 30%);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 20%, transparent);
   border-radius: var(--radius-cell);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  color: var(--status-error-fg, #dc2626);
+  color: var(--status-error-fg);
 }
 
 .sendRow {
@@ -207,11 +207,11 @@
   align-items: center;
   gap: var(--space-8);
   padding: var(--space-16);
-  background: color-mix(in srgb, var(--status-success-bg, #dcfce7) 70%, white 30%);
-  border: 1px solid color-mix(in srgb, var(--status-success-fg, #16a34a) 20%, transparent);
+  background: color-mix(in srgb, var(--status-success-bg) 70%, white 30%);
+  border: 1px solid color-mix(in srgb, var(--status-success-fg) 20%, transparent);
   border-radius: var(--radius-cell);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   font-weight: var(--font-weight-semibold);
-  color: var(--status-success-fg, #16a34a);
+  color: var(--status-success-fg);
 }

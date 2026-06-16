@@ -116,11 +116,11 @@
   align-items: center;
   gap: var(--space-8);
   padding: var(--space-8) var(--space-12);
-  background: color-mix(in srgb, var(--color-success, #22c55e) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-success, #22c55e) 20%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-success-fg) 20%, transparent);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
-  color: color-mix(in srgb, var(--color-success, #22c55e) 80%, var(--color-ink));
+  color: color-mix(in srgb, var(--status-success-fg) 80%, var(--color-ink));
   margin: 0;
 }
 
@@ -194,11 +194,11 @@
   align-items: center;
   gap: var(--space-12);
   padding: var(--space-24);
-  background: color-mix(in srgb, var(--color-success, #22c55e) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-success, #22c55e) 20%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-success-fg) 20%, transparent);
   border-radius: var(--radius-lg);
   text-align: center;
-  color: color-mix(in srgb, var(--color-success, #22c55e) 80%, var(--color-ink));
+  color: color-mix(in srgb, var(--status-success-fg) 80%, var(--color-ink));
 }
 
 .resetBtn {
@@ -213,6 +213,6 @@
 
 .error {
   font-size: var(--font-size-sm);
-  color: var(--color-error, #ef4444);
+  color: var(--status-error-fg);
   margin: 0;
 }
