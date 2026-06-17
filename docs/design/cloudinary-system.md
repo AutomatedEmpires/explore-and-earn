@@ -1,5 +1,7 @@
 # Cloudinary Asset Management System — Explore&Earn
 
+> ⚠️ **SUPERSEDED (2026-06-17).** This hand-maintained doc drifted from reality (claimed 566 assets; live count is **974**). The **source of truth** is now the generated manifest [`scripts/assets.manifest.v2.json`](../../scripts/assets.manifest.v2.json) (regenerate via `node scripts/assets-sync.mjs`) and the design spec [`2026-06-17-asset-management-v2-design.md`](../superpowers/specs/2026-06-17-asset-management-v2-design.md). Kept below for historical transform/preset reference only.
+
 > **Living document.** Update whenever you add, remove, or recategorize assets.  
 > Last generated: 2026-06-07 | Cloud: `dwiwyt9vi` | Plan: Free (25 credits/mo)
 

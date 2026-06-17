@@ -1,5 +1,7 @@
 # Streamline Cloudinary Inventory
 
+> ⚠️ **SUPERSEDED (2026-06-17).** Point-in-time snapshot. The live source of truth is the generated manifest [`scripts/assets.manifest.v2.json`](../../scripts/assets.manifest.v2.json) (`node scripts/assets-sync.mjs`); see the spec [`2026-06-17-asset-management-v2-design.md`](../superpowers/specs/2026-06-17-asset-management-v2-design.md).
+
 Auto-generated inventory of real, already-uploaded Streamline assets on Cloudinary (cloud dwiwyt9vi, folder explore-and-earn/icons). These are the ONLY verified, deliverable assets — registry cloudinaryId values must come from this list.
 
 **Total assets: 364**
