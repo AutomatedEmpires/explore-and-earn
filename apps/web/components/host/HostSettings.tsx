@@ -8,6 +8,10 @@ import {
   PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
 
+import {
+  startHostCheckoutAction,
+  startHostBillingPortalAction,
+} from "../../app/actions/hostBilling";
 import styles from "./HostSettings.module.css";
 
 const SUPPORT_EMAIL = "jackson@automatedempires.com";
@@ -184,17 +188,19 @@ function PlanCard({ tier, current }: { tier: PaidTier; current: boolean }) {
         ))}
       </ul>
       {current ? (
-        <span className={`${styles.planCta} ${styles.planCtaCurrent}`} aria-label={`${meta.name} — your current plan`}>
-          Current plan
-        </span>
+        <form action={startHostBillingPortalAction} className={styles.ctaForm}>
+          <button type="submit" className={`${styles.planCta} ${styles.planCtaManage}`}>
+            Manage billing
+          </button>
+        </form>
       ) : (
-        <a
-          className={styles.planCta}
-          href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Explore & Earn — ${meta.name} plan`)}`}
-          aria-label={meta.cta}
-        >
-          {meta.cta}
-        </a>
+        <form action={startHostCheckoutAction} className={styles.ctaForm}>
+          <input type="hidden" name="tier" value={tier} />
+          <input type="hidden" name="interval" value="monthly" />
+          <button type="submit" className={styles.planCta} aria-label={meta.cta}>
+            {meta.cta}
+          </button>
+        </form>
       )}
     </div>
   );
@@ -276,11 +282,13 @@ function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProp
       <div className={styles.billingNote}>
         <Icon name="system.info" size={16} aria-hidden />
         <span>
-          Billing is managed manually during early access. Reach out to{" "}
+          Plans are billed securely through Stripe — choose a plan above, or use
+          Manage billing to update payment details, switch plans, or cancel. For
+          add-on capacity, contact{" "}
           <a href={`mailto:${SUPPORT_EMAIL}`} className={styles.inlineLink}>
             {SUPPORT_EMAIL}
-          </a>{" "}
-          to choose a plan or add capacity.
+          </a>
+          .
         </span>
       </div>
     </div>

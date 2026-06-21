@@ -217,10 +217,17 @@
   margin-top: 1px;
 }
 
+/* Form wrapper is layout-transparent so the button stays a direct flex child of
+ * the plan card (stretches full width like the prior <a>). */
+.ctaForm {
+  display: contents;
+}
+
 .planCta {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   min-height: 2.5rem;
   padding: 0 var(--space-16);
   border: 1px solid var(--border-ink);
@@ -232,7 +239,31 @@
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
   text-align: center;
-  transition: opacity var(--motion-base) var(--ease-standard);
+  cursor: pointer;
+  appearance: none;
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.planCta:hover {
+  opacity: 0.92;
+}
+
+.planCta:active {
+  transform: translateY(1px);
+}
+
+.planCta:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+/* Current subscriber → clickable "Manage billing" (Stripe portal), secondary look. */
+.planCtaManage {
+  background: var(--color-surface);
+  color: var(--text-primary);
+  border-color: var(--border-ink);
 }
 
 .planCta:hover {
