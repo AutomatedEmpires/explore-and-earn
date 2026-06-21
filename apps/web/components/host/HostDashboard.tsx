@@ -62,33 +62,39 @@ export function HostDashboard({
   primaryLane,
   analytics,
 }: HostDashboardProps) {
-  const liveCount = stats.listingsByStatus["live"] ?? 0;
-  const draftCount = stats.listingsByStatus["draft"] ?? 0;
-  const totalListings = Object.values(stats.listingsByStatus).reduce(
-    (sum, n) => sum + n,
-    0,
-  );
+  // Primary counts come from analytics — getHostAnalytics is the reliable host
+  // resolver (live listings + applications by status); the month-scoped stats
+  // are used only for the "this month" figures, with all-time fallbacks so a
+  // stats hiccup never blanks the dashboard to zeros.
+  const totalListings = analytics.perListingStats.length;
+  const liveCount = analytics.activeListingCount;
+  const draftCount =
+    stats.listingsByStatus["draft"] ??
+    analytics.perListingStats.filter((l) => l.listingStatus === "draft").length;
 
-  const newApps = stats.applicationsThisMonth["applied"] ?? 0;
-  const totalAppsMonth = Object.values(stats.applicationsThisMonth).reduce(
-    (sum, n) => sum + n,
-    0,
-  );
-
-  // "Pipeline fill" as a 0–100 percentage for the Meter, based on how many
-  // of this month's applications have moved past "applied".
-  const reviewed = totalAppsMonth - newApps;
-  const pipelineFill =
-    totalAppsMonth > 0 ? Math.round((reviewed / totalAppsMonth) * 100) : 0;
-
-  // Analytics-derived figures for the performance cards.
-  const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
   const totalApplicationsAllTime = Object.values(
     analytics.totalApplicationsByStatus,
   ).reduce((sum, n) => sum + n, 0);
+  const pendingReview = analytics.totalApplicationsByStatus["applied"] ?? 0;
+
+  const monthApps = Object.values(stats.applicationsThisMonth).reduce(
+    (sum, n) => sum + n,
+    0,
+  );
+  const totalAppsMonth = monthApps > 0 ? monthApps : totalApplicationsAllTime;
+  const newApps = stats.applicationsThisMonth["applied"] ?? pendingReview;
+
+  // "Pipeline fill" — share of applications moved past "applied".
+  const reviewed = totalApplicationsAllTime - pendingReview;
+  const pipelineFill =
+    totalApplicationsAllTime > 0
+      ? Math.round((reviewed / totalApplicationsAllTime) * 100)
+      : 0;
+
+  const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
   const topListings = analytics.perListingStats.slice(0, 5);
 
-  const pending = stats.pendingActions;
+  const pending = stats.pendingActions > 0 ? stats.pendingActions : pendingReview;
   const isNewHost = totalListings === 0;
   // Exactly one KPI leads as the dominant tile — the host's most urgent job
   // (pending review > new applicants). Avoids two competing "primary" tiles.
