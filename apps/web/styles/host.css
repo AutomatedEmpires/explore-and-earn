@@ -68,7 +68,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
-  min-height: 36px;
+  min-height: var(--tap-min);
   padding: var(--space-6) var(--space-12);
   border-radius: var(--radius-pill);
   font-family: var(--font-ui);
@@ -94,10 +94,17 @@
   gap: var(--space-16);
   padding: var(--space-20);
   border-radius: var(--radius-card);
-  background: var(--gradient-sky);
+  background: var(--gradient-sky); /* default / no-lane fallback */
   color: var(--color-cta-text);
   box-shadow: var(--elevation-card);
 }
+/* Lane atmosphere — the hero reflects the host's primary marketplace lane.
+   One locked gradient per lane (never re-rolled); falls back to sky above. */
+.host-hero[data-lane="farm"]     { background: var(--gradient-category-farm); }
+.host-hero[data-lane="maritime"] { background: var(--gradient-category-maritime); }
+.host-hero[data-lane="remote"]   { background: var(--gradient-category-remote); }
+.host-hero[data-lane="seasonal"] { background: var(--gradient-category-seasonal); }
+.host-hero[data-lane="mix"]      { background: var(--gradient-category-mix); }
 /* subtle top catch-light */
 .host-hero::before {
   content: "";
@@ -133,6 +140,7 @@
   color: color-mix(in srgb, var(--color-cta-text) 86%, transparent);
 }
 .host-hero__actions { position: relative; display: flex; flex-wrap: wrap; gap: var(--space-8); }
+/* (removed unused .host-hero__meter* rules — the dashboard hero has no meter) */
 
 /* Primary action on the hero (white pill on sky) */
 .host-hero__cta {
@@ -160,30 +168,6 @@
 }
 .host-hero__cta--ghost:hover { background: color-mix(in srgb, var(--color-cta-text) 22%, transparent); }
 
-/* completeness meter inside the hero */
-.host-hero__meter {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.host-hero__meterTrack {
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-cta-text) 22%, transparent);
-  overflow: hidden;
-}
-.host-hero__meterFill {
-  height: 100%;
-  border-radius: var(--radius-pill);
-  background: var(--color-cta-text);
-}
-.host-hero__meterLabel {
-  font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
-  color: color-mix(in srgb, var(--color-cta-text) 84%, transparent);
-}
-
 /* =================================================================== */
 /* KPI — compact metric card                                           */
 /* =================================================================== */
@@ -207,7 +191,7 @@
   border-radius: var(--radius-cell);
   text-decoration: none;
   color: var(--text-primary);
-  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard);
+  transition: border-color var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
 }
 a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-card); }
 .host-kpi:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
@@ -232,6 +216,8 @@ a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-
 
 /* primary emphasis — when the metric is actionable (> 0 pending/new) */
 .host-kpi--primary {
+  order: -1;            /* the single actionable metric leads the row */
+  grid-column: span 2; /* …and reads as the dominant tile */
   background: var(--status-match-bg);
   border-color: var(--status-match-fg);
   box-shadow: var(--elevation-card);
@@ -239,6 +225,7 @@ a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-
 .host-kpi--primary .host-kpi__value,
 .host-kpi--primary .host-kpi__label,
 .host-kpi--primary .host-kpi__top { color: var(--status-match-fg); }
+.host-kpi--primary .host-kpi__value { font-size: var(--type-display-size); }
 
 /* =================================================================== */
 /* Stat row — dense label/value list inside panels                     */
@@ -387,7 +374,7 @@ a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-
   background: var(--color-surface);
   text-decoration: none;
   color: var(--text-primary);
-  transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard);
+  transition: border-color var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
 }
 .host-attention:hover { border-color: var(--border-ink); background: var(--color-surface-raised); }
 .host-attention:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
@@ -431,6 +418,16 @@ a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-
 }
 .host-empty__cta:hover { filter: brightness(1.06); }
 .host-empty__cta:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+/* Press feedback — physical, mobile-first (the most-skipped state). Gated on
+   no-preference so reduced-motion users get an instant, scale-free press. */
+@media (prefers-reduced-motion: no-preference) {
+  .host-kpi:active,
+  .host-action-tile:active,
+  .host-attention:active,
+  .host-hero__cta:active,
+  .host-empty__cta:active { transform: scale(0.97); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .host-action-tile,

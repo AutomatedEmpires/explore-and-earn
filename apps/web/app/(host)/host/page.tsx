@@ -49,6 +49,7 @@ export default async function HostDashboardPage() {
         stats={stats}
         recentActivity={recentActivity}
         companyName={hostProfile?.companyName ?? null}
+        primaryLane={hostProfile?.categoryScopes?.[0] ?? null}
         analytics={analytics}
       />
     </div>

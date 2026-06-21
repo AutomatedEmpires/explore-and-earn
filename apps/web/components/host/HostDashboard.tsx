@@ -13,6 +13,8 @@ export interface HostDashboardProps {
   readonly recentActivity: readonly RecentActivity[];
   /** Company name for the greeting. */
   readonly companyName: string | null;
+  /** Host's primary marketplace lane (farm/maritime/remote/seasonal/mix) — drives the hero atmosphere. */
+  readonly primaryLane: string | null;
   /** Full host analytics for the performance cards. */
   readonly analytics: HostAnalytics;
 }
@@ -56,6 +58,7 @@ export function HostDashboard({
   stats,
   recentActivity,
   companyName,
+  primaryLane,
   analytics,
 }: HostDashboardProps) {
   const liveCount = stats.listingsByStatus["live"] ?? 0;
@@ -86,16 +89,20 @@ export function HostDashboard({
 
   const pending = stats.pendingActions;
   const isNewHost = totalListings === 0;
+  // Exactly one KPI leads as the dominant tile — the host's most urgent job
+  // (pending review > new applicants). Avoids two competing "primary" tiles.
+  const leadKpi: "pending" | "new" | null =
+    pending > 0 ? "pending" : newApps > 0 ? "new" : null;
   // The single strongest next action drives the hero CTA.
   const heroPrimary =
     pending > 0
       ? { href: "/host/applicants", label: `Review ${pending} applicant${pending === 1 ? "" : "s"}`, icon: "action.apply" as const }
-      : { href: "/host/listings/new", label: "Create a listing", icon: "action.apply" as const };
+      : { href: "/host/listings/new", label: "Create a listing", icon: "status.open" as const };
 
   return (
     <div className={`host-page ${styles.dashboard}`}>
       {/* ── Identity hero + strongest next action ──────────────────── */}
-      <section className="host-hero">
+      <section className="host-hero" data-lane={primaryLane ?? undefined}>
         <div>
           <p className="host-hero__eyebrow">Hosting command center</p>
           <h1 className="host-hero__title">
@@ -131,7 +138,7 @@ export function HostDashboard({
           <span className="host-kpi__label">Live listings</span>
         </Link>
         <Link
-          className={`host-kpi${newApps > 0 ? " host-kpi--primary" : ""}`}
+          className={`host-kpi${leadKpi === "new" ? " host-kpi--primary" : ""}`}
           href="/host/applicants"
         >
           <span className="host-kpi__top">
@@ -141,7 +148,7 @@ export function HostDashboard({
           <span className="host-kpi__label">New applicants</span>
         </Link>
         <Link
-          className={`host-kpi${pending > 0 ? " host-kpi--primary" : ""}`}
+          className={`host-kpi${leadKpi === "pending" ? " host-kpi--primary" : ""}`}
           href="/host/applicants"
         >
           <span className="host-kpi__top">
