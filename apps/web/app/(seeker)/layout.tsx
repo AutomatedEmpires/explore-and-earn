@@ -10,6 +10,8 @@ import {
 
 import { GlobalHeader } from "../../components/global";
 import { SeekerBottomNav } from "../../components/seeker";
+import { DEV_USER_ID, devSeekerName, isDevBenchEnabled } from "../../lib/devBench";
+import { readDevRole } from "../../lib/devBench/server";
 import styles from "./layout.module.css";
 
 /**
@@ -57,6 +59,19 @@ interface SeekerShellState {
  * intentionally NOT redirected here.
  */
 async function resolveSeekerShellState(): Promise<SeekerShellState> {
+  // DEV MOCK BENCH (review tooling only): present a clean impersonated identity
+  // and skip the DB reads that would fail on the bench's sentinel token. No-op
+  // in production/preview (isDevBenchEnabled() is false).
+  if (isDevBenchEnabled() && (await readDevRole())) {
+    return {
+      unreadCount: 0,
+      clerkUserId: DEV_USER_ID,
+      needsOnboarding: false,
+      seekerName: devSeekerName(),
+      unreadCommunity: 0,
+    };
+  }
+
   try {
     const { userId, getToken } = await auth();
     if (!userId) {

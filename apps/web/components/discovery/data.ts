@@ -6,6 +6,7 @@ import {
   rowToDiscoveryFields,
   SWIPE_BATCH_SIZE,
 } from "@explore-and-earn/db";
+import { isDevBenchEnabled } from "../../lib/devBench";
 import { DISCOVERY_FIXTURES } from "./fixtures";
 import type { DiscoveryListing } from "./listing";
 
@@ -40,6 +41,8 @@ function reportMissingProductionDiscoveryConfig(context: string) {
 
 /** All discoverable live opportunities. */
 export async function getDiscoveryListings(): Promise<DiscoveryListing[]> {
+  // DEV MOCK BENCH: deterministic fixtures over live data while impersonating.
+  if (isDevBenchEnabled()) return [...DISCOVERY_FIXTURES];
   if (!hasPublicDataConfig) {
     if (allowFixtureFallback) {
       return [...DISCOVERY_FIXTURES];
@@ -66,6 +69,10 @@ export async function getDiscoveryListings(): Promise<DiscoveryListing[]> {
 export async function getDiscoveryListingById(
   id: string,
 ): Promise<DiscoveryListing | null> {
+  // DEV MOCK BENCH: deterministic fixtures over live data while impersonating.
+  if (isDevBenchEnabled()) {
+    return DISCOVERY_FIXTURES.find((listing) => listing.id === id) ?? null;
+  }
   if (!hasPublicDataConfig) {
     if (allowFixtureFallback) {
       return DISCOVERY_FIXTURES.find((listing) => listing.id === id) ?? null;
@@ -93,6 +100,10 @@ export async function getDiscoveryListingById(
 export async function getDiscoveryListingsWithCoords(): Promise<
   DiscoveryListing[]
 > {
+  // DEV MOCK BENCH: deterministic fixtures over live data while impersonating.
+  if (isDevBenchEnabled()) {
+    return DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
+  }
   if (!hasPublicDataConfig) {
     if (allowFixtureFallback) {
       return DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
@@ -149,6 +160,10 @@ export async function getSwipeListings(
   excludeIds: string[],
   cursor?: string,
 ): Promise<SwipeBatch> {
+  // DEV MOCK BENCH: serve a fixture deck so /swipe renders without a real token.
+  if (isDevBenchEnabled()) {
+    return { listings: [...DISCOVERY_FIXTURES], nextCursor: null };
+  }
   const rows = await getSwipeBatch(clerkToken, clerkUserId, excludeIds, cursor);
   const listings = rows.map(
     (row) => rowToDiscoveryFields(row) as DiscoveryListing,

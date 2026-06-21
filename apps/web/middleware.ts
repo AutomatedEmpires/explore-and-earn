@@ -1,6 +1,8 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
+import { DEV_ROLE_COOKIE, isDevBenchEnabled } from "./lib/devBench";
+
 const isPublicRoute = createRouteMatcher([
   "/",
   "/search",
@@ -38,6 +40,13 @@ if (process.env.NODE_ENV === "production" && !hasClerkMiddlewareConfig) {
 
 export default hasClerkMiddlewareConfig
   ? clerkMiddleware(async (auth, request) => {
+      // DEV MOCK BENCH (review tooling only): when impersonating a role locally,
+      // skip Clerk protection so every surface is reachable without a login.
+      // isDevBenchEnabled() is false in production/preview, so this never opens
+      // a deployed environment. See lib/devBench.
+      if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
+        return;
+      }
       if (!isPublicRoute(request)) {
         await auth.protect();
       }

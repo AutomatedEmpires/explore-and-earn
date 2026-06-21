@@ -1,0 +1,75 @@
+/* Dev Mock Bench toolbar — deliberately unbranded "tooling" chrome so it never
+   reads as product UI. Review tooling only; never bundled in production. */
+
+.bar {
+  position: fixed;
+  right: 12px;
+  bottom: 84px; /* clear the seeker/host bottom nav */
+  z-index: 2147483000; /* above all app chrome */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  background: #1f1147;
+  border: 1px solid #c026d3;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  color: #f5f3ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.badge {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f0abfc;
+}
+
+.note {
+  opacity: 0.7;
+}
+
+.roles {
+  display: flex;
+  gap: 4px;
+}
+
+.role,
+.roleActive {
+  appearance: none;
+  cursor: pointer;
+  text-transform: capitalize;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f5f3ff;
+  font: inherit;
+}
+
+.role:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.roleActive {
+  background: #c026d3;
+  border-color: #f0abfc;
+  font-weight: 700;
+}
+
+.index {
+  color: #f0abfc;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.index:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+  .note {
+    display: none;
+  }
+}

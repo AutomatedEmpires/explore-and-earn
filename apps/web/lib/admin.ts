@@ -1,5 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
+import { DEV_USER_ID, isDevBenchEnabled } from "./devBench";
+
 /**
  * Founder allow-list for the admin panel.
  *
@@ -15,6 +17,12 @@ export const ADMIN_USER_IDS: string[] = [
 
 /** True only when `userId` is a configured founder/admin id. */
 export function isAdminUserId(userId: string | null | undefined): boolean {
+  // DEV MOCK BENCH (review tooling only): the synthetic bench user id only ever
+  // appears when the Clerk shim is already impersonating, so granting it admin
+  // here lets the (admin) lane be reviewed locally. False in production/preview.
+  if (isDevBenchEnabled() && userId === DEV_USER_ID) {
+    return true;
+  }
   return typeof userId === "string" && ADMIN_USER_IDS.includes(userId);
 }
 

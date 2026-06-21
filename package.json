@@ -16,7 +16,7 @@
     "test": "corepack pnpm -r --if-present test",
     "test:e2e": "corepack pnpm --filter @explore-and-earn/web test:e2e",
     "db:assert": "corepack pnpm --filter @explore-and-earn/db-assert check",
-    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-category-taxonomy.mjs && node tools/scripts/check-canon-contracts.mjs"
+    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-category-taxonomy.mjs && node tools/scripts/check-canon-contracts.mjs && node tools/scripts/check-dev-bench.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

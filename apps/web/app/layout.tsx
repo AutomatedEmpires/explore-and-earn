@@ -30,6 +30,8 @@ import { CookieBanner } from "../components/CookieBanner";
 import { SiteFooter } from "../components/SiteFooter";
 import { SentryUserProvider } from "../components/providers/SentryUserProvider";
 import { AppShell } from "../components/shell";
+import { DevBenchToolbar } from "../components/dev/DevBenchToolbar";
+import { isDevBenchEnabled } from "../lib/devBench";
 import { Providers } from "./providers";
 
 /**
@@ -77,6 +79,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 						<SiteFooter />
 						<CookieBanner />
 					</Providers>
+					{isDevBenchEnabled() && <DevBenchToolbar />}
 				</body>
 			</html>
 		</AuthBoundary>

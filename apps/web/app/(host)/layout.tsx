@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 
 import { GlobalHeader } from "../../components/global";
 import { HostBottomNav } from "../../components/host";
+import { devHostProfile, isDevBenchEnabled } from "../../lib/devBench";
+import { readDevRole } from "../../lib/devBench/server";
 import "../../styles/host.css";
 import styles from "./layout.module.css";
 
@@ -42,6 +44,26 @@ export default async function HostLayout({
 }: {
   children: ReactNode;
 }) {
+  // DEV MOCK BENCH (review tooling only): render the host shell from a synthetic
+  // profile so the (host) lane is reviewable without a real host_profiles row.
+  // Must short-circuit before getHostProfile(), which throws on the bench's
+  // sentinel token. No-op in production/preview (isDevBenchEnabled() is false).
+  if (isDevBenchEnabled() && (await readDevRole())) {
+    const hostProfile = devHostProfile();
+    return (
+      <div className={styles.shell}>
+        <GlobalHeader
+          scope="host"
+          isAuthenticated={true}
+          userName={hostProfile.companyName}
+          unreadCount={0}
+        />
+        <main className={styles.main}>{children}</main>
+        <HostBottomNav />
+      </div>
+    );
+  }
+
   const { userId, getToken } = await auth();
   if (!userId) {
     redirect("/sign-in");

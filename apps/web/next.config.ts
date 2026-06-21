@@ -1,5 +1,10 @@
+import { createRequire } from "node:module";
+import path from "node:path";
+
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+
+const require = createRequire(import.meta.url);
 
 // Baseline security headers applied to every response. CSP is sent in
 // report-only mode first: it logs violations without blocking, so we can verify
@@ -65,6 +70,28 @@ const nextConfig: NextConfig = {
         pathname: "/**"
       }
     ]
+  },
+  webpack(config, { isServer }) {
+    // DEV MOCK BENCH (review tooling only). Outside production, alias the
+    // Clerk server import to a shim that can return a synthetic session while
+    // impersonating a role — so the bench needs no Clerk login. Gated on
+    // NODE_ENV so the shim is never bundled in a production (or preview) build,
+    // and scoped to the server build since "@clerk/nextjs/server" is server-only.
+    // The `$` suffix is an exact-match alias: deep imports are untouched, and
+    // the shim's own `clerk-real/server` import resolves to the real file rather
+    // than aliasing back to itself.
+    if (process.env.NODE_ENV !== "production" && isServer) {
+      config.resolve = config.resolve ?? {};
+      config.resolve.alias = {
+        ...(config.resolve.alias ?? {}),
+        "clerk-real/server$": require.resolve("@clerk/nextjs/server"),
+        "@clerk/nextjs/server$": path.resolve(
+          process.cwd(),
+          "lib/devBench/clerkServerShim.ts",
+        ),
+      };
+    }
+    return config;
   }
 };
 
