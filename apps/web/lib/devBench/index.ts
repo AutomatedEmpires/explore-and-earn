@@ -59,7 +59,11 @@ export function devSession() {
     sessionClaims: {},
     orgId: null,
     orgRole: null,
-    getToken: async () => DEV_TOKEN,
+    // Real Supabase service-role key so the authed db client bypasses RLS and
+    // returns the impersonated demo user's ACTUAL seeded data (queries still
+    // filter explicitly by clerk_user_id). Review tooling only — never bundled
+    // in a prod build. Falls back to the inert sentinel if the key is unset.
+    getToken: async () => process.env.SUPABASE_SERVICE_ROLE_KEY ?? DEV_TOKEN,
   };
 }
 

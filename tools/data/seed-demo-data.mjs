@@ -277,6 +277,9 @@ async function main() {
         owner_user_id: ownerUserId,
         company_name: host.company_name,
         slug: host.slug,
+        // Dev mock bench: link the lead demo host to the impersonated reviewer
+        // (lib/devBench DEV_USER_ID) so the (host) lane renders real seeded data.
+        clerk_user_id: host.slug === "greenfield-family-farm" ? "user_devbench_local" : null,
         category_scopes: host.category_scopes,
         public_status: "active",
       },
@@ -296,6 +299,8 @@ async function main() {
         id,
         user_id: userId,
         display_name: seeker.display_name,
+        // Dev mock bench: link the lead demo seeker to the impersonated reviewer.
+        clerk_user_id: seeker.display_name === "Avery Stone" ? "user_devbench_local" : null,
         desired_categories: seeker.desired_categories,
         visibility_status: "platform",
       },

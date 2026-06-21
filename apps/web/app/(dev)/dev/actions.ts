@@ -8,8 +8,12 @@ import { writeDevRole } from "../../../lib/devBench/server";
 /** Where each role lands after switching, unless an explicit target is given. */
 const ROLE_HOME: Record<DevRole, string> = {
   seeker: "/seek",
-  host: "/host/dashboard",
-  admin: "/admin",
+  // "/host/dashboard" was WRONG: it resolves to the public host-profile route
+  // app/host/[id] (id="dashboard" → uuid error). The authed host dashboard is
+  // "/host". "/admin" 404s (no (admin)/admin/page.tsx) → land on a real admin
+  // surface ("/hosts") instead.
+  host: "/host",
+  admin: "/hosts",
 };
 
 /**
