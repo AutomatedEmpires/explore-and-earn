@@ -13,7 +13,9 @@ One system, two registers. The register is chosen by **surface job**, not by com
 | Register | Used for | Treatment |
 |---|---|---|
 | **Dark · immersive** | homepage/marketing heroes, seeker discovery hero, listing-detail hero, profile hero, onboarding, full-bleed "moments" | golden-hour gradient + grain + glow, Fraunces display, photography/video pop, motion-forward |
-| **Light · working** | dashboards, forms, listings/feeds, messages, settings, tables, applicant review | warm paper, soft depth, Fraunces titles + Inter data, fast & legible, restrained motion |
+| **Light · working** | seeker dashboards, forms, listings/feeds, messages, settings, tables | warm paper, soft depth, Fraunces titles + Inter data, fast & legible, restrained motion |
+
+> **Host scope exception — "Host OS" (founder-directed, 2026-06-21).** The *entire* host dashboard uses the **dark-immersive** register: a dark-glass golden-hour command center (glass sidebar → mobile bottom-nav + drawer, glowing accents, grain, Fraunces, spring motion), per the host benchmark. Implemented as a scoped token cascade in `apps/web/styles/host-os.css` + `HostShell` + `StaggerReveal`; every host surface inherits it. Seeker working surfaces remain light.
 
 The **wow lives in the immersive moments**; the **work happens on light surfaces**. This is how Airbnb/Hopper operate and is why we did not go full-dark (Direction B).
 
