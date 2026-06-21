@@ -2,6 +2,12 @@ node_modules
 .next
 out
 dist
+
+# Local Claude Code session state (skills under .claude/skills ARE tracked)
+.claude/projects/
+
+# Generated design-review screenshots — no image binaries in git (see media-buckets.md)
+docs/design/reference/_shots/
 .env
 .env.local
 .env.*.local
