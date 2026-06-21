@@ -3,7 +3,8 @@
 	"version": "0.1.0",
 	"private": true,
 	"scripts": {
-		"dev": "WATCHPACK_POLLING=true next dev",
+		"dev": "next dev",
+		"dev:poll": "WATCHPACK_POLLING=true next dev",
 		"build": "next build && node ../../tools/scripts/repair-client-reference-manifests.mjs",
 		"lint": "eslint .",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
