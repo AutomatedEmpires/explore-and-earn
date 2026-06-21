@@ -7,6 +7,7 @@ import type {
   RecentActivity,
 } from "@explore-and-earn/db";
 import styles from "./HostDashboard.module.css";
+import { StaggerReveal } from "./StaggerReveal";
 
 export interface HostDashboardProps {
   readonly stats: HostDashboardStats;
@@ -100,7 +101,7 @@ export function HostDashboard({
       : { href: "/host/listings/new", label: "Create a listing", icon: "status.open" as const };
 
   return (
-    <div className={`host-page ${styles.dashboard}`}>
+    <StaggerReveal className={`host-page ${styles.dashboard}`}>
       {/* ── Identity hero + strongest next action ──────────────────── */}
       <section className="host-hero" data-lane={primaryLane ?? undefined}>
         <div>
@@ -363,6 +364,6 @@ export function HostDashboard({
           </ol>
         </section>
       ) : null}
-    </div>
+    </StaggerReveal>
   );
 }
