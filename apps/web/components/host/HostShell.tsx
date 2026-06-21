@@ -111,11 +111,14 @@ export function HostShell({ companyName, photoUrl, tier, unread = 0, children }:
       <div className="hostos-main">
         <header className="hostos-top">
           <div className="hostos-search">⌕&nbsp;&nbsp;Search applicants, listings, messages…</div>
-          <Link className="hostos-tact" href="/host/messages" aria-label="Messages">
+          <Link className="hostos-tact hostos-tact--msg" href="/host/messages" aria-label="Messages">
             <Icon name="nav.messages" size={20} aria-hidden />
             {unread > 0 ? <span className="hostos-bdg">{unread}</span> : null}
           </Link>
-          <Link className="hostos-tact hostos-tact--p" href="/host/listings/new">+ New listing</Link>
+          <Link className="hostos-tact hostos-tact--p" href="/host/listings/new" aria-label="New listing">
+            <span aria-hidden>+</span>
+            <span className="hostos-tlabel">New listing</span>
+          </Link>
           <Link className="hostos-account" href="/host/settings" aria-label="Account &amp; settings" title="Account &amp; settings">
             <span className="hostos-avatar">{(companyName ?? "H").charAt(0).toUpperCase()}</span>
           </Link>

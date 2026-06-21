@@ -49,13 +49,20 @@
   --benefit-pay-bg:     rgba(255, 214, 111, 0.16); --benefit-pay-fg:    #FFDE94;
 
   /* ---- glass + golden-hour helpers ---- */
-  --hostos-glass:   rgba(255, 255, 255, 0.07);
-  --hostos-glass-2: rgba(255, 255, 255, 0.11);
-  --hostos-line:    rgba(255, 255, 255, 0.13);
-  --hostos-amber:   #E0922F;
-  --hostos-teal:    #2FD3B6;
-  --hostos-gold:    #FFD66F;
-  --hostos-grad:    linear-gradient(135deg, #E0922F, #FFD66F);
+  --hostos-glass:    rgba(255, 255, 255, 0.07);
+  --hostos-glass-2:  rgba(255, 255, 255, 0.11);
+  --hostos-glass-3:  rgba(255, 255, 255, 0.045);
+  --hostos-line:     rgba(255, 255, 255, 0.13);
+  --hostos-scrim:    rgba(8, 16, 12, 0.5);   /* glass panels over a hero/photo */
+  --hostos-amber:    #E0922F;
+  --hostos-teal:     #2FD3B6;
+  --hostos-gold:     #FFD66F;
+  --hostos-bone:     #FBF4E8;                /* text on dark/photo */
+  --hostos-on-amber: #1A1208;                /* text on amber/gold */
+  --hostos-grad:     linear-gradient(135deg, #E0922F, #FFD66F);
+  --hostos-blur:     18px;                    /* glass backdrop blur */
+  --hostos-control:  46px;                    /* topbar control height */
+  --hostos-avatar:   42px;
   --hostos-grain:   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* ---- elevation reads as glow/depth on dark ---- */
@@ -208,7 +215,7 @@
 .hostos-foot { margin-top: auto; }
 .hostos-main { min-width: 0; display: flex; flex-direction: column; }
 .hostos-top { position: sticky; top: 0; z-index: 30; display: flex; gap: 10px; align-items: center; padding: 13px 22px; border-bottom: 1px solid var(--hostos-line); background: rgba(6,16,12,.6); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
-.hostos-search { flex: 1; max-width: 560px; min-height: 46px; border-radius: 99px; border: 1px solid var(--hostos-line); background: var(--hostos-glass); display: flex; align-items: center; padding: 0 18px; color: var(--text-muted); font-size: 14px; }
+.hostos-search { flex: 1 1 auto; min-width: 0; max-width: 560px; height: var(--hostos-control); line-height: calc(var(--hostos-control) - 2px); border-radius: var(--radius-pill); border: 1px solid var(--hostos-line); background: var(--hostos-glass); padding: 0 var(--space-18); color: var(--text-muted); font-size: var(--type-meta-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hostos-tact { min-height: 46px; border-radius: 99px; border: 1px solid var(--hostos-line); background: var(--hostos-glass); color: #fff; padding: 0 16px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
 .hostos-tact--p { background: var(--hostos-grad); color: #1A1208; border-color: transparent; }
 .hostos-account { display: inline-grid; place-items: center; flex: none; }
@@ -219,7 +226,11 @@
 @media (max-width: 1023px) {
   .hostos-shell { display: block; padding-bottom: 96px; }
   .hostos-side { display: none; }
-  .hostos-top { padding: 11px 14px; }
+  .hostos-top { padding: var(--space-10) var(--space-14); gap: var(--space-8); }
+  /* keep the topbar to one row: search truncates, messages lives in the bottom
+     nav, and "New listing" collapses to its "+" glyph */
+  .hostos-tact--msg, .hostos-tlabel { display: none; }
+  .hostos-tact--p { padding: 0 var(--space-16); }
   .hostos-contentwrap { padding: 14px; }
   .hostos-mnav { display: grid; position: fixed; z-index: 70; left: 10px; right: 10px; bottom: 10px; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 8px; border-radius: 24px; background: rgba(6,16,12,.84); backdrop-filter: blur(22px); border: 1px solid var(--hostos-line); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
   .hostos-mtab { border: 0; background: transparent; color: var(--text-muted); border-radius: 18px; padding: 7px 4px; min-height: var(--tap-min, 44px); display: grid; place-items: center; gap: 3px; font-size: 10px; font-weight: 600; text-decoration: none; }
