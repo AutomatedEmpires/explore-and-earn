@@ -36,6 +36,7 @@ const fraunces = Fraunces({
 });
 import { CookieBanner } from "../components/CookieBanner";
 import { SiteFooter } from "../components/SiteFooter";
+import { HideOnHost } from "../components/HideOnHost";
 import { SentryUserProvider } from "../components/providers/SentryUserProvider";
 import { AppShell } from "../components/shell";
 import { DevBenchToolbar } from "../components/dev/DevBenchToolbar";
@@ -84,7 +85,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 					<SentryUserProvider />
 					<Providers>
 						<AppShell>{children}</AppShell>
-						<SiteFooter />
+						<HideOnHost>
+							<SiteFooter />
+						</HideOnHost>
 						<CookieBanner />
 					</Providers>
 					{isDevBenchEnabled() && <DevBenchToolbar />}

@@ -116,6 +116,9 @@ export function HostShell({ companyName, photoUrl, tier, unread = 0, children }:
             {unread > 0 ? <span className="hostos-bdg">{unread}</span> : null}
           </Link>
           <Link className="hostos-tact hostos-tact--p" href="/host/listings/new">+ New listing</Link>
+          <Link className="hostos-account" href="/host/settings" aria-label="Account &amp; settings" title="Account &amp; settings">
+            <span className="hostos-avatar">{(companyName ?? "H").charAt(0).toUpperCase()}</span>
+          </Link>
         </header>
         <div className="hostos-contentwrap">{children}</div>
       </div>

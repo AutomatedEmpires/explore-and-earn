@@ -189,6 +189,9 @@
 .hostos-search { flex: 1; max-width: 560px; min-height: 46px; border-radius: 99px; border: 1px solid var(--hostos-line); background: var(--hostos-glass); display: flex; align-items: center; padding: 0 18px; color: var(--text-muted); font-size: 14px; }
 .hostos-tact { min-height: 46px; border-radius: 99px; border: 1px solid var(--hostos-line); background: var(--hostos-glass); color: #fff; padding: 0 16px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
 .hostos-tact--p { background: var(--hostos-grad); color: #1A1208; border-color: transparent; }
+.hostos-account { display: inline-grid; place-items: center; flex: none; }
+.hostos-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-fraunces); font-weight: 600; font-size: 17px; color: #1A1208; background: var(--hostos-grad); border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 0 18px rgba(224, 146, 47, 0.28); }
+.hostos-account:hover .hostos-avatar { filter: brightness(1.06); }
 .hostos-contentwrap { padding: 22px; }
 .hostos-mnav, .hostos-drawer { display: none; }
 @media (max-width: 1023px) {
