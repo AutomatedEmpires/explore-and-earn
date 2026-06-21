@@ -133,6 +133,13 @@ export function HostDashboard({
             </Link>
           ) : null}
         </div>
+        {!isNewHost ? (
+          <div className="hostos-herokpi" aria-hidden>
+            <div><b>{liveCount}</b><span>live listings</span></div>
+            <div><b>{totalApplicationsAllTime}</b><span>applicants</span></div>
+            <div><b>{pipelineFill}%</b><span>reviewed</span></div>
+          </div>
+        ) : null}
       </section>
 
       {/* ── KPI row ─────────────────────────────────────────────────── */}

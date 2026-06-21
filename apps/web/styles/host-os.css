@@ -149,6 +149,28 @@
 }
 .host-os .host-hero__cta { background: var(--hostos-grad); color: #1A1208; }
 
+/* Floating glass hero KPI — command-center signature. Stacks below the hero
+   copy on mobile; overlaps bottom-right on desktop. */
+.hostos-herokpi {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+  padding: var(--space-12);
+  border-radius: var(--radius-card);
+  background: rgba(8, 16, 12, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.hostos-herokpi > div { padding: var(--space-10); border-radius: var(--radius-cell); background: var(--hostos-glass); border: 1px solid var(--hostos-line); }
+.hostos-herokpi b { display: block; font-family: var(--font-fraunces); font-weight: 600; font-size: 30px; line-height: 1; letter-spacing: -0.03em; color: #FBF4E8; }
+.hostos-herokpi span { font-size: 11px; font-weight: 700; color: rgba(251, 246, 236, 0.62); }
+@media (min-width: 64rem) {
+  .hostos-herokpi { position: absolute; right: var(--space-20); bottom: var(--space-20); width: 430px; margin: 0; }
+}
+
 /* primary buttons / pills pick up amber via --color-cta override above */
 
 /* =================================================================== */
