@@ -1,0 +1,156 @@
+/**
+ * Host OS — dark-glass, golden-hour theme for the (host) scope.
+ *
+ * Strategy: the host-* primitives + module CSS all read SEMANTIC tokens, so we
+ * scope dark token values to `.host-os` and the entire host scope flips to a
+ * cinematic dark-glass surface with ZERO changes to host.css or feature code
+ * (the same token-cascade trick as the global re-skin). Plus a few targeted
+ * glass/backdrop overrides the flat tokens can't express, and the golden-hour
+ * atmosphere. Light scopes (seeker/marketing) are untouched.
+ *
+ * Canon: docs/superpowers/specs/2026-06-21-design-system-v2-golden-hour-hybrid.md
+ */
+
+.host-os {
+  /* ---- dark surfaces ---- */
+  --color-paper:          #08110C;
+  --color-surface:        rgba(255, 255, 255, 0.055);
+  --color-surface-raised: rgba(255, 255, 255, 0.075);
+  --color-card-warm:      rgba(255, 255, 255, 0.06);
+  --color-parchment:      rgba(255, 255, 255, 0.045);
+  --color-steel:          rgba(255, 255, 255, 0.06);
+
+  /* ---- text (warm bone) ---- */
+  --text-primary:   #FBF6EC;
+  --text-secondary: rgba(251, 246, 236, 0.70);
+  --text-muted:     rgba(251, 246, 236, 0.46);
+
+  /* ---- borders / lines ---- */
+  --border-soft: rgba(255, 255, 255, 0.12);
+  --border-ink:  rgba(255, 255, 255, 0.18);
+  --palette-line: rgba(255, 255, 255, 0.12);
+
+  /* ---- titles use the editorial serif ---- */
+  --font-display: var(--font-fraunces, "Fraunces", ui-serif, Georgia, serif);
+
+  /* ---- accents shift sky→golden-hour (amber primary, teal aurora, gold) ---- */
+  --color-cta:        #E0922F;
+  --color-cta-text:   #1A1208;
+  --color-header-bg:  #0C1812;
+  --color-gold:       #FFD66F;
+  --color-gold-text:  #1A1208;
+
+  --status-match-bg: rgba(47, 211, 182, 0.14);
+  --status-match-fg: #8FEAD8;
+  --status-boosted-bg: rgba(255, 214, 111, 0.16);
+  --status-boosted-fg: #FFDE94;
+  --benefit-housing-bg: rgba(47, 211, 182, 0.14); --benefit-housing-fg: #8FEAD8;
+  --benefit-meals-bg:   rgba(140, 210, 120, 0.14); --benefit-meals-fg:  #AEE39A;
+  --benefit-pay-bg:     rgba(255, 214, 111, 0.16); --benefit-pay-fg:    #FFDE94;
+
+  /* ---- glass + golden-hour helpers ---- */
+  --hostos-glass:   rgba(255, 255, 255, 0.07);
+  --hostos-glass-2: rgba(255, 255, 255, 0.11);
+  --hostos-line:    rgba(255, 255, 255, 0.13);
+  --hostos-amber:   #E0922F;
+  --hostos-teal:    #2FD3B6;
+  --hostos-gold:    #FFD66F;
+  --hostos-grad:    linear-gradient(135deg, #E0922F, #FFD66F);
+  --hostos-grain:   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  /* ---- elevation reads as glow/depth on dark ---- */
+  --elevation-card:  0 18px 50px rgba(0, 0, 0, 0.28);
+  --elevation-hover: 0 24px 64px rgba(0, 0, 0, 0.36);
+
+  position: relative;
+  min-height: 100vh;
+  color: var(--text-primary);
+  background:
+    radial-gradient(circle at 16% -2%, rgba(224, 146, 47, 0.22), transparent 34%),
+    radial-gradient(circle at 90% 8%, rgba(47, 211, 182, 0.14), transparent 30%),
+    radial-gradient(circle at 72% 98%, rgba(255, 214, 111, 0.10), transparent 32%),
+    linear-gradient(135deg, #08110C, #0C1812 55%, #08110C);
+}
+
+/* ambient grid + grain over the dark base */
+.host-os::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: linear-gradient(#000, transparent 78%);
+  mask-image: linear-gradient(#000, transparent 78%);
+}
+.host-os::after {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  opacity: 0.06;
+  background-image: var(--hostos-grain);
+}
+.host-os > * { position: relative; z-index: 1; }
+
+/* the host layout's shell/main inherit the dark paper automatically */
+.host-os .host-page { gap: var(--space-20); }
+
+/* ---- glass treatment the flat tokens can't express ---- */
+@supports (backdrop-filter: blur(1px)) {
+  .host-os .host-panel,
+  .host-os .host-kpi,
+  .host-os .host-action-tile,
+  .host-os .host-attention,
+  .host-os .host-stat {
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+}
+.host-os .host-panel,
+.host-os .host-kpi,
+.host-os .host-action-tile,
+.host-os .host-attention {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.045));
+  border-color: var(--hostos-line);
+}
+.host-os .host-panel--raised { box-shadow: var(--elevation-card); }
+
+/* promoted KPI / primary tile glow in amber */
+.host-os .host-kpi--primary {
+  background: radial-gradient(circle at 16% 20%, rgba(224, 146, 47, 0.22), transparent 48%), var(--hostos-glass-2);
+  border-color: rgba(224, 146, 47, 0.32);
+}
+.host-os .host-kpi--primary .host-kpi__value,
+.host-os .host-kpi--primary .host-kpi__label,
+.host-os .host-kpi--primary .host-kpi__top { color: var(--hostos-gold); }
+
+.host-os .host-action-tile--primary {
+  background: radial-gradient(circle at 16% 20%, rgba(224, 146, 47, 0.22), transparent 48%), var(--hostos-glass-2);
+  border-color: rgba(224, 146, 47, 0.3);
+}
+.host-os .host-action-tile--primary .host-action-tile__icon {
+  background: var(--hostos-grad);
+  color: #1A1208;
+}
+
+/* hero → golden-hour gradient + grain, regardless of lane fallback */
+.host-os .host-hero {
+  background:
+    linear-gradient(95deg, rgba(8, 16, 12, 0.92), rgba(8, 16, 12, 0.5) 52%, rgba(8, 16, 12, 0.1)),
+    linear-gradient(135deg, #0E1730 0%, #2A2342 34%, #9A4A46 68%, #E0922F 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+}
+.host-os .host-hero[data-lane="farm"]     { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-farm); }
+.host-os .host-hero[data-lane="maritime"] { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-maritime); }
+.host-os .host-hero[data-lane="seasonal"] { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-seasonal); }
+.host-os .host-hero::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  opacity: 0.12; background-image: var(--hostos-grain); mix-blend-mode: overlay;
+}
+.host-os .host-hero__cta { background: var(--hostos-grad); color: #1A1208; }
+
+/* primary buttons / pills pick up amber via --color-cta override above */
+
+@media (prefers-reduced-motion: reduce) {
+  .host-os *, .host-os *::before, .host-os *::after { animation: none !important; }
+}

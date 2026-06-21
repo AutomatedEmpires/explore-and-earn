@@ -9,6 +9,7 @@ import { HostBottomNav } from "../../components/host";
 import { devHostProfile, isDevBenchEnabled } from "../../lib/devBench";
 import { readDevRole } from "../../lib/devBench/server";
 import "../../styles/host.css";
+import "../../styles/host-os.css";
 import styles from "./layout.module.css";
 
 /**
@@ -51,7 +52,7 @@ export default async function HostLayout({
   if (isDevBenchEnabled() && (await readDevRole())) {
     const hostProfile = devHostProfile();
     return (
-      <div className={styles.shell}>
+      <div className={`host-os ${styles.shell}`}>
         <GlobalHeader
           scope="host"
           isAuthenticated={true}
@@ -81,7 +82,7 @@ export default async function HostLayout({
   }
 
   return (
-    <div className={styles.shell}>
+    <div className={`host-os ${styles.shell}`}>
       <GlobalHeader
         scope="host"
         isAuthenticated={true}
