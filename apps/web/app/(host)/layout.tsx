@@ -4,13 +4,11 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { GlobalHeader } from "../../components/global";
-import { HostBottomNav } from "../../components/host";
+import { HostShell } from "../../components/host/HostShell";
 import { devHostProfile, isDevBenchEnabled } from "../../lib/devBench";
 import { readDevRole } from "../../lib/devBench/server";
 import "../../styles/host.css";
 import "../../styles/host-os.css";
-import styles from "./layout.module.css";
 
 /**
  * Host scope layout.
@@ -52,15 +50,15 @@ export default async function HostLayout({
   if (isDevBenchEnabled() && (await readDevRole())) {
     const hostProfile = devHostProfile();
     return (
-      <div className={`host-os ${styles.shell}`}>
-        <GlobalHeader
-          scope="host"
-          isAuthenticated={true}
-          userName={hostProfile.companyName}
-          unreadCount={0}
-        />
-        <main className={styles.main}>{children}</main>
-        <HostBottomNav />
+      <div className="host-os">
+        <HostShell
+          companyName={hostProfile.companyName}
+          photoUrl={hostProfile.photoUrl}
+          tier={hostProfile.subscriptionTier}
+          unread={0}
+        >
+          {children}
+        </HostShell>
       </div>
     );
   }
@@ -82,15 +80,15 @@ export default async function HostLayout({
   }
 
   return (
-    <div className={`host-os ${styles.shell}`}>
-      <GlobalHeader
-        scope="host"
-        isAuthenticated={true}
-        userName={hostProfile.companyName ?? null}
-        unreadCount={unreadMessages}
-      />
-      <main className={styles.main}>{children}</main>
-      <HostBottomNav />
+    <div className="host-os">
+      <HostShell
+        companyName={hostProfile.companyName ?? null}
+        photoUrl={hostProfile.photoUrl ?? null}
+        tier={hostProfile.subscriptionTier ?? null}
+        unread={unreadMessages}
+      >
+        {children}
+      </HostShell>
     </div>
   );
 }

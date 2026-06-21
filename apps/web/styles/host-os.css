@@ -151,6 +151,58 @@
 
 /* primary buttons / pills pick up amber via --color-cta override above */
 
+/* =================================================================== */
+/* HOST OS SHELL — sidebar (desktop) → mobile bottom-nav + drawer       */
+/* =================================================================== */
+.hostos-shell { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+.hostos-side {
+  position: sticky; top: 0; height: 100vh; padding: 16px 13px; overflow: auto;
+  border-right: 1px solid var(--hostos-line);
+  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+  backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px);
+  display: flex; flex-direction: column; gap: 13px; scrollbar-width: none;
+}
+.hostos-side::-webkit-scrollbar { display: none; }
+.hostos-brand { display: flex; align-items: center; gap: 11px; padding: 11px; border-radius: 22px; background: var(--hostos-glass); border: 1px solid var(--hostos-line); }
+.hostos-mark { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-family: var(--font-fraunces); font-weight: 700; font-size: 20px; color: #1A1208; background: conic-gradient(from 200deg, #E0922F, #FFD66F, #2FD3B6, #E0922F); box-shadow: 0 0 30px rgba(224,146,47,.4); }
+.hostos-brand b { display: block; font-family: var(--font-fraunces); font-weight: 600; font-size: 18px; line-height: .9; color: var(--text-primary); }
+.hostos-brand i { font-style: normal; display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+.hostos-livedot { width: 7px; height: 7px; border-radius: 50%; background: #2FD3B6; box-shadow: 0 0 0 0 rgba(47,211,182,.6); animation: hostos-pulse 1.9s infinite; }
+@keyframes hostos-pulse { 70% { box-shadow: 0 0 0 10px rgba(47,211,182,0); } 100% { box-shadow: 0 0 0 0 rgba(47,211,182,0); } }
+.hostos-hostcard { position: relative; min-height: 128px; border-radius: 22px; overflow: hidden; padding: 13px; border: 1px solid var(--hostos-line); background-size: cover; background-position: center; display: flex; align-items: flex-end; }
+.hostos-hostcard::before { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(6,16,12,.85), rgba(6,16,12,.1)); }
+.hostos-hostcard b { position: relative; font-family: var(--font-fraunces); font-weight: 600; font-size: 18px; line-height: .98; letter-spacing: -.02em; color: #fff; }
+.hostos-chip { position: absolute; top: 11px; left: 11px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 99px; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #CFF6EA; background: rgba(6,16,12,.55); border: 1px solid var(--hostos-line); backdrop-filter: blur(10px); }
+.hostos-navlabel { margin: 4px 10px 1px; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--text-muted); }
+.hostos-nav { display: grid; gap: 5px; }
+.hostos-navitem { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 16px; color: var(--text-secondary); border: 1px solid transparent; text-decoration: none; transition: background var(--motion-fast, 140ms) var(--ease-standard), transform var(--motion-fast, 140ms) var(--ease-standard); }
+.hostos-navitem:hover { background: var(--hostos-glass); color: #fff; transform: translateX(2px); }
+.hostos-navitem .i { width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--hostos-glass); border: 1px solid var(--hostos-line); color: currentColor; }
+.hostos-navitem b { display: block; font-size: 14px; font-weight: 600; line-height: 1.1; }
+.hostos-navitem s { display: block; font-size: 11px; color: var(--text-muted); text-decoration: none; }
+.hostos-navitem[aria-current="page"] { color: #fff; background: radial-gradient(circle at 12% 30%, rgba(224,146,47,.22), transparent 46%), var(--hostos-glass-2); border-color: rgba(224,146,47,.3); }
+.hostos-navitem[aria-current="page"] .i { background: var(--hostos-grad); color: #1A1208; border-color: transparent; }
+.hostos-bdg { min-width: 24px; height: 22px; padding: 0 7px; border-radius: 99px; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); background: var(--hostos-glass); border: 1px solid var(--hostos-line); }
+.hostos-foot { margin-top: auto; }
+.hostos-main { min-width: 0; display: flex; flex-direction: column; }
+.hostos-top { position: sticky; top: 0; z-index: 30; display: flex; gap: 10px; align-items: center; padding: 13px 22px; border-bottom: 1px solid var(--hostos-line); background: rgba(6,16,12,.6); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
+.hostos-search { flex: 1; max-width: 560px; min-height: 46px; border-radius: 99px; border: 1px solid var(--hostos-line); background: var(--hostos-glass); display: flex; align-items: center; padding: 0 18px; color: var(--text-muted); font-size: 14px; }
+.hostos-tact { min-height: 46px; border-radius: 99px; border: 1px solid var(--hostos-line); background: var(--hostos-glass); color: #fff; padding: 0 16px; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
+.hostos-tact--p { background: var(--hostos-grad); color: #1A1208; border-color: transparent; }
+.hostos-contentwrap { padding: 22px; }
+.hostos-mnav, .hostos-drawer { display: none; }
+@media (max-width: 1023px) {
+  .hostos-shell { display: block; padding-bottom: 96px; }
+  .hostos-side { display: none; }
+  .hostos-top { padding: 11px 14px; }
+  .hostos-contentwrap { padding: 14px; }
+  .hostos-mnav { display: grid; position: fixed; z-index: 70; left: 10px; right: 10px; bottom: 10px; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 8px; border-radius: 24px; background: rgba(6,16,12,.84); backdrop-filter: blur(22px); border: 1px solid var(--hostos-line); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .hostos-mtab { border: 0; background: transparent; color: var(--text-muted); border-radius: 18px; padding: 7px 4px; min-height: var(--tap-min, 44px); display: grid; place-items: center; gap: 3px; font-size: 10px; font-weight: 600; text-decoration: none; }
+  .hostos-mtab[aria-current="page"] { background: var(--hostos-grad); color: #1A1208; }
+  .hostos-drawer.open { display: block; position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.5); backdrop-filter: blur(5px); }
+  .hostos-drawerpanel { position: absolute; left: 10px; right: 10px; bottom: 92px; padding: 12px; border-radius: 26px; border: 1px solid var(--hostos-line); background: rgba(8,18,14,.96); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .host-os *, .host-os *::before, .host-os *::after { animation: none !important; }
 }
