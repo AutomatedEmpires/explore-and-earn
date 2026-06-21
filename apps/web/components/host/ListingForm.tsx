@@ -42,6 +42,7 @@ export interface ListingFormInitialValues {
   readonly payPeriod?: CompensationUnit;
   readonly summary?: string;
   readonly startDate?: string;
+  readonly endDate?: string;
   readonly coverPhotoUrl?: string;
   readonly galleryUrls?: ReadonlyArray<string>;
 }
@@ -112,6 +113,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
   );
   const [summary, setSummary] = useState(initial?.summary ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
+  const [endDate, setEndDate] = useState(initial?.endDate ?? "");
 
   const submitLabel = mode === "create" ? "Create listing" : "Save changes";
   const cancelHref = listingId ? `/host/listings/${listingId}` : "/host/listings";
@@ -179,6 +181,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
     formData.set("payPeriod", payPeriod);
     formData.set("summary", summary.trim());
     formData.set("startDate", startDate.trim());
+    formData.set("endDate", endDate.trim());
     formData.set("coverPhotoUrl", coverPhotoUrl);
     formData.set("galleryUrls", JSON.stringify(galleryImages.map((img) => img.url)));
 
@@ -407,18 +410,34 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
         </p>
       </fieldset>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="listing-start-date">
-          Start date
-        </label>
-        <input
-          className={styles.input}
-          id="listing-start-date"
-          name="startDate"
-          type="date"
-          value={startDate}
-          onChange={(event) => setStartDate(event.target.value)}
-        />
+      <div className={styles.row}>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="listing-start-date">
+            Start date
+          </label>
+          <input
+            className={styles.input}
+            id="listing-start-date"
+            name="startDate"
+            type="date"
+            value={startDate}
+            onChange={(event) => setStartDate(event.target.value)}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="listing-end-date">
+            End date
+          </label>
+          <input
+            className={styles.input}
+            id="listing-end-date"
+            name="endDate"
+            type="date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(event) => setEndDate(event.target.value)}
+          />
+        </div>
       </div>
 
       <div className={styles.actions}>
