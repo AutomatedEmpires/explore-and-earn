@@ -17,6 +17,8 @@ import {
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
+import { isAllowedStorageUrl } from "../../lib/storageUrl";
+
 type HostManageableListingStatus = "live" | "paused" | "archived";
 
 interface HostAuth {
@@ -63,20 +65,6 @@ function resolvePayPeriod(raw: FormDataEntryValue | null): CompensationUnit | un
   return (COMPENSATION_UNIT as readonly string[]).includes(value)
     ? (value as CompensationUnit)
     : undefined;
-}
-
-function isAllowedStorageUrl(url: string | undefined | null): boolean {
-  if (!url) return true;
-  try {
-    const { protocol, hostname, pathname } = new URL(url);
-    return (
-      protocol === "https:" &&
-      hostname.endsWith(".supabase.co") &&
-      pathname.startsWith("/storage/v1/object/")
-    );
-  } catch {
-    return false;
-  }
 }
 
 function parseAmount(raw: FormDataEntryValue | null): number | null | undefined {
@@ -247,12 +235,17 @@ export async function updateListingStatusAction(
     newStatus,
   );
   if (!result.ok) {
-    return result;
+    // The canonical lifecycle fn rejects disallowed edges with 'invalid_transition'.
+    const error =
+      result.error === "invalid_transition"
+        ? "That status change isn't allowed from the listing's current state."
+        : result.error;
+    return { ok: false, error };
   }
 
   revalidatePath("/host/listings");
   revalidatePath(`/host/listings/${listingId}`);
-  return result;
+  return { ok: true, status: newStatus };
 }
 
 export async function pauseListingAction(

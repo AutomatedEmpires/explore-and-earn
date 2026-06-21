@@ -5,10 +5,12 @@ export {
 	canTransitionListing,
 	duplicateListing,
 	expireListings,
+	updateListingStatus,
 	type DuplicateListingResult,
 	type ExpireListingsResult,
 	type UpdateListingStatusResult,
 } from "./queries/listingLifecycle";
+export * from "./queries/benefitDetails";
 export * from "./queries/savedListings";
 export * from "./queries/applications";
 export * from "./queries/seekerApplicationsRich";

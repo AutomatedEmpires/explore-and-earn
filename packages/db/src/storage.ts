@@ -51,6 +51,25 @@ export async function uploadListingMedia(
 }
 
 /**
+ * Upload a Housing/Meals benefit photo and return its public URL. Stored under
+ * `listing-media/{hostProfileId}/benefit/{listingId}/{kind}/{slot}` — the first
+ * path segment is the caller's own host_profile id, so the listing-media RLS
+ * insert policy (017) authorizes the write. `slot` is the photo-slot id from the
+ * benefit editor (e.g. "inside", "kitchen").
+ */
+export async function uploadBenefitPhoto(
+  token: string,
+  hostProfileId: string,
+  listingId: string,
+  kind: "housing" | "meals",
+  slot: string,
+  file: File,
+): Promise<string> {
+  const path = `${hostProfileId}/benefit/${listingId}/${kind}/${slot}`;
+  return uploadToBucket(token, LISTING_MEDIA_BUCKET, path, file);
+}
+
+/**
  * Upload a profile photo to `profile-photos/{ownerType}/{ownerId}` and return
  * its public URL.
  */

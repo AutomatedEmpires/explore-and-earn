@@ -49,3 +49,27 @@ export interface BenefitTriad {
 	readonly meals: MealsInfo;
 	readonly pay: PayInfo;
 }
+
+/**
+ * Structured detail captured by the host benefit editor for ONE benefit kind
+ * (housing or meals). Persisted in `listings.benefit_details` (migration 040),
+ * keyed by kind. Intentionally open string-keyed maps so the editor's field /
+ * chip-section / photo-slot configuration can evolve without a schema change:
+ *  - `fields`      — single-select values, keyed by field id (e.g. "housing-type").
+ *  - `toggles`     — multi-select chip ids, keyed by chip-section id (e.g. "amenities").
+ *  - `photos`      — public Storage URL per photo slot, keyed by slot id (e.g. "inside").
+ *  - `customChips` — host-added chips, keyed by chip-section id.
+ */
+export interface BenefitDetail {
+	readonly fields: Record<string, string>;
+	readonly toggles: Record<string, readonly string[]>;
+	readonly photos: Record<string, string>;
+	readonly customChips?: Record<string, ReadonlyArray<{ id: string; label: string }>>;
+}
+
+/** Editable benefit kinds (pay is structured on the listing itself, not here). */
+export const EDITABLE_BENEFIT_KINDS = ["housing", "meals"] as const;
+export type EditableBenefitKind = (typeof EDITABLE_BENEFIT_KINDS)[number];
+
+/** The `listings.benefit_details` JSONB shape — detail per editable kind. */
+export type BenefitDetailsMap = Partial<Record<EditableBenefitKind, BenefitDetail>>;

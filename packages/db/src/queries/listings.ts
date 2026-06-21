@@ -25,6 +25,8 @@ export interface ListingRow {
   status: string;
   housing_included: boolean;
   meals_included: boolean;
+  housing_description: string | null;
+  meals_description: string | null;
   visa_support: boolean;
   compensation_summary: string | null;
   compensation_min_cents: number | null;
@@ -55,6 +57,8 @@ type RawListingRow = {
   status: string;
   housing_included: boolean;
   meals_included: boolean;
+  housing_description: string | null;
+  meals_description: string | null;
   visa_support: boolean;
   compensation_summary: string | null;
   compensation_min_cents: number | null;
@@ -139,8 +143,14 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
       verified,
     },
     benefits: {
-      housing: { provision: housingProvision },
-      meals: { provision: mealsProvision },
+      housing: {
+        provision: housingProvision,
+        summary: row.housing_description ?? undefined,
+      },
+      meals: {
+        provision: mealsProvision,
+        summary: row.meals_description ?? undefined,
+      },
       pay: {
         provision: "provided" as BenefitProvision,
         summary: buildCompensationSummary(row),
@@ -165,7 +175,7 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
 }
 
 const LISTING_COLUMNS =
-  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profiles(company_name,attestation_status)";
+  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profiles(company_name,attestation_status)";
 
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;
@@ -452,6 +462,8 @@ type ListingColumnPatch = {
   compensation_unit?: CompensationUnit | null;
   housing_included?: boolean;
   meals_included?: boolean;
+  housing_description?: string | null;
+  meals_description?: string | null;
   cover_photo_url?: string | null;
   gallery_photo_urls?: string[];
 };
@@ -495,6 +507,14 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
     patch.compensation_currency = fields.payCurrency.trim().toUpperCase();
   }
   if (fields.payPeriod != null) patch.compensation_unit = fields.payPeriod;
+  if (fields.housingDescription !== undefined) {
+    const trimmed = fields.housingDescription?.trim() ?? "";
+    patch.housing_description = trimmed.length > 0 ? trimmed : null;
+  }
+  if (fields.mealsDescription !== undefined) {
+    const trimmed = fields.mealsDescription?.trim() ?? "";
+    patch.meals_description = trimmed.length > 0 ? trimmed : null;
+  }
   if (fields.housingProvision !== undefined || fields.housingDescription !== undefined) {
     patch.housing_included = benefitIncluded(fields.housingProvision, fields.housingDescription);
   }
@@ -568,30 +588,14 @@ export async function updateListing(
   return { ok: true };
 }
 
-export async function updateListingStatus(
-  clerkToken: string,
-  clerkUserId: string,
-  listingId: string,
-  status: "live" | "paused" | "archived",
-): Promise<{ ok: boolean; error?: string }> {
-  if (!listingId) return { ok: false, error: "Missing listing id." };
-
-  const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
-  if (!hostProfileId) return { ok: false, error: "No host profile found for your account." };
-
-  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data, error } = await untyped
-    .from("listings")
-    .update({ status })
-    .eq("id", listingId)
-    .eq("host_profile_id", hostProfileId)
-    .select("id")
-    .maybeSingle();
-
-  if (error) return { ok: false, error: error.message };
-  if (!data) return { ok: false, error: "Listing not found or you do not have access to it." };
-  return { ok: true };
-}
+/**
+ * NOTE: listing status transitions are owned by the canonical
+ * `updateListingStatus` in ./listingLifecycle.ts — it validates the transition
+ * against LISTING_STATUS_TRANSITIONS and stamps published_at / paused_at /
+ * archived_at. The earlier duplicate that lived here (status-only, no
+ * validation, no timestamps) was removed; the action layer now calls the
+ * canonical fn (re-exported from the package index).
+ */
 
 /* ========================================================================== */
 /* Wave 10 — public listing detail + per-seeker state queries                 */
