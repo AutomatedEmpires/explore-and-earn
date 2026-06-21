@@ -87,6 +87,9 @@ export interface UpdateHostProfileInput {
 	websiteUrl?: string | null
 	photoUrl?: string | null
 	socialLinks?: SocialLinks
+	housingOfferedGenerally?: boolean
+	mealsOfferedGenerally?: boolean
+	categoryScopes?: string[]
 }
 
 /**

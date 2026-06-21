@@ -32,6 +32,12 @@ export interface HostProfileSummary {
   readonly instagram?: string;
   /** X (Twitter) handle (without @). */
   readonly twitter?: string | null;
+  /** Host-level "we generally provide housing" positioning. */
+  readonly housingOfferedGenerally?: boolean;
+  /** Host-level "we generally provide meals" positioning. */
+  readonly mealsOfferedGenerally?: boolean;
+  /** Marketplace categories this host operates in. */
+  readonly categoryScopes?: readonly string[];
 }
 
 export type HostListingState =

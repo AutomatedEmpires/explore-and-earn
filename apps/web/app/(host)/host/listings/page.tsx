@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   authedClient,
   getApplicationCountsByListing,
+  getNewApplicationCountsByListing,
   getHostListings,
   getHostProfile,
   rowToDiscoveryFields,
@@ -101,9 +102,12 @@ export default async function HostListingsPage() {
 
   // Listings (with embed/fallback) and real applicant counts are independent;
   // a counts failure must not break the listings view, so it degrades to {}.
-  const [items, counts] = await Promise.all([
+  const [items, counts, newCounts] = await Promise.all([
     loadHostItems(token, userId),
     getApplicationCountsByListing(token, userId).catch(
+      () => ({}) as Record<string, number>,
+    ),
+    getNewApplicationCountsByListing(token, userId).catch(
       () => ({}) as Record<string, number>,
     ),
   ]);
@@ -111,6 +115,7 @@ export default async function HostListingsPage() {
   const withCounts = items.map((item) => ({
     ...item,
     applicantCount: counts[item.listing.id] ?? 0,
+    newApplicantCount: newCounts[item.listing.id] ?? 0,
   }));
 
   return (
