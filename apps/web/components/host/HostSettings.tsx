@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { Icon } from "@explore-and-earn/ui";
+import {
+  ADDON_PRICING,
+  FOUNDER_LOCKED_PRICING,
+  PLAN_ENTITLEMENTS,
+} from "@explore-and-earn/contracts";
 
 import styles from "./HostSettings.module.css";
 
@@ -15,84 +20,66 @@ export interface HostSettingsProps {
 
 type SettingsTab = "billing" | "team" | "support" | "account";
 
-/* ── Tier plan definitions ──────────────────────────────────────── */
+/* ── Paid tiers (rendered from the founder-locked pricing contract) ──────
+ * There is NO free tier. Names + taglines are presentation; every number — price
+ * AND entitlement — is read from @explore-and-earn/contracts so this surface can
+ * never drift from canonical pricing (the prior hardcoded plan list did, inventing
+ * a free tier, "3 starter listings", "unlimited pro listings", etc.). */
 
-interface TierPlan {
-  readonly id: "none" | "starter" | "professional" | "enterprise";
-  readonly name: string;
-  readonly price: string;
-  readonly period: string;
-  readonly tagline: string;
-  readonly features: readonly string[];
-  readonly cta: string;
-  readonly highlighted?: boolean;
+type PaidTier = "starter" | "professional" | "enterprise";
+const PAID_TIERS: readonly PaidTier[] = ["starter", "professional", "enterprise"];
+
+const TIER_META: Record<
+  PaidTier,
+  { name: string; tagline: string; highlighted: boolean; cta: string }
+> = {
+  starter: {
+    name: "Starter",
+    tagline: "Get your first crew in the door",
+    highlighted: false,
+    cta: "Choose Starter",
+  },
+  professional: {
+    name: "Professional",
+    tagline: "For established, growing operations",
+    highlighted: true,
+    cta: "Choose Professional",
+  },
+  enterprise: {
+    name: "Enterprise",
+    tagline: "Large, multi-site teams",
+    highlighted: false,
+    cta: "Choose Enterprise",
+  },
+};
+
+/** Whole-dollar USD from integer cents (the contract stores cents everywhere). */
+function usd(cents: number): string {
+  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
 }
 
-const PLANS: readonly TierPlan[] = [
-  {
-    id: "none",
-    name: "Free",
-    price: "$0",
-    period: "forever",
-    tagline: "Get started with one listing",
-    features: [
-      "1 active listing",
-      "Basic analytics overview",
-      "Application pipeline (30 days)",
-      "Public host profile",
-      "Direct applicant messaging",
-    ],
-    cta: "Current plan",
-  },
-  {
-    id: "starter",
-    name: "Starter",
-    price: "$199",
-    period: "per month",
-    tagline: "For growing operations",
-    features: [
-      "3 active listings",
-      "Full analytics + per-listing breakdown",
-      "10 invite credits per month",
-      "Custom tagline on profile",
-      "Priority applicant view",
-    ],
-    cta: "Upgrade to Starter",
-    highlighted: true,
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    price: "$399",
-    period: "per month",
-    tagline: "For established hosts",
-    features: [
-      "Unlimited active listings",
-      "Advanced analytics + trends",
-      "Unlimited invite credits",
-      "Listing boost access",
-      "Priority search placement",
-      "Cover photo + gallery",
-    ],
-    cta: "Upgrade to Pro",
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: "$749",
-    period: "per month",
-    tagline: "Large operations & teams",
-    features: [
-      "Everything in Professional",
-      "3 team member seats",
-      "Dedicated account support",
-      "Custom onboarding",
-      "Early access to new features",
-      "SLA guarantee",
-    ],
-    cta: "Contact sales",
-  },
-];
+/** Human feature list derived entirely from the locked plan entitlements. */
+function planFeatures(tier: PaidTier): string[] {
+  const e = PLAN_ENTITLEMENTS[tier];
+  const features: (string | null)[] = [
+    `${e.listings} active listing${e.listings === 1 ? "" : "s"}`,
+    e.analytics === "full"
+      ? "Full analytics + per-listing breakdown"
+      : "Basic analytics overview",
+    e.monthlyAnnouncements > 0
+      ? `${e.monthlyAnnouncements} community announcement${e.monthlyAnnouncements === 1 ? "" : "s"} / month`
+      : null,
+    e.includedInviteCredits > 0
+      ? `${e.includedInviteCredits} invite credits / month`
+      : null,
+    e.teamSeats > 0
+      ? `${e.teamSeats} team seat${e.teamSeats === 1 ? "" : "s"} included`
+      : null,
+    "Public host profile",
+    "Direct applicant messaging",
+  ];
+  return features.filter((f): f is string => Boolean(f));
+}
 
 /* ── FAQ data ───────────────────────────────────────────────────── */
 
@@ -123,9 +110,9 @@ const FAQ_ITEMS: readonly FaqItem[] = [
       "Your data is retained for 90 days after cancellation. After that, listings and applicant history are anonymized per our data retention policy.",
   },
   {
-    question: "Do you offer seasonal or annual billing?",
+    question: "Do you offer annual billing?",
     answer:
-      "Annual billing with a 20% discount is coming soon. Reach out to be notified when it launches.",
+      "Yes — annual plans bill 10 months for 12, so you get two months free versus paying monthly. Reach out to switch to annual.",
   },
 ];
 
@@ -165,31 +152,29 @@ function TabBar({
   );
 }
 
-function PlanCard({
-  plan,
-  current,
-}: {
-  plan: TierPlan;
-  current: boolean;
-}) {
+function PlanCard({ tier, current }: { tier: PaidTier; current: boolean }) {
+  const meta = TIER_META[tier];
+  const price = usd(FOUNDER_LOCKED_PRICING[tier].monthly);
+  const features = planFeatures(tier);
+
   return (
     <div
-      className={`${styles.planCard}${plan.highlighted ? ` ${styles.planHighlighted}` : ""}${current ? ` ${styles.planCurrent}` : ""}`}
+      className={`${styles.planCard}${meta.highlighted ? ` ${styles.planHighlighted}` : ""}${current ? ` ${styles.planCurrent}` : ""}`}
     >
-      {plan.highlighted && !current ? (
+      {meta.highlighted && !current ? (
         <div className={styles.planBadge}>Most popular</div>
       ) : null}
       {current ? <div className={styles.planBadge}>Your plan</div> : null}
       <div className={styles.planHead}>
-        <p className={styles.planName}>{plan.name}</p>
+        <p className={styles.planName}>{meta.name}</p>
         <div className={styles.planPriceRow}>
-          <span className={styles.planPrice}>{plan.price}</span>
-          <span className={styles.planPeriod}>{plan.period}</span>
+          <span className={styles.planPrice}>{price}</span>
+          <span className={styles.planPeriod}>per month</span>
         </div>
-        <p className={styles.planTagline}>{plan.tagline}</p>
+        <p className={styles.planTagline}>{meta.tagline}</p>
       </div>
       <ul className={styles.planFeatures} role="list">
-        {plan.features.map((f) => (
+        {features.map((f) => (
           <li key={f} className={styles.planFeature}>
             <span className={styles.planCheck} aria-hidden>
               <Icon name="system.success" size={16} aria-hidden />
@@ -198,13 +183,74 @@ function PlanCard({
           </li>
         ))}
       </ul>
-      <a
-        className={`${styles.planCta}${current ? ` ${styles.planCtaCurrent}` : ""}`}
-        href={`mailto:${SUPPORT_EMAIL}?subject=Explore%20%26%20Earn%20Plan%20Upgrade`}
-        aria-label={`${plan.cta} — ${plan.name}`}
-      >
-        {plan.cta}
-      </a>
+      {current ? (
+        <span className={`${styles.planCta} ${styles.planCtaCurrent}`} aria-label={`${meta.name} — your current plan`}>
+          Current plan
+        </span>
+      ) : (
+        <a
+          className={styles.planCta}
+          href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Explore & Earn — ${meta.name} plan`)}`}
+          aria-label={meta.cta}
+        >
+          {meta.cta}
+        </a>
+      )}
+    </div>
+  );
+}
+
+/* ── Add-ons (rendered from the locked add-on pricing) ──────────────────── */
+
+function AddOnsSection({
+  subscriptionTier,
+}: {
+  subscriptionTier: HostSettingsProps["subscriptionTier"];
+}) {
+  const addl = ADDON_PRICING.additionalListingMonthly;
+  const ann = ADDON_PRICING.additionalAnnouncement;
+  const boost = ADDON_PRICING.boost;
+
+  const listingPrice =
+    subscriptionTier === "none"
+      ? `from ${usd(addl.enterprise)}/mo`
+      : `${usd(addl[subscriptionTier])}/mo`;
+  const listingDesc =
+    subscriptionTier === "none"
+      ? `Add an active listing beyond your plan's included count. Priced by tier — ${usd(addl.starter)} Starter · ${usd(addl.professional)} Pro · ${usd(addl.enterprise)} Enterprise, each per month.`
+      : "Add an active listing beyond your plan's included count, billed monthly per extra active listing.";
+
+  const addons: { name: string; price: string; desc: string }[] = [
+    { name: "Additional active listing", price: `${listingPrice} each`, desc: listingDesc },
+    {
+      name: "Extra community announcement",
+      price: `${usd(ann.priceCents)} each`,
+      desc: `A single ${ann.runDays}-day announcement run beyond your plan's monthly allowance.`,
+    },
+    {
+      name: "Listing boost",
+      price: `${usd(boost.d7)}–${usd(boost.d28)}`,
+      desc: `Temporary exposure boost — ${usd(boost.d7)} / 7 days, ${usd(boost.d14)} / 14 days, ${usd(boost.d28)} / 28 days. Visibility only; never changes match score.`,
+    },
+  ];
+
+  return (
+    <div className={styles.addonSection}>
+      <h3 className={styles.addonHeading}>Add-ons</h3>
+      <p className={styles.addonIntro}>
+        Top up any plan as you grow — purchased à la carte, never bundled.
+      </p>
+      <div className={styles.addonGrid}>
+        {addons.map((a) => (
+          <div key={a.name} className={styles.addonCard}>
+            <div className={styles.addonCardHead}>
+              <span className={styles.addonName}>{a.name}</span>
+              <span className={styles.addonPrice}>{a.price}</span>
+            </div>
+            <p className={styles.addonDesc}>{a.desc}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -215,15 +261,18 @@ function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProp
       <div className={styles.panelHead}>
         <h2 className={styles.panelTitle}>Plans</h2>
         <p className={styles.panelDesc}>
-          Choose the plan that fits your operation. All plans include a public host profile and
-          direct applicant messaging.
+          Choose the plan that fits your operation. Every plan includes a public host profile and
+          direct applicant messaging. Annual billing is 10 months for 12 — two months free.
         </p>
       </div>
       <div className={styles.planGrid}>
-        {PLANS.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} current={subscriptionTier === plan.id} />
+        {PAID_TIERS.map((tier) => (
+          <PlanCard key={tier} tier={tier} current={subscriptionTier === tier} />
         ))}
       </div>
+
+      <AddOnsSection subscriptionTier={subscriptionTier} />
+
       <div className={styles.billingNote}>
         <Icon name="system.info" size={16} aria-hidden />
         <span>
@@ -231,7 +280,7 @@ function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProp
           <a href={`mailto:${SUPPORT_EMAIL}`} className={styles.inlineLink}>
             {SUPPORT_EMAIL}
           </a>{" "}
-          to upgrade or discuss custom pricing.
+          to choose a plan or add capacity.
         </span>
       </div>
     </div>
@@ -246,7 +295,7 @@ function TeamPanel({ subscriptionTier, companyName }: { subscriptionTier: HostSe
       <div className={styles.panelHead}>
         <h2 className={styles.panelTitle}>Team members</h2>
         <p className={styles.panelDesc}>
-          Enterprise plan hosts can add up to 3 team members who can manage listings and view
+          Enterprise plans include a team seat so a crew member can manage listings and review
           applicants under your account.
         </p>
       </div>

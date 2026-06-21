@@ -67,15 +67,30 @@ export const INVITE_CREDITS_REFUNDABLE = false
 // Add-on pricing (integer cents), LOCKED.
 // Boost: ADR-031 (founder override 2026-05-31) — priced at the same point as
 // Featured Employer; exposure-only, never affects match score (G8).
-// Team seat: ADR-032 — Enterprise-only, $49/seat/mo, billed per active quantity
-// with proration.
+// Team seat: ADR-032 — $49/seat/mo. NOT surfaced as a self-serve add-on
+// (founder directive 2026-06-21: "i dont need team seat addons"); retained here
+// as the locked rate only.
+// Additional active listing: founder directive 2026-06-21 — tiered per plan so
+// higher tiers get a cheaper marginal listing. Monthly, per extra active listing
+// beyond the plan's included count.
+// Additional community announcement: founder directive 2026-06-21 — flat $149 for
+// a single 7-day run, no duration options.
 export const ADDON_PRICING = {
   boost: {
     d7: 20000, // $200 / 7 days
     d14: 35000, // $350 / 14 days
     d28: 50000, // $500 / 28 days
   },
-  teamSeatMonthly: 4900, // $49/mo
+  teamSeatMonthly: 4900, // $49/mo (locked rate; not self-serve)
+  additionalListingMonthly: {
+    starter: 9900, // $99/mo per extra active listing
+    professional: 7500, // $75/mo per extra active listing
+    enterprise: 4900, // $49/mo per extra active listing
+  },
+  additionalAnnouncement: {
+    priceCents: 14900, // $149 flat
+    runDays: 7, // single 7-day run, no options
+  },
 } as const
 
 // Service credits expire 12 months after issuance; redemption is FIFO
