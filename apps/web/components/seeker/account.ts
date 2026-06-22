@@ -136,13 +136,15 @@ export interface HelpItem {
 	readonly icon: IconKey;
 	readonly title: string;
 	readonly detail: string;
+	/** Destination — internal route or mailto. Every help item is a real link. */
+	readonly href: string;
 }
 
 export const HELP_ITEMS: readonly HelpItem[] = [
-	{ id: "articles", icon: "system.info", title: "Help articles", detail: "Guides on profiles, applying, and offers." },
-	{ id: "application", icon: "action.apply", title: "Application help", detail: "Resume gates, applying, and tracking status." },
-	{ id: "safety", icon: "trust.verified_host", title: "Safety and trust", detail: "How verification and Self-Declared by Host works." },
-	{ id: "report", icon: "system.warning", title: "Report an issue", detail: "Report a listing, host, message, or photo." },
-	{ id: "account", icon: "system.lock", title: "Account help", detail: "Sign-in, security, and account controls." },
-	{ id: "contact", icon: "action.message", title: "Contact support", detail: "Reach the Explore&Earn team." },
+	{ id: "articles", icon: "system.info", title: "Help articles", detail: "Guides on profiles, applying, and offers.", href: "/faq" },
+	{ id: "application", icon: "action.apply", title: "Application help", detail: "Resume gates, applying, and tracking status.", href: "/faq" },
+	{ id: "safety", icon: "trust.verified_host", title: "Safety and trust", detail: "How verification and Self-Declared by Host works.", href: "/about" },
+	{ id: "report", icon: "system.warning", title: "Report an issue", detail: "Report a listing, host, message, or photo.", href: "mailto:jackson@automatedempires.com?subject=Report%20an%20issue" },
+	{ id: "account", icon: "system.lock", title: "Account help", detail: "Sign-in, security, and account controls.", href: "/settings" },
+	{ id: "contact", icon: "action.message", title: "Contact support", detail: "Reach the Explore&Earn team.", href: "mailto:jackson@automatedempires.com?subject=Support" },
 ];
