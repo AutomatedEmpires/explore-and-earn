@@ -69,8 +69,8 @@
 }
 
 .ee-search__input:focus-visible {
-	outline: var(--ui-focus-ring);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
 /* select inherits .ee-search__input sizing; appearance reset lets the token
@@ -93,8 +93,8 @@
 }
 
 .ee-search__submit:focus-visible {
-	outline: var(--ui-focus-ring);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
 .ee-search__filters {
@@ -120,8 +120,8 @@
 }
 
 .ee-search__chip-button:focus-visible {
-	outline: var(--ui-focus-ring);
-	outline-offset: 2px;
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
 /* Selected category chips adopt their lane accent tokens. */
