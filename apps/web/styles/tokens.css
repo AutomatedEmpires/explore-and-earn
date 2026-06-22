@@ -213,6 +213,7 @@
   --color-cta:        var(--palette-sky);
   --color-cta-text:   #FFFFFF;
   --color-action-soft: color-mix(in srgb, var(--palette-sky) 12%, var(--palette-white));
+  --color-panel-dark: #38322A;   /* warm dark charcoal panel (employer/CTA blocks) */
   --color-teal:       var(--palette-teal);
   --color-gold:       var(--palette-amber);
   --color-gold-text:  #24221E;

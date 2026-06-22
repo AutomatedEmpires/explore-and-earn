@@ -26,7 +26,7 @@
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;
-	box-shadow: 0 20px 52px rgba(36, 34, 30, 0.2);
+	box-shadow: var(--elevation-hover);
 	background: var(--text-primary);
 }
 
@@ -89,7 +89,7 @@
 	font-family: var(--font-display);
 	font-size: clamp(3rem, 8vw, 5.5rem);
 	line-height: 0.92;
-	color: #ffffff;
+	color: var(--palette-white);
 	max-width: 13ch;
 }
 
@@ -129,14 +129,14 @@
 }
 
 .photoHeroPrimary {
-	background: #ffffff;
+	background: var(--palette-white);
 	color: var(--text-primary);
 	border: 1px solid transparent;
 }
 
 .photoHeroSecondary {
 	background: rgba(255, 255, 255, 0.14);
-	color: #ffffff;
+	color: var(--palette-white);
 	border: 1px solid rgba(255, 255, 255, 0.38);
 	backdrop-filter: blur(8px);
 }
@@ -254,7 +254,7 @@
 	display: block;
 	text-decoration: none;
 	background: var(--text-primary);
-	box-shadow: 0 4px 18px rgba(36, 34, 30, 0.12);
+	box-shadow: var(--elevation-card);
 	transition:
 		transform var(--motion-base) var(--ease-standard),
 		box-shadow var(--motion-base) var(--ease-standard);
@@ -262,7 +262,7 @@
 
 .reelCard:hover {
 	transform: translateY(-4px) scale(1.02);
-	box-shadow: 0 14px 36px rgba(36, 34, 30, 0.22);
+	box-shadow: var(--elevation-hover);
 }
 
 .reelPhoto {
@@ -332,7 +332,7 @@
 	background: color-mix(in srgb, var(--palette-sky-light) 40%, var(--color-surface-raised));
 	border: 1px solid color-mix(in srgb, var(--palette-sky) 20%, transparent);
 	border-radius: calc(var(--radius-card) + 0.2rem);
-	box-shadow: 0 6px 24px rgba(36, 34, 30, 0.06);
+	box-shadow: var(--elevation-card);
 }
 
 .seekerHeader {
@@ -419,7 +419,7 @@
 	padding: 0 var(--space-20);
 	border-radius: var(--radius-pill);
 	background: var(--palette-sky);
-	color: #ffffff;
+	color: var(--palette-white);
 	border: 1px solid transparent;
 	font-family: var(--font-ui);
 	font-size: var(--type-button-size);
@@ -440,10 +440,10 @@
 	gap: var(--space-20);
 	padding: var(--space-32);
 	/* Deep warm charcoal — dark premium feel, lighter than pure black */
-	background: #38322a;
+	background: var(--color-panel-dark);
 	border: 1px solid rgba(255, 255, 255, 0.07);
 	border-radius: calc(var(--radius-card) + 0.2rem);
-	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+	box-shadow: var(--elevation-overlay);
 }
 
 .employerEyebrow {
@@ -461,7 +461,7 @@
 	font-family: var(--font-display);
 	font-size: clamp(1.8rem, 3.5vw, 2.8rem);
 	line-height: 0.95;
-	color: #ffffff;
+	color: var(--palette-white);
 }
 
 .tierTable {
@@ -534,7 +534,7 @@
 	padding: 0 var(--space-20);
 	border-radius: var(--radius-pill);
 	background: rgba(255, 255, 255, 0.1);
-	color: #ffffff;
+	color: var(--palette-white);
 	border: 1px solid rgba(255, 255, 255, 0.18);
 	font-family: var(--font-ui);
 	font-size: var(--type-button-size);
@@ -564,7 +564,7 @@
 	min-height: 320px;
 	display: flex;
 	align-items: center;
-	box-shadow: 0 14px 44px rgba(36, 34, 30, 0.18);
+	box-shadow: var(--elevation-card);
 }
 
 .teaserBg {
@@ -613,7 +613,7 @@
 	font-family: var(--font-display);
 	font-size: clamp(2rem, 5vw, 3.5rem);
 	line-height: 0.95;
-	color: #ffffff;
+	color: var(--palette-white);
 }
 
 .teaserDesc {
@@ -632,7 +632,7 @@
 	min-height: 2.75rem;
 	padding: 0 var(--space-20);
 	border-radius: var(--radius-pill);
-	background: #ffffff;
+	background: var(--palette-white);
 	color: var(--text-primary);
 	border: 1px solid transparent;
 	font-family: var(--font-ui);
