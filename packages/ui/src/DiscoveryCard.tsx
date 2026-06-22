@@ -91,12 +91,13 @@ export interface DiscoveryCardProps {
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 
-const INK       = "#1A2B3C"
-const INK_SOFT  = "rgba(26,43,60,0.46)"
-const PAPER     = "#FEFAF4"
+// V2 "Golden Hour Hybrid" — warm ink + warm surface, via tokens (no raw hex).
+const INK       = "var(--palette-ink)"
+const INK_SOFT  = "var(--palette-ink-muted)"
+const PAPER     = "var(--palette-surface)"
 
-const H_INK = "#185848"   /* green  — housing/meals available */
-const P_INK = "#184878"   /* blue   — pay */
+const H_INK = "color-mix(in srgb, var(--palette-teal) 78%, var(--palette-ink))"   /* teal — housing/meals available */
+const P_INK = "color-mix(in srgb, var(--palette-amber) 52%, var(--palette-ink))"  /* deep gold — pay (money) */
 
 /** Per-category card body — top-lit, atmospheric, inviting */
 const CAT_CARD: Record<MarketplaceCategory, string> = {
@@ -177,15 +178,16 @@ const MAPPIN: Record<MarketplaceCategory, IconKey> = {
 // Housing & Meals share a green/red signal: provided = green, not_provided = light red.
 // Pay is always blue — it always has a dollar value so it never reads as "unavailable".
 
-const RED_INK = "rgba(180,44,28,0.72)"
+// "Not provided" is information, not an error — muted neutral, never alarming red.
+const RED_INK = "var(--palette-ink-muted)"
 
-// Housing / Meals
-const HM_GREEN_BG     = "linear-gradient(180deg, rgba(228,248,240,0.97) 0%, rgba(196,232,220,0.94) 100%)"
-const HM_GREEN_BORDER = `2px solid ${H_INK}`
-const HM_GREEN_SHADOW = `inset 0 1.5px 0 rgba(255,255,255,0.82), 0 3px 8px rgba(24,88,72,0.22), 0 1px 3px rgba(24,88,72,0.14)`
-const HM_RED_BG       = "linear-gradient(180deg, rgba(255,240,238,0.97) 0%, rgba(252,222,218,0.93) 100%)"
-const HM_RED_BORDER   = `1.5px solid rgba(180,44,28,0.28)`
-const HM_RED_SHADOW   = "inset 0 1.5px 3px rgba(180,44,28,0.07), inset 0 1px 0 rgba(255,255,255,0.55)"
+// Housing / Meals — provided = warm teal, not-provided = muted neutral
+const HM_GREEN_BG     = "color-mix(in srgb, var(--palette-teal) 13%, var(--palette-surface))"
+const HM_GREEN_BORDER = `1.5px solid color-mix(in srgb, var(--palette-teal) 42%, var(--palette-line))`
+const HM_GREEN_SHADOW = "var(--elevation-card)"
+const HM_RED_BG       = "color-mix(in srgb, var(--palette-ink) 4%, var(--palette-surface))"
+const HM_RED_BORDER   = "1px solid var(--palette-line)"
+const HM_RED_SHADOW   = "none"
 
 // partial is treated identically to provided — "available" is the single signal
 function hmBg(p: BenefitProvision | undefined):     string { return (p === "provided" || p === "partial") ? HM_GREEN_BG     : HM_RED_BG     }
@@ -194,10 +196,11 @@ function hmColor(p: BenefitProvision | undefined):  string { return (p === "prov
 function hmShadow(p: BenefitProvision | undefined): string { return (p === "provided" || p === "partial") ? HM_GREEN_SHADOW : HM_RED_SHADOW }
 
 // Pay — always blue regardless of provision
-const PAY_BG     = "linear-gradient(180deg, rgba(222,240,252,0.97) 0%, rgba(192,220,244,0.94) 100%)"
-const PAY_BORDER = `2px solid ${P_INK}`
+// Pay — always present (money), warm gold accent
+const PAY_BG     = "color-mix(in srgb, var(--palette-amber) 15%, var(--palette-surface))"
+const PAY_BORDER = `1.5px solid color-mix(in srgb, var(--palette-amber) 52%, var(--palette-line))`
 const PAY_COLOR  = P_INK
-const PAY_SHADOW = `inset 0 1.5px 0 rgba(255,255,255,0.82), 0 3px 8px rgba(24,72,120,0.22), 0 1px 3px rgba(24,72,120,0.14)`
+const PAY_SHADOW = "var(--elevation-card)"
 
 // ─── Fill bar helpers ─────────────────────────────────────────────────────────
 
@@ -228,23 +231,23 @@ const STAMP: CSSProperties = {
 	whiteSpace: "nowrap",
 }
 
-/** Info row cell (name / job / location) — debossed tray feel */
+/** Info row cell (name / job / location) — clean warm tray, V2 soft depth */
 const ROW_CELL: CSSProperties = {
 	display: "flex", alignItems: "center", justifyContent: "center",
-	gap: "6px", padding: "9px 14px",
-	background: PAPER, border: "1.5px solid rgba(26,43,60,0.16)",
-	borderRadius: "10px", textAlign: "center",
-	boxShadow: "inset 0 2px 4px rgba(26,43,60,0.08), inset 0 1px 0 rgba(0,0,0,0.04), 0 1.5px 0 rgba(255,255,255,0.72)",
+	gap: "6px", padding: "10px 14px",
+	background: PAPER, border: "1px solid var(--palette-line)",
+	borderRadius: "12px", textAlign: "center",
+	boxShadow: "var(--elevation-card)",
 }
 
-/** Strip cell — stacked (begins/ends columns) — debossed tray feel */
+/** Strip cell — stacked (begins/ends columns) — clean warm tray */
 const STRIP_CELL: CSSProperties = {
 	display: "flex", flexDirection: "column",
 	alignItems: "center", justifyContent: "center",
-	gap: "3px", padding: "8px 6px",
-	background: PAPER, border: "1.5px solid rgba(26,43,60,0.16)",
-	borderRadius: "10px", textAlign: "center",
-	boxShadow: "inset 0 2px 4px rgba(26,43,60,0.08), inset 0 1px 0 rgba(0,0,0,0.04), 0 1.5px 0 rgba(255,255,255,0.72)",
+	gap: "3px", padding: "9px 6px",
+	background: PAPER, border: "1px solid var(--palette-line)",
+	borderRadius: "12px", textAlign: "center",
+	boxShadow: "var(--elevation-card)",
 }
 
 /** Benefit cell — inline icon + label (housing / meals / pay) */
@@ -446,27 +449,23 @@ export function DiscoveryCard({
 		width: "min(100%, 360px)",
 		overflow: "hidden",
 		background: CAT_CARD[cat],
-		border: `2px solid ${INK}`,
-		borderTop: `5px solid ${CAT_ACCENT[cat]}`,
-		borderRadius: "24px",
+		border: `1px solid var(--palette-line)`,
+		borderTop: `3px solid ${CAT_ACCENT[cat]}`,
+		borderRadius: "20px",
 		color: INK,
 		opacity: isDisabled ? 0.6 : 1,
 		boxShadow: [
-			"inset 0 0 0 1.5px rgba(255,253,246,0.80)",   /* inner rim highlight */
-			"inset 0 5px 0 rgba(255,255,255,0.46)",        /* top surface catch-light */
-			`inset 0 -52px 68px ${CAT_GLOW[cat]}`,         /* category ambient from below */
-			"inset 0 0 120px rgba(26,43,60,0.03)",          /* subtle depth vignette */
-			"5px 8px 0 rgba(26,43,60,0.26)",               /* hard offset shadow */
-			"0 1px 0 rgba(26,43,60,0.48)",                 /* ground contact shadow */
-			"0 20px 52px rgba(26,43,60,0.18)",             /* soft lift shadow */
+			"inset 0 1px 0 rgba(255,255,255,0.55)",        /* top catch-light */
+			`inset 0 -44px 56px ${CAT_GLOW[cat]}`,         /* category ambient from below */
+			"var(--elevation-card)",                        /* V2 soft depth */
 		].join(", "),
 	}
 
 	const heroStyle: CSSProperties = {
-		position: "relative", width: "100%", aspectRatio: "4 / 3",
+		position: "relative", width: "100%", aspectRatio: "16 / 10",
 		overflow: "hidden", flexShrink: 0,
 		background: CAT_HERO[cat],
-		borderBottom: `2px solid ${INK}`,
+		borderBottom: `1px solid var(--palette-line)`,
 	}
 
 	const hostCircle: CSSProperties = {
