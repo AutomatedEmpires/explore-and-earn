@@ -140,6 +140,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-8);
+  min-height: var(--tap-min);
   padding: var(--space-12) var(--space-20);
   border: 1px solid transparent;
   border-radius: var(--radius-button);

@@ -54,6 +54,10 @@
 	gap: var(--space-8);
 }
 
+@media (max-width: 479px) {
+	.triad { grid-template-columns: 1fr; }
+}
+
 .chip {
 	display: flex;
 	flex-direction: column;

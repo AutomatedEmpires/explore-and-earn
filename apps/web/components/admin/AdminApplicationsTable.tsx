@@ -39,16 +39,16 @@ export function AdminApplicationsTable({
             ) : (
               applications.map((application) => (
                 <tr key={application.id}>
-                  <td>
+                  <td data-label="Seeker">
                     <span className={styles.mono}>
                       {application.seekerClerkUserId || "\u2014"}
                     </span>
                   </td>
-                  <td>{application.listingTitle || "\u2014"}</td>
-                  <td>
+                  <td data-label="Listing">{application.listingTitle || "\u2014"}</td>
+                  <td data-label="Status">
                     <Badge label={humanizeToken(application.status)} />
                   </td>
-                  <td>{formatAdminDate(application.createdAt)}</td>
+                  <td data-label="Applied">{formatAdminDate(application.createdAt)}</td>
                 </tr>
               ))
             )}

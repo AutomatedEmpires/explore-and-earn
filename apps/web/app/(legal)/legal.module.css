@@ -475,3 +475,12 @@
 	color: var(--text-secondary);
 	text-align: center;
 }
+
+/* Mobile-first: collapse the multi-column legal grids to a single column. */
+@media (max-width: 639px) {
+	.badgeGrid,
+	.providerGrid,
+	.retentionRow {
+		grid-template-columns: 1fr;
+	}
+}

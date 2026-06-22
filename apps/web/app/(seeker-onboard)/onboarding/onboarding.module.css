@@ -178,7 +178,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-8);
-	min-height: 40px;
+	min-height: var(--tap-min);
 	padding: var(--space-8) var(--space-14);
 	border: 1px solid var(--border-soft);
 	border-radius: var(--radius-pill);

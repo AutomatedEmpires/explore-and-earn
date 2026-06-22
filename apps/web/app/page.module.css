@@ -175,12 +175,13 @@
 .destinationPill {
 	display: inline-flex;
 	align-items: center;
+	min-height: var(--tap-min);
 	padding: var(--space-8) var(--space-16);
 	border-radius: var(--radius-pill);
 	border: 1.5px solid rgba(255, 255, 255, 0.28);
 	background: rgba(255, 255, 255, 0.1);
 	backdrop-filter: blur(10px);
-	color: #ffffff;
+	color: var(--palette-white);
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	font-weight: var(--font-weight-medium);

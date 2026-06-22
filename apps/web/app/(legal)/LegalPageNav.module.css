@@ -169,3 +169,10 @@
 	flex-shrink: 0;
 	background: color-mix(in srgb, var(--border-ink) 28%, transparent);
 }
+
+/* Mobile-first: 4 tabs cramp at 380px — go 2x2. */
+@media (max-width: 479px) {
+	.pageTabs {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}

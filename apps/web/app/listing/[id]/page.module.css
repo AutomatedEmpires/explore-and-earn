@@ -134,6 +134,10 @@
   margin-bottom: var(--space-section);
 }
 
+@media (max-width: 479px) {
+  .triad { grid-template-columns: 1fr; }
+}
+
 .triadCell {
   padding: var(--space-16);
   border-radius: var(--radius-card);

@@ -113,17 +113,17 @@ export function AdminListingsTable({
                 const busy = isPending && pendingId === listing.id;
                 return (
                   <tr key={listing.id}>
-                    <td>{listing.hostCompanyName}</td>
-                    <td>{listing.title}</td>
-                    <td>{humanizeToken(listing.category)}</td>
-                    <td>
+                    <td data-label="Host">{listing.hostCompanyName}</td>
+                    <td data-label="Title">{listing.title}</td>
+                    <td data-label="Category">{humanizeToken(listing.category)}</td>
+                    <td data-label="Status">
                       <Badge
                         label={humanizeToken(listing.status)}
                         variant={listingStatusVariant(listing.status)}
                       />
                     </td>
-                    <td>{formatAdminDate(listing.publishedAt)}</td>
-                    <td>
+                    <td data-label="Published">{formatAdminDate(listing.publishedAt)}</td>
+                    <td data-label="Actions">
                       <div className={styles.actions}>
                         <Button
                           variant="primary"
