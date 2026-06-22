@@ -4,6 +4,7 @@ import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 
 import {
+  getConversations,
   getHostApplications,
   getHostListings,
   getSeekerDisplayName,
@@ -16,7 +17,7 @@ import {
   HostSectionHeading,
 } from "../../../../../components/host";
 import type { DiscoveryListing } from "../../../../../components/discovery";
-import { toApplicantItem } from "../applicants-data";
+import { toApplicantItem, threadsByApplicationId } from "../applicants-data";
 import { StatusActions } from "./StatusActions";
 import { ApplicantResumePopupButton } from "./ApplicantResumePopupButton";
 import styles from "../page.module.css";
@@ -38,10 +39,12 @@ export default async function HostApplicantDetailPage({
     notFound();
   }
 
-  const [applications, listingRows] = await Promise.all([
+  const [applications, listingRows, conversations] = await Promise.all([
     getHostApplications(token, userId),
     getHostListings(token, userId).catch(() => []),
+    getConversations(token, userId, "host").catch(() => []),
   ]);
+  const threadsMap = threadsByApplicationId(conversations);
 
   // Ownership check: application must belong to one of this host's own listings.
   // Guards against any ownership filter ambiguity in the DB layer.
@@ -66,7 +69,7 @@ export default async function HostApplicantDetailPage({
       rowToDiscoveryFields(row),
     ]),
   );
-  const applicant = toApplicantItem(application, listingsById);
+  const applicant = toApplicantItem(application, listingsById, undefined, threadsMap);
   // Prefer the resolved display name in the heading; fall back to the existing
   // pseudonymous handle when no name is available yet.
   const applicantWithName = displayName

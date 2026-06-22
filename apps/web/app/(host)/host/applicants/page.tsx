@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import {
+  getConversations,
   getHostApplications,
   getHostListings,
   getSeekerDisplayNames,
@@ -9,7 +10,7 @@ import {
 
 import { HostPipelineBoard, HostSectionHeading } from "../../../../components/host";
 import { EmptyState, type DiscoveryListing } from "../../../../components/discovery";
-import { toApplicantItem } from "./applicants-data";
+import { toApplicantItem, threadsByApplicationId } from "./applicants-data";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Applicants" };
@@ -45,10 +46,12 @@ export default async function HostApplicantsPage({
 
   // Applications carry only listingId/listingTitle; load the host's listings to
   // resolve each application's full DiscoveryListing for the canonical card.
-  const [applications, listingRows] = await Promise.all([
+  const [applications, listingRows, conversations] = await Promise.all([
     getHostApplications(token, userId),
     getHostListings(token, userId).catch(() => []),
+    getConversations(token, userId, "host").catch(() => []),
   ]);
+  const threadsMap = threadsByApplicationId(conversations);
 
   // Resolve seeker display names in a single batch query.
   const displayNames = await getSeekerDisplayNames(
@@ -78,7 +81,7 @@ export default async function HostApplicantsPage({
     : ownedApplications;
 
   const applicants = filteredApplications.map((application) =>
-    toApplicantItem(application, listingsById, displayNames),
+    toApplicantItem(application, listingsById, displayNames, threadsMap),
   );
 
   const filterListing = filterListingId
