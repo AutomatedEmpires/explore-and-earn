@@ -36,6 +36,11 @@ const HIDE_PREFIXES: readonly string[] = [
   "/help",
   "/home",
   "/onboarding",
+  // Admin OS scope (founder moderation command center)
+  "/admin",
+  "/listings",
+  "/hosts",
+  "/applications",
 ];
 
 export function HideOnHost({ children }: { children: ReactNode }) {

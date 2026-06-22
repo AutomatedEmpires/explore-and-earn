@@ -1,0 +1,541 @@
+/**
+ * Admin OS — dark-glass, emerald-aurora theme for the (admin) scope.
+ *
+ * Same token-cascade strategy as host-os.css: seeker surfaces read SEMANTIC
+ * tokens, so scoping dark + emerald values to `.admin-os` flips the whole
+ * seeker experience into a cinematic dark-glass command center with no feature
+ * changes, plus the locked --adminos-* set for glass/lines/accents/sizes and
+ * the shell chrome (glass sidebar → mobile bottom-nav). Host = golden command;
+ * Admin = emerald moderation command.
+ *
+ * Benchmark: docs/design/reference/_benchmarks/explore_earn_admin_dashboard_worldclass.html
+ */
+.admin-os {
+  /* ---- dark forest surfaces ---- */
+  --color-paper:          #07120f;
+  --color-surface:        rgba(255, 255, 255, 0.055);
+  --color-surface-raised: rgba(255, 255, 255, 0.075);
+  --color-surface-2:      rgba(255, 255, 255, 0.05);
+  --color-card-warm:      rgba(255, 255, 255, 0.06);
+  --color-parchment:      rgba(255, 255, 255, 0.045);
+  --palette-paper:        #07120f;
+  --palette-surface:      rgba(255, 255, 255, 0.07);
+  /* ---- text (cool bone) ---- */
+  --text-primary:   #f6fff8;
+  --text-secondary: rgba(246, 255, 248, 0.70);
+  --text-muted:     rgba(246, 255, 248, 0.46);
+  --palette-ink:        #f6fff8;
+  --palette-ink-soft:   rgba(246, 255, 248, 0.70);
+  --palette-ink-muted:  rgba(246, 255, 248, 0.46);
+  /* ---- borders / lines ---- */
+  --border-soft:  rgba(255, 255, 255, 0.13);
+  --border-ink:   rgba(255, 255, 255, 0.20);
+  --palette-line: rgba(255, 255, 255, 0.15);
+  /* ---- titles use the editorial serif ---- */
+  --font-display: var(--font-fraunces, "Fraunces", ui-serif, Georgia, serif);
+  /* ---- accents shift to emerald aurora ---- */
+  --color-cta:        #36f49c;
+  --color-cta-text:   #061d13;
+  --color-header-bg:  #0b1914;
+  --palette-teal:     #36f49c;
+  --palette-amber:    #ffd66d;
+  /* moderation danger (reports / removals) */
+  --status-error-fg:  #ff4f6d;
+  --status-error-bg:  rgba(255, 79, 109, 0.14);
+  --adminos-red:      #ff4f6d;
+  --status-success-fg: #bbffd7;
+  --status-match-bg: rgba(54, 244, 156, 0.14);  --status-match-fg: #bbffd7;
+  --status-boosted-bg: rgba(255, 214, 109, 0.16); --status-boosted-fg: #ffe09a;
+  --elevation-card:  0 18px 54px rgba(0, 0, 0, 0.22);
+  --elevation-hover: 0 26px 70px rgba(0, 0, 0, 0.30);
+
+  /* ---- locked Admin OS set (glass / accents / sizes) ---- */
+  --adminos-glass:    rgba(255, 255, 255, 0.075);
+  --adminos-glass-2:  rgba(255, 255, 255, 0.11);
+  --adminos-glass-3:  rgba(255, 255, 255, 0.045);
+  --adminos-line:     rgba(255, 255, 255, 0.15);
+  --adminos-line-2:   rgba(255, 255, 255, 0.12);
+  --adminos-emerald:  #36f49c;
+  --adminos-mint:     #bbffd7;
+  --adminos-aqua:     #6deaff;
+  --adminos-gold:     #ffd66d;
+  --adminos-on-emerald: #061d13;
+  --adminos-grad:     linear-gradient(135deg, #36f49c, #ffd66d);
+  --adminos-blur:     22px;
+  --adminos-blur-lg:  26px;
+  --adminos-control:  46px;
+  --adminos-avatar:   42px;
+  --adminos-side:     292px;
+  --adminos-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+
+  color: var(--text-primary);
+  background:
+    radial-gradient(circle at 16% 0%, rgba(54, 244, 156, 0.18), transparent 35%),
+    radial-gradient(circle at 88% 12%, rgba(109, 234, 255, 0.12), transparent 32%),
+    radial-gradient(circle at 80% 92%, rgba(255, 214, 109, 0.09), transparent 32%),
+    linear-gradient(135deg, #06100d, #0b1914 48%, #07120f);
+  min-height: 100svh;
+}
+
+/* ── Shell grid ─────────────────────────────────────────────── */
+.adminos-shell {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: var(--adminos-side) 1fr;
+  min-height: 100svh;
+}
+
+/* ── Glass sidebar ──────────────────────────────────────────── */
+.adminos-side {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  padding: 18px 14px;
+  border-right: 1px solid var(--adminos-line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.035)),
+    rgba(7, 18, 15, 0.58);
+  backdrop-filter: blur(var(--adminos-blur-lg));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.adminos-brand {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 24px;
+  background: var(--adminos-glass);
+  border: 1px solid var(--adminos-line-2);
+}
+
+.adminos-mark {
+  width: var(--adminos-avatar);
+  height: var(--adminos-avatar);
+  flex: 0 0 auto;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--adminos-on-emerald);
+  font-weight: 900;
+  background:
+    radial-gradient(circle at 33% 24%, #fff 0 8%, transparent 9%),
+    conic-gradient(from 180deg, var(--adminos-emerald), var(--adminos-aqua), var(--adminos-gold), var(--adminos-emerald));
+  box-shadow: 0 0 28px rgba(54, 244, 156, 0.30);
+}
+
+.adminos-brand b {
+  display: block;
+  letter-spacing: -0.05em;
+  font-size: 1.08rem;
+  line-height: 0.95;
+  font-weight: 800;
+}
+
+.adminos-brand i {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.adminos-livedot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--adminos-emerald);
+  box-shadow: 0 0 0 0 rgba(54, 244, 156, 0.7);
+  animation: adminos-pulse 1.9s infinite;
+}
+
+@keyframes adminos-pulse {
+  70% { box-shadow: 0 0 0 11px rgba(54, 244, 156, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(54, 244, 156, 0); }
+}
+
+/* Seeker identity card (photo + avatar + name) */
+.adminos-card {
+  position: relative;
+  padding: 14px;
+  border-radius: 26px;
+  overflow: hidden;
+  border: 1px solid var(--adminos-line);
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.58)),
+    radial-gradient(circle at 74% 10%, rgba(54, 244, 156, 0.16), transparent 40%),
+    linear-gradient(135deg, rgba(54, 244, 156, 0.16), rgba(45, 117, 136, 0.16));
+  min-height: 132px;
+  display: flex;
+  align-items: flex-end;
+  box-shadow: var(--elevation-card);
+}
+
+.adminos-card .adminos-avatarimg {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.adminos-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  color: var(--adminos-on-emerald);
+  background: linear-gradient(135deg, var(--adminos-emerald), var(--adminos-gold));
+  flex: 0 0 auto;
+  box-shadow: 0 0 24px rgba(54, 244, 156, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  overflow: hidden;
+}
+
+.adminos-card b {
+  display: block;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.adminos-card span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* Profile readiness meter */
+.adminos-score {
+  padding: 12px;
+  border-radius: 22px;
+  background: var(--adminos-glass-3);
+  border: 1px solid var(--adminos-line-2);
+}
+
+.adminos-score-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  color: var(--text-muted);
+  margin-bottom: 9px;
+}
+
+.adminos-meter {
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+}
+
+.adminos-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--adminos-grad);
+  box-shadow: 0 0 24px rgba(54, 244, 156, 0.28);
+}
+
+/* Nav */
+.adminos-navlabel {
+  margin: 4px 10px 6px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+}
+
+.adminos-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.adminos-nav:last-of-type {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.adminos-nav::-webkit-scrollbar { display: none; }
+
+.adminos-navitem {
+  width: 100%;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  background: transparent;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 17px;
+  text-align: left;
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+
+.adminos-navitem .i {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--adminos-glass);
+  border: 1px solid var(--adminos-line-2);
+}
+
+.adminos-navitem b {
+  display: block;
+  color: inherit;
+  font-size: 0.92rem;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.adminos-navitem s {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  text-decoration: none;
+}
+
+.adminos-bdg {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  background: var(--adminos-glass);
+  border: 1px solid var(--adminos-line-2);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.adminos-navitem:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  transform: translateX(2px);
+}
+
+.adminos-navitem[aria-current="page"] {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(54, 244, 156, 0.22), transparent 40%),
+    rgba(255, 255, 255, 0.10);
+  border-color: rgba(54, 244, 156, 0.25);
+  color: #fff;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.20);
+}
+
+.adminos-navitem[aria-current="page"] .i {
+  background: var(--adminos-grad);
+  color: var(--adminos-on-emerald);
+  border-color: transparent;
+}
+
+/* ── Main + topbar ──────────────────────────────────────────── */
+.adminos-main {
+  min-width: 0;
+  position: relative;
+}
+
+.adminos-top {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--adminos-line-2);
+  background: rgba(7, 18, 15, 0.55);
+  backdrop-filter: blur(var(--adminos-blur));
+}
+
+.adminos-search {
+  position: relative;
+  flex: 1;
+  max-width: 640px;
+  height: var(--adminos-control);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--adminos-line-2);
+  background: var(--adminos-glass);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.adminos-tact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--adminos-control);
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--adminos-line-2);
+  background: var(--adminos-glass);
+  color: var(--text-primary);
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  position: relative;
+}
+
+.adminos-tact--icon { width: var(--adminos-control); padding: 0; }
+
+.adminos-tact--danger {
+  background: var(--adminos-red);
+  color: #2a0710;
+  border-color: transparent;
+}
+
+.adminos-tact--p {
+  background: var(--adminos-grad);
+  color: var(--adminos-on-emerald);
+  border-color: transparent;
+  box-shadow: 0 16px 36px rgba(54, 244, 156, 0.18);
+}
+
+.adminos-tact:hover { transform: translateY(-2px); border-color: var(--border-ink); }
+
+.adminos-bdg--top {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--adminos-emerald);
+  color: var(--adminos-on-emerald);
+  font-size: 0.64rem;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+.adminos-account {
+  display: inline-grid;
+  place-items: center;
+  width: var(--adminos-control);
+  height: var(--adminos-control);
+  border-radius: 999px;
+  border: 1px solid var(--adminos-line-2);
+  background: var(--adminos-glass);
+  text-decoration: none;
+}
+
+.adminos-avatarmini {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 0.82rem;
+  color: var(--adminos-on-emerald);
+  background: var(--adminos-grad);
+}
+
+.adminos-contentwrap {
+  padding: 24px;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+/* ── Mobile (≤1023px): hide sidebar, floating bottom nav ───────── */
+.adminos-mnav, .adminos-mtop { display: none; }
+
+@media (max-width: 1023px) {
+  .adminos-shell { grid-template-columns: 1fr; }
+  .adminos-side { display: none; }
+  .adminos-contentwrap { padding: 16px 14px 96px; }
+  .adminos-top { padding: 12px 14px; }
+  .adminos-tlabel { display: none; }
+
+  .adminos-mnav {
+    display: grid;
+    position: fixed;
+    z-index: 70;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 8px;
+    border-radius: 24px;
+    background: rgba(6, 16, 12, 0.84);
+    backdrop-filter: blur(var(--adminos-blur-lg));
+    border: 1px solid var(--adminos-line);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  }
+
+  .adminos-mtab {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 16px;
+    padding: 7px 4px;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .adminos-mtab[aria-current="page"] {
+    color: var(--adminos-on-emerald);
+    background: var(--adminos-grad);
+  }
+}
+
+/* grid + grain atmosphere overlay on the scope */
+.admin-os::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .adminos-livedot { animation: none; }
+  .view, .adminos-navitem { transition: none; }
+}

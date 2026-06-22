@@ -10,3 +10,5 @@ export { AdminApplicationsTable } from "./AdminApplicationsTable";
 export type { AdminApplicationRowView } from "./AdminApplicationsTable";
 export { AdminListingCard } from "./AdminListingCard";
 export type { AdminListingCardProps } from "./AdminListingCard";
+export { AdminShell } from "./AdminShell";
+export type { AdminShellProps } from "./AdminShell";

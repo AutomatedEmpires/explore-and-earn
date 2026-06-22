@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import type { ReactNode } from "react";
 
-import { AdminHeader, AdminSidebar } from "../../components/admin";
+import { AdminShell } from "../../components/admin";
 import { isAdminUserId } from "../../lib/admin";
-import styles from "./layout.module.css";
+import "../../styles/admin-os.css";
 
 export const metadata: Metadata = {
   title: {
@@ -30,13 +30,14 @@ export default async function AdminLayout({
     redirect("/");
   }
 
+  // Admin OS — dark-glass emerald moderation command center. The .admin-os token
+  // cascade flips the scope; AdminShell owns the chrome (and links the REAL admin
+  // routes — the legacy AdminSidebar linked broken /admin/* paths).
   return (
-    <div className={styles.shell}>
-      <AdminHeader />
-      <div className={styles.body}>
-        <AdminSidebar />
-        <main className={styles.main}>{children}</main>
-      </div>
+    <div className="admin-os">
+      <AdminShell adminName="Founder" healthScore={100}>
+        {children}
+      </AdminShell>
     </div>
   );
 }
