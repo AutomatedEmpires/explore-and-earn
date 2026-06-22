@@ -225,9 +225,9 @@ const STAMP: CSSProperties = {
 	fontFamily: DISPLAY_FONT,
 	fontSize: "11px", fontWeight: 700,
 	letterSpacing: "0.08em", textTransform: "uppercase",
-	background: "rgba(255,248,225,0.96)",
+	background: "color-mix(in srgb, var(--palette-paper) 88%, var(--palette-amber))",
 	backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-	boxShadow: "0 2px 10px rgba(23,19,13,0.24), 0 1px 0 rgba(255,255,255,0.90) inset",
+	boxShadow: "var(--elevation-card), 0 1px 0 rgba(255,255,255,0.55) inset",
 	whiteSpace: "nowrap",
 }
 
@@ -372,9 +372,9 @@ export function DiscoveryCard({
 		isApplied    ? { label: "Applied",  color: INK,    decoration: false }
 		: isScheduled ? { label: "Schedule", color: INK,    decoration: true  }
 		: isDraft     ? { label: "Draft",    color: INK,    decoration: false }
-		: isFilled    ? { label: "Filled",   color: "#fff", bg: "linear-gradient(135deg, #1D5026 0%, #2F6B3F 100%)", decoration: false }
-		: isReported  ? { label: data.reportCount ? `${data.reportCount} Reports` : "Reported", color: "#fff", bg: "linear-gradient(135deg, #C93824 0%, #E84020 100%)", decoration: false }
-		: isBoosted   ? { label: "Boosted",  color: "#fff", bg: "linear-gradient(135deg, #B8780A 0%, #D4960C 50%, #E8A820 100%)", icon: "status.boosted" as IconKey, decoration: false }
+		: isFilled    ? { label: "Filled",   color: "var(--palette-paper)", bg: "var(--status-success-fg)", decoration: false }
+		: isReported  ? { label: data.reportCount ? `${data.reportCount} Reports` : "Reported", color: "var(--palette-paper)", bg: "var(--status-error-fg)", decoration: false }
+		: isBoosted   ? { label: "Boosted",  color: "var(--palette-paper)", bg: "var(--palette-amber)", icon: "status.boosted" as IconKey, decoration: false }
 		: null
 
 	// R1 right secondary: passive state badges only (boosted moved to center)
@@ -382,16 +382,16 @@ export function DiscoveryCard({
 	type SecondaryBadge = { label: string; ink: string }
 	const matchBadgeLabel = typeof data.matchScore === "number" ? `${data.matchScore}% Match` : "Matched"
 	const secondaryBadge: SecondaryBadge | null =
-		isSaved       ? { label: "Saved",          ink: "#1D5026" }
-		: isOffered   ? { label: "Offered",         ink: "#1D5026" }
-		: isAccepted  ? { label: "Accepted",        ink: "#1D5026" }
-		: isMatched   ? { label: matchBadgeLabel,   ink: "#0D3E6A" }
-		: isInvited   ? { label: "Invited",         ink: "#7A5A10" }
+		isSaved       ? { label: "Saved",          ink: "var(--status-success-fg)" }
+		: isOffered   ? { label: "Offered",         ink: "var(--status-success-fg)" }
+		: isAccepted  ? { label: "Accepted",        ink: "var(--status-success-fg)" }
+		: isMatched   ? { label: matchBadgeLabel,   ink: "var(--palette-teal)" }
+		: isInvited   ? { label: "Invited",         ink: "var(--status-warning-fg)" }
 		: isNotSelected ? { label: "Passed",        ink: INK_SOFT  }
 		: isWithdrawn ? { label: "Withdrawn",       ink: INK_SOFT  }
-		: isPaused    ? { label: "Paused",          ink: "#7A5A10" }
+		: isPaused    ? { label: "Paused",          ink: "var(--status-warning-fg)" }
 		: isExpired   ? { label: "Expired",         ink: INK_SOFT  }
-		: isReported && data.reportCategory ? { label: data.reportCategory, ink: "#8B1A1A" }
+		: isReported && data.reportCategory ? { label: data.reportCategory, ink: "var(--status-error-fg)" }
 		: null
 
 	// Match bar: always-on for host_applicant_review (boosted doesn't apply to seeker cards);
@@ -597,11 +597,11 @@ export function DiscoveryCard({
 							style={{
 								position: "absolute", bottom: "-4px", right: "-4px", zIndex: 4,
 								width: "18px", height: "18px", borderRadius: "50%",
-								background: "#155DA8",
-								border: "2px solid rgba(255,248,225,0.95)",
+								background: "var(--palette-teal)",
+								border: "2px solid var(--palette-surface)",
 								boxShadow: `0 0 0 1px ${INK}, 0 2px 6px rgba(0,0,0,0.32)`,
 								display: "flex", alignItems: "center", justifyContent: "center",
-								color: "#fff", flexShrink: 0,
+								color: "var(--palette-paper)", flexShrink: 0,
 							}}
 							aria-label="Verified Host"
 						>
@@ -659,7 +659,7 @@ export function DiscoveryCard({
 						<div style={{
 							height: "9px", borderRadius: "5px",
 							border: "1.5px solid rgba(23,19,13,0.30)",
-							background: "linear-gradient(90deg, #C93824 0%, #E87520 28%, #E8C020 55%, #5AA830 100%)",
+							background: "linear-gradient(90deg, var(--status-error-fg) 0%, var(--palette-amber) 48%, var(--status-success-fg) 100%)",
 							boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
 						}} />
 						<div style={{
@@ -695,7 +695,7 @@ export function DiscoveryCard({
 						<div style={{
 							height: "9px", borderRadius: "5px",
 							border: "1.5px solid rgba(23,19,13,0.30)",
-							background: "linear-gradient(90deg, #C93824 0%, #E87520 28%, #E8C020 55%, #5AA830 100%)",
+							background: "linear-gradient(90deg, var(--status-error-fg) 0%, var(--palette-amber) 48%, var(--status-success-fg) 100%)",
 							boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
 						}} />
 						<div style={{
@@ -731,7 +731,7 @@ export function DiscoveryCard({
 						<span style={{
 							...STAMP,
 							color: secondaryBadge.ink,
-							border: `1px solid ${secondaryBadge.ink === INK_SOFT ? "rgba(23,19,13,0.18)" : secondaryBadge.ink + "50"}`,
+							border: `1px solid color-mix(in srgb, ${secondaryBadge.ink} 32%, transparent)`,
 						}}>
 							{secondaryBadge.label}
 						</span>
@@ -903,8 +903,8 @@ export function DiscoveryCard({
 								type="button"
 								onClick={onApprove ? () => onApprove(data.id) : undefined}
 								style={{
-									background: "#1D5026", color: "#fff",
-									border: "3px solid #1D5026", borderRadius: "10px",
+									background: "var(--status-success-fg)", color: "var(--palette-paper)",
+									border: "3px solid var(--status-success-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
 									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
@@ -920,8 +920,8 @@ export function DiscoveryCard({
 								type="button"
 								onClick={onWarn ? () => onWarn(data.id) : undefined}
 								style={{
-									background: "transparent", color: "#7A5A10",
-									border: "2px dashed #B8780A", borderRadius: "10px",
+									background: "transparent", color: "var(--status-warning-fg)",
+									border: "2px dashed var(--status-warning-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
 									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
@@ -936,8 +936,8 @@ export function DiscoveryCard({
 								type="button"
 								onClick={onRemove ? () => onRemove(data.id) : undefined}
 								style={{
-									background: "transparent", color: "#C93824",
-									border: "2px dashed #C93824", borderRadius: "10px",
+									background: "transparent", color: "var(--status-error-fg)",
+									border: "2px dashed var(--status-error-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
 									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
