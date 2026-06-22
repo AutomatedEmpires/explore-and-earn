@@ -7,7 +7,7 @@ import type {
   BenefitDetailsMap,
   EditableBenefitKind,
 } from "@explore-and-earn/contracts";
-import { authedClient } from "../client";
+import { anonClient, authedClient } from "../client";
 
 /**
  * Persistence for the host benefit editor (BenefitTrustModal).
@@ -85,6 +85,27 @@ export async function getBenefitDetails(
     .eq("host_profile_id", hostProfileId)
     .maybeSingle();
   if (error) throw new Error(`getBenefitDetails: ${error.message}`);
+  if (!data) return {};
+  return asBenefitDetailsMap((data as { benefit_details: unknown }).benefit_details);
+}
+
+/**
+ * Public read of a LIVE listing's benefit detail — no auth. Backs the
+ * seeker-facing Housing/Meals viewer (the photos + detail a host published).
+ * Only live listings are exposed, matching getPublicListingById's trust level.
+ */
+export async function getPublicBenefitDetails(
+  listingId: string,
+): Promise<BenefitDetailsMap> {
+  if (!listingId) return {};
+  const db = anonClient() as unknown as SupabaseClient;
+  const { data, error } = await db
+    .from("listings")
+    .select("benefit_details")
+    .eq("id", listingId)
+    .eq("status", "live")
+    .maybeSingle();
+  if (error) throw new Error(`getPublicBenefitDetails: ${error.message}`);
   if (!data) return {};
   return asBenefitDetailsMap((data as { benefit_details: unknown }).benefit_details);
 }

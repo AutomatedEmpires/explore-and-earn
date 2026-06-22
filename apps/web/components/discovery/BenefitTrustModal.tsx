@@ -9,6 +9,7 @@ import {
 } from "@explore-and-earn/contracts";
 import {
 	getBenefitDetailsAction,
+	getPublicBenefitDetailsAction,
 	saveBenefitDetailsAction,
 	uploadBenefitPhotoAction,
 } from "../../app/actions/benefitDetails";
@@ -301,7 +302,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	const cfg = kind ? KIND_CONFIG[kind] : null;
 	const listingId = isEdit
 		? (props as BenefitTrustModalEditProps).listingId
-		: undefined;
+		: (props as BenefitTrustModalViewProps).listing?.id;
 
 	const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
 	const [toggles, setToggles] = useState<Record<string, Set<string>>>(() =>
@@ -318,52 +319,58 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	const [addingTo, setAddingTo] = useState<string | null>(null);
 	const [draftChip, setDraftChip] = useState("");
 
-	// Hydrate the editor from previously saved detail whenever it opens (or the
-	// kind switches while open). Resets to defaults first so a stale kind's state
-	// can never bleed across. View mode never hydrates.
+	// Hydrate from saved detail whenever the modal opens (or the kind switches
+	// while open). EDIT pulls the host-scoped detail; VIEW pulls the public
+	// detail so seekers see the photos + facts the host published. Resets first
+	// so a stale kind can't bleed across — edit pre-checks defaults, view starts
+	// empty (only render what was actually saved).
 	useEffect(() => {
-		if (!isEdit || !open || !kind) return;
+		if (!open || !kind) return;
 		const sections = KIND_CONFIG[kind].chipSections;
 		setError(null);
 		setAddingTo(null);
 		setDraftChip("");
 		setFieldValues({});
-		setToggles(initToggles(sections));
+		setToggles(() => {
+			const next: Record<string, Set<string>> = {};
+			for (const s of sections) next[s.id] = new Set(isEdit ? s.defaults : []);
+			return next;
+		});
 		setPhotos({});
 		setCustomChips({});
 		if (!listingId) return;
 
 		let cancelled = false;
 		setHydrating(true);
-		getBenefitDetailsAction(listingId)
-			.then((res) => {
-				if (cancelled) return;
-				const detail = res.ok ? res.details?.[kind] : undefined;
-				if (detail) {
-					setFieldValues({ ...detail.fields });
-					setPhotos({ ...detail.photos });
-					setCustomChips(
-						Object.fromEntries(
-							Object.entries(detail.customChips ?? {}).map(([k, v]) => [
-								k,
-								v.map((c) => ({ ...c })),
-							]),
-						),
-					);
-					setToggles(() => {
-						const next: Record<string, Set<string>> = {};
-						for (const s of sections) {
-							const saved = detail.toggles?.[s.id];
-							next[s.id] = new Set(saved ?? s.defaults);
-						}
-						return next;
-					});
-				} else if (!res.ok) {
-					setError(res.error ?? null);
-				}
+		const load = isEdit
+			? getBenefitDetailsAction(listingId).then((res) => {
+					if (!res.ok) throw new Error(res.error ?? "load_failed");
+					return res.details?.[kind];
+				})
+			: getPublicBenefitDetailsAction(listingId).then((map) => map?.[kind]);
+		load
+			.then((detail) => {
+				if (cancelled || !detail) return;
+				setFieldValues({ ...detail.fields });
+				setPhotos({ ...detail.photos });
+				setCustomChips(
+					Object.fromEntries(
+						Object.entries(detail.customChips ?? {}).map(([k, v]) => [
+							k,
+							v.map((c) => ({ ...c })),
+						]),
+					),
+				);
+				setToggles(() => {
+					const next: Record<string, Set<string>> = {};
+					for (const s of sections) {
+						next[s.id] = new Set(detail.toggles?.[s.id] ?? (isEdit ? s.defaults : []));
+					}
+					return next;
+				});
 			})
 			.catch(() => {
-				if (!cancelled) setError("Could not load saved details.");
+				if (!cancelled && isEdit) setError("Could not load saved details.");
 			})
 			.finally(() => {
 				if (!cancelled) setHydrating(false);
@@ -381,6 +388,14 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		: null;
 	const benefitInfo = viewListing ? viewListing.benefits[kind] : null;
 	const canUpload = Boolean(listingId);
+	// Edit shows all slots (to upload into); view shows only slots the host filled.
+	const slotsToShow = isEdit ? cfg.slots : cfg.slots.filter((s) => photos[s.id]);
+	// Saved single-select facts (housing type, meal style…) for the read-only view.
+	const viewFacts = isEdit
+		? []
+		: cfg.fields
+				.map((f) => ({ label: f.label, value: fieldValues[f.id] }))
+				.filter((f): f is { label: string; value: string } => Boolean(f.value));
 
 	function toggleOption(sectionId: string, optId: string) {
 		setToggles((prev) => {
@@ -499,10 +514,11 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		>
 			<p className={styles.subtitle}>{cfg.subtitle}</p>
 
-			{/* ── Photo grid ────────────────────────────────────────── */}
+			{/* ── Photo grid (edit: all slots; view: only the ones filled) ── */}
+			{isEdit || slotsToShow.length > 0 ? (
 			<section className={styles.photoSection} aria-label={cfg.photoLabel}>
 				<div className={styles.photoGrid}>
-					{cfg.slots.map((slot) => (
+					{slotsToShow.map((slot) => (
 						<div
 							key={slot.id}
 							className={`${styles.photoSlot} ${slotClass(kind, slot.id)}`}
@@ -575,6 +591,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 					))}
 				</div>
 			</section>
+			) : null}
 
 			{isEdit ? (
 				<>
@@ -691,7 +708,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 					})}
 				</>
 			) : benefitInfo ? (
-				/* ── View mode: provision + summary ─────────────────── */
+				/* ── View mode (seeker): provision + summary + published detail ── */
 				<div className={styles.viewSummary}>
 					<span
 						className={`${styles.provisionBadge} ${PROVISION_CLASS[benefitInfo.provision]}`}
@@ -701,6 +718,49 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 					{benefitInfo.summary ? (
 						<p className={styles.summaryText}>{benefitInfo.summary}</p>
 					) : null}
+
+					{viewFacts.length > 0 ? (
+						<dl className={styles.viewFacts}>
+							{viewFacts.map((fact) => (
+								<div key={fact.label} className={styles.viewFact}>
+									<dt className={styles.viewFactLabel}>{fact.label}</dt>
+									<dd className={styles.viewFactValue}>{fact.value}</dd>
+								</div>
+							))}
+						</dl>
+					) : null}
+
+					{cfg.chipSections.map((section) => {
+						const all = [
+							...section.options,
+							...(customChips[section.id] ?? []),
+						];
+						const selected = all.filter(
+							(opt) => toggles[section.id]?.has(opt.id),
+						);
+						if (selected.length === 0) return null;
+						return (
+							<div key={section.id} className={styles.viewChipGroup}>
+								<span className={styles.chipLabel}>{section.label}</span>
+								<div className={styles.chips}>
+									{selected.map((opt) => {
+										const optIcon = "icon" in opt ? opt.icon : undefined;
+										return (
+											<span
+												key={opt.id}
+												className={`${styles.chip} ${styles.chipReadonly}`}
+											>
+												{optIcon ? (
+													<Icon name={optIcon} size={16} aria-hidden />
+												) : null}
+												{opt.label.toUpperCase()}
+											</span>
+										);
+									})}
+								</div>
+							</div>
+						);
+					})}
 				</div>
 			) : null}
 

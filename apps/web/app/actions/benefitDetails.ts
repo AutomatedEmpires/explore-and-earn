@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   getBenefitDetails,
+  getPublicBenefitDetails,
   saveBenefitDetails,
   resolveOwnedListingHost,
   uploadBenefitPhoto,
@@ -92,6 +93,22 @@ function sanitizeBenefitDetail(input: unknown): BenefitDetail {
     return { ...detail, customChips };
   }
   return detail;
+}
+
+/**
+ * Public (no-auth) read of a live listing's benefit detail — backs the
+ * seeker-facing Housing/Meals viewer (photos + structured detail the host
+ * published). Returns {} for non-live/missing listings.
+ */
+export async function getPublicBenefitDetailsAction(
+  listingId: string,
+): Promise<BenefitDetailsMap> {
+  if (!listingId) return {};
+  try {
+    return await getPublicBenefitDetails(listingId);
+  } catch {
+    return {};
+  }
 }
 
 /** Hydrate the benefit editor with whatever detail the host has already saved. */
