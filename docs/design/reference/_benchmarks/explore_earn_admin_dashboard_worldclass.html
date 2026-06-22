@@ -1,0 +1,2308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Explore&Earn — Admin Moderator Dashboard Vision</title>
+  <style>
+    :root {
+      --bg: #07120f;
+      --panel: rgba(255,255,255,.075);
+      --panel2: rgba(255,255,255,.11);
+      --text: #f6fff8;
+      --muted: rgba(246,255,248,.67);
+      --line: rgba(255,255,255,.15);
+      --emerald: #36f49c;
+      --mint: #bbffd7;
+      --aqua: #6deaff;
+      --gold: #ffd66d;
+      --coral: #ff7b61;
+      --red: #ff4f6d;
+      --violet: #b987ff;
+      --teal: #2d7588;
+      --ink: #10201b;
+      --paper: #f7f0df;
+      --shadow: 0 32px 90px rgba(0,0,0,.34);
+      --softShadow: 0 18px 54px rgba(0,0,0,.22);
+      --radius-xl: 34px;
+      --radius-lg: 24px;
+      --side: 292px;
+      --top: 76px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100svh;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 16% 0%, rgba(54,244,156,.18), transparent 34%),
+        radial-gradient(circle at 88% 14%, rgba(185,135,255,.17), transparent 32%),
+        radial-gradient(circle at 82% 92%, rgba(255,79,109,.09), transparent 32%),
+        linear-gradient(135deg, #06100d, #0b1518 48%, #07120f);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: linear-gradient(to bottom, black, transparent 72%);
+      z-index: 0;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: .075;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      z-index: 1;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+
+    .app {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: var(--side) 1fr;
+      min-height: 100svh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100svh;
+      padding: 18px 14px;
+      border-right: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.035)),
+        rgba(7,18,15,.58);
+      backdrop-filter: blur(24px);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow: hidden;
+    }
+
+    .brand {
+      min-height: 66px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 26px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.13);
+      box-shadow: inset 0 1px rgba(255,255,255,.08);
+    }
+
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      flex: 0 0 auto;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: #061d13;
+      font-weight: 950;
+      background:
+        radial-gradient(circle at 33% 24%, #fff 0 8%, transparent 9%),
+        conic-gradient(from 180deg, var(--emerald), var(--aqua), var(--violet), var(--gold), var(--emerald));
+      box-shadow: 0 0 34px rgba(54,244,156,.32);
+    }
+
+    .brand strong {
+      display: block;
+      letter-spacing: -.05em;
+      font-size: 1.12rem;
+      line-height: .95;
+    }
+
+    .brand span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: rgba(246,255,248,.6);
+      font-size: .78rem;
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      font-weight: 900;
+    }
+
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 0 0 rgba(54,244,156,.7);
+      animation: pulse 1.9s infinite;
+    }
+
+    .danger-dot {
+      background: var(--red);
+      box-shadow: 0 0 0 0 rgba(255,79,109,.7);
+    }
+
+    @keyframes pulse {
+      70% { box-shadow: 0 0 0 11px rgba(54,244,156,0); }
+      100% { box-shadow: 0 0 0 0 rgba(54,244,156,0); }
+    }
+
+    .ops-card {
+      position: relative;
+      min-height: 158px;
+      padding: 14px;
+      border-radius: 28px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.14);
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,.04), rgba(0,0,0,.62)),
+        url("https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80");
+      background-size: cover;
+      background-position: center;
+      box-shadow: var(--softShadow);
+      isolation: isolate;
+    }
+
+    .ops-card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 74% 10%, rgba(255,255,255,.28), transparent 18%),
+        linear-gradient(135deg, rgba(185,135,255,.18), rgba(54,244,156,.12));
+      mix-blend-mode: screen;
+      z-index: -1;
+    }
+
+    .ops-bottom {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+    }
+
+    .ops-bottom strong {
+      display: block;
+      letter-spacing: -.055em;
+      line-height: .95;
+      font-size: 1.28rem;
+    }
+
+    .ops-bottom span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: rgba(246,255,248,.68);
+      font-size: .76rem;
+      font-weight: 850;
+      margin-top: 6px;
+    }
+
+    .nav-list {
+      display: grid;
+      gap: 7px;
+      overflow-y: auto;
+      padding-right: 2px;
+      scrollbar-width: none;
+    }
+
+    .nav-list::-webkit-scrollbar { display: none; }
+
+    .nav-group-label {
+      margin: 4px 10px 8px;
+      color: rgba(246,255,248,.42);
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .16em;
+      font-weight: 950;
+    }
+
+    .nav-item {
+      width: 100%;
+      border: 1px solid transparent;
+      color: rgba(246,255,248,.72);
+      background: transparent;
+      min-height: 48px;
+      display: grid;
+      grid-template-columns: 38px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 19px;
+      text-align: left;
+      transition: .2s ease;
+    }
+
+    .nav-icon {
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.10);
+      font-size: 1.05rem;
+    }
+
+    .nav-item strong {
+      display: block;
+      color: inherit;
+      font-size: .94rem;
+      letter-spacing: -.02em;
+    }
+
+    .nav-item small {
+      color: rgba(246,255,248,.42);
+      font-size: .72rem;
+    }
+
+    .nav-badge {
+      min-width: 26px;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: rgba(246,255,248,.74);
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.10);
+      font-size: .72rem;
+      font-weight: 950;
+    }
+
+    .nav-badge.danger {
+      color: #ffd7dd;
+      background: rgba(255,79,109,.16);
+      border-color: rgba(255,79,109,.24);
+    }
+
+    .nav-item:hover {
+      background: rgba(255,255,255,.08);
+      color: white;
+      transform: translateX(2px);
+    }
+
+    .nav-item.active {
+      background:
+        radial-gradient(circle at 15% 20%, rgba(185,135,255,.24), transparent 42%),
+        rgba(255,255,255,.10);
+      border-color: rgba(185,135,255,.25);
+      color: white;
+      box-shadow: 0 18px 42px rgba(0,0,0,.2);
+    }
+
+    .nav-item.active .nav-icon {
+      background: linear-gradient(135deg, var(--violet), var(--aqua));
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 0 24px rgba(185,135,255,.24);
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 12px;
+      border-radius: 24px;
+      background: rgba(255,255,255,.065);
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .meter-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: rgba(246,255,248,.58);
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .10em;
+      font-weight: 950;
+      margin-bottom: 9px;
+    }
+
+    .meter {
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      overflow: hidden;
+    }
+
+    .meter span {
+      display: block;
+      height: 100%;
+      width: var(--w, 68%);
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--emerald), var(--gold));
+      box-shadow: 0 0 24px rgba(54,244,156,.28);
+    }
+
+    .main { min-width: 0; position: relative; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      height: var(--top);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 24px;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      background: rgba(7,18,15,.55);
+      backdrop-filter: blur(22px);
+    }
+
+    .search {
+      position: relative;
+      flex: 1;
+      max-width: 760px;
+    }
+
+    .search input {
+      width: 100%;
+      height: 48px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.075);
+      color: var(--text);
+      border-radius: 999px;
+      outline: none;
+      padding: 0 48px 0 46px;
+      box-shadow: inset 0 1px rgba(255,255,255,.05);
+    }
+
+    .search input::placeholder { color: rgba(246,255,248,.45); }
+
+    .search::before {
+      content: "⌘";
+      position: absolute;
+      left: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: rgba(246,255,248,.46);
+      font-weight: 900;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .icon-btn, .primary-btn, .ghost-btn, .small-btn {
+      border: 1px solid rgba(255,255,255,.14);
+      color: var(--text);
+      background: rgba(255,255,255,.075);
+      border-radius: 999px;
+      min-height: 46px;
+      padding: 0 16px;
+      font-weight: 900;
+      transition: .2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .icon-btn {
+      width: 46px;
+      padding: 0;
+      font-size: 1.1rem;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, var(--emerald), var(--gold));
+      color: #061d13;
+      border-color: transparent;
+      box-shadow: 0 16px 36px rgba(54,244,156,.18);
+    }
+
+    .danger-btn {
+      background: linear-gradient(135deg, var(--red), var(--coral));
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 16px 36px rgba(255,79,109,.18);
+    }
+
+    .small-btn {
+      min-height: 36px;
+      padding: 0 12px;
+      font-size: .82rem;
+    }
+
+    .ghost-btn:hover, .icon-btn:hover, .primary-btn:hover, .small-btn:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,.28);
+    }
+
+    .content {
+      padding: 24px;
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+
+    .view {
+      display: none;
+      animation: enter .46s ease both;
+    }
+
+    .view.active { display: block; }
+
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(18px) scale(.992); }
+      to { opacity: 1; transform: none; }
+    }
+
+    .hero-board {
+      position: relative;
+      min-height: 430px;
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 42px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      background:
+        linear-gradient(90deg, rgba(7,18,15,.96) 0%, rgba(7,18,15,.76) 46%, rgba(7,18,15,.22) 100%),
+        url("https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&w=1800&q=85");
+      background-size: cover;
+      background-position: center;
+      padding: 28px;
+      isolation: isolate;
+    }
+
+    .hero-board::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 70% 30%, rgba(255,255,255,.22), transparent 18%),
+        linear-gradient(105deg, transparent 0 35%, rgba(255,255,255,.12) 50%, transparent 65%);
+      transform: translateX(-65%);
+      animation: sheen 7s ease-in-out infinite;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    @keyframes sheen {
+      0%, 22% { transform: translateX(-70%); opacity: 0; }
+      45%, 58% { opacity: .78; }
+      85%, 100% { transform: translateX(70%); opacity: 0; }
+    }
+
+    .hero-board h1 {
+      margin: 18px 0 12px;
+      max-width: 800px;
+      font-size: clamp(2.8rem, 6vw, 6.2rem);
+      line-height: .88;
+      letter-spacing: -.08em;
+    }
+
+    .gradient {
+      background: linear-gradient(115deg, #fff, var(--mint) 28%, var(--aqua) 56%, var(--violet) 82%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-board p {
+      max-width: 660px;
+      color: rgba(246,255,248,.72);
+      line-height: 1.55;
+      font-size: 1.08rem;
+      margin: 0 0 22px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .tiny-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 7px 10px;
+      color: var(--mint);
+      background: rgba(54,244,156,.10);
+      border: 1px solid rgba(54,244,156,.20);
+      font-size: .72rem;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      white-space: nowrap;
+    }
+
+    .tiny-label.danger {
+      color: #ffd7dd;
+      background: rgba(255,79,109,.13);
+      border-color: rgba(255,79,109,.24);
+    }
+
+    .floating-ops {
+      position: absolute;
+      right: 24px;
+      bottom: 24px;
+      width: min(100% - 48px, 560px);
+      padding: 16px;
+      border-radius: 28px;
+      background: rgba(7,18,15,.66);
+      border: 1px solid rgba(255,255,255,.16);
+      backdrop-filter: blur(22px);
+      box-shadow: 0 22px 70px rgba(0,0,0,.28);
+    }
+
+    .ops-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .ops-node {
+      min-height: 76px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border-radius: 20px;
+      background: rgba(255,255,255,.075);
+      border: 1px solid rgba(255,255,255,.11);
+    }
+
+    .ops-node strong {
+      display: block;
+      font-size: 1.18rem;
+      letter-spacing: -.04em;
+    }
+
+    .ops-node span {
+      color: rgba(246,255,248,.58);
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 950;
+    }
+
+    .ops-node.hot {
+      background: linear-gradient(135deg, rgba(255,79,109,.20), rgba(255,214,109,.08));
+      border-color: rgba(255,79,109,.20);
+    }
+
+    .ops-node.good {
+      background: linear-gradient(135deg, rgba(54,244,156,.20), rgba(109,234,255,.08));
+      border-color: rgba(54,244,156,.20);
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid.two { grid-template-columns: 1fr 1fr; }
+    .grid.three { grid-template-columns: repeat(3, 1fr); }
+    .grid.four { grid-template-columns: repeat(4, 1fr); }
+    .grid.main-split { grid-template-columns: 1.14fr .86fr; }
+    .grid.left-split { grid-template-columns: .86fr 1.14fr; }
+
+    .section-title {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 26px 0 14px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: clamp(1.7rem, 3vw, 2.8rem);
+      line-height: .95;
+      letter-spacing: -.065em;
+    }
+
+    .section-title p {
+      margin: 6px 0 0;
+      color: rgba(246,255,248,.58);
+      line-height: 1.45;
+      max-width: 740px;
+    }
+
+    .card {
+      position: relative;
+      border: 1px solid rgba(255,255,255,.14);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.045)),
+        rgba(255,255,255,.045);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--softShadow);
+      overflow: hidden;
+    }
+
+    .card.pad { padding: 18px; }
+
+    .card.paper {
+      background:
+        radial-gradient(circle at 10% 0%, rgba(255,214,109,.20), transparent 40%),
+        linear-gradient(180deg, rgba(255,255,255,.96), rgba(246,240,224,.93));
+      color: var(--ink);
+      border-color: rgba(16,32,27,.12);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+
+    .card-header h3 {
+      margin: 0;
+      letter-spacing: -.045em;
+      line-height: 1;
+      font-size: 1.26rem;
+    }
+
+    .card-header p {
+      margin: 5px 0 0;
+      color: rgba(246,255,248,.56);
+      line-height: 1.4;
+    }
+
+    .paper .card-header p { color: rgba(16,32,27,.58); }
+
+    .metric-card {
+      padding: 18px;
+      min-height: 154px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      isolation: isolate;
+    }
+
+    .metric-card::before {
+      content: "";
+      position: absolute;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      right: -42px;
+      top: -42px;
+      background: radial-gradient(circle, rgba(185,135,255,.20), transparent 68%);
+      z-index: -1;
+    }
+
+    .metric-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: rgba(246,255,248,.62);
+      font-size: .84rem;
+      font-weight: 850;
+    }
+
+    .metric {
+      font-size: 2.65rem;
+      letter-spacing: -.075em;
+      font-weight: 950;
+      line-height: .92;
+    }
+
+    .trend {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      gap: 5px;
+      color: var(--mint);
+      padding: 7px 9px;
+      border-radius: 999px;
+      background: rgba(54,244,156,.08);
+      border: 1px solid rgba(54,244,156,.16);
+      font-size: .78rem;
+      font-weight: 900;
+    }
+
+    .trend.danger {
+      color: #ffd7dd;
+      background: rgba(255,79,109,.11);
+      border-color: rgba(255,79,109,.20);
+    }
+
+    .spark {
+      height: 46px;
+      display: flex;
+      align-items: end;
+      gap: 5px;
+      margin-top: 12px;
+    }
+
+    .spark i {
+      flex: 1;
+      border-radius: 999px 999px 4px 4px;
+      min-height: 10px;
+      background: linear-gradient(180deg, var(--violet), rgba(185,135,255,.20));
+      animation: barIn .9s ease both;
+    }
+
+    .spark.danger i {
+      background: linear-gradient(180deg, var(--red), rgba(255,79,109,.20));
+    }
+
+    @keyframes barIn {
+      from { transform: scaleY(.15); opacity: .3; }
+      to { transform: scaleY(1); opacity: 1; }
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.10);
+      color: rgba(246,255,248,.68);
+      font-size: .74rem;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .paper .tag {
+      background: rgba(16,32,27,.055);
+      border-color: rgba(16,32,27,.10);
+      color: rgba(16,32,27,.68);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: .74rem;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      color: rgba(246,255,248,.76);
+      white-space: nowrap;
+    }
+
+    .status-pill.live {
+      color: var(--mint);
+      background: rgba(54,244,156,.11);
+      border-color: rgba(54,244,156,.22);
+    }
+
+    .status-pill.gold {
+      color: var(--gold);
+      background: rgba(255,214,109,.12);
+      border-color: rgba(255,214,109,.22);
+    }
+
+    .status-pill.danger {
+      color: #ffd7dd;
+      background: rgba(255,79,109,.13);
+      border-color: rgba(255,79,109,.24);
+    }
+
+    .queue-layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+      min-height: 680px;
+    }
+
+    .queue-list {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .queue-item, .entity-card, .audit-row, .report-card {
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.075);
+      border-radius: 20px;
+      padding: 12px;
+      box-shadow: 0 10px 26px rgba(0,0,0,.13);
+      transition: .2s ease;
+    }
+
+    .queue-item:hover, .entity-card:hover, .audit-row:hover, .report-card:hover {
+      transform: translateY(-3px);
+      background: rgba(255,255,255,.10);
+      border-color: rgba(255,255,255,.22);
+    }
+
+    .queue-item.active {
+      background: rgba(185,135,255,.13);
+      border-color: rgba(185,135,255,.28);
+    }
+
+    .person {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      font-weight: 950;
+      color: #061d13;
+      background: linear-gradient(135deg, var(--emerald), var(--gold));
+      flex: 0 0 auto;
+      box-shadow: 0 0 26px rgba(54,244,156,.18);
+      border: 1px solid rgba(255,255,255,.22);
+    }
+
+    .avatar.alt { background: linear-gradient(135deg, var(--aqua), var(--violet)); color: white; }
+    .avatar.danger { background: linear-gradient(135deg, var(--red), var(--coral)); color: white; }
+    .avatar.ghost { background: rgba(255,255,255,.10); color: var(--text); border: 1px solid rgba(255,255,255,.12); }
+
+    .person strong {
+      display: block;
+      letter-spacing: -.035em;
+      line-height: 1.05;
+    }
+
+    .person span {
+      color: rgba(246,255,248,.54);
+      font-size: .78rem;
+    }
+
+    .review-panel {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      min-height: 680px;
+    }
+
+    .evidence {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .evidence-box {
+      min-height: 220px;
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.12);
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,.02), rgba(0,0,0,.62)),
+        url("https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=900&q=80");
+      background-size: cover;
+      background-position: center;
+      padding: 14px;
+      display: flex;
+      align-items: end;
+    }
+
+    .evidence-box.alt {
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,.02), rgba(0,0,0,.62)),
+        url("https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=900&q=80");
+      background-size: cover;
+      background-position: center;
+    }
+
+    .decision-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,.10);
+    }
+
+    .entity-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .entity-card h3 {
+      margin: 10px 0 4px;
+      letter-spacing: -.045em;
+      line-height: 1;
+    }
+
+    .entity-card p {
+      color: rgba(246,255,248,.56);
+      line-height: 1.42;
+      margin: 0;
+    }
+
+    .listing-row {
+      display: grid;
+      grid-template-columns: 132px 1fr auto;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .listing-image {
+      height: 96px;
+      border-radius: 18px;
+      background-size: cover;
+      background-position: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .listing-image::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent, rgba(0,0,0,.38));
+    }
+
+    .listing-row h3 {
+      margin: 0 0 4px;
+      letter-spacing: -.045em;
+      line-height: 1;
+    }
+
+    .listing-row p {
+      margin: 0;
+      color: rgba(246,255,248,.57);
+      font-size: .9rem;
+    }
+
+    .actions-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    .chart {
+      height: 260px;
+      display: flex;
+      align-items: end;
+      gap: 12px;
+      padding: 20px 8px 0;
+    }
+
+    .bar {
+      flex: 1;
+      min-height: 22px;
+      border-radius: 16px 16px 6px 6px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.42), rgba(255,255,255,0)),
+        linear-gradient(180deg, var(--violet), rgba(185,135,255,.18));
+      height: var(--h);
+      position: relative;
+      animation: barIn 1s ease both;
+    }
+
+    .bar:nth-child(2n) {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.36), rgba(255,255,255,0)),
+        linear-gradient(180deg, var(--aqua), rgba(109,234,255,.16));
+    }
+
+    .bar.danger {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.36), rgba(255,255,255,0)),
+        linear-gradient(180deg, var(--red), rgba(255,79,109,.16));
+    }
+
+    .bar::after {
+      content: attr(data-label);
+      position: absolute;
+      bottom: -24px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(246,255,248,.48);
+      font-size: .72rem;
+      font-weight: 850;
+    }
+
+    .route-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .quick-route {
+      min-height: 170px;
+      padding: 18px;
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(185,135,255,.16), transparent 36%),
+        rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      transition: .2s ease;
+      cursor: pointer;
+    }
+
+    .quick-route:hover {
+      transform: translateY(-4px);
+      border-color: rgba(185,135,255,.26);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(185,135,255,.24), transparent 38%),
+        rgba(255,255,255,.09);
+    }
+
+    .quick-route .nav-icon { margin-bottom: 26px; }
+    .quick-route h3 { margin: 0 0 6px; letter-spacing: -.04em; }
+    .quick-route p { margin: 0; color: rgba(246,255,248,.55); line-height: 1.42; font-size: .92rem; }
+
+    .settings-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+      padding: 16px;
+      border-radius: 22px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+      margin-bottom: 10px;
+    }
+
+    .toggle {
+      width: 58px;
+      height: 34px;
+      border-radius: 999px;
+      padding: 4px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.14);
+      position: relative;
+    }
+
+    .toggle::after {
+      content: "";
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      top: 4px;
+      left: 4px;
+      background: rgba(255,255,255,.74);
+      transition: .2s ease;
+    }
+
+    .toggle.on {
+      background: linear-gradient(135deg, var(--emerald), var(--gold));
+    }
+
+    .toggle.on::after {
+      left: 28px;
+      background: #071b12;
+    }
+
+    .mobile-top {
+      display: none;
+      position: sticky;
+      top: 0;
+      z-index: 60;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      background: rgba(7,18,15,.70);
+      backdrop-filter: blur(20px);
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .mobile-bottom {
+      display: none;
+      position: fixed;
+      z-index: 70;
+      left: 10px;
+      right: 10px;
+      bottom: 10px;
+      padding: 8px;
+      border-radius: 28px;
+      background: rgba(7,18,15,.78);
+      backdrop-filter: blur(22px);
+      border: 1px solid rgba(255,255,255,.16);
+      box-shadow: 0 20px 70px rgba(0,0,0,.32);
+      grid-template-columns: repeat(5, 1fr);
+      gap: 5px;
+    }
+
+    .mobile-nav-btn {
+      border: 0;
+      background: transparent;
+      color: rgba(246,255,248,.62);
+      border-radius: 20px;
+      padding: 8px 4px;
+      display: grid;
+      place-items: center;
+      gap: 3px;
+      font-size: .68rem;
+      font-weight: 850;
+    }
+
+    .mobile-nav-btn span {
+      font-size: 1.18rem;
+      line-height: 1;
+    }
+
+    .mobile-nav-btn.active {
+      background: linear-gradient(135deg, var(--violet), var(--aqua));
+      color: white;
+    }
+
+    .drawer {
+      position: fixed;
+      z-index: 90;
+      inset: 0;
+      display: none;
+      background: rgba(0,0,0,.46);
+      backdrop-filter: blur(4px);
+    }
+
+    .drawer.open { display: block; }
+
+    .drawer-panel {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      bottom: 92px;
+      border-radius: 30px;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(7,18,15,.92);
+      box-shadow: var(--shadow);
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      animation: enter .24s ease both;
+    }
+
+    .drawer .nav-item {
+      min-height: 58px;
+      background: rgba(255,255,255,.055);
+      border-color: rgba(255,255,255,.10);
+    }
+
+    .dev-bench {
+      position: fixed;
+      z-index: 100;
+      right: 18px;
+      bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 11px;
+      border-radius: 999px;
+      background: rgba(44, 18, 74, .88);
+      border: 1px solid rgba(235,78,255,.65);
+      box-shadow: 0 18px 54px rgba(0,0,0,.32);
+      color: #f4d7ff;
+      font-size: .82rem;
+      font-weight: 950;
+    }
+
+    .dev-bench button {
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.10);
+      color: #f4d7ff;
+      border-radius: 999px;
+      min-height: 28px;
+      padding: 0 10px;
+      font-weight: 950;
+    }
+
+    .dev-bench button.active {
+      background: linear-gradient(135deg, #e64fff, #7c55ff);
+      border-color: transparent;
+      color: white;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 120;
+      display: none;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0,0,0,.54);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal.open { display: grid; }
+
+    .modal-card {
+      width: min(100%, 780px);
+      border-radius: 34px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,.18);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(185,135,255,.18), transparent 36%),
+        rgba(7,18,15,.94);
+      box-shadow: var(--shadow);
+      animation: enter .25s ease both;
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .modal-head h2 {
+      margin: 0;
+      font-size: 2rem;
+      line-height: .95;
+      letter-spacing: -.065em;
+    }
+
+    .x {
+      width: 42px;
+      height: 42px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.08);
+      color: white;
+      font-size: 1.2rem;
+    }
+
+    @media (max-width: 1180px) {
+      :root { --side: 252px; }
+      .grid.four, .route-grid, .entity-grid { grid-template-columns: repeat(2, 1fr); }
+      .queue-layout { grid-template-columns: 1fr; }
+      .evidence { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 900px) {
+      .app { display: block; padding-bottom: 92px; }
+      .sidebar, .topbar { display: none; }
+      .mobile-top, .mobile-bottom { display: flex; }
+      .mobile-bottom { display: grid; }
+      .content { padding: 14px; }
+      .hero-board { min-height: 640px; padding: 22px; border-radius: 34px; }
+      .floating-ops {
+        left: 18px;
+        right: 18px;
+        bottom: 18px;
+        width: auto;
+      }
+      .grid.two, .grid.three, .grid.four, .grid.main-split, .grid.left-split, .route-grid, .entity-grid {
+        grid-template-columns: 1fr;
+      }
+      .listing-row {
+        grid-template-columns: 1fr;
+      }
+      .listing-image { height: 170px; }
+      .actions-stack {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .dev-bench { display: none; }
+    }
+
+    @media (max-width: 560px) {
+      .hero-board h1 { font-size: 3.2rem; }
+      .hero-board { min-height: 760px; }
+      .ops-grid { grid-template-columns: 1fr 1fr; }
+      .mobile-top .brand { min-height: 54px; padding: 8px; border-radius: 20px; }
+      .brand-mark { width: 36px; height: 36px; border-radius: 14px; }
+      .brand strong { font-size: .98rem; }
+      .brand span { display: none; }
+      .drawer-panel { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="mobile-top">
+    <div class="brand">
+      <div class="brand-mark">E</div>
+      <div>
+        <strong>Explore&Earn</strong>
+        <span><i class="live-dot"></i> Admin OS</span>
+      </div>
+    </div>
+    <button class="primary-btn" data-route="queue">Review queue</button>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">E</div>
+        <div>
+          <strong>Explore&Earn</strong>
+          <span><i class="live-dot"></i> Admin OS</span>
+        </div>
+      </div>
+
+      <div class="ops-card">
+        <span class="tiny-label"><i class="live-dot"></i> Moderator</span>
+        <div class="ops-bottom">
+          <strong>Platform Control</strong>
+          <span>Trust, safety, inventory, and operations</span>
+        </div>
+      </div>
+
+      <div class="nav-list" id="desktopNav"></div>
+
+      <div class="sidebar-footer">
+        <div class="meter-row">
+          <span>Ops health</span>
+          <span>87%</span>
+        </div>
+        <div class="meter" style="--w:87%"><span></span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search">
+          <input id="globalSearch" placeholder="Search users, hosts, listings, reports, payments, audit events..." />
+        </div>
+        <div class="top-actions">
+          <button class="ghost-btn" data-route="audit">Audit log</button>
+          <button class="icon-btn" aria-label="Queue" data-route="queue">⚑</button>
+          <button class="icon-btn" aria-label="Alerts">🔔</button>
+          <button class="primary-btn" data-route="queue">Review queue</button>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="view active" id="overview"></div>
+        <div class="view" id="queue"></div>
+        <div class="view" id="users"></div>
+        <div class="view" id="hosts"></div>
+        <div class="view" id="listings"></div>
+        <div class="view" id="reports"></div>
+        <div class="view" id="verification"></div>
+        <div class="view" id="billing"></div>
+        <div class="view" id="analytics"></div>
+        <div class="view" id="audit"></div>
+        <div class="view" id="settings"></div>
+        <div class="view" id="support"></div>
+      </section>
+    </main>
+  </div>
+
+  <nav class="mobile-bottom" id="mobileBottom"></nav>
+
+  <div class="drawer" id="drawer">
+    <div class="drawer-panel" id="drawerPanel"></div>
+  </div>
+
+  <div class="dev-bench">
+    <span>DEV BENCH</span>
+    <button data-route="overview" class="active">Overview</button>
+    <button data-route="queue">Queue</button>
+    <button data-route="users">Users</button>
+    <button data-route="audit">All surfaces →</button>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <div class="tiny-label">Moderator action</div>
+          <h2 id="modalTitle">Review decision</h2>
+        </div>
+        <button class="x" id="closeModal">×</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const routes = [
+      { id: "overview", label: "Overview", icon: "⌁", badge: "Live", sub: "Command center" },
+      { id: "queue", label: "Moderation Queue", icon: "⚑", badge: "23", sub: "Review workbench", danger: true },
+      { id: "users", label: "Seekers", icon: "🧍", badge: "8.2k", sub: "Accounts + status" },
+      { id: "hosts", label: "Hosts", icon: "🏕", badge: "412", sub: "Companies + teams" },
+      { id: "listings", label: "Listings", icon: "🎯", badge: "1.6k", sub: "Jobs + boosts" },
+      { id: "reports", label: "Reports", icon: "!", badge: "12", sub: "Trust & safety", danger: true },
+      { id: "verification", label: "Verification", icon: "✓", badge: "31", sub: "ID, host, listing" },
+      { id: "billing", label: "Billing / Boosts", icon: "$", badge: "$", sub: "Plans + payments" },
+      { id: "analytics", label: "Analytics", icon: "◷", badge: "↑", sub: "Platform health" },
+      { id: "audit", label: "Audit Log", icon: "≡", badge: "", sub: "Action history" },
+      { id: "settings", label: "Settings", icon: "⚙", badge: "", sub: "Rules + roles" },
+      { id: "support", label: "Support", icon: "?", badge: "6", sub: "Tickets + escalations" },
+    ];
+
+    const queue = [
+      { type: "Listing review", title: "Ranch Maintenance Tech", owner: "Cedar Trail Ranch", risk: "Medium", status: "Needs pay range", icon: "🎯", tone: "" },
+      { type: "User report", title: "Suspicious message thread", owner: "Avery Stone", risk: "High", status: "Potential off-platform payment", icon: "!", tone: "danger" },
+      { type: "Host verification", title: "Alaska Fjord Tours", owner: "New host", risk: "Low", status: "Documents uploaded", icon: "✓", tone: "alt" },
+      { type: "Boost review", title: "Homepage featured request", owner: "Greenfield Family Farm", risk: "Low", status: "Enterprise slot", icon: "$", tone: "" },
+    ];
+
+    const users = [
+      ["AS","Avery Stone","Seeker • active • 3 applications","Active",["Farm","Seasonal","Ready now"]],
+      ["MC","Miles Carter","Seeker • flagged message","Review",["Messaging","Report","High priority"]],
+      ["JK","Jade Kim","Seeker • resume complete","Active",["Hospitality","Remote","Verified"]],
+      ["NR","Noah Reed","Seeker • offer accepted","Active",["Maintenance","Accepted","Travel"]]
+    ];
+
+    const hosts = [
+      ["GF","Greenfield Family Farm","Enterprise • 2 active listings","Verified",["Farm","Housing","Boosted"]],
+      ["AF","Alaska Fjord Tours","Pro • verification pending","Pending",["Maritime","Documents","Review"]],
+      ["GR","Glacier Ridge Lodge","Enterprise • high conversion","Verified",["Lodge","Remote","Boosted"]],
+      ["CT","Cedar Trail Ranch","Starter • listing flagged","Review",["Ranch","Pay range","Moderation"]]
+    ];
+
+    const listings = [
+      {
+        title: "Farm Stay Operations Assistant",
+        host: "Greenfield Family Farm",
+        location: "North Idaho • Housing available",
+        pay: "$21–$26/hr",
+        status: "Live boosted",
+        image: "https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=900&q=80",
+        tags: ["Enterprise", "Homepage", "Verified"]
+      },
+      {
+        title: "Backcountry Maintenance Tech",
+        host: "Glacier Ridge Lodge",
+        location: "Montana • May–September",
+        pay: "$26–$34/hr",
+        status: "Live boosted",
+        image: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=900&q=80",
+        tags: ["Enterprise", "High match", "Housing"]
+      },
+      {
+        title: "Ranch Maintenance Tech",
+        host: "Cedar Trail Ranch",
+        location: "Draft • needs pay range",
+        pay: "Missing",
+        status: "Flagged",
+        image: "https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=900&q=80",
+        tags: ["Policy", "Pay required", "Review"]
+      }
+    ];
+
+    function navItem(route, extraClass = "") {
+      return `
+        <button class="nav-item ${extraClass}" data-route="${route.id}">
+          <span class="nav-icon">${route.icon}</span>
+          <span>
+            <strong>${route.label}</strong>
+            <small>${route.sub}</small>
+          </span>
+          ${route.badge ? `<span class="nav-badge ${route.danger ? "danger" : ""}">${route.badge}</span>` : `<span></span>`}
+        </button>
+      `;
+    }
+
+    function renderNavs() {
+      document.getElementById("desktopNav").innerHTML = `
+        <div class="nav-group-label">Command</div>
+        ${routes.slice(0,2).map((r, i) => navItem(r, i === 0 ? "active" : "")).join("")}
+        <div class="nav-group-label">People & Inventory</div>
+        ${routes.slice(2,5).map(navItem).join("")}
+        <div class="nav-group-label">Trust & Revenue</div>
+        ${routes.slice(5,8).map(navItem).join("")}
+        <div class="nav-group-label">Operations</div>
+        ${routes.slice(8).map(navItem).join("")}
+      `;
+
+      const bottomRoutes = [
+        routes[0], routes[1], routes[2], routes[5], { id: "more", label: "More", icon: "•••" }
+      ];
+
+      document.getElementById("mobileBottom").innerHTML = bottomRoutes.map((r, i) => `
+        <button class="mobile-nav-btn ${i === 0 ? "active" : ""}" data-route="${r.id}">
+          <span>${r.icon}</span>${r.label}
+        </button>
+      `).join("");
+
+      document.getElementById("drawerPanel").innerHTML = routes.slice(3).map(navItem).join("");
+    }
+
+    function tagList(tags) {
+      return `<div class="tags">${tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>`;
+    }
+
+    function metric(label, value, trend, bars, danger = false) {
+      return `
+        <article class="card metric-card">
+          <div class="metric-top">
+            <span>${label}</span>
+            <span class="trend ${danger ? "danger" : ""}">${trend}</span>
+          </div>
+          <div>
+            <div class="metric">${value}</div>
+            <div class="spark ${danger ? "danger" : ""}">${bars.map((h, i) => `<i style="height:${h}%;animation-delay:${i * .05}s"></i>`).join("")}</div>
+          </div>
+        </article>
+      `;
+    }
+
+    function queueItem(q, active = false) {
+      return `
+        <div class="queue-item ${active ? "active" : ""}">
+          <div class="person">
+            <div class="avatar ${q.tone}">${q.icon}</div>
+            <div>
+              <strong>${q.title}</strong>
+              <span>${q.type} • ${q.owner}</span>
+            </div>
+          </div>
+          ${tagList([q.status, `${q.risk} risk`])}
+        </div>
+      `;
+    }
+
+    function entityCard(e) {
+      const isReview = e[3] === "Review" || e[3] === "Pending";
+      return `
+        <div class="entity-card">
+          <div class="person">
+            <div class="avatar ${isReview ? "danger" : "alt"}">${e[0]}</div>
+            <div>
+              <strong>${e[1]}</strong>
+              <span>${e[2]}</span>
+            </div>
+          </div>
+          ${tagList(e[4])}
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+            <button class="small-btn" data-action="inspect">Inspect</button>
+            <button class="small-btn ${isReview ? "danger-btn" : "primary-btn"}" data-action="moderate">${e[3]}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function listingRow(l) {
+      return `
+        <article class="listing-row card pad">
+          <div class="listing-image" style="background-image:url('${l.image}')"></div>
+          <div>
+            <span class="status-pill ${l.status === "Flagged" ? "danger" : "live"}">${l.status}</span>
+            <h3 style="margin-top:10px;">${l.title}</h3>
+            <p>${l.host} • ${l.location}</p>
+            ${tagList(l.tags)}
+          </div>
+          <div class="actions-stack">
+            <strong style="font-size:1.25rem;letter-spacing:-.05em;">${l.pay}</strong>
+            <button class="small-btn" data-action="inspect">Inspect</button>
+            <button class="small-btn ${l.status === "Flagged" ? "danger-btn" : "primary-btn"}" data-action="moderate">${l.status === "Flagged" ? "Review" : "Approve"}</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function overviewView() {
+      document.getElementById("overview").innerHTML = `
+        <section class="hero-board">
+          <span class="tiny-label"><i class="live-dot"></i> Admin / moderator dashboard</span>
+          <h1>Moderate the marketplace without losing <span class="gradient">platform momentum.</span></h1>
+          <p>
+            Admin OS gives moderators a cinematic but operational control center: queue review, user and host oversight, listing quality, reports, verification, boosts, analytics, audit history, support, and policy controls.
+          </p>
+          <div class="hero-actions">
+            <button class="primary-btn" data-route="queue">Open moderation queue</button>
+            <button class="ghost-btn" data-route="reports">Review reports</button>
+            <button class="ghost-btn" data-route="analytics">Platform analytics</button>
+          </div>
+
+          <div class="floating-ops">
+            <div class="card-header" style="margin-bottom:4px;">
+              <div>
+                <h3>Platform health</h3>
+                <p>Trust, safety, inventory, revenue, and support snapshot.</p>
+              </div>
+              <span class="tiny-label">87% healthy</span>
+            </div>
+            <div class="ops-grid">
+              <div class="ops-node hot"><div><strong>23</strong><span>Queue</span></div></div>
+              <div class="ops-node hot"><div><strong>12</strong><span>Reports</span></div></div>
+              <div class="ops-node good"><div><strong>1.6k</strong><span>Listings</span></div></div>
+              <div class="ops-node good"><div><strong>$18.4k</strong><span>MRR</span></div></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="grid four" style="margin-top:16px;">
+          ${metric("Open queue", "23", "Needs review", [64,72,60,80,76,84,70], true)}
+          ${metric("Reports", "12", "↑ 4", [20,34,46,60,72,66,78], true)}
+          ${metric("Verified hosts", "91%", "Strong", [70,76,82,86,88,90,91])}
+          ${metric("Boost health", "76%", "Stable", [60,66,72,68,78,82,76])}
+        </div>
+
+        <div class="section-title">
+          <div>
+            <h2>Priority moderation workbench</h2>
+            <p>Moderators should not hunt. High-risk items, incomplete listings, verification holds, and user reports should land here first.</p>
+          </div>
+          <button class="ghost-btn" data-route="queue">View all</button>
+        </div>
+
+        <div class="grid main-split">
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <h3>Live review queue</h3>
+                <p>Queue sorted by risk, impact, and time waiting.</p>
+              </div>
+              <span class="tiny-label danger"><i class="live-dot danger-dot"></i> 23 open</span>
+            </div>
+            <div class="queue-list">
+              ${queue.map((q, i) => queueItem(q, i === 1)).join("")}
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="card paper pad">
+              <div class="card-header">
+                <div>
+                  <h3>Next best action</h3>
+                  <p>Resolve the suspicious message thread first. It carries high trust risk and could move a seeker off-platform before an offer is documented.</p>
+                </div>
+                <span class="tiny-label danger">High risk</span>
+              </div>
+              <button class="small-btn danger-btn" data-route="reports">Open report →</button>
+            </div>
+
+            <div class="card pad">
+              <div class="card-header">
+                <div>
+                  <h3>Ops automation suggestions</h3>
+                  <p>Policy nudges that reduce human moderation load.</p>
+                </div>
+              </div>
+              ${tagList(["Require pay range", "Auto-hold unverified hosts", "Flag off-platform payment terms", "Enforce housing disclosure"])}
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <div>
+            <h2>All admin surfaces</h2>
+            <p>A browsable route map for the moderator dashboard architecture.</p>
+          </div>
+        </div>
+
+        <div class="route-grid">
+          ${routes.slice(1).map(r => `
+            <article class="quick-route" data-route="${r.id}">
+              <span class="nav-icon">${r.icon}</span>
+              <h3>${r.label}</h3>
+              <p>${r.sub}. Click to browse this dashboard surface.</p>
+            </article>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function queueView() {
+      document.getElementById("queue").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label danger">Moderation queue</div>
+            <h2>Review should be fast, evidence-rich, and defensible.</h2>
+            <p>Every decision needs context, evidence, policy reason, user impact, and audit trail.</p>
+          </div>
+          <button class="primary-btn" data-action="bulk">Bulk tools</button>
+        </div>
+
+        <div class="grid four">
+          ${metric("Open", "23", "Review", [64,72,60,80,76,84,70], true)}
+          ${metric("High risk", "4", "Now", [20,34,46,64,76,70,82], true)}
+          ${metric("Avg age", "3.4h", "Good", [80,72,64,54,46,38,32])}
+          ${metric("Resolved today", "41", "↑ 18%", [34,44,58,62,76,82,90])}
+        </div>
+
+        <div class="queue-layout" style="margin-top:16px;">
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <h3>Queue</h3>
+                <p>Filtered by highest risk first.</p>
+              </div>
+              <span class="tiny-label danger">Live</span>
+            </div>
+            <div class="queue-list">
+              ${queue.concat(queue).map((q, i) => queueItem(q, i === 1)).join("")}
+            </div>
+          </div>
+
+          <div class="card pad review-panel">
+            <div>
+              <div class="card-header">
+                <div>
+                  <h3>Suspicious message thread</h3>
+                  <p>Reporter: Avery Stone • Reported 18 minutes ago • Reason: off-platform payment request.</p>
+                </div>
+                <span class="status-pill danger">High risk</span>
+              </div>
+              ${tagList(["Trust & safety", "Messaging", "Possible scam", "User protection"])}
+              <div class="evidence">
+                <div class="evidence-box">
+                  <div>
+                    <span class="status-pill danger">Flagged message</span>
+                    <p style="margin:8px 0 0;color:rgba(246,255,248,.8);">“Send deposit outside the platform to hold housing.”</p>
+                  </div>
+                </div>
+                <div class="evidence-box alt">
+                  <div>
+                    <span class="status-pill gold">Related listing</span>
+                    <p style="margin:8px 0 0;color:rgba(246,255,248,.8);">Listing claims housing is included, but no formal housing terms are attached.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="padding:16px 0;color:rgba(246,255,248,.62);line-height:1.48;">
+              Recommended action: freeze thread, warn host, require housing disclosure update, and notify seeker not to pay off-platform. Escalate if repeated.
+            </div>
+            <div class="decision-row">
+              <button class="primary-btn" data-action="approve">Resolve safe</button>
+              <button class="ghost-btn" data-action="request">Request info</button>
+              <button class="small-btn danger-btn" data-action="suspend">Freeze / suspend</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function usersView() {
+      document.getElementById("users").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Seekers</div>
+            <h2>Account oversight without flattening people into rows.</h2>
+            <p>Moderators need status, verification, application activity, reports, messages, and safety signals.</p>
+          </div>
+          <button class="ghost-btn">Export users</button>
+        </div>
+
+        <div class="grid four">
+          ${metric("Seekers", "8.2k", "↑ 9%", [44,52,58,64,70,78,84])}
+          ${metric("Verified", "61%", "Improve", [40,48,52,56,58,60,61])}
+          ${metric("Flagged", "18", "Review", [20,28,36,48,42,58,62], true)}
+          ${metric("Active today", "934", "Live", [54,58,62,70,74,82,88])}
+        </div>
+
+        <div class="section-title">
+          <div>
+            <h2>Seeker accounts</h2>
+            <p>Cards can collapse into table rows in production, but this sets the information hierarchy.</p>
+          </div>
+        </div>
+
+        <div class="entity-grid">
+          ${users.map(entityCard).join("")}
+        </div>
+      `;
+    }
+
+    function hostsView() {
+      document.getElementById("hosts").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Host operations</div>
+            <h2>Hosts are inventory, revenue, and risk.</h2>
+            <p>Admin needs plan, verification, listing quality, boost usage, reports, and team permissions in one surface.</p>
+          </div>
+          <button class="primary-btn" data-route="verification">Verify hosts</button>
+        </div>
+
+        <div class="grid four">
+          ${metric("Hosts", "412", "↑ 6%", [38,44,52,60,66,72,78])}
+          ${metric("Enterprise", "48", "Revenue", [30,38,46,52,58,66,70])}
+          ${metric("Pending", "31", "Verify", [24,32,46,56,64,70,76], true)}
+          ${metric("Reported", "7", "Review", [12,18,24,32,42,38,46], true)}
+        </div>
+
+        <div class="section-title">
+          <div>
+            <h2>Host accounts</h2>
+            <p>Plan, verification, listings, and risk posture should be obvious at a glance.</p>
+          </div>
+        </div>
+
+        <div class="entity-grid">
+          ${hosts.map(entityCard).join("")}
+        </div>
+      `;
+    }
+
+    function listingsView() {
+      document.getElementById("listings").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Listing governance</div>
+            <h2>Listings need quality control before they become public promises.</h2>
+            <p>Pay range, housing disclosure, location, category, terms, and safety language should be enforced.</p>
+          </div>
+          <button class="ghost-btn">Listing policy</button>
+        </div>
+
+        <div class="grid four">
+          ${metric("Listings", "1.6k", "Live", [40,48,56,62,70,80,86])}
+          ${metric("Boosted", "214", "Revenue", [30,42,48,60,66,74,80])}
+          ${metric("Incomplete", "39", "Fix", [18,26,38,48,58,62,70], true)}
+          ${metric("Avg quality", "84%", "Good", [64,70,74,78,80,82,84])}
+        </div>
+
+        <div class="section-title">
+          <div>
+            <h2>Listing inventory</h2>
+            <p>Prioritize boosted inventory, policy holds, incomplete posts, and high-visibility homepage cards.</p>
+          </div>
+        </div>
+
+        <div class="grid">
+          ${listings.map(listingRow).join("")}
+        </div>
+      `;
+    }
+
+    function reportsView() {
+      document.getElementById("reports").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label danger">Trust & safety reports</div>
+            <h2>Reports should triage harm, not just count tickets.</h2>
+            <p>Group by severity, surface evidence, protect the reporting user, and preserve auditability.</p>
+          </div>
+          <button class="danger-btn small-btn" data-action="emergency">Emergency tools</button>
+        </div>
+
+        <div class="grid four">
+          ${metric("Open reports", "12", "↑ 4", [20,34,46,60,72,66,78], true)}
+          ${metric("High severity", "3", "Now", [12,24,40,52,60,66,74], true)}
+          ${metric("Avg response", "42m", "Good", [80,70,58,48,42,36,30])}
+          ${metric("Resolved", "29", "Today", [34,44,58,62,76,82,90])}
+        </div>
+
+        <div class="grid two" style="margin-top:16px;">
+          ${[
+            ["Off-platform payment request","Seeker reported host asking for housing deposit outside platform.","High","Messaging"],
+            ["Misleading housing description","Listing says housing included, but applicant says host changed terms.","Medium","Listing"],
+            ["Duplicate host account","Same company appears to have two billing accounts.","Low","Host"],
+            ["Harassing message","Host team member sent inappropriate follow-up after decline.","High","Messaging"]
+          ].map((r, i) => `
+            <div class="report-card">
+              <div class="card-header">
+                <div>
+                  <h3>${r[0]}</h3>
+                  <p>${r[1]}</p>
+                </div>
+                <span class="status-pill ${r[2] === "High" ? "danger" : r[2] === "Medium" ? "gold" : "live"}">${r[2]}</span>
+              </div>
+              ${tagList([r[3], "Evidence attached", "Audit required"])}
+              <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+                <button class="small-btn" data-action="inspect">Inspect</button>
+                <button class="small-btn danger-btn" data-action="moderate">Moderate</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function verificationView() {
+      document.getElementById("verification").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Verification center</div>
+            <h2>Verification should protect seekers and unlock trust signals.</h2>
+            <p>Host identity, business details, team access, listing legitimacy, and housing claims need structured review.</p>
+          </div>
+          <button class="primary-btn">Start batch review</button>
+        </div>
+
+        <div class="grid four">
+          ${metric("Pending", "31", "Verify", [24,32,46,56,64,70,76], true)}
+          ${metric("Approved", "184", "Month", [40,52,60,68,76,80,86])}
+          ${metric("Rejected", "6", "Month", [10,18,22,28,34,30,26])}
+          ${metric("SLA", "93%", "Healthy", [70,78,82,86,88,90,93])}
+        </div>
+
+        <div class="grid main-split" style="margin-top:16px;">
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <h3>Pending verification</h3>
+                <p>Documents, location, team identity, business legitimacy.</p>
+              </div>
+              <span class="tiny-label">31 open</span>
+            </div>
+            ${hosts.filter(h => h[3] !== "Verified").concat(hosts.slice(0,2)).map(entityCard).join("")}
+          </div>
+
+          <div class="card paper pad">
+            <div class="card-header">
+              <div>
+                <h3>Verification checklist</h3>
+                <p>Suggested production rules.</p>
+              </div>
+            </div>
+            ${["Business name and contact verified", "Location proof attached", "Housing claims documented", "Pay range present", "Team owner confirmed", "Policy acknowledgement signed"].map(x => `
+              <div class="settings-row" style="background:rgba(16,32,27,.045);border-color:rgba(16,32,27,.09);">
+                <div><strong>${x}</strong><div style="color:rgba(16,32,27,.54);font-size:.86rem;margin-top:3px;">Verification requirement.</div></div>
+                <span style="color:#0a6b42;font-weight:950;">✓</span>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function billingView() {
+      document.getElementById("billing").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Billing / boosts</div>
+            <h2>Revenue oversight should connect directly to homepage inventory.</h2>
+            <p>Moderators and admins need visibility into plans, boosted slots, Stripe state, failed payments, and plan-based display logic.</p>
+          </div>
+          <button class="primary-btn">Open Stripe view</button>
+        </div>
+
+        <div class="grid four">
+          ${metric("MRR", "$18.4k", "↑ 11%", [34,44,56,62,70,82,88])}
+          ${metric("Boosted slots", "214", "Live", [40,50,58,66,74,78,82])}
+          ${metric("Failed payments", "9", "Collect", [20,26,34,44,52,58,66], true)}
+          ${metric("Enterprise", "48", "Accounts", [30,38,46,52,58,66,70])}
+        </div>
+
+        <div class="grid three" style="margin-top:16px;">
+          ${[
+            ["Enterprise boost inventory","Homepage slots should fill Enterprise first, then Pro, then Starter fallback.",["Enterprise first","Pro second","Starter fallback"]],
+            ["Failed payment holds","Pause premium exposure when Stripe subscription enters failed or unpaid state.",["Stripe state","Grace period","Auto-hold"]],
+            ["Boost auditability","Every boosted card impression should connect to plan, slot, user segment, and match logic.",["Impressions","Plan tier","Match score"]]
+          ].map(x => `
+            <div class="card pad">
+              <div class="card-header"><h3>${x[0]}</h3></div>
+              <p style="color:rgba(246,255,248,.62);line-height:1.48;">${x[1]}</p>
+              ${tagList(x[2])}
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function analyticsView() {
+      document.getElementById("analytics").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Platform analytics</div>
+            <h2>Admin analytics should explain what is healthy, risky, or monetizable.</h2>
+            <p>Show marketplace liquidity, trust load, application conversion, boost revenue, and moderation burden.</p>
+          </div>
+          <button class="primary-btn">Export report</button>
+        </div>
+
+        <div class="grid four">
+          ${metric("Applications", "12.8k", "↑ 18%", [40,48,58,66,72,80,86])}
+          ${metric("Match rate", "84%", "Strong", [64,70,74,78,80,82,84])}
+          ${metric("Report rate", "0.7%", "Watch", [20,18,24,28,32,30,36], true)}
+          ${metric("Boost revenue", "$7.2k", "↑ 14%", [34,44,56,62,70,82,88])}
+        </div>
+
+        <div class="grid main-split" style="margin-top:16px;">
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <h3>Moderation volume</h3>
+                <p>Incoming queue and report volume over the last week.</p>
+              </div>
+              <span class="tiny-label">7 days</span>
+            </div>
+            <div class="chart">
+              <div class="bar" style="--h:36%" data-label="Mon"></div>
+              <div class="bar" style="--h:48%" data-label="Tue"></div>
+              <div class="bar danger" style="--h:72%" data-label="Wed"></div>
+              <div class="bar" style="--h:58%" data-label="Thu"></div>
+              <div class="bar danger" style="--h:82%" data-label="Fri"></div>
+              <div class="bar" style="--h:54%" data-label="Sat"></div>
+              <div class="bar" style="--h:46%" data-label="Sun"></div>
+            </div>
+          </div>
+
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <h3>Marketplace health</h3>
+                <p>Liquidity, matching, trust, inventory, and revenue.</p>
+              </div>
+              <span class="tiny-label">87%</span>
+            </div>
+            ${tagList(["High seeker demand", "Healthy boosted inventory", "Reports rising", "Verification backlog", "Strong application rate"])}
+            <div class="meter" style="--w:87%;margin-top:16px;"><span></span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function auditView() {
+      document.getElementById("audit").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Audit log</div>
+            <h2>Every admin action needs a clear trail.</h2>
+            <p>Policy decisions, account changes, listing approvals, billing holds, and moderator notes should be searchable.</p>
+          </div>
+          <button class="ghost-btn">Export audit</button>
+        </div>
+
+        <div class="grid">
+          ${[
+            ["Freeze thread","Moderator Casey froze suspicious message thread between host and seeker.","2 minutes ago","High"],
+            ["Approved listing","Moderator Riley approved Farm Stay Operations Assistant after pay range verification.","18 minutes ago","Normal"],
+            ["Requested host documents","Admin Morgan requested business verification from Alaska Fjord Tours.","1 hour ago","Normal"],
+            ["Plan hold applied","System paused boosted exposure after failed Stripe payment.","2 hours ago","Billing"],
+            ["Report resolved","Harassing message report resolved with host warning.","Yesterday","High"]
+          ].map((a, i) => `
+            <div class="audit-row">
+              <div class="card-header" style="margin-bottom:8px;">
+                <div>
+                  <h3>${a[0]}</h3>
+                  <p>${a[1]}</p>
+                </div>
+                <span class="status-pill ${a[3] === "High" ? "danger" : a[3] === "Billing" ? "gold" : "live"}">${a[3]}</span>
+              </div>
+              ${tagList([a[2], "Audit ID", "Policy linked"])}
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function settingsView() {
+      document.getElementById("settings").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Admin settings</div>
+            <h2>Control the rules without burying the moderators.</h2>
+            <p>Role-based access, moderation thresholds, verification requirements, billing exposure rules, and safety automation belong here.</p>
+          </div>
+          <button class="primary-btn">Save policy</button>
+        </div>
+
+        <div class="grid main-split">
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <h3>Policy automation</h3>
+                <p>Controls that reduce manual review load.</p>
+              </div>
+            </div>
+            ${["Require pay range before listing approval", "Auto-hold unverified hosts from boosted homepage", "Flag off-platform payment language", "Require housing disclosure for housing badges", "Escalate reports involving payment or harassment"].map((x, i) => `
+              <div class="settings-row">
+                <div><strong>${x}</strong><div style="color:rgba(246,255,248,.54);font-size:.86rem;margin-top:3px;">Platform rule.</div></div>
+                <button class="toggle ${i !== 1 ? "on" : ""}"></button>
+              </div>
+            `).join("")}
+          </div>
+
+          <div class="card pad">
+            <div class="card-header">
+              <div>
+                <h3>Admin roles</h3>
+                <p>Separate authority by risk level.</p>
+              </div>
+            </div>
+            ${[
+              ["Owner","Full control: billing, policy, admin management"],
+              ["Admin","Platform settings, verification, billing view"],
+              ["Moderator","Queue, reports, listings, user safety"],
+              ["Support","Tickets, read-only account context"]
+            ].map(r => `
+              <div class="settings-row">
+                <div><strong>${r[0]}</strong><div style="color:rgba(246,255,248,.54);font-size:.86rem;margin-top:3px;">${r[1]}</div></div>
+                <button class="small-btn">Edit</button>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function supportView() {
+      document.getElementById("support").innerHTML = `
+        <div class="section-title" style="margin-top:0;">
+          <div>
+            <div class="tiny-label">Support tools</div>
+            <h2>Support should connect tickets to real marketplace context.</h2>
+            <p>Tickets should show user profile, host, listing, application, message thread, payment state, and moderation history.</p>
+          </div>
+          <button class="primary-btn">New support note</button>
+        </div>
+
+        <div class="grid two">
+          ${[
+            ["Seeker cannot access offer","Avery Stone says offer page loads blank on mobile.","Open","Product"],
+            ["Host billing question","Greenfield asks why one boosted slot is not visible on homepage.","Open","Billing"],
+            ["Verification delay","Alaska Fjord Tours waiting on document review.","Pending","Verification"],
+            ["Application status confusion","Seeker asks why application says viewed but no message arrived.","Open","Workflow"]
+          ].map(t => `
+            <div class="report-card">
+              <div class="card-header">
+                <div>
+                  <h3>${t[0]}</h3>
+                  <p>${t[1]}</p>
+                </div>
+                <span class="status-pill ${t[2] === "Open" ? "gold" : "live"}">${t[2]}</span>
+              </div>
+              ${tagList([t[3], "Linked account", "Context loaded"])}
+              <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+                <button class="small-btn" data-action="inspect">Open ticket</button>
+                <button class="small-btn primary-btn">Reply</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderAllViews() {
+      overviewView();
+      queueView();
+      usersView();
+      hostsView();
+      listingsView();
+      reportsView();
+      verificationView();
+      billingView();
+      analyticsView();
+      auditView();
+      settingsView();
+      supportView();
+    }
+
+    function setRoute(id) {
+      if (id === "more") {
+        document.getElementById("drawer").classList.add("open");
+        return;
+      }
+
+      const route = routes.find(r => r.id === id) ? id : "overview";
+      document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === route));
+      document.querySelectorAll("[data-route]").forEach(el => {
+        if (el.classList.contains("nav-item") || el.classList.contains("mobile-nav-btn") || el.parentElement?.classList.contains("dev-bench")) {
+          el.classList.toggle("active", el.dataset.route === route);
+        }
+      });
+      document.getElementById("drawer").classList.remove("open");
+      window.location.hash = route;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function openModal(type) {
+      const modal = document.getElementById("modal");
+      const title = document.getElementById("modalTitle");
+      const body = document.getElementById("modalBody");
+
+      const copy = {
+        approve: ["Approve / resolve", "Record a defensible moderation decision and attach policy reason."],
+        request: ["Request more information", "Send a structured request to the host or seeker and keep the item in pending review."],
+        suspend: ["Freeze or suspend", "Freeze the risky surface immediately while preserving evidence and audit history."],
+        moderate: ["Moderation action", "Choose warning, hold, freeze, removal, or escalation."],
+        inspect: ["Inspect record", "Open connected account, listing, message, report, payment, and audit context."],
+        bulk: ["Bulk moderation tools", "Batch approve low-risk items, assign queues, or apply policy holds."],
+        emergency: ["Emergency safety tools", "High-risk reports can be escalated, frozen, and logged immediately."]
+      };
+
+      const c = copy[type] || ["Admin action", "This action would be wired into the production admin workflow."];
+
+      title.textContent = c[0];
+      body.innerHTML = `
+        <p style="color:rgba(246,255,248,.70);line-height:1.5;margin-top:0;">${c[1]}</p>
+        <div class="grid two">
+          ${["Policy reason required", "Moderator note required", "User notification optional", "Audit log automatic"].map((x, i) => `
+            <div class="settings-row">
+              <div><strong>${x}</strong><div style="color:rgba(246,255,248,.54);font-size:.86rem;margin-top:3px;">Production decision control.</div></div>
+              <button class="toggle ${i < 2 ? "on" : ""}"></button>
+            </div>
+          `).join("")}
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+          <button class="primary-btn">Confirm action</button>
+          <button class="ghost-btn">Save note only</button>
+          ${type === "suspend" || type === "emergency" ? `<button class="small-btn danger-btn">Escalate</button>` : ""}
+        </div>
+      `;
+
+      modal.classList.add("open");
+    }
+
+    function wireEvents() {
+      document.body.addEventListener("click", (e) => {
+        const routeEl = e.target.closest("[data-route]");
+        const actionEl = e.target.closest("[data-action]");
+        const toggle = e.target.closest(".toggle");
+
+        if (routeEl) setRoute(routeEl.dataset.route);
+        if (actionEl) openModal(actionEl.dataset.action);
+        if (toggle) toggle.classList.toggle("on");
+      });
+
+      document.getElementById("drawer").addEventListener("click", (e) => {
+        if (e.target.id === "drawer") e.currentTarget.classList.remove("open");
+      });
+
+      document.getElementById("closeModal").addEventListener("click", () => {
+        document.getElementById("modal").classList.remove("open");
+      });
+
+      document.getElementById("modal").addEventListener("click", (e) => {
+        if (e.target.id === "modal") e.currentTarget.classList.remove("open");
+      });
+
+      document.getElementById("globalSearch").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          openModal("inspect");
+          document.getElementById("modalTitle").textContent = "Global admin search";
+          document.getElementById("modalBody").innerHTML = `
+            <p style="color:rgba(246,255,248,.70);line-height:1.5;margin-top:0;">Prototype command result for: <strong>${e.target.value || "all platform records"}</strong></p>
+            <div class="grid">
+              <button class="queue-item" data-route="queue" style="text-align:left;color:var(--text);">
+                <div class="person"><div class="avatar danger">!</div><div><strong>Suspicious message thread</strong><span>Report • High risk • Needs review</span></div></div>
+              </button>
+              <button class="queue-item" data-route="listings" style="text-align:left;color:var(--text);">
+                <div class="person"><div class="avatar">🎯</div><div><strong>Farm Stay Operations Assistant</strong><span>Listing • Live boosted • Enterprise host</span></div></div>
+              </button>
+            </div>
+          `;
+        }
+      });
+    }
+
+    renderNavs();
+    renderAllViews();
+    wireEvents();
+
+    const initial = window.location.hash.replace("#", "");
+    if (initial) setRoute(initial);
+  </script>
+</body>
+</html>

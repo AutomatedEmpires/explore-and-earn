@@ -82,3 +82,5 @@ export * from "./messaging";
 export * from "./schedule";
 export * from "./travel";
 export * from "./journey";
+export { SeekerShell } from "./SeekerShell";
+export type { SeekerShellProps } from "./SeekerShell";
