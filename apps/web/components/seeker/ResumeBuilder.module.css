@@ -463,7 +463,7 @@
 	font-size: var(--type-meta-size);
 	font-weight: var(--font-weight-semibold);
 	color: var(--color-cta);
-	background: var(--color-action-soft, #EAF2F5);
+	background: var(--color-action-soft);
 	border: none;
 	border-radius: var(--radius-cell);
 	padding: var(--space-4) var(--space-8);

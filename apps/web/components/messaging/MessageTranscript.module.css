@@ -77,7 +77,7 @@
 	background: var(--palette-sky);
 	border-color: color-mix(in srgb, var(--palette-sky) 80%, var(--palette-ink) 20%);
 	border-radius: var(--radius-card) var(--radius-card) var(--radius-input) var(--radius-card);
-	color: #ffffff;
+	color: var(--palette-white);
 }
 
 /* ── Scroll anchor ────────────────────────────────────── */
@@ -96,5 +96,5 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-caption-size);
 	line-height: var(--type-caption-lh);
-	color: var(--status-danger-fg, #b00020);
+	color: var(--status-error-fg);
 }
