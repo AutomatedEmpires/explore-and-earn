@@ -158,7 +158,9 @@
 }
 .host-os .host-hero[data-lane="farm"]     { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-farm); }
 .host-os .host-hero[data-lane="maritime"] { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-maritime); }
+.host-os .host-hero[data-lane="remote"]   { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-remote); }
 .host-os .host-hero[data-lane="seasonal"] { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-seasonal); }
+.host-os .host-hero[data-lane="mix"]      { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-mix); }
 .host-os .host-hero::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   opacity: 0.12; background-image: var(--hostos-grain); mix-blend-mode: overlay;

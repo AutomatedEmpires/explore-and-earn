@@ -89,6 +89,71 @@
 
 /* ── Plan grid ───────────────────────────────────────────────────── */
 
+/* ── Billing interval toggle ─────────────────────────────────────── */
+.intervalToggle {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: var(--space-3);
+  gap: var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.intervalOption {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 2.25rem;
+  padding: 0 var(--space-16);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.intervalOption:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.intervalActive {
+  background: var(--text-primary);
+  color: var(--color-surface-raised);
+}
+
+.intervalBadge {
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cta) 22%, transparent);
+  color: var(--color-cta);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.intervalActive .intervalBadge {
+  background: color-mix(in srgb, var(--color-cta) 32%, transparent);
+  color: var(--color-cta-text, #fff);
+}
+
+.planSaveNote {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--status-success-fg);
+}
+
 .planGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

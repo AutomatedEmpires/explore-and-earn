@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { useAuth } from "@clerk/nextjs";
 
-import { Button } from "@explore-and-earn/ui";
+import { Button, Icon } from "@explore-and-earn/ui";
 import {
   uploadListingMedia,
   deleteListingMedia,
@@ -19,6 +19,7 @@ import {
 } from "@explore-and-earn/contracts";
 
 import { ImageUpload } from "../ImageUpload";
+import { BenefitTrustModal, type BenefitKind } from "../discovery";
 import { MediaGalleryUpload, type GalleryItem } from "./MediaGalleryUpload";
 import { createListingAction, updateListingAction } from "../../app/actions/listings";
 import styles from "./ListingForm.module.css";
@@ -114,6 +115,10 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
   const [summary, setSummary] = useState(initial?.summary ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  // The structured benefit editor (photos + amenities) only works once a listing
+  // exists to attach uploads to — offered in edit mode alongside the free-text.
+  const [benefitKind, setBenefitKind] = useState<BenefitKind | null>(null);
+  const canEditBenefits = mode === "edit" && Boolean(listingId);
 
   const submitLabel = mode === "create" ? "Create listing" : "Save changes";
   const cancelHref = listingId ? `/host/listings/${listingId}` : "/host/listings";
@@ -210,6 +215,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
   }
 
   return (
+    <>
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       {error ? (
         <p className={styles.error} role="alert">
@@ -334,6 +340,16 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
             onChange={(event) => setHousingDescription(event.target.value)}
             placeholder="On-site private cabin, utilities included."
           />
+          {canEditBenefits ? (
+            <button
+              type="button"
+              className={styles.benefitLink}
+              onClick={() => setBenefitKind("housing")}
+            >
+              <Icon name="nav.photos" size={16} aria-hidden />
+              Add housing photos &amp; amenities
+            </button>
+          ) : null}
         </div>
 
         <div className={styles.field}>
@@ -349,6 +365,16 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
             onChange={(event) => setMealsDescription(event.target.value)}
             placeholder="Three daily meals provided during the season."
           />
+          {canEditBenefits ? (
+            <button
+              type="button"
+              className={styles.benefitLink}
+              onClick={() => setBenefitKind("meals")}
+            >
+              <Icon name="nav.photos" size={16} aria-hidden />
+              Add meal photos &amp; details
+            </button>
+          ) : null}
         </div>
 
         <div className={styles.row}>
@@ -449,5 +475,18 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
         </Link>
       </div>
     </form>
+
+    {/* Structured benefit editor \u2014 mounted OUTSIDE the form so its Save never
+        submits the listing form. Edit mode only (needs a saved listing id). */}
+    {canEditBenefits && listingId ? (
+      <BenefitTrustModal
+        mode="edit"
+        open={benefitKind !== null}
+        kind={benefitKind ?? "housing"}
+        onClose={() => setBenefitKind(null)}
+        listingId={listingId}
+      />
+    ) : null}
+    </>
   );
 }

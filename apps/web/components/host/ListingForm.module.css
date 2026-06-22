@@ -21,6 +21,35 @@
   }
 }
 
+/* Link from a free-text benefit field into the structured photo/amenity editor. */
+.benefitLink {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+  padding: var(--space-6) 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.benefitLink:hover {
+  color: color-mix(in srgb, var(--color-cta) 80%, var(--text-primary));
+  text-decoration: underline;
+}
+
+.benefitLink:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+  border-radius: var(--radius-cell);
+}
+
 .field {
   display: flex;
   flex-direction: column;

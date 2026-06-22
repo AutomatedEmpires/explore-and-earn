@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 
 import {
@@ -26,6 +27,26 @@ export interface HostPipelineBoardProps {
 export function HostPipelineBoard({ applicants }: HostPipelineBoardProps) {
   const counts = countByStage(applicants);
 
+  // Whole-board empty → one designed state, not five repeated "no applicants".
+  if (applicants.length === 0) {
+    return (
+      <div className={styles.emptyState}>
+        <span className={styles.emptyIcon} aria-hidden>
+          <Icon name="status.match" size={24} />
+        </span>
+        <p className={styles.emptyTitle}>No applicants yet</p>
+        <p className={styles.emptySub}>
+          As seekers apply, they flow through this pipeline — new, reviewing,
+          saved, then offered. Invite standout seekers to get the first ones in.
+        </p>
+        <Link className={styles.emptyCta} href="/host/invites">
+          <Icon name="action.forward" size={16} aria-hidden />
+          Invite seekers
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.board}>
       {APPLICANT_STAGE_ORDER.map((stage) => {
@@ -52,7 +73,9 @@ export function HostPipelineBoard({ applicants }: HostPipelineBoardProps) {
                 ))}
               </div>
             ) : (
-              <p className={styles.empty}>No applicants in this stage.</p>
+              <p className={styles.empty} aria-hidden>
+                —
+              </p>
             )}
           </section>
         );

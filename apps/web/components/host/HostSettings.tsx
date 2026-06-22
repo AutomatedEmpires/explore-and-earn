@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Icon } from "@explore-and-earn/ui";
 import {
   ADDON_PRICING,
+  ANNUAL_MONTHS_BILLED,
   FOUNDER_LOCKED_PRICING,
   PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
@@ -31,6 +32,7 @@ type SettingsTab = "billing" | "team" | "support" | "account";
  * a free tier, "3 starter listings", "unlimited pro listings", etc.). */
 
 type PaidTier = "starter" | "professional" | "enterprise";
+type BillingInterval = "monthly" | "yearly";
 const PAID_TIERS: readonly PaidTier[] = ["starter", "professional", "enterprise"];
 
 const TIER_META: Record<
@@ -156,9 +158,20 @@ function TabBar({
   );
 }
 
-function PlanCard({ tier, current }: { tier: PaidTier; current: boolean }) {
+function PlanCard({
+  tier,
+  current,
+  interval,
+}: {
+  tier: PaidTier;
+  current: boolean;
+  interval: BillingInterval;
+}) {
   const meta = TIER_META[tier];
-  const price = usd(FOUNDER_LOCKED_PRICING[tier].monthly);
+  const annual = interval === "yearly";
+  const price = usd(
+    annual ? FOUNDER_LOCKED_PRICING[tier].yearly : FOUNDER_LOCKED_PRICING[tier].monthly,
+  );
   const features = planFeatures(tier);
 
   return (
@@ -173,8 +186,13 @@ function PlanCard({ tier, current }: { tier: PaidTier; current: boolean }) {
         <p className={styles.planName}>{meta.name}</p>
         <div className={styles.planPriceRow}>
           <span className={styles.planPrice}>{price}</span>
-          <span className={styles.planPeriod}>per month</span>
+          <span className={styles.planPeriod}>{annual ? "per year" : "per month"}</span>
         </div>
+        {annual ? (
+          <span className={styles.planSaveNote}>
+            {12 - ANNUAL_MONTHS_BILLED} months free vs monthly
+          </span>
+        ) : null}
         <p className={styles.planTagline}>{meta.tagline}</p>
       </div>
       <ul className={styles.planFeatures} role="list">
@@ -196,7 +214,7 @@ function PlanCard({ tier, current }: { tier: PaidTier; current: boolean }) {
       ) : (
         <form action={startHostCheckoutAction} className={styles.ctaForm}>
           <input type="hidden" name="tier" value={tier} />
-          <input type="hidden" name="interval" value="monthly" />
+          <input type="hidden" name="interval" value={interval} />
           <button type="submit" className={styles.planCta} aria-label={meta.cta}>
             {meta.cta}
           </button>
@@ -262,18 +280,46 @@ function AddOnsSection({
 }
 
 function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProps["subscriptionTier"] }) {
+  const [interval, setInterval] = useState<BillingInterval>("monthly");
+
   return (
     <div className={styles.panel} id="panel-billing" role="tabpanel" aria-label="Plan & billing">
       <div className={styles.panelHead}>
         <h2 className={styles.panelTitle}>Plans</h2>
         <p className={styles.panelDesc}>
           Choose the plan that fits your operation. Every plan includes a public host profile and
-          direct applicant messaging. Annual billing is 10 months for 12 — two months free.
+          direct applicant messaging.
         </p>
       </div>
+
+      <div className={styles.intervalToggle} role="group" aria-label="Billing interval">
+        <button
+          type="button"
+          className={interval === "monthly" ? `${styles.intervalOption} ${styles.intervalActive}` : styles.intervalOption}
+          aria-pressed={interval === "monthly"}
+          onClick={() => setInterval("monthly")}
+        >
+          Monthly
+        </button>
+        <button
+          type="button"
+          className={interval === "yearly" ? `${styles.intervalOption} ${styles.intervalActive}` : styles.intervalOption}
+          aria-pressed={interval === "yearly"}
+          onClick={() => setInterval("yearly")}
+        >
+          Annual
+          <span className={styles.intervalBadge}>{12 - ANNUAL_MONTHS_BILLED} mo free</span>
+        </button>
+      </div>
+
       <div className={styles.planGrid}>
         {PAID_TIERS.map((tier) => (
-          <PlanCard key={tier} tier={tier} current={subscriptionTier === tier} />
+          <PlanCard
+            key={tier}
+            tier={tier}
+            current={subscriptionTier === tier}
+            interval={interval}
+          />
         ))}
       </div>
 
