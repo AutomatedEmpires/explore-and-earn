@@ -87,6 +87,20 @@
   margin: 0;
 }
 
+/* Mobile-first: 5 stage cells are unreadable at ~76px wide — drop to a
+ * comfortable 2-up (then 3-up on small tablets) before the desktop 5-up. */
+@media (max-width: 479px) {
+  .pipeline {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 480px) and (max-width: 767px) {
+  .pipeline {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 .pipelineCell {
   display: flex;
   flex-direction: column;

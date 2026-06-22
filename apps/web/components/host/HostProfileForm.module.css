@@ -14,6 +14,13 @@
   gap: var(--space-12);
 }
 
+/* Mobile-first: stack paired fields (host/location, social handles) into one column. */
+@media (max-width: 639px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .field {
   display: flex;
   flex-direction: column;
