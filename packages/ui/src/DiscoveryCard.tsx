@@ -10,6 +10,7 @@ import type {
 
 import { Meter } from "./Meter"
 import { Icon, type IconKey } from "./icons"
+import styles from "./DiscoveryCard.module.css"
 
 /**
  * DiscoveryCard — canonical Explore&Earn listing card.
@@ -99,65 +100,6 @@ const PAPER     = "var(--palette-surface)"
 const H_INK = "color-mix(in srgb, var(--palette-teal) 78%, var(--palette-ink))"   /* teal — housing/meals available */
 const P_INK = "color-mix(in srgb, var(--palette-amber) 52%, var(--palette-ink))"  /* deep gold — pay (money) */
 
-/** Per-category card body — top-lit, atmospheric, inviting */
-const CAT_CARD: Record<MarketplaceCategory, string> = {
-	farm:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(255,240,180,0.62) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 20% 95%, rgba(201,139,27,0.22) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #FAF0CC 0%, #EED990 55%, #D4B84A 100%)",
-	maritime:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(200,235,255,0.58) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 80% 95%, rgba(26,78,114,0.20) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #EAF4FF 0%, #B8D8F4 55%, #88B8E0 100%)",
-	remote:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(210,200,255,0.52) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 20% 95%, rgba(48,56,152,0.18) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #F0EAFF 0%, #C8B8F4 55%, #A090D8 100%)",
-	seasonal:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(190,248,210,0.55) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 20% 95%, rgba(26,94,56,0.18) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #EAFAE0 0%, #B8DCA0 55%, #84BC68 100%)",
-	mix:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(248,244,238,0.58) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 20% 95%, rgba(42,62,106,0.14) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #F5ECD8 0%, #D8C4A4 55%, #BCA880 100%)",
-}
-
-/** Per-category hero fallback (no cover image) */
-const CAT_HERO: Record<MarketplaceCategory, string> = {
-	farm:     "linear-gradient(145deg, #C4A854 0%, #E8CC80 50%, #F4DFA0 100%)",
-	maritime: "linear-gradient(145deg, #5C9CC8 0%, #8EC4E4 50%, #B4D8F0 100%)",
-	remote:   "linear-gradient(145deg, #7870B8 0%, #A898D8 50%, #C8C0EC 100%)",
-	seasonal: "linear-gradient(145deg, #5A9C60 0%, #8CC480 50%, #B0D898 100%)",
-	mix:      "linear-gradient(145deg, #A890A0 0%, #C8B0B8 50%, #DED0C8 100%)",
-}
-
-/** Per-category top accent border — aligned with V2 category fg tokens */
-const CAT_ACCENT: Record<MarketplaceCategory, string> = {
-	farm:     "#C98B1B",    /* warm gold — farm is intentionally warm */
-	maritime: "#1A4E72",    /* V2 maritime fg */
-	remote:   "#303898",    /* V2 remote fg */
-	seasonal: "#1A5E38",    /* V2 seasonal fg */
-	mix:      "#2A3E6A",    /* V2 mix fg — cool navy, not warm purple */
-}
-
-/** Per-category ambient glow (inset bottom) — makes each card feel lit from within */
-const CAT_GLOW: Record<MarketplaceCategory, string> = {
-	farm:     "rgba(201,139,27,0.18)",
-	maritime: "rgba(26,78,114,0.16)",
-	remote:   "rgba(48,56,152,0.15)",
-	seasonal: "rgba(26,94,56,0.16)",
-	mix:      "rgba(42,62,106,0.13)",
-}
-
-/** Per-category info-cell bg — tinted gradient pulls each cell into the card's color identity */
-const CAT_CELL_BG: Record<MarketplaceCategory, string> = {
-	farm:     "linear-gradient(180deg, rgba(250,240,200,0.64) 0%, rgba(238,215,130,0.48) 100%)",
-	maritime: "linear-gradient(180deg, rgba(234,244,255,0.68) 0%, rgba(180,210,244,0.52) 100%)",
-	remote:   "linear-gradient(180deg, rgba(240,234,255,0.66) 0%, rgba(196,180,244,0.50) 100%)",
-	seasonal: "linear-gradient(180deg, rgba(234,250,224,0.66) 0%, rgba(180,220,152,0.50) 100%)",
-	mix:      "linear-gradient(180deg, rgba(245,236,215,0.64) 0%, rgba(214,193,155,0.48) 100%)",
-}
 
 const CAT_LABEL: Record<MarketplaceCategory, string> = {
 	farm: "Farm", maritime: "Maritime", remote: "Remote", seasonal: "Seasonal", mix: "Mix",
@@ -319,7 +261,7 @@ export function DiscoveryCard({
 	// a row of em-dashes).
 	const hasLocation = Boolean(data.location) && data.location !== "Location not specified"
 	const hasDates    = Boolean(data.begins || data.ends)
-	const cellBg          = CAT_CELL_BG[cat]
+	const cellBg          = "var(--cat-cell)"
 	const ROW_CELL_CAT:   CSSProperties = { ...ROW_CELL,   background: cellBg }
 	const STRIP_CELL_CAT: CSSProperties = { ...STRIP_CELL, background: cellBg }
 	const verified = data.verifiedHost === true
@@ -448,15 +390,15 @@ export function DiscoveryCard({
 		display: "flex", flexDirection: "column",
 		width: "min(100%, 360px)",
 		overflow: "hidden",
-		background: CAT_CARD[cat],
+		background: "var(--cat-body)",
 		border: `1px solid var(--palette-line)`,
-		borderTop: `3px solid ${CAT_ACCENT[cat]}`,
+		borderTop: `3px solid var(--cat-accent)`,
 		borderRadius: "20px",
 		color: INK,
 		opacity: isDisabled ? 0.6 : 1,
 		boxShadow: [
 			"inset 0 1px 0 rgba(255,255,255,0.55)",        /* top catch-light */
-			`inset 0 -44px 56px ${CAT_GLOW[cat]}`,         /* category ambient from below */
+			`inset 0 -44px 56px var(--cat-glow)`,         /* category ambient from below */
 			"var(--elevation-card)",                        /* V2 soft depth */
 		].join(", "),
 	}
@@ -464,7 +406,7 @@ export function DiscoveryCard({
 	const heroStyle: CSSProperties = {
 		position: "relative", width: "100%", aspectRatio: "16 / 10",
 		overflow: "hidden", flexShrink: 0,
-		background: CAT_HERO[cat],
+		background: "var(--cat-cover)",
 		borderBottom: `1px solid var(--palette-line)`,
 	}
 
@@ -473,7 +415,7 @@ export function DiscoveryCard({
 		borderRadius: "50%",
 		border: "3px solid rgba(255,248,225,0.95)",
 		// dark ring + category-colored glow ring + deep shadow
-		boxShadow: `0 0 0 2.5px ${INK}, 0 0 0 5px ${CAT_ACCENT[cat]}, 0 6px 20px rgba(26,43,60,0.40)`,
+		boxShadow: `0 0 0 2.5px ${INK}, 0 0 0 5px var(--cat-accent), 0 6px 20px rgba(26,43,60,0.40)`,
 		background: data.hostAvatarUrl ? "transparent" : "rgba(255,248,225,0.22)",
 		backdropFilter: data.hostAvatarUrl ? "none" : "blur(4px)",
 		WebkitBackdropFilter: data.hostAvatarUrl ? "none" : "blur(4px)",
@@ -520,7 +462,7 @@ export function DiscoveryCard({
 			}
 		`}</style>
 		<article
-			className="ui-card--discovery"
+			className={`ui-card--discovery ${styles.card}`}
 			style={cardStyle}
 			data-category={cat}
 			data-surface={surface}
@@ -718,8 +660,8 @@ export function DiscoveryCard({
 					{/* Category stamp — always ONE, always here; colored fill = instant recognition */}
 					<span style={{
 						...STAMP,
-						background: CAT_ACCENT[cat],
-						color: "#FFFAF0",
+						background: "var(--cat-accent)",
+						color: "var(--palette-paper)",
 						boxShadow: `0 3px 12px rgba(23,19,13,0.32), 0 1px 0 rgba(255,255,255,0.22) inset`,
 					}}>
 						<Icon name={CAT_ICON[cat]} size={16} aria-hidden />
