@@ -6,9 +6,11 @@
  * AGENTS.md: never hardcode raw colors where semantic tokens exist.
  */
 .dashboard {
-  --community-green:    #2A5724;
-  --community-green-deep: #1E4018;
-  --community-green-bg: #EDF4EC;
+  /* On-system: the community "green" is now V2 teal (a forest green-teal), so the
+     whole surface inherits the brand secondary instead of a bespoke off-palette green. */
+  --community-green:      color-mix(in srgb, var(--palette-teal) 82%, var(--palette-ink));
+  --community-green-deep: color-mix(in srgb, var(--palette-teal) 62%, var(--palette-ink));
+  --community-green-bg:   color-mix(in srgb, var(--palette-teal) 10%, var(--palette-surface));
 }
 
 .dashboard {
@@ -184,7 +186,7 @@
 .xpFill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #7FD063, #A8E87A);
+  background: linear-gradient(90deg, var(--palette-teal), color-mix(in srgb, var(--palette-teal) 55%, var(--palette-surface)));
   transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
