@@ -105,3 +105,17 @@
   font-size: var(--type-body-xs);
   color: var(--color-text-secondary);
 }
+
+.itemFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  margin-top: var(--space-4);
+}
+
+.withdrawError {
+  margin: var(--space-8) 0 0;
+  font-size: var(--type-meta-size);
+  color: var(--status-error-fg);
+}

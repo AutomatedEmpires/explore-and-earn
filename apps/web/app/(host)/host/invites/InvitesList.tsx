@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Badge, Button, Icon } from "@explore-and-earn/ui";
 import type { HostInvite } from "@explore-and-earn/db/client";
 import type { ListingRow } from "@explore-and-earn/db/client";
 
 import { SeekerSearchDrawer } from "../../../../components/host/SeekerSearchDrawer";
+import { withdrawInviteAction } from "../../../actions/invites";
 import styles from "./InvitesList.module.css";
+
+/** Invite statuses a host can still retract. */
+const WITHDRAWABLE_STATUSES = new Set(["created", "delivered", "viewed"]);
 
 export interface InvitesListProps {
   readonly invites: readonly HostInvite[];
@@ -52,8 +56,24 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
   const [selectedListingId, setSelectedListingId] = useState(
     listings[0]?.id ?? "",
   );
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
 
   const selectedListing = listings.find((l) => l.id === selectedListingId);
+
+  function handleWithdraw(inviteId: string) {
+    setWithdrawError(null);
+    setWithdrawingId(inviteId);
+    startTransition(async () => {
+      const result = await withdrawInviteAction(inviteId);
+      setWithdrawingId(null);
+      if (!result.ok) {
+        setWithdrawError(result.error ?? "Could not withdraw the invite.");
+      }
+      // On success, revalidatePath('/host/invites') refreshes this list's props.
+    });
+  }
 
   return (
     <>
@@ -114,21 +134,38 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
               {invite.message ? (
                 <p className={styles.message}>{invite.message}</p>
               ) : null}
-              <time
-                className={styles.date}
-                dateTime={invite.createdAt}
-                title={new Date(invite.createdAt).toLocaleString()}
-              >
-                {new Date(invite.createdAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </time>
+              <div className={styles.itemFoot}>
+                <time
+                  className={styles.date}
+                  dateTime={invite.createdAt}
+                  title={new Date(invite.createdAt).toLocaleString()}
+                >
+                  {new Date(invite.createdAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </time>
+                {WITHDRAWABLE_STATUSES.has(invite.status) ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleWithdraw(invite.id)}
+                    disabled={withdrawingId === invite.id}
+                  >
+                    {withdrawingId === invite.id ? "Withdrawing…" : "Withdraw"}
+                  </Button>
+                ) : null}
+              </div>
             </li>
           ))}
         </ol>
       )}
+
+      {withdrawError ? (
+        <p className={styles.withdrawError} role="alert">
+          {withdrawError}
+        </p>
+      ) : null}
 
       {selectedListing ? (
         <SeekerSearchDrawer

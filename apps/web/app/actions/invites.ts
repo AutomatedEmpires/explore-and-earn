@@ -11,6 +11,7 @@ import {
 	getNotificationPrefs,
 	getSeekerClerkIdByProfileId,
 	searchSeekersForInvite,
+	withdrawInvite,
 	type InviteResponse,
 	type InviteWithListing,
 	type SeekerSearchResult,
@@ -49,6 +50,28 @@ async function getInvitesActionImpl(): Promise<InviteWithListing[]> {
 	}
 
 	return getSeekerInvites(token, userId)
+}
+
+/**
+ * Host retracts a still-pending invite. Ownership + withdrawable-status are
+ * enforced in the db layer; userId always from auth().userId.
+ */
+export async function withdrawInviteAction(
+	inviteId: string,
+): Promise<{ ok: boolean; error?: string }> {
+	try {
+		const { userId, getToken } = await auth()
+		if (!userId) return { ok: false, error: "You must be signed in as a host." }
+		const token = await getToken({ template: "supabase" })
+		if (!token) return { ok: false, error: "Your session has expired — sign in again." }
+
+		const result = await withdrawInvite(token, userId, inviteId)
+		if (result.ok) revalidatePath("/host/invites")
+		return result
+	} catch (error) {
+		reportError(error, { action: "withdrawInviteAction" })
+		return { ok: false, error: "Could not withdraw the invite. Please try again." }
+	}
 }
 
 export async function getInvitesAction(): Promise<InviteWithListing[]> {
