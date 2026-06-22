@@ -3,16 +3,28 @@
 .page {
   background-color: var(--color-paper);
   min-height: 100vh;
-  padding-bottom: 80px;
+  padding-bottom: var(--space-80);
 }
 
-/* ─── Cover photo ─────────────────────────────────────────────────────────── */
+/* ─── Cover photo — framed photograph on the paper mat (frame, not filter) ──── */
 
 .cover {
   position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
+  margin: var(--space-16) var(--space-gutter) 0;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--elevation-card);
   background-color: var(--color-surface);
+}
+
+/* On wide screens the cover stays a contained, framed hero — not edge-to-edge. */
+@media (min-width: 64rem) {
+  .cover {
+    aspect-ratio: 21 / 9;
+    margin-top: var(--space-20);
+  }
 }
 
 .fillImg {
