@@ -168,7 +168,7 @@
   border: 1.5px solid rgba(25, 21, 14, 0.22);
   border-top: 4px solid rgba(25, 21, 14, 0.40); /* overridden per-category below */
   border-radius: var(--radius-card);
-  background: linear-gradient(160deg, var(--color-card-warm) 0%, #F0E8D8 100%);
+  background: linear-gradient(160deg, var(--color-card-warm) 0%, var(--color-surface-2, var(--color-surface)) 100%);
   color: inherit;
   text-decoration: none;
   scroll-snap-align: start;
@@ -181,38 +181,28 @@
 /* ─── Per-category card gradient backgrounds ────────────────────────────── */
 
 .card_farm {
-  background:
-    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(250,240,180,0.64) 0%, transparent 55%),
-    linear-gradient(160deg, #FFFAEC 0%, #F0E4AA 50%, #DECE68 100%);
-  border-top-color: #C98B1B;
+  background: var(--cat-farm-body);
+  border-top-color: var(--cat-farm-accent);
 }
 
 .card_maritime {
-  background:
-    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(200,232,255,0.56) 0%, transparent 55%),
-    linear-gradient(160deg, #F0F9FF 0%, #C4DCFF 50%, #88BCE8 100%);
-  border-top-color: #1A4E72;
+  background: var(--cat-maritime-body);
+  border-top-color: var(--cat-maritime-accent);
 }
 
 .card_remote {
-  background:
-    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(210,198,255,0.52) 0%, transparent 55%),
-    linear-gradient(160deg, #F4F0FF 0%, #D4C8F8 50%, #AE9EE4 100%);
-  border-top-color: #303898;
+  background: var(--cat-remote-body);
+  border-top-color: var(--cat-remote-accent);
 }
 
 .card_seasonal {
-  background:
-    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(188,248,200,0.52) 0%, transparent 55%),
-    linear-gradient(160deg, #F0FEF4 0%, #C0E8A8 50%, #7EC460 100%);
-  border-top-color: #1A5E38;
+  background: var(--cat-seasonal-body);
+  border-top-color: var(--cat-seasonal-accent);
 }
 
 .card_mix {
-  background:
-    radial-gradient(ellipse 160% 55% at 50% -10%, rgba(248,236,215,0.58) 0%, transparent 55%),
-    linear-gradient(160deg, #FFF8F0 0%, #E8D4B0 50%, #C4A46A 100%);
-  border-top-color: #2A3E6A;
+  background: var(--cat-mix-body);
+  border-top-color: var(--cat-mix-accent);
 }
 
 .card:hover {
@@ -250,11 +240,11 @@
 }
 
 /* Category fallback gradients when no photo is available */
-.imageFrame_farm     { background: linear-gradient(145deg, #F0E4B0 0%, #C49030 100%); }
-.imageFrame_maritime { background: linear-gradient(145deg, #C4DCF8 0%, #4A90CC 100%); }
-.imageFrame_remote   { background: linear-gradient(145deg, #D0C8F8 0%, #7070C0 100%); }
-.imageFrame_seasonal { background: linear-gradient(145deg, #C0E8A0 0%, #48A040 100%); }
-.imageFrame_mix      { background: linear-gradient(145deg, #E4D0A8 0%, #9A7840 100%); }
+.imageFrame_farm     { background: var(--cat-farm-cover); }
+.imageFrame_maritime { background: var(--cat-maritime-cover); }
+.imageFrame_remote   { background: var(--cat-remote-cover); }
+.imageFrame_seasonal { background: var(--cat-seasonal-cover); }
+.imageFrame_mix      { background: var(--cat-mix-cover); }
 
 .image {
   display: block;
@@ -308,37 +298,37 @@
 
 /* Category-tinted badge fills — gradient fills + gap-ring matches card top color */
 .badge_farm {
-  background: linear-gradient(145deg, #F4E8B8 0%, #DEC86A 100%);
+  background: var(--cat-farm-cover);
   box-shadow:
-    0 0 0 3px #FFFAEC,
+    0 0 0 3px var(--palette-surface),
     0 0 0 5px var(--border-ink-warm),
     0 3px 8px rgba(25, 21, 14, 0.20);
 }
 .badge_maritime {
-  background: linear-gradient(145deg, #C8DCFF 0%, #88B8E8 100%);
+  background: var(--cat-maritime-cover);
   box-shadow:
-    0 0 0 3px #F0F9FF,
+    0 0 0 3px var(--palette-surface),
     0 0 0 5px var(--border-ink-warm),
     0 3px 8px rgba(25, 21, 14, 0.20);
 }
 .badge_remote {
-  background: linear-gradient(145deg, #D4C8F8 0%, #A89EE0 100%);
+  background: var(--cat-remote-cover);
   box-shadow:
-    0 0 0 3px #F4F0FF,
+    0 0 0 3px var(--palette-surface),
     0 0 0 5px var(--border-ink-warm),
     0 3px 8px rgba(25, 21, 14, 0.20);
 }
 .badge_seasonal {
-  background: linear-gradient(145deg, #C0E8A8 0%, #78BE58 100%);
+  background: var(--cat-seasonal-cover);
   box-shadow:
-    0 0 0 3px #F0FEF4,
+    0 0 0 3px var(--palette-surface),
     0 0 0 5px var(--border-ink-warm),
     0 3px 8px rgba(25, 21, 14, 0.20);
 }
 .badge_mix {
-  background: linear-gradient(145deg, #E8D4B0 0%, #C0A468 100%);
+  background: var(--cat-mix-cover);
   box-shadow:
-    0 0 0 3px #FFF8F0,
+    0 0 0 3px var(--palette-surface),
     0 0 0 5px var(--border-ink-warm),
     0 3px 8px rgba(25, 21, 14, 0.20);
 }
@@ -477,8 +467,8 @@
   display: inline-block;
   padding: 2px 8px;
   border-radius: 99px;
-  background: var(--color-steel-100, #e8edf4);
-  color: var(--color-steel-700, #2d4a72);
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
   font-family: var(--font-ui);
   font-size: 10px;
   font-weight: 600;
