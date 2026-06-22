@@ -75,8 +75,15 @@ export function HostListingDetail({
         <div className={styles.titleGroup}>
           <span className={styles.title}>{listing.title}</span>
           <span className={styles.meta}>
-            {CATEGORY_LABEL[listing.category]} · {listing.location} ·{" "}
-            {listing.opportunityWindow}
+            {[
+              CATEGORY_LABEL[listing.category],
+              listing.location && listing.location !== "Location not specified"
+                ? listing.location
+                : null,
+              listing.opportunityWindow,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
         <Badge

@@ -310,6 +310,12 @@ export function DiscoveryCard({
 }: DiscoveryCardProps) {
 	const cat      = data.category
 	const roleText = data.positionTitle ?? data.title
+	// Don't render placeholder content as if it were real — hide an empty/unknown
+	// location, and collapse the begins|ends strip to the opportunity window when
+	// no concrete dates exist (so the card never shows "LOCATION NOT SPECIFIED" or
+	// a row of em-dashes).
+	const hasLocation = Boolean(data.location) && data.location !== "Location not specified"
+	const hasDates    = Boolean(data.begins || data.ends)
 	const cellBg          = CAT_CELL_BG[cat]
 	const ROW_CELL_CAT:   CSSProperties = { ...ROW_CELL,   background: cellBg }
 	const STRIP_CELL_CAT: CSSProperties = { ...STRIP_CELL, background: cellBg }
@@ -530,7 +536,22 @@ export function DiscoveryCard({
 						alt={`${data.hostName} cover`}
 						style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
 					/>
-				) : null}
+				) : (
+					/* No cover yet — a large category watermark so the frame reads as
+					   intentional, not empty (placeholder, not a filter on a photo). */
+					<span
+						aria-hidden
+						style={{
+							position: "absolute", inset: 0,
+							display: "flex", alignItems: "center", justifyContent: "center",
+							color: "rgba(255,255,255,0.40)",
+							transform: "scale(2.7)",
+							filter: "drop-shadow(0 2px 6px rgba(23,19,13,0.18))",
+						}}
+					>
+						<Icon name={CAT_ICON[cat]} size={24} />
+					</span>
+				)}
 
 				{/* Gradient scrim — top shadow for badges, bottom shadow, warm golden side wash */}
 				<div
@@ -770,36 +791,45 @@ export function DiscoveryCard({
 					</div>
 				)}
 
-				{/* 4. LOCATION */}
-				{onLocationClick ? (
-					<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={() => onLocationClick(data.id)}>
-						<Icon name={MAPPIN[cat]} size={20} aria-hidden />
-						<span style={locationText}>{data.location}</span>
-					</button>
+				{/* 4. LOCATION — only when a real place is known */}
+				{hasLocation ? (
+					onLocationClick ? (
+						<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={() => onLocationClick(data.id)}>
+							<Icon name={MAPPIN[cat]} size={20} aria-hidden />
+							<span style={locationText}>{data.location}</span>
+						</button>
+					) : (
+						<div style={ROW_CELL_CAT}>
+							<Icon name={MAPPIN[cat]} size={20} aria-hidden />
+							<span style={locationText}>{data.location}</span>
+						</div>
+					)
+				) : null}
+
+				{/* 5. TIMING — concrete BEGINS | ENDS when known, else the opportunity window */}
+				{hasDates ? (
+					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
+						<div style={STRIP_CELL_CAT}>
+							<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+								<Icon name="status.begins" size={16} aria-hidden />
+								<span style={stripLabel}>Begins</span>
+							</span>
+							<span style={stripValue}>{data.begins ?? "Flexible"}</span>
+						</div>
+						<div style={STRIP_CELL_CAT}>
+							<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+								<Icon name="status.ends" size={16} aria-hidden />
+								<span style={stripLabel}>Ends</span>
+							</span>
+							<span style={stripValue}>{data.ends ?? "Flexible"}</span>
+						</div>
+					</div>
 				) : (
-					<div style={ROW_CELL_CAT}>
-						<Icon name={MAPPIN[cat]} size={20} aria-hidden />
-						<span style={locationText}>{data.location}</span>
+					<div style={{ ...STRIP_CELL_CAT, flexDirection: "row", gap: "7px", padding: "9px 14px" }}>
+						<Icon name="status.begins" size={16} aria-hidden />
+						<span style={locationText}>{data.opportunityWindow || "Open timing"}</span>
 					</div>
 				)}
-
-				{/* 5. BEGINS | ENDS — own 2-column row, never collapses */}
-				<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
-					<div style={STRIP_CELL_CAT}>
-						<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-							<Icon name="status.begins" size={16} aria-hidden />
-							<span style={stripLabel}>Begins</span>
-						</span>
-						<span style={stripValue}>{data.begins ?? "—"}</span>
-					</div>
-					<div style={STRIP_CELL_CAT}>
-						<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-							<Icon name="status.ends" size={16} aria-hidden />
-							<span style={stripLabel}>Ends</span>
-						</span>
-						<span style={stripValue}>{data.ends ?? "—"}</span>
-					</div>
-				</div>
 
 				{/* 6. SKILLS (applicant review) or HOUSING | MEALS | PAY */}
 				{isApplicantReview && data.skills && data.skills.length > 0 ? (

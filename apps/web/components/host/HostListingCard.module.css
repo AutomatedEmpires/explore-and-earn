@@ -50,7 +50,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.42);
+}
+
+/* Large category watermark so an un-photographed cover reads as intentional. */
+.coverPlaceholder svg {
+  transform: scale(2.6);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.22));
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
