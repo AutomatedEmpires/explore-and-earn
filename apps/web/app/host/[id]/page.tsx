@@ -2,11 +2,17 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { getPublicHostProfile, getPublicListingsByHost } from "@explore-and-earn/db";
+import {
+  getPublicHostProfile,
+  getPublicListingsByHost,
+  getHostRatingSummary,
+  getHostReviews,
+} from "@explore-and-earn/db";
 import { Icon } from "@explore-and-earn/ui";
 import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 
 import { HostProfileHero } from "../../../components/host/HostProfileHero";
+import { HostReviews } from "../../../components/host/HostReviews";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { generateBreadcrumbJsonLd } from "../../../lib/seo";
 import styles from "./page.module.css";
@@ -354,9 +360,11 @@ function HousingMealsCard({
 
 export default async function PublicHostProfilePage({ params }: Props) {
   const { id } = await params;
-  const [host, listings] = await Promise.all([
+  const [host, listings, ratingSummary, reviews] = await Promise.all([
     getPublicHostProfile(id),
     getPublicListingsByHost(id),
+    getHostRatingSummary(id),
+    getHostReviews(id),
   ]);
   if (!host) notFound();
 
@@ -405,6 +413,11 @@ export default async function PublicHostProfilePage({ params }: Props) {
         {/* Main column: about + listings */}
         <div className={styles.mainCol}>
           {host.about ? <AboutSection about={host.about} /> : null}
+          <HostReviews
+            hostName={host.companyName}
+            summary={ratingSummary}
+            reviews={reviews}
+          />
           <ListingsSection listings={listings} />
         </div>
 

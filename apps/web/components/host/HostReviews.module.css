@@ -1,0 +1,212 @@
+/**
+ * Host reviews — two-sided trust. The trust row (housing/meals/pay kept %) is the
+ * hero. Token-driven; reads on the light public host page.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-h2-size, 1.5rem);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  color: var(--color-gold, var(--palette-amber));
+}
+
+.avg {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-display-size, 2rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.count {
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+/* ── The hero: triad-trust percentages ─────────────────────── */
+.trustRow {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.trustPill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-16);
+  border-radius: var(--radius-cell, var(--radius-card));
+  border: 1px solid color-mix(in srgb, var(--status-success-fg, var(--palette-teal)) 28%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg, var(--palette-teal)) 9%, var(--color-surface-raised));
+  color: var(--status-success-fg, var(--palette-teal));
+}
+
+.trustLabel {
+  flex: 1 1 auto;
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.trustPct {
+  flex: none;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-h3-size, 1.25rem);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+/* ── Empty state ───────────────────────────────────────────── */
+.empty {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  padding: var(--space-8) 0;
+}
+
+.emptyIcon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--palette-teal) 14%, transparent);
+  color: var(--palette-teal);
+}
+
+.emptyText {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Review list ───────────────────────────────────────────── */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding-top: var(--space-16);
+  border-top: 1px solid var(--border-soft);
+}
+
+.reviewHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.reviewWho {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reviewWho strong {
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.reviewDate {
+  font-size: var(--type-label-size);
+  color: var(--text-muted);
+}
+
+.reviewRating {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gold, var(--palette-amber));
+}
+
+.reviewBody {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+.reviewChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.chipKept {
+  background: color-mix(in srgb, var(--status-success-fg, var(--palette-teal)) 14%, transparent);
+  color: var(--status-success-fg, var(--palette-teal));
+}
+
+.chipNot {
+  background: color-mix(in srgb, var(--status-error-fg, var(--palette-error, currentColor)) 14%, transparent);
+  color: var(--status-error-fg, var(--palette-error, currentColor));
+}
