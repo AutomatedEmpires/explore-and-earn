@@ -90,28 +90,24 @@ export default async function AdminDashboardPage() {
           value={reviewQueue}
           trend={reviewQueue > 0 ? "Needs review" : "Clear"}
           trendTone={reviewQueue > 0 ? "down" : "up"}
-          spark={[40, 56, 48, 70, 62, 78, Math.min(100, reviewQueue * 8 + 20)]}
         />
         <MetricCard
           label="Listings live"
           value={stats.liveListings}
           trend={`${livePct}% of ${stats.totalListings}`}
           trendTone="neutral"
-          spark={[30, 44, 52, 60, 66, 74, Math.max(8, livePct)]}
         />
         <MetricCard
           label="Hosts to verify"
           value={hostsToVerify}
           trend={hostsToVerify > 0 ? "Awaiting" : "All clear"}
           trendTone={hostsToVerify > 0 ? "down" : "up"}
-          spark={[22, 30, 44, 50, 58, 64, Math.min(100, hostsToVerify * 10 + 18)]}
         />
         <MetricCard
           label="Marketplace health"
           value={`${healthValue}%`}
           trend={healthValue >= 70 ? "Stable" : "Watch"}
           trendTone={healthValue >= 70 ? "up" : "neutral"}
-          spark={[52, 58, 63, 67, 70, 74, Math.max(8, healthValue)]}
         />
       </MetricGrid>
 
@@ -140,7 +136,8 @@ export default async function AdminDashboardPage() {
           </div>
 
           <div className={styles.queue}>
-            <div
+            <Link
+              href="/applications"
               className={styles.queueRow}
               data-tone={stats.pendingApplications > 0 ? "hot" : undefined}
             >
@@ -152,9 +149,13 @@ export default async function AdminDashboardPage() {
                 <span className={styles.queueMeta}>Status: applied</span>
               </span>
               <span className={styles.queueCount}>{stats.pendingApplications}</span>
-            </div>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
 
-            <div
+            <Link
+              href="/listings"
               className={styles.queueRow}
               data-tone={stats.underReviewListings > 0 ? "hot" : undefined}
             >
@@ -166,9 +167,13 @@ export default async function AdminDashboardPage() {
                 <span className={styles.queueMeta}>Held for moderation</span>
               </span>
               <span className={styles.queueCount}>{stats.underReviewListings}</span>
-            </div>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
 
-            <div
+            <Link
+              href="/hosts"
               className={styles.queueRow}
               data-tone={hostsToVerify > 0 ? "hot" : undefined}
             >
@@ -180,9 +185,12 @@ export default async function AdminDashboardPage() {
                 <span className={styles.queueMeta}>Trust + safety hold</span>
               </span>
               <span className={styles.queueCount}>{hostsToVerify}</span>
-            </div>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
 
-            <div className={styles.queueRow}>
+            <Link href="/listings" className={styles.queueRow}>
               <span className={styles.queueIcon}>
                 <Icon name="status.draft" size={20} aria-hidden />
               </span>
@@ -191,7 +199,10 @@ export default async function AdminDashboardPage() {
                 <span className={styles.queueMeta}>Not yet submitted</span>
               </span>
               <span className={styles.queueCount}>{stats.draftListings}</span>
-            </div>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
           </div>
 
           <Link className={styles.cta} href="/applications">

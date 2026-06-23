@@ -55,9 +55,9 @@ function coverAccent(category: string): string {
     case "farm":
       return "var(--status-success-fg)";
     case "maritime":
-      return "var(--status-match-fg)";
+      return "var(--color-cta)";
     case "remote":
-      return "var(--status-featured-fg)";
+      return "var(--status-match-fg)";
     case "seasonal":
       return "var(--status-boosted-fg)";
     default:
@@ -68,6 +68,65 @@ function coverAccent(category: string): string {
 /** Status that needs a moderator's eye gets the accent edge + danger figure. */
 function isReviewState(status: string): boolean {
   return status === "under_review" || status === "draft";
+}
+
+type SignalTone = "ok" | "warn" | "neutral";
+
+interface RowSignal {
+  readonly label: string;
+  readonly tone: SignalTone;
+  readonly icon: IconKey;
+}
+
+/**
+ * Honest, scannable moderation signals derived ONLY from the row's real
+ * moderation fields (status + publish state). The row query exposes no
+ * housing/meals/pay disclosure, so we never claim a triad here — the full
+ * disclosure checklist lives on the review detail page where that data exists.
+ */
+function rowSignals(status: string, published: boolean): ReadonlyArray<RowSignal> {
+  const signals: RowSignal[] = [];
+
+  switch (status) {
+    case "under_review":
+      signals.push({
+        label: "Awaiting decision",
+        tone: "warn",
+        icon: "action.view",
+      });
+      break;
+    case "draft":
+      signals.push({
+        label: "Host draft",
+        tone: "neutral",
+        icon: "status.draft",
+      });
+      break;
+    case "live":
+      signals.push({ label: "Cleared", tone: "ok", icon: "system.success" });
+      break;
+    case "paused":
+      signals.push({ label: "Paused", tone: "neutral", icon: "status.paused" });
+      break;
+    case "closed":
+    case "archived":
+      signals.push({
+        label: "Off-market",
+        tone: "neutral",
+        icon: "status.archived",
+      });
+      break;
+    default:
+      break;
+  }
+
+  signals.push(
+    published
+      ? { label: "Indexed", tone: "ok", icon: "status.open" }
+      : { label: "Not published", tone: "warn", icon: "system.warning" },
+  );
+
+  return signals;
 }
 
 export function AdminListingsTable({
@@ -236,25 +295,28 @@ export function AdminListingsTable({
                       ? `Published ${formatAdminDate(listing.publishedAt)}`
                       : "Not yet published"}
                   </p>
-                  <div className={styles.tags}>
-                    <span className={styles.tag}>Housing · Meals · Pay</span>
-                    <span className={styles.tag}>
-                      {published ? "Live record" : "Pre-publish"}
-                    </span>
-                  </div>
+                  <ul className={styles.tags} aria-label="Moderation signals">
+                    {rowSignals(listing.status, published).map((signal) => (
+                      <li
+                        key={signal.label}
+                        className={`${styles.tag} ${styles[`tag_${signal.tone}`]}`}
+                      >
+                        <Icon name={signal.icon} size={16} />
+                        {signal.label}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
                 <div className={styles.actionsStack}>
                   <div className={styles.figure}>
-                    <span
-                      className={`${styles.figureValue} ${
-                        published ? "" : styles.figureValueMissing
-                      }`.trim()}
-                    >
-                      {published ? formatAdminDate(listing.publishedAt) : "Draft"}
+                    <span className={styles.figureValue}>
+                      {published
+                        ? formatAdminDate(listing.publishedAt)
+                        : humanizeToken(listing.status)}
                     </span>
                     <span className={styles.figureLabel}>
-                      {published ? "Published" : "Pay range pending"}
+                      {published ? "Published" : "Current stage"}
                     </span>
                   </div>
                   <div className={styles.actions}>
@@ -269,25 +331,25 @@ export function AdminListingsTable({
                     >
                       Approve
                     </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() =>
-                        runAction(listing.id, () =>
-                          rejectListingAction(listing.id),
-                        )
-                      }
-                    >
-                      Reject
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        router.push(`/admin/listings/${listing.id}`)
-                      }
-                    >
-                      Review
-                    </Button>
+                    <div className={styles.actionsSecondary}>
+                      <Button
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() =>
+                          runAction(listing.id, () =>
+                            rejectListingAction(listing.id),
+                          )
+                        }
+                      >
+                        Reject
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => router.push(`/listings/${listing.id}`)}
+                      >
+                        Review
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </li>

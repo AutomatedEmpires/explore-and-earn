@@ -113,11 +113,6 @@ export default async function HostInvitesPage() {
   const applyRate = pct(applied, sent);
   const campaigns = toCampaigns(invites);
 
-  // Sparklines: cumulative invite cadence + funnel shape from the real data.
-  const sentSpark = [18, 30, 24, 46, 58, 72, Math.min(100, 60 + sent)];
-  const openSpark = [20, 28, 36, 44, 52, 60, Math.max(20, openRate)];
-  const applySpark = [12, 18, 22, 30, 26, 34, Math.max(14, applyRate)];
-
   const roleOptions =
     listings.length > 0
       ? listings.map((l) => l.title)
@@ -137,21 +132,18 @@ export default async function HostInvitesPage() {
           value={sent.toLocaleString()}
           trend={sent > 0 ? "All-time" : "None yet"}
           trendTone="neutral"
-          spark={sentSpark}
         />
         <MetricCard
           label="Open rate"
           value={`${openRate}%`}
           trend={sent > 0 ? `${opened} opened` : "—"}
           trendTone={openRate >= 40 ? "up" : "neutral"}
-          spark={openSpark}
         />
         <MetricCard
           label="Invite-to-apply"
           value={`${applyRate}%`}
           trend={sent > 0 ? `${applied} applied` : "—"}
           trendTone={applyRate >= 15 ? "up" : "neutral"}
-          spark={applySpark}
         />
       </MetricGrid>
 
@@ -166,7 +158,7 @@ export default async function HostInvitesPage() {
                 search.
               </p>
             </div>
-            <Chip icon="status.match">Smart targeting</Chip>
+            <Chip icon="action.edit">Planning aid</Chip>
           </div>
 
           <div className={styles.form}>
@@ -191,9 +183,10 @@ export default async function HostInvitesPage() {
                 Audience
               </label>
               <select id="campaign-audience" className={styles.select}>
-                <option>90%+ match seekers</option>
+                <option>Seekers in your category</option>
                 <option>Ready-now seekers</option>
-                <option>Housing-seeking seekers</option>
+                <option>Seekers needing housing</option>
+                <option>Open to all seekers</option>
               </select>
             </div>
             <div className={styles.field}>
@@ -229,9 +222,10 @@ export default async function HostInvitesPage() {
 
           <p className={styles.builderNote}>
             <Icon name="system.info" size={16} aria-hidden />
-            Targeting is a planning aid. Pick a listing below and open seeker
-            search to send real, personalized invites — every send is tracked as
-            a campaign.
+            This builder is a planning aid, not an automatic match engine —
+            nothing here sends on its own. Use it to shape your angle, then pick
+            a listing below and open seeker search to send real, personalized
+            invites. Every send is tracked as a campaign.
           </p>
         </div>
 
@@ -290,7 +284,7 @@ export default async function HostInvitesPage() {
                     </div>
                     <div className={styles.campaignTags}>
                       <span className={styles.tag}>
-                        <Icon name="status.match" size={16} aria-hidden />
+                        <Icon name="action.view" size={16} aria-hidden />
                         {pct(c.opened, c.sent)}% open
                       </span>
                       <span className={styles.tag}>

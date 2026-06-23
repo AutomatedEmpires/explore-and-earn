@@ -8,118 +8,281 @@
 	padding-bottom: calc(var(--space-section) * 2);
 }
 
-/* ── Progress ─────────────────────────────────────────────────────────────── */
+/* ── Stepper (progress ring + segmented rail) ─────────────────────────────── */
 
-.progressBar {
-	position: relative;
-	height: 6px;
-	background: var(--color-surface-raised);
-	border-radius: var(--radius-pill);
-	overflow: hidden;
-	margin-bottom: var(--space-4);
-}
-
-.progressFill {
-	height: 100%;
-	background: var(--color-cta);
-	border-radius: var(--radius-pill);
-	transition: width 0.4s var(--ease-standard);
-}
-
-.progressLabel {
-	position: absolute;
-	top: 10px;
-	right: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-meta-size);
-	color: var(--text-secondary);
-}
-
-/* ── Step nav ─────────────────────────────────────────────────────────────── */
-
-.stepNav {
-	display: flex;
-	align-items: stretch;
-	gap: 2px;
-	background: var(--color-surface-raised);
-	border-radius: var(--radius-card);
-	padding: var(--space-4);
-	overflow-x: auto;
-	scrollbar-width: none;
-}
-
-.stepNav::-webkit-scrollbar {
-	display: none;
-}
-
-.stepBtn,
-.stepBtnActive,
-.stepBtnDone {
+.stepper {
 	display: flex;
 	flex-direction: column;
-	align-items: center;
-	gap: var(--space-4);
-	flex: 1 1 0;
-	min-width: 56px;
-	padding: var(--space-8) var(--space-4);
-	background: transparent;
-	border: none;
-	border-radius: var(--radius-cell);
-	cursor: pointer;
-	transition: background var(--motion-fast) var(--ease-standard);
+	gap: var(--space-16);
+	background: var(--color-surface-raised);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	padding: var(--space-16);
 }
 
-.stepBtn {
+.stepperTop {
+	display: flex;
+	align-items: center;
+	gap: var(--space-12);
+}
+
+.stepperHead {
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.stepperStatus {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 	color: var(--text-muted);
 }
 
-.stepBtn:hover {
-	background: var(--color-surface);
-	color: var(--text-secondary);
+.stepperTitle {
+	display: flex;
+	align-items: center;
+	gap: var(--space-6);
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	line-height: 1.15;
+	color: var(--text-primary);
 }
 
-.stepBtnActive {
-	background: var(--color-cta);
-	color: var(--color-cta-text);
+.stepperCount {
+	flex-shrink: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	line-height: 1;
 }
 
-.stepBtnDone {
-	color: var(--color-cta);
+.stepperCountTotal {
+	font-size: var(--type-meta-size);
+	color: var(--text-muted);
 }
 
-.stepBtnDone:hover {
-	background: var(--color-surface);
-}
-
-.stepIconWrap {
+/* Completion ring — mirrors the dashboard ResumeCallout signal */
+.ringWrap,
+.ringWrapComplete {
 	position: relative;
+	flex-shrink: 0;
+	width: 44px;
+	height: 44px;
+	display: grid;
+	place-items: center;
+}
+
+.ring {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.ringTrack {
+	stroke: var(--border-soft);
+	stroke-width: 4;
+}
+
+.ringValue {
+	stroke: var(--color-cta);
+	stroke-width: 4;
+	transition: stroke-dasharray var(--motion-base) var(--ease-standard);
+}
+
+.ringWrapComplete .ringValue {
+	stroke: var(--status-match-fg);
+}
+
+.ringPct {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	line-height: 1;
+}
+
+.ringWrapComplete .ringPct {
+	color: var(--status-match-fg);
+}
+
+/* Segmented rail — equal-width nodes, no horizontal overflow */
+.rail {
+	position: relative;
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-2);
+}
+
+.node,
+.nodeActive,
+.nodeDone {
+	position: relative;
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min);
+	padding: var(--space-4) 0 0;
+	background: transparent;
+	border: none;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+}
+
+/* Connector rail behind the dots */
+.node::before,
+.nodeActive::before,
+.nodeDone::before {
+	content: "";
+	position: absolute;
+	top: calc(var(--space-4) + 13px);
+	left: -50%;
+	width: 100%;
+	height: 2px;
+	background: var(--border-soft);
+	z-index: 0;
+}
+
+.node:first-child::before,
+.nodeActive:first-child::before,
+.nodeDone:first-child::before {
+	display: none;
+}
+
+.nodeDone::before,
+.nodeActive::before {
+	background: var(--color-cta);
+}
+
+.nodeDot {
+	position: relative;
+	z-index: 1;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 24px;
-	height: 24px;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--radius-pill);
+	border: 2px solid var(--border-soft);
+	background: var(--color-surface-raised);
+	color: var(--text-muted);
+	transition: transform var(--motion-base) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard),
+		color var(--motion-fast) var(--ease-standard);
 }
 
-.stepCheck {
-	position: absolute;
-	top: -4px;
-	right: -6px;
-	font-size: 9px;
-	font-weight: 700;
-	color: var(--color-cta);
-	background: var(--color-paper);
-	border-radius: 50%;
-	line-height: 1;
-	padding: 1px;
-}
-
-.stepLabel {
+.nodeNum {
 	font-family: var(--font-ui);
-	font-size: 10px;
+	font-size: var(--type-caption-size);
 	font-weight: var(--font-weight-semibold);
-	letter-spacing: 0.03em;
+	line-height: 1;
+}
+
+.nodeDone .nodeDot {
+	border-color: var(--color-cta);
+	background: var(--status-match-bg);
+	color: var(--color-cta);
+}
+
+.nodeActive .nodeDot {
+	border-color: var(--color-cta);
+	background: var(--color-cta);
+	color: var(--color-cta-text);
+	transform: scale(1.12);
+	box-shadow: 0 0 0 4px var(--status-match-bg);
+}
+
+.node:hover .nodeDot {
+	border-color: var(--color-cta);
+	color: var(--color-cta);
+}
+
+.nodeLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
 	text-align: center;
-	white-space: nowrap;
+	line-height: 1.2;
+	color: var(--text-muted);
+}
+
+.nodeActive .nodeLabel {
+	color: var(--text-primary);
+}
+
+.nodeDone .nodeLabel {
+	color: var(--text-secondary);
+}
+
+.node:focus-visible,
+.nodeActive:focus-visible,
+.nodeDone:focus-visible {
+	outline: none;
+}
+
+.node:focus-visible .nodeDot,
+.nodeActive:focus-visible .nodeDot,
+.nodeDone:focus-visible .nodeDot {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+.node:active .nodeDot,
+.nodeDone:active .nodeDot {
+	transform: scale(0.94);
+}
+
+/* Hide crowded labels on the very narrowest screens — the active step's full
+   title already shows above the rail, so the track stays scannable. */
+@media (max-width: 360px) {
+	.nodeLabel {
+		display: none;
+	}
+
+	.node,
+	.nodeActive,
+	.nodeDone {
+		gap: 0;
+		min-height: 44px;
+		justify-content: center;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ringValue {
+		transition: none;
+	}
+
+	.nodeDot {
+		transition: background var(--motion-fast) var(--ease-standard),
+			border-color var(--motion-fast) var(--ease-standard),
+			color var(--motion-fast) var(--ease-standard);
+	}
+
+	.nodeActive .nodeDot {
+		transform: none;
+	}
+
+	.node:active .nodeDot,
+	.nodeDone:active .nodeDot {
+		transform: none;
+	}
 }
 
 /* ── Step content ─────────────────────────────────────────────────────────── */
@@ -666,8 +829,9 @@
 	border-top: 1px solid var(--border-soft);
 }
 
-/* On phones the Prev/Next controls stick to the bottom so they stay reachable
-   on long steps (e.g. Experience with several saved cards). */
+/* On phones the Back / Save & continue controls stick to the bottom so
+   advancing is always reachable on long steps (e.g. Experience with several
+   saved cards). The primary affordance dominates the bar. */
 @media (max-width: 640px) {
 	.stepFooter {
 		position: sticky;
@@ -676,10 +840,11 @@
 		margin: var(--space-16) calc(-1 * var(--space-gutter)) 0;
 		padding: var(--space-12) var(--space-gutter)
 			calc(var(--space-12) + env(safe-area-inset-bottom));
+		border-top: 1px solid var(--border-soft);
 		background: color-mix(in srgb, var(--color-paper) 88%, transparent);
-		backdrop-filter: blur(10px);
-		-webkit-backdrop-filter: blur(10px);
-		box-shadow: var(--elevation-card);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		box-shadow: 0 -4px 16px color-mix(in srgb, var(--color-ink) 6%, transparent);
 	}
 }
 
@@ -687,4 +852,83 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	color: var(--text-muted);
+}
+
+.backBtn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-4);
+	flex-shrink: 0;
+	min-height: var(--tap-min);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-secondary);
+	background: transparent;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-cell);
+	padding: var(--space-8) var(--space-16);
+	cursor: pointer;
+	transition: background var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard),
+		color var(--motion-fast) var(--ease-standard);
+}
+
+.backBtn:hover {
+	background: var(--color-surface);
+	color: var(--text-primary);
+}
+
+.backBtn:active {
+	background: var(--color-surface-raised);
+}
+
+.backBtn:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+.continueBtn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta-text);
+	background: var(--color-cta);
+	border: none;
+	border-radius: var(--radius-cell);
+	padding: var(--space-8) var(--space-section);
+	cursor: pointer;
+	transition: transform var(--motion-fast) var(--ease-standard),
+		filter var(--motion-fast) var(--ease-standard);
+}
+
+.continueBtn:hover {
+	filter: brightness(1.04);
+}
+
+.continueBtn:active {
+	transform: scale(0.98);
+}
+
+.continueBtn:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* On phones, let the primary CTA dominate the sticky bar. */
+@media (max-width: 640px) {
+	.continueBtn {
+		flex: 1 1 auto;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.continueBtn:active {
+		transform: none;
+	}
 }

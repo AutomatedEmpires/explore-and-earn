@@ -82,18 +82,25 @@ function StageChart({ byStatus }: { byStatus: Record<string, number> }) {
     return <p className={styles.emptyNote}>No applications to chart yet.</p>;
   }
 
+  // One semantic structure, two responsive readings:
+  //  · ≥640px → vertical bar columns (the premium command-center chart)
+  //  · ≤639px → horizontal bar list — label · token track · value — so all
+  //    eight real stages stay readable instead of 38px wrapping columns.
   return (
     <div className={styles.chart} role="img" aria-label="Applications by pipeline stage">
       {stages.map((status, i) => {
         const count = byStatus[status] ?? 0;
-        const h = Math.max(8, Math.round((count / max) * 100));
+        const pct = Math.max(8, Math.round((count / max) * 100));
         return (
-          <div key={status} className={styles.chartCol}>
+          <div
+            key={status}
+            className={styles.chartCol}
+            style={{ "--p": `${pct}%`, "--i": i } as React.CSSProperties}
+          >
             <span className={styles.chartCount}>{count}</span>
-            <div
-              className={styles.bar}
-              style={{ "--h": `${h}%`, "--i": i } as React.CSSProperties}
-            />
+            <div className={styles.barTrack}>
+              <div className={styles.bar} />
+            </div>
             <span className={styles.chartLabel}>
               {APPLICATION_STATUS_LABEL[status] ?? status}
             </span>

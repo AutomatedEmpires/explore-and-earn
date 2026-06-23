@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { Badge, Icon, Meter } from "@explore-and-earn/ui";
+import { Badge, Icon } from "@explore-and-earn/ui";
 
 import type {
   HostAnalytics,
@@ -91,6 +91,38 @@ export function HostDashboard({
     totalApplicationsAllTime > 0
       ? Math.round((reviewed / totalApplicationsAllTime) * 100)
       : 0;
+
+  // ── Pipeline stage breakdown ────────────────────────────────────────
+  // Group the host's REAL all-time application counts (the same source the
+  // radar reads) into three honest funnel stages so the pipeline panel is as
+  // explainable as the radar — never a single mystery meter. Counts come
+  // straight from analytics.totalApplicationsByStatus (no fabrication); the
+  // denominator is the all-time total so the bars always sum to the pipeline.
+  const appsByStatus = analytics.totalApplicationsByStatus;
+  const stageNew = appsByStatus["applied"] ?? 0;
+  const stageReview =
+    (appsByStatus["reviewing"] ?? 0) + (appsByStatus["saved_by_host"] ?? 0);
+  const stageAdvanced =
+    (appsByStatus["offered"] ?? 0) +
+    (appsByStatus["accepted"] ?? 0) +
+    (appsByStatus["active"] ?? 0) +
+    (appsByStatus["completed"] ?? 0);
+  const pipelineTotal = totalApplicationsAllTime;
+  const pipelineStages = [
+    { label: "New", hint: "Awaiting first look", count: stageNew, tone: "new" },
+    {
+      label: "In review",
+      hint: "Reviewing & shortlisted",
+      count: stageReview,
+      tone: "review",
+    },
+    {
+      label: "Advanced",
+      hint: "Offered & onward",
+      count: stageAdvanced,
+      tone: "advanced",
+    },
+  ] as const;
 
   const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
   const topListings = analytics.perListingStats.slice(0, 5);
@@ -297,17 +329,49 @@ export function HostDashboard({
               <Icon name="action.forward" size={16} aria-hidden />
             </Link>
           </div>
-          {totalAppsMonth > 0 ? (
-            <>
-              <div className={styles.meterRow}>
-                <Meter value={pipelineFill} label="REVIEWED" />
-                <span className={styles.meterLabel}>
-                  {reviewed} of {totalAppsMonth} reviewed
+          {pipelineTotal > 0 ? (
+            <div className={styles.pipeline}>
+              <div className={styles.pipelineLede}>
+                <span className={styles.pipelinePct}>{pipelineFill}%</span>
+                <span className={styles.pipelineLedeText}>
+                  moved past first review
+                  <span className={styles.pipelineLedeSub}>
+                    {reviewed} of {pipelineTotal} applicants
+                  </span>
                 </span>
               </div>
-            </>
+              <ul className={styles.pipelineStages}>
+                {pipelineStages.map((stage) => {
+                  const pct =
+                    pipelineTotal > 0
+                      ? Math.round((stage.count / pipelineTotal) * 100)
+                      : 0;
+                  return (
+                    <li
+                      key={stage.label}
+                      className={styles.pipelineStage}
+                      data-tone={stage.tone}
+                      style={{ "--pct": `${pct}%` } as CSSProperties}
+                    >
+                      <span className={styles.pipelineStageLabel}>
+                        {stage.label}
+                        <span className={styles.pipelineStageHint}>
+                          {stage.hint}
+                        </span>
+                      </span>
+                      <span className={styles.pipelineStageCount}>
+                        {stage.count}
+                      </span>
+                      <span className={styles.pipelineStageTrack} aria-hidden>
+                        <span />
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           ) : (
-            <p className={styles.muted}>No applications yet this month.</p>
+            <p className={styles.muted}>No applications yet.</p>
           )}
         </section>
 

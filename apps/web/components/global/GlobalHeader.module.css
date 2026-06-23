@@ -1,10 +1,25 @@
 /*
- * GlobalHeader — ocean blue / silver-chrome header.
+ * GlobalHeader — deep-sky / silver-chrome glass header.
  *
- * Medium-dark navy gradient. Silver metallic accents. Two distinct separated
- * nav buttons (not a shared pill) so EXPLORE / COMMUNITY clearly read as
- * individual selectable choices. Smart hide-on-scroll via .headerHidden.
+ * The single public + scoped header. Deep-sky gradient shell, silver-chrome
+ * accents, two distinct separated nav buttons (not a shared pill) so
+ * EXPLORE / COMMUNITY clearly read as individual selectable choices. Smart
+ * hide-on-scroll via .headerHidden.
+ *
+ * Fully tokenized: every surface, line, and text tone derives from the locked
+ * chrome/sky palette via color-mix, so it themes correctly on the dark-sky
+ * shell and never drifts from the dashboard header family. Focus rings use a
+ * bright steel halo (legible on the dark gradient).
  */
+
+/* Local chrome aliases — keep the rest of the file readable while staying
+   100% token-derived. --hdr-chrome is the silver metallic accent; --hdr-text
+   is the cool steel ink that rides on the deep-sky gradient. */
+.header {
+  --hdr-chrome: var(--color-chrome);
+  --hdr-text: var(--palette-steel);
+  --hdr-focus: 0 0 0 2px var(--palette-white), 0 0 0 4px var(--palette-sky-light);
+}
 
 /* ─── Full-bleed shell ───────────────────────────────────────────────────── */
 
@@ -14,18 +29,20 @@
   z-index: 30;
   width: 100%;
 
-  /* Ocean blue: sky glow left → deep navy right */
+  /* Deep sky: sky glow left → deeper sky right, all palette-locked */
   background-color: var(--palette-header);
   background-image:
-    radial-gradient(ellipse 60% 150% at 0% 60%,  rgba(26, 142, 206, 0.22) 0%, transparent 58%),
-    radial-gradient(ellipse 50% 120% at 100% 30%, rgba(18,  40,  80, 0.28) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 150% at 0% 60%,
+      color-mix(in srgb, var(--palette-sky-light) 26%, transparent) 0%, transparent 58%),
+    radial-gradient(ellipse 50% 120% at 100% 30%,
+      color-mix(in srgb, var(--palette-sky-dark) 55%, transparent) 0%, transparent 55%),
     linear-gradient(130deg, var(--palette-header-mid) 0%, var(--palette-header) 100%);
 
   /* Single silver hairline — clean terminus, no shadow float */
-  border-bottom: 1px solid rgba(180, 200, 225, 0.14);
+  border-bottom: 1px solid color-mix(in srgb, var(--hdr-chrome) 24%, transparent);
 
   will-change: transform;
-  transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--motion-drawer) var(--ease-standard);
 }
 
 .headerHidden {
@@ -60,14 +77,14 @@
   align-items: center;
   gap: var(--space-8);
   text-decoration: none;
-  color: #FFFFFF;
+  color: var(--palette-white);
   border-radius: var(--radius-input);
   flex-shrink: 0;
   outline: none;
 }
 
 .brand:focus-visible {
-  box-shadow: 0 0 0 2px var(--palette-sky);
+  box-shadow: var(--hdr-focus);
 }
 
 .pinMark {
@@ -77,12 +94,12 @@
   width: 2rem;
   height: 2.375rem;
   flex-shrink: 0;
-  color: #FFFFFF;
+  color: var(--palette-white);
   transition: color var(--motion-fast) var(--ease-standard);
 }
 
 .brand:hover .pinMark {
-  color: var(--palette-chrome); /* silver shimmer on hover */
+  color: var(--hdr-chrome); /* silver shimmer on hover */
 }
 
 /* Patrick Hand wordmark */
@@ -92,12 +109,12 @@
   font-weight: var(--font-weight-regular);
   line-height: 1;
   letter-spacing: -0.01em;
-  color: #FFFFFF;
+  color: var(--palette-white);
   white-space: nowrap;
 }
 
 .wordmarkAmp {
-  color: rgba(255, 255, 255, 0.4);
+  color: color-mix(in srgb, var(--palette-white) 42%, transparent);
 }
 
 /* Silver capsule badge */
@@ -106,15 +123,15 @@
   align-items: center;
   height: 1.25rem;
   padding: 0 var(--space-8);
-  border: 1px solid rgba(180, 200, 225, 0.3);
+  border: 1px solid color-mix(in srgb, var(--hdr-chrome) 40%, transparent);
   border-radius: var(--radius-pill);
-  background: rgba(180, 200, 225, 0.08);
+  background: color-mix(in srgb, var(--hdr-chrome) 12%, transparent);
   font-family: var(--font-ui);
   font-size: 0.5625rem;
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
-  color: rgba(200, 218, 235, 0.65); /* silver text */
+  color: color-mix(in srgb, var(--hdr-text) 80%, transparent); /* silver text */
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -124,7 +141,7 @@
 .sectionNav {
   display: inline-flex;
   align-items: center;
-  gap: 5px; /* visible gap — clearly two separate choices */
+  gap: var(--space-6); /* visible gap — clearly two separate choices */
   padding: 0;
   border: none;
   background: transparent;
@@ -139,14 +156,14 @@
   padding: 0 var(--space-16);
   border-radius: var(--radius-pill);
   /* Visible outline makes it look like a button, not just text */
-  border: 1.5px solid rgba(180, 200, 225, 0.22);
-  background: rgba(180, 200, 225, 0.06);
+  border: 1.5px solid color-mix(in srgb, var(--hdr-chrome) 28%, transparent);
+  background: color-mix(in srgb, var(--hdr-chrome) 8%, transparent);
   font-family: var(--font-ui);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: rgba(200, 218, 235, 0.48);
+  color: color-mix(in srgb, var(--hdr-text) 60%, transparent);
   text-decoration: none;
   outline: none;
   white-space: nowrap;
@@ -158,27 +175,27 @@
 }
 
 .navLink:hover {
-  color: rgba(220, 232, 245, 0.82);
-  border-color: rgba(180, 200, 225, 0.42);
-  background: rgba(180, 200, 225, 0.1);
+  color: color-mix(in srgb, var(--hdr-text) 92%, transparent);
+  border-color: color-mix(in srgb, var(--hdr-chrome) 50%, transparent);
+  background: color-mix(in srgb, var(--hdr-chrome) 13%, transparent);
 }
 
 .navLink:focus-visible {
-  box-shadow: 0 0 0 2px var(--palette-sky);
+  box-shadow: var(--hdr-focus);
 }
 
-/* Active: bright white fill — clearly "you are here" */
+/* Active: bright chrome fill — clearly "you are here" */
 .navLinkActive {
-  background: rgba(255, 255, 255, 0.93);
-  border-color: rgba(255, 255, 255, 0.5);
-  color: var(--palette-header); /* deep navy text on white — maximum contrast */
+  background: color-mix(in srgb, var(--palette-white) 94%, transparent);
+  border-color: color-mix(in srgb, var(--palette-white) 50%, transparent);
+  color: var(--palette-header); /* deep-sky text on white — maximum contrast */
   box-shadow:
-    0 2px 8px  rgba(0, 0, 0, 0.22),
-    0 0 0 1px  rgba(255, 255, 255, 0.35) inset;
+    var(--elevation-pin),
+    0 0 0 1px color-mix(in srgb, var(--palette-white) 35%, transparent) inset;
 }
 
 .navLinkActive:hover {
-  background: rgba(255, 255, 255, 0.97);
+  background: var(--palette-white);
   color: var(--palette-header);
 }
 
@@ -209,7 +226,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: rgba(200, 218, 235, 0.48);
+  color: color-mix(in srgb, var(--hdr-text) 60%, transparent);
   text-decoration: none;
   white-space: nowrap;
   outline: none;
@@ -217,16 +234,16 @@
 }
 
 .communityTab:hover {
-  color: rgba(220, 232, 245, 0.82);
+  color: color-mix(in srgb, var(--hdr-text) 92%, transparent);
 }
 
 .communityTab:focus-visible {
-  box-shadow: 0 0 0 2px var(--palette-sky) inset;
+  box-shadow: var(--hdr-focus);
 }
 
 .communityTabActive {
-  color: #FFFFFF;
-  border-bottom-color: var(--color-cta);
+  color: var(--palette-white);
+  border-bottom-color: var(--palette-sky-light);
 }
 
 /* Unread activity dot — shown on Feed tab when there is unread community content */
@@ -234,11 +251,11 @@
   display: inline-block;
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: var(--color-cta);
-  margin-left: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--palette-sky-light);
+  margin-left: var(--space-2);
   flex-shrink: 0;
-  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--palette-sky-dark) 50%, transparent);
 }
 
 /* ─── Col 3 — auth ───────────────────────────────────────────────────────── */
@@ -250,7 +267,7 @@
   gap: var(--space-8);
 }
 
-/* Sky blue CTA — bright, pops on navy */
+/* Sky CTA — bright, pops on the deep-sky shell */
 .signInBtn {
   display: inline-flex;
   align-items: center;
@@ -259,8 +276,8 @@
   padding: 0 var(--space-20);
   border-radius: var(--radius-pill);
   border: none;
-  background: var(--color-cta); /* #2E9CDB sky blue */
-  color: #FFFFFF;
+  background: var(--palette-sky-light);
+  color: var(--palette-sky-dark);
   font-family: var(--font-ui);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
@@ -268,8 +285,8 @@
   text-transform: uppercase;
   text-decoration: none;
   box-shadow:
-    0 2px 10px rgba(46, 156, 219, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+    0 2px 10px color-mix(in srgb, var(--palette-sky-dark) 45%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--palette-white) 30%, transparent) inset;
   transition:
     transform    var(--motion-fast) var(--ease-standard),
     box-shadow   var(--motion-fast) var(--ease-standard);
@@ -281,8 +298,8 @@
 .signInBtn:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 5px 18px rgba(46, 156, 219, 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+    0 5px 18px color-mix(in srgb, var(--palette-sky-dark) 55%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--palette-white) 40%, transparent) inset;
 }
 
 .signInBtn:active {
@@ -290,7 +307,7 @@
 }
 
 .signInBtn:focus-visible {
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--palette-sky);
+  box-shadow: var(--hdr-focus);
   transform: translateY(-1px);
 }
 
@@ -303,10 +320,10 @@
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  border: 1.5px solid rgba(180, 200, 225, 0.25);
-  border-radius: 50%;
-  background: rgba(180, 200, 225, 0.07);
-  color: rgba(220, 232, 245, 0.8);
+  border: 1.5px solid color-mix(in srgb, var(--hdr-chrome) 30%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--hdr-chrome) 9%, transparent);
+  color: color-mix(in srgb, var(--hdr-text) 88%, transparent);
   text-decoration: none;
   transition:
     border-color var(--motion-fast) var(--ease-standard),
@@ -316,13 +333,13 @@
 }
 
 .iconBtn:hover {
-  border-color: rgba(180, 200, 225, 0.5);
-  background: rgba(180, 200, 225, 0.13);
+  border-color: color-mix(in srgb, var(--hdr-chrome) 55%, transparent);
+  background: color-mix(in srgb, var(--hdr-chrome) 16%, transparent);
   transform: translateY(-1px);
 }
 
 .iconBtn:focus-visible {
-  box-shadow: 0 0 0 2px var(--palette-sky);
+  box-shadow: var(--hdr-focus);
 }
 
 .badge {
@@ -336,8 +353,8 @@
   height: 1rem;
   padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
-  background: var(--color-cta);
-  color: white;
+  background: var(--palette-sky-light);
+  color: var(--palette-sky-dark);
   font-family: var(--font-ui);
   font-size: 0.5625rem;
   font-weight: var(--font-weight-semibold);
@@ -350,10 +367,10 @@
   gap: var(--space-8);
   height: 2.25rem;
   padding: 0 var(--space-8);
-  border: 1.5px solid rgba(180, 200, 225, 0.25);
+  border: 1.5px solid color-mix(in srgb, var(--hdr-chrome) 30%, transparent);
   border-radius: var(--radius-pill);
-  background: rgba(180, 200, 225, 0.07);
-  color: rgba(220, 232, 245, 0.8);
+  background: color-mix(in srgb, var(--hdr-chrome) 9%, transparent);
+  color: color-mix(in srgb, var(--hdr-text) 88%, transparent);
   text-decoration: none;
   transition:
     border-color var(--motion-fast) var(--ease-standard),
@@ -363,13 +380,13 @@
 }
 
 .avatarBtn:hover {
-  border-color: rgba(180, 200, 225, 0.5);
-  background: rgba(180, 200, 225, 0.13);
+  border-color: color-mix(in srgb, var(--hdr-chrome) 55%, transparent);
+  background: color-mix(in srgb, var(--hdr-chrome) 16%, transparent);
   transform: translateY(-1px);
 }
 
 .avatarBtn:focus-visible {
-  box-shadow: 0 0 0 2px var(--palette-sky);
+  box-shadow: var(--hdr-focus);
 }
 
 .avatarInitial {
@@ -378,9 +395,9 @@
   justify-content: center;
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 50%;
-  background: rgba(180, 200, 225, 0.18);
-  color: #FFFFFF;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--hdr-chrome) 22%, transparent);
+  color: var(--palette-white);
   font-family: var(--font-display);
   font-size: 0.75rem;
   line-height: 1;
@@ -417,7 +434,7 @@
     width: calc(100% + 2 * clamp(var(--space-16), 3vw, var(--space-24)));
     margin-left: calc(-1 * clamp(var(--space-16), 3vw, var(--space-24)));
     gap: 0;
-    border-top: 1px solid rgba(180, 200, 225, 0.1);
+    border-top: 1px solid color-mix(in srgb, var(--hdr-chrome) 18%, transparent);
     padding: 0;
   }
 
@@ -439,14 +456,14 @@
   .navLinkActive {
     background: transparent;
     border: none;
-    border-bottom: 2px solid var(--color-cta); /* sky blue rule */
-    color: #FFFFFF;
+    border-bottom: 2px solid var(--palette-sky-light); /* sky rule */
+    color: var(--palette-white);
     box-shadow: none;
   }
 
   .navLinkActive:hover {
     background: transparent;
-    color: #FFFFFF;
+    color: var(--palette-white);
   }
 
   /* Community tabs — same wall-to-wall treatment as sectionNav on mobile */
@@ -455,7 +472,7 @@
     grid-row: 2;
     width: calc(100% + 2 * clamp(var(--space-16), 3vw, var(--space-24)));
     margin-left: calc(-1 * clamp(var(--space-16), 3vw, var(--space-24)));
-    border-top: 1px solid rgba(180, 200, 225, 0.1);
+    border-top: 1px solid color-mix(in srgb, var(--hdr-chrome) 18%, transparent);
   }
 
   .communityTab {
@@ -482,6 +499,7 @@
 /* ─── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
+  .header,
   .navLink, .signInBtn, .iconBtn, .avatarBtn, .pinMark {
     transition: none;
   }

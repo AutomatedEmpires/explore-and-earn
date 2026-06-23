@@ -1,40 +1,14 @@
-import Link from "next/link";
-import { Icon } from "@explore-and-earn/ui";
+import { GlobalHeader } from "../global";
 
-import styles from "./PublicEntryHeader.module.css";
-
+/**
+ * @deprecated Retired in favor of the single unified public header.
+ *
+ * There is now ONE guest header across the whole public surface (home,
+ * about, legal): {@link GlobalHeader} in `scope="guest"`. This thin alias
+ * stays only so any lingering import keeps rendering the canonical header —
+ * it must never reintroduce a divergent wordmark/seal/scope-pill. Prefer
+ * importing `GlobalHeader` directly in new code.
+ */
 export function PublicEntryHeader() {
-	return (
-		<header className={styles.header}>
-			<div className={styles.brandGroup}>
-				<Link className={styles.brand} href="/" aria-label="Explore and Earn home">
-					<span className={styles.brandSeal} aria-hidden>
-						<Icon name="category.mix" size={20} aria-hidden />
-					</span>
-					<span className={styles.brandWordmark}>
-						explore&amp;earn
-					</span>
-				</Link>
-				<span className={styles.scopePill}>Seeker</span>
-			</div>
-
-			<nav className={styles.sectionNav} aria-label="Primary sections">
-				<Link className={`${styles.sectionLink} ${styles.sectionLinkActive}`} href="/">
-					Explore
-				</Link>
-				<Link className={styles.sectionLink} href="/community">
-					Community
-				</Link>
-			</nav>
-
-			<nav className={styles.authNav} aria-label="Authentication">
-				<Link className={styles.secondaryLink} href="/sign-up">
-					Sign up
-				</Link>
-				<Link className={styles.primaryLink} href="/sign-in">
-					Sign in
-				</Link>
-			</nav>
-		</header>
-	);
+	return <GlobalHeader scope="guest" isAuthenticated={false} />;
 }

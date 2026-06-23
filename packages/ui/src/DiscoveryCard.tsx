@@ -570,11 +570,11 @@ export function DiscoveryCard({
 						}}>
 							{centerBadge.icon && <Icon name={centerBadge.icon} size={16} aria-hidden />}
 							{centerBadge.decoration && (
-								<span aria-hidden style={{ fontFamily: UI_FONT, fontSize: "11px", opacity: 0.6, letterSpacing: 0 }}>≥—</span>
+								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
 							)}
 							{centerBadge.label}
 							{centerBadge.decoration && (
-								<span aria-hidden style={{ fontFamily: UI_FONT, fontSize: "11px", opacity: 0.6, letterSpacing: 0 }}>—≤</span>
+								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
 							)}
 						</span>
 					</div>
@@ -908,9 +908,9 @@ export function DiscoveryCard({
 									boxShadow: "3px 3px 0 rgba(23,19,13,0.30)",
 								}}
 							>
-								<span aria-hidden style={{ fontFamily: UI_FONT, fontSize: "12px", opacity: 0.6 }}>≥—</span>
+								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
 								Skip
-								<span aria-hidden style={{ fontFamily: UI_FONT, fontSize: "12px", opacity: 0.6 }}>—≤</span>
+								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
 							</button>
 
 							{/* SAVE — neutral bordered */}

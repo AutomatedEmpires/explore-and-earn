@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Icon } from "@explore-and-earn/ui";
+import { Icon, Skeleton } from "@explore-and-earn/ui";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 
 import styles from "./FeaturedEmployersRail.module.css";
@@ -19,6 +19,13 @@ export interface FeaturedEmployer {
   /** True when this employer holds an active paid featured campaign. */
   readonly isBoosted?: boolean;
 }
+
+/**
+ * Above this count the curated row genuinely overflows a typical viewport, so
+ * we switch from a static centered row to a manual scroll-snap carousel.
+ * At or below it, every employer is shown at once — no scroll, no duplication.
+ */
+const STATIC_ROW_MAX = 4;
 
 const CATEGORY_ABBR: Record<OpportunityCategory, string> = {
   farm:     "FARM",
@@ -51,34 +58,22 @@ function EmployerBadge({
 }
 
 function EmployerSkeleton() {
-  const slab = {
-    background: "rgba(0,0,0,0.07)",
-    borderRadius: "4px",
-  } as const;
-
   return (
     <li className={styles.railItem} aria-hidden="true">
-      <div
-        style={{
-          position: "relative",
-          display: "flex",
-          flexDirection: "column",
-          flexShrink: 0,
-          width: "18rem",
-          minWidth: "264px",
-          border: "1.5px solid rgba(25,21,14,0.12)",
-          borderRadius: "var(--radius-card)",
-          background: "var(--color-card-warm, #faf8f4)",
-          overflow: "hidden",
-        }}
-      >
-        {/* image placeholder */}
-        <div style={{ height: "160px", background: "rgba(0,0,0,0.06)" }} />
-        {/* text rows */}
-        <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          <div style={{ ...slab, height: "14px", width: "60%" }} />
-          <div style={{ ...slab, height: "12px", width: "80%" }} />
-          <div style={{ ...slab, height: "11px", width: "40%" }} />
+      <div className={styles.skeletonCard}>
+        <div className={styles.skeletonImage}>
+          <Skeleton variant="rect" />
+        </div>
+        <div className={styles.skeletonBody}>
+          <div className={styles.skeletonLine} data-w="name">
+            <Skeleton variant="text" />
+          </div>
+          <div className={styles.skeletonLine} data-w="meta">
+            <Skeleton variant="text" />
+          </div>
+          <div className={styles.skeletonLine} data-w="chips">
+            <Skeleton variant="text" />
+          </div>
         </div>
       </div>
     </li>
@@ -94,7 +89,9 @@ function EmployerCard({ employer }: { employer: FeaturedEmployer }) {
     <Link
       className={`${styles.card} ${styles[`card_${employer.category}`]}`}
       href={href}
-      aria-label={`${employer.hostName} — ${employer.location}`}
+      aria-label={`${employer.hostName} — ${employer.location}${
+        employer.isBoosted ? " (featured employer)" : ""
+      }`}
     >
       <div className={styles.imageSection}>
         <div className={`${styles.imageFrame} ${styles[`imageFrame_${employer.category}`]}`}>
@@ -109,6 +106,16 @@ function EmployerCard({ employer }: { employer: FeaturedEmployer }) {
             />
           ) : null}
         </div>
+
+        {/* Curated paid-placement marker — gold, paired with the verified mark.
+            Reads as deliberate selection, not a per-card noise label. */}
+        {employer.isBoosted ? (
+          <span className={styles.featuredMark}>
+            <Icon name="trust.featured_employer" size={16} aria-hidden />
+            Featured
+          </span>
+        ) : null}
+
         <EmployerBadge name={employer.hostName} category={employer.category} />
       </div>
 
@@ -121,11 +128,8 @@ function EmployerCard({ employer }: { employer: FeaturedEmployer }) {
             </span>
           )}
         </div>
-        {employer.isBoosted ? (
-          <span className={styles.featuredBadge} aria-label="Featured employer">Featured</span>
-        ) : null}
         <p className={styles.location}>
-          <span className={styles.locationDot} aria-hidden="true">●</span>
+          <span className={styles.locationDot} aria-hidden="true" />
           {employer.location}
         </p>
         <div className={styles.chips}>
@@ -149,6 +153,12 @@ export function FeaturedEmployersRail({
 }: {
   employers: readonly FeaturedEmployer[];
 }) {
+  const isLoading = employers.length === 0;
+  // A small curated set renders as a static, centered, evenly-spaced row.
+  // Only when the set genuinely overflows do we become a manual scroll rail.
+  const overflowing = employers.length > STATIC_ROW_MAX;
+  const layout = isLoading ? "static" : overflowing ? "scroll" : "static";
+
   return (
     <section
       className={styles.section}
@@ -158,8 +168,10 @@ export function FeaturedEmployersRail({
         <div className={styles.titleGroup}>
           <p className={styles.eyebrow}>Employers</p>
           <h2 id="featured-employers-heading" className={styles.sectionTitle}>
+            <span className={styles.titleMark} aria-hidden="true">
+              <Icon name="trust.featured_employer" size={20} aria-hidden />
+            </span>
             Featured employers
-            <span className={styles.sparkle} aria-hidden="true">✦</span>
           </h2>
         </div>
         <Link className={styles.viewAll} href="/seek">
@@ -168,30 +180,25 @@ export function FeaturedEmployersRail({
         </Link>
       </div>
 
-      {/* ── Rail — auto-scrolls, loops seamlessly ────────────────────── */}
-      <div className={styles.railOuter}>
-        <ul className={styles.rail} role="list">
-          {employers.length === 0 ? (
+      {/* Static centered row for a curated set; manual scroll-snap when it
+          genuinely overflows. No auto-scroll, no duplicated inventory. */}
+      <div className={styles.railOuter} data-layout={layout}>
+        <ul className={styles.rail} data-layout={layout} role="list">
+          {isLoading ? (
             <>
               <EmployerSkeleton />
               <EmployerSkeleton />
               <EmployerSkeleton />
             </>
           ) : (
-            <>
-              {/* Primary items — interactive */}
-              {employers.map((employer) => (
-                <li key={`${employer.hostName}-${employer.listingId}`} className={styles.railItem}>
-                  <EmployerCard employer={employer} />
-                </li>
-              ))}
-              {/* Duplicate items — decorative, for seamless loop */}
-              {employers.map((employer) => (
-                <li key={`${employer.hostName}-${employer.listingId}-2`} className={styles.railItem} aria-hidden="true">
-                  <EmployerCard employer={employer} />
-                </li>
-              ))}
-            </>
+            employers.map((employer) => (
+              <li
+                key={`${employer.hostName}-${employer.listingId}`}
+                className={styles.railItem}
+              >
+                <EmployerCard employer={employer} />
+              </li>
+            ))
           )}
         </ul>
       </div>

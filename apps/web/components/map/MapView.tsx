@@ -101,21 +101,38 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
           `${listing.coordinates.lat.toFixed(1)}:${listing.coordinates.lon.toFixed(1)}`,
       ),
     );
-    const housing = mapped.filter(
-      (listing) => listing.benefits.housing.provision !== "not_provided",
+    // Housing on site = roof fully provided (not partial, not absent). The
+    // label only claims a roof when the provision actually backs it.
+    const housingOnSite = mapped.filter(
+      (listing) => listing.benefits.housing.provision === "provided",
     ).length;
     const verified = mapped.filter((listing) => listing.host.verified).length;
     const topMatch = mapped.reduce(
       (best, listing) => Math.max(best, listing.matchScore ?? 0),
       0,
     );
+    // Real east–west span from actual pins (no fabricated geography). Only call
+    // it "coast to coast" when the longitude spread genuinely crosses the
+    // continent (~> 35° of longitude); otherwise describe the true footprint.
+    const lons = mapped.map((listing) => listing.coordinates.lon);
+    const lonSpan =
+      lons.length > 1 ? Math.max(...lons) - Math.min(...lons) : 0;
+    const spanLabel =
+      regions.size <= 1
+        ? "One region"
+        : lonSpan >= 35
+          ? "Coast to coast"
+          : lonSpan >= 12
+            ? "Spanning regions"
+            : "Clustered nearby";
     return {
       mapped: mapped.length,
       regions: regions.size,
       clusters: markerGroups.length,
-      housing,
+      housingOnSite,
       verified,
       topMatch,
+      spanLabel,
     };
   }, [mapped, markerGroups]);
 
@@ -273,14 +290,14 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
         <MetricCard
           label="Regions in reach"
           value={atlas.regions}
-          trend="Coast to coast"
-          trendTone="up"
+          trend={atlas.spanLabel}
+          trendTone={atlas.regions > 1 ? "up" : "neutral"}
         />
         <MetricCard
           label="Housing on site"
-          value={atlas.housing}
-          trend={atlas.housing > 0 ? "Roof included" : "None yet"}
-          trendTone={atlas.housing > 0 ? "up" : "down"}
+          value={atlas.housingOnSite}
+          trend={atlas.housingOnSite > 0 ? "Roof included" : "None yet"}
+          trendTone={atlas.housingOnSite > 0 ? "up" : "down"}
         />
         <MetricCard
           label={atlas.topMatch > 0 ? "Top match" : "Verified hosts"}

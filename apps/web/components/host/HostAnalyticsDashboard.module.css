@@ -112,6 +112,7 @@
 
 /* ── Token bar chart ─────────────────────────────────────────────── */
 
+/* Desktop (≥640px): vertical bar columns. */
 .chart {
   display: grid;
   grid-auto-flow: column;
@@ -139,11 +140,20 @@
   color: var(--text-secondary);
 }
 
+/* The track is the full-height lane; the bar fills it to --p from the bottom. */
+.barTrack {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  align-self: stretch;
+}
+
 .bar {
   width: 100%;
   max-width: 3.25rem;
-  height: var(--h, 8%);
-  align-self: end;
+  height: var(--p, 8%);
   border-radius: var(--radius-cell) var(--radius-cell) var(--space-4) var(--space-4);
   background:
     linear-gradient(
@@ -179,6 +189,17 @@
   }
   to {
     transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes analytics-bar-h {
+  from {
+    transform: scaleX(0.04);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
     opacity: 1;
   }
 }
@@ -591,13 +612,75 @@
     justify-content: space-between;
   }
 
+  /* Mobile (≤639px): horizontal bar list — label · token track · value.
+     All eight real stages stay readable instead of 38px wrapping columns. */
   .chart {
-    gap: var(--space-6);
-    min-height: 180px;
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    align-items: stretch;
+    gap: var(--space-10);
+    min-height: 0;
+    padding-top: var(--space-4);
+  }
+
+  .chartCol {
+    grid-template-rows: none;
+    grid-template-columns: minmax(0, 8.5rem) 1fr auto;
+    align-items: center;
+    justify-items: stretch;
+    gap: var(--space-12);
+    height: auto;
+    min-height: 2.25rem;
   }
 
   .chartLabel {
-    font-size: 0.6rem;
+    grid-column: 1;
+    order: 0;
+    font-size: var(--type-meta-size);
+    letter-spacing: 0.03em;
+    text-align: left;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-secondary);
+  }
+
+  .barTrack {
+    grid-column: 2;
+    order: 1;
+    align-items: center;
+    justify-content: flex-start;
+    height: 0.625rem;
+    border-radius: var(--radius-pill);
+    background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+    box-shadow: 0 0 0 1px var(--border-soft) inset;
+    overflow: hidden;
+  }
+
+  .bar {
+    width: var(--p, 8%);
+    max-width: none;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background:
+      linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--color-cta) 78%, transparent),
+        var(--color-cta)
+      );
+    transform-origin: left;
+    animation-name: analytics-bar-h;
+  }
+
+  .chartCount {
+    grid-column: 3;
+    order: 2;
+    justify-self: end;
+    min-width: 1.5rem;
+    font-size: var(--type-body-size);
+    text-align: right;
+    color: var(--text-primary);
   }
 }
 

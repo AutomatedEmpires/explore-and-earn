@@ -18,36 +18,6 @@
   gap: var(--space-12);
 }
 
-/* The Boosted-slots tile renders the fraction (in MetricCard display type) with
-   an inline capacity Meter stacked beneath it — slotted into MetricCard's value
-   so we reuse the tile frame rather than reinventing it. */
-.capacityValue {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-}
-
-.capacityMeter {
-  display: block;
-}
-
-.capacityTrack {
-  position: relative;
-  display: block;
-  height: var(--space-6);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
-  overflow: hidden;
-}
-
-.capacityFill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
-  background: var(--color-cta);
-  /* width set inline from real data */
-}
-
 /* Boost strategy — three-up fallback explainer (Enterprise -> Pro -> Starter). */
 .boostGrid {
   display: grid;

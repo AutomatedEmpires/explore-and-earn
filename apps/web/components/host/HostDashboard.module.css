@@ -32,10 +32,124 @@
   }
 }
 
-.meterRow {
+/* ── Application pipeline (stage breakdown) ──────────────────────── */
+/* Matches the conversion radar's density: a dominant headline figure, then a
+   per-stage mini-meter list so the funnel is explainable, never a single bar.
+   Counts + percentages are real (analytics.totalApplicationsByStatus). */
+.pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.pipelineLede {
   display: flex;
   align-items: center;
   gap: var(--space-12);
+}
+
+.pipelinePct {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 2.4rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pipelineLedeText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.pipelineLedeSub {
+  font-size: var(--type-caption-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pipelineStages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+/* Each stage: label + hint on the left, count on the right, then a full-width
+   tonal mini-meter — the same grid rhythm as the radar legend rows. */
+.pipelineStage {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--space-4) var(--space-8);
+}
+
+.pipelineStageLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.pipelineStageHint {
+  font-size: var(--type-caption-size);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.pipelineStageCount {
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pipelineStageTrack {
+  grid-column: 1 / -1;
+  height: 6px;
+  margin-top: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  overflow: hidden;
+}
+
+.pipelineStageTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  width: var(--pct, 0%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--stage-accent, var(--color-cta)) 55%, transparent),
+    var(--stage-accent, var(--color-cta))
+  );
+  transition: width 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Tonal accents per funnel stage — a cool→warm→accent progression so the eye
+   reads the pipeline left-to-right without good/bad coloring. */
+.pipelineStage[data-tone="new"] {
+  --stage-accent: var(--status-match-fg);
+}
+.pipelineStage[data-tone="review"] {
+  --stage-accent: var(--color-cta);
+}
+.pipelineStage[data-tone="advanced"] {
+  --stage-accent: var(--status-success-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipelineStageTrack > span {
+    transition: none;
+  }
 }
 
 /* ── Conversion radar (radial health donut) ──────────────────────── */
@@ -168,11 +282,6 @@
     color-mix(in srgb, var(--color-cta) 60%, transparent),
     var(--color-cta)
   );
-}
-
-.meterLabel {
-  font-size: var(--type-meta-size);
-  color: var(--text-secondary);
 }
 
 .muted {

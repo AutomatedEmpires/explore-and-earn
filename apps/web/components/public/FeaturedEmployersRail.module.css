@@ -7,6 +7,12 @@
  *   - Pencil-stamp circular badges at the image / body seam.
  *   - Ink borders throughout; no generic SaaS shadows.
  *
+ * Curation integrity:
+ *   - No duplicated inventory. A curated set (<= 4) renders as a STATIC,
+ *     centered, evenly-spaced row. Only a genuinely overflowing set becomes a
+ *     manual scroll-snap rail. There is no auto-scroll anywhere — the user
+ *     controls pacing.
+ *
  * Badge geometry:
  *   diameter  = 90px
  *   half      = 45px
@@ -28,9 +34,7 @@
   background: var(--color-parchment);
   border: 1.5px solid var(--border-ink-warm);
   border-radius: var(--radius-modal);
-  box-shadow:
-    0 4px 20px rgba(25, 21, 14, 0.07),
-    0 1px 4px  rgba(25, 21, 14, 0.04);
+  box-shadow: var(--elevation-card);
 }
 
 /* ─── Section header ────────────────────────────────────────────────────── */
@@ -70,10 +74,19 @@
   gap: var(--space-8);
 }
 
-.sparkle {
-  font-size: 0.8em;
+/* Gold curation mark beside the section title — sits in a soft ink ring so it
+   reads as an editorial stamp, not a decorative sparkle. */
+.titleMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
   color: var(--color-gold);
-  line-height: 1;
+  background: color-mix(in srgb, var(--status-featured-bg) 70%, var(--color-card-warm));
+  border: 1.5px solid color-mix(in srgb, var(--color-gold) 45%, transparent);
+  flex-shrink: 0;
 }
 
 .viewAll {
@@ -86,23 +99,37 @@
   color: var(--text-secondary);
   text-decoration: none;
   white-space: nowrap;
-  transition: color var(--motion-fast) var(--ease-standard);
+  transition: color var(--motion-fast) var(--ease-standard),
+              transform var(--motion-fast) var(--ease-standard);
 }
 
 .viewAll:hover {
   color: var(--text-primary);
 }
 
+.viewAll:active {
+  transform: translateX(1px);
+}
+
+.viewAll:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 3px;
+  border-radius: var(--radius-pill);
+}
+
 /* ─── Rail wrapper ──────────────────────────────────────────────────────── */
 
 .railOuter {
   position: relative;
+}
+
+/* Only the scroll layout clips + fades its edges into the parchment panel. */
+.railOuter[data-layout="scroll"] {
   overflow: hidden;
 }
 
-/* Fade edges into the parchment section background */
-.railOuter::before,
-.railOuter::after {
+.railOuter[data-layout="scroll"]::before,
+.railOuter[data-layout="scroll"]::after {
   content: "";
   position: absolute;
   top: 0;
@@ -112,12 +139,12 @@
   pointer-events: none;
 }
 
-.railOuter::before {
+.railOuter[data-layout="scroll"]::before {
   left: 0;
   background: linear-gradient(to right, var(--color-parchment), transparent);
 }
 
-.railOuter::after {
+.railOuter[data-layout="scroll"]::after {
   right: 0;
   background: linear-gradient(to left, var(--color-parchment), transparent);
 }
@@ -126,34 +153,38 @@
   display: flex;
   gap: var(--space-12);
   /* bottom padding lets the badge shadow clear cleanly */
-  padding-bottom: var(--space-4);
+  padding: 0 0 var(--space-4);
   list-style: none;
   margin: 0;
-  padding-left: 0;
-  width: max-content;
-  animation: railScroll 36s linear infinite;
 }
 
-.railOuter:hover .rail {
-  animation-play-state: paused;
+/* Curated set — centered, evenly spaced, wraps gracefully on narrow viewports.
+   No scroll, no auto-advance: every selected employer is visible. */
+.rail[data-layout="static"] {
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
-@keyframes railScroll {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
+/* Overflowing set — manual horizontal scroll with snap. User drives pacing. */
+.rail[data-layout="scroll"] {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-padding-left: var(--space-4);
+  scrollbar-width: none;
+}
+
+.rail[data-layout="scroll"]::-webkit-scrollbar {
+  display: none;
 }
 
 .railItem {
   flex-shrink: 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .rail { animation: none; }
-}
-
-.nextBtn:hover {
-  transform: translateY(calc(-50% - 1px));
-  box-shadow: 0 4px 14px rgba(25, 21, 14, 0.18);
+.rail[data-layout="scroll"] .railItem {
+  scroll-snap-align: start;
 }
 
 /* ─── Individual card ───────────────────────────────────────────────────── */
@@ -165,13 +196,12 @@
   flex-shrink: 0;
   width: 18rem;          /* 288px */
   min-width: 264px;
-  border: 1.5px solid rgba(25, 21, 14, 0.22);
-  border-top: 4px solid rgba(25, 21, 14, 0.40); /* overridden per-category below */
+  border: 1.5px solid var(--border-ink-warm);
+  border-top: 4px solid var(--border-ink-warm); /* overridden per-category below */
   border-radius: var(--radius-card);
-  background: linear-gradient(160deg, var(--color-card-warm) 0%, var(--color-surface-2, var(--color-surface)) 100%);
+  background: var(--gradient-paper-warm);
   color: inherit;
   text-decoration: none;
-  scroll-snap-align: start;
   overflow: visible;     /* badge protrudes below imageSection */
   transition:
     transform  var(--motion-base) var(--ease-standard),
@@ -207,11 +237,15 @@
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(25, 21, 14, 0.10);
+  box-shadow: var(--elevation-hover);
+}
+
+.card:active {
+  transform: translateY(0);
 }
 
 .card:focus-visible {
-  outline: 2px solid var(--border-ink-warm);
+  outline: 2px solid var(--color-cta);
   outline-offset: 3px;
 }
 
@@ -233,7 +267,7 @@
 
 .imageFrame {
   aspect-ratio: 3 / 2;
-  border: 1.5px solid rgba(25, 21, 14, 0.30);
+  border: 1.5px solid var(--border-ink-warm);
   border-radius: 14px;
   overflow: hidden;
   background: color-mix(in srgb, var(--color-parchment) 60%, var(--color-card-warm));
@@ -253,11 +287,46 @@
   object-fit: cover;
   object-position: center;
   /* No scrim — AGENTS.md: frame-not-filter. Never overlay on host photos. */
-  transition: transform 360ms var(--ease-standard);
+  transition: transform var(--motion-drawer) var(--ease-standard);
 }
 
 .card:hover .image {
   transform: scale(1.03);
+}
+
+/* ─── Featured (paid placement) marker ──────────────────────────────────── */
+
+/*
+ * A single gold curation stamp pinned to the top-right of the photo mat.
+ * Gold + ink ring = deliberate editorial selection. It does NOT expose tier
+ * mechanics — it simply marks this employer as curated/featured.
+ */
+
+.featuredMark {
+  position: absolute;
+  top: var(--space-8);
+  right: var(--space-8);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 1.5rem;
+  padding: 0 var(--space-8) 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid color-mix(in srgb, var(--color-gold) 55%, var(--border-ink-warm));
+  background: var(--status-featured-bg);
+  color: var(--status-featured-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+  box-shadow: var(--elevation-pin);
+}
+
+.featuredMark > * {
+  color: var(--color-gold);
 }
 
 /* ─── Circular employer badge ───────────────────────────────────────────── */
@@ -290,48 +359,29 @@
   box-shadow:
     0 0 0 3px var(--color-card-warm),
     0 0 0 5px var(--border-ink-warm),
-    0 3px 8px rgba(25, 21, 14, 0.18);
+    var(--elevation-pin);
 
   background: var(--color-card-warm);
   user-select: none;
 }
 
 /* Category-tinted badge fills — gradient fills + gap-ring matches card top color */
-.badge_farm {
-  background: var(--cat-farm-cover);
-  box-shadow:
-    0 0 0 3px var(--palette-surface),
-    0 0 0 5px var(--border-ink-warm),
-    0 3px 8px rgba(25, 21, 14, 0.20);
-}
-.badge_maritime {
-  background: var(--cat-maritime-cover);
-  box-shadow:
-    0 0 0 3px var(--palette-surface),
-    0 0 0 5px var(--border-ink-warm),
-    0 3px 8px rgba(25, 21, 14, 0.20);
-}
-.badge_remote {
-  background: var(--cat-remote-cover);
-  box-shadow:
-    0 0 0 3px var(--palette-surface),
-    0 0 0 5px var(--border-ink-warm),
-    0 3px 8px rgba(25, 21, 14, 0.20);
-}
-.badge_seasonal {
-  background: var(--cat-seasonal-cover);
-  box-shadow:
-    0 0 0 3px var(--palette-surface),
-    0 0 0 5px var(--border-ink-warm),
-    0 3px 8px rgba(25, 21, 14, 0.20);
-}
+.badge_farm,
+.badge_maritime,
+.badge_remote,
+.badge_seasonal,
 .badge_mix {
-  background: var(--cat-mix-cover);
   box-shadow:
     0 0 0 3px var(--palette-surface),
     0 0 0 5px var(--border-ink-warm),
-    0 3px 8px rgba(25, 21, 14, 0.20);
+    var(--elevation-pin);
 }
+
+.badge_farm     { background: var(--cat-farm-cover); }
+.badge_maritime { background: var(--cat-maritime-cover); }
+.badge_remote   { background: var(--cat-remote-cover); }
+.badge_seasonal { background: var(--cat-seasonal-cover); }
+.badge_mix      { background: var(--cat-mix-cover); }
 
 .badgeMark {
   font-family: var(--font-display);
@@ -346,7 +396,7 @@
   display: block;
   width: 28px;
   height: 1px;
-  background: rgba(25, 21, 14, 0.25);
+  background: color-mix(in srgb, var(--border-ink-warm) 25%, transparent);
   flex-shrink: 0;
 }
 
@@ -403,7 +453,7 @@
   margin: 0;
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-6);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
@@ -414,10 +464,12 @@
 }
 
 .locationDot {
-  font-size: 0.38em;
-  color: var(--color-cta, var(--palette-ink-warm));
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-cta);
   flex-shrink: 0;
-  line-height: 1;
 }
 
 /* ─── Chips row ─────────────────────────────────────────────────────────── */
@@ -425,7 +477,7 @@
 .chips {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-6);
   flex-wrap: wrap;
 }
 
@@ -435,7 +487,7 @@
   gap: var(--space-4);
   height: 1.625rem;
   padding: 0 var(--space-10);
-  border: 1px solid rgba(25, 21, 14, 0.18);
+  border: 1px solid color-mix(in srgb, var(--border-ink-warm) 18%, transparent);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-parchment) 60%, var(--color-card-warm));
   font-family: var(--font-ui);
@@ -461,22 +513,6 @@
   flex-shrink: 0;
 }
 
-/* ─── Featured (paid placement) badge ──────────────────────────────────── */
-
-.featuredBadge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: var(--color-surface-raised);
-  color: var(--text-secondary);
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  line-height: 1.6;
-}
-
 /* ─── Tagline ───────────────────────────────────────────────────────────── */
 
 .tagline {
@@ -491,6 +527,50 @@
   overflow: hidden;
 }
 
+/* ─── Loading skeleton — mirrors the real card layout ───────────────────── */
+
+.skeletonCard {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: 18rem;
+  min-width: 264px;
+  border: 1.5px solid color-mix(in srgb, var(--border-ink-warm) 14%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--color-card-warm);
+  overflow: hidden;
+}
+
+.skeletonImage {
+  margin: 14px 14px 0;
+  aspect-ratio: 3 / 2;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* The shared Skeleton renders a span — stretch it to fill its frame. */
+.skeletonImage > :global(.ui-skeleton),
+.skeletonLine > :global(.ui-skeleton) {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.skeletonBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-16);
+}
+
+.skeletonLine {
+  height: 0.875rem;
+}
+
+.skeletonLine[data-w="name"]  { width: 60%; }
+.skeletonLine[data-w="meta"]  { width: 80%; }
+.skeletonLine[data-w="chips"] { width: 45%; height: 0.75rem; }
+
 /* ─── Responsive ────────────────────────────────────────────────────────── */
 
 @media (max-width: 639px) {
@@ -498,13 +578,28 @@
     padding: var(--space-16) var(--space-14);
   }
 
-  .nextBtn {
+  .card,
+  .skeletonCard {
+    width: 15.5rem;
+    min-width: 248px;
+  }
+
+  /* Even a small set scrolls horizontally on phones — the user paces it. */
+  .rail[data-layout="static"] {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .rail[data-layout="static"]::-webkit-scrollbar {
     display: none;
   }
 
-  .card {
-    width: 15.5rem;
-    min-width: 248px;
+  .rail[data-layout="static"] .railItem {
+    scroll-snap-align: start;
   }
 
   .badge {
@@ -522,7 +617,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .card,
-  .nextBtn,
   .viewAll,
   .image {
     transition: none;
@@ -530,10 +624,14 @@
 
   .card:hover {
     transform: none;
-    box-shadow: none;
+    box-shadow: var(--elevation-card);
   }
 
   .card:hover .image {
     transform: none;
+  }
+
+  .rail {
+    scroll-behavior: auto;
   }
 }

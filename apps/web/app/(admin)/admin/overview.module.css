@@ -54,9 +54,10 @@
   border-radius: var(--radius-pill);
   border: 1px solid color-mix(in srgb, var(--color-cta) 38%, transparent);
   background: color-mix(in srgb, var(--color-cta) 14%, transparent);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
   color: var(--color-cta);
 }
@@ -129,16 +130,17 @@
 
 .opsValue {
   font-family: var(--font-display);
-  font-size: 1.55rem;
+  font-size: var(--type-section-size);
   line-height: 1;
   letter-spacing: -0.03em;
   color: var(--text-primary);
 }
 
 .opsLabel {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -156,8 +158,8 @@
 .sectionTitle {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.5rem;
-  line-height: 1.1;
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
   color: var(--text-primary);
 }
 
@@ -204,15 +206,15 @@
 .panelTitle {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.2rem;
-  line-height: 1.15;
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
   color: var(--text-primary);
 }
 
 .panelNote {
   margin: 0.2rem 0 0;
-  font-size: 0.86rem;
-  line-height: 1.45;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
   color: var(--text-secondary);
 }
 
@@ -227,11 +229,37 @@
   display: flex;
   align-items: center;
   gap: var(--space-12);
-  min-height: 3rem;
+  min-height: 3.25rem;
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-card);
   border: 1px solid var(--border-soft);
   background: color-mix(in srgb, var(--color-surface-raised) 60%, transparent);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
+}
+
+.queueRow:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--color-cta) 50%, var(--border-soft));
+  background: color-mix(in srgb, var(--color-surface-raised) 82%, transparent);
+}
+
+.queueRow:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.queueRow:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.queueRow:hover .queueGo {
+  color: var(--color-cta);
+  transform: translateX(2px);
 }
 
 .queueIcon {
@@ -261,20 +289,22 @@
 }
 
 .queueLabel {
-  font-weight: 700;
-  font-size: 0.94rem;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-body-size);
+  line-height: 1.25;
   color: var(--text-primary);
 }
 
 .queueMeta {
-  font-size: 0.78rem;
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
   color: var(--text-secondary);
 }
 
 .queueCount {
   flex: none;
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: var(--type-section-size);
   line-height: 1;
   letter-spacing: -0.04em;
   color: var(--text-primary);
@@ -282,6 +312,19 @@
 
 .queueRow[data-tone="hot"] .queueCount {
   color: var(--status-error-fg);
+}
+
+/* Affordance chevron — signals each queue row navigates to its workbench */
+.queueGo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--text-muted);
+  transition:
+    color var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 /* Health / diagnosis panel */
@@ -301,7 +344,7 @@
 
 .healthValue {
   font-family: var(--font-display);
-  font-size: 2.6rem;
+  font-size: var(--type-display-size);
   line-height: 1;
   letter-spacing: -0.04em;
   color: var(--text-primary);
@@ -384,20 +427,22 @@
 }
 
 .diagLabel {
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
   color: var(--text-primary);
 }
 
 .diagMeta {
-  font-size: 0.78rem;
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
   color: var(--text-secondary);
 }
 
 .diagValue {
   flex: none;
   font-family: var(--font-display);
-  font-size: 1.05rem;
+  font-size: var(--type-card-size);
   letter-spacing: -0.02em;
   color: var(--text-primary);
 }
@@ -420,14 +465,20 @@
   border: 1px solid transparent;
   background: var(--color-cta);
   color: var(--color-cta-text);
-  font-weight: 700;
-  font-size: 0.9rem;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-button-size);
+  line-height: var(--type-button-lh);
   text-decoration: none;
   transition: transform var(--motion-base) var(--ease-standard);
 }
 
 .cta:hover {
   transform: translateY(-1px);
+}
+
+.cta:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
 }
 
 .cta:active {
@@ -443,8 +494,19 @@
 @media (prefers-reduced-motion: reduce) {
   .dot,
   .healthFill,
-  .cta {
+  .cta,
+  .queueRow,
+  .queueGo {
     animation: none;
     transition: none;
+  }
+
+  .queueRow:hover,
+  .queueRow:active {
+    transform: none;
+  }
+
+  .queueRow:hover .queueGo {
+    transform: none;
   }
 }

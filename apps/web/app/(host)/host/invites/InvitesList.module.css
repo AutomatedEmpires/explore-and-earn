@@ -1,121 +1,346 @@
+/**
+ * Sent-invites list — re-tokenized against the locked set so it themes
+ * correctly inside the (host) dark-glass scope. Rows follow the applicant-card
+ * pattern: an initials avatar, an honest Sent→Delivered→Viewed→Applied status
+ * pip driven only by the real `status` field, and a right-aligned Withdraw.
+ * Semantic tokens only — no raw hex, px type, or ad-hoc radii.
+ */
+
+/* --- Toolbar: pick a listing, open seeker search -------------------------- */
 .toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-12);
   flex-wrap: wrap;
 }
 
 .listingLabel {
-  font-size: var(--type-body-sm);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.selectWrap {
+  position: relative;
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  max-width: 26rem;
 }
 
 .listingSelect {
-  flex: 1;
-  min-width: 12rem;
-  max-width: 24rem;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--type-body-sm);
-  background-color: var(--color-surface);
-  color: var(--color-text-primary);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-12) var(--space-32) var(--space-12) var(--space-14);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-input);
+  background: var(--field-bg);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  appearance: none;
   outline: none;
+  transition: border-color var(--motion-fast) var(--ease-standard);
 }
 
-.listingSelect:focus {
-  border-color: var(--color-text-link);
+.listingSelect:hover {
+  border-color: var(--border-ink);
+}
+
+.listingSelect:focus-visible {
+  border-color: var(--field-border-focus);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.selectChevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-12);
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
 }
 
 .noListings {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  gap: var(--space-8);
   margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
 }
 
+.noListings svg {
+  color: var(--color-cta);
+}
+
+/* --- Empty state ---------------------------------------------------------- */
 .empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-8) var(--space-4);
+  gap: var(--space-10);
+  padding: var(--space-32) var(--space-16);
   text-align: center;
-  color: var(--color-text-secondary);
-  font-size: var(--type-body-sm);
+  color: var(--text-secondary);
+}
+
+.empty svg {
+  color: var(--color-cta);
 }
 
 .empty p {
   margin: 0;
+  max-width: 38ch;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
 }
 
+/* --- List of sent invites ------------------------------------------------- */
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-12);
 }
 
 .item {
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background-color: var(--color-surface);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .item:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-ink);
+  }
+}
+
+/* Cold / terminal invites read quieter than in-flight ones. */
+.item[data-cold] {
+  opacity: 0.78;
+}
+
+.itemMain {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+/* Initials avatar — derived display initials only, never a raw id. */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-sky);
+  color: var(--color-cta-text);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: 1;
+}
+
+.itemBody {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-8);
+  min-width: 0;
+  flex: 1;
 }
 
 .itemHead {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
+  gap: var(--space-10);
 }
 
 .seekerName {
-  font-size: var(--type-body-sm);
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-
-.listingName {
-  font-size: var(--type-body-xs);
-  color: var(--color-text-secondary);
-}
-
-.message {
-  font-size: var(--type-body-xs);
-  color: var(--color-text-secondary);
-  font-style: italic;
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  background-color: var(--color-surface-raised);
-  border-radius: var(--radius-sm);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .date {
-  font-size: var(--type-body-xs);
-  color: var(--color-text-secondary);
+  flex: none;
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
-.itemFoot {
+.listingName {
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* --- Status pip: Sent → Delivered → Viewed → Applied ---------------------- */
+.pips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.pip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+/* connector between stages */
+.pip::after {
+  content: "";
+  width: var(--space-16);
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 24%, transparent);
+}
+
+.pip:last-child::after {
+  display: none;
+}
+
+.pipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  flex: none;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.pipLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* completed stages: solid CTA dot + filled connector */
+.pip[data-state="done"] .pipDot {
+  background: var(--color-cta);
+}
+
+.pip[data-state="done"]::after {
+  background: var(--color-cta);
+}
+
+.pip[data-state="done"] .pipLabel {
+  color: var(--text-secondary);
+}
+
+/* the current stage: emphasized ring + primary label */
+.pip[data-state="current"] .pipDot {
+  background: var(--color-cta);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-cta) 24%, transparent);
+}
+
+.pip[data-state="current"] .pipLabel {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* --- Cold / terminal status line ------------------------------------------ */
+.coldStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  align-self: flex-start;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-medium);
+}
+
+.coldStatus svg {
+  color: var(--text-muted);
+}
+
+/* --- Personal message ----------------------------------------------------- */
+.message {
+  margin: 0;
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--radius-cell);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  color: var(--text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  overflow-wrap: anywhere;
+}
+
+/* --- Right-aligned actions ------------------------------------------------ */
+.itemActions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-8);
-  margin-top: var(--space-4);
+  flex: none;
+  margin-left: auto;
 }
 
 .withdrawError {
-  margin: var(--space-8) 0 0;
+  margin: var(--space-12) 0 0;
   font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
   color: var(--status-error-fg);
+}
+
+@media (max-width: 639px) {
+  .itemActions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .itemActions :global(.ui-button) {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .pipDot,
+  .listingSelect {
+    transition: none;
+  }
+  .item:hover {
+    transform: none;
+  }
 }

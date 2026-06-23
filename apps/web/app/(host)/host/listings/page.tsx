@@ -24,13 +24,6 @@ import { EmptyState } from "../../../../components/discovery";
 import styles from "./page.module.css";
 
 /**
- * Premium homepage boost inventory available to this host's plan. Presentation-
- * only context for the command strip (real plan/billing is founder-gated and
- * out of scope); the capacity meter reads against this denominator.
- */
-const BOOST_SLOT_CAPACITY = 12;
-
-/**
  * Boost strategy fallback ladder — Enterprise fills first, Pro backfills empty
  * premium slots, Starter backfills only what is left without competing with
  * paid inventory. Mirrors the benchmark listingsView() "Boost strategy" panel.
@@ -82,7 +75,6 @@ function deriveListingMetrics(items: readonly HostListingItem[]) {
     active,
     drafts: counts.draft,
     boostedUsed,
-    boostCapacity: BOOST_SLOT_CAPACITY,
     applications,
     newApplications,
   };
@@ -187,7 +179,6 @@ export default async function HostListingsPage() {
   }));
 
   const metrics = deriveListingMetrics(withCounts);
-  const boostPct = Math.round((metrics.boostedUsed / metrics.boostCapacity) * 100);
 
   return (
     <section className={styles.block}>
@@ -216,29 +207,16 @@ export default async function HostListingsPage() {
                 trendTone={metrics.drafts > 0 ? "neutral" : "down"}
               />
               <MetricCard
-                label="Boosted slots"
-                value={
-                  <span className={styles.capacityValue}>
-                    {`${metrics.boostedUsed}/${metrics.boostCapacity}`}
-                    <span
-                      className={styles.capacityMeter}
-                      role="meter"
-                      aria-label="Boost slots used"
-                      aria-valuenow={metrics.boostedUsed}
-                      aria-valuemin={0}
-                      aria-valuemax={metrics.boostCapacity}
-                    >
-                      <span className={styles.capacityTrack}>
-                        <span
-                          className={styles.capacityFill}
-                          style={{ width: `${boostPct}%` }}
-                        />
-                      </span>
-                    </span>
-                  </span>
+                label="Boosted"
+                value={metrics.boostedUsed}
+                trend={
+                  metrics.boostedUsed > 0
+                    ? metrics.active > 0
+                      ? `of ${metrics.active} active`
+                      : "Live"
+                    : "None boosted"
                 }
-                trend={`${boostPct}%`}
-                trendTone="neutral"
+                trendTone={metrics.boostedUsed > 0 ? "up" : "neutral"}
               />
               <MetricCard
                 label="Applications"

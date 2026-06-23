@@ -190,7 +190,10 @@ export default async function HomePage() {
 
 					<div className={styles.photoHeroContent}>
 						<div className={styles.photoHeroCopy}>
-							<p className={styles.photoHeroEyebrow}>Welcome to Explore &amp; Earn</p>
+							<p className={styles.photoHeroEyebrow}>
+								<span className={styles.photoHeroEyebrowDot} aria-hidden="true" />
+								Welcome to Explore &amp; Earn
+							</p>
 							<h1 className={styles.photoHeroTitle}>
 								Built by seekers,<br />for seekers.
 							</h1>
@@ -224,24 +227,12 @@ export default async function HomePage() {
 				</div>
 			</section>
 
-			{/* ── Category photo reel — auto-scrolls, loops seamlessly ──── */}
+			{/* ── Category grid (4-up desktop) → scroll-snap row on mobile ── */}
 			<section className={styles.categoryReel} aria-label="Browse by category">
 				<div className={styles.categoryReelTrack}>
-					{/* Primary items — interactive */}
 					{WORK_CATEGORIES.map((cat) => (
 						<Link key={cat.key} href={cat.href} className={styles.reelCard}>
-							<Image src={cat.photoUrl} alt="" aria-hidden="true" fill className={styles.reelPhoto} sizes="220px" />
-							<div className={styles.reelOverlay} aria-hidden="true" />
-							<div className={styles.reelMeta}>
-								<Icon name={cat.iconName} size={16} aria-hidden />
-								<span className={styles.reelLabel}>{cat.label}</span>
-							</div>
-						</Link>
-					))}
-					{/* Duplicate items — decorative, for seamless loop */}
-					{WORK_CATEGORIES.map((cat) => (
-						<Link key={`${cat.key}-2`} href={cat.href} className={styles.reelCard} aria-hidden="true" tabIndex={-1}>
-							<Image src={cat.photoUrl} alt="" aria-hidden="true" fill className={styles.reelPhoto} sizes="220px" />
+							<Image src={cat.photoUrl} alt="" aria-hidden="true" fill className={styles.reelPhoto} sizes="(min-width: 900px) 22vw, 70vw" />
 							<div className={styles.reelOverlay} aria-hidden="true" />
 							<div className={styles.reelMeta}>
 								<Icon name={cat.iconName} size={16} aria-hidden />
@@ -306,7 +297,7 @@ export default async function HomePage() {
 							Log every opportunity. Compare what you&rsquo;ve seen. Connect with
 							seekers who&rsquo;ve been there — and employers who are ready for you.
 						</p>
-						<Link href="/seek" className={styles.teaserCta}>
+						<Link href="/sign-up?next=/community" className={styles.teaserCta}>
 							Join the community
 							<Icon name="action.forward" size={16} aria-hidden />
 						</Link>
@@ -325,12 +316,8 @@ export default async function HomePage() {
 				<DiscoveryFeed
 					listings={feedListings}
 					loading={false}
-					heading={hasBoostedInventory ? "Featured listings" : "Explore opportunities"}
-					subheading={
-						hasBoostedInventory
-							? "Verified opportunities with housing, meals, and pay — promoted by active employers."
-							: "Discover live opportunities from verified employers — housing, meals, and pay upfront."
-					}
+					heading="Featured opportunities"
+					subheading="Live roles from verified employers — housing, meals, and pay upfront, before you apply."
 				/>
 			) : null}
 

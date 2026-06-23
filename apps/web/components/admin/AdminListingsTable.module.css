@@ -118,7 +118,10 @@
 
 /* Flagged / under-review rows carry an accent edge so risk is scannable. */
 .rowReview {
-  border-color: color-mix(in srgb, var(--status-featured-fg) 42%, var(--border-soft));
+  border-color: color-mix(in srgb, var(--status-boosted-fg) 46%, var(--border-soft));
+  box-shadow:
+    var(--elevation-card),
+    inset 3px 0 0 0 color-mix(in srgb, var(--status-boosted-fg) 70%, transparent);
 }
 
 /* ── Cover: frame-not-filter on a category-tinted mat (no host photo in the
@@ -211,13 +214,15 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-6);
-  margin-top: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-6);
   padding: var(--space-4) var(--space-10);
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-soft);
@@ -228,6 +233,31 @@
   line-height: var(--type-caption-lh);
   font-weight: var(--font-weight-semibold);
   white-space: nowrap;
+}
+
+/* Tone-coded signal chips — the icon carries the colour so the label stays calm. */
+.tag_ok {
+  border-color: color-mix(in srgb, var(--status-success-fg) 38%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.tag_ok svg {
+  color: var(--status-success-fg);
+}
+
+.tag_warn {
+  border-color: color-mix(in srgb, var(--status-boosted-fg) 44%, transparent);
+  background: color-mix(in srgb, var(--status-boosted-fg) 14%, transparent);
+  color: var(--text-primary);
+}
+
+.tag_warn svg {
+  color: var(--status-boosted-fg);
+}
+
+.tag_neutral svg {
+  color: var(--text-muted);
 }
 
 /* ── Actions stack: prominent figure above the moderation buttons ── */
@@ -273,6 +303,12 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
+  gap: var(--space-8);
+}
+
+.actionsSecondary {
+  display: flex;
+  align-items: center;
   gap: var(--space-8);
 }
 
@@ -327,19 +363,45 @@
     min-height: 148px;
   }
 
+  /* Stack the decision rail: a single primary CTA, then a demoted secondary
+     pair — no three-button wrap-cramp at 390px. */
   .actionsStack {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: stretch;
     width: 100%;
+    gap: var(--space-12);
   }
 
   .figure {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-8);
     text-align: left;
   }
 
+  .figureValue {
+    font-size: var(--type-card-size);
+  }
+
+  .figureLabel {
+    margin-top: 0;
+  }
+
   .actions {
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-8);
+  }
+
+  .actions :global(.ui-button) {
+    width: 100%;
+  }
+
+  .actionsSecondary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-8);
+    width: 100%;
   }
 }
 

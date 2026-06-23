@@ -1,14 +1,76 @@
-/* ── Page shell ─────────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Marketing home — dark-glass premium family.
+
+   The public home funnels into the dark-glass dashboards (Host/Seeker/Admin),
+   so it reads as the SAME premium family: a deep atmosphere base, translucent
+   glass panels, hairline borders, high-contrast bone text, and soft glow.
+
+   Token cascade: we re-point a small set of SEMANTIC tokens to dark values on
+   .page ONLY. Composed feature surfaces (DiscoveryFeed heading, Featured
+   EmployersRail section) read these semantics and theme dark automatically.
+   The DiscoveryCard / Rail CARDS read --palette-* primitives (untouched), so
+   they keep their bright "field-journal" look — bright cards floating on dark
+   glass, exactly the dashboards' depth language. We never edit shared CSS.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 .page {
+	/* ── Dark-glass token cascade (scoped to this surface only) ──────────────── */
+	color-scheme: dark;
+	--page-glass:      color-mix(in srgb, var(--palette-white) 7%, transparent);
+	--page-glass-2:    color-mix(in srgb, var(--palette-white) 11%, transparent);
+	--page-glass-soft: color-mix(in srgb, var(--palette-white) 4.5%, transparent);
+	--page-line:       color-mix(in srgb, var(--palette-white) 14%, transparent);
+	--page-line-2:     color-mix(in srgb, var(--palette-white) 9%, transparent);
+	--page-scrim:      color-mix(in srgb, var(--palette-ink) 78%, transparent);
+	--page-on-dark:        var(--palette-white);
+	--page-on-dark-soft:   color-mix(in srgb, var(--palette-white) 74%, transparent);
+	--page-on-dark-muted:  color-mix(in srgb, var(--palette-white) 56%, transparent);
+	--page-on-dark-faint:  color-mix(in srgb, var(--palette-white) 40%, transparent);
+
+	/* Re-point semantics so composed surfaces (feed/rail headings) read light. */
+	--color-paper:      transparent;
+	--color-parchment:  var(--page-glass-soft);
+	--text-primary:     var(--page-on-dark);
+	--text-secondary:   var(--page-on-dark-soft);
+	--text-muted:       var(--page-on-dark-muted);
+	--border-soft:      var(--page-line);
+	--border-ink-warm:  var(--page-line);
+
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-section);
 	padding: 0 var(--space-gutter) calc(var(--size-bottom-nav) + var(--space-24));
+	position: relative;
+	isolation: isolate;
+	color: var(--page-on-dark);
+	/* Deep atmosphere — locked category gradient + sky/teal aurora glows. */
 	background:
-		radial-gradient(circle at top left,  rgba(218, 228, 240, 0.8), transparent 34%),
-		radial-gradient(circle at top right, rgba(220, 235, 214, 0.7), transparent 28%),
-		var(--color-paper);
+		radial-gradient(circle at 14% -4%, color-mix(in srgb, var(--palette-sky) 30%, transparent), transparent 38%),
+		radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--palette-teal) 22%, transparent), transparent 34%),
+		radial-gradient(circle at 80% 96%, color-mix(in srgb, var(--palette-amber) 14%, transparent), transparent 34%),
+		var(--gradient-category-default);
+	background-attachment: fixed;
+	animation: pageViewIn 360ms var(--ease-standard) both;
+}
+
+/* View-enter — matches the dashboards' command-center settle (transform/opacity). */
+@keyframes pageViewIn {
+	from { opacity: 0; transform: translateY(8px); }
+	to   { opacity: 1; transform: none; }
+}
+
+/* Faint blueprint grid overlay — the same atmospheric signature as the OS scopes. */
+.page::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background-image:
+		linear-gradient(color-mix(in srgb, var(--palette-white) 4%, transparent) 1px, transparent 1px),
+		linear-gradient(90deg, color-mix(in srgb, var(--palette-white) 4%, transparent) 1px, transparent 1px);
+	background-size: 44px 44px;
+	mask-image: linear-gradient(to bottom, black, transparent 64%);
 }
 
 /* ── Hero section ───────────────────────────────────────────────────────────── */
@@ -26,8 +88,9 @@
 	display: flex;
 	flex-direction: column;
 	justify-content: space-between;
-	box-shadow: var(--elevation-hover);
-	background: var(--text-primary);
+	border: 1px solid var(--page-line);
+	box-shadow: var(--elevation-overlay);
+	background: var(--palette-ink);
 }
 
 .photoHeroBg {
@@ -53,9 +116,9 @@
 	background:
 		linear-gradient(
 			to bottom,
-			rgba(20, 16, 10, 0.24) 0%,
-			rgba(20, 16, 10, 0.38) 40%,
-			rgba(20, 16, 10, 0.78) 100%
+			color-mix(in srgb, var(--palette-ink) 24%, transparent) 0%,
+			color-mix(in srgb, var(--palette-ink) 42%, transparent) 40%,
+			color-mix(in srgb, var(--palette-ink) 82%, transparent) 100%
 		);
 }
 
@@ -75,13 +138,36 @@
 }
 
 .photoHeroEyebrow {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	width: fit-content;
 	margin: 0;
+	padding: var(--space-6) var(--space-12);
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--page-line);
+	background: var(--page-glass);
+	backdrop-filter: blur(10px);
 	font-family: var(--font-ui);
 	font-size: var(--type-label-size);
 	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0.1em;
 	text-transform: uppercase;
-	color: rgba(255, 255, 255, 0.62);
+	color: var(--page-on-dark-soft);
+}
+
+.photoHeroEyebrowDot {
+	width: 7px;
+	height: 7px;
+	border-radius: var(--radius-pill);
+	background: var(--state-live-dot);
+	box-shadow: 0 0 0 0 color-mix(in srgb, var(--state-live-dot) 70%, transparent);
+	animation: heroLivePulse 1.9s infinite;
+}
+
+@keyframes heroLivePulse {
+	70%  { box-shadow: 0 0 0 9px color-mix(in srgb, var(--state-live-dot) 0%, transparent); }
+	100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--state-live-dot) 0%, transparent); }
 }
 
 .photoHeroTitle {
@@ -91,6 +177,7 @@
 	line-height: 0.92;
 	color: var(--palette-white);
 	max-width: 13ch;
+	text-shadow: 0 2px 24px color-mix(in srgb, var(--palette-ink) 50%, transparent);
 }
 
 .photoHeroSummary {
@@ -98,7 +185,7 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	line-height: 1.55;
-	color: rgba(255, 255, 255, 0.78);
+	color: var(--page-on-dark-soft);
 	max-width: 46ch;
 }
 
@@ -115,7 +202,7 @@
 	align-items: center;
 	justify-content: center;
 	gap: var(--space-8);
-	min-height: 3rem;
+	min-height: var(--tap-min);
 	padding: 0 var(--space-20);
 	border-radius: var(--radius-pill);
 	font-family: var(--font-ui);
@@ -125,24 +212,42 @@
 	transition:
 		transform var(--motion-base) var(--ease-standard),
 		background-color var(--motion-base) var(--ease-standard),
+		box-shadow var(--motion-base) var(--ease-standard),
 		border-color var(--motion-base) var(--ease-standard);
 }
 
 .photoHeroPrimary {
-	background: var(--palette-white);
-	color: var(--text-primary);
+	background: var(--gradient-sky);
+	color: var(--color-cta-text);
 	border: 1px solid transparent;
+	box-shadow: 0 16px 36px color-mix(in srgb, var(--palette-sky) 28%, transparent);
 }
 
 .photoHeroSecondary {
-	background: rgba(255, 255, 255, 0.14);
+	background: var(--page-glass);
 	color: var(--palette-white);
-	border: 1px solid rgba(255, 255, 255, 0.38);
-	backdrop-filter: blur(8px);
+	border: 1px solid var(--page-line);
+	backdrop-filter: blur(10px);
 }
 
-.photoHeroPrimary:hover  { background: rgba(255, 255, 255, 0.9); transform: translateY(-2px); }
-.photoHeroSecondary:hover { background: rgba(255, 255, 255, 0.22); border-color: rgba(255, 255, 255, 0.6); transform: translateY(-2px); }
+.photoHeroPrimary:hover  {
+	transform: translateY(-2px);
+	box-shadow: 0 22px 48px color-mix(in srgb, var(--palette-sky) 36%, transparent);
+}
+.photoHeroSecondary:hover {
+	background: var(--page-glass-2);
+	border-color: color-mix(in srgb, var(--palette-white) 30%, transparent);
+	transform: translateY(-2px);
+}
+
+.photoHeroPrimary:active,
+.photoHeroSecondary:active { transform: translateY(0) scale(0.985); }
+
+.photoHeroPrimary:focus-visible,
+.photoHeroSecondary:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--palette-ink), 0 0 0 4px var(--palette-sky-light);
+}
 
 /* ── Popular destinations ────────────────────────────────────────────────────── */
 
@@ -153,7 +258,7 @@
 	flex-direction: column;
 	gap: var(--space-12);
 	padding: var(--space-20) var(--space-40) var(--space-32);
-	border-top: 1px solid rgba(255, 255, 255, 0.16);
+	border-top: 1px solid var(--page-line-2);
 }
 
 .destinationsLabel {
@@ -163,7 +268,7 @@
 	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
-	color: rgba(255, 255, 255, 0.55);
+	color: var(--page-on-dark-muted);
 }
 
 .destinationPills {
@@ -178,8 +283,8 @@
 	min-height: var(--tap-min);
 	padding: var(--space-8) var(--space-16);
 	border-radius: var(--radius-pill);
-	border: 1.5px solid rgba(255, 255, 255, 0.28);
-	background: rgba(255, 255, 255, 0.1);
+	border: 1px solid var(--page-line);
+	background: var(--page-glass);
 	backdrop-filter: blur(10px);
 	color: var(--palette-white);
 	font-family: var(--font-ui);
@@ -193,59 +298,31 @@
 }
 
 .destinationPill:hover {
-	background: rgba(255, 255, 255, 0.2);
-	border-color: rgba(255, 255, 255, 0.52);
+	background: var(--page-glass-2);
+	border-color: color-mix(in srgb, var(--palette-white) 32%, transparent);
 	transform: translateY(-2px);
 }
 
-/* ── Category photo reel ─────────────────────────────────────────────────────── */
+.destinationPill:active { transform: translateY(0) scale(0.97); }
+
+.destinationPill:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--palette-ink), 0 0 0 4px var(--palette-sky-light);
+}
+
+/* ── Category grid (desktop) → scroll-snap row (mobile) ───────────────────────── */
 
 .categoryReel {
-	overflow: hidden;
-	/* Fade edges using psuedo-elements on a position:relative ancestor */
 	position: relative;
 }
 
-.categoryReel::before,
-.categoryReel::after {
-	content: "";
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	width: 48px;
-	z-index: 2;
-	pointer-events: none;
-}
-
-.categoryReel::before {
-	left: 0;
-	background: linear-gradient(to right, var(--color-paper), transparent);
-}
-
-.categoryReel::after {
-	right: 0;
-	background: linear-gradient(to left, var(--color-paper), transparent);
-}
-
 .categoryReelTrack {
-	display: flex;
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
 	gap: var(--space-12);
-	width: max-content;
-	animation: categoryScroll 28s linear infinite;
-}
-
-.categoryReel:hover .categoryReelTrack {
-	animation-play-state: paused;
-}
-
-@keyframes categoryScroll {
-	from { transform: translateX(0); }
-	to   { transform: translateX(-50%); }
 }
 
 .reelCard {
-	flex-shrink: 0;
-	width: 220px;
 	position: relative;
 	isolation: isolate;
 	border-radius: calc(var(--radius-card) + 0.2rem);
@@ -253,16 +330,26 @@
 	aspect-ratio: 3 / 4;
 	display: block;
 	text-decoration: none;
-	background: var(--text-primary);
+	background: var(--palette-ink);
+	border: 1px solid var(--page-line);
 	box-shadow: var(--elevation-card);
 	transition:
 		transform var(--motion-base) var(--ease-standard),
-		box-shadow var(--motion-base) var(--ease-standard);
+		box-shadow var(--motion-base) var(--ease-standard),
+		border-color var(--motion-base) var(--ease-standard);
 }
 
 .reelCard:hover {
 	transform: translateY(-4px) scale(1.02);
 	box-shadow: var(--elevation-hover);
+	border-color: color-mix(in srgb, var(--palette-white) 28%, transparent);
+}
+
+.reelCard:active { transform: translateY(-1px) scale(1.0); }
+
+.reelCard:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--palette-ink), 0 0 0 4px var(--palette-sky-light);
 }
 
 .reelPhoto {
@@ -281,8 +368,8 @@
 	z-index: 1;
 	background: linear-gradient(
 		to bottom,
-		rgba(20, 16, 10, 0.0) 45%,
-		rgba(20, 16, 10, 0.82) 100%
+		color-mix(in srgb, var(--palette-ink) 0%, transparent) 42%,
+		color-mix(in srgb, var(--palette-ink) 84%, transparent) 100%
 	);
 }
 
@@ -296,7 +383,7 @@
 	align-items: center;
 	gap: var(--space-6);
 	padding: var(--space-14);
-	color: white;
+	color: var(--palette-white);
 }
 
 .reelLabel {
@@ -304,7 +391,7 @@
 	font-size: var(--type-label-size);
 	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0.04em;
-	color: white;
+	color: var(--palette-white);
 }
 
 /* ── Employers + Community split ─────────────────────────────────────────────── */
@@ -322,127 +409,22 @@
 	}
 }
 
-/* ─── Seeker card ─── */
-
-.seekerCard {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-20);
-	padding: var(--space-32);
-	background: color-mix(in srgb, var(--palette-sky-light) 40%, var(--color-surface-raised));
-	border: 1px solid color-mix(in srgb, var(--palette-sky) 20%, transparent);
-	border-radius: calc(var(--radius-card) + 0.2rem);
-	box-shadow: var(--elevation-card);
-}
-
-.seekerHeader {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-8);
-}
-
-.cardEyebrow {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	font-weight: var(--font-weight-semibold);
-	letter-spacing: 0.1em;
-	text-transform: uppercase;
-	color: var(--text-muted);
-}
-
-.seekerTitle {
-	margin: 0;
-	font-family: var(--font-display);
-	font-size: clamp(1.6rem, 3.2vw, 2.4rem);
-	line-height: 1.0;
-	color: var(--text-primary);
-}
-
-.modeChips {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-	display: flex;
-	flex-direction: row;
-	gap: var(--space-8);
-	flex-wrap: wrap;
-}
-
-.modeChip {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-6);
-	padding: var(--space-8) var(--space-14);
-	border-radius: var(--radius-pill);
-	background: rgba(255, 255, 255, 0.7);
-	border: 1px solid color-mix(in srgb, var(--palette-sky) 22%, transparent);
-	backdrop-filter: blur(8px);
-	font-family: var(--font-ui);
-	font-size: var(--type-meta-size);
-	font-weight: var(--font-weight-semibold);
-	color: var(--text-primary);
-}
-
-.benefitRow {
-	display: flex;
-	align-items: center;
-	gap: var(--space-6);
-	flex-wrap: wrap;
-}
-
-.benefitPill {
-	display: inline-flex;
-	align-items: center;
-	padding: var(--space-4) var(--space-10);
-	border-radius: var(--radius-pill);
-	border: 1px solid color-mix(in srgb, var(--palette-sky) 28%, transparent);
-	background: color-mix(in srgb, var(--palette-sky-light) 60%, transparent);
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	font-weight: var(--font-weight-semibold);
-	color: var(--palette-sky);
-}
-
-.freeForever {
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	color: var(--text-muted);
-	font-style: italic;
-}
-
-.seekerCta {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-8);
-	min-height: 2.75rem;
-	padding: 0 var(--space-20);
-	border-radius: var(--radius-pill);
-	background: var(--palette-sky);
-	color: var(--palette-white);
-	border: 1px solid transparent;
-	font-family: var(--font-ui);
-	font-size: var(--type-button-size);
-	font-weight: var(--font-weight-semibold);
-	text-decoration: none;
-	align-self: flex-start;
-	margin-top: auto;
-	transition: transform var(--motion-base) var(--ease-standard), opacity var(--motion-base) var(--ease-standard);
-}
-
-.seekerCta:hover { transform: translateY(-2px); opacity: 0.88; }
-
-/* ─── Employer card — dark/premium ─── */
+/* ─── Employer / pricing card — deep glass ─── */
 
 .employerCard {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-20);
 	padding: var(--space-32);
-	/* Deep warm charcoal — dark premium feel, lighter than pure black */
-	background: var(--color-panel-dark);
-	border: 1px solid rgba(255, 255, 255, 0.07);
+	border: 1px solid var(--page-line);
 	border-radius: calc(var(--radius-card) + 0.2rem);
+	background:
+		radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--palette-sky) 22%, transparent), transparent 46%),
+		linear-gradient(160deg, var(--page-glass-2), var(--page-glass-soft));
+	backdrop-filter: blur(18px);
 	box-shadow: var(--elevation-overlay);
 }
 
@@ -453,7 +435,7 @@
 	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0.1em;
 	text-transform: uppercase;
-	color: rgba(255, 255, 255, 0.38);
+	color: var(--page-on-dark-muted);
 }
 
 .employerTitle {
@@ -474,33 +456,39 @@
 }
 
 .tierRow {
+	position: relative;
 	display: flex;
 	align-items: center;
 	gap: var(--space-12);
 	padding: var(--space-14) var(--space-16);
-	border: 1px solid rgba(255, 255, 255, 0.07);
+	border: 1px solid var(--page-line-2);
 	border-radius: var(--radius-cell);
-	background: rgba(255, 255, 255, 0.04);
+	background: var(--page-glass-soft);
+	transition:
+		background var(--motion-base) var(--ease-standard),
+		border-color var(--motion-base) var(--ease-standard);
 }
 
 .tierHighlight {
-	background: rgba(47, 102, 122, 0.2);
-	border-color: rgba(47, 102, 122, 0.48);
-	box-shadow: 0 0 0 1px rgba(47, 102, 122, 0.18);
+	background:
+		radial-gradient(circle at 0% 50%, color-mix(in srgb, var(--palette-sky) 26%, transparent), transparent 70%),
+		var(--page-glass-2);
+	border-color: color-mix(in srgb, var(--palette-sky-light) 38%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--palette-sky-light) 16%, transparent);
 }
 
 .tierName {
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	font-weight: var(--font-weight-semibold);
-	color: rgba(255, 255, 255, 0.86);
+	color: var(--page-on-dark);
 	flex: 1;
 }
 
 .tierListings {
 	font-family: var(--font-ui);
 	font-size: var(--type-label-size);
-	color: rgba(255, 255, 255, 0.38);
+	color: var(--page-on-dark-muted);
 	white-space: nowrap;
 }
 
@@ -515,7 +503,7 @@
 .tierPer {
 	font-size: var(--type-label-size);
 	font-weight: var(--font-weight-regular);
-	color: rgba(255, 255, 255, 0.32);
+	color: var(--page-on-dark-faint);
 }
 
 .annualNote {
@@ -523,35 +511,41 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-label-size);
 	line-height: 1.45;
-	color: rgba(255, 255, 255, 0.38);
+	color: var(--page-on-dark-muted);
 }
 
 .employerCta {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-8);
-	min-height: 2.75rem;
+	min-height: var(--tap-min);
 	padding: 0 var(--space-20);
 	border-radius: var(--radius-pill);
-	background: rgba(255, 255, 255, 0.1);
-	color: var(--palette-white);
-	border: 1px solid rgba(255, 255, 255, 0.18);
+	background: var(--gradient-sky);
+	color: var(--color-cta-text);
+	border: 1px solid transparent;
 	font-family: var(--font-ui);
 	font-size: var(--type-button-size);
 	font-weight: var(--font-weight-semibold);
 	text-decoration: none;
 	align-self: flex-start;
 	margin-top: auto;
+	box-shadow: 0 14px 32px color-mix(in srgb, var(--palette-sky) 26%, transparent);
 	transition:
 		transform var(--motion-base) var(--ease-standard),
-		background var(--motion-base) var(--ease-standard),
-		border-color var(--motion-base) var(--ease-standard);
+		box-shadow var(--motion-base) var(--ease-standard);
 }
 
 .employerCta:hover {
 	transform: translateY(-2px);
-	background: rgba(255, 255, 255, 0.16);
-	border-color: rgba(255, 255, 255, 0.32);
+	box-shadow: 0 20px 44px color-mix(in srgb, var(--palette-sky) 34%, transparent);
+}
+
+.employerCta:active { transform: translateY(0) scale(0.985); }
+
+.employerCta:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--palette-ink), 0 0 0 4px var(--palette-sky-light);
 }
 
 /* ── Community teaser ────────────────────────────────────────────────────────── */
@@ -564,7 +558,8 @@
 	min-height: 320px;
 	display: flex;
 	align-items: center;
-	box-shadow: var(--elevation-card);
+	border: 1px solid var(--page-line);
+	box-shadow: var(--elevation-overlay);
 }
 
 .teaserBg {
@@ -583,9 +578,9 @@
 	z-index: 1;
 	background: linear-gradient(
 		100deg,
-		rgba(20, 16, 10, 0.90) 0%,
-		rgba(20, 16, 10, 0.66) 50%,
-		rgba(20, 16, 10, 0.12) 100%
+		color-mix(in srgb, var(--palette-ink) 90%, transparent) 0%,
+		color-mix(in srgb, var(--palette-ink) 66%, transparent) 50%,
+		color-mix(in srgb, var(--palette-ink) 12%, transparent) 100%
 	);
 }
 
@@ -605,7 +600,7 @@
 	font-weight: var(--font-weight-semibold);
 	letter-spacing: 0.1em;
 	text-transform: uppercase;
-	color: rgba(255, 255, 255, 0.52);
+	color: var(--page-on-dark-muted);
 }
 
 .teaserTitle {
@@ -614,6 +609,7 @@
 	font-size: clamp(2rem, 5vw, 3.5rem);
 	line-height: 0.95;
 	color: var(--palette-white);
+	text-shadow: 0 2px 24px color-mix(in srgb, var(--palette-ink) 50%, transparent);
 }
 
 .teaserDesc {
@@ -621,7 +617,7 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	line-height: 1.6;
-	color: rgba(255, 255, 255, 0.72);
+	color: var(--page-on-dark-soft);
 	max-width: 44ch;
 }
 
@@ -629,21 +625,29 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-8);
-	min-height: 2.75rem;
+	min-height: var(--tap-min);
 	padding: 0 var(--space-20);
 	border-radius: var(--radius-pill);
 	background: var(--palette-white);
-	color: var(--text-primary);
+	color: var(--palette-ink);
 	border: 1px solid transparent;
 	font-family: var(--font-ui);
 	font-size: var(--type-button-size);
 	font-weight: var(--font-weight-semibold);
 	text-decoration: none;
 	align-self: flex-start;
-	transition: transform var(--motion-base) var(--ease-standard), opacity var(--motion-base) var(--ease-standard);
+	transition:
+		transform var(--motion-base) var(--ease-standard),
+		opacity var(--motion-base) var(--ease-standard);
 }
 
-.teaserCta:hover { transform: translateY(-2px); opacity: 0.9; }
+.teaserCta:hover { transform: translateY(-2px); opacity: 0.92; }
+.teaserCta:active { transform: translateY(0) scale(0.985); }
+
+.teaserCta:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--palette-ink), 0 0 0 4px var(--palette-sky-light);
+}
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 
@@ -655,6 +659,29 @@
 	}
 }
 
+@media (max-width: 900px) {
+	/* Below the 4-up grid breakpoint: scroll-snap row, no overflow, no loop. */
+	.categoryReelTrack {
+		display: flex;
+		grid-template-columns: none;
+		gap: var(--space-12);
+		overflow-x: auto;
+		scroll-snap-type: x mandatory;
+		scrollbar-width: none;
+		margin-inline: calc(-1 * var(--space-gutter));
+		padding-inline: var(--space-gutter);
+		padding-bottom: var(--space-4);
+	}
+
+	.categoryReelTrack::-webkit-scrollbar { display: none; }
+
+	.reelCard {
+		flex: 0 0 auto;
+		width: 64vw;
+		max-width: 240px;
+		scroll-snap-align: start;
+	}
+}
 
 @media (max-width: 639px) {
 	.page {
@@ -689,20 +716,26 @@
 		padding: var(--space-32) var(--space-24);
 	}
 
+	.categoryReelTrack {
+		margin-inline: calc(-1 * var(--space-12));
+		padding-inline: var(--space-12);
+	}
+
 	.reelCard {
-		min-width: 140px;
+		width: 70vw;
+		max-width: 220px;
 	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.photoHeroBg { animation: none; }
-	.categoryReelTrack { animation: none; }
+	.page,
+	.photoHeroBg,
+	.photoHeroEyebrowDot { animation: none; }
 
 	.photoHeroPrimary,
 	.photoHeroSecondary,
 	.destinationPill,
 	.reelCard,
-	.seekerCta,
 	.employerCta,
 	.teaserCta { transition: none; }
 
@@ -710,7 +743,6 @@
 	.photoHeroSecondary:hover,
 	.destinationPill:hover,
 	.reelCard:hover,
-	.seekerCta:hover,
 	.employerCta:hover,
 	.teaserCta:hover { transform: none; }
 }

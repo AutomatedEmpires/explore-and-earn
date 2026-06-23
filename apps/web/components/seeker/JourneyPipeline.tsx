@@ -36,34 +36,50 @@ export function JourneyPipeline({
 
   const reachedIdx = steps.reduce((max, s, i) => (s.hasActivity ? i : max), -1);
 
+  // "You are here / do this next" — the most urgent open step wins, otherwise
+  // the furthest step that already has activity. This is the only promoted dot.
+  const urgentIdx = steps.findIndex((s) => s.isUrgent);
+  const currentIdx = urgentIdx >= 0 ? urgentIdx : reachedIdx;
+
   return (
     <nav className={styles.pipeline} aria-label="Application journey">
-      {steps.map((step, i) => (
-        <div key={step.href} className={styles.unit}>
-          {i > 0 && (
-            <div
-              className={`${styles.connector} ${i <= reachedIdx ? styles.connectorFilled : ""}`}
-              aria-hidden="true"
-            />
-          )}
-          <Link
-            href={step.href}
-            className={`${styles.step} ${step.hasActivity ? styles.stepActive : ""} ${step.isUrgent ? styles.stepUrgent : ""}`}
-            aria-label={step.count != null ? `${step.label}: ${step.count}` : step.label}
-          >
-            <div className={styles.dot}>
-              {step.count != null && step.count > 0 ? (
-                <span className={styles.dotCount}>{step.count > 99 ? "99+" : step.count}</span>
-              ) : step.hasActivity ? (
-                <span className={styles.dotCheck} aria-hidden="true" />
-              ) : (
-                <span className={styles.dotEmpty} aria-hidden="true" />
-              )}
-            </div>
-            <span className={styles.stepLabel}>{step.label}</span>
-          </Link>
-        </div>
-      ))}
+      {steps.map((step, i) => {
+        const isCurrent = i === currentIdx;
+        return (
+          <div key={step.href} className={styles.unit}>
+            {i > 0 && (
+              <div
+                className={`${styles.connector} ${i <= reachedIdx ? styles.connectorFilled : ""}`}
+                aria-hidden="true"
+              />
+            )}
+            <Link
+              href={step.href}
+              className={[
+                styles.step,
+                step.hasActivity ? styles.stepActive : "",
+                step.isUrgent ? styles.stepUrgent : "",
+                isCurrent ? styles.stepCurrent : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-label={step.count != null ? `${step.label}: ${step.count}` : step.label}
+              aria-current={isCurrent ? "step" : undefined}
+            >
+              <span className={styles.dot}>
+                {step.count != null && step.count > 0 ? (
+                  <span className={styles.dotCount}>{step.count > 99 ? "99+" : step.count}</span>
+                ) : step.hasActivity ? (
+                  <span className={styles.dotCheck} aria-hidden="true" />
+                ) : (
+                  <span className={styles.dotEmpty} aria-hidden="true" />
+                )}
+              </span>
+              <span className={styles.stepLabel}>{step.label}</span>
+            </Link>
+          </div>
+        );
+      })}
     </nav>
   );
 }

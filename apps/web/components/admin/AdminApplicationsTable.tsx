@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useMemo, useState } from "react";
 import { Badge, type BadgeProps, Button, Icon, type IconKey } from "@explore-and-earn/ui";
 
 import { formatAdminDate, humanizeToken } from "./status";
@@ -13,6 +15,16 @@ export interface AdminApplicationRowView {
 }
 
 type BadgeVariant = NonNullable<BadgeProps["variant"]>;
+
+/** Coarse triage lanes a moderator filters by. */
+type Lane = "all" | "awaiting" | "decided";
+
+const DECIDED_STATUSES = new Set(["accepted", "offered", "declined", "withdrawn"]);
+
+/** A decided application has reached a terminal moderation outcome. */
+function isDecided(status: string): boolean {
+  return DECIDED_STATUSES.has(status);
+}
 
 /** Map an application status token to a Badge variant + queue lane. */
 function statusVariant(status: string): BadgeVariant {
@@ -92,7 +104,7 @@ function summarize(applications: ReadonlyArray<AdminApplicationRowView>) {
   let decided = 0;
   let oldestDays = 0;
   for (const a of applications) {
-    if (a.status === "accepted" || a.status === "offered" || a.status === "declined" || a.status === "withdrawn") {
+    if (isDecided(a.status)) {
       decided += 1;
     } else {
       inReview += 1;
@@ -106,29 +118,16 @@ function summarize(applications: ReadonlyArray<AdminApplicationRowView>) {
   return { total: applications.length, inReview, decided, oldestDays };
 }
 
-/** Deterministic spark heights derived from a seed — pure data-viz, no icons. */
-function spark(seed: number, n = 7): readonly number[] {
-  const out: number[] = [];
-  let x = seed * 2654435761;
-  for (let i = 0; i < n; i += 1) {
-    x = (x ^ (x >>> 15)) >>> 0;
-    out.push(28 + (x % 70));
-  }
-  return out;
-}
-
 function MetricTile({
   label,
   value,
   trend,
   tone,
-  seed,
 }: {
   readonly label: string;
-  readonly value: ReactNode;
+  readonly value: string;
   readonly trend: string;
   readonly tone: "up" | "down" | "neutral";
-  readonly seed: number;
 }) {
   const trendClass =
     tone === "up" ? styles.trendUp : tone === "down" ? styles.trendDown : styles.trendNeutral;
@@ -139,11 +138,6 @@ function MetricTile({
         <span className={`${styles.trend} ${trendClass}`}>{trend}</span>
       </div>
       <div className={styles.metricValue}>{value}</div>
-      <div className={styles.spark} aria-hidden="true">
-        {spark(seed).map((h, i) => (
-          <i key={i} style={{ height: `${h}%`, animationDelay: `${i * 0.05}s` }} />
-        ))}
-      </div>
     </article>
   );
 }
@@ -151,52 +145,108 @@ function MetricTile({
 /**
  * Admin moderation queue — recent applications as a premium review workbench.
  *
- * Read-only by contract (observation only): no application-mutation server
- * action exists yet, so the per-row Review affordance renders disabled with an
- * explanatory tooltip rather than a dead link. Raw Clerk user ids are NEVER
- * shown to the eye — only a derived display name, a short reference, and an
- * initials avatar; the id stays the React key.
+ * Local-only triage: a segment toolbar (All / Awaiting / Decided) plus a search
+ * field filter the rows already on screen — no new query, no data contract
+ * change. Read-only by contract: no application-mutation server action exists
+ * yet, so the per-row Review affordance renders disabled with an explanatory
+ * tooltip rather than a dead link. Raw Clerk user ids are NEVER shown to the eye
+ * — only a derived display name, a short reference, and an initials avatar; the
+ * id stays the React key.
  */
 export function AdminApplicationsTable({
   applications,
 }: {
   readonly applications: ReadonlyArray<AdminApplicationRowView>;
 }) {
-  const { total, inReview, decided, oldestDays } = summarize(applications);
+  const [lane, setLane] = useState<Lane>("all");
+  const [query, setQuery] = useState("");
+
+  const { total, inReview, decided, oldestDays } = useMemo(
+    () => summarize(applications),
+    [applications],
+  );
   const oldestLabel =
     oldestDays <= 0 ? "Today" : oldestDays === 1 ? "1 day" : `${oldestDays} days`;
+
+  const trimmedQuery = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    return applications.filter((a) => {
+      if (lane === "awaiting" && isDecided(a.status)) return false;
+      if (lane === "decided" && !isDecided(a.status)) return false;
+      if (trimmedQuery) {
+        const who = applicantIdentity(a.seekerClerkUserId);
+        const haystack =
+          `${a.listingTitle} ${who.name} ${who.ref} ${humanizeToken(a.status)}`.toLowerCase();
+        if (!haystack.includes(trimmedQuery)) return false;
+      }
+      return true;
+    });
+  }, [applications, lane, trimmedQuery]);
+
+  const segments: ReadonlyArray<{ id: Lane; label: string; count: number }> = [
+    { id: "all", label: "All", count: total },
+    { id: "awaiting", label: "Awaiting", count: inReview },
+    { id: "decided", label: "Decided", count: decided },
+  ];
+
+  const isFiltered = lane !== "all" || trimmedQuery.length > 0;
 
   return (
     <div className={styles.wrap}>
       <div className={styles.metricGrid} role="presentation">
-        <MetricTile
-          label="In queue"
-          value={total}
-          trend="Live"
-          tone="neutral"
-          seed={total + 3}
-        />
+        <MetricTile label="In queue" value={String(total)} trend="Live" tone="neutral" />
         <MetricTile
           label="Awaiting review"
-          value={inReview}
+          value={String(inReview)}
           trend={inReview > 0 ? "Action" : "Clear"}
           tone={inReview > 0 ? "down" : "up"}
-          seed={inReview + 7}
         />
-        <MetricTile
-          label="Decided"
-          value={decided}
-          trend="Resolved"
-          tone="up"
-          seed={decided + 11}
-        />
+        <MetricTile label="Decided" value={String(decided)} trend="Resolved" tone="up" />
         <MetricTile
           label="Oldest waiting"
           value={oldestLabel}
           trend={oldestDays >= 7 ? "Aging" : "Fresh"}
           tone={oldestDays >= 7 ? "down" : "up"}
-          seed={oldestDays + 5}
         />
+      </div>
+
+      <div className={styles.toolbar}>
+        <div
+          className={styles.segments}
+          role="tablist"
+          aria-label="Filter applications by review status"
+        >
+          {segments.map((segment) => {
+            const active = lane === segment.id;
+            return (
+              <button
+                key={segment.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`${styles.segment} ${active ? styles.segmentActive : ""}`.trim()}
+                onClick={() => setLane(segment.id)}
+              >
+                <span className={styles.segmentLabel}>{segment.label}</span>
+                <span className={styles.segmentCount}>{segment.count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className={styles.search}>
+          <span className={styles.searchIcon} aria-hidden="true">
+            <Icon name="action.search" size={16} />
+          </span>
+          <input
+            type="search"
+            className={styles.searchInput}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search seeker, listing, or status"
+            aria-label="Search applications by seeker, listing, or status"
+          />
+        </div>
       </div>
 
       {applications.length === 0 ? (
@@ -210,61 +260,95 @@ export function AdminApplicationsTable({
             seeker applies.
           </p>
         </div>
+      ) : filtered.length === 0 ? (
+        <div className={styles.emptyState}>
+          <span className={styles.emptyMarkNeutral} aria-hidden="true">
+            <Icon name="action.search" size={24} />
+          </span>
+          <p className={styles.emptyTitle}>No matches in this view</p>
+          <p className={styles.emptyHint}>
+            No applications match the current filter. Widen the view to see the
+            rest of the queue.
+          </p>
+          <Button
+            variant="secondary"
+            icon="action.close"
+            onClick={() => {
+              setLane("all");
+              setQuery("");
+            }}
+          >
+            Clear filters
+          </Button>
+        </div>
       ) : (
-        <ul className={styles.queue} aria-label="Recent applications review queue">
-          {applications.map((application) => {
-            const who = applicantIdentity(application.seekerClerkUserId);
-            const isAging =
-              !Number.isNaN(new Date(application.createdAt).getTime()) &&
-              Date.now() - new Date(application.createdAt).getTime() > 7 * 86_400_000;
-            return (
-              <li key={application.id} className={styles.row}>
-                <span className={styles.avatar} aria-hidden="true">
-                  {who.initials}
-                </span>
-
-                <div className={styles.identity}>
-                  <span className={styles.name}>{who.name}</span>
-                  <span className={styles.sub}>
-                    Applied to{" "}
-                    <span className={styles.listing}>
-                      {application.listingTitle || "Untitled listing"}
-                    </span>
+        <>
+          <p className={styles.resultLine} role="status" aria-live="polite">
+            {isFiltered ? (
+              <>
+                Showing <strong>{filtered.length}</strong> of {total}
+              </>
+            ) : (
+              <>
+                <strong>{total}</strong> applications
+              </>
+            )}
+          </p>
+          <ul className={styles.queue} aria-label="Recent applications review queue">
+            {filtered.map((application) => {
+              const who = applicantIdentity(application.seekerClerkUserId);
+              const isAging =
+                !Number.isNaN(new Date(application.createdAt).getTime()) &&
+                Date.now() - new Date(application.createdAt).getTime() > 7 * 86_400_000;
+              return (
+                <li key={application.id} className={styles.row}>
+                  <span className={styles.avatar} aria-hidden="true">
+                    {who.initials}
                   </span>
-                </div>
 
-                <div className={styles.meta}>
-                  <Badge
-                    label={humanizeToken(application.status)}
-                    variant={statusVariant(application.status)}
-                    icon={statusIcon(application.status)}
-                  />
-                  <span
-                    className={`${styles.age} ${isAging ? styles.ageHot : ""}`.trim()}
-                  >
-                    <Icon name="status.begins" size={16} aria-hidden />
-                    <span>{appliedAge(application.createdAt)}</span>
-                    <span className={styles.date}>
-                      {formatAdminDate(application.createdAt)}
+                  <div className={styles.identity}>
+                    <span className={styles.name}>{who.name}</span>
+                    <span className={styles.sub}>
+                      Applied to{" "}
+                      <span className={styles.listing}>
+                        {application.listingTitle || "Untitled listing"}
+                      </span>
                     </span>
-                  </span>
-                </div>
+                  </div>
 
-                <div className={styles.action}>
-                  <Button
-                    variant="secondary"
-                    icon="action.view"
-                    disabled
-                    title="Review actions arrive with the moderation workbench"
-                    aria-label={`Review the application from ${who.name} (coming soon)`}
-                  >
-                    Review
-                  </Button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                  <div className={styles.meta}>
+                    <Badge
+                      label={humanizeToken(application.status)}
+                      variant={statusVariant(application.status)}
+                      icon={statusIcon(application.status)}
+                    />
+                    <span
+                      className={`${styles.age} ${isAging ? styles.ageHot : ""}`.trim()}
+                    >
+                      <Icon name="status.begins" size={16} aria-hidden />
+                      <span>{appliedAge(application.createdAt)}</span>
+                      <span className={styles.date}>
+                        {formatAdminDate(application.createdAt)}
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className={styles.action}>
+                    <Button
+                      variant="secondary"
+                      icon="action.view"
+                      disabled
+                      title="Review actions arrive with the moderation workbench"
+                      aria-label={`Review the application from ${who.name} (coming soon)`}
+                    >
+                      Review
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </div>
   );
