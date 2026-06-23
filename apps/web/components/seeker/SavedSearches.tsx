@@ -16,6 +16,8 @@ export interface SavedSearchView {
   readonly id: string;
   readonly label: string;
   readonly href: string;
+  /** Live listings published since this search was saved that still match it. */
+  readonly newCount?: number;
 }
 
 /** Filter shape derived from the action — avoids importing the server-only db module. */
@@ -94,8 +96,21 @@ export function SavedSearches({
           </span>
           {searches.map((s) => (
             <span key={s.id} className={styles.chip}>
-              <Link href={`/seek?${s.href}`} className={styles.chipLink}>
+              <Link
+                href={`/seek?${s.href}`}
+                className={styles.chipLink}
+                aria-label={
+                  s.newCount && s.newCount > 0
+                    ? `${s.label} — ${s.newCount} new ${s.newCount === 1 ? "match" : "matches"}`
+                    : s.label
+                }
+              >
                 {s.label}
+                {s.newCount && s.newCount > 0 ? (
+                  <span className={styles.newBadge}>
+                    {s.newCount > 9 ? "9+" : s.newCount} new
+                  </span>
+                ) : null}
               </Link>
               <button
                 type="button"

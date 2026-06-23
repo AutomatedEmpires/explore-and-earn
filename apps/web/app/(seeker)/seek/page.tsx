@@ -254,11 +254,41 @@ export default async function SeekPage({
 			getSavedSearches(token, userId).catch(() => []),
 		]);
 
-		savedSearchViews = savedSearches.map((s) => ({
-			id: s.id,
-			label: s.label,
-			href: savedSearchToQueryString(s.filters),
-		}));
+		// Per saved search, count live listings published AFTER it was saved that
+		// still match its filters — the "N new" alert the seeker sees on return.
+		// searchListings is the public/anon path, so this works without the
+		// seeker token. Capped at 8 searches to bound page-load fan-out.
+		savedSearchViews = await Promise.all(
+			savedSearches.slice(0, 8).map(async (s) => {
+				const f = s.filters;
+				let newCount = 0;
+				try {
+					const rows = await searchListings({
+						query: f.q,
+						categories: f.category ? [f.category] : undefined,
+						hasHousing: f.housing,
+						hasMeals: f.meals,
+						visaSupport: f.visa,
+						startRangeMonths: f.startRangeMonths as SearchFilters["startRangeMonths"],
+						payMin: f.payMin,
+						payUnit: f.payUnit as SearchFilters["payUnit"],
+						location: f.location,
+						limit: 24,
+					});
+					newCount = rows.filter(
+						(r) => r.published_at != null && r.published_at > s.createdAt,
+					).length;
+				} catch {
+					/* count stays 0 — never block the page on an alert count */
+				}
+				return {
+					id: s.id,
+					label: s.label,
+					href: savedSearchToQueryString(s.filters),
+					newCount,
+				};
+			}),
+		);
 
 		dashboardProps = {
 			profile,

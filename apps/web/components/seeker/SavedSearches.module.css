@@ -66,6 +66,17 @@
   color: var(--text-primary);
 }
 
+.newBadge {
+  margin-left: var(--space-8);
+  padding: 1px var(--space-8);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cta) 22%, transparent);
+  color: var(--color-cta);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
 .remove {
   display: grid;
   place-items: center;
