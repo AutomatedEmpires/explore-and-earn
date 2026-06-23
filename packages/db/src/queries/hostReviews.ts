@@ -2,12 +2,19 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { anonClient } from "../client";
+import { anonClient, authedClient } from "../client";
 
 /** Untyped anon client — types.gen does not yet carry host_reviews. */
 function untypedAnon(): SupabaseClient {
   return anonClient() as unknown as SupabaseClient;
 }
+
+function untypedAuthed(clerkToken: string): SupabaseClient {
+  return authedClient(clerkToken) as unknown as SupabaseClient;
+}
+
+/** Engagement statuses that mean the seeker actually worked there → can review. */
+const REVIEWABLE_STATUSES = ["active", "completed"];
 
 /**
  * Host reviews — the two-sided trust layer. Reads are PUBLIC (anon client), like
@@ -107,4 +114,129 @@ export async function getHostReviews(
     seekerDisplayName: r.seeker_display_name,
     createdAt: r.created_at,
   }));
+}
+
+/* ── Write side: a seeker reviews a host after a real engagement ─────────────── */
+
+export interface ReviewableEngagement {
+  readonly applicationId: string;
+  readonly seekerDisplayName: string;
+}
+
+/**
+ * The seeker's reviewable engagement with this host — an active/completed
+ * application for one of the host's listings that they haven't reviewed yet.
+ * Returns null when the seeker isn't eligible (gates the "leave a review" UI).
+ */
+export async function getReviewableEngagementForHost(
+  clerkToken: string,
+  clerkUserId: string,
+  hostProfileId: string,
+): Promise<ReviewableEngagement | null> {
+  try {
+    const db = untypedAuthed(clerkToken);
+
+    const { data: seeker } = await db
+      .from("seeker_profiles")
+      .select("id, display_name")
+      .eq("clerk_user_id", clerkUserId)
+      .maybeSingle();
+    const seekerRow = seeker as { id: string; display_name: string | null } | null;
+    if (!seekerRow) return null;
+
+    const { data: listings } = await db
+      .from("listings")
+      .select("id")
+      .eq("host_profile_id", hostProfileId);
+    const listingIds = ((listings ?? []) as Array<{ id: string }>).map((l) => l.id);
+    if (listingIds.length === 0) return null;
+
+    const { data: apps } = await db
+      .from("applications")
+      .select("id")
+      .eq("seeker_profile_id", seekerRow.id)
+      .in("listing_id", listingIds)
+      .in("status", REVIEWABLE_STATUSES)
+      .order("created_at", { ascending: false });
+    const appRows = (apps ?? []) as Array<{ id: string }>;
+    if (appRows.length === 0) return null;
+
+    const { data: reviewed } = await db
+      .from("host_reviews")
+      .select("application_id")
+      .in("application_id", appRows.map((a) => a.id));
+    const reviewedSet = new Set(
+      ((reviewed ?? []) as Array<{ application_id: string }>).map((r) => r.application_id),
+    );
+    const unreviewed = appRows.find((a) => !reviewedSet.has(a.id));
+    if (!unreviewed) return null;
+
+    return {
+      applicationId: unreviewed.id,
+      seekerDisplayName: seekerRow.display_name?.trim() || "A seeker",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface HostReviewInput {
+  readonly rating: number;
+  readonly housingAsDescribed: boolean | null;
+  readonly mealsAsDescribed: boolean | null;
+  readonly payOnTime: boolean | null;
+  readonly body: string;
+}
+
+export async function createHostReview(
+  clerkToken: string,
+  clerkUserId: string,
+  hostProfileId: string,
+  applicationId: string,
+  input: HostReviewInput,
+): Promise<{ ok: boolean }> {
+  try {
+    const db = untypedAuthed(clerkToken);
+
+    const { data: seeker } = await db
+      .from("seeker_profiles")
+      .select("id, display_name")
+      .eq("clerk_user_id", clerkUserId)
+      .maybeSingle();
+    const seekerRow = seeker as { id: string; display_name: string | null } | null;
+    if (!seekerRow) return { ok: false };
+
+    // Defense in depth: the application must be the seeker's own + reviewable.
+    const { data: app } = await db
+      .from("applications")
+      .select("id, status, seeker_profile_id")
+      .eq("id", applicationId)
+      .maybeSingle();
+    const appRow = app as
+      | { id: string; status: string; seeker_profile_id: string }
+      | null;
+    if (
+      !appRow ||
+      appRow.seeker_profile_id !== seekerRow.id ||
+      !REVIEWABLE_STATUSES.includes(appRow.status)
+    ) {
+      return { ok: false };
+    }
+
+    const rating = Math.max(1, Math.min(5, Math.round(input.rating)));
+    const { error } = await db.from("host_reviews").insert({
+      host_profile_id: hostProfileId,
+      seeker_profile_id: seekerRow.id,
+      application_id: applicationId,
+      seeker_display_name: seekerRow.display_name?.trim() || "A seeker",
+      rating,
+      housing_as_described: input.housingAsDescribed,
+      meals_as_described: input.mealsAsDescribed,
+      pay_on_time: input.payOnTime,
+      body: input.body.slice(0, 1000),
+    });
+    return { ok: !error };
+  } catch {
+    return { ok: false };
+  }
 }
