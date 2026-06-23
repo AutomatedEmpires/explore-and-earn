@@ -8,6 +8,7 @@ import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 import type { SearchListing } from "../../components/search/listing";
 import { SEARCH_FIXTURES } from "../../components/search/fixtures";
 import { SearchView } from "../../components/search/SearchView";
+import { PublicBottomNav } from "../../components/public/PublicBottomNav";
 
 export const dynamic = "force-dynamic";
 
@@ -207,17 +208,21 @@ export default async function SearchPage({
 	}
 
 	return (
-		<SearchView
-			listings={listings}
-			query={query}
-			category={category}
-			housing={housing}
-			meals={meals}
-			payMin={payMin}
-			payUnit={payUnit}
-			location={location}
-			startAfter={startAfter}
-			startBefore={startBefore}
-		/>
+		<>
+			<SearchView
+				listings={listings}
+				query={query}
+				category={category}
+				housing={housing}
+				meals={meals}
+				payMin={payMin}
+				payUnit={payUnit}
+				location={location}
+				startAfter={startAfter}
+				startBefore={startBefore}
+			/>
+			{/* Pinned bottom nav so the primary nav stays put on search results. */}
+			<PublicBottomNav />
+		</>
 	);
 }

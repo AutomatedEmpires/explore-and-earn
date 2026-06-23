@@ -62,7 +62,44 @@ function trustTier(host: AdminHostRowView): TrustTier {
   return host.listingCount > 0 ? "active" : "newcomer";
 }
 
-type SegmentKey = "all" | "verified" | "awaiting";
+/**
+ * Honest risk signal from REAL fields only. The only risk the host query
+ * exposes is "unvetted host with public footprint": an UNVERIFIED host that
+ * already carries listings is publishing to the marketplace without trust
+ * review — that is the single, real, review-worthy flag. A new host with no
+ * listings is low-signal, not risky; a verified host is cleared.
+ */
+type RiskLevel = "flagged" | "watch" | "clear";
+
+interface HostRisk {
+  readonly level: RiskLevel;
+  readonly label: string;
+  /** Higher sorts first in the "needs attention" priority order. */
+  readonly weight: number;
+}
+
+function hostRisk(host: AdminHostRowView): HostRisk {
+  if (isVerified(host.attestationStatus)) {
+    return { level: "clear", label: "Trust cleared", weight: 0 };
+  }
+  if (host.listingCount >= 3) {
+    return {
+      level: "flagged",
+      label: "Unverified · live footprint",
+      weight: 30 + host.listingCount,
+    };
+  }
+  if (host.listingCount > 0) {
+    return {
+      level: "flagged",
+      label: "Unverified · publishing",
+      weight: 20 + host.listingCount,
+    };
+  }
+  return { level: "watch", label: "New · unvetted", weight: 5 };
+}
+
+type SegmentKey = "all" | "flagged" | "verified" | "awaiting";
 
 export function AdminHostsTable({
   hosts,
@@ -99,6 +136,10 @@ export function AdminHostsTable({
     [hosts],
   );
   const pendingCount = total - verifiedCount;
+  const flaggedCount = useMemo(
+    () => hosts.filter((host) => hostRisk(host).level === "flagged").length,
+    [hosts],
+  );
 
   const segments: ReadonlyArray<{
     readonly key: SegmentKey;
@@ -106,18 +147,25 @@ export function AdminHostsTable({
     readonly count: number;
   }> = [
     { key: "all", label: "All", count: total },
+    { key: "flagged", label: "Flagged", count: flaggedCount },
     { key: "verified", label: "Verified", count: verifiedCount },
     { key: "awaiting", label: "Awaiting", count: pendingCount },
   ];
 
   const visibleHosts = useMemo(() => {
-    if (segment === "verified") {
-      return hosts.filter((host) => isVerified(host.attestationStatus));
+    let rows: ReadonlyArray<AdminHostRowView>;
+    if (segment === "flagged") {
+      rows = hosts.filter((host) => hostRisk(host).level === "flagged");
+    } else if (segment === "verified") {
+      rows = hosts.filter((host) => isVerified(host.attestationStatus));
+    } else if (segment === "awaiting") {
+      rows = hosts.filter((host) => !isVerified(host.attestationStatus));
+    } else {
+      rows = hosts;
     }
-    if (segment === "awaiting") {
-      return hosts.filter((host) => !isVerified(host.attestationStatus));
-    }
-    return hosts;
+    // Priority sort: highest-risk (unvetted + publishing) first, so the moderator
+    // sees what needs attention now without hunting. Stable for equal weights.
+    return [...rows].sort((a, b) => hostRisk(b).weight - hostRisk(a).weight);
   }, [hosts, segment]);
 
   return (
@@ -130,16 +178,16 @@ export function AdminHostsTable({
           trendTone="up"
         />
         <MetricCard
+          label="Flagged for review"
+          value={flaggedCount}
+          trend={flaggedCount > 0 ? "Unvetted live" : "None"}
+          trendTone={flaggedCount > 0 ? "down" : "up"}
+        />
+        <MetricCard
           label="Awaiting review"
           value={pendingCount}
           trend={pendingCount > 0 ? "Verify" : "Clear"}
           trendTone={pendingCount > 0 ? "down" : "up"}
-        />
-        <MetricCard
-          label="Total hosts"
-          value={total}
-          trend="Inventory"
-          trendTone="neutral"
         />
       </MetricGrid>
 
@@ -193,12 +241,18 @@ export function AdminHostsTable({
             <Icon aria-hidden name="system.success" size={24} />
           </span>
           <h3 className={styles.emptyTitle}>
-            {segment === "verified" ? "No verified hosts yet" : "Nothing awaiting review"}
+            {segment === "flagged"
+              ? "No hosts flagged for review"
+              : segment === "verified"
+                ? "No verified hosts yet"
+                : "Nothing awaiting review"}
           </h3>
           <p className={styles.emptySub}>
-            {segment === "verified"
-              ? "Verify a host below and they will appear in this segment."
-              : "Every host has been reviewed — the verification queue is clear."}
+            {segment === "flagged"
+              ? "No unverified host is publishing listings — every public host is trust-cleared."
+              : segment === "verified"
+                ? "Verify a host below and they will appear in this segment."
+                : "Every host has been reviewed — the verification queue is clear."}
           </p>
         </div>
       ) : (
@@ -207,6 +261,7 @@ export function AdminHostsTable({
             const busy = isPending && pendingId === host.id;
             const verified = isVerified(host.attestationStatus);
             const tier = trustTier(host);
+            const risk = hostRisk(host);
             const company = host.companyName || "Unnamed host";
             const ref = hostRef(host.clerkUserId);
             const listingLabel =
@@ -222,6 +277,7 @@ export function AdminHostsTable({
                 className={`${styles.card} ${styles[`tier_${tier}`]}`}
                 key={host.id}
                 role="listitem"
+                data-risk={risk.level}
               >
                 <span className={styles.tierEdge} aria-hidden="true" />
 
@@ -256,6 +312,17 @@ export function AdminHostsTable({
                       Awaiting review
                     </span>
                   )}
+                  {risk.level === "flagged" ? (
+                    <span className={styles.riskFlag}>
+                      <Icon
+                        aria-hidden
+                        name="action.report"
+                        size={16}
+                        className={styles.riskFlagIcon}
+                      />
+                      {risk.label}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className={styles.tags}>

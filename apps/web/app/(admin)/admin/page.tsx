@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getMarketplaceStats } from "@explore-and-earn/db";
 import { Chip, Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
+import { AdminMarketHealth } from "../../../components/admin";
 import styles from "./overview.module.css";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -205,10 +206,16 @@ export default async function AdminDashboardPage() {
             </Link>
           </div>
 
-          <Link className={styles.cta} href="/applications">
-            <Icon name="action.view" size={20} aria-hidden />
-            Open moderation queue
-          </Link>
+          <div className={styles.ctaRow}>
+            <Link className={styles.cta} href="/applications">
+              <Icon name="action.view" size={20} aria-hidden />
+              Open moderation queue
+            </Link>
+            <Link className={`${styles.cta} ${styles.ctaGhost}`} href="/admin/guidelines">
+              <Icon name="nav.help" size={20} aria-hidden />
+              Guidelines
+            </Link>
+          </div>
         </div>
 
         {/* Health + diagnosis */}
@@ -308,6 +315,19 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ---- Marketplace liquidity analytics -------------------------- */}
+      <div className={styles.sectionHead}>
+        <div>
+          <h2 className={styles.sectionTitle}>Marketplace health</h2>
+          <p className={styles.sectionSub}>
+            Two-sided liquidity from live counts — is supply absorbing demand,
+            and is trust keeping up.
+          </p>
+        </div>
+      </div>
+
+      <AdminMarketHealth stats={stats} />
     </section>
   );
 }

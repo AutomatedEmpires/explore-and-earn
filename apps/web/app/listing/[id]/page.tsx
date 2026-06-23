@@ -15,6 +15,7 @@ import { Icon } from "@explore-and-earn/ui";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
 import { TrueValue } from "../../../components/listing/TrueValue";
+import { PublicBottomNav } from "../../../components/public/PublicBottomNav";
 import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../lib/seo";
@@ -314,6 +315,9 @@ export default async function ListingDetailPage({ params }: Props) {
           />
         </div>
       </main>
+      {/* Pinned bottom nav so the seeker's primary nav never vanishes when they
+          tap into a listing detail from the feed. */}
+      <PublicBottomNav />
     </>
   );
 }

@@ -482,6 +482,38 @@ export function HostDashboard({
           </ol>
         </section>
       ) : null}
+
+      {/* ── Resources / help ────────────────────────────────────────── */}
+      <section className={styles.resources} aria-labelledby="resources-heading">
+        <div className={styles.resourcesIntro}>
+          <span className={styles.resourcesIcon} aria-hidden>
+            <Icon name="nav.help" size={20} aria-hidden />
+          </span>
+          <div>
+            <h2 id="resources-heading" className={styles.resourcesTitle}>
+              Hosting resources
+            </h2>
+            <p className={styles.resourcesNote}>
+              New here, or stuck on a step? Answers for posting, boosting,
+              applicants, billing, and trust.
+            </p>
+          </div>
+        </div>
+        <div className={styles.resourcesLinks}>
+          <Link className={styles.resourceChip} href="/host/help">
+            <Icon name="nav.help" size={16} aria-hidden />
+            Help &amp; FAQ
+          </Link>
+          <Link className={styles.resourceChip} href="/host/help">
+            <Icon name="status.boosted" size={16} aria-hidden />
+            Boosting guide
+          </Link>
+          <Link className={styles.resourceChip} href="/host/help">
+            <Icon name="trust.verified_host" size={16} aria-hidden />
+            Get verified
+          </Link>
+        </div>
+      </section>
     </StaggerReveal>
   );
 }

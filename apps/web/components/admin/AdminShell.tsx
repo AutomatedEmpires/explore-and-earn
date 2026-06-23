@@ -32,6 +32,7 @@ const NAV: readonly NavGroup[] = [
   {
     group: "Tools",
     items: [
+      { href: "/admin/guidelines", label: "Guidelines", sub: "Moderation policy", icon: "nav.help" },
       { href: "/admin/email-preview", label: "Email templates", sub: "Transactional", icon: "nav.messages" },
     ],
   },

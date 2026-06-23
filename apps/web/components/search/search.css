@@ -6,6 +6,8 @@
 	flex-direction: column;
 	gap: var(--space-section, var(--space-24));
 	padding: var(--space-gutter, var(--space-16));
+	/* Clear the fixed PublicBottomNav so the last results aren't occluded. */
+	padding-bottom: var(--space-80);
 	background: var(--color-paper);
 	color: var(--text-primary);
 	font-family: var(--font-ui);

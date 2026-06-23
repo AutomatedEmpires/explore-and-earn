@@ -1,0 +1,297 @@
+/*
+ * Marketplace liquidity panel — renders inside the dark-glass .admin-os scope.
+ * Token-only: no raw hex, no px font-size, no ad-hoc radii. color-mix on tokens
+ * is the only computed color.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.note {
+  margin: 0.2rem 0 0;
+  max-width: 52ch;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.seekers {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex: none;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface-raised) 70%, transparent);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+/* ── Liquidity reads ──────────────────────────────────────────────────── */
+
+.reads {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: 1fr;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 32rem) {
+  .reads {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.read {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface-raised) 56%, transparent);
+}
+
+.readTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.readIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+}
+
+.read[data-tone="good"] .readIcon {
+  border-color: color-mix(in srgb, var(--status-success-fg) 42%, transparent);
+  color: var(--status-success-fg);
+}
+
+.read[data-tone="watch"] .readIcon {
+  border-color: color-mix(in srgb, var(--status-warning-fg) 46%, transparent);
+  color: var(--status-warning-fg);
+}
+
+.read[data-tone="low"] .readIcon {
+  border-color: color-mix(in srgb, var(--status-error-fg) 40%, transparent);
+  color: var(--status-error-fg);
+}
+
+.readLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-primary);
+}
+
+.readTag {
+  flex: none;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  border: 1px solid var(--border-soft);
+  color: var(--text-muted);
+}
+
+.read[data-tone="good"] .readTag {
+  border-color: color-mix(in srgb, var(--status-success-fg) 40%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg) 12%, transparent);
+  color: var(--status-success-fg);
+}
+
+.read[data-tone="watch"] .readTag {
+  border-color: color-mix(in srgb, var(--status-warning-fg) 44%, transparent);
+  background: color-mix(in srgb, var(--status-warning-fg) 12%, transparent);
+  color: var(--status-warning-fg);
+}
+
+.read[data-tone="low"] .readTag {
+  border-color: color-mix(in srgb, var(--status-error-fg) 38%, transparent);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
+  color: var(--status-error-fg);
+}
+
+.readFigure {
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.meter {
+  position: relative;
+  height: 0.4rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  overflow: hidden;
+}
+
+.meterFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+  animation: mh-grow 0.7s var(--ease-standard) both;
+}
+
+.read[data-tone="good"] .meterFill {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--status-success-fg) 65%, transparent),
+    var(--status-success-fg)
+  );
+}
+
+.read[data-tone="watch"] .meterFill {
+  background: var(--status-warning-fg);
+}
+
+.read[data-tone="low"] .meterFill {
+  background: var(--status-error-fg);
+}
+
+.readCaption {
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Application funnel ───────────────────────────────────────────────── */
+
+.funnel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-cta) 6%, transparent);
+}
+
+.funnelTitle {
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.funnelBars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.funnelRow {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr auto;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.funnelLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.funnelTrack {
+  position: relative;
+  height: 0.7rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 20%, transparent);
+  overflow: hidden;
+}
+
+.funnelBar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-cta) 60%, transparent),
+    var(--color-cta)
+  );
+  animation: mh-grow 0.8s var(--ease-standard) both;
+}
+
+.funnelValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.funnelDrop {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+@keyframes mh-grow {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meterFill,
+  .funnelBar {
+    animation: none;
+  }
+}

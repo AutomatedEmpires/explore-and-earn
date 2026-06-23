@@ -454,6 +454,12 @@
   gap: var(--space-8);
 }
 
+.ctaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}
+
 .cta {
   display: inline-flex;
   align-items: center;

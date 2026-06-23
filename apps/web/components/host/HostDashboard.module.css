@@ -407,3 +407,98 @@
     grid-column: 2;
   }
 }
+
+/* ── Resources / help band ──────────────────────────────────────── */
+.resources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+  padding: var(--space-16) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-cta) 12%, transparent), transparent 52%),
+    var(--color-surface);
+}
+@media (min-width: 720px) {
+  .resources {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-20);
+  }
+}
+
+.resourcesIntro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+}
+
+.resourcesIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+  color: var(--color-cta);
+}
+
+.resourcesTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-card-size);
+  color: var(--text-primary);
+}
+
+.resourcesNote {
+  margin: 2px 0 0;
+  max-width: 48ch;
+  color: var(--text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+}
+
+.resourcesLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.resourceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 40px;
+  padding: var(--space-8) var(--space-14);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--type-meta-size);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.resourceChip:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-cta);
+  color: var(--color-cta);
+}
+.resourceChip:active { transform: translateY(0); }
+.resourceChip:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resourceChip { transition: none; }
+  .resourceChip:hover { transform: none; }
+}

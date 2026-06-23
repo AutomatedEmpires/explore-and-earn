@@ -6,14 +6,17 @@ import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import styles from "./PublicBottomNav.module.css";
 
+// Order is locked to the seeker mobile-primary nav (Swipe · Map · Seek ·
+// Profile) so the bottom bar never reorders as a visitor crosses from a public
+// page into the seeker scope — same destinations, same positions, everywhere.
 const TABS: ReadonlyArray<{
 	href: string;
 	label: string;
 	icon: IconKey;
 }> = [
-	{ href: "/seek", label: "Seek", icon: "nav.seek" },
-	{ href: "/map", label: "Map", icon: "nav.map" },
 	{ href: "/swipe", label: "Swipe", icon: "nav.swipe" },
+	{ href: "/map", label: "Map", icon: "nav.map" },
+	{ href: "/seek", label: "Seek", icon: "nav.seek" },
 	{ href: "/profile", label: "Profile", icon: "nav.profile" },
 ];
 

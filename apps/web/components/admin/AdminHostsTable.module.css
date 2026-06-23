@@ -324,6 +324,42 @@
   color: var(--status-warning-fg);
 }
 
+/* Risk flag — only on hosts that are unverified yet already publishing.
+   The single, honest trust-and-safety signal the host query exposes. */
+.riskFlag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--status-error-fg);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 28%, transparent);
+}
+
+.riskFlagIcon {
+  flex: none;
+  color: var(--status-error-fg);
+}
+
+/* A flagged card pulls a danger-toned border + edge so it reads as priority
+   the instant the moderator squints at the grid. */
+.card[data-risk="flagged"] {
+  border-color: color-mix(in srgb, var(--status-error-fg) 34%, var(--border-soft));
+}
+
+.card[data-risk="flagged"] .tierEdge {
+  background: linear-gradient(
+    to bottom,
+    var(--status-error-fg),
+    color-mix(in srgb, var(--status-error-fg) 28%, transparent)
+  );
+}
+
 /* Tag row: footprint + listing trust facts (real fields only) */
 .tags {
   display: flex;

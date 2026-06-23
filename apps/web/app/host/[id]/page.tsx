@@ -14,9 +14,11 @@ import { Icon } from "@explore-and-earn/ui";
 import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 
 import { HostProfileHero } from "../../../components/host/HostProfileHero";
+import { HostTrustBand } from "../../../components/host/HostTrustBand";
 import { HostReviews } from "../../../components/host/HostReviews";
 import { LeaveReview } from "../../../components/host/LeaveReview";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
+import { PublicBottomNav } from "../../../components/public/PublicBottomNav";
 import { generateBreadcrumbJsonLd } from "../../../lib/seo";
 import styles from "./page.module.css";
 
@@ -423,6 +425,13 @@ export default async function PublicHostProfilePage({ params }: Props) {
         hostingSinceYear={hostingSinceYear}
       />
 
+      {/* ── Trust band — triad-kept proof (renders only with reviews) ── */}
+      <HostTrustBand
+        summary={ratingSummary}
+        verified={host.attestationStatus === "attested"}
+        reviewsHref="#reviews-heading"
+      />
+
       {/* ── Content grid: main col + sidebar ─────────────────── */}
       <div className={hasSidebar ? styles.contentGrid : styles.contentSingle}>
         {/* Main column: about + listings */}
@@ -459,6 +468,9 @@ export default async function PublicHostProfilePage({ params }: Props) {
         ) : null}
       </div>
     </main>
+    {/* Pinned bottom nav so the seeker's primary nav stays put when they tap
+        through to a host profile. */}
+    <PublicBottomNav />
     </>
   );
 }

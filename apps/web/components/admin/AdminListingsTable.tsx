@@ -36,6 +36,30 @@ const FILTERS = [
 
 type FilterId = (typeof FILTERS)[number]["id"];
 
+const SORTS = [
+  { id: "priority", label: "Priority" },
+  { id: "newest", label: "Newest" },
+  { id: "title", label: "A–Z" },
+] as const;
+
+type SortId = (typeof SORTS)[number]["id"];
+
+/** Moderation urgency rank — what a moderator should see first. */
+function priorityRank(status: string): number {
+  switch (status) {
+    case "under_review":
+      return 0;
+    case "draft":
+      return 1;
+    case "paused":
+      return 2;
+    case "live":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
 /** Category lane -> Streamline registry icon + a tint hook for the cover mat. */
 const CATEGORY_ICON: Record<string, IconKey> = {
   farm: "category.farm",
@@ -136,17 +160,44 @@ export function AdminListingsTable({
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterId>("all");
+  const [sort, setSort] = useState<SortId>("priority");
+  const [query, setQuery] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const visible = useMemo(
-    () =>
-      filter === "all"
-        ? listings
-        : listings.filter((listing) => listing.status === filter),
-    [filter, listings],
-  );
+  const trimmedQuery = query.trim().toLowerCase();
+
+  const visible = useMemo(() => {
+    const filtered = listings.filter((listing) => {
+      if (filter !== "all" && listing.status !== filter) return false;
+      if (trimmedQuery) {
+        const haystack =
+          `${listing.title} ${listing.hostCompanyName} ${listing.category} ${listing.status}`.toLowerCase();
+        if (!haystack.includes(trimmedQuery)) return false;
+      }
+      return true;
+    });
+
+    const sorted = [...filtered];
+    if (sort === "priority") {
+      sorted.sort((a, b) => {
+        const rank = priorityRank(a.status) - priorityRank(b.status);
+        if (rank !== 0) return rank;
+        // Within a rank, newest published first (nulls last).
+        return (b.publishedAt ?? "").localeCompare(a.publishedAt ?? "");
+      });
+    } else if (sort === "newest") {
+      sorted.sort((a, b) =>
+        (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""),
+      );
+    } else {
+      sorted.sort((a, b) =>
+        (a.title || "Untitled").localeCompare(b.title || "Untitled"),
+      );
+    }
+    return sorted;
+  }, [filter, listings, sort, trimmedQuery]);
 
   const counts = useMemo(() => {
     let live = 0;
@@ -236,6 +287,42 @@ export function AdminListingsTable({
         </span>
       </div>
 
+      <div className={styles.triageBar}>
+        <div className={styles.search}>
+          <span className={styles.searchIcon} aria-hidden="true">
+            <Icon name="action.search" size={16} />
+          </span>
+          <input
+            type="search"
+            className={styles.searchInput}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search title, host, category, or status"
+            aria-label="Search listings by title, host, category, or status"
+          />
+        </div>
+        <div
+          className={styles.sorts}
+          role="group"
+          aria-label="Sort listings"
+        >
+          <span className={styles.sortIcon} aria-hidden="true">
+            <Icon name="action.sort" size={16} />
+          </span>
+          {SORTS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={styles.sort}
+              aria-pressed={sort === option.id}
+              onClick={() => setSort(option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error ? (
         <p className={styles.error} role="alert">
           {error}
@@ -249,11 +336,18 @@ export function AdminListingsTable({
           </span>
           <p className={styles.emptyTitle}>The queue is clear</p>
           <p className={styles.emptyBody}>
-            No listings in this view. Switch filters to see other states.
+            No listings match this view. Clear the search or switch filters to
+            see other states.
           </p>
-          {filter !== "all" ? (
-            <Button variant="secondary" onClick={() => setFilter("all")}>
-              Show all listings
+          {filter !== "all" || trimmedQuery ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setFilter("all");
+                setQuery("");
+              }}
+            >
+              Clear filters
             </Button>
           ) : null}
         </div>
