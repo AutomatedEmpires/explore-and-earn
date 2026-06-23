@@ -206,14 +206,14 @@ export async function createHostReview(
     const seekerRow = seeker as { id: string; display_name: string | null } | null;
     if (!seekerRow) return { ok: false };
 
-    // Defense in depth: the application must be the seeker's own + reviewable.
+    // The application must be the seeker's own + reviewable.
     const { data: app } = await db
       .from("applications")
-      .select("id, status, seeker_profile_id")
+      .select("id, status, seeker_profile_id, listing_id")
       .eq("id", applicationId)
       .maybeSingle();
     const appRow = app as
-      | { id: string; status: string; seeker_profile_id: string }
+      | { id: string; status: string; seeker_profile_id: string; listing_id: string }
       | null;
     if (
       !appRow ||
@@ -223,9 +223,25 @@ export async function createHostReview(
       return { ok: false };
     }
 
+    // IDOR guard: the engagement's listing must actually belong to this host.
+    // Without it a seeker could pair a real engagement (host A) with an arbitrary
+    // hostProfileId (host B) and review a host they never worked with. Derive the
+    // host from the listing (source of truth) and reject any mismatch; the review
+    // is written against the DERIVED host, never the caller-supplied value.
+    const { data: listing } = await db
+      .from("listings")
+      .select("host_profile_id")
+      .eq("id", appRow.listing_id)
+      .maybeSingle();
+    const listingHostId = (listing as { host_profile_id: string | null } | null)
+      ?.host_profile_id;
+    if (!listingHostId || listingHostId !== hostProfileId) {
+      return { ok: false };
+    }
+
     const rating = Math.max(1, Math.min(5, Math.round(input.rating)));
     const { error } = await db.from("host_reviews").insert({
-      host_profile_id: hostProfileId,
+      host_profile_id: listingHostId,
       seeker_profile_id: seekerRow.id,
       application_id: applicationId,
       seeker_display_name: seekerRow.display_name?.trim() || "A seeker",
