@@ -3,7 +3,9 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 
 import {
 	type SearchFilters,
+	getSavedSearches,
 	rowToDiscoveryFields,
+	savedSearchToQueryString,
 	searchListings,
 } from "@explore-and-earn/db";
 import {
@@ -237,6 +239,7 @@ export default async function SeekPage({
 
 	// Dashboard data — only fetched when signed in
 	let dashboardProps = null;
+	let savedSearchViews: { id: string; label: string; href: string }[] = [];
 	if (userId && token) {
 		const clerkUser = await currentUser();
 		const fallbackName =
@@ -244,11 +247,18 @@ export default async function SeekPage({
 				? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
 				: "Seeker";
 
-		const [status, matchedListings, profile] = await Promise.all([
+		const [status, matchedListings, profile, savedSearches] = await Promise.all([
 			getSeekerStatus(token, userId, fallbackName),
 			getMatchedListings(token, userId),
 			getSeekerProfile(token, userId),
+			getSavedSearches(token, userId).catch(() => []),
 		]);
+
+		savedSearchViews = savedSearches.map((s) => ({
+			id: s.id,
+			label: s.label,
+			href: savedSearchToQueryString(s.filters),
+		}));
 
 		dashboardProps = {
 			profile,
@@ -281,6 +291,7 @@ export default async function SeekPage({
 					location={location}
 					payMin={payMin}
 					payUnit={payUnit}
+					savedSearches={savedSearchViews}
 				/>
 			</div>
 

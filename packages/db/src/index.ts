@@ -12,6 +12,7 @@ export {
 } from "./queries/listingLifecycle";
 export * from "./queries/benefitDetails";
 export * from "./queries/savedListings";
+export * from "./queries/savedSearches";
 export * from "./queries/applications";
 export * from "./queries/seekerApplicationsRich";
 export * from "./queries/invites";

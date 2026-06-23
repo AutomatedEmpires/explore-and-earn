@@ -1,0 +1,143 @@
+/**
+ * Saved searches row — re-run chips + a "save this search" affordance. Mirrors
+ * the SeekQuickFilters chip language; token-driven, scrollable on overflow.
+ */
+
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.scroll {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.lead {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.chip:focus-within {
+  border-color: var(--color-cta);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.chipLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min, 44px);
+  padding: 0 var(--space-12);
+  color: var(--text-secondary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+.chipLink:hover {
+  color: var(--text-primary);
+}
+
+.remove {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  min-height: var(--tap-min, 44px);
+  border: 0;
+  border-left: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+.remove:hover {
+  color: var(--status-error-fg, var(--text-primary));
+}
+.remove:active {
+  transform: scale(0.9);
+}
+.remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.saveBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min, 44px);
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 40%, transparent);
+  background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+  color: var(--color-cta);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+.saveBtn:hover {
+  background: color-mix(in srgb, var(--color-cta) 22%, transparent);
+}
+.saveBtn:active {
+  transform: scale(0.97);
+}
+.saveBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+.saveBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.savedFlag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--status-success-fg, var(--color-cta));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chipLink,
+  .remove,
+  .saveBtn {
+    transition: none;
+  }
+  .remove:active,
+  .saveBtn:active {
+    transform: none;
+  }
+}

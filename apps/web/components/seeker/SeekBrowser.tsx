@@ -28,6 +28,7 @@ import {
 } from "../public/FeaturedEmployersRail";
 import styles from "./SeekBrowser.module.css";
 import { SeekFilterPopup, type SeekFilterPopupValue } from "./SeekFilterPopup";
+import { SavedSearches, type SavedSearchView } from "./SavedSearches";
 import { SeekQuickFilters } from "./SeekQuickFilters";
 import { SeekSortPopup } from "./SeekSortPopup";
 
@@ -102,6 +103,7 @@ export interface SeekBrowserProps {
 	readonly location?: string;
 	readonly payMin?: number;
 	readonly payUnit?: CompensationUnit;
+	readonly savedSearches?: readonly SavedSearchView[];
 }
 
 /**
@@ -126,6 +128,7 @@ export function SeekBrowser({
 	location,
 	payMin,
 	payUnit,
+	savedSearches = [],
 }: SeekBrowserProps) {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -261,6 +264,31 @@ export function SeekBrowser({
 
 	const filterCount = activeFilterChips.length;
 
+	// Current filter set + a human label, for the "save this search" affordance.
+	const currentFilters = {
+		q: query || undefined,
+		category: category || undefined,
+		housing: housing || undefined,
+		meals: meals || undefined,
+		visa: visaSupport || undefined,
+		startRangeMonths,
+		payMin: payMin && payMin > 0 ? payMin : undefined,
+		payUnit: payUnit || undefined,
+		location: location || undefined,
+	};
+	const currentLabel =
+		[
+			category ? CATEGORY_LABEL[category as OpportunityCategory] : null,
+			housing ? "Housing" : null,
+			meals ? "Meals" : null,
+			payMin ? `$${payMin}${payUnit ? `/${payUnit}` : ""}` : null,
+			startRangeMonths ? `${startRangeMonths}mo start` : null,
+			location || null,
+			query ? `“${query}”` : null,
+		]
+			.filter(Boolean)
+			.join(" · ") || "All opportunities";
+
 	const applyFilters = (value: SeekFilterPopupValue) => {
 		const next = new URLSearchParams(searchParams.toString());
 		if (value.housing) next.set("housing", "1");
@@ -304,6 +332,13 @@ export function SeekBrowser({
 					from hosts worldwide.
 				</p>
 			</header>
+
+			<SavedSearches
+				searches={savedSearches}
+				currentFilters={currentFilters}
+				currentLabel={currentLabel}
+				canSave={hasActiveFilters}
+			/>
 
 			<div className={styles.filters}>
 				<label className={styles.search}>
