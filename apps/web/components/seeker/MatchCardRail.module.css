@@ -67,6 +67,26 @@
   flex-shrink: 0;
 }
 
+/* Capped staggered reveal — matched cards settle into place on first paint.
+   Only the first ~6 stagger (delay clamps), so the rail never feels slow. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .railItem {
+    animation: rise var(--motion-base) var(--ease-standard) both;
+    animation-delay: calc(min(var(--i, 0), 6) * 40ms);
+  }
+}
+
 /* ─── Card — fluid width so a single card never exceeds a narrow phone,
        and the next card always peeks (signalling the rail scrolls). ─── */
 .card {

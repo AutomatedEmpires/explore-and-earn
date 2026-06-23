@@ -36,6 +36,11 @@
 	--border-soft:      var(--page-line);
 	--border-ink-warm:  var(--page-line);
 
+	/* --color-paper is transparent here, which would collapse the inner gap of
+	   composed focus rings (--ui-focus-ring). Re-point to an opaque dark gap +
+	   sky halo so keyboard focus stays legible on the dark-glass page. */
+	--ui-focus-ring: 0 0 0 2px var(--palette-ink), 0 0 0 4px var(--palette-sky);
+
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-section);

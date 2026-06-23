@@ -1,0 +1,311 @@
+{
+  "summary": "Adversarial read-only review of the just-improved surfaces — find the last 10% (motion, micro-interaction, a11y depth, edge states) that separates great from elite",
+  "agentCount": 5,
+  "logs": [
+    "Adversarial elite review of 5 areas (read-only).",
+    "Elite review done: 33 findings."
+  ],
+  "result": {
+    "areas": [
+      {
+        "area": "Community / Public (marketing home, header, employer rail, public nav, DiscoveryCard, search, legal)",
+        "verdict": "Strong and cohesive after the dark-glass pass, but not yet elite: the home's two main content modules (feed + rail) reveal with no stagger/skeleton-continuity, the public header has a \"you are here\" state that is styled but never wired up, mobile press feedback is gated behind hover, and the legal surface is still carrying a wall of raw hex/rgba that slipped the tokenization pass.",
+        "high": 0,
+        "findings": [
+          {
+            "surface": "Discovery feed — card grid reveal + skeleton continuity",
+            "files": "apps/web/components/discovery/DiscoveryFeed.module.css (.grid), DiscoveryFeed.tsx",
+            "gap": "The homepage's primary content module renders all cards instantly with zero entrance — no fade+rise, no stagger, and the loading skeletons (same grid) hard-swap to cards with no continuity. The motion system explicitly calls for staggered list reveals (30–50ms/item, capped) and skeleton→content continuity so load→loaded does not jump. This is the single biggest 'feels expensive' miss on the home.",
+            "fix": "Add a reveal under @media (prefers-reduced-motion: no-preference): .grid > * { opacity:0; transform: translateY(10px); animation: feedItemIn var(--motion-base) var(--ease-standard) both; } with a capped nth-child stagger (e.g. delays 0/40/80/120/160ms, reset after ~6). Define @keyframes feedItemIn { to { opacity:1; transform:none } }. Under reduced-motion leave the static final state (no animation). Use transform/opacity only.",
+            "severity": "medium",
+            "effort": "S"
+          },
+          {
+            "surface": "GlobalHeader — public/section nav 'you are here' state",
+            "files": "apps/web/components/global/GlobalHeader.tsx (lines 155-168), GlobalHeader.module.css (.navLinkActive defined L188)",
+            "gap": ".navLinkActive (bright chrome fill / mobile sky underline) is fully designed in CSS but NEVER applied to the Explore/Community section links, and neither gets aria-current. On the marketing home the 'Explore' tab points to the current page yet reads identical to the inactive 'Community' tab — no active affordance, an a11y current-page gap, and dead CSS. (Community sub-tabs do this correctly; section nav was left behind.)",
+            "fix": "Compute an active key from pathname (Explore active when scope-home/seek route is current, Community when pathname starts with /community) and apply `${styles.navLink} ${isActive ? styles.navLinkActive : ''}` plus aria-current=\"page\" on the active link, mirroring the communityTab pattern already in this file.",
+            "severity": "medium",
+            "effort": "S"
+          },
+          {
+            "surface": "GlobalHeader — section nav press state",
+            "files": "apps/web/components/global/GlobalHeader.module.css (.navLink L150, has :hover/:focus-visible only)",
+            "gap": ".navLink has hover and focus-visible but no :active. The motion system names tap/press as the #1 most-skipped state and the mobile primary; these are full-width tab targets on phones with no press feedback.",
+            "fix": "Add `.navLink:active { transform: translateY(0) scale(0.97); }` (and guard it off in the existing reduced-motion block alongside signInBtn). Matches the press scale already used on signInBtn/iconBtn.",
+            "severity": "low",
+            "effort": "S"
+          },
+          {
+            "surface": "EmptyState — press feedback gated behind pointer",
+            "files": "apps/web/components/discovery/EmptyState.module.css (lines 62-65)",
+            "gap": "The forward-CTA's `:active { transform: scale(0.98) }` lives inside `@media (hover: hover)`, so touch devices — where this empty-state CTA matters most — get no press confirmation at all. Hover and press are conflated.",
+            "fix": "Move `.action:active { transform: scale(0.98); }` out of the @media (hover:hover) block to the top level (keep only the hover brightness inside it), and disable it under prefers-reduced-motion.",
+            "severity": "low",
+            "effort": "S"
+          },
+          {
+            "surface": "Legal surface — residual raw hex/rgba (tokenization gap)",
+            "files": "apps/web/app/(legal)/legal.module.css (32 rgba + ~14 raw hex: #9a7038, #2f667a, #185848, #184878, #c4954a, rgba(196,149,74,…), rgba(47,102,122,…) etc.)",
+            "gap": "This is static, high-read marketing/legal text and the whole stylesheet bypasses the locked token system — hardcoded badge/callout/hero colors and white overlays. It re-derives sky (#2f667a == --color-cta) and the green/blue/gold accents by hand, so it will drift from the palette and breaks the 'zero raw hex' rule. Largest concentration of slipped-through debt in the area.",
+            "fix": "Replace the literals with tokens: #2f667a → var(--color-cta)/var(--palette-sky); the green family → var(--status-success-fg)/--palette-teal; gold → var(--color-gold)/--palette-amber; rgba(255,255,255,x) overlays → color-mix(in srgb, var(--palette-white) X%, transparent); the rgba accent tints → color-mix on the corresponding palette token. No visual redesign needed — same values, token-sourced.",
+            "severity": "medium",
+            "effort": "M"
+          },
+          {
+            "surface": "FeaturedEmployersRail — section enter has no orchestrated reveal",
+            "files": "apps/web/components/public/FeaturedEmployersRail.tsx (employers.map L194), FeaturedEmployersRail.module.css (.card L192)",
+            "gap": "Cards only animate on hover/scale-image; the curated set appears all-at-once with no fade+rise, while the page itself does a view-enter settle. The 'one orchestrated moment' (a single confident rail reveal) is exactly the sanctioned pattern and is missing, so the rail feels static next to the animated hero/page.",
+            "fix": "Give .railItem a capped fade+rise reveal (opacity 0→1, translateY 8px→0, var(--motion-base), small per-item stagger ≤4 items) under @media (prefers-reduced-motion: no-preference); leave the static row visible instantly under reduced-motion. transform/opacity only.",
+            "severity": "low",
+            "effort": "S"
+          },
+          {
+            "surface": "EmptyState focus ring on dark-glass home",
+            "files": "apps/web/components/discovery/EmptyState.module.css (.action:focus-visible → var(--ui-focus-ring)), apps/web/styles/primitives.css (L14), apps/web/app/page.module.css (--color-paper: transparent)",
+            "gap": "--ui-focus-ring is `0 0 0 2px var(--color-paper), 0 0 0 4px var(--status-match-fg)`. On the home, .page re-points --color-paper to transparent, so when an empty feed renders on the dark-glass page the inner separator ring collapses to transparent and the ring loses its halo/contrast against the dark backdrop.",
+            "fix": "On the dark page scope, re-point the focus ring's inner stop to an opaque dark (e.g. add `--ui-focus-ring: 0 0 0 2px var(--palette-ink), 0 0 0 4px var(--palette-sky-light);` inside .page) so composed surfaces inherit a legible ring, matching what the hero CTAs already hardcode.",
+            "severity": "low",
+            "effort": "S"
+          }
+        ]
+      },
+      {
+        "area": "Host OS (overview, analytics, listings, applicants, invites, profile, settings, shell)",
+        "verdict": "Strong and cohesive — the dark-glass re-skin, MetricGrids, view-enter motion, and meter fills land — but it falls short of elite on three concrete fronts: the press/tactile layer is missing at the primitive level (no :active on ui-button), the marquee entrance uses an overshooting spring that violates the locked no-bounce ease, and the dashboard's loading skeleton is a generic detail shape that jumps to a totally different layout.",
+        "high": 2,
+        "findings": [
+          {
+            "surface": "Primary action buttons (Skip/Save/Offer applicant row, gate/upgrade buttons, every composed <Button> in Host OS)",
+            "files": "apps/web/styles/primitives.css:152-156 (.ui-button transition + missing :active)",
+            "gap": ".ui-button transitions only background/border-color/color and has NO :active state. The motion system calls press feedback 'the #1 most-skipped state' and mandates scale 0.97-0.98 on every tappable element. Tapping Skip/Save/Offer or any CTA in the Host OS gives zero tactile response — the single biggest 'feels cheap on mobile' tell.",
+            "fix": "Add `transform var(--motion-fast) var(--ease-standard)` to the .ui-button transition list and add `.ui-button:active:not(:disabled){ transform: scale(0.98); }`. One primitive edit lifts every button across all three OSes. Meaning: confirms the tap registered.",
+            "severity": "high",
+            "effort": "S"
+          },
+          {
+            "surface": "Dashboard entrance (StaggerReveal — the marquee 'falls into place' moment on /host)",
+            "files": "apps/web/components/host/StaggerReveal.tsx:38",
+            "gap": "Uses `type: 'spring'` at stiffness 130 / damping 18 / mass 0.9 — damping ratio ~0.78, which is underdamped and visibly overshoots. motion-system.md §1 and §5 explicitly ban spring overshoot ('The locked ease --ease-standard has no overshoot for this reason'; '❌ Bounce / elastic / spring overshoot'). The header comment even claims 'expo-out spring' but the params bounce. This is the most-seen animation in the Host OS and it's the one that breaks the locked motion contract.",
+            "fix": "Replace the spring transition with a tween on the locked curve: `transition={{ duration: 0.36, ease: [0.2, 0.8, 0.2, 1] }}` (matches --motion-drawer / --ease-standard) and keep staggerChildren 0.06. Settles, never bounces.",
+            "severity": "high",
+            "effort": "S"
+          },
+          {
+            "surface": "Dashboard loading state (/host route transition)",
+            "files": "apps/web/app/(host)/host/loading.tsx → apps/web/components/host/HostDetailSkeleton.tsx (+ .module.css)",
+            "gap": "The overview route falls back to HostDetailSkeleton, which is a DETAIL shape (one title line + 3 stat rects + 3 body lines). The real dashboard is a hero KPI band + MetricGrid + attention list + two-column radar/pipeline panels. Load→loaded visibly jumps to a different layout — the exact 'skeletons that don't match the real layout' defect motion-system.md §Loading calls out. The detail skeleton is right for listing/applicant/message but wrong as the dashboard's catch-all.",
+            "fix": "Add a dedicated `app/(host)/host/loading.tsx` whose skeleton mirrors the dashboard grid (hero band rect → MetricGrid row of skeleton tiles → two panel-shaped rects), so the transition holds the real silhouette. Reuse the existing Skeleton primitive (shimmer already on by default).",
+            "severity": "medium",
+            "effort": "M"
+          },
+          {
+            "surface": "Applicant pipeline action row (optimistic Skip/Save/Offer)",
+            "files": "apps/web/components/host/HostApplicantCardActions.tsx:58 (aria-busy) + HostApplicantCard.module.css:90-100 (.actionRow)",
+            "gap": "The row sets aria-busy={isPending} but there is NO visual busy treatment — no dim, no row-level pulse, no disabled-look beyond the single tapped button. The label optimistically swaps (Save→Saved) which is good, but during the server round-trip the row gives no 'working' signal, so a slow network reads as a dead tap. Elite optimistic UI shows the in-flight state, not just the end state.",
+            "fix": "In .actionRow add `&[aria-busy='true']{ opacity: 0.72; transition: opacity var(--motion-fast) var(--ease-standard); }` (the buttons are already disabled while pending, so it reads as a settle). Meaning: the action is committing.",
+            "severity": "medium",
+            "effort": "S"
+          },
+          {
+            "surface": "Conversion radar donut (dashboard) vs its legend meters",
+            "files": "apps/web/components/host/HostDashboard.module.css:177-195 (.radar conic) vs :124-135 (.pipelineStageTrack > span animates width)",
+            "gap": "The legend mini-meters and pipeline tracks animate their fill (width transition over 480ms, the sanctioned 'animate the change' pattern), but the radar's conic-gradient sweep (the dominant figure of the panel) just appears with no fill animation. Inconsistent: the supporting data moves, the headline gauge snaps. The eye reads the snap as the gauge being less 'alive' than its own legend.",
+            "fix": "Animate the donut sweep on mount with `@property --pct` registered as <percentage> + a keyframe from 0 to the value over --motion-base on the .radar (transform/opacity rule is satisfied since conic angle isn't a layout prop), gated behind prefers-reduced-motion: no-preference. Meaning: the gauge fills to the real conversion score.",
+            "severity": "low",
+            "effort": "M"
+          },
+          {
+            "surface": "Host shell — sidebar, brand, hero KPI, nav typography",
+            "files": "apps/web/styles/host-os.css:192-226 (font-size:30px/20px/18px/14px/11px/10px throughout the shell + .hostos-chip color:#CFF6EA)",
+            "gap": "The improve pass tokenized the feature modules, but the hand-authored shell still carries ~12 raw px font-sizes (30/20/18/14/11/10px) and a raw hex (#CFF6EA on .hostos-chip). AGENTS.md §6 mandates zero px type / zero raw hex bypassing tokens; these slipped through because they live in the shell stylesheet, not a .module.css. It's the only large surface in the area still off the type scale.",
+            "fix": "Map the shell font-sizes to the --type-* / rem scale (e.g. 30px→ a display step, 14px→--type-meta-size, 10/11px→--type-caption-size) and replace #CFF6EA with `var(--status-match-fg)` (the teal it's approximating). Visual is unchanged; it just stops drifting from the scale.",
+            "severity": "low",
+            "effort": "M"
+          },
+          {
+            "surface": "Applicant avatar gradient (host-side review card)",
+            "files": "apps/web/components/host/HostApplicantCard.module.css:51 (background: var(--gradient-sky)) + apps/web/styles/host-os.css:31",
+            "gap": "The avatar fills with --gradient-sky, which resolves to linear-gradient(--palette-sky → --palette-teal). host-os.css remaps --palette-sky to teal #2FD3B6 but does NOT remap --palette-teal (stays the light-theme forest #3F7D5A), so the avatar lands as a teal→muddy-green wash that isn't part of the golden-hour palette and doesn't match the amber/gold avatar in the shell (.hostos-avatar uses --hostos-grad). Two avatars, two unrelated identities.",
+            "fix": "Either point the card avatar at the scope gradient (`background: var(--hostos-grad)` won't resolve outside host scope — instead add `.host-os { --gradient-sky: var(--hostos-grad); }`) or remap --palette-teal in host-os.css so the existing sky gradient lands on-brand. Unifies seeker-initials avatars with the shell.",
+            "severity": "low",
+            "effort": "S"
+          }
+        ]
+      },
+      {
+        "area": "Admin OS (overview /admin, applications, listings + [id], hosts, email-preview, loading, shell)",
+        "verdict": "Strong, cohesive dark-glass command center — but not elite yet: the two surfaces that actually mutate marketplace state (listings table, hosts table) have hollow action feedback (no loading affordance, listings never re-renders on success), one meter animates a layout property, and a couple of interaction/tap-target holes slipped through.",
+        "high": 2,
+        "findings": [
+          {
+            "surface": "Listings moderation table — approve/reject action",
+            "files": "apps/web/components/admin/AdminListingsTable.tsx (runAction, ~163-176)",
+            "gap": "On success the action only flips `setPendingId(null)` — it never calls `router.refresh()`. Approve a listing and its status Badge + moderation signals stay stale until a manual reload, so the highest-stakes interaction in the OS appears to do nothing. The sibling AdminListingCard already does `router.refresh()` on success; the table forgot it.",
+            "fix": "In the `if (result.ok)` path of runAction, call `router.refresh()` (router is already imported/used at line 137/348) so the row re-renders with the new server status. Optionally clear filter to surface the moved row.",
+            "severity": "high",
+            "effort": "S"
+          },
+          {
+            "surface": "Action buttons in listings + hosts tables (Approve/Reject/Verify/Unverify)",
+            "files": "apps/web/components/admin/AdminListingsTable.tsx (~323-352), AdminHostsTable.tsx (~277-300)",
+            "gap": "During the in-flight server action the only feedback is `disabled={busy}` — no spinner, no label swap, no aria-busy. On a slow round-trip the primary moderation control just looks dead/greyed, which reads cheap and gives no 'cause→effect' (motion-system §60). The Button primitive has no loading prop, so there's currently no premium busy state anywhere.",
+            "fix": "Add a minimal `loading` prop to the Button primitive (renders an inline spinner/shimmer in the icon slot + sets `aria-busy`), and pass `loading={busy}` here; or, lower-effort, swap the label to 'Approving…/Verifying…' when busy. Name the meaning: the control acknowledges the request is in flight.",
+            "severity": "high",
+            "effort": "M"
+          },
+          {
+            "surface": "Listing review detail — checklist tally meter",
+            "files": "apps/web/app/(admin)/listings/[id]/page.module.css (.tallyFill, ~140-149)",
+            "gap": "`transition: inline-size var(--motion-base)…` animates a LAYOUT property (logical width). Motion-system §14 / §72 is explicit: animate transform/opacity only, never width — this is a CLS/jank vector. The overview health bar does it right (`transform: scaleX`); this meter drifted.",
+            "fix": "Render the fill full-width and drive it with `transform: scaleX(passed/total)` + `transform-origin: left`, transitioning `transform` not `inline-size` (mirror overview-fill). Set the scale via the inline style instead of inline-size.",
+            "severity": "medium",
+            "effort": "S"
+          },
+          {
+            "surface": "Listings table — filtered empty state",
+            "files": "apps/web/components/admin/AdminListingsTable.tsx (~240-249)",
+            "gap": "When a status filter yields zero rows, the empty state is a dead end: 'No listings in this view. Switch filters to see other states.' with no control. The applications table empty state in the same OS offers a real 'Clear filters' Button — so the two surfaces are inconsistent and this one makes the user re-hunt the tab row.",
+            "fix": "Add a `<Button variant=\"secondary\" onClick={() => setFilter('all')}>Show all listings</Button>` inside the empty block (only when `filter !== 'all'`), matching the applications-table pattern.",
+            "severity": "medium",
+            "effort": "S"
+          },
+          {
+            "surface": "Listing review detail — back link (primary escape on mobile)",
+            "files": "apps/web/app/(admin)/listings/[id]/page.module.css (.back, ~5-16)",
+            "gap": "The 'Listing moderation' back link is meta-size text with no padding and no min-height — its hit area is well under the 44px `--tap-min` floor the rest of the OS honors. It's the main way back from a deep detail route on a phone.",
+            "fix": "Give `.back` `min-height: var(--tap-min)` + small inline padding (e.g. `var(--space-6) var(--space-10)`) and a negative inline-start margin so the text stays flush, restoring a 44px target without shifting layout.",
+            "severity": "medium",
+            "effort": "S"
+          },
+          {
+            "surface": "Per-navigation view-enter (template.tsx) across all admin lists",
+            "files": "apps/web/styles/admin-os.css (.adminos-view, ~599-603); table CSS in components/admin/*",
+            "gap": "Every route animates as ONE block (`adminos-viewin` on the wrapper). The motion-system explicitly calls for list/rail stagger (§44: 30–50ms per item, capped) and the loading skeleton mirrors a multi-row queue — so loaded content pops in all-at-once while the skeleton implied rows. The reveal lands flat vs. an Apple-grade settle. No per-row entrance exists on the queue/rows/grid.",
+            "fix": "Add a capped stagger to the first ~6 rows of `.queue`/`.rows`/`.grid` (e.g. `animation: adminos-viewin var(--motion-base) var(--ease-standard) both; animation-delay` via `:nth-child(-n+6)` at 40ms steps), gated by `@media (prefers-reduced-motion: no-preference)` so reduced-motion still cuts instantly. Meaning: rows arrive in reading order, not as a slab.",
+            "severity": "low",
+            "effort": "M"
+          },
+          {
+            "surface": "Hosts table — verify/unverify success",
+            "files": "apps/web/components/admin/AdminHostsTable.tsx (runAction, ~76-89)",
+            "gap": "Verify succeeds and the badge flips (server action revalidates), but there's no positive confirmation moment — only the error path renders a message (`styles.error`). Compared to AdminListingCard which shows a success line, the destructive/trust action here gives no 'done' acknowledgement, so a moderator can't tell a no-op disable from a completed verify.",
+            "fix": "On `result.ok`, set a transient success line (role=status, aria-live=polite) like 'Host verified' / 'Verification removed' reusing the existing error slot styling with a success tone; clear after a tick or on next action.",
+            "severity": "low",
+            "effort": "S"
+          }
+        ]
+      },
+      {
+        "area": "Seeker OS (seek, profile, resume, map, saved/applied/offered, journey, match rail, shell)",
+        "verdict": "Strong dark-glass re-skin with honest data and good per-view motion, but it stops short of elite: the readiness control and bottom-nav still carry accent/color drift from the old light system, primary lists and the match rail don't stagger their reveal, and the most-tapped mobile filter chips lack a press state and a 44px target.",
+        "high": 3,
+        "findings": [
+          {
+            "surface": "ReadinessSlider — availability control (the #1 identity control, lives on the seeker hero/profile)",
+            "files": "apps/web/components/seeker/ReadinessSlider.module.css",
+            "gap": "It never got the dark-glass token pass like its siblings. Line 17 paints a bright light-mode bevel `inset 0 -1px 0 rgba(255,255,255,0.6)` (a white edge-light on near-black glass), the active 'now' fill uses `--gradient-state-ready` (#1E8A50→#2CAE6A, the LIGHT-mode tokens, NOT the seeker emerald #36f49c), and the `nowDot` pulse is hardcoded `rgba(74,222,128,...)` (generic #4ADE80) instead of the seeker emerald — so the same OS has two different 'live' greens (compare seekeros-livedot at seeker-os.css:160 which correctly uses rgba(54,244,156)). The result is a control that reads a half-shade off-brand and slightly washed against the dark shell.",
+            "fix": "Drop the white inset bevel (or swap to a faint dark inset like the rest of the OS); point the active gradient/pulse at the seeker emerald family (`--seekeros-emerald` / `--color-cta` = #36f49c and its rgba 54,244,156) so the readiness 'now' state and its pulse match the seekeros-livedot exactly.",
+            "severity": "high",
+            "effort": "S"
+          },
+          {
+            "surface": "SeekerSidebar — resume completion ring (desktop nav identity area)",
+            "files": "apps/web/components/seeker/SeekerSidebar.tsx (line 14)",
+            "gap": "The ring stroke color is a hardcoded light-mode farm triad `#2D7A3A / #C48A18 / #A05030` plus a `rgba(0,0,0,0.1)` track. On the dark-glass sidebar the muted-green/brown 'incomplete' tones are low-contrast and off the seeker emerald/amber palette, and the black track is nearly invisible — a literal raw-hex slip that survived the tokenization pass on the single most personal widget in the rail.",
+            "fix": "Replace with seeker-OS tokens: stroke `var(--color-cta)` (≥80), `var(--seekeros-gold)` (≥40), `var(--text-muted)` (<40); track `var(--seekeros-line-2)` instead of rgba(0,0,0,0.1).",
+            "severity": "high",
+            "effort": "S"
+          },
+          {
+            "surface": "SeekerBottomNav — active tab indicator (most-visible mobile element)",
+            "files": "apps/web/components/seeker/SeekerBottomNav.module.css (lines 65-70)",
+            "gap": "The active tab paints an aqua/sky wash behind the tab (`color-mix(... var(--palette-sky) 10% ...)` = #6deaff in seeker-os) while the icon+label flip to `--color-cta` emerald (#36f49c). Two different accent hues collide on the same pill — the premium read is one decisive accent, not teal-on-aqua. Also `.tab` has hover + focus-visible but NO `:active` press state, so the primary mobile nav has zero tap feedback (motion-system flags press as the #1 most-skipped state).",
+            "fix": "Make the active pill background a tint of the SAME accent as the text (`color-mix(in srgb, var(--color-cta) 12%, transparent)`), and add `.tab:active { transform: scale(0.97); }` gated for reduced-motion (the block at line 80 already exists to extend).",
+            "severity": "high",
+            "effort": "S"
+          },
+          {
+            "surface": "MatchCardRail + Saved/Applied/Lifecycle lists — reveal motion",
+            "files": "apps/web/components/seeker/MatchCardRail.tsx, SavedCardGrid.tsx, LifecycleList.tsx",
+            "gap": "The whole view rises once via .seekeros-view (template.tsx), but the rail cards and the saved/applied grids do NOT stagger — they appear as one block. motion-system §3 explicitly calls for rails/lists to stagger 30–50ms per item (capped) so the eye reads 'these are individual matches arriving,' which is the difference between great and Apple-grade on the rail that's meant to drive decisions. There is no per-item animationDelay anywhere in these components.",
+            "fix": "Add a capped stagger: in the .map() set `style={{ '--i': index }}` and a keyframe `.card { animation: rise var(--motion-base) var(--ease-standard) both; animation-delay: calc(min(var(--i), 6) * 40ms); }`, reusing the existing seekeros-viewin keyframe shape; gate under the existing reduced-motion block.",
+            "severity": "medium",
+            "effort": "M"
+          },
+          {
+            "surface": "BucketChips — saved/applied bucket filter (primary mobile filter)",
+            "files": "apps/web/components/seeker/BucketChips.module.css",
+            "gap": "These are nav-link filter chips but have no `:active` press state, the transition only covers background/border (no transform), and the tap target is ~34px tall (padding `--space-8` top+bottom + meta line-height), under the 44px floor the motion/scorecard mandates for touch. So the main way a seeker slices their saved/applied lists gives no press feedback and is a small target on phones.",
+            "fix": "Add `min-height: var(--tap-min)` (44px) to `.chip`, add `transform var(--motion-fast)` to the transition list, and a `.chip:active { transform: scale(0.97); }` inside the existing reduced-motion-safe pattern.",
+            "severity": "medium",
+            "effort": "S"
+          }
+        ]
+      },
+      {
+        "area": "Cross-cutting: motion system + a11y + interaction-state completeness (Host/Seeker/Admin OS)",
+        "verdict": "The dark-glass shells are keyboard-solid and the OS chrome (nav, topbar, search) is genuinely premium, but it stops short of elite: the Button/Chip primitives composed inside every surface have no press or hover state, the view-enter is one undifferentiated block fade with no stagger, two key durations live off the motion-token scale, and the host \"More\" drawer is an un-trapped, un-animated div — so the OS feels expensive in its chrome but cheap the moment you touch a real control.",
+        "high": 1,
+        "findings": [
+          {
+            "surface": "Button + Chip primitives (composed across all 3 OSes)",
+            "files": "apps/web/styles/primitives.css:138-209",
+            "gap": "The motion doc names press as the #1 most-skipped state, yet .ui-button and .ui-chip have NO :active and NO :hover anywhere — only a background/border/color transition, no transform. The nav items got :active scale; the actual buttons inside content (forms, panels, tables) feel dead on tap/click.",
+            "fix": "Add `.ui-button:active, .ui-chip:active { transform: scale(0.97); transition-duration: 60ms; }` plus a `:hover` brightness/lift, and append `transform var(--motion-fast) var(--ease-standard)` to the existing transition lists. Mirror the press the DiscoveryCard buttons already use (primitives.css:326).",
+            "severity": "high",
+            "effort": "S"
+          },
+          {
+            "surface": "View-enter transition (all 3 OSes)",
+            "files": "apps/web/styles/host-os.css:308, seeker-os.css:570, admin-os.css:599; app/(host|seeker|admin)/template.tsx",
+            "gap": "The whole view rises as ONE block — no stagger across the MetricGrid row / panels. Motion doc §3 calls for 30–50ms list stagger so content settles in sequence; a single 8px lift of the entire page reads as a generic page-fade, not a command-center reveal.",
+            "fix": "Stagger the view's top-level children: e.g. `.hostos-view > * { animation: hostos-viewin var(--motion-base) var(--ease-standard) both; } .hostos-view > *:nth-child(2){animation-delay:40ms} ...` capped at ~4 steps, or add a `--motion-stagger: 40ms` token and apply via nth-child. Keep it inside the existing reduced-motion kill block.",
+            "severity": "medium",
+            "effort": "M"
+          },
+          {
+            "surface": "Off-token motion durations",
+            "files": "apps/web/styles/host-os.css:308, seeker-os.css:570, admin-os.css:599; packages/ui/src/MetricCard.module.css:85",
+            "gap": "View-enter is hardcoded 360ms and the MetricCard sparkline is 0.5s + 0.05s delay — none are on the locked --motion scale (120/200/320). Doc §2: 'Need a value off this list? Propose a token, don't inline a magic number.'",
+            "fix": "Use `var(--motion-drawer)` (320ms) for the view-enter and `var(--motion-base)` for the sparkline rise; if a stagger interval is needed, add a `--motion-stagger` token to tokens.css rather than the inline 0.05s.",
+            "severity": "low",
+            "effort": "S"
+          },
+          {
+            "surface": "MetricCard reveal (the dominant tile element)",
+            "files": "packages/ui/src/MetricCard.tsx:41-54, MetricCard.module.css:63-95",
+            "gap": "The sparkline animates in but the big editorial .value (the card's dominant element) snaps instantly — split-focus motion. The decorative bar chart moves while the number it summarizes stays static, so the eye is drawn to the wrong thing.",
+            "fix": "Give .value the same fade+rise (`metriccard-rise`-style opacity+translateY over var(--motion-base)) so the headline leads and the sparkline follows ~60ms later; keep the value out of reduced-motion animation.",
+            "severity": "low",
+            "effort": "S"
+          },
+          {
+            "surface": "MetricCard tokenization drift",
+            "files": "packages/ui/src/MetricCard.module.css:21,34,42,48,63,77",
+            "gap": "Residual raw values slipped the tokenize pass: `var(--radius-card, 18px)` fallback contradicts the real token (24px), and font sizes use bare `0.72rem / 0.68rem / 2rem` plus `min-height:134px / height:34px` instead of the --type-* and --space-* scales.",
+            "fix": "Fix the fallback to `var(--radius-card, 24px)`; swap the label to `--type-label-size`, the value toward `--type-display-size`, and the trend pill to `--type-caption-size`; round min-height to a --space step.",
+            "severity": "low",
+            "effort": "S"
+          },
+          {
+            "surface": "Host OS mobile 'More' drawer",
+            "files": "apps/web/components/host/HostShell.tsx:159-163; host-os.css:269-270",
+            "gap": "It's an overlay div with no role=dialog / aria-modal, no Escape-to-close, no focus trap or return-focus, and it toggles display:none→block — so it pops into existence with zero motion (violates motion doc §3 'surfaces slide + scrim fade, exit mirrors enter') and is a screen-reader/keyboard dead-end.",
+            "fix": "Add role=\"dialog\" aria-modal=\"true\" + aria-label, close on Escape and restore focus to the More button, and animate the panel with a translateY-from-bottom + scrim fade over var(--motion-drawer) (with a mirrored exit), all gated by the existing reduced-motion block.",
+            "severity": "medium",
+            "effort": "M"
+          },
+          {
+            "surface": "Sidebar nav reveal (all 3 OSes)",
+            "files": "apps/web/styles/host-os.css:221-228, seeker-os.css:271-357, admin-os.css:275-361",
+            "gap": "Nav items have hover/active/focus but never reveal — they appear instantly with the shell. The motion doc sanctions a one-time rail stagger on load; the persistent sidebar (the command-center signature) currently has no entrance, so the shell reads static next to the animating content view.",
+            "fix": "Add a one-time staggered fade+translateX(-4px) on `.hostos-nav .hostos-navitem` (30–40ms steps, reveal once via the layout mount, not template re-mount so it doesn't replay per navigation), gated by reduced-motion.",
+            "severity": "low",
+            "effort": "M"
+          }
+        ]
+      }
+    ]
+  }
+}

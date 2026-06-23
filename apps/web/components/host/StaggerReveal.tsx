@@ -12,7 +12,8 @@ import { motion, useReducedMotion } from "motion/react";
  * plain container, no animation). Client leaf only — the page shell stays a
  * server component; `children` are server-rendered and passed through.
  *
- * Design System V2 / motion-system.md: transform+opacity only, expo-out spring.
+ * Design System V2 / motion-system.md: transform+opacity only, tween on the
+ * locked ease-out curve (no bounce — overshoot is off-system).
  */
 export function StaggerReveal({
   children,
@@ -34,8 +35,8 @@ export function StaggerReveal({
       {Children.map(children, (child) =>
         child == null ? child : (
           <motion.div
-            variants={{ hidden: { opacity: 0, y: 18 }, shown: { opacity: 1, y: 0 } }}
-            transition={{ type: "spring", stiffness: 130, damping: 18, mass: 0.9 }}
+            variants={{ hidden: { opacity: 0, y: 14 }, shown: { opacity: 1, y: 0 } }}
+            transition={{ duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
           >
             {child}
           </motion.div>

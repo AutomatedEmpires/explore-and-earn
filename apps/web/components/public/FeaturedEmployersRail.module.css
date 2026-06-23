@@ -183,6 +183,36 @@
   flex-shrink: 0;
 }
 
+/* ─── Orchestrated section reveal ───────────────────────────────────────────
+ *
+ * One confident cascade as the curated row enters: each card fades + rises
+ * (opacity 0→1, translateY 8px→0) over --motion-base on --ease-standard, with
+ * a small per-item stagger. The stagger index is capped to 0–3 in the markup
+ * (index % 4), so a long set re-starts the cascade rather than trailing slow.
+ *
+ * Default (and reduced-motion) state is the FINAL state — no animation is
+ * registered outside the no-preference block, so content is instantly visible
+ * and never trapped at opacity:0. transform/opacity only.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    animation: railReveal var(--motion-base) var(--ease-standard) both;
+    /* per-item stagger, capped via --reveal-index (0–3) in the markup */
+    animation-delay: calc(var(--reveal-index, 0) * 50ms);
+  }
+}
+
+@keyframes railReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .rail[data-layout="scroll"] .railItem {
   scroll-snap-align: start;
 }

@@ -48,8 +48,16 @@
   width: 44px;
   height: 44px;
   border-radius: var(--radius-pill);
-  background: var(--gradient-sky);
-  color: var(--color-cta-text);
+  /* Warm host-golden monogram — the applicant lives inside the host OS, so the
+     sky gradient read off-brand. Mix toward the scoped --color-gold so it sits
+     on the golden command palette on dark glass; --color-gold-text keeps the
+     initial legible (dark ink on gold). */
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-gold) 86%, var(--palette-amber)),
+    var(--color-gold)
+  );
+  color: var(--color-gold-text);
   font-family: var(--font-display);
   font-size: var(--type-card-size);
   line-height: 1;
@@ -91,6 +99,19 @@
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
 	gap: var(--space-8);
+}
+
+/* Optimistic feedback: while an action is in flight the row dims so the host
+   sees the pending state land immediately (HostApplicantCardActions sets
+   aria-busy on the row). Opacity-only + reduced-motion-safe below. */
+.actionRow[aria-busy="true"] {
+	opacity: 0.72;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.actionRow {
+		transition: opacity var(--motion-fast) var(--ease-standard);
+	}
 }
 
 @media (max-width: 639px) {

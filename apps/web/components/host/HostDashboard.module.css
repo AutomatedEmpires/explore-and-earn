@@ -174,6 +174,16 @@
 /* The donut: a token conic-gradient ring (scope accent → soft track) with a
    surface-raised hole punched out by a radial-gradient. --pct drives the
    filled sweep; the value sits dead-center. */
+
+/* Registered so the sweep can animate: a bare custom property isn't
+   interpolable, but a typed <number> is. --radar-pct draws from 0 → the real
+   score on mount (the gauge "fills in" rather than popping into place). */
+@property --radar-pct {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 .radar {
   position: relative;
   width: 9.5rem;
@@ -182,6 +192,8 @@
   border-radius: var(--radius-pill);
   display: grid;
   place-items: center;
+  /* hold the final value by default (reduced-motion / no-animation path) */
+  --radar-pct: var(--pct, 0);
   background:
     radial-gradient(
       circle at center,
@@ -189,9 +201,28 @@
       transparent 56%
     ),
     conic-gradient(
-      var(--color-cta) 0 calc(var(--pct, 0) * 1%),
-      color-mix(in srgb, var(--text-muted) 22%, transparent) calc(var(--pct, 0) * 1%) 100%
+      var(--color-cta) 0 calc(var(--radar-pct) * 1%),
+      color-mix(in srgb, var(--text-muted) 22%, transparent) calc(var(--radar-pct) * 1%) 100%
     );
+}
+
+/* Mount sweep — fill from empty to the real score once. transform/opacity rule
+   doesn't apply here (the animated property is the gauge value itself, not a
+   layout prop), and it's gated behind no-preference so reduced-motion users see
+   the final fill instantly. */
+@media (prefers-reduced-motion: no-preference) {
+  .radar {
+    animation: radar-sweep var(--motion-base) var(--ease-standard) both;
+  }
+}
+
+@keyframes radar-sweep {
+  from {
+    --radar-pct: 0;
+  }
+  to {
+    --radar-pct: var(--pct, 0);
+  }
 }
 
 /* Soft accent halo behind the ring — reads as a glowing command gauge on

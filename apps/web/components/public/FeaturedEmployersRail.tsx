@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { Icon, Skeleton } from "@explore-and-earn/ui";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
@@ -191,10 +192,13 @@ export function FeaturedEmployersRail({
               <EmployerSkeleton />
             </>
           ) : (
-            employers.map((employer) => (
+            employers.map((employer, index) => (
               <li
                 key={`${employer.hostName}-${employer.listingId}`}
-                className={styles.railItem}
+                className={`${styles.railItem} ${styles.reveal}`}
+                // Capped per-item stagger: the reveal cascade resets every 4
+                // items so a long curated set never trails into slow sequencing.
+                style={{ "--reveal-index": index % 4 } as CSSProperties}
               >
                 <EmployerCard employer={employer} />
               </li>

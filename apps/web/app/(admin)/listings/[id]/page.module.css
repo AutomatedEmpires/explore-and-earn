@@ -6,6 +6,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
+  /* Grow the hit area to the 44px tap minimum with inline padding, then pull
+     the box back by that padding so the text/icon stay optically aligned. */
+  min-height: var(--tap-min, 44px);
+  padding-inline: var(--space-8);
+  margin-inline-start: calc(var(--space-8) * -1);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
@@ -140,14 +145,19 @@
 .tallyFill {
   position: absolute;
   inset-block: 0;
-  inset-inline-start: 0;
+  inset-inline: 0;
   border-radius: var(--radius-pill);
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--color-cta) 70%, transparent),
     var(--color-cta)
   );
-  transition: inline-size var(--motion-base, 220ms) var(--ease-standard, ease);
+  /* Full-width track; the fill ratio is driven by scaleX so we animate a
+     compositor-only property (transform) instead of inline-size → no layout
+     thrash. transform-origin pins the fill to the start edge. */
+  transform-origin: left;
+  transform: scaleX(var(--tally-fill, 0));
+  transition: transform var(--motion-base, 220ms) var(--ease-standard, ease);
 }
 
 .tallyText {

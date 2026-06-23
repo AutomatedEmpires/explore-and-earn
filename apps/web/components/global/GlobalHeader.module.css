@@ -180,6 +180,11 @@
   background: color-mix(in srgb, var(--hdr-chrome) 13%, transparent);
 }
 
+/* Press feedback — settle down on tap (mobile primary state) */
+.navLink:active {
+  transform: translateY(0) scale(0.97);
+}
+
 .navLink:focus-visible {
   box-shadow: var(--hdr-focus);
 }
@@ -504,6 +509,9 @@
     transition: none;
   }
   .signInBtn:hover, .iconBtn:hover, .avatarBtn:hover {
+    transform: none;
+  }
+  .navLink:active {
     transform: none;
   }
 }

@@ -171,6 +171,11 @@ export function AdminListingsTable({
       setPendingId(null);
       if (!result.ok) {
         setError(result.error ?? "Something went wrong.");
+      } else {
+        // Re-render the route so the moderated row reflects its new status
+        // immediately (the server action's revalidatePath alone won't repaint
+        // this client list within the same transition).
+        router.refresh();
       }
     });
   }
@@ -246,6 +251,11 @@ export function AdminListingsTable({
           <p className={styles.emptyBody}>
             No listings in this view. Switch filters to see other states.
           </p>
+          {filter !== "all" ? (
+            <Button variant="secondary" onClick={() => setFilter("all")}>
+              Show all listings
+            </Button>
+          ) : null}
         </div>
       ) : (
         <ul className={styles.rows}>

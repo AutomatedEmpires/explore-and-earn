@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 
 import { Icon } from "@explore-and-earn/ui";
@@ -194,8 +195,13 @@ export function MatchCardRail({ listings, title = "Matched for You" }: MatchCard
         <EmptyState />
       ) : (
         <div className={styles.rail} role="list">
-          {listings.map((listing) => (
-            <div key={listing.id} role="listitem">
+          {listings.map((listing, index) => (
+            <div
+              key={listing.id}
+              role="listitem"
+              className={styles.railItem}
+              style={{ "--i": index } as CSSProperties}
+            >
               <MatchCard listing={listing} />
             </div>
           ))}

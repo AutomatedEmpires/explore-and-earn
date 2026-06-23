@@ -39,6 +39,40 @@
   justify-items: center;
 }
 
+/* Staggered entrance — each card fades + rises so the feed assembles itself
+   on first paint instead of snapping in. Cosmetic only: the static final
+   state is the default, so reduced-motion users (and no-JS) see finished cards. */
+/* Only the loaded card grid reveals — the busy skeleton grid stays still
+   (it has its own shimmer), so the load -> loaded handoff doesn't double-animate. */
+@media (prefers-reduced-motion: no-preference) {
+  /* Local stagger base — a presentational constant, not a global token. */
+  .grid:not([aria-busy]) > * {
+    --stagger-step: 40ms;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: feed-card-reveal var(--motion-base) var(--ease-standard) both;
+  }
+
+  /* Cap the cascade after ~6 cards so long feeds don't trail off. */
+  .grid:not([aria-busy]) > *:nth-child(6n + 1) { animation-delay: calc(var(--stagger-step) * 0); }
+  .grid:not([aria-busy]) > *:nth-child(6n + 2) { animation-delay: calc(var(--stagger-step) * 1); }
+  .grid:not([aria-busy]) > *:nth-child(6n + 3) { animation-delay: calc(var(--stagger-step) * 2); }
+  .grid:not([aria-busy]) > *:nth-child(6n + 4) { animation-delay: calc(var(--stagger-step) * 3); }
+  .grid:not([aria-busy]) > *:nth-child(6n + 5) { animation-delay: calc(var(--stagger-step) * 4); }
+  .grid:not([aria-busy]) > *:nth-child(6n) { animation-delay: calc(var(--stagger-step) * 0); }
+}
+
+@keyframes feed-card-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* tablet: 2 cards side by side */
 @media (min-width: 640px) {
   .grid {

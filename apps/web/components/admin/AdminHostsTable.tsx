@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Icon, MetricCard, MetricGrid, VerifiedHostBadge } from "@explore-and-earn/ui";
 
 import { unverifyHostAction, verifyHostAction } from "../../app/actions/admin";
@@ -68,6 +69,7 @@ export function AdminHostsTable({
 }: {
   readonly hosts: ReadonlyArray<AdminHostRowView>;
 }) {
+  const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +86,9 @@ export function AdminHostsTable({
       setPendingId(null);
       if (!result.ok) {
         setError(result.error ?? "Something went wrong.");
+      } else {
+        // Repaint so the card flips to its new verification state at once.
+        router.refresh();
       }
     });
   }

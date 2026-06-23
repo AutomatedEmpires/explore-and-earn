@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { DiscoveryCard } from "@explore-and-earn/ui";
 
@@ -20,15 +21,20 @@ export function SavedCardGrid({ listings }: SavedCardGridProps) {
 
 	return (
 		<div className={styles.grid}>
-			{listings.map((listing) => (
-				<DiscoveryCard
+			{listings.map((listing, index) => (
+				<div
 					key={listing.id}
-					data={toDiscoveryCardData(listing)}
-					surface="discovery_feed"
-					cardState="saved"
-					onOpen={(id) => router.push(`/listing/${id}`)}
-					onApply={(id) => router.push(`/listing/${id}`)}
-				/>
+					className={styles.cell}
+					style={{ "--i": index } as CSSProperties}
+				>
+					<DiscoveryCard
+						data={toDiscoveryCardData(listing)}
+						surface="discovery_feed"
+						cardState="saved"
+						onOpen={(id) => router.push(`/listing/${id}`)}
+						onApply={(id) => router.push(`/listing/${id}`)}
+					/>
+				</div>
 			))}
 		</div>
 	);

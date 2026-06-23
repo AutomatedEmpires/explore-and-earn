@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
 import { DiscoveryCard, type DiscoveryCardProps, type IllustrationKey } from "@explore-and-earn/ui";
 
@@ -51,14 +51,19 @@ export function LifecycleList({
   }
   return (
     <div className={styles.grid}>
-      {items.map((item) => (
-        <DiscoveryCard
+      {items.map((item, index) => (
+        <div
           key={item.listing.id}
-          data={toDiscoveryCardData(item.listing)}
-          surface={surface}
-          cardState={item.cardState}
-          actions={item.actions}
-        />
+          className={styles.cell}
+          style={{ "--i": index } as CSSProperties}
+        >
+          <DiscoveryCard
+            data={toDiscoveryCardData(item.listing)}
+            surface={surface}
+            cardState={item.cardState}
+            actions={item.actions}
+          />
+        </div>
       ))}
     </div>
   );

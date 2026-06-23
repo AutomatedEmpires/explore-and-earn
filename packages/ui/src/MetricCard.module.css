@@ -32,7 +32,7 @@
 }
 
 .label {
-  font-size: 0.72rem;
+  font-size: var(--type-label-size);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -43,7 +43,7 @@
   flex: none;
   padding: 2px 9px;
   border-radius: var(--radius-pill, 999px);
-  font-size: 0.68rem;
+  font-size: var(--type-caption-size);
   font-weight: 700;
   white-space: nowrap;
   background: color-mix(in srgb, var(--color-cta) 16%, transparent);
@@ -63,10 +63,17 @@
 .value {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 2rem;
+  font-size: var(--type-display-size);
   line-height: 1;
   letter-spacing: -0.03em;
   color: var(--text-primary);
+  /* The headline leads on mount; the sparkline (below) follows ~a beat later. */
+  animation: metriccard-value-in var(--motion-base, 200ms) var(--ease-standard, ease) both;
+}
+
+@keyframes metriccard-value-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .spark {
@@ -95,5 +102,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spark > i { animation: none; }
+  .spark > i,
+  .value { animation: none; }
 }

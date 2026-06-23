@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -154,7 +155,11 @@ export default async function AdminListingDetailPage({ params }: Props) {
             <div className={detailStyles.tallyTrack}>
               <span
                 className={detailStyles.tallyFill}
-                style={{ inlineSize: `${(passed / checks.length) * 100}%` }}
+                style={
+                  {
+                    "--tally-fill": passed / checks.length,
+                  } as CSSProperties
+                }
               />
             </div>
             <span className={detailStyles.tallyText}>
