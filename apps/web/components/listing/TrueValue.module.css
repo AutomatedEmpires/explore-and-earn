@@ -1,0 +1,177 @@
+/**
+ * TrueValue — the signature "your pay is what you keep" decision tool.
+ * Token-driven so it reads correctly in any scope; the result number is the one
+ * dominant element. Sliders use accent-color for a branded, zero-hack control.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-20);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background:
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--benefit-pay-fg, var(--color-cta)) 12%, transparent), transparent 46%),
+    var(--color-surface-raised);
+  box-shadow: var(--elevation-card);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  align-self: flex-start;
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--benefit-pay-fg, var(--color-cta)) 16%, transparent);
+  color: var(--benefit-pay-fg, var(--color-cta));
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-h2-size, 1.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.title em {
+  font-style: normal;
+  color: var(--benefit-pay-fg, var(--color-cta));
+}
+
+.sub {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+.sub strong {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── Calculator inputs ─────────────────────────────────────── */
+.calc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.fieldTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.fieldTop b {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-body-size);
+  color: var(--text-primary);
+}
+
+.slider {
+  width: 100%;
+  height: var(--tap-min, 44px);
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--benefit-pay-fg, var(--color-cta));
+  background: transparent;
+}
+
+.slider:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+  border-radius: var(--radius-pill);
+}
+
+/* ── Result ────────────────────────────────────────────────── */
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-16);
+  border-radius: var(--radius-cell, var(--radius-card));
+  border: 1px solid color-mix(in srgb, var(--benefit-pay-fg, var(--color-cta)) 28%, transparent);
+  background: color-mix(in srgb, var(--benefit-pay-fg, var(--color-cta)) 8%, var(--color-surface));
+}
+
+.resultLabel {
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.resultValue {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-display-size, 2.75rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.resultValue small {
+  font-size: 0.42em;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  letter-spacing: 0;
+}
+
+.resultSub {
+  font-size: var(--type-meta-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+.resultSub strong {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.honest {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  font-size: var(--type-label-size);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+@media (min-width: 48rem) {
+  .calc {
+    flex-direction: row;
+    gap: var(--space-24);
+  }
+  .field {
+    flex: 1 1 0;
+  }
+}

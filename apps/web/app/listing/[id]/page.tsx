@@ -14,6 +14,7 @@ import {
 import { Icon } from "@explore-and-earn/ui";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
+import { TrueValue } from "../../../components/listing/TrueValue";
 import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../lib/seo";
@@ -254,6 +255,13 @@ export default async function ListingDetailPage({ params }: Props) {
               <div className={styles.triadValue}>{paySummary}</div>
             </div>
           </div>
+
+          {/* True value — what the covered housing/meals are really worth */}
+          <TrueValue
+            housingIncluded={listing.housingIncluded}
+            mealsIncluded={listing.mealsIncluded}
+            paySummary={paySummary}
+          />
 
           {/* Description */}
           {listing.description && (
