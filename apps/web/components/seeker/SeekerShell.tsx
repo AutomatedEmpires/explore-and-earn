@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
+import { CommandSearch } from "../shared/CommandSearch";
 
 interface NavItem {
   readonly href: string;
@@ -149,7 +150,11 @@ export function SeekerShell({
 
       <div className="seekeros-main">
         <header className="seekeros-top">
-          <div className="seekeros-search">⌕&nbsp;&nbsp;Search opportunities, places, hosts…</div>
+          <CommandSearch
+            className="seekeros-search"
+            action="/seek"
+            placeholder="Search opportunities, places, hosts…"
+          />
           <Link className="seekeros-tact seekeros-tact--icon" href="/notifications" aria-label="Notifications">
             <Icon name="system.info" size={20} aria-hidden />
             {unread > 0 ? <span className="seekeros-bdg--top">{unread}</span> : null}

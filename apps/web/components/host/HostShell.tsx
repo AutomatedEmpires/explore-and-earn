@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
+import { CommandSearch } from "../shared/CommandSearch";
 
 interface NavItem {
   readonly href: string;
@@ -110,7 +111,11 @@ export function HostShell({ companyName, photoUrl, tier, unread = 0, children }:
 
       <div className="hostos-main">
         <header className="hostos-top">
-          <div className="hostos-search">⌕&nbsp;&nbsp;Search applicants, listings, messages…</div>
+          <CommandSearch
+            className="hostos-search"
+            action="/host/listings"
+            placeholder="Search applicants, listings, messages…"
+          />
           <Link className="hostos-tact hostos-tact--msg" href="/host/messages" aria-label="Messages">
             <Icon name="nav.messages" size={20} aria-hidden />
             {unread > 0 ? <span className="hostos-bdg">{unread}</span> : null}

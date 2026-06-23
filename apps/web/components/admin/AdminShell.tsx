@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
+import { CommandSearch } from "../shared/CommandSearch";
 
 interface NavItem {
   readonly href: string;
@@ -133,7 +134,11 @@ export function AdminShell({
 
       <div className="adminos-main">
         <header className="adminos-top">
-          <div className="adminos-search">⌕&nbsp;&nbsp;Search listings, hosts, applications…</div>
+          <CommandSearch
+            className="adminos-search"
+            action="/applications"
+            placeholder="Search listings, hosts, applications…"
+          />
           <Link className="adminos-tact adminos-tact--p" href="/applications" aria-label="Review queue">
             <Icon name="action.apply" size={20} aria-hidden />
             <span className="adminos-tlabel">Review queue</span>

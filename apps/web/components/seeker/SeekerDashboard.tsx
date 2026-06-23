@@ -12,7 +12,6 @@ import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
 import { JourneyPipeline } from "./JourneyPipeline";
 import { MatchCardRail } from "./MatchCardRail";
 import { SeekerHero } from "./SeekerHero";
-import { SeekerSidebar } from "./SeekerSidebar";
 import styles from "./SeekerDashboard.module.css";
 import type { SeekerStatusSummary } from "./models";
 
@@ -238,17 +237,10 @@ export function SeekerDashboard({
       .slice(0, 2)
       .toUpperCase() || "SE";
 
+  // The Seeker OS shell (.seekeros-side) owns the persistent sidebar now, so the
+  // dashboard renders a single full-width content column — no second sidebar.
   return (
-    <div className={styles.dashboard}>
-      {/* Desktop persistent sidebar (hidden on mobile via CSS) */}
-      <SeekerSidebar
-        seekerName={seekerName}
-        avatarUrl={profile?.profilePhotoUrl}
-        status={status}
-      />
-
-      {/* Main content column */}
-      <div className={styles.main}>
+    <div className={styles.main}>
         {/* Hero + readiness strip */}
         <SeekerHero
           seekerName={seekerName}
@@ -292,7 +284,6 @@ export function SeekerDashboard({
           <h2 className={styles.sectionHeading}>Your Applications</h2>
           <LifecycleTeasers status={status} />
         </section>
-      </div>
     </div>
   );
 }

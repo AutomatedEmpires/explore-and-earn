@@ -23,6 +23,9 @@
   --color-card-warm:      rgba(255, 255, 255, 0.06);
   --color-parchment:      rgba(255, 255, 255, 0.045);
   --color-steel:          rgba(255, 255, 255, 0.06);
+  --palette-steel:        rgba(255, 255, 255, 0.06);
+  /* sky leaks a light steel-blue onto the golden dark glass — map to the host teal */
+  --palette-sky:          #2FD3B6;
 
   /* ---- text (warm bone) ---- */
   --text-primary:   #FBF6EC;
@@ -248,6 +251,55 @@
   .hostos-drawerpanel { position: absolute; left: 10px; right: 10px; bottom: 92px; padding: var(--space-12); border-radius: 26px; border: 1px solid var(--hostos-line); background: rgba(8, 18, 14, 0.96); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); }
 }
 
+/* ── Command-search inner elements (CommandSearch.tsx markup) ─────── */
+.hostos-search { display: flex; align-items: center; gap: 10px; line-height: normal; cursor: text; }
+.hostos-search:focus-within {
+  border-color: var(--hostos-amber);
+  box-shadow: 0 0 0 3px var(--hostos-amber-glow);
+}
+.hostos-search .cmdsearch-i { flex: none; color: var(--text-muted); font-size: 1.05rem; line-height: 1; }
+.hostos-search .cmdsearch-input {
+  flex: 1 1 auto; min-width: 0; height: 100%;
+  background: transparent; border: 0; outline: none; padding: 0;
+  color: var(--text-primary); font: inherit;
+}
+.hostos-search .cmdsearch-input::placeholder { color: var(--text-muted); }
+.hostos-search .cmdsearch-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.hostos-search .cmdsearch-kbd {
+  flex: none; display: grid; place-items: center; min-width: 22px; height: 22px;
+  padding: 0 6px; border-radius: 7px; background: var(--hostos-glass);
+  border: 1px solid var(--hostos-line); color: var(--text-muted); font-size: 0.72rem;
+  font-family: var(--font-ui, ui-monospace, monospace);
+}
+@media (max-width: 1023px) { .hostos-search .cmdsearch-kbd { display: none; } }
+
+/* ── View-enter: content settles into place on each navigation ─────
+   template.tsx re-mounts this wrapper on every route change, so the rise +
+   fade replays as the host moves between surfaces — the command-center
+   signature. Killed under reduced-motion by the block below. */
+.hostos-view { animation: hostos-viewin 360ms var(--ease-standard) both; }
+@keyframes hostos-viewin {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Keyboard focus rings (legible on dark glass) + tactile press ── */
+.hostos-navitem:focus-visible,
+.hostos-tact:focus-visible,
+.hostos-account:focus-visible,
+.hostos-mtab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--hostos-amber);
+}
+.hostos-navitem:active { transform: translateX(2px) scale(0.985); }
+.hostos-tact:active,
+.hostos-account:active,
+.hostos-mtab:active { transform: translateY(1px) scale(0.98); }
+
 @media (prefers-reduced-motion: reduce) {
-  .host-os *, .host-os *::before, .host-os *::after { animation: none !important; }
+  .host-os *, .host-os *::before, .host-os *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }

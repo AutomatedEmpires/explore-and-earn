@@ -125,8 +125,8 @@
 }
 
 .intervalActive {
-  background: var(--text-primary);
-  color: var(--color-surface-raised);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
 }
 
 .intervalBadge {
@@ -177,10 +177,10 @@
 }
 
 .planHighlighted {
-  border-color: color-mix(in srgb, var(--palette-sky) 60%, transparent);
+  border-color: color-mix(in srgb, var(--color-cta) 60%, transparent);
   background: linear-gradient(
     160deg,
-    color-mix(in srgb, var(--palette-sky) 5%, var(--color-surface-raised) 95%),
+    color-mix(in srgb, var(--color-cta) 8%, var(--color-surface-raised) 92%),
     var(--color-surface-raised)
   );
 }
@@ -197,8 +197,8 @@
   padding: var(--space-4) var(--space-12);
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-ink);
-  background: var(--text-primary);
-  color: var(--color-surface-raised);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
@@ -297,8 +297,8 @@
   padding: 0 var(--space-16);
   border: 1px solid var(--border-ink);
   border-radius: var(--radius-pill);
-  background: var(--text-primary);
-  color: var(--color-surface-raised);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-button-size);
   font-weight: var(--font-weight-semibold);
@@ -586,8 +586,8 @@
   padding: 0 var(--space-20);
   border: 1px solid var(--border-ink);
   border-radius: var(--radius-pill);
-  background: var(--text-primary);
-  color: var(--color-surface-raised);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-button-size);
   font-weight: var(--font-weight-semibold);
