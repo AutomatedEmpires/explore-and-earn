@@ -154,9 +154,19 @@ export function AdminShell({
       <nav className="adminos-mnav" aria-label="Admin">
         {MOBILE_PRIMARY.map((item) => {
           const active = isActive(pathname, item);
+          // The Queue tab carries the live review-queue count on mobile (the
+          // triage-on-the-go device), mirroring the desktop sidebar badge.
+          const showBadge = item.href === "/applications" && queueCount > 0;
           return (
             <Link key={item.href} href={item.href} className="adminos-mtab" aria-current={active ? "page" : undefined}>
-              <Icon name={item.icon} size={20} aria-hidden />
+              <span className="adminos-mtab__icon">
+                <Icon name={item.icon} size={20} aria-hidden />
+                {showBadge ? (
+                  <span className="adminos-mtab__bdg" aria-hidden="true">
+                    {queueCount > 99 ? "99+" : queueCount}
+                  </span>
+                ) : null}
+              </span>
               {item.label}
             </Link>
           );

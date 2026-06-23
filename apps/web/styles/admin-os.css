@@ -526,6 +526,25 @@
     color: var(--adminos-on-emerald);
     background: var(--adminos-grad);
   }
+
+  .adminos-mtab__icon { position: relative; display: inline-grid; place-items: center; }
+  .adminos-mtab__bdg {
+    position: absolute;
+    top: -6px;
+    right: -9px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--adminos-on-emerald);
+    background: var(--adminos-emerald);
+    box-shadow: 0 0 0 2px rgba(7, 18, 15, 0.9);
+  }
 }
 
 /* grid + grain atmosphere overlay on the scope */
