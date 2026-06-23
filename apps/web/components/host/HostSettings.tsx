@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 import {
   ADDON_PRICING,
@@ -439,25 +440,22 @@ function SupportPanel() {
           <span className={styles.supportCardLabel}>Email support</span>
           <span className={styles.supportCardDesc}>Hear back within 1–2 business days</span>
         </a>
-        <a
-          className={styles.supportCard}
-          href={`mailto:${SUPPORT_EMAIL}?subject=Help%20Center%20Request`}
-        >
+        <Link className={styles.supportCard} href="/host/help">
           <span className={styles.supportIcon}>
             <Icon name="system.info" size={20} aria-hidden />
           </span>
           <span className={styles.supportCardLabel}>Help center</span>
-          <span className={styles.supportCardDesc}>Coming soon — contact us for now</span>
-        </a>
+          <span className={styles.supportCardDesc}>Guides, answers, and FAQs</span>
+        </Link>
         <a
           className={styles.supportCard}
-          href={`mailto:${SUPPORT_EMAIL}?subject=Community%20Request`}
+          href={`mailto:${SUPPORT_EMAIL}?subject=Community%20Announcement`}
         >
           <span className={styles.supportIcon}>
             <Icon name="nav.feed" size={20} aria-hidden />
           </span>
           <span className={styles.supportCardLabel}>Community</span>
-          <span className={styles.supportCardDesc}>Coming soon — contact us for now</span>
+          <span className={styles.supportCardDesc}>Announce to seekers — ask us to feature you</span>
         </a>
       </div>
 
