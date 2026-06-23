@@ -334,7 +334,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		if (loadingMore || cursor !== null) {
 			return (
 				<div className={styles.deck} aria-busy="true">
-					<p className={styles.progress}>Finding more opportunities\u2026</p>
+					<p className={styles.progress}>Finding more opportunities…</p>
 					<div className={styles.stack}>
 						<DiscoveryCardSkeleton />
 						<DiscoveryCardSkeleton />
@@ -540,7 +540,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 			</div>
 
 			<p className={styles.hint}>
-				Drag a card, tap a button, or use \u2190 Skip \u00b7 \u2192 Save \u00b7 \u2191 Apply \u00b7 Backspace to undo.
+				Drag a card, tap a button, or use ← Skip · → Save · ↑ Apply · Backspace to undo.
 			</p>
 
 			<span className={styles.srOnly} role="status" aria-live="polite">

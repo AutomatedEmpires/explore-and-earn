@@ -1,0 +1,119 @@
+/**
+ * Triad-first quick filters — a prominent, scannable chip row. Token-driven so
+ * it themes to the seeker scope; horizontally scrollable on mobile (no wrap
+ * overflow); triad chips carry their benefit accent when active.
+ */
+
+.root {
+  margin-bottom: var(--space-12);
+}
+
+.scroll {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  overflow-x: auto;
+  padding-bottom: var(--space-4);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.triad,
+.lanes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex: none;
+}
+
+.divider {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  background: var(--border-soft);
+}
+
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min, 44px);
+  padding: 0 var(--space-14);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.chip:hover {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+}
+
+.chip:active {
+  transform: scale(0.97);
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* Active (generic lane) — tinted accent fill, never a heavy block. */
+.chip[data-on] {
+  background: color-mix(in srgb, var(--color-cta) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-cta) 50%, transparent);
+  color: var(--color-cta);
+}
+
+/* Active triad chips carry their own benefit colour — the signature. */
+.housing[data-on] {
+  background: var(--benefit-housing-bg);
+  border-color: color-mix(in srgb, var(--benefit-housing-fg) 50%, transparent);
+  color: var(--benefit-housing-fg);
+}
+.meals[data-on] {
+  background: var(--benefit-meals-bg);
+  border-color: color-mix(in srgb, var(--benefit-meals-fg) 50%, transparent);
+  color: var(--benefit-meals-fg);
+}
+
+.more {
+  margin-left: auto;
+}
+
+.count {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-bold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+  .chip:active {
+    transform: none;
+  }
+}

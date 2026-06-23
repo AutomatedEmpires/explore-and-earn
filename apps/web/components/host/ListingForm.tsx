@@ -78,7 +78,7 @@ function categoryLabel(category: MarketplaceCategory): string {
 
 /**
  * Shared create/edit listing form. Client component that gathers the listing
- * basics plus the Housing / Meals / Pay triad (product law \u2014 never "Perks";
+ * basics plus the Housing / Meals / Pay triad (product law — never "Perks";
  * see AGENTS.md and packages/contracts/src/benefits.ts) and submits to the
  * listing server actions. Token-only styling via the CSS module.
  */
@@ -125,22 +125,22 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
 
   async function uploadCover(file: File): Promise<string> {
     if (!hostProfileId) {
-      throw new Error("Missing host profile \u2014 reload the page and try again.");
+      throw new Error("Missing host profile — reload the page and try again.");
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-      throw new Error("Your session has expired \u2014 sign in again.");
+      throw new Error("Your session has expired — sign in again.");
     }
     return uploadListingMedia(token, hostProfileId, file, "cover");
   }
 
   async function uploadGallerySlot(file: File, slotIndex: number): Promise<string> {
     if (!hostProfileId) {
-      throw new Error("Missing host profile \u2014 reload the page and try again.");
+      throw new Error("Missing host profile — reload the page and try again.");
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-      throw new Error("Your session has expired \u2014 sign in again.");
+      throw new Error("Your session has expired — sign in again.");
     }
     return uploadListingMedia(token, hostProfileId, file, slotIndex);
   }
@@ -322,7 +322,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
       </div>
 
       <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Housing \u00b7 Meals \u00b7 Pay</legend>
+        <legend className={styles.legend}>Housing · Meals · Pay</legend>
         <p className={styles.fieldsetNote}>
           Housing, Meals, and Pay are the core promise to seekers.
         </p>
@@ -468,7 +468,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
 
       <div className={styles.actions}>
         <Button type="submit" variant="primary" icon="action.forward" disabled={isPending}>
-          {isPending ? "Saving\u2026" : submitLabel}
+          {isPending ? "Saving…" : submitLabel}
         </Button>
         <Link className={styles.cancel} href={cancelHref}>
           Cancel
@@ -476,7 +476,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
       </div>
     </form>
 
-    {/* Structured benefit editor \u2014 mounted OUTSIDE the form so its Save never
+    {/* Structured benefit editor — mounted OUTSIDE the form so its Save never
         submits the listing form. Edit mode only (needs a saved listing id). */}
     {canEditBenefits && listingId ? (
       <BenefitTrustModal
