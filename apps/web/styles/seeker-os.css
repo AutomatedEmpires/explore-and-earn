@@ -11,6 +11,9 @@
  * Benchmark: docs/design/reference/_benchmarks/explore_earn_seeker_dashboard_worldclass.html
  */
 .seeker-os {
+  /* native form controls + scrollbars use the dark UA base (otherwise a glassy
+     rgba field composites over a WHITE control base and reads near-white) */
+  color-scheme: dark;
   /* ---- dark forest surfaces ---- */
   --color-paper:          #07120f;
   --color-surface:        rgba(255, 255, 255, 0.055);
@@ -23,10 +26,10 @@
   /* ---- text (cool bone) ---- */
   --text-primary:   #f6fff8;
   --text-secondary: rgba(246, 255, 248, 0.70);
-  --text-muted:     rgba(246, 255, 248, 0.46);
+  --text-muted:     rgba(246, 255, 248, 0.58);
   --palette-ink:        #f6fff8;
   --palette-ink-soft:   rgba(246, 255, 248, 0.70);
-  --palette-ink-muted:  rgba(246, 255, 248, 0.46);
+  --palette-ink-muted:  rgba(246, 255, 248, 0.58);
   /* ---- borders / lines ---- */
   --border-soft:  rgba(255, 255, 255, 0.13);
   --border-ink:   rgba(255, 255, 255, 0.20);
@@ -527,6 +530,15 @@
   background-size: 44px 44px;
   mask-image: linear-gradient(to bottom, black, transparent 72%);
   z-index: 0;
+}
+
+/* The primary Button primitive paints a bone fill + (light-theme) light text —
+   invisible on dark glass. Repaint with the scope CTA so every composed
+   <Button variant="primary"> reads correctly inside the Seeker OS. */
+.seeker-os .ui-button--primary {
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  border-color: transparent;
 }
 
 /* ── Command-search inner elements (CommandSearch.tsx markup) ─────── */

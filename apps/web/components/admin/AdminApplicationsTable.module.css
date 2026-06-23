@@ -1,0 +1,341 @@
+/**
+ * Admin moderation queue — the recent-applications review workbench.
+ *
+ * Renders inside the dark-glass `.admin-os` scope, so every token below
+ * resolves to dark-glass surfaces + the emerald scope accent automatically.
+ * Token-only: zero raw hex, zero px font-sizes, zero ad-hoc radii. color-mix
+ * on tokens is the only computed color allowed.
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+/* ── Command metric row — totals by status, derived from the data ───────── */
+.metricGrid {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: 130px;
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(
+      circle at 84% -10%,
+      color-mix(in srgb, var(--color-cta) 16%, transparent),
+      transparent 60%
+    ),
+    var(--color-surface);
+  overflow: hidden;
+}
+
+.metricTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.metricLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.trend {
+  flex: none;
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.trendNeutral {
+  background: color-mix(in srgb, var(--color-cta) 16%, transparent);
+  color: var(--color-cta);
+}
+
+.trendUp {
+  background: color-mix(in srgb, var(--status-success-fg) 18%, transparent);
+  color: var(--status-success-fg);
+}
+
+.trendDown {
+  background: color-mix(in srgb, var(--status-warning-fg) 20%, transparent);
+  color: var(--status-warning-fg);
+}
+
+.metricValue {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-display-size);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  height: 34px;
+}
+
+.spark > i {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: var(--radius-pill) var(--radius-pill) var(--space-2) var(--space-2);
+  background: color-mix(in srgb, var(--color-cta) 48%, transparent);
+  transform-origin: bottom;
+  animation: applications-rise 0.5s var(--ease-standard) both;
+}
+
+.spark > i:last-child {
+  background: var(--color-cta);
+}
+
+@keyframes applications-rise {
+  from {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* ── Queue — applicant rows as glass review cards ───────────────────────── */
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-16);
+  padding: var(--space-14) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-card);
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
+}
+
+.row:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-cta) 40%, var(--border-soft));
+  background: var(--color-surface-raised);
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-button);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-cta) 30%, transparent),
+      color-mix(in srgb, var(--color-cta) 8%, transparent)
+    );
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+
+.identity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.name {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.sub {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listing {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.age {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-10);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ageHot {
+  border-color: color-mix(in srgb, var(--status-warning-fg) 34%, transparent);
+  background: color-mix(in srgb, var(--status-warning-fg) 14%, transparent);
+  color: var(--status-warning-fg);
+}
+
+.date {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Designed empty state — never a bare "No data" string ───────────────── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-8);
+  padding: var(--space-48) var(--space-24);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.emptyMark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--status-success-fg) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--status-success-fg) 14%, transparent);
+  color: var(--status-success-fg);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.emptyHint {
+  margin: 0;
+  max-width: 40ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Responsive: stack the row at narrow widths, no overflow ─────────────── */
+@media (max-width: 768px) {
+  .row {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "avatar identity"
+      "meta   meta"
+      "action action";
+    gap: var(--space-12);
+  }
+
+  .avatar {
+    grid-area: avatar;
+  }
+
+  .identity {
+    grid-area: identity;
+  }
+
+  .meta {
+    grid-area: meta;
+    flex-wrap: wrap;
+    padding-top: var(--space-10);
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .action {
+    grid-area: action;
+    justify-content: stretch;
+  }
+
+  .action :global(.ui-button) {
+    width: 100%;
+    min-height: var(--tap-min);
+  }
+
+  .date {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spark > i {
+    animation: none;
+  }
+
+  .row {
+    transition: none;
+  }
+
+  .row:hover {
+    transform: none;
+  }
+}

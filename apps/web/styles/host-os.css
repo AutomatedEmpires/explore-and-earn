@@ -16,6 +16,9 @@
  */
 
 .host-os {
+  /* native form controls + scrollbars use the dark UA base (otherwise a glassy
+     rgba field composites over a WHITE control base and reads near-white) */
+  color-scheme: dark;
   /* ---- dark surfaces ---- */
   --color-paper:          #08110C;
   --color-surface:        rgba(255, 255, 255, 0.055);
@@ -30,7 +33,7 @@
   /* ---- text (warm bone) ---- */
   --text-primary:   #FBF6EC;
   --text-secondary: rgba(251, 246, 236, 0.70);
-  --text-muted:     rgba(251, 246, 236, 0.46);
+  --text-muted:     rgba(251, 246, 236, 0.58);
 
   /* ---- borders / lines ---- */
   --border-soft: rgba(255, 255, 255, 0.12);
@@ -224,7 +227,23 @@
 .hostos-navitem[aria-current="page"] { color: var(--hostos-bone); background: radial-gradient(circle at 12% 30%, var(--hostos-amber-glow), transparent 46%), var(--hostos-glass-2); border-color: rgba(224, 146, 47, 0.3); }
 .hostos-navitem[aria-current="page"] .i { background: var(--hostos-grad); color: var(--hostos-on-amber); border-color: transparent; }
 .hostos-bdg { min-width: 24px; height: 22px; padding: 0 7px; border-radius: var(--radius-pill); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); background: var(--hostos-glass); border: 1px solid var(--hostos-line); }
-.hostos-foot { margin-top: auto; }
+.hostos-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: var(--space-12);
+  border-radius: 18px;
+  border: 1px solid var(--hostos-line);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--hostos-amber) 10%, transparent), var(--hostos-glass-3));
+  text-decoration: none;
+  transition: border-color var(--motion-fast, 140ms) var(--ease-standard), transform var(--motion-fast, 140ms) var(--ease-standard);
+}
+.hostos-foot:hover { border-color: rgba(224, 146, 47, 0.32); transform: translateY(-1px); }
+.hostos-foot__row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hostos-foot__label { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+.hostos-foot__tier { font-family: var(--font-fraunces); font-weight: 600; font-size: 15px; letter-spacing: -.02em; color: var(--hostos-gold); }
+.hostos-foot__cta { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .hostos-main { min-width: 0; display: flex; flex-direction: column; }
 .hostos-top { position: sticky; top: 0; z-index: 30; display: flex; gap: var(--space-10); align-items: center; padding: var(--space-12) var(--space-20); border-bottom: 1px solid var(--hostos-line); background: var(--hostos-scrim-2); backdrop-filter: blur(var(--hostos-blur-lg)); -webkit-backdrop-filter: blur(var(--hostos-blur-lg)); }
 .hostos-search { flex: 1 1 auto; min-width: 0; max-width: 560px; height: var(--hostos-control); line-height: calc(var(--hostos-control) - 2px); border-radius: var(--radius-pill); border: 1px solid var(--hostos-line); background: var(--hostos-glass); padding: 0 var(--space-18); color: var(--text-muted); font-size: var(--type-meta-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -249,6 +268,15 @@
   .hostos-mtab[aria-current="page"] { background: var(--hostos-grad); color: var(--hostos-on-amber); }
   .hostos-drawer.open { display: block; position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(5px); }
   .hostos-drawerpanel { position: absolute; left: 10px; right: 10px; bottom: 92px; padding: var(--space-12); border-radius: 26px; border: 1px solid var(--hostos-line); background: rgba(8, 18, 14, 0.96); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); }
+}
+
+/* The primary Button primitive paints a bone fill + (light-theme) light text —
+   invisible on dark glass. Repaint with the scope CTA so every composed
+   <Button variant="primary"> reads correctly inside the Host OS. */
+.host-os .ui-button--primary {
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  border-color: transparent;
 }
 
 /* ── Command-search inner elements (CommandSearch.tsx markup) ─────── */

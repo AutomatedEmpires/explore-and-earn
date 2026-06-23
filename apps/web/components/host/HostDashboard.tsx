@@ -1,5 +1,6 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
-import { Icon, Meter } from "@explore-and-earn/ui";
+import { Badge, Icon, Meter } from "@explore-and-earn/ui";
 
 import type {
   HostAnalytics,
@@ -93,6 +94,25 @@ export function HostDashboard({
 
   const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
   const topListings = analytics.perListingStats.slice(0, 5);
+
+  // ── Conversion radar ────────────────────────────────────────────────
+  // A composite "operational health" score, computed only from data that
+  // already exists on this dashboard — never fabricated. Three real signals,
+  // each surfaced individually in the legend so the headline % is explainable:
+  //   • Pipeline   — share of applications moved past "applied" (responsiveness)
+  //   • Outreach   — invite acceptance rate (recruiting effectiveness)
+  //   • Inventory  — whether the host has live listings collecting demand
+  const inventoryPct = totalListings > 0 ? (liveCount > 0 ? 100 : 40) : 0;
+  const radarInputs = [
+    { label: "Pipeline movement", value: pipelineFill },
+    { label: "Invite acceptance", value: acceptancePct },
+    { label: "Listing inventory", value: inventoryPct },
+  ] as const;
+  const conversionScore = Math.round(
+    radarInputs.reduce((sum, s) => sum + s.value, 0) / radarInputs.length,
+  );
+  const radarTone =
+    conversionScore >= 70 ? "Healthy" : conversionScore >= 40 ? "Building" : "Needs work";
 
   const pending = stats.pendingActions > 0 ? stats.pendingActions : pendingReview;
   const isNewHost = totalListings === 0;
@@ -295,23 +315,44 @@ export function HostDashboard({
           <div className="host-panel__head">
             <div className="host-panel__titles">
               <span className="host-panel__eyebrow">Reach</span>
-              <h2 className="host-panel__title">Invite performance</h2>
+              <h2 className="host-panel__title">Conversion radar</h2>
             </div>
+            <Badge
+              variant={conversionScore >= 70 ? "success" : "neutral"}
+              label={radarTone}
+            />
           </div>
-          <dl className="host-statList">
-            <div className="host-stat">
-              <dt className="host-stat__label">Active listings</dt>
-              <dd className="host-stat__value">{analytics.activeListingCount}</dd>
+          <div className={styles.radarSplit}>
+            <div
+              className={styles.radar}
+              style={{ "--pct": conversionScore } as CSSProperties}
+              role="meter"
+              aria-valuenow={conversionScore}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Operational health ${conversionScore} percent — ${radarTone}`}
+            >
+              <span className={styles.radarCore} aria-hidden>
+                <span className={styles.radarValue}>{conversionScore}%</span>
+                <span className={styles.radarCaption}>Health</span>
+              </span>
             </div>
-            <div className="host-stat">
-              <dt className="host-stat__label">Total applications</dt>
-              <dd className="host-stat__value">{totalApplicationsAllTime}</dd>
-            </div>
-            <div className="host-stat">
-              <dt className="host-stat__label">Invite acceptance</dt>
-              <dd className="host-stat__value">{acceptancePct}%</dd>
-            </div>
-          </dl>
+            <ul className={styles.radarLegend}>
+              {radarInputs.map((input) => (
+                <li
+                  key={input.label}
+                  className={styles.radarLegendRow}
+                  style={{ "--pct": `${input.value}%` } as CSSProperties}
+                >
+                  <span className={styles.radarLegendLabel}>{input.label}</span>
+                  <span className={styles.radarLegendValue}>{input.value}%</span>
+                  <span className={styles.radarTrack} aria-hidden>
+                    <span />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       </div>
 

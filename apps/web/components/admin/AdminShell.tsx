@@ -23,7 +23,7 @@ const NAV: readonly NavGroup[] = [
   {
     group: "Moderation",
     items: [
-      { href: "/", label: "Overview", sub: "Marketplace health", icon: "analytics.meter", exact: true },
+      { href: "/admin", label: "Overview", sub: "Marketplace health", icon: "analytics.meter", exact: true },
       { href: "/applications", label: "Applications", sub: "Review queue", icon: "action.apply", badgeKey: "unread" },
       { href: "/listings", label: "Listings", sub: "Moderate posts", icon: "category.mix" },
       { href: "/hosts", label: "Hosts", sub: "Verify + trust", icon: "nav.profile" },
@@ -39,7 +39,7 @@ const NAV: readonly NavGroup[] = [
 
 // Admin mobile tabs: Overview · Applications · Listings · Hosts.
 const MOBILE_PRIMARY: readonly NavItem[] = [
-  { href: "/", label: "Overview", sub: "", icon: "analytics.meter", exact: true },
+  { href: "/admin", label: "Overview", sub: "", icon: "analytics.meter", exact: true },
   { href: "/applications", label: "Queue", sub: "", icon: "action.apply" },
   { href: "/listings", label: "Listings", sub: "", icon: "category.mix" },
   { href: "/hosts", label: "Hosts", sub: "", icon: "nav.profile" },
@@ -144,7 +144,7 @@ export function AdminShell({
             <span className="adminos-tlabel">Review queue</span>
             {queueCount > 0 ? <span className="adminos-bdg--top">{queueCount}</span> : null}
           </Link>
-          <Link className="adminos-account" href="/" aria-label="Admin overview">
+          <Link className="adminos-account" href="/admin" aria-label="Admin overview">
             <span className="adminos-avatarmini">{initial}</span>
           </Link>
         </header>

@@ -1,11 +1,127 @@
 .block {
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
+  gap: var(--space-24);
 }
 
 .stack {
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
+}
+
+/* Command strip — the listing inventory + boost-capacity context that sits
+   above the inventory list, mirroring the benchmark listingsView() metric row. */
+.command {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+/* The Boosted-slots tile renders the fraction (in MetricCard display type) with
+   an inline capacity Meter stacked beneath it — slotted into MetricCard's value
+   so we reuse the tile frame rather than reinventing it. */
+.capacityValue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.capacityMeter {
+  display: block;
+}
+
+.capacityTrack {
+  position: relative;
+  display: block;
+  height: var(--space-6);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  overflow: hidden;
+}
+
+.capacityFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--color-cta);
+  /* width set inline from real data */
+}
+
+/* Boost strategy — three-up fallback explainer (Enterprise -> Pro -> Starter). */
+.boostGrid {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+}
+
+.boostCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+}
+
+/* The primary (Enterprise) fallback tier is visually dominant — one dominant
+   element per module — via a brushed accent wash, never a flat gray card. */
+.boostCardLead {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--color-cta) 14%, var(--color-surface)),
+    var(--color-surface) 62%
+  );
+  border-color: color-mix(in srgb, var(--color-cta) 32%, var(--border-soft));
+}
+
+.boostHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.boostStep {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--space-24);
+  height: var(--space-24);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--color-cta-text);
+  background: var(--color-cta);
+}
+
+.boostCard:not(.boostCardLead) .boostStep {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+}
+
+.boostTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.boostBody {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.boostTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin-top: auto;
 }

@@ -106,7 +106,16 @@ export function HostShell({ companyName, photoUrl, tier, unread = 0, children }:
             {g.items.map(navItem)}
           </nav>
         ))}
-        <div className="hostos-foot" />
+        <Link className="hostos-foot" href="/host/settings" aria-label="Plan and billing">
+          <span className="hostos-foot__row">
+            <span className="hostos-foot__label">Current plan</span>
+            <span className="hostos-foot__tier">{tier ?? "Starter"}</span>
+          </span>
+          <span className="hostos-foot__cta">
+            Manage plan &amp; boosts
+            <Icon name="action.forward" size={16} aria-hidden />
+          </span>
+        </Link>
       </aside>
 
       <div className="hostos-main">

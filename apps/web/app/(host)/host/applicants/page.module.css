@@ -9,3 +9,219 @@
   flex-direction: column;
   gap: var(--space-12);
 }
+
+/* ── Recommended seekers rail ──────────────────────────────────────────────
+   Outbound talent discovery below the pipeline. Composes the same dark-glass
+   surface + accent tokens as MetricCard so it themes per-OS automatically.    */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-20);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.railHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+}
+
+.railKicker {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-cta);
+}
+
+.railTitle {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.6rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.railSub {
+  margin: var(--space-8) 0 0;
+  max-width: 46ch;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.railAction {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  font-size: 0.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform 0.18s var(--ease-standard, ease);
+}
+
+.railAction:hover {
+  transform: translateY(-2px);
+}
+
+.railGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.matchCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-surface-raised) 60%, transparent);
+  transition:
+    transform 0.18s var(--ease-standard, ease),
+    border-color 0.18s var(--ease-standard, ease);
+}
+
+.matchCard:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--color-cta) 40%, var(--border-soft));
+}
+
+.matchWho {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.matchAvatar {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cta) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 36%, var(--border-soft));
+  color: var(--color-cta);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.matchText {
+  min-width: 0;
+}
+
+.matchName {
+  display: block;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.matchRole {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.matchMeter {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.matchMeter :global(.ui-meter) {
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* Presentational signal track (data viz, not an icon) — a token-filled bar. */
+.matchTrack {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  overflow: hidden;
+}
+
+.matchTrack > span {
+  display: block;
+  height: 100%;
+  width: var(--w, 0%);
+  border-radius: inherit;
+  background: var(--color-cta);
+  transform-origin: left center;
+  animation: applicants-fill 0.6s var(--ease-standard, ease) both;
+}
+
+@keyframes applicants-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.matchInvite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: 0 var(--space-12);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+  color: var(--color-cta);
+  font-size: 0.85rem;
+  font-weight: 700;
+  transition:
+    transform 0.18s var(--ease-standard, ease),
+    background 0.18s var(--ease-standard, ease);
+}
+
+.matchInvite:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--color-cta) 20%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .matchCard:hover,
+  .railAction:hover,
+  .matchInvite:hover {
+    transform: none;
+  }
+  .matchTrack > span {
+    animation: none;
+  }
+}

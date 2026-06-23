@@ -1,17 +1,157 @@
-.wrap {
-	position: relative;
+/* Seeker Map — dark-glass atlas inside the emerald Seeker OS.
+   Tokens resolve to dark glass + emerald CTA under the (seeker) scope, so the
+   surface joins the OS instead of fighting it. Zero raw hex. */
+
+.shell {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
 	width: calc(100vw - (var(--space-gutter) * 2));
 	margin-inline: calc(50% - 50vw + var(--space-gutter));
-	height: max(34rem, calc(100dvh - var(--size-bottom-nav) - 8.5rem));
+}
+
+/* ---- editorial header ---- */
+
+.head {
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--space-20);
+	flex-wrap: wrap;
+}
+
+.headLede {
+	max-width: 44rem;
+	min-width: 0;
+}
+
+.eyebrow {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-6) var(--space-12);
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--color-cta) 28%, transparent);
+	background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+	color: var(--status-success-fg);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	letter-spacing: var(--type-label-tracking);
+	font-weight: var(--font-weight-semibold);
+	text-transform: uppercase;
+}
+
+.live {
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: var(--radius-pill);
+	background: var(--color-cta);
+	box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-cta) 70%, transparent);
+	animation: livePulse 1.9s ease-out infinite;
+}
+
+@keyframes livePulse {
+	70% {
+		box-shadow: 0 0 0 0.6rem color-mix(in srgb, var(--color-cta) 0%, transparent);
+	}
+	100% {
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-cta) 0%, transparent);
+	}
+}
+
+.title {
+	margin: var(--space-12) 0 var(--space-8);
+	font-family: var(--font-display);
+	font-size: clamp(1.7rem, 4vw, 2.6rem);
+	line-height: 1;
+	letter-spacing: -0.02em;
+	color: var(--text-primary);
+}
+
+.subtitle {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.legend {
+	display: grid;
+	grid-template-columns: auto auto;
+	align-items: center;
+	gap: var(--space-6) var(--space-8);
+	padding: var(--space-12) var(--space-16);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+	backdrop-filter: blur(12px);
+}
+
+.legendDot {
+	width: 0.85rem;
+	height: 0.85rem;
+	border-radius: var(--radius-pill) var(--radius-pill) var(--radius-pill) 2px;
+	transform: rotate(-45deg);
+	justify-self: center;
+}
+
+.legendSingle {
+	background: linear-gradient(135deg, var(--color-cta), var(--seekeros-gold, var(--status-warning-fg)));
+	box-shadow: 0 0 0.75rem color-mix(in srgb, var(--color-cta) 40%, transparent);
+}
+
+.legendGroup {
+	background: linear-gradient(135deg, var(--seekeros-aqua, var(--color-cta)), var(--color-cta));
+	box-shadow: 0 0 0.75rem color-mix(in srgb, var(--color-cta) 30%, transparent);
+}
+
+.legendLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	letter-spacing: var(--type-label-tracking);
+	font-weight: var(--font-weight-semibold);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+/* ---- at-a-glance rail ---- */
+
+.rail {
+	width: 100%;
+}
+
+/* ---- map frame ---- */
+
+.wrap {
+	position: relative;
+	width: 100%;
+	height: max(34rem, calc(100dvh - var(--size-bottom-nav) - 18rem));
 	border: 1px solid var(--border-ink);
 	border-radius: var(--radius-card);
 	overflow: hidden;
-	background: var(--color-surface);
+	background:
+		radial-gradient(circle at 28% 22%, color-mix(in srgb, var(--color-cta) 14%, transparent), transparent 38%),
+		radial-gradient(circle at 76% 64%, color-mix(in srgb, var(--seekeros-aqua, var(--color-cta)) 10%, transparent), transparent 40%),
+		var(--color-paper);
+	box-shadow: 0 24px 60px color-mix(in srgb, var(--color-ink) 30%, transparent);
 }
 
 .canvas {
 	position: absolute;
 	inset: 0;
+}
+
+/* Tone the Mapbox dark base toward the emerald OS without touching tiles. */
+.canvas :global(.mapboxgl-map) {
+	filter: saturate(0.9) brightness(0.92);
+}
+
+.canvas :global(.mapboxgl-ctrl-logo),
+.canvas :global(.mapboxgl-ctrl-attrib) {
+	opacity: 0.55;
 }
 
 .loading {
@@ -26,6 +166,8 @@
 	height: 100%;
 }
 
+/* ---- pins: emerald-gold teardrops ---- */
+
 .pin {
 	display: inline-flex;
 	align-items: center;
@@ -33,44 +175,63 @@
 	min-width: 2.75rem;
 	height: 2.75rem;
 	padding: 0 var(--space-8);
-	border: 2px solid color-mix(in srgb, var(--border-ink) 88%, #1f150c 12%);
+	border: 1px solid color-mix(in srgb, var(--text-primary) 32%, transparent);
 	border-radius: var(--radius-pill);
-	background: color-mix(in srgb, #fff8ea 90%, var(--color-surface) 10%);
+	background: color-mix(in srgb, var(--color-cta) 18%, var(--color-paper) 82%);
 	color: var(--text-primary);
 	box-shadow:
-		0 10px 22px color-mix(in srgb, var(--color-ink) 16%, transparent),
-		inset 0 0 0 1px color-mix(in srgb, white 34%, transparent);
+		0 8px 20px color-mix(in srgb, var(--color-ink) 40%, transparent),
+		0 0 0 0.4rem color-mix(in srgb, var(--color-cta) 12%, transparent),
+		inset 0 1px 0 color-mix(in srgb, white 22%, transparent);
 	cursor: pointer;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
 }
 
-.pinFarm {
-	background: color-mix(in srgb, var(--accent-farm-bg) 76%, #fff8ea 24%);
-	color: var(--accent-farm-fg);
+.pin:hover {
+	transform: translateY(-2px);
 }
 
-.pinMaritime {
-	background: color-mix(in srgb, var(--accent-maritime-bg) 76%, #fff8ea 24%);
-	color: var(--accent-maritime-fg);
-}
-
-.pinRemote {
-	background: color-mix(in srgb, var(--accent-remote-bg) 76%, #fff8ea 24%);
-	color: var(--accent-remote-fg);
-}
-
+.pinFarm,
 .pinSeasonal {
-	background: color-mix(in srgb, var(--accent-seasonal-bg) 76%, #fff8ea 24%);
-	color: var(--accent-seasonal-fg);
+	background: linear-gradient(
+		135deg,
+		var(--color-cta),
+		var(--seekeros-gold, var(--status-warning-fg))
+	);
+	color: var(--color-cta-text);
+	border-color: transparent;
+}
+
+.pinMaritime,
+.pinRemote {
+	background: linear-gradient(
+		135deg,
+		var(--seekeros-aqua, var(--color-cta)),
+		var(--color-cta)
+	);
+	color: var(--color-cta-text);
+	border-color: transparent;
 }
 
 .pinMix {
-	background: color-mix(in srgb, var(--accent-mix-bg) 76%, #fff8ea 24%);
-	color: var(--accent-mix-fg);
+	background: linear-gradient(
+		135deg,
+		var(--color-cta),
+		var(--seekeros-aqua, var(--color-cta))
+	);
+	color: var(--color-cta-text);
+	border-color: transparent;
 }
 
 .pinCluster {
 	min-width: 3rem;
 	padding-inline: var(--space-10);
+	box-shadow:
+		0 8px 20px color-mix(in srgb, var(--color-ink) 44%, transparent),
+		0 0 0 0.5rem color-mix(in srgb, var(--color-cta) 16%, transparent),
+		inset 0 1px 0 color-mix(in srgb, white 22%, transparent);
 }
 
 .clusterCount {
@@ -83,10 +244,12 @@
 }
 
 .pin:focus-visible {
-	outline: 2px solid var(--border-ink);
+	outline: 2px solid var(--color-cta);
 	outline-offset: 2px;
 	border-radius: var(--radius-pill);
 }
+
+/* ---- popup card: dark glass ---- */
 
 .popupCard {
 	width: min(21rem, 82vw);
@@ -98,10 +261,13 @@
 	flex-direction: column;
 	gap: var(--space-10);
 	padding: var(--space-10);
-	border: 2px solid color-mix(in srgb, var(--border-ink) 88%, #20160d 12%);
+	border: 1px solid var(--border-ink);
 	border-radius: calc(var(--radius-card) + 0.25rem);
-	background: linear-gradient(180deg, color-mix(in srgb, #fff8ea 96%, var(--color-surface-raised)) 0%, color-mix(in srgb, #f6ead1 92%, var(--color-surface)) 100%);
-	box-shadow: 0 14px 28px color-mix(in srgb, var(--color-ink) 18%, transparent);
+	background:
+		radial-gradient(circle at 16% 0%, color-mix(in srgb, var(--color-cta) 14%, transparent), transparent 42%),
+		color-mix(in srgb, var(--color-paper) 90%, transparent);
+	box-shadow: 0 20px 48px color-mix(in srgb, var(--color-ink) 44%, transparent);
+	backdrop-filter: blur(18px);
 }
 
 .popupHeader {
@@ -123,7 +289,7 @@
 }
 
 .popupEyebrow {
-	color: var(--text-primary);
+	color: var(--status-success-fg);
 }
 
 .popupMeta {
@@ -142,6 +308,8 @@
 	display: none;
 }
 
+/* ---- listing tray: dark glass ---- */
+
 .tray {
 	position: absolute;
 	left: 0;
@@ -151,13 +319,14 @@
 	height: min(40%, 24rem);
 	display: flex;
 	flex-direction: column;
-	border-top: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
+	border-top: 1px solid var(--border-ink);
 	background:
-		linear-gradient(180deg, color-mix(in srgb, #fff8ea 96%, var(--color-surface-raised)) 0%, color-mix(in srgb, #f7ecd4 92%, var(--color-surface)) 100%);
-	box-shadow: 0 -14px 28px color-mix(in srgb, var(--color-ink) 12%, transparent);
+		linear-gradient(180deg, color-mix(in srgb, var(--color-cta) 8%, transparent), transparent 36%),
+		color-mix(in srgb, var(--color-paper) 78%, transparent);
+	box-shadow: 0 -18px 40px color-mix(in srgb, var(--color-ink) 36%, transparent);
 	transform: translateY(calc(100% - 4.5rem));
 	transition: transform var(--motion-base) var(--ease-standard);
-	backdrop-filter: blur(10px);
+	backdrop-filter: blur(20px);
 }
 
 .trayOpen {
@@ -170,6 +339,7 @@
 	align-items: center;
 	gap: var(--space-10);
 	width: 100%;
+	min-height: 2.75rem;
 	padding: var(--space-12) var(--space-16);
 	border: 0;
 	background: transparent;
@@ -181,8 +351,8 @@
 .trayGrip {
 	width: 2.5rem;
 	height: 0.35rem;
-	border-radius: 999px;
-	background: color-mix(in srgb, var(--border-ink) 24%, transparent);
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--text-primary) 26%, transparent);
 }
 
 .trayTitle,
@@ -234,13 +404,13 @@
 }
 
 .trayCardActive {
-	outline: 2px solid var(--border-ink);
+	outline: 2px solid var(--color-cta);
 	outline-offset: 2px;
 }
 
 @media (max-width: 767px) {
 	.wrap {
-		height: max(32rem, calc(100dvh - var(--size-bottom-nav) - 7.75rem));
+		height: max(32rem, calc(100dvh - var(--size-bottom-nav) - 22rem));
 	}
 
 	.tray {
@@ -249,10 +419,17 @@
 }
 
 @media (max-width: 640px) {
-	.wrap {
+	.shell {
 		width: calc(100vw - var(--space-16));
 		margin-inline: calc(50% - 50vw + var(--space-8));
-		height: max(30rem, calc(100dvh - var(--size-bottom-nav) - 7rem));
+	}
+
+	.legend {
+		display: none;
+	}
+
+	.wrap {
+		height: max(30rem, calc(100dvh - var(--size-bottom-nav) - 24rem));
 	}
 
 	.tray {
@@ -268,5 +445,15 @@
 
 	.trayMeta {
 		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.live,
+	.pin,
+	.tray,
+	.trayBody {
+		animation: none;
+		transition: none;
 	}
 }

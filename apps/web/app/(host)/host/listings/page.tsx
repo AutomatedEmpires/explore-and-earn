@@ -11,14 +11,82 @@ import {
   type ListingRow,
 } from "@explore-and-earn/db";
 
+import { MetricCard, MetricGrid, Chip } from "@explore-and-earn/ui";
+
 import {
   HostListingsManager,
   HostSectionHeading,
+  countListingsByState,
   dbStatusToHostState,
   type HostListingItem,
 } from "../../../../components/host";
 import { EmptyState } from "../../../../components/discovery";
 import styles from "./page.module.css";
+
+/**
+ * Premium homepage boost inventory available to this host's plan. Presentation-
+ * only context for the command strip (real plan/billing is founder-gated and
+ * out of scope); the capacity meter reads against this denominator.
+ */
+const BOOST_SLOT_CAPACITY = 12;
+
+/**
+ * Boost strategy fallback ladder — Enterprise fills first, Pro backfills empty
+ * premium slots, Starter backfills only what is left without competing with
+ * paid inventory. Mirrors the benchmark listingsView() "Boost strategy" panel.
+ * Static copy: this explains the homepage-exposure logic; it drives nothing.
+ */
+const BOOST_TIERS = [
+  {
+    step: "1",
+    tier: "Enterprise priority",
+    pill: "First fill",
+    body: "Paid Enterprise boosted cards surface first — rotated by category and match relevance across the homepage and matched feed.",
+    tags: ["Homepage", "Matched feed", "Top carousel"],
+  },
+  {
+    step: "2",
+    tier: "Pro fallback",
+    pill: "Second",
+    body: "Pro listings backfill empty premium slots only when Enterprise inventory is insufficient, weighted by category and location fit.",
+    tags: ["Weighted", "Category fit", "Location fit"],
+  },
+  {
+    step: "3",
+    tier: "Starter fallback",
+    pill: "Last",
+    body: "Starter can backfill unsold slots at lower weight, and never carries a premium badge that competes with paid boost inventory.",
+    tags: ["Controlled", "Lower weight", "No premium badge"],
+  },
+] as const;
+
+/**
+ * Derive the listings command-strip metrics from the host's REAL listings +
+ * applicant counts (never hardcoded), so the strip can never drift from the
+ * inventory rendered below. Presentation only — no matching/scoring.
+ */
+function deriveListingMetrics(items: readonly HostListingItem[]) {
+  const counts = countListingsByState(items);
+  const active = counts.open + counts.partially_filled + counts.filled;
+  const boostedUsed = items.filter(
+    (item) =>
+      item.state !== "draft" &&
+      (item.listing.conditionalBadges?.includes("boosted") ?? false),
+  ).length;
+  const applications = items.reduce((sum, item) => sum + item.applicantCount, 0);
+  const newApplications = items.reduce(
+    (sum, item) => sum + item.newApplicantCount,
+    0,
+  );
+  return {
+    active,
+    drafts: counts.draft,
+    boostedUsed,
+    boostCapacity: BOOST_SLOT_CAPACITY,
+    applications,
+    newApplications,
+  };
+}
 
 export const metadata: Metadata = { title: "Listings" };
 
@@ -118,16 +186,107 @@ export default async function HostListingsPage() {
     newApplicantCount: newCounts[item.listing.id] ?? 0,
   }));
 
+  const metrics = deriveListingMetrics(withCounts);
+  const boostPct = Math.round((metrics.boostedUsed / metrics.boostCapacity) * 100);
+
   return (
     <section className={styles.block}>
       <HostSectionHeading
+        eyebrow="Listings command"
         title="Listings"
         description="Every opportunity you have posted, with live applicant counts. Filter by status to focus your pipeline."
         actionLabel="New listing"
         actionHref="/host/listings/new"
       />
+
       {withCounts.length > 0 ? (
-        <HostListingsManager listings={withCounts} />
+        <>
+          <div className={styles.command}>
+            <MetricGrid>
+              <MetricCard
+                label="Active"
+                value={metrics.active}
+                trend={metrics.active > 0 ? "Live" : "None live"}
+                trendTone={metrics.active > 0 ? "up" : "down"}
+              />
+              <MetricCard
+                label="Drafts"
+                value={metrics.drafts}
+                trend={metrics.drafts > 0 ? "Finish" : "Clear"}
+                trendTone={metrics.drafts > 0 ? "neutral" : "down"}
+              />
+              <MetricCard
+                label="Boosted slots"
+                value={
+                  <span className={styles.capacityValue}>
+                    {`${metrics.boostedUsed}/${metrics.boostCapacity}`}
+                    <span
+                      className={styles.capacityMeter}
+                      role="meter"
+                      aria-label="Boost slots used"
+                      aria-valuenow={metrics.boostedUsed}
+                      aria-valuemin={0}
+                      aria-valuemax={metrics.boostCapacity}
+                    >
+                      <span className={styles.capacityTrack}>
+                        <span
+                          className={styles.capacityFill}
+                          style={{ width: `${boostPct}%` }}
+                        />
+                      </span>
+                    </span>
+                  </span>
+                }
+                trend={`${boostPct}%`}
+                trendTone="neutral"
+              />
+              <MetricCard
+                label="Applications"
+                value={metrics.applications}
+                trend={
+                  metrics.newApplications > 0
+                    ? `+${metrics.newApplications} new`
+                    : "Steady"
+                }
+                trendTone={metrics.newApplications > 0 ? "up" : "neutral"}
+              />
+            </MetricGrid>
+          </div>
+
+          <HostListingsManager listings={withCounts} />
+
+          <section className={styles.command} aria-label="Boost strategy">
+            <HostSectionHeading
+              eyebrow="Boost strategy"
+              title="Homepage exposure logic"
+              description="Paid boosted slots surface first. Empty premium inventory falls back Enterprise → Pro → Starter, with clear visual distinction."
+            />
+            <div className={styles.boostGrid}>
+              {BOOST_TIERS.map((tier, index) => (
+                <article
+                  key={tier.tier}
+                  className={`${styles.boostCard}${
+                    index === 0 ? ` ${styles.boostCardLead}` : ""
+                  }`}
+                >
+                  <div className={styles.boostHead}>
+                    <span className={styles.boostStep} aria-hidden="true">
+                      {tier.step}
+                    </span>
+                    <Chip>{tier.pill}</Chip>
+                  </div>
+                  <h3 className={styles.boostTitle}>{tier.tier}</h3>
+                  <p className={styles.boostBody}>{tier.body}</p>
+                  <div className={styles.boostTags}>
+                    {tier.tags.map((tag) => (
+                      <Chip key={tag}>{tag}</Chip>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </>
       ) : (
         <EmptyState
           title="No listings yet"

@@ -11,6 +11,7 @@ import type { DiscoveryListing } from "../discovery";
 import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
 import { JourneyPipeline } from "./JourneyPipeline";
 import { MatchCardRail } from "./MatchCardRail";
+import { QuickStats } from "./QuickStats";
 import { SeekerHero } from "./SeekerHero";
 import styles from "./SeekerDashboard.module.css";
 import type { SeekerStatusSummary } from "./models";
@@ -38,7 +39,7 @@ function ResumeCallout({ pct }: { pct: number }) {
     >
       <div className={styles.calloutRing}>
         <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
-          <circle cx="18" cy="18" r={r} stroke="rgba(196,148,26,0.2)" strokeWidth="3" fill="none" />
+          <circle cx="18" cy="18" r={r} stroke="var(--border-soft)" strokeWidth="3" fill="none" />
           <circle
             cx="18" cy="18" r={r}
             stroke={ringColor} strokeWidth="3" fill="none"
@@ -57,93 +58,6 @@ function ResumeCallout({ pct }: { pct: number }) {
       </div>
       <span className={styles.calloutCta} aria-hidden="true">Go →</span>
     </Link>
-  );
-}
-
-/* ─── Quick stats chip ─── */
-interface StatChipProps {
-  readonly href: string;
-  readonly label: string;
-  readonly value: string | number;
-  readonly icon: string;
-  readonly highlight?: boolean;
-}
-
-function StatChip({ href, label, value, icon, highlight }: StatChipProps) {
-  return (
-    <Link
-      href={href}
-      className={`${styles.statChip} ${highlight ? styles.statHighlight : ""}`}
-      aria-label={`${label}: ${value}`}
-    >
-      <Icon name={icon as Parameters<typeof Icon>[0]["name"]} size={16} />
-      <span className={styles.statValue}>{value}</span>
-      <span className={styles.statLabel}>{label}</span>
-    </Link>
-  );
-}
-
-/* ─── Resume ring chip in stats bar ─── */
-function ResumeRingChip({ pct }: { pct: number }) {
-  const r = 14;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
-  const color = pct >= 80 ? "var(--state-ready-fg)" : pct >= 40 ? "var(--state-soon-fg)" : "var(--accent-seasonal-fg)";
-
-  return (
-    <Link href="/resume" className={styles.resumeChip} aria-label={`Resume: ${pct}% complete`}>
-      <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
-        <circle cx="18" cy="18" r={r} stroke="var(--border-soft)" strokeWidth="3" fill="none" />
-        <circle
-          cx="18" cy="18" r={r}
-          stroke={color} strokeWidth="3" fill="none"
-          strokeDasharray={`${dash} ${circ - dash}`}
-          strokeDashoffset={0}
-          strokeLinecap="round"
-          transform="rotate(-90 18 18)"
-          style={{ transition: "stroke-dasharray 0.4s ease" }}
-        />
-        <text x="18" y="22" textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--text-primary)">
-          {pct}%
-        </text>
-      </svg>
-      <span className={styles.statLabel}>Resume</span>
-    </Link>
-  );
-}
-
-/* ─── Quick stats bar ─── */
-function QuickStats({ status }: { status: SeekerStatusSummary }) {
-  return (
-    <div className={styles.statsBar} role="list" aria-label="Your activity stats">
-      <div role="listitem"><ResumeRingChip pct={status.resumeCompletion} /></div>
-      <div role="listitem">
-        <StatChip href="/saved" label="Saved" value={status.savedCount} icon="action.save" />
-      </div>
-      <div role="listitem">
-        <StatChip href="/applied" label="Applied" value={status.appliedCount} icon="action.apply" />
-      </div>
-      <div role="listitem">
-        <StatChip
-          href="/offered"
-          label="Offers"
-          value={status.offersCount}
-          icon="action.forward"
-          highlight={status.offersCount > 0}
-        />
-      </div>
-      {status.unreadNotifications > 0 && (
-        <div role="listitem">
-          <StatChip
-            href="/invites"
-            label="Inbox"
-            value={status.unreadNotifications}
-            icon="action.message"
-            highlight
-          />
-        </div>
-      )}
-    </div>
   );
 }
 

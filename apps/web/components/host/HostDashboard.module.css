@@ -38,6 +38,138 @@
   gap: var(--space-12);
 }
 
+/* ── Conversion radar (radial health donut) ──────────────────────── */
+/* A split: the radial gauge on the left, the actionable readout on the
+   right. Collapses to a single column under 30rem so the donut never
+   crowds the labels on a 380px viewport. */
+.radarSplit {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-20);
+}
+
+@media (max-width: 30rem) {
+  .radarSplit {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+}
+
+/* The donut: a token conic-gradient ring (scope accent → soft track) with a
+   surface-raised hole punched out by a radial-gradient. --pct drives the
+   filled sweep; the value sits dead-center. */
+.radar {
+  position: relative;
+  width: 9.5rem;
+  height: 9.5rem;
+  flex: none;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(
+      circle at center,
+      var(--color-surface-raised) 0 55%,
+      transparent 56%
+    ),
+    conic-gradient(
+      var(--color-cta) 0 calc(var(--pct, 0) * 1%),
+      color-mix(in srgb, var(--text-muted) 22%, transparent) calc(var(--pct, 0) * 1%) 100%
+    );
+}
+
+/* Soft accent halo behind the ring — reads as a glowing command gauge on
+   dark glass without a drop shadow. */
+.radar::before {
+  content: "";
+  position: absolute;
+  inset: -6%;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--color-cta) 22%, transparent),
+    transparent 70%
+  );
+  z-index: -1;
+}
+
+.radarCore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.radarValue {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 2.4rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+}
+
+.radarCaption {
+  font-size: var(--type-caption-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The breakdown: each health input as a labelled mini-meter so the score is
+   explainable, not a mystery number. */
+.radarLegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  width: 100%;
+}
+
+.radarLegendRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--space-8);
+}
+
+.radarLegendLabel {
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.radarLegendValue {
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.radarTrack {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  overflow: hidden;
+}
+
+.radarTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  width: var(--pct, 0%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-cta) 60%, transparent),
+    var(--color-cta)
+  );
+}
+
 .meterLabel {
   font-size: var(--type-meta-size);
   color: var(--text-secondary);
