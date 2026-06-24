@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "../client";
+import { adminClient } from "../adminClient";
 
 /**
  * Notifications data access for the seeker notification feed + unread badge,
@@ -235,8 +236,13 @@ export async function notifyHostOfApplication(
   clerkToken: string,
   listingId: string,
 ): Promise<{ ok: boolean }> {
+  // A notification is a cross-user write (the seeker creates a row the host
+  // reads), so it must go through the service-role client — under the RLS added
+  // in migration 043 the seeker's authed client has no INSERT policy. The
+  // clerkToken stays in the signature for call-site compatibility.
+  void clerkToken;
   try {
-    const db = untypedClient(clerkToken);
+    const db = adminClient() as unknown as SupabaseClient;
 
     const { data: listing, error: listingError } = await db
       .from("listings")
