@@ -30,6 +30,7 @@ export * from "./queries/admin";
 export * from "./lib/matchScore";
 export * from "./hostAnalytics";
 export * from "./queries/reports";
+export * from "./queries/moderation";
 export * from "./queries/boosts";
 export * from "./queries/seekerBadges";
 export * from "./queries/community";

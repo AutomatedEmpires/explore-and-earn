@@ -4,6 +4,11 @@ export { AdminHostsTable } from "./AdminHostsTable";
 export type { AdminHostRowView } from "./AdminHostsTable";
 export { AdminApplicationsTable } from "./AdminApplicationsTable";
 export type { AdminApplicationRowView } from "./AdminApplicationsTable";
+export { ModerationWorkbench } from "./ModerationWorkbench";
+export type {
+  ModerationReportRowView,
+  ModerationStatsView,
+} from "./ModerationWorkbench";
 export { AdminListingCard } from "./AdminListingCard";
 export type { AdminListingCardProps } from "./AdminListingCard";
 export { AdminMarketHealth } from "./AdminMarketHealth";

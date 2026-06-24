@@ -27,6 +27,7 @@ const NAV: readonly NavGroup[] = [
       { href: "/applications", label: "Applications", sub: "Review queue", icon: "action.apply", badgeKey: "unread" },
       { href: "/listings", label: "Listings", sub: "Moderate posts", icon: "category.mix" },
       { href: "/hosts", label: "Hosts", sub: "Verify + trust", icon: "nav.profile" },
+      { href: "/admin/reports", label: "Reports", sub: "Moderation queue", icon: "action.report" },
     ],
   },
   {

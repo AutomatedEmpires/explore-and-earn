@@ -1,0 +1,540 @@
+/*
+ * Admin Moderation Workbench — the action surface that closes the report loop,
+ * inside the admin (emerald) dark-glass OS. Token-driven only: every
+ * color/space/radius resolves through the .admin-os scope cascade, so the surface
+ * themes itself automatically.
+ *
+ * Severity gradient: each card carries an honest severity tier derived from the
+ * REAL report reason only (unsafe/scam = critical, housing_pay/inappropriate =
+ * elevated, else routine). The tier tones the left edge + reason tag; it never
+ * invents a numeric score. Resolved reports dim and drop their action row.
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.metrics {
+  margin: 0;
+}
+
+/* ── Local segment toolbar (All / Open / Reviewing / Resolved / Dismissed) ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-6);
+  padding-left: var(--space-14);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.toolbarIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.segments {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 36px;
+  padding: var(--space-6) var(--space-14);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  transition:
+    color var(--motion-fast, 0.15s) var(--ease-standard, ease),
+    background var(--motion-fast, 0.15s) var(--ease-standard, ease),
+    border-color var(--motion-fast, 0.15s) var(--ease-standard, ease);
+}
+
+.segment:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.segment:active {
+  transform: translateY(1px);
+}
+
+.segmentActive {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta) 26%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-cta) 40%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-cta) 18%, transparent);
+}
+
+.segmentActive:hover {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta) 32%, var(--color-surface));
+}
+
+.segmentLabel {
+  letter-spacing: 0.01em;
+}
+
+.segmentCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.segmentActive .segmentCount {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta-text) 16%, transparent);
+}
+
+/* ── Result line (aria-live region) ─────────────────────────────────────── */
+.resultLine {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+.resultLine strong {
+  color: var(--text-primary);
+}
+
+/* ── Error alert (business logic preserved) ─────────────────────────────── */
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 30%, transparent);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--status-error-fg);
+}
+
+.errorIcon {
+  flex: none;
+  color: var(--status-error-fg);
+}
+
+/* ── Report-card grid ───────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-16);
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-20);
+  padding-left: var(--space-24);
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-card);
+  transition:
+    transform var(--motion-base, 0.2s) var(--ease-standard, ease),
+    border-color var(--motion-base, 0.2s) var(--ease-standard, ease),
+    box-shadow var(--motion-base, 0.2s) var(--ease-standard, ease),
+    background var(--motion-base, 0.2s) var(--ease-standard, ease),
+    opacity var(--motion-base, 0.2s) var(--ease-standard, ease);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-ink);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-hover);
+}
+
+/* A resolved report recedes — its work is done, so it stops competing for the
+   moderator's eye but stays auditable in the lane. */
+.card[data-resolved="true"] {
+  opacity: 0.7;
+}
+
+.card[data-resolved="true"]:hover {
+  opacity: 1;
+}
+
+/* Severity edge — a left rail toned by reason severity; the card's first signal */
+.sevEdge {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: var(--radius-pill);
+}
+
+.sev_critical {
+  border-color: color-mix(in srgb, var(--status-error-fg) 30%, var(--border-soft));
+}
+.sev_critical .sevEdge {
+  background: linear-gradient(
+    to bottom,
+    var(--status-error-fg),
+    color-mix(in srgb, var(--status-error-fg) 28%, transparent)
+  );
+}
+
+.sev_elevated {
+  border-color: color-mix(in srgb, var(--status-warning-fg) 26%, var(--border-soft));
+}
+.sev_elevated .sevEdge {
+  background: linear-gradient(
+    to bottom,
+    var(--status-warning-fg),
+    color-mix(in srgb, var(--status-warning-fg) 26%, transparent)
+  );
+}
+
+.sev_routine .sevEdge {
+  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
+}
+
+/* Card head: reason tag + status badge */
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.reasonTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  border: 1px solid var(--border-soft);
+}
+
+.reasonIcon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.reason_critical {
+  color: var(--status-error-fg);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
+  border-color: color-mix(in srgb, var(--status-error-fg) 28%, transparent);
+}
+.reason_critical .reasonIcon {
+  color: var(--status-error-fg);
+}
+
+.reason_elevated {
+  color: var(--status-warning-fg);
+  background: color-mix(in srgb, var(--status-warning-fg) 12%, transparent);
+  border-color: color-mix(in srgb, var(--status-warning-fg) 24%, transparent);
+}
+.reason_elevated .reasonIcon {
+  color: var(--status-warning-fg);
+}
+
+/* Subject row — the reported listing + host, deep-linking to the admin detail */
+.subject {
+  min-width: 0;
+}
+
+.subjectLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-width: 0;
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  text-decoration: none;
+  transition:
+    border-color var(--motion-fast, 0.15s) var(--ease-standard, ease),
+    background var(--motion-fast, 0.15s) var(--ease-standard, ease);
+}
+
+.subjectLink:hover {
+  border-color: var(--border-ink);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+}
+
+.subjectLink:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.subjectIcon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--text-primary) 8%, var(--color-surface));
+  color: var(--text-secondary);
+}
+
+.subjectText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  flex: 1 1 auto;
+}
+
+.subjectTitle {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subjectMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+.metaDot {
+  flex: none;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+}
+
+.subjectGo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+/* Reporter's free-text detail — the human signal, quoted */
+.detail {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-primary);
+}
+
+.detailEmpty {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* Foot meta: age + action-count chip */
+.cardFootMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.age {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+.date {
+  color: var(--text-muted);
+}
+
+.actionCount {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+}
+
+/* Action row — the four moderator decisions, pinned to the card foot */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: auto;
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--border-soft);
+}
+
+.actions > * {
+  flex: 1 1 auto;
+  min-height: 44px;
+}
+
+/* Tone the destructive + warning decisions so the foot reads its danger
+   gradient at a glance — composed on the shared Button primitive via data-tone,
+   never a re-styled button. The selectors carry the hashed .actions class, so
+   they out-specify the scoped `.admin-os .ui-button--primary` repaint without
+   needing !important. */
+.actions :global(.ui-button)[data-tone="danger"] {
+  background: color-mix(in srgb, var(--status-error-fg) 90%, black);
+  color: var(--color-cta-text);
+  border-color: transparent;
+}
+
+.actions :global(.ui-button)[data-tone="danger"]:hover:not(:disabled) {
+  background: var(--status-error-fg);
+}
+
+.actions :global(.ui-button)[data-tone="warn"] {
+  color: var(--status-warning-fg);
+  border-color: color-mix(in srgb, var(--status-warning-fg) 36%, transparent);
+}
+
+.actions :global(.ui-button)[data-tone="warn"]:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--status-warning-fg) 52%, transparent);
+  background: color-mix(in srgb, var(--status-warning-fg) 10%, var(--color-surface-raised));
+}
+
+/* Resolved foot — replaces the action row once a report is terminal */
+.resolvedFoot {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: auto;
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--border-soft);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+}
+
+.resolvedIcon {
+  flex: none;
+  color: var(--color-cta);
+}
+
+/* ── Empty state — a clear queue reads as success, not a void ────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-32) var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-card);
+  color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 24%, transparent);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.emptySub {
+  margin: 0;
+  max-width: 40ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .segment,
+  .subjectLink {
+    transition: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+  .segment:active {
+    transform: none;
+  }
+}
