@@ -621,6 +621,50 @@ export async function createBillingPortalSession(params: {
   });
 }
 
+/**
+ * Issue a REAL Stripe refund against a PaymentIntent. This is the single place
+ * money actually moves on a refund — the admin server action calls it ONLY after
+ * an admin has approved the request. It must NEVER be invoked on the host's
+ * request, during verification, or speculatively.
+ *
+ * Guarded by hasStripeServerConfig(): when Stripe is not configured (local /
+ * preview without keys) it returns a structured not-ok result instead of
+ * throwing, so the caller can record a 'failed' outcome rather than crash. A full
+ * refund is the default; pass amountCents to refund a partial amount (integer
+ * cents — never dollars). Stripe is idempotent enough that a duplicate refund
+ * attempt surfaces as a StripeError here, which we map to { ok: false }.
+ */
+export async function issueRefund(
+  paymentIntentId: string,
+  amountCents?: number,
+): Promise<{ ok: boolean; refundId?: string; error?: string }> {
+  if (!hasStripeServerConfig()) {
+    return { ok: false, error: "Stripe is not configured on this environment." };
+  }
+  if (!paymentIntentId) {
+    return { ok: false, error: "Missing Stripe payment intent id." };
+  }
+  if (amountCents !== undefined && (!Number.isInteger(amountCents) || amountCents <= 0)) {
+    return { ok: false, error: "Refund amount must be a positive integer of cents." };
+  }
+
+  try {
+    const refund = await getStripeClient().refunds.create({
+      payment_intent: paymentIntentId,
+      ...(amountCents !== undefined ? { amount: amountCents } : {}),
+    });
+    return { ok: true, refundId: refund.id };
+  } catch (error) {
+    const message =
+      error instanceof Stripe.errors.StripeError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Stripe refund failed.";
+    return { ok: false, error: message };
+  }
+}
+
 export function verifyStripeWebhookEvent(
   payload: string,
   signature: string,

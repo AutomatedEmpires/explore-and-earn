@@ -8,6 +8,7 @@ import {
 import { Card } from "@explore-and-earn/ui";
 import {
   getHostProfile,
+  getHostRefundRequests,
   getHostSubscriptionTier,
 } from "@explore-and-earn/db";
 
@@ -15,6 +16,10 @@ import {
   startHostBillingPortalAction,
   startHostCheckoutAction,
 } from "../../../actions/hostBilling";
+import {
+  HostRefundPanel,
+  type HostRefundRequestView,
+} from "../../../../components/host/HostRefundPanel";
 import {
   hasStripeCheckoutConfig,
   type HostSubscriptionTier,
@@ -131,6 +136,24 @@ export default async function HostBillingPage({
   const feedback = resolveFeedback(query);
   const checkoutConfigured = hasStripeCheckoutConfig();
 
+  // The host's own refund-request history (RLS-scoped to their host profile).
+  const refundHistory: HostRefundRequestView[] = hostProfile
+    ? await getHostRefundRequests(token, hostProfile.id)
+        .then((rows) =>
+          rows.map((r) => ({
+            id: r.id,
+            purchaseType: r.purchaseType,
+            amountCents: r.amountCents,
+            reason: r.reason,
+            status: r.status,
+            adminNote: r.adminNote,
+            createdAt: r.createdAt,
+            resolvedAt: r.resolvedAt,
+          })),
+        )
+        .catch(() => [])
+    : [];
+
   return (
     <section className={styles.page}>
       <div className={styles.header}>
@@ -228,6 +251,10 @@ export default async function HostBillingPage({
           );
         })}
       </div>
+
+      <Card title="Request a refund">
+        <HostRefundPanel history={refundHistory} />
+      </Card>
     </section>
   );
 }

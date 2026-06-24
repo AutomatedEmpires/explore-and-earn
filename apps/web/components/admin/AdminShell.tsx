@@ -28,6 +28,7 @@ const NAV: readonly NavGroup[] = [
       { href: "/listings", label: "Listings", sub: "Moderate posts", icon: "category.mix" },
       { href: "/hosts", label: "Hosts", sub: "Verify + trust", icon: "nav.profile" },
       { href: "/admin/reports", label: "Reports", sub: "Moderation queue", icon: "action.report" },
+      { href: "/admin/refunds", label: "Refunds", sub: "Host requests", icon: "benefit.pay" },
     ],
   },
   {
