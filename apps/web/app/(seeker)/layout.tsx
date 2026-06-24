@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
+  getCommunityUnreadCount,
   getSeekerProfile,
   getUnreadNotificationCount,
 } from "@explore-and-earn/db";
@@ -42,8 +43,7 @@ interface SeekerShellState {
   readonly seekerName: string | null;
   /** Profile readiness % shown in the Seeker OS sidebar meter. */
   readonly profileScore: number;
-  // TODO(community-unreads): replace with real query against community_post_views
-  // once the community_posts table exists. Zero until then.
+  /** "N new" badge on the Community nav — photos + announcements since last seen. */
   readonly unreadCommunity: number;
 }
 
@@ -69,7 +69,8 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
       clerkUserId: DEV_USER_ID,
       needsOnboarding: false,
       seekerName: devSeekerName(),
-      unreadCommunity: 0,
+      // Service-role query — works on the bench (bypasses the sentinel token).
+      unreadCommunity: await getCommunityUnreadCount(DEV_USER_ID),
       profileScore: 78,
     };
   }
@@ -83,16 +84,17 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
     if (!token) {
       return { unreadCount: 0, clerkUserId: userId, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
     }
-    const [unreadCount, profile] = await Promise.all([
+    const [unreadCount, profile, unreadCommunity] = await Promise.all([
       getUnreadNotificationCount(token, userId),
       getSeekerProfile(token, userId),
+      getCommunityUnreadCount(userId),
     ]);
     return {
       unreadCount,
       clerkUserId: userId,
       needsOnboarding: profile !== null && !profile.onboardingComplete,
       seekerName: profile?.displayName?.trim() || null,
-      unreadCommunity: 0,
+      unreadCommunity,
       profileScore: profile ? (profile.onboardingComplete ? 82 : 48) : 28,
     };
   } catch {
