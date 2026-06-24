@@ -1,24 +1,8 @@
 .body {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: var(--space-16);
-  text-align: center;
-  padding: var(--space-8) 0 var(--space-4);
-}
-
-.iconRing {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-pill);
-  background: var(--gradient-gold);
-  border: 1.5px solid color-mix(in srgb, var(--status-boosted-fg) 28%, transparent);
-  color: var(--color-gold-text);
-  box-shadow: var(--elevation-card);
-  flex-shrink: 0;
+  padding: var(--space-4) 0 var(--space-4);
 }
 
 .intro {
@@ -27,13 +11,14 @@
   font-size: var(--type-body-size);
   line-height: 1.6;
   color: var(--text-secondary);
-  max-width: 28ch;
 }
 
 .listingName {
   color: var(--text-primary);
   font-weight: var(--font-weight-semibold);
 }
+
+/* ── Perks ───────────────────────────────────────────────────────────────── */
 
 .perks {
   display: flex;
@@ -43,7 +28,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  text-align: left;
 }
 
 .perk {
@@ -69,18 +53,146 @@
   color: var(--text-secondary);
 }
 
-.note {
+/* ── Duration tiers ──────────────────────────────────────────────────────── */
+
+.tierGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.legend {
+  padding: 0;
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+.tier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.tier:hover {
+  border-color: var(--border-ink);
+}
+
+.tier:active {
+  transform: translateY(1px);
+}
+
+.tierActive {
+  border-color: var(--status-boosted-fg);
+  background: var(--gradient-gold);
+  box-shadow: var(--elevation-card);
+}
+
+/* Visually hidden radio — the label is the control; focus ring lifts to it. */
+.tierInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.tier:focus-within {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.tierMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tierLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.tierTagline {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+.tierPrice {
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+/* ── Summary + checkout ──────────────────────────────────────────────────── */
+
+.summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--border-soft);
+}
+
+.summaryLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.summaryPrice {
+  font-family: var(--font-display, var(--font-ui));
+  font-size: var(--type-h3-size, var(--type-body-size));
+  font-weight: var(--font-weight-bold, var(--font-weight-semibold));
+  color: var(--text-primary);
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
   margin: 0;
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
-  color: var(--text-tertiary, var(--text-secondary));
+  color: var(--status-error-fg, var(--text-primary));
 }
 
-.closeBtn {
+.checkoutBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: var(--space-8);
   min-height: 2.75rem;
   padding: 0 var(--space-24);
   border: 1px solid var(--border-ink);
@@ -94,11 +206,73 @@
   transition: opacity var(--motion-base) var(--ease-standard);
 }
 
-.closeBtn:hover {
+.checkoutBtn:hover:not(:disabled) {
   opacity: 0.85;
 }
 
-.closeBtn:focus-visible {
+.checkoutBtn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.checkoutBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.fineprint {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-tertiary, var(--text-secondary));
+}
+
+/* ── Not-live guidance ───────────────────────────────────────────────────── */
+
+.notLive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  text-align: center;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--text-secondary);
+}
+
+.notLive p {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.5;
+}
+
+.dismissBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 var(--space-20);
+  border: 1px solid var(--border-ink);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background var(--motion-base) var(--ease-standard);
+}
+
+.dismissBtn:hover {
+  background: var(--color-surface-raised);
+}
+
+.dismissBtn:focus-visible {
   outline: none;
   box-shadow: var(--ui-focus-ring);
 }

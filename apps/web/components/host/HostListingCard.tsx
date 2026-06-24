@@ -208,7 +208,9 @@ export function HostListingCard({ item }: HostListingCardProps) {
       <BoostListingPopup
         open={boostOpen}
         onClose={() => setBoostOpen(false)}
+        listingId={listing.id}
         listingTitle={listing.title}
+        isLive={isLive}
       />
     </>
   );

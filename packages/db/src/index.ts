@@ -32,6 +32,7 @@ export * from "./hostAnalytics";
 export * from "./queries/reports";
 export * from "./queries/moderation";
 export * from "./queries/boosts";
+export * from "./queries/boostPurchase";
 export * from "./queries/seekerBadges";
 export * from "./queries/community";
 export * from "./queries/communityViews";

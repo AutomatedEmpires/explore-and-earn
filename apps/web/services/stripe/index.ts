@@ -1,11 +1,18 @@
 import "server-only";
 
 import Stripe from "stripe";
-import { adminClient, insertHostAnnouncement } from "@explore-and-earn/db";
+import {
+  adminClient,
+  activateBoostCampaignFromCheckout,
+  insertHostAnnouncement,
+} from "@explore-and-earn/db";
 import {
   ANNOUNCEMENT_PRICING,
+  BOOST_DURATIONS,
+  BOOST_PRICING,
   FOUNDER_LOCKED_PRICING,
   type AnnouncementDuration,
+  type BoostDuration,
 } from "@explore-and-earn/contracts";
 
 const APP_INFO = {
@@ -252,11 +259,60 @@ async function syncAnnouncementPurchase(
   return { action: "created_announcement_draft", clerkUserId, tier: null };
 }
 
+async function syncBoostPurchase(
+  session: Stripe.Checkout.Session,
+): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
+  const clerkUserId = session.metadata?.clerkUserId ?? null;
+  const hostProfileId = session.metadata?.hostProfileId ?? null;
+  const listingId = session.metadata?.listingId ?? null;
+  const durationRaw = session.metadata?.durationDays;
+  const durationDays = durationRaw ? parseInt(durationRaw, 10) : null;
+
+  if (!hostProfileId || !listingId || !durationDays) {
+    return { action: "ignored_missing_boost_metadata", clerkUserId, tier: null };
+  }
+
+  if (!BOOST_DURATIONS.includes(durationDays as BoostDuration)) {
+    return { action: "ignored_invalid_boost_duration", clerkUserId, tier: null };
+  }
+
+  const paymentIntentId =
+    typeof session.payment_intent === "string" ? session.payment_intent : null;
+
+  // amount_total is authoritative (what the customer actually paid); fall back
+  // to the founder-locked contract price if Stripe omits it.
+  const amountCents =
+    typeof session.amount_total === "number"
+      ? session.amount_total
+      : BOOST_PRICING[durationDays as BoostDuration];
+
+  const result = await activateBoostCampaignFromCheckout({
+    sessionId:       session.id,
+    paymentIntentId,
+    listingId,
+    hostProfileId,
+    durationDays,
+    amountCents,
+  });
+
+  return {
+    action: result.alreadyExisted
+      ? "boost_campaign_already_active"
+      : "activated_boost_campaign",
+    clerkUserId,
+    tier: null,
+  };
+}
+
 async function syncCheckoutCompleted(
   session: Stripe.Checkout.Session,
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
   if (session.metadata?.productType === "announcement") {
     return syncAnnouncementPurchase(session);
+  }
+
+  if (session.metadata?.productType === "listing_boost") {
+    return syncBoostPurchase(session);
   }
 
   if (session.mode !== "subscription") {
@@ -477,6 +533,67 @@ export async function createAnnouncementCheckoutSession(params: {
       durationDays:  String(params.durationDays),
     },
     line_items: [{ price: priceId, quantity: 1 }],
+  });
+}
+
+// ─── Listing boost checkout ───────────────────────────────────────────────────
+// Optional pre-created Stripe Price ids per duration. When unset we fall back to
+// an inline price_data line item priced from the founder-locked BOOST_PRICING
+// contract (integer cents). Either path works; env price ids let Finance manage
+// the catalog in Stripe without a code change.
+const BOOST_PRICE_ENV: Record<BoostDuration, string> = {
+  7:  "STRIPE_PRICE_BOOST_7D",
+  14: "STRIPE_PRICE_BOOST_14D",
+  28: "STRIPE_PRICE_BOOST_28D",
+};
+
+const BOOST_DURATION_LABEL: Record<BoostDuration, string> = {
+  7:  "7-day listing boost",
+  14: "14-day listing boost",
+  28: "28-day listing boost",
+};
+
+export async function createBoostCheckoutSession(params: {
+  clerkUserId: string;
+  hostProfileId: string;
+  listingId: string;
+  durationDays: BoostDuration;
+}): Promise<Stripe.Checkout.Session> {
+  const stripe = getStripeClient();
+  const envPriceId = process.env[BOOST_PRICE_ENV[params.durationDays]];
+  const amountCents = BOOST_PRICING[params.durationDays];
+
+  // Boost provenance is carried on session.metadata; the webhook reads it to
+  // write the listing_boost_campaigns row. productType keys the webhook branch,
+  // matching the announcement flow's metadata shape.
+  const metadata = {
+    productType:   "listing_boost",
+    kind:          "listing_boost",
+    listingId:     params.listingId,
+    hostProfileId: params.hostProfileId,
+    clerkUserId:   params.clerkUserId,
+    durationDays:  String(params.durationDays),
+    amountCents:   String(amountCents),
+  } as const;
+
+  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = envPriceId
+    ? { price: envPriceId, quantity: 1 }
+    : {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: amountCents,
+          product_data: { name: BOOST_DURATION_LABEL[params.durationDays] },
+        },
+      };
+
+  return stripe.checkout.sessions.create({
+    mode: "payment",
+    client_reference_id: params.clerkUserId,
+    success_url: absoluteAppUrl("/host/listings?boosted=1"),
+    cancel_url:  absoluteAppUrl("/host/listings"),
+    metadata,
+    line_items: [lineItem],
   });
 }
 

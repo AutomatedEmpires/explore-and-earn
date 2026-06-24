@@ -93,6 +93,20 @@ export const ADDON_PRICING = {
   },
 } as const
 
+// Listing boost — typed duration tiers for the self-serve purchase flow.
+// DERIVED from ADDON_PRICING.boost above so there is a single source of truth;
+// these are the LAUNCH boost pricing tiers (founder-locked, ADR-031). Durations
+// mirror the announcement set (7 / 14 / 28) and the listing_boost_campaigns
+// table's window semantics. Money is integer cents (G1/G23).
+export const BOOST_DURATIONS = [7, 14, 28] as const
+export type BoostDuration = (typeof BOOST_DURATIONS)[number]
+
+export const BOOST_PRICING: Record<BoostDuration, number> = {
+  7: ADDON_PRICING.boost.d7, // $200
+  14: ADDON_PRICING.boost.d14, // $350
+  28: ADDON_PRICING.boost.d28, // $500
+}
+
 // Service credits expire 12 months after issuance; redemption is FIFO
 // oldest-first, auto-applied to the next invoice, capped at invoice total, no
 // cash-out (ADR-033).
