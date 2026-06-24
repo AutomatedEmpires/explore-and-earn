@@ -1,0 +1,18 @@
+/* ── Frame / main ────────────────────────────────────────────────────────── */
+
+.frame {
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+	background: var(--color-paper);
+}
+
+.main {
+	flex: 1;
+	width: 100%;
+	margin: 0 auto;
+	/* Clear the fixed bottom nav + breathing room beneath the last module. */
+	padding-bottom: calc(var(--size-bottom-nav) + var(--space-80) + env(safe-area-inset-bottom, 0px));
+	display: flex;
+	flex-direction: column;
+}

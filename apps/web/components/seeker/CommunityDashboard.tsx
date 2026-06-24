@@ -20,6 +20,7 @@ import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import type { SeekerStatusSummary } from "./models";
 import { HostAnnouncementComposer } from "../host/HostAnnouncementComposer";
 import { uploadCommunityPhotoAction } from "../../app/actions/community";
+import { getEditorialPosts, type EditorialPost } from "../../lib/editorial";
 import styles from "./CommunityDashboard.module.css";
 
 // ─── Feed item types ──────────────────────────────────────────────────────────
@@ -67,9 +68,20 @@ type FeaturedEmployerCard = {
   readonly employer: FeaturedEmployer;
 };
 
-type FeedItem = SeekerPost | HostAnnouncement | BoostedListing | FeaturedEmployerCard;
+type EditorialCard = {
+  readonly kind: "editorial";
+  readonly id: string;
+  readonly post: EditorialPost;
+};
 
-type FeedSlotType = "seeker" | "announcement" | "listing" | "employer";
+type FeedItem =
+  | SeekerPost
+  | HostAnnouncement
+  | BoostedListing
+  | FeaturedEmployerCard
+  | EditorialCard;
+
+type FeedSlotType = "seeker" | "announcement" | "listing" | "employer" | "editorial";
 
 interface CommunityDashboardProps {
   readonly tab: "feed" | "photos" | "announcements";
@@ -112,6 +124,7 @@ const FEED_TYPE_RHYTHM: readonly FeedSlotType[] = [
   "seeker",
   "announcement",
   "listing",
+  "editorial",
   "seeker",
   "employer",
   "announcement",
@@ -249,6 +262,16 @@ function buildEmployerFeedCards(featuredEmployers: readonly FeaturedEmployer[]):
   );
 }
 
+/** E&E "field guide" editorial posts, surfaced into the communal feed. Capped so
+ *  the guide complements the feed without ever dominating it (static source). */
+function buildEditorialFeedCards(): EditorialCard[] {
+  return getEditorialPosts().slice(0, 2).map((post): EditorialCard => ({
+    kind: "editorial",
+    id: `editorial-${post.slug}`,
+    post,
+  }));
+}
+
 /**
  * Ranked, communal interleaver. Inputs are REAL content buckets (seeker photos,
  * host announcements, boosted listings, featured employers). It favours the
@@ -263,12 +286,13 @@ function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[
     announcement: [...buckets.announcement],
     listing: [...buckets.listing],
     employer: [...buckets.employer],
+    editorial: [...buckets.editorial],
   };
 
   const result: FeedItem[] = [];
   const remaining = () =>
     queues.seeker.length + queues.announcement.length +
-    queues.listing.length + queues.employer.length;
+    queues.listing.length + queues.employer.length + queues.editorial.length;
 
   const runOf = (type: FeedSlotType): number => {
     let run = 0;
@@ -288,7 +312,7 @@ function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[
     // Eligible = has supply AND wouldn't create a 3-in-a-row of its type.
     const order: FeedSlotType[] = [
       preferred,
-      "seeker", "announcement", "listing", "employer",
+      "seeker", "announcement", "listing", "employer", "editorial",
     ];
     let chosen: FeedSlotType | null = null;
     for (const type of order) {
@@ -301,7 +325,7 @@ function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[
     // take whatever remains so we never drop real content.
     if (!chosen) {
       chosen =
-        (["seeker", "announcement", "listing", "employer"] as FeedSlotType[])
+        (["seeker", "announcement", "listing", "employer", "editorial"] as FeedSlotType[])
           .find(t => queues[t].length > 0) ?? null;
     }
     if (!chosen) break;
@@ -914,6 +938,41 @@ function EmployerFeedCard({ item }: { readonly item: FeaturedEmployerCard }) {
   );
 }
 
+// ─── Editorial / field-guide feed card ────────────────────────────────────────
+
+/** E&E field-guide post in the feed. Reuses the `.blog*` card family (text-only
+ *  layout — editorial posts carry no cover image) and links to the /blog route. */
+function EditorialFeedCard({ item }: { readonly item: EditorialCard }) {
+  const { post } = item;
+  const formatted = new Date(post.publishedAt).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+  });
+  return (
+    <article className={styles.blogCard}>
+      <div className={styles.blogLayoutFull}>
+        <div className={styles.blogText}>
+          <div className={styles.blogMeta}>
+            <span className={styles.blogBrand} aria-hidden>
+              <Icon name="nav.feed" size={16} aria-hidden />
+            </span>
+            <span className={styles.blogBadge}>{post.kind}</span>
+            <span className={styles.blogTreeRule} aria-hidden>
+              {formatted} · {post.readMinutes} min read
+            </span>
+          </div>
+          <h3 className={styles.blogTitle}>{post.title}</h3>
+          <p className={styles.blogExcerpt}>{post.excerpt}</p>
+          <Link href={`/blog/${post.slug}`} className={styles.readMoreBtn}>
+            Read the guide
+            <Icon name="action.forward" size={16} aria-hidden />
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 // ─── Feed end marker ──────────────────────────────────────────────────────────
 
 function FeedEndMarker() {
@@ -1336,14 +1395,17 @@ export function CommunityDashboard({
     : [];
   const listingCards = buildListingFeedCards(listings);
   const employerCards = buildEmployerFeedCards(featuredEmployers);
+  const editorialCards = buildEditorialFeedCards();
 
   // Ranked communal feed: real photos + announcements + boosted listings +
-  // featured employers, interleaved with the no-more-than-two-in-a-row rule.
+  // featured employers + E&E field-guide posts, interleaved with the
+  // no-more-than-two-in-a-row rule.
   const feedItems: FeedItem[] = rankCommunityFeed({
     seeker: realSeekerPosts,
     announcement: realAnnouncementItems,
     listing: listingCards,
     employer: employerCards,
+    editorial: editorialCards,
   });
 
   const photoItems: SeekerPost[] = realSeekerPosts;
@@ -1405,6 +1467,8 @@ export function CommunityDashboard({
                           <ListingFeedCard item={item} />
                         ) : item.kind === "employer" ? (
                           <EmployerFeedCard item={item} />
+                        ) : item.kind === "editorial" ? (
+                          <EditorialFeedCard item={item} />
                         ) : null}
                       </div>
                     ))}
