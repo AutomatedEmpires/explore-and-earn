@@ -1,0 +1,12 @@
+# Build artifacts + caches — Vercel installs deps and builds fresh on its infra,
+# so none of these should be uploaded (they blow past the 100MB/file limit).
+node_modules
+**/node_modules
+.next
+**/.next
+.turbo
+**/.turbo
+dist
+**/dist
+.git
+*.log
