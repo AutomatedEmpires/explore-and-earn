@@ -34,24 +34,16 @@ Exit code `0` = pass, `1` = fail. No `pnpm install` required.
 
 The guard logic and registry are committed and runnable today. Wiring it into CI requires elevated capability the implementation agent does not have, so two admin-executable options are provided:
 
-### Option 1 — install the staged workflow (recommended)
+**Both enforcement paths are now installed (2026-06-24):**
 
-The agent token lacks the GitHub `workflows` permission, so it could not create `.github/workflows/migration-guard.yml` (the API returns `403 Resource not accessible by integration`). The complete workflow is staged at [`docs/ci/migration-guard.workflow.yml`](./migration-guard.workflow.yml). An admin installs it with:
+### Option 1 — standalone workflow ✅ installed
 
-```bash
-git mv docs/ci/migration-guard.workflow.yml .github/workflows/migration-guard.yml
-git commit -m "ci(workflows): add migration numbering integrity guard"
-```
+[`.github/workflows/migration-guard.yml`](../../.github/workflows/migration-guard.yml) runs the guard on every PR / merge_group / push to `main` that touches migrations or the registry. To make it *blocking*, add `migration-guard` to required status checks (see [`branch-protection-and-review-governance.md`](./branch-protection-and-review-governance.md)).
 
-Then add `migration-guard` to required status checks (see [`branch-protection-and-review-governance.md`](./branch-protection-and-review-governance.md)).
+### Option 2 — hooked into the existing `verify` check ✅ installed
 
-### Option 2 — no new workflow (hook into the existing `verify` check)
+`check-migration-prefixes.mjs` is appended to the `guardrails` script in the root `package.json`, so the already-required `verify` check runs it on every PR — blocking immediately, with no branch-protection change needed.
 
-`verify` already runs `pnpm guardrails`. Appending the guard to that script makes it blocking with no new workflow and no new required-check name. Root `package.json` is outside this lane's owned paths, so the agent did not edit it; an owner should apply this one-line change:
+The two are intentionally redundant (the script is zero-dependency and fast): the standalone workflow gives a clear named signal; the `guardrails` hook guarantees enforcement even before `migration-guard` is added to required checks.
 
-```diff
--    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-category-taxonomy.mjs && node tools/scripts/check-canon-contracts.mjs",
-+    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-category-taxonomy.mjs && node tools/scripts/check-canon-contracts.mjs && node tools/scripts/check-migration-prefixes.mjs",
-```
-
-Today's required checks are `verify` and `design-guardrails`.
+See also the deploy half of the loop: [`docs/runbooks/db-migrations-ci.md`](../runbooks/db-migrations-ci.md).
