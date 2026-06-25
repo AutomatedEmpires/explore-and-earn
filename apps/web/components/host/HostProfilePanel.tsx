@@ -7,6 +7,7 @@ import {
   type IconKey,
 } from "@explore-and-earn/ui";
 
+import { sparkFromCount } from "../../lib/sparkline";
 import type { HostProfileSummary, HostStats } from "./models";
 import styles from "./HostProfilePanel.module.css";
 
@@ -167,27 +168,21 @@ export function HostProfilePanel({
           value={`${strength}%`}
           trend={strength >= 80 ? "Excellent" : strength >= 50 ? "Building" : "Get started"}
           trendTone={strength >= 80 ? "up" : "neutral"}
-          spark={[
-            Math.max(20, strength - 18),
-            Math.max(28, strength - 12),
-            Math.max(34, strength - 8),
-            Math.max(40, strength - 4),
-            strength,
-          ]}
+          spark={sparkFromCount(strength)}
         />
         <MetricCard
           label="Active listings"
           value={stats.activeListings}
           trend={stats.activeListings > 0 ? "Live" : "None live"}
           trendTone={stats.activeListings > 0 ? "up" : "down"}
-          spark={[18, 30, 26, 44, Math.max(20, stats.activeListings * 18)]}
+          spark={sparkFromCount(stats.activeListings)}
         />
         <MetricCard
           label="Total applicants"
           value={stats.totalApplicants}
           trend={stats.newApplicants > 0 ? `${stats.newApplicants} new` : "Quiet"}
           trendTone={stats.newApplicants > 0 ? "up" : "neutral"}
-          spark={[14, 22, 38, 50, Math.max(24, Math.min(100, stats.totalApplicants * 8))]}
+          spark={sparkFromCount(stats.totalApplicants)}
         />
       </MetricGrid>
 

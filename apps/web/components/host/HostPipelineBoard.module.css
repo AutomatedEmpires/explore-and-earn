@@ -35,8 +35,6 @@
   border-radius: var(--radius-card);
   background: var(--color-surface);
   border: 1px solid var(--border-soft);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 .columnHead {

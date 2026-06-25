@@ -15,6 +15,7 @@ import {
   approveListingAction,
   rejectListingAction,
 } from "../../app/actions/admin";
+import { sparkFromCount } from "../../lib/sparkline";
 import { formatAdminDate, humanizeToken, listingStatusVariant } from "./status";
 import styles from "./AdminListingsTable.module.css";
 
@@ -239,28 +240,28 @@ export function AdminListingsTable({
           value={counts.total}
           trend="Catalog"
           trendTone="neutral"
-          spark={[34, 52, 41, 63, 58, 74, 69]}
+          spark={sparkFromCount(counts.total)}
         />
         <MetricCard
           label="Live"
           value={counts.live}
           trend="Published"
           trendTone="up"
-          spark={[40, 48, 55, 60, 66, 72, 81]}
+          spark={sparkFromCount(counts.live)}
         />
         <MetricCard
           label="Under review"
           value={counts.underReview}
           trend={counts.underReview > 0 ? "Needs eyes" : "Clear"}
           trendTone={counts.underReview > 0 ? "neutral" : "up"}
-          spark={[22, 38, 30, 46, 34, 52, 44]}
+          spark={sparkFromCount(counts.underReview)}
         />
         <MetricCard
           label="Drafts"
           value={counts.draft}
           trend="Incomplete"
           trendTone="down"
-          spark={[18, 26, 22, 30, 24, 33, 28]}
+          spark={sparkFromCount(counts.draft)}
         />
       </MetricGrid>
 

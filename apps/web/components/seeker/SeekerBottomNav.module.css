@@ -7,8 +7,6 @@
 	width: 100%;
 	border-top: 1px solid var(--border-soft);
 	background: color-mix(in srgb, var(--color-paper) 94%, transparent);
-	backdrop-filter: blur(16px) saturate(1.4);
-	-webkit-backdrop-filter: blur(16px) saturate(1.4);
 	box-shadow: 0 -1px 0 color-mix(in srgb, var(--border-soft) 60%, transparent),
 	            0 -8px 24px color-mix(in srgb, var(--color-ink) 6%, transparent);
 	/* Safe area for iOS home indicator */

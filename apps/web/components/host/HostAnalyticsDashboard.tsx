@@ -1,6 +1,7 @@
 import type { HostAnalytics, HostPerListingStats } from "@explore-and-earn/db";
 import { Icon, MetricCard, MetricGrid, type IconKey } from "@explore-and-earn/ui";
 
+import { sparkFromCount } from "../../lib/sparkline";
 import styles from "./HostAnalyticsDashboard.module.css";
 
 export interface HostAnalyticsDashboardProps {
@@ -49,19 +50,6 @@ function totalApplications(byStatus: Record<string, number>): number {
 
 function countFor(byStatus: Record<string, number>, keys: string[]): number {
   return keys.reduce((sum, k) => sum + (byStatus[k] ?? 0), 0);
-}
-
-/**
- * Build a deterministic sparkline (7 bars, 0..100) from a real count, so each
- * metric tile reads as a believable build-up to its current value — no random,
- * no fake data. A small count rises gently; a large count rises steeply.
- */
-function sparkFromCount(count: number): number[] {
-  // Amplitude scales with the real count so a tiny pool reads as a flatter
-  // build-up and a busy listing reads as a steep climb. Bounded 0..100.
-  const amp = Math.min(1, 0.45 + Math.log10(count + 1) * 0.35);
-  const curve = [0.28, 0.4, 0.36, 0.55, 0.62, 0.78, 1];
-  return curve.map((c) => Math.round(14 + c * 86 * amp));
 }
 
 /** Conversion score: how far the pipeline carries applicants toward a hire. */

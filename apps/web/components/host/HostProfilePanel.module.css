@@ -60,7 +60,6 @@
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
   color: var(--text-secondary);
-  backdrop-filter: blur(12px);
 }
 
 .kickerDot {
@@ -91,7 +90,6 @@
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--color-surface) 86%, transparent);
-  backdrop-filter: blur(18px);
 }
 
 .heroBody {

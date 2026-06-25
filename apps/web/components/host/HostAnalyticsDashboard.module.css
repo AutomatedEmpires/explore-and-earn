@@ -490,7 +490,6 @@
   text-align: center;
   padding: var(--space-24);
   background: color-mix(in srgb, var(--color-surface-raised) 82%, transparent);
-  backdrop-filter: blur(2px);
   border-radius: var(--radius-card);
 }
 
