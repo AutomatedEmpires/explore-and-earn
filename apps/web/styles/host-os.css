@@ -1,180 +1,117 @@
 /**
- * Host OS — dark-glass, golden-hour theme for the (host) scope.
+ * Host OS — warm "Adventure Paper & Sky" command surface for the (host) scope.
  *
- * Strategy: the host-* primitives + module CSS all read SEMANTIC tokens, so we
- * scope dark token values to `.host-os` and the entire host scope flips to a
- * cinematic dark-glass surface with ZERO changes to host.css or feature code
- * (the same token-cascade trick as the global re-skin). Plus a few targeted
- * glass/backdrop overrides the flat tokens can't express, and the golden-hour
- * atmosphere. Light scopes (seeker/marketing) are untouched.
+ * Part of the SINGLE, flowing design system (founder mandate 2026-06-24): the
+ * dashboards speak the same warm paper + ink + framed-photo language as the
+ * marketing and discovery surfaces, so a host flows from the public site into
+ * their command center with no theme switch. The token-cascade strategy is
+ * unchanged — host surfaces read SEMANTIC tokens, so the scope keeps the warm
+ * root tokens (paper/ink/gold) and only sets the locked --hostos-* chrome set
+ * (panels / lines / accent / sizes) + the shell chrome. Role identity is carried
+ * by the GOLD accent + the brand/identity card, not by a separate palette.
+ * Host = gold ownership; Seeker = sky exploration; Admin = sky + warm danger.
  *
- * Tokens: the locked --hostos-* set below is the single source for glass,
- * lines, accents, blur, and control sizes — used everywhere instead of raw
- * rgba/hex/px so the theme is changeable from one place.
- *
- * Canon: docs/superpowers/specs/2026-06-21-design-system-v2-golden-hour-hybrid.md
+ * The one intentionally photographic element is the identity card: a framed
+ * photo with an ink scrim and bone text (brand's #1 lever), the same treatment
+ * the DiscoveryCard uses. Everything else is paper, ink hairlines, whisper lifts.
  */
 
 .host-os {
-  /* native form controls + scrollbars use the dark UA base (otherwise a glassy
-     rgba field composites over a WHITE control base and reads near-white) */
-  color-scheme: dark;
-  /* ---- dark surfaces ---- */
-  --color-paper:          #08110C;
-  --color-surface:        rgba(255, 255, 255, 0.055);
-  --color-surface-raised: rgba(255, 255, 255, 0.075);
-  --color-card-warm:      rgba(255, 255, 255, 0.06);
-  --color-parchment:      rgba(255, 255, 255, 0.045);
-  --color-steel:          rgba(255, 255, 255, 0.06);
-  --palette-steel:        rgba(255, 255, 255, 0.06);
-  /* sky leaks a light steel-blue onto the golden dark glass — map to the host teal */
-  --palette-sky:          #2FD3B6;
-
-  /* ---- text (warm bone) ---- */
-  --text-primary:   #FBF6EC;
-  --text-secondary: rgba(251, 246, 236, 0.70);
-  --text-muted:     rgba(251, 246, 236, 0.58);
-
-  /* ---- borders / lines ---- */
-  --border-soft: rgba(255, 255, 255, 0.12);
-  --border-ink:  rgba(255, 255, 255, 0.18);
-  --palette-line: rgba(255, 255, 255, 0.12);
-
-  /* ---- titles use the editorial serif ---- */
-  --font-display: var(--font-fraunces, "Fraunces", ui-serif, Georgia, serif);
-
-  /* ---- accents shift sky→golden-hour (amber primary, teal aurora, gold) ---- */
-  --color-cta:        #E0922F;
-  --color-cta-text:   #1A1208;
-  --color-header-bg:  #0C1812;
-  --color-gold:       #FFD66F;
-  --color-gold-text:  #1A1208;
-
-  --status-match-bg: rgba(47, 211, 182, 0.14);
-  --status-match-fg: #8FEAD8;
-  --status-boosted-bg: rgba(255, 214, 111, 0.16);
-  --status-boosted-fg: #FFDE94;
-  --benefit-housing-bg: rgba(47, 211, 182, 0.14); --benefit-housing-fg: #8FEAD8;
-  --benefit-meals-bg:   rgba(140, 210, 120, 0.14); --benefit-meals-fg:  #AEE39A;
-  --benefit-pay-bg:     rgba(255, 214, 111, 0.16); --benefit-pay-fg:    #FFDE94;
-
-  /* ---- locked Host OS token set (glass / accents / sizes) ---- */
-  --hostos-glass:     rgba(255, 255, 255, 0.07);
-  --hostos-glass-2:   rgba(255, 255, 255, 0.11);
-  --hostos-glass-3:   rgba(255, 255, 255, 0.045);
-  --hostos-glass-top: rgba(255, 255, 255, 0.09);  /* card top-edge highlight */
-  --hostos-line:      rgba(255, 255, 255, 0.13);
-  --hostos-line-2:    rgba(255, 255, 255, 0.16);
-  --hostos-scrim:     rgba(8, 16, 12, 0.5);        /* glass panels over a hero/photo */
-  --hostos-scrim-2:   rgba(6, 16, 12, 0.6);        /* sticky topbar */
-  --hostos-amber:     #E0922F;
-  --hostos-amber-glow: rgba(224, 146, 47, 0.22);
-  --hostos-teal:      #2FD3B6;
-  --hostos-gold:      #FFD66F;
-  --hostos-bone:      #FBF4E8;                      /* text on dark/photo */
-  --hostos-on-amber:  #1A1208;                      /* text on amber/gold */
-  --hostos-grad:      linear-gradient(135deg, #E0922F, #FFD66F);
-  --hostos-blur:      18px;                          /* glass backdrop blur */
-  --hostos-blur-lg:   22px;                          /* shell/topbar blur */
-  --hostos-control:   46px;                          /* topbar control height */
-  --hostos-avatar:    42px;
-  --hostos-side:      280px;                          /* sidebar width */
-  --hostos-grain:   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-
-  /* ---- elevation reads as glow/depth on dark ---- */
-  --elevation-card:  0 18px 50px rgba(0, 0, 0, 0.28);
-  --elevation-hover: 0 24px 64px rgba(0, 0, 0, 0.36);
+  /* ---- locked Host OS chrome set (warm) ---- */
+  --hostos-panel:    var(--color-surface);        /* #FFFCF5 warm card surface */
+  --hostos-panel-2:  var(--color-parchment);      /* #F0EAE0 warm panel */
+  --hostos-panel-3:  var(--color-paper);          /* page paper */
+  --hostos-line:     var(--border-soft);          /* #DDE2E3 chrome hairline */
+  --hostos-line-2:   var(--border-soft);
+  --hostos-ink-line: var(--border-ink);           /* ink hairline for emphasis */
+  --hostos-accent:   var(--color-gold);           /* gold #D8A84E — host ownership */
+  --hostos-accent-deep: #7A5A12;                  /* deep gold for text-on-soft */
+  --hostos-accent-soft: color-mix(in srgb, var(--color-gold) 16%, var(--color-surface));
+  --hostos-amber:    var(--color-gold);           /* legacy alias → gold */
+  --hostos-amber-glow: color-mix(in srgb, var(--color-gold) 22%, transparent);
+  --hostos-gold:     var(--color-gold);
+  --hostos-teal:     var(--state-ready-fg);       /* pine for live dot */
+  --hostos-bone:     #FBF7EE;                      /* text on framed photo */
+  --hostos-on-amber: var(--color-gold-text);      /* DARK ink on gold (contrast) */
+  --hostos-on-accent: var(--color-gold-text);     /* DARK ink on gold */
+  --hostos-grad:     var(--gradient-gold);         /* gold for meter + active fills */
+  --hostos-control:  46px;                          /* topbar control height */
+  --hostos-avatar:   42px;
+  --hostos-side:     280px;                          /* sidebar width */
 
   position: relative;
   min-height: 100vh;
   color: var(--text-primary);
   background:
-    radial-gradient(circle at 16% -2%, rgba(224, 146, 47, 0.22), transparent 34%),
-    radial-gradient(circle at 90% 8%, rgba(47, 211, 182, 0.14), transparent 30%),
-    radial-gradient(circle at 72% 98%, rgba(255, 214, 111, 0.10), transparent 32%),
-    linear-gradient(135deg, #08110C, #0C1812 55%, #08110C);
+    radial-gradient(circle at 16% -2%, color-mix(in srgb, var(--color-gold) 9%, transparent), transparent 34%),
+    radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--color-gold) 6%, transparent), transparent 30%),
+    radial-gradient(circle at 72% 98%, color-mix(in srgb, var(--palette-amber-light) 30%, transparent), transparent 32%),
+    var(--color-paper);
 }
 
-/* ambient grid + grain over the dark base */
+/* faint ink grid atmosphere on the scope (paper register) */
 .host-os::before {
   content: "";
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    linear-gradient(rgba(36, 34, 30, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 34, 30, 0.028) 1px, transparent 1px);
   background-size: 46px 46px;
   -webkit-mask-image: linear-gradient(#000, transparent 78%);
   mask-image: linear-gradient(#000, transparent 78%);
-}
-.host-os::after {
-  content: "";
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  opacity: 0.06;
-  background-image: var(--hostos-grain);
 }
 .host-os > * { position: relative; z-index: 1; }
 
 .host-os .host-page { gap: var(--space-20); }
 
-/* ---- glass treatment the flat tokens can't express ---- */
-@supports (backdrop-filter: blur(1px)) {
-  .host-os .host-panel,
-  .host-os .host-kpi,
-  .host-os .host-action-tile,
-  .host-os .host-attention,
-  .host-os .host-stat {
-    backdrop-filter: blur(var(--hostos-blur));
-    -webkit-backdrop-filter: blur(var(--hostos-blur));
-  }
-}
+/* ---- warm paper panels (paper is opaque, not glass) ---- */
 .host-os .host-panel,
 .host-os .host-kpi,
 .host-os .host-action-tile,
 .host-os .host-attention {
-  background: linear-gradient(180deg, var(--hostos-glass-top), var(--hostos-glass-3));
+  background: var(--hostos-panel);
   border-color: var(--hostos-line);
 }
 .host-os .host-panel--raised { box-shadow: var(--elevation-card); }
 
-/* promoted KPI / primary tile glow in amber */
+/* promoted KPI / primary tile glow in gold */
 .host-os .host-kpi--primary {
-  background: radial-gradient(circle at 16% 20%, var(--hostos-amber-glow), transparent 48%), var(--hostos-glass-2);
-  border-color: rgba(224, 146, 47, 0.32);
+  background: var(--hostos-accent-soft);
+  border-color: color-mix(in srgb, var(--color-gold) 38%, transparent);
 }
 .host-os .host-kpi--primary .host-kpi__value,
 .host-os .host-kpi--primary .host-kpi__label,
-.host-os .host-kpi--primary .host-kpi__top { color: var(--hostos-gold); }
+.host-os .host-kpi--primary .host-kpi__top { color: var(--hostos-accent-deep); }
 
 .host-os .host-action-tile--primary {
-  background: radial-gradient(circle at 16% 20%, var(--hostos-amber-glow), transparent 48%), var(--hostos-glass-2);
-  border-color: rgba(224, 146, 47, 0.3);
+  background: var(--hostos-accent-soft);
+  border-color: color-mix(in srgb, var(--color-gold) 38%, transparent);
 }
 .host-os .host-action-tile--primary .host-action-tile__icon {
   background: var(--hostos-grad);
   color: var(--hostos-on-amber);
 }
 
-/* hero → golden-hour gradient + grain, regardless of lane fallback */
+/* hero → framed photo + ink scrim over a category/adventure cover fallback,
+   bone text for legibility (WCAG). The one photographic surface besides the
+   identity card. */
 .host-os .host-hero {
   background:
-    linear-gradient(95deg, rgba(8, 16, 12, 0.92), rgba(8, 16, 12, 0.5) 52%, rgba(8, 16, 12, 0.1)),
-    linear-gradient(135deg, #0E1730 0%, #2A2342 34%, #9A4A46 68%, #E0922F 100%);
-  border: 1px solid var(--hostos-line-2);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
+    var(--gradient-hero-scrim),
+    var(--gradient-cover-adventure);
+  border: 1px solid var(--hostos-ink-line);
+  box-shadow: var(--elevation-card);
 }
-.host-os .host-hero[data-lane="farm"]     { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-farm); }
-.host-os .host-hero[data-lane="maritime"] { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-maritime); }
-.host-os .host-hero[data-lane="remote"]   { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-remote); }
-.host-os .host-hero[data-lane="seasonal"] { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-seasonal); }
-.host-os .host-hero[data-lane="mix"]      { background: linear-gradient(95deg, rgba(8,16,12,.9), rgba(8,16,12,.4) 55%, transparent), var(--gradient-category-mix); }
-.host-os .host-hero::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  opacity: 0.12; background-image: var(--hostos-grain); mix-blend-mode: overlay;
-}
+.host-os .host-hero[data-lane="farm"]     { background: var(--gradient-hero-scrim), var(--gradient-category-farm); }
+.host-os .host-hero[data-lane="maritime"] { background: var(--gradient-hero-scrim), var(--gradient-category-maritime); }
+.host-os .host-hero[data-lane="remote"]   { background: var(--gradient-hero-scrim), var(--gradient-category-remote); }
+.host-os .host-hero[data-lane="seasonal"] { background: var(--gradient-hero-scrim), var(--gradient-category-seasonal); }
+.host-os .host-hero[data-lane="mix"]      { background: var(--gradient-hero-scrim), var(--gradient-category-mix); }
 .host-os .host-hero__cta { background: var(--hostos-grad); color: var(--hostos-on-amber); }
 
-/* Floating glass hero KPI — command-center signature. Stacks below the hero
-   copy on mobile; overlaps bottom-right on desktop. */
+/* Floating hero KPI — command-center signature. Stacks below the hero
+   copy on mobile; overlaps bottom-right on desktop. Sits over the photo
+   scrim → framed bone-text panel. */
 .hostos-herokpi {
   position: relative;
   display: grid;
@@ -183,14 +120,12 @@
   margin-top: var(--space-16);
   padding: var(--space-12);
   border-radius: var(--radius-card);
-  background: var(--hostos-scrim);
-  border: 1px solid var(--hostos-line-2);
-  backdrop-filter: blur(var(--hostos-blur));
-  -webkit-backdrop-filter: blur(var(--hostos-blur));
+  background: var(--gradient-hero-scrim);
+  border: 1px solid color-mix(in srgb, #FBF7EE 28%, transparent);
 }
-.hostos-herokpi > div { padding: var(--space-10); border-radius: var(--radius-cell); background: var(--hostos-glass); border: 1px solid var(--hostos-line); }
-.hostos-herokpi b { display: block; font-family: var(--font-fraunces); font-weight: 600; font-size: 30px; line-height: 1; letter-spacing: -0.03em; color: var(--hostos-bone); }
-.hostos-herokpi span { font-size: 11px; font-weight: 700; color: rgba(251, 246, 236, 0.62); }
+.hostos-herokpi > div { padding: var(--space-10); border-radius: var(--radius-cell); background: color-mix(in srgb, #FBF7EE 12%, transparent); border: 1px solid color-mix(in srgb, #FBF7EE 18%, transparent); }
+.hostos-herokpi b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 30px; line-height: 1; letter-spacing: -0.03em; color: var(--hostos-bone); }
+.hostos-herokpi span { font-size: 11px; font-weight: 700; color: rgba(251, 247, 238, 0.78); }
 @media (min-width: 64rem) {
   .hostos-herokpi { position: absolute; right: var(--space-20); bottom: var(--space-20); width: 430px; margin: 0; }
 }
@@ -202,31 +137,32 @@
 .hostos-side {
   position: sticky; top: 0; height: 100vh; padding: var(--space-16) var(--space-12); overflow: auto;
   border-right: 1px solid var(--hostos-line);
-  background: linear-gradient(180deg, var(--hostos-glass-top), rgba(255, 255, 255, 0.03));
-  backdrop-filter: blur(var(--hostos-blur-lg)); -webkit-backdrop-filter: blur(var(--hostos-blur-lg));
+  background: var(--color-parchment);
   display: flex; flex-direction: column; gap: var(--space-12); scrollbar-width: none;
 }
 .hostos-side::-webkit-scrollbar { display: none; }
-.hostos-brand { display: flex; align-items: center; gap: var(--space-10); padding: var(--space-10); border-radius: 22px; background: var(--hostos-glass); border: 1px solid var(--hostos-line); }
-.hostos-mark { width: var(--hostos-avatar); height: var(--hostos-avatar); border-radius: 14px; display: grid; place-items: center; font-family: var(--font-fraunces); font-weight: 700; font-size: 20px; color: var(--hostos-on-amber); background: conic-gradient(from 200deg, var(--hostos-amber), var(--hostos-gold), var(--hostos-teal), var(--hostos-amber)); box-shadow: 0 0 30px rgba(224, 146, 47, 0.4); }
-.hostos-brand b { display: block; font-family: var(--font-fraunces); font-weight: 600; font-size: 18px; line-height: .9; color: var(--text-primary); }
+.hostos-brand { display: flex; align-items: center; gap: var(--space-10); padding: var(--space-10); border-radius: 22px; background: var(--hostos-panel); border: 1px solid var(--hostos-line); }
+.hostos-mark { width: var(--hostos-avatar); height: var(--hostos-avatar); border-radius: 14px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 20px; color: var(--hostos-on-amber); background: var(--gradient-gold); box-shadow: var(--elevation-card); }
+.hostos-brand b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: .9; color: var(--text-primary); }
 .hostos-brand i { font-style: normal; display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
-.hostos-livedot { width: 7px; height: 7px; border-radius: 50%; background: var(--hostos-teal); box-shadow: 0 0 0 0 rgba(47, 211, 182, 0.6); animation: hostos-pulse 1.9s infinite; }
-@keyframes hostos-pulse { 70% { box-shadow: 0 0 0 10px rgba(47, 211, 182, 0); } 100% { box-shadow: 0 0 0 0 rgba(47, 211, 182, 0); } }
-.hostos-hostcard { position: relative; min-height: 128px; border-radius: 22px; overflow: hidden; padding: var(--space-12); border: 1px solid var(--hostos-line); background-size: cover; background-position: center; display: flex; align-items: flex-end; }
-.hostos-hostcard::before { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(6, 16, 12, 0.85), rgba(6, 16, 12, 0.1)); }
-.hostos-hostcard b { position: relative; font-family: var(--font-fraunces); font-weight: 600; font-size: 18px; line-height: .98; letter-spacing: -.02em; color: var(--hostos-bone); }
-.hostos-chip { position: absolute; top: 11px; left: 11px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #CFF6EA; background: var(--hostos-scrim); border: 1px solid var(--hostos-line); backdrop-filter: blur(10px); }
+.hostos-livedot { width: 7px; height: 7px; border-radius: 50%; background: var(--hostos-teal); box-shadow: 0 0 0 0 color-mix(in srgb, var(--hostos-teal) 55%, transparent); animation: hostos-pulse 1.9s infinite; }
+@keyframes hostos-pulse { 70% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--hostos-teal) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--hostos-teal) 0%, transparent); } }
+/* Host identity card — framed photo + ink scrim + bone text (brand #1 lever).
+   The one intentionally photographic surface; everything else is paper. */
+.hostos-hostcard { position: relative; min-height: 128px; border-radius: 22px; overflow: hidden; padding: var(--space-12); border: 1px solid var(--hostos-ink-line); background-size: cover; background-position: center; display: flex; align-items: flex-end; box-shadow: var(--elevation-card); }
+.hostos-hostcard::before { content: ""; position: absolute; inset: 0; background: var(--gradient-hero-scrim), var(--gradient-cover-adventure); }
+.hostos-hostcard b { position: relative; font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: .98; letter-spacing: -.02em; color: var(--hostos-bone); }
+.hostos-chip { position: absolute; top: 11px; left: 11px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--hostos-bone); background: var(--gradient-hero-scrim); border: 1px solid color-mix(in srgb, #FBF7EE 24%, transparent); }
 .hostos-navlabel { margin: 4px 10px 1px; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--text-muted); }
 .hostos-nav { display: grid; gap: 5px; }
 .hostos-navitem { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: var(--space-10); padding: var(--space-8) var(--space-10); border-radius: 16px; color: var(--text-secondary); border: 1px solid transparent; text-decoration: none; transition: background var(--motion-fast, 140ms) var(--ease-standard), transform var(--motion-fast, 140ms) var(--ease-standard); }
-.hostos-navitem:hover { background: var(--hostos-glass); color: var(--hostos-bone); transform: translateX(2px); }
-.hostos-navitem .i { width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--hostos-glass); border: 1px solid var(--hostos-line); color: currentColor; }
+.hostos-navitem:hover { background: var(--hostos-accent-soft); color: var(--hostos-accent-deep); transform: translateX(2px); }
+.hostos-navitem .i { width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--hostos-panel); border: 1px solid var(--hostos-line); color: currentColor; }
 .hostos-navitem b { display: block; font-size: 14px; font-weight: 600; line-height: 1.1; }
 .hostos-navitem s { display: block; font-size: 11px; color: var(--text-muted); text-decoration: none; }
-.hostos-navitem[aria-current="page"] { color: var(--hostos-bone); background: radial-gradient(circle at 12% 30%, var(--hostos-amber-glow), transparent 46%), var(--hostos-glass-2); border-color: rgba(224, 146, 47, 0.3); }
+.hostos-navitem[aria-current="page"] { color: var(--hostos-accent-deep); background: var(--hostos-accent-soft); border-color: color-mix(in srgb, var(--color-gold) 38%, transparent); box-shadow: var(--elevation-card); }
 .hostos-navitem[aria-current="page"] .i { background: var(--hostos-grad); color: var(--hostos-on-amber); border-color: transparent; }
-.hostos-bdg { min-width: 24px; height: 22px; padding: 0 7px; border-radius: var(--radius-pill); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); background: var(--hostos-glass); border: 1px solid var(--hostos-line); }
+.hostos-bdg { min-width: 24px; height: 22px; padding: 0 7px; border-radius: var(--radius-pill); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); background: var(--hostos-panel); border: 1px solid var(--hostos-line); }
 .hostos-foot {
   margin-top: auto;
   display: flex;
@@ -235,22 +171,22 @@
   padding: var(--space-12);
   border-radius: 18px;
   border: 1px solid var(--hostos-line);
-  background: linear-gradient(160deg, color-mix(in srgb, var(--hostos-amber) 10%, transparent), var(--hostos-glass-3));
+  background: var(--hostos-accent-soft);
   text-decoration: none;
   transition: border-color var(--motion-fast, 140ms) var(--ease-standard), transform var(--motion-fast, 140ms) var(--ease-standard);
 }
-.hostos-foot:hover { border-color: rgba(224, 146, 47, 0.32); transform: translateY(-1px); }
+.hostos-foot:hover { border-color: color-mix(in srgb, var(--color-gold) 38%, transparent); transform: translateY(-1px); }
 .hostos-foot__row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .hostos-foot__label { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
-.hostos-foot__tier { font-family: var(--font-fraunces); font-weight: 600; font-size: 15px; letter-spacing: -.02em; color: var(--hostos-gold); }
+.hostos-foot__tier { font-family: var(--font-display); font-weight: 600; font-size: 15px; letter-spacing: -.02em; color: var(--hostos-accent-deep); }
 .hostos-foot__cta { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .hostos-main { min-width: 0; display: flex; flex-direction: column; }
-.hostos-top { position: sticky; top: 0; z-index: 30; display: flex; gap: var(--space-10); align-items: center; padding: var(--space-12) var(--space-20); border-bottom: 1px solid var(--hostos-line); background: var(--hostos-scrim-2); backdrop-filter: blur(var(--hostos-blur-lg)); -webkit-backdrop-filter: blur(var(--hostos-blur-lg)); }
-.hostos-search { flex: 1 1 auto; min-width: 0; max-width: 560px; height: var(--hostos-control); line-height: calc(var(--hostos-control) - 2px); border-radius: var(--radius-pill); border: 1px solid var(--hostos-line); background: var(--hostos-glass); padding: 0 var(--space-18); color: var(--text-muted); font-size: var(--type-meta-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hostos-tact { min-height: var(--hostos-control); border-radius: var(--radius-pill); border: 1px solid var(--hostos-line); background: var(--hostos-glass); color: var(--hostos-bone); padding: 0 var(--space-16); font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
-.hostos-tact--p { background: var(--hostos-grad); color: var(--hostos-on-amber); border-color: transparent; }
+.hostos-top { position: sticky; top: 0; z-index: 30; display: flex; gap: var(--space-10); align-items: center; padding: var(--space-12) var(--space-20); border-bottom: 1px solid var(--hostos-line); background: var(--color-surface); }
+.hostos-search { flex: 1 1 auto; min-width: 0; max-width: 560px; height: var(--hostos-control); line-height: calc(var(--hostos-control) - 2px); border-radius: var(--radius-pill); border: 1px solid var(--field-border); background: var(--field-bg); padding: 0 var(--space-18); color: var(--text-muted); font-size: var(--type-meta-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hostos-tact { min-height: var(--hostos-control); border-radius: var(--radius-pill); border: 1px solid var(--hostos-line); background: var(--hostos-panel); color: var(--text-primary); padding: 0 var(--space-16); font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
+.hostos-tact--p { background: var(--hostos-grad); color: var(--hostos-on-amber); border-color: transparent; box-shadow: var(--elevation-hover); }
 .hostos-account { display: inline-grid; place-items: center; flex: none; }
-.hostos-avatar { width: var(--hostos-avatar); height: var(--hostos-avatar); border-radius: 50%; display: grid; place-items: center; font-family: var(--font-fraunces); font-weight: 600; font-size: 17px; color: var(--hostos-on-amber); background: var(--hostos-grad); border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 0 18px rgba(224, 146, 47, 0.28); }
+.hostos-avatar { width: var(--hostos-avatar); height: var(--hostos-avatar); border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--hostos-on-amber); background: var(--hostos-grad); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: var(--elevation-pin); }
 .hostos-account:hover .hostos-avatar { filter: brightness(1.06); }
 .hostos-contentwrap { padding: var(--space-20); }
 .hostos-mnav, .hostos-drawer { display: none; }
@@ -263,27 +199,27 @@
   .hostos-tact--msg, .hostos-tlabel { display: none; }
   .hostos-tact--p { padding: 0 var(--space-16); }
   .hostos-contentwrap { padding: var(--space-14); }
-  .hostos-mnav { display: grid; position: fixed; z-index: 70; left: 10px; right: 10px; bottom: 10px; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: var(--space-8); border-radius: 24px; background: rgba(6, 16, 12, 0.84); backdrop-filter: blur(var(--hostos-blur-lg)); border: 1px solid var(--hostos-line); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); }
+  .hostos-mnav { display: grid; position: fixed; z-index: 70; left: 10px; right: 10px; bottom: 10px; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: var(--space-8); border-radius: 24px; background: var(--color-surface); border: 1px solid var(--hostos-line); box-shadow: var(--elevation-overlay); }
   .hostos-mtab { border: 0; background: transparent; color: var(--text-muted); border-radius: 18px; padding: 7px 4px; min-height: var(--tap-min, 44px); display: grid; place-items: center; gap: 3px; font-size: 10px; font-weight: 600; text-decoration: none; }
   .hostos-mtab[aria-current="page"] { background: var(--hostos-grad); color: var(--hostos-on-amber); }
-  .hostos-drawer.open { display: block; position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(5px); }
-  .hostos-drawerpanel { position: absolute; left: 10px; right: 10px; bottom: 92px; padding: var(--space-12); border-radius: 26px; border: 1px solid var(--hostos-line); background: rgba(8, 18, 14, 0.96); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); }
+  .hostos-drawer.open { display: block; position: fixed; inset: 0; z-index: 80; background: rgba(36, 34, 30, 0.5); }
+  .hostos-drawerpanel { position: absolute; left: 10px; right: 10px; bottom: 92px; padding: var(--space-12); border-radius: 26px; border: 1px solid var(--hostos-line); background: var(--color-surface); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); box-shadow: var(--elevation-overlay); }
 }
 
-/* The primary Button primitive paints a bone fill + (light-theme) light text —
-   invisible on dark glass. Repaint with the scope CTA so every composed
-   <Button variant="primary"> reads correctly inside the Host OS. */
+/* Button primitive already paints the primary fill via --color-cta; keep explicit
+   so a composed <Button variant="primary"> reads correctly inside the Host OS.
+   Host's primary is GOLD (dark ink text for contrast). */
 .host-os .ui-button--primary {
-  background: var(--color-cta);
-  color: var(--color-cta-text);
+  background: var(--hostos-grad);
+  color: var(--hostos-on-amber);
   border-color: transparent;
 }
 
 /* ── Command-search inner elements (CommandSearch.tsx markup) ─────── */
 .hostos-search { display: flex; align-items: center; gap: 10px; line-height: normal; cursor: text; }
 .hostos-search:focus-within {
-  border-color: var(--hostos-amber);
-  box-shadow: 0 0 0 3px var(--hostos-amber-glow);
+  border-color: var(--hostos-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hostos-accent) 20%, transparent);
 }
 .hostos-search .cmdsearch-i { flex: none; color: var(--text-muted); font-size: 1.05rem; line-height: 1; }
 .hostos-search .cmdsearch-input {
@@ -295,7 +231,7 @@
 .hostos-search .cmdsearch-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 .hostos-search .cmdsearch-kbd {
   flex: none; display: grid; place-items: center; min-width: 22px; height: 22px;
-  padding: 0 6px; border-radius: 7px; background: var(--hostos-glass);
+  padding: 0 6px; border-radius: 7px; background: var(--hostos-panel);
   border: 1px solid var(--hostos-line); color: var(--text-muted); font-size: 0.72rem;
   font-family: var(--font-ui, ui-monospace, monospace);
 }
@@ -311,13 +247,13 @@
   to   { opacity: 1; transform: none; }
 }
 
-/* ── Keyboard focus rings (legible on dark glass) + tactile press ── */
+/* ── Keyboard focus rings (gold, legible on paper) + tactile press ── */
 .hostos-navitem:focus-visible,
 .hostos-tact:focus-visible,
 .hostos-account:focus-visible,
 .hostos-mtab:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--hostos-amber);
+  box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--hostos-accent);
 }
 .hostos-navitem:active { transform: translateX(2px) scale(0.985); }
 .hostos-tact:active,

@@ -28,10 +28,10 @@
 
 .welcomeBar {
   background:
-    radial-gradient(ellipse 90% 140% at 5% 70%, rgba(112, 192, 84, 0.30) 0%, transparent 55%),
-    radial-gradient(ellipse 55% 70% at 95% 15%, rgba(30, 64, 24, 0.40) 0%, transparent 50%),
+    radial-gradient(ellipse 90% 140% at 5% 70%, color-mix(in srgb, var(--palette-teal) 24%, transparent) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 70% at 95% 15%, rgba(36, 34, 30, 0.34) 0%, transparent 50%),
     var(--community-green);
-  color: rgba(255, 255, 255, 0.95);
+  color: #FBF7EE;
   /* Full-bleed — no side margins, no border-radius */
   border-radius: 0;
   border: none;

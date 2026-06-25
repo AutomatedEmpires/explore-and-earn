@@ -1,82 +1,43 @@
 /**
- * Seeker OS — dark-glass, emerald-aurora theme for the (seeker) scope.
+ * Seeker OS — warm "Adventure Paper & Sky" command surface for the (seeker) scope.
  *
- * Same token-cascade strategy as host-os.css: seeker surfaces read SEMANTIC
- * tokens, so scoping dark + emerald values to `.seeker-os` flips the whole
- * seeker experience into a cinematic dark-glass command center with no feature
- * changes, plus the locked --seekeros-* set for glass/lines/accents/sizes and
- * the shell chrome (glass sidebar → mobile bottom-nav). Host = golden command;
- * Seeker = emerald exploration.
+ * Part of the SINGLE, flowing design system (founder mandate 2026-06-24): the
+ * dashboards speak the same warm paper + ink + framed-photo language as the
+ * marketing and discovery surfaces, so a seeker flows from the public site into
+ * their command center with no theme switch. The token-cascade strategy is
+ * unchanged — seeker surfaces read SEMANTIC tokens, so the scope keeps the warm
+ * root tokens (paper/ink/sky) and only sets the locked --seekeros-* chrome set
+ * (panels / lines / accent / sizes) + the shell chrome. Role identity is carried
+ * by the SKY accent + the brand/identity card, not by a separate palette.
+ * Host = gold ownership; Seeker = sky exploration; Admin = sky + warm danger.
  *
- * Benchmark: docs/design/reference/_benchmarks/explore_earn_seeker_dashboard_worldclass.html
+ * The one intentionally photographic element is the identity card: a framed
+ * photo with an ink scrim and bone text (brand's #1 lever), the same treatment
+ * the DiscoveryCard uses. Everything else is paper, ink hairlines, whisper lifts.
  */
 .seeker-os {
-  /* native form controls + scrollbars use the dark UA base (otherwise a glassy
-     rgba field composites over a WHITE control base and reads near-white) */
-  color-scheme: dark;
-  /* ---- dark forest surfaces ---- */
-  --color-paper:          #07120f;
-  --color-surface:        rgba(255, 255, 255, 0.055);
-  --color-surface-raised: rgba(255, 255, 255, 0.075);
-  --color-surface-2:      rgba(255, 255, 255, 0.05);
-  --color-card-warm:      rgba(255, 255, 255, 0.06);
-  --color-parchment:      rgba(255, 255, 255, 0.045);
-  --palette-paper:        #07120f;
-  --palette-surface:      rgba(255, 255, 255, 0.07);
-  /* ---- text (cool bone) ---- */
-  --text-primary:   #f6fff8;
-  --text-secondary: rgba(246, 255, 248, 0.70);
-  --text-muted:     rgba(246, 255, 248, 0.58);
-  --palette-ink:        #f6fff8;
-  --palette-ink-soft:   rgba(246, 255, 248, 0.70);
-  --palette-ink-muted:  rgba(246, 255, 248, 0.58);
-  /* ---- borders / lines ---- */
-  --border-soft:  rgba(255, 255, 255, 0.13);
-  --border-ink:   rgba(255, 255, 255, 0.20);
-  --palette-line: rgba(255, 255, 255, 0.15);
-  /* ---- titles use the editorial serif ---- */
-  --font-display: var(--font-fraunces, "Fraunces", ui-serif, Georgia, serif);
-  /* ---- accents shift to emerald aurora ---- */
-  --color-cta:        #36f49c;
-  --color-cta-text:   #061d13;
-  --color-header-bg:  #0b1914;
-  --palette-teal:     #36f49c;
-  --palette-amber:    #ffd66d;
-  /* de-drift: steel/sky default to LIGHT values and leak onto the dark glass */
-  --palette-steel:    rgba(255, 255, 255, 0.06);
-  --color-steel:      rgba(255, 255, 255, 0.06);
-  --palette-sky:      #6deaff;
-  --status-success-fg: #bbffd7;
-  --status-match-bg: rgba(54, 244, 156, 0.14);  --status-match-fg: #bbffd7;
-  --status-boosted-bg: rgba(255, 214, 109, 0.16); --status-boosted-fg: #ffe09a;
-  --elevation-card:  0 18px 54px rgba(0, 0, 0, 0.22);
-  --elevation-hover: 0 26px 70px rgba(0, 0, 0, 0.30);
-
-  /* ---- locked Seeker OS set (glass / accents / sizes) ---- */
-  --seekeros-glass:    rgba(255, 255, 255, 0.075);
-  --seekeros-glass-2:  rgba(255, 255, 255, 0.11);
-  --seekeros-glass-3:  rgba(255, 255, 255, 0.045);
-  --seekeros-line:     rgba(255, 255, 255, 0.15);
-  --seekeros-line-2:   rgba(255, 255, 255, 0.12);
-  --seekeros-emerald:  #36f49c;
-  --seekeros-mint:     #bbffd7;
-  --seekeros-aqua:     #6deaff;
-  --seekeros-gold:     #ffd66d;
-  --seekeros-on-emerald: #061d13;
-  --seekeros-grad:     linear-gradient(135deg, #36f49c, #ffd66d);
-  --seekeros-blur:     22px;
-  --seekeros-blur-lg:  26px;
+  /* ---- locked Seeker OS chrome set (warm) ---- */
+  --seekeros-panel:    var(--color-surface);        /* #FFFCF5 warm card surface */
+  --seekeros-panel-2:  var(--color-parchment);      /* #F0EAE0 warm panel */
+  --seekeros-panel-3:  var(--color-paper);          /* page paper */
+  --seekeros-line:     var(--border-soft);          /* #DDE2E3 chrome hairline */
+  --seekeros-line-2:   var(--border-soft);
+  --seekeros-ink-line: var(--border-ink);           /* ink hairline for emphasis */
+  --seekeros-accent:   var(--color-cta);            /* sky #2F667A — the brand action */
+  --seekeros-accent-deep: var(--palette-sky-dark);  /* deep sky for text-on-soft */
+  --seekeros-accent-soft: var(--color-action-soft); /* sky 12% on white */
+  --seekeros-ready:    var(--state-ready-fg);       /* pine — ready/explore */
+  --seekeros-on-accent: var(--color-cta-text);      /* white on sky */
+  --seekeros-grad:     var(--gradient-sky);         /* sky→teal for meter + active fills */
   --seekeros-control:  46px;
   --seekeros-avatar:   42px;
   --seekeros-side:     286px;
-  --seekeros-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
   color: var(--text-primary);
   background:
-    radial-gradient(circle at 16% 0%, rgba(54, 244, 156, 0.18), transparent 35%),
-    radial-gradient(circle at 88% 12%, rgba(109, 234, 255, 0.12), transparent 32%),
-    radial-gradient(circle at 80% 92%, rgba(255, 214, 109, 0.09), transparent 32%),
-    linear-gradient(135deg, #06100d, #0b1914 48%, #07120f);
+    radial-gradient(circle at 12% -2%, color-mix(in srgb, var(--palette-sky) 7%, transparent), transparent 30%),
+    radial-gradient(circle at 92% 4%, color-mix(in srgb, var(--palette-teal) 6%, transparent), transparent 28%),
+    var(--color-paper);
   min-height: 100svh;
 }
 
@@ -89,17 +50,14 @@
   min-height: 100svh;
 }
 
-/* ── Glass sidebar ──────────────────────────────────────────── */
+/* ── Paper sidebar ──────────────────────────────────────────── */
 .seekeros-side {
   position: sticky;
   top: 0;
   height: 100svh;
   padding: 18px 14px;
   border-right: 1px solid var(--seekeros-line);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.035)),
-    rgba(7, 18, 15, 0.58);
-  backdrop-filter: blur(var(--seekeros-blur-lg));
+  background: var(--color-parchment);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -113,8 +71,8 @@
   gap: 12px;
   padding: 12px;
   border-radius: 24px;
-  background: var(--seekeros-glass);
-  border: 1px solid var(--seekeros-line-2);
+  background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line);
 }
 
 .seekeros-mark {
@@ -124,12 +82,12 @@
   border-radius: 14px;
   display: grid;
   place-items: center;
-  color: var(--seekeros-on-emerald);
+  color: var(--seekeros-on-accent);
   font-weight: 900;
   background:
-    radial-gradient(circle at 33% 24%, #fff 0 8%, transparent 9%),
-    conic-gradient(from 180deg, var(--seekeros-emerald), var(--seekeros-aqua), var(--seekeros-gold), var(--seekeros-emerald));
-  box-shadow: 0 0 28px rgba(54, 244, 156, 0.30);
+    radial-gradient(circle at 33% 24%, rgba(255, 255, 255, 0.85) 0 8%, transparent 9%),
+    var(--gradient-sky);
+  box-shadow: var(--elevation-card);
 }
 
 .seekeros-brand b {
@@ -138,6 +96,7 @@
   font-size: 1.08rem;
   line-height: 0.95;
   font-weight: 800;
+  color: var(--text-primary);
 }
 
 .seekeros-brand i {
@@ -157,27 +116,27 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--seekeros-emerald);
-  box-shadow: 0 0 0 0 rgba(54, 244, 156, 0.7);
+  background: var(--seekeros-ready);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--seekeros-ready) 55%, transparent);
   animation: seekeros-pulse 1.9s infinite;
 }
 
 @keyframes seekeros-pulse {
-  70% { box-shadow: 0 0 0 11px rgba(54, 244, 156, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(54, 244, 156, 0); }
+  70% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--seekeros-ready) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--seekeros-ready) 0%, transparent); }
 }
 
-/* Seeker identity card (photo + avatar + name) */
+/* Seeker identity card — framed photo + ink scrim + bone text (brand #1 lever).
+   The one intentionally photographic surface; everything else is paper. */
 .seekeros-card {
   position: relative;
   padding: 14px;
   border-radius: 26px;
   overflow: hidden;
-  border: 1px solid var(--seekeros-line);
+  border: 1px solid var(--seekeros-ink-line);
   background:
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.58)),
-    radial-gradient(circle at 74% 10%, rgba(54, 244, 156, 0.16), transparent 40%),
-    linear-gradient(135deg, rgba(54, 244, 156, 0.16), rgba(45, 117, 136, 0.16));
+    var(--gradient-hero-scrim),
+    var(--gradient-cover-mountain);
   min-height: 132px;
   display: flex;
   align-items: flex-end;
@@ -197,27 +156,29 @@
   display: grid;
   place-items: center;
   font-weight: 900;
-  color: var(--seekeros-on-emerald);
-  background: linear-gradient(135deg, var(--seekeros-emerald), var(--seekeros-gold));
+  color: var(--seekeros-on-accent);
+  background: var(--gradient-sky);
   flex: 0 0 auto;
-  box-shadow: 0 0 24px rgba(54, 244, 156, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: var(--elevation-pin);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   overflow: hidden;
 }
 
+/* Text sits over the photo scrim → bone, not ink. */
 .seekeros-card b {
   display: block;
   letter-spacing: -0.04em;
   line-height: 0.95;
   font-size: 1.1rem;
   font-weight: 800;
+  color: #FBF7EE;
 }
 
 .seekeros-card span {
   display: flex;
   align-items: center;
   gap: 5px;
-  color: var(--text-secondary);
+  color: rgba(251, 247, 238, 0.85);
   font-size: 0.74rem;
   font-weight: 700;
   margin-top: 4px;
@@ -227,8 +188,8 @@
 .seekeros-score {
   padding: 12px;
   border-radius: 22px;
-  background: var(--seekeros-glass-3);
-  border: 1px solid var(--seekeros-line-2);
+  background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line);
 }
 
 .seekeros-score-row {
@@ -246,7 +207,7 @@
 .seekeros-meter {
   height: 9px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.10);
+  background: var(--palette-steel);
   overflow: hidden;
 }
 
@@ -255,7 +216,6 @@
   height: 100%;
   border-radius: inherit;
   background: var(--seekeros-grad);
-  box-shadow: 0 0 24px rgba(54, 244, 156, 0.28);
 }
 
 /* Nav */
@@ -302,8 +262,9 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: var(--seekeros-glass);
-  border: 1px solid var(--seekeros-line-2);
+  color: var(--text-secondary);
+  background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line);
 }
 
 .seekeros-navitem b {
@@ -329,30 +290,28 @@
   display: grid;
   place-items: center;
   color: var(--text-secondary);
-  background: var(--seekeros-glass);
-  border: 1px solid var(--seekeros-line-2);
+  background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line);
   font-size: 0.7rem;
   font-weight: 800;
 }
 
 .seekeros-navitem:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: var(--seekeros-accent-soft);
+  color: var(--seekeros-accent-deep);
   transform: translateX(2px);
 }
 
 .seekeros-navitem[aria-current="page"] {
-  background:
-    radial-gradient(circle at 15% 20%, rgba(54, 244, 156, 0.22), transparent 40%),
-    rgba(255, 255, 255, 0.10);
-  border-color: rgba(54, 244, 156, 0.25);
-  color: #fff;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.20);
+  background: var(--seekeros-accent-soft);
+  border-color: color-mix(in srgb, var(--seekeros-accent) 38%, transparent);
+  color: var(--seekeros-accent-deep);
+  box-shadow: var(--elevation-card);
 }
 
 .seekeros-navitem[aria-current="page"] .i {
   background: var(--seekeros-grad);
-  color: var(--seekeros-on-emerald);
+  color: var(--seekeros-on-accent);
   border-color: transparent;
 }
 
@@ -372,9 +331,8 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 24px;
-  border-bottom: 1px solid var(--seekeros-line-2);
-  background: rgba(7, 18, 15, 0.55);
-  backdrop-filter: blur(var(--seekeros-blur));
+  border-bottom: 1px solid var(--seekeros-line);
+  background: var(--color-surface);
 }
 
 .seekeros-search {
@@ -387,8 +345,8 @@
   gap: 10px;
   padding: 0 18px;
   border-radius: 999px;
-  border: 1px solid var(--seekeros-line-2);
-  background: var(--seekeros-glass);
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
   color: var(--text-muted);
   font-size: 0.9rem;
   white-space: nowrap;
@@ -405,8 +363,8 @@
   min-height: var(--seekeros-control);
   padding: 0 16px;
   border-radius: 999px;
-  border: 1px solid var(--seekeros-line-2);
-  background: var(--seekeros-glass);
+  border: 1px solid var(--seekeros-line);
+  background: var(--seekeros-panel);
   color: var(--text-primary);
   font-weight: 700;
   text-decoration: none;
@@ -418,9 +376,9 @@
 
 .seekeros-tact--p {
   background: var(--seekeros-grad);
-  color: var(--seekeros-on-emerald);
+  color: var(--seekeros-on-accent);
   border-color: transparent;
-  box-shadow: 0 16px 36px rgba(54, 244, 156, 0.18);
+  box-shadow: var(--elevation-hover);
 }
 
 .seekeros-tact:hover { transform: translateY(-2px); border-color: var(--border-ink); }
@@ -433,8 +391,8 @@
   height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--seekeros-emerald);
-  color: var(--seekeros-on-emerald);
+  background: var(--seekeros-accent);
+  color: var(--seekeros-on-accent);
   font-size: 0.64rem;
   font-weight: 900;
   display: grid;
@@ -447,8 +405,8 @@
   width: var(--seekeros-control);
   height: var(--seekeros-control);
   border-radius: 999px;
-  border: 1px solid var(--seekeros-line-2);
-  background: var(--seekeros-glass);
+  border: 1px solid var(--seekeros-line);
+  background: var(--seekeros-panel);
   text-decoration: none;
 }
 
@@ -460,7 +418,7 @@
   place-items: center;
   font-weight: 900;
   font-size: 0.82rem;
-  color: var(--seekeros-on-emerald);
+  color: var(--seekeros-on-accent);
   background: var(--seekeros-grad);
 }
 
@@ -491,10 +449,9 @@
     gap: 4px;
     padding: 8px;
     border-radius: 24px;
-    background: rgba(6, 16, 12, 0.84);
-    backdrop-filter: blur(var(--seekeros-blur-lg));
+    background: var(--color-surface);
     border: 1px solid var(--seekeros-line);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--elevation-overlay);
   }
 
   .seekeros-mtab {
@@ -513,28 +470,27 @@
   }
 
   .seekeros-mtab[aria-current="page"] {
-    color: var(--seekeros-on-emerald);
+    color: var(--seekeros-on-accent);
     background: var(--seekeros-grad);
   }
 }
 
-/* grid + grain atmosphere overlay on the scope */
+/* faint ink grid atmosphere on the scope (paper register) */
 .seeker-os::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    linear-gradient(rgba(36, 34, 30, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 34, 30, 0.028) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: linear-gradient(to bottom, black, transparent 72%);
   z-index: 0;
 }
 
-/* The primary Button primitive paints a bone fill + (light-theme) light text —
-   invisible on dark glass. Repaint with the scope CTA so every composed
-   <Button variant="primary"> reads correctly inside the Seeker OS. */
+/* Button primitive already paints the sky CTA via --color-cta; keep explicit so
+   a composed <Button variant="primary"> reads correctly inside the Seeker OS. */
 .seeker-os .ui-button--primary {
   background: var(--color-cta);
   color: var(--color-cta-text);
@@ -544,8 +500,8 @@
 /* ── Command-search inner elements (CommandSearch.tsx markup) ─────── */
 .seekeros-search { display: flex; align-items: center; gap: 10px; cursor: text; }
 .seekeros-search:focus-within {
-  border-color: var(--seekeros-emerald);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--seekeros-emerald) 22%, transparent);
+  border-color: var(--seekeros-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--seekeros-accent) 20%, transparent);
 }
 .seekeros-search .cmdsearch-i { flex: none; color: var(--text-muted); font-size: 1.05rem; line-height: 1; }
 .seekeros-search .cmdsearch-input {
@@ -557,29 +513,29 @@
 .seekeros-search .cmdsearch-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
 .seekeros-search .cmdsearch-kbd {
   flex: none; display: grid; place-items: center; min-width: 22px; height: 22px;
-  padding: 0 6px; border-radius: 7px; background: var(--seekeros-glass);
-  border: 1px solid var(--seekeros-line-2); color: var(--text-muted); font-size: 0.72rem;
+  padding: 0 6px; border-radius: 7px; background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line); color: var(--text-muted); font-size: 0.72rem;
   font-family: var(--font-ui, ui-monospace, monospace);
 }
 @media (max-width: 1023px) { .seekeros-search .cmdsearch-kbd { display: none; } }
 
 /* ── View-enter: content settles into place on each navigation ─────
    template.tsx re-mounts this wrapper on every route change, so the rise +
-   fade replays as the seeker moves between surfaces — the command-center
-   signature. Killed under reduced-motion by the block below. */
+   fade replays as the seeker moves between surfaces. Killed under
+   reduced-motion by the block below. */
 .seekeros-view { animation: seekeros-viewin 360ms var(--ease-standard, ease) both; }
 @keyframes seekeros-viewin {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
 }
 
-/* ── Keyboard focus rings (legible on dark glass) + tactile press ── */
+/* ── Keyboard focus rings (sky, legible on paper) + tactile press ── */
 .seekeros-navitem:focus-visible,
 .seekeros-tact:focus-visible,
 .seekeros-account:focus-visible,
 .seekeros-mtab:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--seekeros-emerald);
+  box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--seekeros-accent);
 }
 .seekeros-navitem:active { transform: translateX(2px) scale(0.985); }
 .seekeros-tact:active,
