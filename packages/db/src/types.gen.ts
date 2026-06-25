@@ -113,6 +113,159 @@ export type Database = {
         }
         Relationships: []
       }
+      community_announcement_reactions: {
+        Row: {
+          announcement_id: string
+          clerk_user_id: string
+          created_at: string
+          id: string
+          reaction: string
+        }
+        Insert: {
+          announcement_id: string
+          clerk_user_id: string
+          created_at?: string
+          id?: string
+          reaction: string
+        }
+        Update: {
+          announcement_id?: string
+          clerk_user_id?: string
+          created_at?: string
+          id?: string
+          reaction?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_announcement_reactions_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "host_announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_comments: {
+        Row: {
+          author_name: string
+          body: string
+          clerk_user_id: string
+          created_at: string
+          id: string
+          status: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          author_name: string
+          body: string
+          clerk_user_id: string
+          created_at?: string
+          id?: string
+          status?: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          author_name?: string
+          body?: string
+          clerk_user_id?: string
+          created_at?: string
+          id?: string
+          status?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
+      community_photo_reactions: {
+        Row: {
+          clerk_user_id: string
+          created_at: string
+          id: string
+          photo_id: string
+          reaction: string
+        }
+        Insert: {
+          clerk_user_id: string
+          created_at?: string
+          id?: string
+          photo_id: string
+          reaction: string
+        }
+        Update: {
+          clerk_user_id?: string
+          created_at?: string
+          id?: string
+          photo_id?: string
+          reaction?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_photo_reactions_photo_id_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "community_photos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          location_tag: string | null
+          seeker_profile_id: string
+          status: string
+          storage_path: string
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          location_tag?: string | null
+          seeker_profile_id: string
+          status?: string
+          storage_path: string
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          location_tag?: string | null
+          seeker_profile_id?: string
+          status?: string
+          storage_path?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_photos_seeker_profile_id_fkey"
+            columns: ["seeker_profile_id"]
+            isOneToOne: false
+            referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_view_state: {
+        Row: {
+          clerk_user_id: string
+          last_seen_at: string
+        }
+        Insert: {
+          clerk_user_id: string
+          last_seen_at?: string
+        }
+        Update: {
+          clerk_user_id?: string
+          last_seen_at?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           application_id: string | null
@@ -168,6 +321,89 @@ export type Database = {
             columns: ["seeker_profile_id"]
             isOneToOne: false
             referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_log: {
+        Row: {
+          error: string | null
+          id: string
+          ok: boolean
+          recipient_email: string
+          sent_at: string
+          template_name: string
+        }
+        Insert: {
+          error?: string | null
+          id?: string
+          ok: boolean
+          recipient_email: string
+          sent_at?: string
+          template_name: string
+        }
+        Update: {
+          error?: string | null
+          id?: string
+          ok?: boolean
+          recipient_email?: string
+          sent_at?: string
+          template_name?: string
+        }
+        Relationships: []
+      }
+      employer_featured_campaigns: {
+        Row: {
+          clicks_count: number
+          created_at: string
+          ends_at: string
+          host_profile_id: string
+          id: string
+          impressions_count: number
+          is_pinned: boolean
+          pin_priority: number | null
+          starts_at: string
+          status: string
+          surfaces: string[]
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          clicks_count?: number
+          created_at?: string
+          ends_at: string
+          host_profile_id: string
+          id?: string
+          impressions_count?: number
+          is_pinned?: boolean
+          pin_priority?: number | null
+          starts_at?: string
+          status?: string
+          surfaces?: string[]
+          tier: string
+          updated_at?: string
+        }
+        Update: {
+          clicks_count?: number
+          created_at?: string
+          ends_at?: string
+          host_profile_id?: string
+          id?: string
+          impressions_count?: number
+          is_pinned?: boolean
+          pin_priority?: number | null
+          starts_at?: string
+          status?: string
+          surfaces?: string[]
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employer_featured_campaigns_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -273,6 +509,59 @@ export type Database = {
           },
         ]
       }
+      host_announcements: {
+        Row: {
+          body: string
+          created_at: string
+          expires_at: string
+          host_profile_id: string
+          id: string
+          kind: string
+          purchase_amount_cents: number | null
+          purchase_duration_days: number | null
+          status: string
+          stripe_payment_intent_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          expires_at: string
+          host_profile_id: string
+          id?: string
+          kind?: string
+          purchase_amount_cents?: number | null
+          purchase_duration_days?: number | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          expires_at?: string
+          host_profile_id?: string
+          id?: string
+          kind?: string
+          purchase_amount_cents?: number | null
+          purchase_duration_days?: number | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "host_announcements_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       host_attestations: {
         Row: {
           attested_at: string
@@ -333,12 +622,14 @@ export type Database = {
           created_at: string
           current_attestation_id: string | null
           deleted_at: string | null
+          host_name: string | null
           housing_offered_generally: boolean
           id: string
           logo_asset_id: string | null
           meals_offered_generally: boolean
           operating_regions: string[]
           owner_user_id: string
+          photo_url: string | null
           primary_latitude: number | null
           primary_location_name: string | null
           primary_longitude: number | null
@@ -350,6 +641,7 @@ export type Database = {
           slug: string
           social_links: Json
           subscription_tier: string
+          tagline: string | null
           trust_status: string | null
           updated_at: string
           website_url: string | null
@@ -368,12 +660,14 @@ export type Database = {
           created_at?: string
           current_attestation_id?: string | null
           deleted_at?: string | null
+          host_name?: string | null
           housing_offered_generally?: boolean
           id?: string
           logo_asset_id?: string | null
           meals_offered_generally?: boolean
           operating_regions?: string[]
           owner_user_id: string
+          photo_url?: string | null
           primary_latitude?: number | null
           primary_location_name?: string | null
           primary_longitude?: number | null
@@ -385,6 +679,7 @@ export type Database = {
           slug: string
           social_links?: Json
           subscription_tier?: string
+          tagline?: string | null
           trust_status?: string | null
           updated_at?: string
           website_url?: string | null
@@ -403,12 +698,14 @@ export type Database = {
           created_at?: string
           current_attestation_id?: string | null
           deleted_at?: string | null
+          host_name?: string | null
           housing_offered_generally?: boolean
           id?: string
           logo_asset_id?: string | null
           meals_offered_generally?: boolean
           operating_regions?: string[]
           owner_user_id?: string
+          photo_url?: string | null
           primary_latitude?: number | null
           primary_location_name?: string | null
           primary_longitude?: number | null
@@ -420,11 +717,76 @@ export type Database = {
           slug?: string
           social_links?: Json
           subscription_tier?: string
+          tagline?: string | null
           trust_status?: string | null
           updated_at?: string
           website_url?: string | null
         }
         Relationships: []
+      }
+      host_reviews: {
+        Row: {
+          application_id: string
+          body: string
+          created_at: string
+          host_profile_id: string
+          housing_as_described: boolean | null
+          id: string
+          meals_as_described: boolean | null
+          pay_on_time: boolean | null
+          rating: number
+          seeker_display_name: string
+          seeker_profile_id: string
+        }
+        Insert: {
+          application_id: string
+          body?: string
+          created_at?: string
+          host_profile_id: string
+          housing_as_described?: boolean | null
+          id?: string
+          meals_as_described?: boolean | null
+          pay_on_time?: boolean | null
+          rating: number
+          seeker_display_name?: string
+          seeker_profile_id: string
+        }
+        Update: {
+          application_id?: string
+          body?: string
+          created_at?: string
+          host_profile_id?: string
+          housing_as_described?: boolean | null
+          id?: string
+          meals_as_described?: boolean | null
+          pay_on_time?: boolean | null
+          rating?: number
+          seeker_display_name?: string
+          seeker_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "host_reviews_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: true
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "host_reviews_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "host_reviews_seeker_profile_id_fkey"
+            columns: ["seeker_profile_id"]
+            isOneToOne: false
+            referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       host_seeker_dispositions: {
         Row: {
@@ -582,6 +944,84 @@ export type Database = {
         }
         Relationships: []
       }
+      listing_boost_campaigns: {
+        Row: {
+          clicks_count: number
+          created_at: string
+          ends_at: string
+          host_profile_id: string
+          id: string
+          impressions_count: number
+          is_pinned: boolean
+          listing_id: string
+          pin_priority: number | null
+          purchase_amount_cents: number | null
+          purchase_duration_days: number | null
+          starts_at: string
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_payment_intent_id: string | null
+          surfaces: string[]
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          clicks_count?: number
+          created_at?: string
+          ends_at: string
+          host_profile_id: string
+          id?: string
+          impressions_count?: number
+          is_pinned?: boolean
+          listing_id: string
+          pin_priority?: number | null
+          purchase_amount_cents?: number | null
+          purchase_duration_days?: number | null
+          starts_at?: string
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          surfaces?: string[]
+          tier: string
+          updated_at?: string
+        }
+        Update: {
+          clicks_count?: number
+          created_at?: string
+          ends_at?: string
+          host_profile_id?: string
+          id?: string
+          impressions_count?: number
+          is_pinned?: boolean
+          listing_id?: string
+          pin_priority?: number | null
+          purchase_amount_cents?: number | null
+          purchase_duration_days?: number | null
+          starts_at?: string
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_payment_intent_id?: string | null
+          surfaces?: string[]
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_boost_campaigns_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_boost_campaigns_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_media_overrides: {
         Row: {
           bucket_type: string
@@ -679,6 +1119,7 @@ export type Database = {
           accepted_count: number
           archived_at: string | null
           begins_at: string | null
+          benefit_details: Json
           category: string
           closed_at: string | null
           compensation_currency: string
@@ -688,23 +1129,29 @@ export type Database = {
           compensation_unit: string | null
           completion_score: number
           cover_asset_id: string | null
+          cover_photo_url: string | null
           created_at: string
           description: string | null
           ends_at: string | null
+          expires_at: string | null
           filled_status: string
+          gallery_photo_urls: string[]
           host_profile_id: string
+          housing_description: string | null
           housing_included: boolean
           id: string
           is_remote: boolean
           latitude: number | null
           location_display: string | null
           longitude: number | null
+          meals_description: string | null
           meals_included: boolean
           mix_domains: string[]
           paused_at: string | null
           published_at: string | null
           remaining_role_count: number
           role_count: number
+          search_vector: unknown
           status: string
           tags: string[]
           timeline_summary: string | null
@@ -716,6 +1163,7 @@ export type Database = {
           accepted_count?: number
           archived_at?: string | null
           begins_at?: string | null
+          benefit_details?: Json
           category: string
           closed_at?: string | null
           compensation_currency?: string
@@ -725,23 +1173,29 @@ export type Database = {
           compensation_unit?: string | null
           completion_score?: number
           cover_asset_id?: string | null
+          cover_photo_url?: string | null
           created_at?: string
           description?: string | null
           ends_at?: string | null
+          expires_at?: string | null
           filled_status?: string
+          gallery_photo_urls?: string[]
           host_profile_id: string
+          housing_description?: string | null
           housing_included?: boolean
           id?: string
           is_remote?: boolean
           latitude?: number | null
           location_display?: string | null
           longitude?: number | null
+          meals_description?: string | null
           meals_included?: boolean
           mix_domains?: string[]
           paused_at?: string | null
           published_at?: string | null
           remaining_role_count?: number
           role_count?: number
+          search_vector?: unknown
           status?: string
           tags?: string[]
           timeline_summary?: string | null
@@ -753,6 +1207,7 @@ export type Database = {
           accepted_count?: number
           archived_at?: string | null
           begins_at?: string | null
+          benefit_details?: Json
           category?: string
           closed_at?: string | null
           compensation_currency?: string
@@ -762,23 +1217,29 @@ export type Database = {
           compensation_unit?: string | null
           completion_score?: number
           cover_asset_id?: string | null
+          cover_photo_url?: string | null
           created_at?: string
           description?: string | null
           ends_at?: string | null
+          expires_at?: string | null
           filled_status?: string
+          gallery_photo_urls?: string[]
           host_profile_id?: string
+          housing_description?: string | null
           housing_included?: boolean
           id?: string
           is_remote?: boolean
           latitude?: number | null
           location_display?: string | null
           longitude?: number | null
+          meals_description?: string | null
           meals_included?: boolean
           mix_domains?: string[]
           paused_at?: string | null
           published_at?: string | null
           remaining_role_count?: number
           role_count?: number
+          search_vector?: unknown
           status?: string
           tags?: string[]
           timeline_summary?: string | null
@@ -936,6 +1397,47 @@ export type Database = {
           },
         ]
       }
+      moderation_actions: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          moderator_clerk_user_id: string
+          rationale: string | null
+          report_id: string | null
+          subject_id: string
+          subject_type: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          moderator_clerk_user_id: string
+          rationale?: string | null
+          report_id?: string | null
+          subject_id: string
+          subject_type: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          moderator_clerk_user_id?: string
+          rationale?: string | null
+          report_id?: string | null
+          subject_id?: string
+          subject_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_actions_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_preferences: {
         Row: {
           category: string
@@ -980,7 +1482,8 @@ export type Database = {
           id: string
           priority: string
           read_at: string | null
-          recipient_user_id: string
+          recipient_clerk_user_id: string | null
+          recipient_user_id: string | null
           subject_id: string | null
           subject_type: string | null
           suppressed_at: string | null
@@ -1000,7 +1503,8 @@ export type Database = {
           id?: string
           priority?: string
           read_at?: string | null
-          recipient_user_id: string
+          recipient_clerk_user_id?: string | null
+          recipient_user_id?: string | null
           subject_id?: string | null
           subject_type?: string | null
           suppressed_at?: string | null
@@ -1020,7 +1524,8 @@ export type Database = {
           id?: string
           priority?: string
           read_at?: string | null
-          recipient_user_id?: string
+          recipient_clerk_user_id?: string | null
+          recipient_user_id?: string | null
           subject_id?: string | null
           subject_type?: string | null
           suppressed_at?: string | null
@@ -1136,6 +1641,103 @@ export type Database = {
           },
         ]
       }
+      refund_requests: {
+        Row: {
+          admin_note: string | null
+          amount_cents: number
+          created_at: string
+          host_profile_id: string
+          id: string
+          purchase_type: string
+          reason: string | null
+          reference_id: string | null
+          resolved_at: string | null
+          resolved_by_clerk_user_id: string | null
+          status: string
+          stripe_payment_intent_id: string | null
+        }
+        Insert: {
+          admin_note?: string | null
+          amount_cents: number
+          created_at?: string
+          host_profile_id: string
+          id?: string
+          purchase_type: string
+          reason?: string | null
+          reference_id?: string | null
+          resolved_at?: string | null
+          resolved_by_clerk_user_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+        }
+        Update: {
+          admin_note?: string | null
+          amount_cents?: number
+          created_at?: string
+          host_profile_id?: string
+          id?: string
+          purchase_type?: string
+          reason?: string | null
+          reference_id?: string | null
+          resolved_at?: string | null
+          resolved_by_clerk_user_id?: string | null
+          status?: string
+          stripe_payment_intent_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_requests_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reports: {
+        Row: {
+          created_at: string
+          detail: string | null
+          id: string
+          listing_id: string
+          reason: string
+          reporter_id: string
+          resolved_at: string | null
+          resolved_by_clerk_user_id: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          listing_id: string
+          reason: string
+          reporter_id: string
+          resolved_at?: string | null
+          resolved_by_clerk_user_id?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          listing_id?: string
+          reason?: string
+          reporter_id?: string
+          resolved_at?: string | null
+          resolved_by_clerk_user_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reports_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       saved_listings: {
         Row: {
           created_at: string
@@ -1178,17 +1780,93 @@ export type Database = {
           },
         ]
       }
+      saved_searches: {
+        Row: {
+          alert_enabled: boolean
+          created_at: string
+          filters: Json
+          id: string
+          label: string
+          last_alerted_at: string | null
+          seeker_profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          alert_enabled?: boolean
+          created_at?: string
+          filters?: Json
+          id?: string
+          label: string
+          last_alerted_at?: string | null
+          seeker_profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          alert_enabled?: boolean
+          created_at?: string
+          filters?: Json
+          id?: string
+          label?: string
+          last_alerted_at?: string | null
+          seeker_profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_searches_seeker_profile_id_fkey"
+            columns: ["seeker_profile_id"]
+            isOneToOne: false
+            referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seeker_badges: {
+        Row: {
+          awarded_at: string
+          badge_key: string
+          id: string
+          metadata: Json | null
+          seeker_profile_id: string
+        }
+        Insert: {
+          awarded_at?: string
+          badge_key: string
+          id?: string
+          metadata?: Json | null
+          seeker_profile_id: string
+        }
+        Update: {
+          awarded_at?: string
+          badge_key?: string
+          id?: string
+          metadata?: Json | null
+          seeker_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seeker_badges_seeker_profile_id_fkey"
+            columns: ["seeker_profile_id"]
+            isOneToOne: false
+            referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       seeker_certifications: {
         Row: {
           category_tags: string[]
           created_at: string
           credential_url: string | null
+          description: string | null
+          does_not_expire: boolean
           expires_at: string | null
           id: string
           issued_at: string | null
           issuing_organization: string | null
           name: string
           seeker_profile_id: string
+          skill_tags: string[]
           sort_order: number
           updated_at: string
         }
@@ -1196,12 +1874,15 @@ export type Database = {
           category_tags?: string[]
           created_at?: string
           credential_url?: string | null
+          description?: string | null
+          does_not_expire?: boolean
           expires_at?: string | null
           id?: string
           issued_at?: string | null
           issuing_organization?: string | null
           name: string
           seeker_profile_id: string
+          skill_tags?: string[]
           sort_order?: number
           updated_at?: string
         }
@@ -1209,12 +1890,15 @@ export type Database = {
           category_tags?: string[]
           created_at?: string
           credential_url?: string | null
+          description?: string | null
+          does_not_expire?: boolean
           expires_at?: string | null
           id?: string
           issued_at?: string | null
           issuing_organization?: string | null
           name?: string
           seeker_profile_id?: string
+          skill_tags?: string[]
           sort_order?: number
           updated_at?: string
         }
@@ -1241,17 +1925,26 @@ export type Database = {
           desired_categories: string[]
           desired_roles: string[]
           display_name: string | null
+          email_on_invite: boolean | null
+          email_on_message: boolean | null
+          email_on_status_change: boolean | null
+          general_skill_tags: string[]
+          hero_cover_url: string | null
           housing_preference: string | null
           id: string
+          location_pref: string | null
           match_confidence_score: number
           meals_preference: string | null
+          onboarding_complete: boolean | null
           open_to_statement: string | null
           pay_expectation_max_cents: number | null
           pay_expectation_min_cents: number | null
           pay_expectation_unit: string | null
           pay_flexible: boolean
           profile_photo_asset_id: string | null
+          profile_photo_url: string | null
           relative_location: string | null
+          seeking_timeline: string | null
           short_bio: string | null
           travel_readiness: string | null
           updated_at: string
@@ -1270,17 +1963,26 @@ export type Database = {
           desired_categories?: string[]
           desired_roles?: string[]
           display_name?: string | null
+          email_on_invite?: boolean | null
+          email_on_message?: boolean | null
+          email_on_status_change?: boolean | null
+          general_skill_tags?: string[]
+          hero_cover_url?: string | null
           housing_preference?: string | null
           id?: string
+          location_pref?: string | null
           match_confidence_score?: number
           meals_preference?: string | null
+          onboarding_complete?: boolean | null
           open_to_statement?: string | null
           pay_expectation_max_cents?: number | null
           pay_expectation_min_cents?: number | null
           pay_expectation_unit?: string | null
           pay_flexible?: boolean
           profile_photo_asset_id?: string | null
+          profile_photo_url?: string | null
           relative_location?: string | null
+          seeking_timeline?: string | null
           short_bio?: string | null
           travel_readiness?: string | null
           updated_at?: string
@@ -1299,17 +2001,26 @@ export type Database = {
           desired_categories?: string[]
           desired_roles?: string[]
           display_name?: string | null
+          email_on_invite?: boolean | null
+          email_on_message?: boolean | null
+          email_on_status_change?: boolean | null
+          general_skill_tags?: string[]
+          hero_cover_url?: string | null
           housing_preference?: string | null
           id?: string
+          location_pref?: string | null
           match_confidence_score?: number
           meals_preference?: string | null
+          onboarding_complete?: boolean | null
           open_to_statement?: string | null
           pay_expectation_max_cents?: number | null
           pay_expectation_min_cents?: number | null
           pay_expectation_unit?: string | null
           pay_flexible?: boolean
           profile_photo_asset_id?: string | null
+          profile_photo_url?: string | null
           relative_location?: string | null
+          seeking_timeline?: string | null
           short_bio?: string | null
           travel_readiness?: string | null
           updated_at?: string
@@ -1325,6 +2036,8 @@ export type Database = {
           end_date: string | null
           id: string
           institution: string | null
+          is_current: boolean
+          location: string | null
           program_or_degree: string | null
           seeker_profile_id: string
           skill_tags: string[]
@@ -1338,6 +2051,8 @@ export type Database = {
           end_date?: string | null
           id?: string
           institution?: string | null
+          is_current?: boolean
+          location?: string | null
           program_or_degree?: string | null
           seeker_profile_id: string
           skill_tags?: string[]
@@ -1351,6 +2066,8 @@ export type Database = {
           end_date?: string | null
           id?: string
           institution?: string | null
+          is_current?: boolean
+          location?: string | null
           program_or_degree?: string | null
           seeker_profile_id?: string
           skill_tags?: string[]
@@ -1376,6 +2093,7 @@ export type Database = {
           end_date: string | null
           id: string
           is_current: boolean
+          location: string | null
           role_title: string | null
           seeker_profile_id: string
           skill_tags: string[]
@@ -1391,6 +2109,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           is_current?: boolean
+          location?: string | null
           role_title?: string | null
           seeker_profile_id: string
           skill_tags?: string[]
@@ -1406,6 +2125,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           is_current?: boolean
+          location?: string | null
           role_title?: string | null
           seeker_profile_id?: string
           skill_tags?: string[]
@@ -1524,7 +2244,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_conversation_ids: { Args: never; Returns: string[] }
+      current_host_listing_ids: { Args: never; Returns: string[] }
+      current_host_profile_ids: { Args: never; Returns: string[] }
+      current_seeker_profile_ids: { Args: never; Returns: string[] }
+      get_clerk_user_id: { Args: never; Returns: string }
     }
     Enums: {
       [_ in never]: never
@@ -1657,4 +2381,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
