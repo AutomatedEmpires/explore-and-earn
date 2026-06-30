@@ -1,4 +1,53 @@
 {
-  "status": "placeholder",
-  "note": "TODO: Replace with the canonical Stripe catalog manifest after Sprint Zero approvals."
+  "$comment": "Committed snapshot of the canonical Stripe catalog (packages/stripe-seed/catalog.mjs, derived from the founder-locked pricing contracts). The catalog.test.ts drift guard asserts this equals catalog.mjs AND that amounts match the pricing contracts, so the three can never silently diverge. seed.mjs creates these Products + Prices idempotently by lookupKey; set the listed envVars (the resulting price ids) in Vercel after seeding. Amounts are integer USD cents.",
+  "currency": "usd",
+  "products": [
+    {
+      "key": "starter",
+      "name": "Explore & Earn — Starter",
+      "description": "Starter host plan — 1 active listing, basic analytics.",
+      "prices": [
+        { "envVar": "STRIPE_PRICE_STARTER_MONTHLY", "lookupKey": "ee_starter_monthly", "unitAmountCents": 19900, "type": "recurring", "interval": "month" },
+        { "envVar": "STRIPE_PRICE_STARTER_YEARLY", "lookupKey": "ee_starter_yearly", "unitAmountCents": 199000, "type": "recurring", "interval": "year" }
+      ]
+    },
+    {
+      "key": "professional",
+      "name": "Explore & Earn — Professional",
+      "description": "Professional host plan — 5 listings, 5 invite credits, full analytics.",
+      "prices": [
+        { "envVar": "STRIPE_PRICE_PROFESSIONAL_MONTHLY", "lookupKey": "ee_professional_monthly", "unitAmountCents": 39900, "type": "recurring", "interval": "month" },
+        { "envVar": "STRIPE_PRICE_PROFESSIONAL_YEARLY", "lookupKey": "ee_professional_yearly", "unitAmountCents": 399000, "type": "recurring", "interval": "year" }
+      ]
+    },
+    {
+      "key": "enterprise",
+      "name": "Explore & Earn — Enterprise",
+      "description": "Enterprise host plan — 10 listings, 10 invite credits, 1 team seat.",
+      "prices": [
+        { "envVar": "STRIPE_PRICE_ENTERPRISE_MONTHLY", "lookupKey": "ee_enterprise_monthly", "unitAmountCents": 74900, "type": "recurring", "interval": "month" },
+        { "envVar": "STRIPE_PRICE_ENTERPRISE_YEARLY", "lookupKey": "ee_enterprise_yearly", "unitAmountCents": 749000, "type": "recurring", "interval": "year" }
+      ]
+    },
+    {
+      "key": "announcement",
+      "name": "Explore & Earn — Community Announcement",
+      "description": "One-time community announcement placement (7 / 14 / 28-day run).",
+      "prices": [
+        { "envVar": "STRIPE_PRICE_ANNOUNCEMENT_7D", "lookupKey": "ee_announcement_7d", "unitAmountCents": 15000, "type": "one_time" },
+        { "envVar": "STRIPE_PRICE_ANNOUNCEMENT_14D", "lookupKey": "ee_announcement_14d", "unitAmountCents": 25000, "type": "one_time" },
+        { "envVar": "STRIPE_PRICE_ANNOUNCEMENT_28D", "lookupKey": "ee_announcement_28d", "unitAmountCents": 35000, "type": "one_time" }
+      ]
+    },
+    {
+      "key": "boost",
+      "name": "Explore & Earn — Listing Boost",
+      "description": "Optional — the app falls back to inline price_data when these are unset.",
+      "prices": [
+        { "envVar": "STRIPE_PRICE_BOOST_7D", "lookupKey": "ee_boost_7d", "unitAmountCents": 20000, "type": "one_time", "optional": true },
+        { "envVar": "STRIPE_PRICE_BOOST_14D", "lookupKey": "ee_boost_14d", "unitAmountCents": 35000, "type": "one_time", "optional": true },
+        { "envVar": "STRIPE_PRICE_BOOST_28D", "lookupKey": "ee_boost_28d", "unitAmountCents": 50000, "type": "one_time", "optional": true }
+      ]
+    }
+  ]
 }

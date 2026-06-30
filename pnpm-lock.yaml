@@ -116,7 +116,18 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(vite@8.0.16(@types/node@24.12.4)(terser@5.48.0))
 
-  packages/stripe-seed: {}
+  packages/stripe-seed:
+    dependencies:
+      '@explore-and-earn/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      stripe:
+        specifier: ^22.2.0
+        version: 22.2.0(@types/node@24.12.4)
+    devDependencies:
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(vite@8.0.16(@types/node@24.12.4)(terser@5.48.0))
 
   packages/test-utils: {}
 
