@@ -242,7 +242,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-16);
   padding: var(--space-14) var(--space-16);

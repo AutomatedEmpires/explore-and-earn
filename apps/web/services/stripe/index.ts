@@ -246,14 +246,17 @@ async function syncAnnouncementPurchase(
 
   await insertHostAnnouncement({
     hostProfileId,
-    title:                  "",
-    body:                   "",
-    kind:                   "general",
-    expiresAt:              expiresAt.toISOString(),
-    status:                 "draft",
-    stripePaymentIntentId:  paymentIntentId,
-    purchaseDurationDays:   durationDays,
-    purchaseAmountCents:    ANNOUNCEMENT_PRICING[durationDays as AnnouncementDuration],
+    title:                    "",
+    body:                     "",
+    kind:                     "general",
+    expiresAt:                expiresAt.toISOString(),
+    status:                   "draft",
+    stripePaymentIntentId:    paymentIntentId,
+    // Idempotency key: a retried checkout.session.completed must not create a
+    // second paid draft (migration 049 + insertHostAnnouncement dedupe).
+    stripeCheckoutSessionId:  session.id,
+    purchaseDurationDays:     durationDays,
+    purchaseAmountCents:      ANNOUNCEMENT_PRICING[durationDays as AnnouncementDuration],
   });
 
   return { action: "created_announcement_draft", clerkUserId, tier: null };
@@ -434,6 +437,10 @@ export function hasStripeCheckoutConfig(): boolean {
 export function getStripeClient(): Stripe {
   if (!cachedStripeClient) {
     cachedStripeClient = new Stripe(requireEnv("STRIPE_SECRET_KEY"), {
+      // Pin the API version so a Stripe-side default bump can't silently change
+      // webhook/response shapes. Matches the version this SDK (22.x) is built
+      // against; review on SDK upgrades.
+      apiVersion: "2026-05-27.dahlia",
       appInfo: APP_INFO,
     });
   }

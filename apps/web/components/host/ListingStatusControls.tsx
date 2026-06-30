@@ -45,9 +45,12 @@ const STATUS_VARIANT: Record<ListingStatus, StatusBadgeVariant> = {
 
 // Mirrors the authoritative server gate in @explore-and-earn/db
 // (canTransitionListing). Buttons render only for these target states.
+// draft → under_review is the host's self-serve "submit for review" path; an
+// admin then approves under_review → live (adminApproveListing), so there is
+// intentionally no host button out of under_review except withdrawing to draft.
 const NEXT_STATES: Record<ListingStatus, readonly HostManageableListingStatus[]> = {
-  draft: [],
-  under_review: [],
+  draft: ["under_review"],
+  under_review: ["draft"],
   live: ["paused", "archived"],
   paused: ["live", "archived"],
   closed: [],
@@ -125,7 +128,11 @@ export function ListingStatusControls({
           <Button
             key={target}
             type="button"
-            variant={target === "archived" ? "secondary" : "primary"}
+            variant={
+              target === "archived" || target === "draft"
+                ? "secondary"
+                : "primary"
+            }
             disabled={isPending}
             onClick={() => changeStatus(target)}
           >

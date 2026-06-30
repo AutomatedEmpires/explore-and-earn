@@ -6,10 +6,38 @@ import type { NextConfig } from "next";
 
 const require = createRequire(import.meta.url);
 
-// Baseline security headers applied to every response. CSP is sent in
-// report-only mode first: it logs violations without blocking, so we can verify
-// Clerk / Mapbox / Supabase / Sentry / PostHog all load before switching to an
-// enforcing `Content-Security-Policy` header.
+// Baseline security headers applied to every response.
+//
+// CSP is sent in REPORT-ONLY mode: it logs violations to /api/csp-report
+// (→ Sentry) without blocking, so we can confirm every third party loads before
+// switching to enforcing. The allowlist below is the full production set —
+// Clerk, Supabase, Mapbox, Cloudinary, PostHog, Sentry, Google OAuth, and
+// Cloudflare Turnstile (Clerk bot protection).
+//
+// TO PROMOTE TO ENFORCING (Phase 2, do NOT do blindly):
+//   1. Add the PRODUCTION Clerk Frontend-API host to script-src + connect-src
+//      (e.g. https://clerk.<yourdomain>.com — it is domain-specific and is NOT
+//      under *.clerk.com, so an enforcing policy without it white-screens the
+//      whole app).
+//   2. Deploy report-only, then watch /api/csp-report (Sentry) for a real
+//      traffic window across sign-in, map, swipe, listing, billing.
+//   3. Only then rename this key to "Content-Security-Policy".
+const CSP_DIRECTIVES = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev https://js.clerk.dev https://challenges.cloudflare.com https://browser.sentry-cdn.com https://us.posthog.com https://us-assets.i.posthog.com",
+  "style-src 'self' 'unsafe-inline' https://api.tiles.mapbox.com https://api.mapbox.com",
+  "img-src 'self' blob: data: https://img.clerk.com https://*.supabase.co https://*.mapbox.com https://res.cloudinary.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://*.clerk.accounts.dev https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://eu.posthog.com https://sentry.io https://*.ingest.sentry.io",
+  "font-src 'self' data:",
+  "frame-src 'self' https://*.clerk.accounts.dev https://accounts.clerk.dev https://challenges.cloudflare.com https://accounts.google.com",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "report-uri /api/csp-report"
+].join("; ");
+
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
@@ -24,20 +52,8 @@ const securityHeaders = [
     value: "max-age=63072000; includeSubDomains; preload"
   },
   {
-    // Report-only first — switch to enforcing after verifying nothing breaks.
     key: "Content-Security-Policy-Report-Only",
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev https://browser.sentry-cdn.com https://us.posthog.com",
-      "style-src 'self' 'unsafe-inline' https://api.tiles.mapbox.com https://api.mapbox.com",
-      "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://sentry.io https://*.ingest.sentry.io",
-      "font-src 'self' data:",
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "report-uri /api/csp-report"
-    ].join("; ")
+    value: CSP_DIRECTIVES
   }
 ];
 

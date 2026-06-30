@@ -6,6 +6,13 @@ import { DEV_ROLE_COOKIE, isDevBenchEnabled } from "./lib/devBench";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/search",
+  // Public discovery surfaces. These live in the (seeker) route group but its
+  // layout renders safe defaults for signed-out visitors (no userId → no
+  // redirect), and their data (live listings) is public. The homepage hero
+  // CTAs, robots.txt, sitemap, and llms.txt all advertise /seek + /map as
+  // public — they MUST be reachable without a login or the funnel dead-ends.
+  "/seek",
+  "/map",
   "/listing/(.*)",
   "/host/(.*)", // Public host profiles (/host/{id}) + layout-gated authed routes
   "/sign-in/(.*)",
@@ -16,6 +23,9 @@ const isPublicRoute = createRouteMatcher([
   "/privacy",
   "/cookies",
   "/about",
+  "/faq", // Advertised in sitemap + llms.txt; legal/marketing content, no auth.
+  "/blog", // Editorial marketing surface (PublicBottomNav-chrome'd).
+  "/blog/(.*)",
   "/sitemap.xml",
   "/robots.txt",
   // Seeker onboarding is auth-required, but excluded from the post-auth gate so

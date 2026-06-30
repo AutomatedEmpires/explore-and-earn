@@ -19,7 +19,16 @@ import {
 
 import { isAllowedStorageUrl } from "../../lib/storageUrl";
 
-type HostManageableListingStatus = "live" | "paused" | "archived";
+// Host-controllable transitions. The authoritative gate is canTransitionListing
+// in @explore-and-earn/db (draft↔under_review, live↔paused, →archived); this
+// union just lets the host UI submit a draft for review and withdraw it. Going
+// under_review → live remains an admin-only approval (adminApproveListing).
+type HostManageableListingStatus =
+  | "draft"
+  | "under_review"
+  | "live"
+  | "paused"
+  | "archived";
 
 interface HostAuth {
   userId: string;

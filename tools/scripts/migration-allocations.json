@@ -50,6 +50,7 @@
     "045": { "slug": "community_view_state", "owner": "community", "status": "applied", "note": "community_view_state for the honest unread badge; service-role read on the bench." },
     "046": { "slug": "boost_campaign_purchase", "owner": "homepage-boost-system", "status": "applied", "note": "Host-paid listing boost purchase columns/flow (Stripe 7/14/28d)." },
     "047": { "slug": "refund_requests", "owner": "billing", "status": "applied", "note": "refund_requests table for host refund requests + admin-approval Stripe refund." },
-    "048": { "slug": "messages_conversations_rls", "owner": "lane-a-security", "status": "applied", "note": "Enables RLS on conversations + messages (013 INSERT AND→OR fix). Verified live end-to-end with the minted-JWT technique." }
+    "048": { "slug": "messages_conversations_rls", "owner": "lane-a-security", "status": "applied", "note": "Enables RLS on conversations + messages (013 INSERT AND→OR fix). Verified live end-to-end with the minted-JWT technique." },
+    "049": { "slug": "announcement_checkout_idempotency", "owner": "launch-phase1-wiring", "status": "pending", "note": "Adds host_announcements.stripe_checkout_session_id + partial unique index so the announcement webhook activation is idempotent on the Checkout Session (Stripe at-least-once). Mirrors the 046 boost guard. Additive; apply via db-migrate pipeline on merge." }
   }
 }

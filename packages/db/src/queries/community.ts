@@ -224,28 +224,62 @@ export interface InsertHostAnnouncementParams {
   readonly stripePaymentIntentId?: string | null;
   readonly purchaseDurationDays?: number | null;
   readonly purchaseAmountCents?: number | null;
+  /**
+   * Originating Stripe Checkout Session id. When set, the insert is idempotent
+   * on it (migration 049) so a retried at-least-once webhook does not grant a
+   * second paid draft. Mirrors the boost activation guard.
+   */
+  readonly stripeCheckoutSessionId?: string | null;
 }
 
 export async function insertHostAnnouncement(
   params: InsertHostAnnouncementParams,
 ): Promise<{ id: string }> {
   const admin = adminClient() as unknown as SupabaseClient;
+
+  // Idempotency: Stripe delivers checkout.session.completed at least once, so a
+  // retried webhook must not insert a second paid draft. Dedupe on the Checkout
+  // Session id before inserting (matches activateBoostCampaignFromCheckout).
+  if (params.stripeCheckoutSessionId) {
+    const { data: existing, error: lookupError } = await admin
+      .from("host_announcements")
+      .select("id")
+      .eq("stripe_checkout_session_id", params.stripeCheckoutSessionId)
+      .maybeSingle();
+    if (lookupError) {
+      throw new Error(`insertHostAnnouncement (lookup): ${lookupError.message}`);
+    }
+    if (existing) return { id: (existing as { id: string }).id };
+  }
+
   const { data, error } = await admin
     .from("host_announcements")
     .insert({
-      host_profile_id:          params.hostProfileId,
-      title:                    params.title,
-      body:                     params.body,
-      kind:                     params.kind,
-      expires_at:               params.expiresAt,
-      status:                   params.status,
-      stripe_payment_intent_id: params.stripePaymentIntentId ?? null,
-      purchase_duration_days:   params.purchaseDurationDays ?? null,
-      purchase_amount_cents:    params.purchaseAmountCents ?? null,
+      host_profile_id:            params.hostProfileId,
+      title:                      params.title,
+      body:                       params.body,
+      kind:                       params.kind,
+      expires_at:                 params.expiresAt,
+      status:                     params.status,
+      stripe_payment_intent_id:   params.stripePaymentIntentId ?? null,
+      stripe_checkout_session_id: params.stripeCheckoutSessionId ?? null,
+      purchase_duration_days:     params.purchaseDurationDays ?? null,
+      purchase_amount_cents:      params.purchaseAmountCents ?? null,
     })
     .select("id")
     .single();
-  if (error) throw new Error(`insertHostAnnouncement: ${error.message}`);
+  if (error) {
+    // Lost a race against a concurrent insert on the unique session key — re-read.
+    if (error.code === "23505" && params.stripeCheckoutSessionId) {
+      const { data: raced } = await admin
+        .from("host_announcements")
+        .select("id")
+        .eq("stripe_checkout_session_id", params.stripeCheckoutSessionId)
+        .maybeSingle();
+      if (raced) return { id: (raced as { id: string }).id };
+    }
+    throw new Error(`insertHostAnnouncement: ${error.message}`);
+  }
   return { id: data.id as string };
 }
 

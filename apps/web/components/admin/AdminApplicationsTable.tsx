@@ -332,18 +332,6 @@ export function AdminApplicationsTable({
                       </span>
                     </span>
                   </div>
-
-                  <div className={styles.action}>
-                    <Button
-                      variant="secondary"
-                      icon="action.view"
-                      disabled
-                      title="Review actions arrive with the moderation workbench"
-                      aria-label={`Review the application from ${who.name} (coming soon)`}
-                    >
-                      Review
-                    </Button>
-                  </div>
                 </li>
               );
             })}

@@ -30,7 +30,7 @@ const DURATION_META: Record<
   28: { label: "28-Day Feature",   tagline: "Maximum visibility, full month" },
 };
 
-const PERKS: ReadonlyArray<{ icon: "status.boosted" | "analytics.trend" | "analytics.meter"; label: string }> = [
+const BOOST_FEATURES: ReadonlyArray<{ icon: "status.boosted" | "analytics.trend" | "analytics.meter"; label: string }> = [
   { icon: "status.boosted", label: "Top of the discovery feed" },
   { icon: "analytics.trend", label: "Highlighted on map and swipe" },
   { icon: "analytics.meter", label: "Boosted reach in your analytics" },
@@ -81,13 +81,13 @@ export function BoostListingPopup({
           the top of discovery and highlight it across map and swipe.
         </p>
 
-        <ul className={styles.perks} role="list">
-          {PERKS.map((perk) => (
-            <li className={styles.perk} key={perk.icon}>
-              <span className={styles.perkIcon}>
-                <Icon name={perk.icon} size={16} aria-hidden />
+        <ul className={styles.features} role="list">
+          {BOOST_FEATURES.map((feature) => (
+            <li className={styles.feature} key={feature.icon}>
+              <span className={styles.featureIcon}>
+                <Icon name={feature.icon} size={16} aria-hidden />
               </span>
-              {perk.label}
+              {feature.label}
             </li>
           ))}
         </ul>
