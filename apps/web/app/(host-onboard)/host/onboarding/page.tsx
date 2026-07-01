@@ -19,7 +19,7 @@ export default function HostOnboardingPage() {
 		startTransition(async () => {
 			const result = await createHostProfileAction(companyName)
 			if (result.ok) {
-				router.push("/host/listings")
+				router.push("/host")
 				return
 			}
 			const message =

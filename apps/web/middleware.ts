@@ -24,6 +24,7 @@ const isPublicRoute = createRouteMatcher([
   "/cookies",
   "/about",
   "/faq", // Advertised in sitemap + llms.txt; legal/marketing content, no auth.
+  "/for-hosts", // Prospect-facing host preview — MUST be reachable without a login.
   "/blog", // Editorial marketing surface (PublicBottomNav-chrome'd).
   "/blog/(.*)",
   "/sitemap.xml",

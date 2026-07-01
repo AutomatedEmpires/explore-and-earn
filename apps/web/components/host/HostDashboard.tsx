@@ -7,6 +7,7 @@ import type {
   HostDashboardStats,
   RecentActivity,
 } from "@explore-and-earn/db";
+import { HostSetupChecklist } from "./HostSetupChecklist";
 import styles from "./HostDashboard.module.css";
 import { StaggerReveal } from "./StaggerReveal";
 
@@ -194,6 +195,15 @@ export function HostDashboard({
         ) : null}
       </section>
 
+      {/* ── First-run setup checklist — until the host has a live listing ─ */}
+      {liveCount === 0 ? (
+        <HostSetupChecklist
+          hasProfile={companyName !== null}
+          listingCount={totalListings}
+          liveCount={liveCount}
+        />
+      ) : null}
+
       {/* ── KPI row ─────────────────────────────────────────────────── */}
       <div className="host-kpiGrid">
         <Link className="host-kpi" href="/host/listings">
@@ -301,6 +311,11 @@ export function HostDashboard({
           <Link className="host-action-tile" href="/host/messages">
             <span className="host-action-tile__icon"><Icon name="nav.messages" size={20} aria-hidden /></span>
             <span className="host-action-tile__label">Messages</span>
+            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
+          </Link>
+          <Link className="host-action-tile" href="/host/announcements">
+            <span className="host-action-tile__icon"><Icon name="nav.announcements" size={20} aria-hidden /></span>
+            <span className="host-action-tile__label">Announcements</span>
             <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
           </Link>
           <Link className="host-action-tile" href="/host/profile/edit">

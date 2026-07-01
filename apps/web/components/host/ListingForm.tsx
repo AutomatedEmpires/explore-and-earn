@@ -289,6 +289,12 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
               </option>
             ))}
           </select>
+          <p className={styles.hint}>
+            The lane seekers browse by — Farm (ranch, orchard, agriculture),
+            Maritime (fishing, docks, vessels), Remote (backcountry, lodges,
+            off-grid), Seasonal (resorts, events, hospitality), or Mix if it
+            spans several.
+          </p>
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="listing-location">
@@ -324,7 +330,8 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>Housing · Meals · Pay</legend>
         <p className={styles.fieldsetNote}>
-          Housing, Meals, and Pay are the core promise to seekers.
+          Housing, Meals, and Pay are the core promise to seekers — the three
+          things they decide on, shown on every card. Be specific and honest.
         </p>
 
         <div className={styles.field}>

@@ -28,6 +28,7 @@ const NAV: readonly NavGroup[] = [
       { href: "/host/applicants", label: "Applicants", sub: "Pipeline", icon: "status.match" },
       { href: "/host/invites", label: "Invites", sub: "Recruiting", icon: "action.forward" },
       { href: "/host/messages", label: "Messages", sub: "Threads", icon: "nav.messages", badgeKey: "unread" },
+      { href: "/host/announcements", label: "Announcements", sub: "Reach seekers", icon: "nav.announcements" },
     ],
   },
   {

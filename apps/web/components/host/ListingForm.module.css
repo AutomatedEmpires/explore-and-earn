@@ -132,6 +132,15 @@
   color: var(--text-secondary);
 }
 
+/* Inline coaching under a field (e.g. what each category lane means). */
+.hint {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
 .benefit {
   display: flex;
   flex-direction: column;

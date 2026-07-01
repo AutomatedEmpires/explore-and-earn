@@ -274,8 +274,8 @@ export default async function HomePage() {
 						Annual plans available — 2 months free.
 					</p>
 
-					<Link href="/host/listings" className={styles.employerCta}>
-						Start listing
+					<Link href="/for-hosts" className={styles.employerCta}>
+						See your dashboard
 						<Icon name="action.forward" size={16} aria-hidden />
 					</Link>
 				</section>
