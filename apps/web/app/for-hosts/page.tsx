@@ -77,24 +77,7 @@ const TIERS: ReadonlyArray<{ name: string; monthly: number; blurb: string }> = [
 
 export default function ForHostsPage() {
   return (
-    <main className={styles.page}>
-      {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className={styles.topbar}>
-        <Link className={styles.brand} href="/">
-          <span className={styles.brandMark} aria-hidden>
-            E
-          </span>
-          Explore&nbsp;&amp;&nbsp;Earn
-        </Link>
-        <nav className={styles.topActions}>
-          <Link className={styles.signIn} href="/sign-in">
-            Sign in
-          </Link>
-          <Link className={styles.startBtn} href="/host/onboarding">
-            Start hosting
-          </Link>
-        </nav>
-      </header>
+    <div className={styles.page}>
 
       {/* ── Hero ────────────────────────────────────────────────── */}
       <section className={styles.hero}>
@@ -202,15 +185,6 @@ export default function ForHostsPage() {
         </Link>
       </section>
 
-      <footer className={styles.footer}>
-        <Link href="/">Explore &amp; Earn</Link>
-        <span>·</span>
-        <Link href="/about">About</Link>
-        <span>·</span>
-        <Link href="/faq">FAQ</Link>
-        <span>·</span>
-        <Link href="/terms">Terms</Link>
-      </footer>
-    </main>
+    </div>
   );
 }

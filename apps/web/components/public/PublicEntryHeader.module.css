@@ -1,6 +1,0 @@
-/*
- * Retired. PublicEntryHeader now renders the unified GlobalHeader (guest mode),
- * so the brand never fractures between home and about/legal. All header styles
- * live in GlobalHeader.module.css. Kept as an empty stylesheet only so the old
- * import path resolves; do not add rules here.
- */

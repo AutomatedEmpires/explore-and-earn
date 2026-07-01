@@ -18,7 +18,6 @@ import { HostTrustBand } from "../../../components/host/HostTrustBand";
 import { HostReviews } from "../../../components/host/HostReviews";
 import { LeaveReview } from "../../../components/host/LeaveReview";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
-import { PublicBottomNav } from "../../../components/public/PublicBottomNav";
 import { generateBreadcrumbJsonLd } from "../../../lib/seo";
 import styles from "./page.module.css";
 
@@ -408,7 +407,7 @@ export default async function PublicHostProfilePage({ params }: Props) {
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }}
     />
-    <main className={styles.page}>
+    <div className={styles.page}>
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <HostProfileHero
         host={host}
@@ -467,10 +466,7 @@ export default async function PublicHostProfilePage({ params }: Props) {
           </aside>
         ) : null}
       </div>
-    </main>
-    {/* Pinned bottom nav so the seeker's primary nav stays put when they tap
-        through to a host profile. */}
-    <PublicBottomNav />
+    </div>
     </>
   );
 }
