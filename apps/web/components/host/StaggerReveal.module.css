@@ -1,0 +1,46 @@
+/*
+ * CSS-first staggered entrance. The wrapper imposes NO layout — the caller's
+ * className (e.g. host-page) drives the grid/gap, exactly as the old motion.div
+ * did. Items are visible by default; the rise/fade is a progressive enhancement
+ * applied only when motion is welcome, so content can never be trapped at
+ * opacity:0 by a JS/hydration failure.
+ */
+/* No layout of its own — the caller's className (host-page) keeps its grid/gap,
+ * exactly as the old motion.div did; the .item children are its flex/grid items. */
+.stagger {
+  min-width: 0;
+}
+
+.item {
+  /* Resting (and reduced-motion / no-animation) state: fully visible. */
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .item {
+    opacity: 0;
+    animation: stagger-rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .item:nth-child(1) { animation-delay: 0.03s; }
+  .item:nth-child(2) { animation-delay: 0.09s; }
+  .item:nth-child(3) { animation-delay: 0.15s; }
+  .item:nth-child(4) { animation-delay: 0.21s; }
+  .item:nth-child(5) { animation-delay: 0.27s; }
+  .item:nth-child(6) { animation-delay: 0.33s; }
+  .item:nth-child(7) { animation-delay: 0.39s; }
+  .item:nth-child(8) { animation-delay: 0.45s; }
+  .item:nth-child(9) { animation-delay: 0.51s; }
+  .item:nth-child(n + 10) { animation-delay: 0.57s; }
+}
+
+@keyframes stagger-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -116,9 +116,9 @@ export default async function SeekerLayout({
     redirect("/onboarding");
   }
 
-  // Seeker OS — dark-glass emerald command center (glass sidebar → mobile
-  // bottom-nav). The scope token cascade (.seeker-os) flips the whole seeker
-  // experience; SeekerShell owns the chrome.
+  // Seeker OS — warm "Adventure Paper & Sky" command center (paper sidebar →
+  // mobile bottom-nav), sky accent. The scope token cascade (.seeker-os) flips
+  // the whole seeker experience; SeekerShell owns the chrome.
   return (
     <div className="seeker-os">
       <SeekerShell

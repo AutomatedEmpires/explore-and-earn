@@ -63,9 +63,10 @@ export default async function AdminLayout({
 
   const { queueCount, healthScore } = await resolveShellStats();
 
-  // Admin OS — dark-glass emerald moderation command center. The .admin-os token
-  // cascade flips the scope; AdminShell owns the chrome (and links the REAL admin
-  // routes — the legacy AdminSidebar linked broken /admin/* paths).
+  // Admin OS — warm "Adventure Paper & Sky" moderation command center, sky
+  // accent + warm-red danger register. The .admin-os token cascade flips the
+  // scope; AdminShell owns the chrome (and links the REAL admin routes — the
+  // legacy AdminSidebar linked broken /admin/* paths).
   return (
     <div className="admin-os">
       <AdminShell adminName="Founder" queueCount={queueCount} healthScore={healthScore}>

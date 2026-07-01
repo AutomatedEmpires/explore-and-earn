@@ -1,19 +1,20 @@
-"use client";
-
 import { Children, type ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
+
+import styles from "./StaggerReveal.module.css";
 
 /**
- * StaggerReveal — spring-physics "things falling into place" entrance for a
- * column of sections. Each direct child rises + fades in on mount, staggered.
+ * StaggerReveal — CSS-first "things falling into place" entrance for a column of
+ * sections. Each direct child rises + fades in, staggered.
  *
- * Screenshot- and SSR-safe: animates on MOUNT (not scroll), so content is never
- * trapped below the fold at opacity 0. Honors prefers-reduced-motion (renders a
- * plain container, no animation). Client leaf only — the page shell stays a
- * server component; `children` are server-rendered and passed through.
+ * Visibility is NEVER gated on JS. The prior Framer-Motion version set
+ * initial="hidden", which renders the SSR HTML at opacity:0 — so a slow or
+ * failed hydration trapped the whole dashboard blank (observed in review). Here
+ * the resting state is fully visible; the rise/fade is applied ONLY inside
+ * `prefers-reduced-motion: no-preference` via a pure-CSS animation that needs no
+ * JS. Reduced-motion (and any no-animation fallback) shows everything instantly.
  *
- * Design System V2 / motion-system.md: transform+opacity only, tween on the
- * locked ease-out curve (no bounce — overshoot is off-system).
+ * motion-system.md: transform+opacity only, locked ease-out, no bounce. Server
+ * component — no "use client", no client JS shipped for the reveal.
  */
 export function StaggerReveal({
   children,
@@ -22,26 +23,11 @@ export function StaggerReveal({
   readonly children: ReactNode;
   readonly className?: string;
 }) {
-  const reduce = useReducedMotion();
-  if (reduce) return <div className={className}>{children}</div>;
-
   return (
-    <motion.div
-      className={className}
-      initial="hidden"
-      animate="shown"
-      variants={{ shown: { transition: { staggerChildren: 0.06, delayChildren: 0.04 } } }}
-    >
+    <div className={className ? `${styles.stagger} ${className}` : styles.stagger}>
       {Children.map(children, (child) =>
-        child == null ? child : (
-          <motion.div
-            variants={{ hidden: { opacity: 0, y: 14 }, shown: { opacity: 1, y: 0 } }}
-            transition={{ duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
-          >
-            {child}
-          </motion.div>
-        ),
+        child == null ? child : <div className={styles.item}>{child}</div>,
       )}
-    </motion.div>
+    </div>
   );
 }

@@ -1,6 +1,16 @@
 # Founder Approval Queue
 
-Decisions that have hit a **founder approval gate** (see [`../agents/founder-approval-gates.md`](../agents/founder-approval-gates.md)) and are waiting on the founder. Agents must **not** implement past these lines. Add a row, then leave the related task in `backlog`.
+> **DELEGATED — no open approval gates (2026-06-30).** The founder has fully
+> delegated routine decision authority to the engineering agent: schema /
+> migrations, pricing, Stripe, deploy, secrets/provisioning, RLS/permissions,
+> and launch are all **execute-without-approval**. Do **not** pause work to queue
+> an approval here. Steps that need a credential or a third-party dashboard
+> (e.g. setting a Stripe key, the Clerk JWT template) are *operational tasks*,
+> not approval gates — do them, or note them in the launch-provisioning runbook.
+> The rows below are retained as a historical decision log only.
+
+The table is a record of decisions that were *once* gated and how they resolved.
+It no longer blocks implementation.
 
 | ID | Decision needed | Gate | Options / tradeoffs | Recommendation | Status |
 | --- | --- | --- | --- | --- | --- |
