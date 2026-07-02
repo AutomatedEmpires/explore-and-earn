@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
-import styles from "./SeekerBottomNav.module.css";
+import styles from "../navigation/BottomNav.module.css";
 
 interface SeekerTab {
 	readonly href: string;

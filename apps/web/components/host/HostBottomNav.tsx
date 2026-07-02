@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import { HostMoreMenu } from "./HostMoreMenu";
-import styles from "./HostBottomNav.module.css";
+import styles from "../navigation/BottomNav.module.css";
 
 interface HostTab {
   readonly href: string;

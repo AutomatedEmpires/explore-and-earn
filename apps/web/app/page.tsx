@@ -321,8 +321,8 @@ export default async function HomePage() {
 				/>
 			) : null}
 
-			<PublicBottomNav />
 		</main>
+		<PublicBottomNav />
 		</>
 	);
 }

@@ -1,0 +1,127 @@
+/**
+ * BottomNav — the shared floating dock for the user (public + seeker) scope.
+ *
+ * Matches the seeker/host/admin OS mobile docks verbatim so a logged-out visitor
+ * and a signed-in seeker see the SAME nav: a warm rounded capsule floating just
+ * above the bottom edge (inset 10px), a hairline ink-warm border, an overlay
+ * lift, and a sky-gradient-filled active lane. Borders-first, token-pure — no
+ * cold frost, no washed-out glass. One design across every scope.
+ *
+ * Flex list (not a fixed 4-col grid) so the same stylesheet also fits the host
+ * dock's 5th "More" control. z-index 70 sits above page chrome; the shell's
+ * reserved padding-bottom clears the floating capsule.
+ */
+
+.nav {
+	position: fixed;
+	left: 10px;
+	right: 10px;
+	bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+	z-index: 70;
+	max-width: var(--bp-md, 640px);
+	margin: 0 auto;
+	border-radius: 24px;
+	background: var(--color-surface);
+	border: 1px solid var(--border-ink-warm);
+	box-shadow: var(--elevation-overlay);
+}
+
+.list {
+	display: flex;
+	align-items: stretch;
+	gap: var(--space-4);
+	width: 100%;
+	margin: 0;
+	padding: var(--space-8);
+	list-style: none;
+}
+
+.item {
+	flex: 1;
+	min-width: 0;
+}
+
+.tab {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-3);
+	width: 100%;
+	min-height: var(--tap-min);
+	padding: var(--space-6) var(--space-4);
+	border: 0;
+	border-radius: var(--radius-cell);
+	background: transparent;
+	color: var(--text-muted);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		transform var(--motion-fast) var(--ease-standard);
+}
+
+.tab :global(svg) {
+	transition: transform var(--motion-base) var(--ease-standard);
+}
+
+.label {
+	font: inherit;
+	letter-spacing: var(--type-label-tracking);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+
+/* Hover is a pointer-device affordance only — the cell warms, the icon lifts. */
+@media (hover: hover) {
+	.tab:hover {
+		color: var(--text-primary);
+		background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+	}
+
+	.tab:hover :global(svg) {
+		transform: translateY(-1px);
+	}
+}
+
+/* Tactile press — the whole tab settles a hair. */
+.tab:active {
+	transform: translateY(1px);
+}
+
+.tab:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+/* ── Active lane — sky-gradient fill, white glyph + label (matches the OS docks) ── */
+.active,
+.active:hover {
+	color: var(--color-cta-text);
+	background: var(--gradient-sky);
+	font-weight: var(--font-weight-semibold);
+}
+
+.active :global(svg) {
+	color: var(--color-cta-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tab,
+	.tab :global(svg) {
+		transition: none;
+	}
+
+	.tab:hover :global(svg),
+	.tab:active {
+		transform: none;
+	}
+}
