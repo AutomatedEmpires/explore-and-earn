@@ -7,14 +7,17 @@ import { authedClient } from "../client";
 /**
  * Messaging data access — scoped seeker <-> host conversations + transcripts.
  *
- * SECURITY: Row Level Security is NOT yet enabled on `conversations` /
- * `messages`, and `authedClient()` talks to PostgREST with the anon key plus the
- * caller's Clerk JWT (the `anon` role performs no row-level enforcement). Every
- * function here is therefore scoped in application code: we resolve the caller's
- * `seeker_profiles.id` / `host_profiles.id` from the already-verified
- * `clerkUserId` (which comes from `auth().userId`, never decoded from the token)
- * and refuse any conversation the caller does not own. Keep these manual guards
- * even once RLS lands — they are defense in depth.
+ * SECURITY: Row Level Security IS enabled on `conversations` / `messages`
+ * (migration 048) and hardened in migration 050 — participant-scoped policies
+ * plus column-level UPDATE grants (only `messages.read_at` and
+ * `conversations.last_message_at` are writable by `authenticated`), and a
+ * conversation INSERT policy that requires a real host<->seeker application
+ * relationship. `authedClient()` talks to PostgREST with the anon key plus the
+ * caller's Clerk JWT, which resolves to the `authenticated` role under those
+ * policies. We ALSO scope every function in application code as defense in depth:
+ * we resolve the caller's `seeker_profiles.id` / `host_profiles.id` from the
+ * already-verified `clerkUserId` (from `auth().userId`, never decoded from the
+ * token) and refuse any conversation the caller does not own. Keep both layers.
  *
  * TYPES: `conversations` and `messages` are now present in the generated
  * `packages/db/src/types.gen.ts`. However, the participant guards below resolve

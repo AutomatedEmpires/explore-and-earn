@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { anonClient, type Message } from "@explore-and-earn/db/client";
+import type { Message } from "@explore-and-earn/db/client";
 
 import { EmptyState } from "../discovery";
 import { ReplyForm } from "./ReplyForm";
@@ -56,26 +55,11 @@ function senderLabel(
 
 const OPTIMISTIC_PREFIX = "optimistic-";
 
-/** Map a realtime `messages` row (snake_case) to our camelCase Message shape. */
-function rowToMessage(row: Record<string, unknown>): Message {
-	return {
-		id: typeof row.id === "string" ? row.id : String(row.id ?? ""),
-		conversationId:
-			typeof row.conversation_id === "string" ? row.conversation_id : "",
-		senderType: row.sender_type === "host" ? "host" : "seeker",
-		senderProfileId:
-			typeof row.sender_profile_id === "string" ? row.sender_profile_id : "",
-		body: typeof row.body === "string" ? row.body : "",
-		readAt: typeof row.read_at === "string" ? row.read_at : null,
-		createdAt:
-			typeof row.created_at === "string"
-				? row.created_at
-				: new Date().toISOString(),
-	};
-}
+/** How often the transcript re-reads the server for new messages. */
+const POLL_INTERVAL_MS = 8000;
 
 /**
- * Fold a realtime INSERT into the local list:
+ * Fold one incoming message into the local list:
  *  - ignore a row we already have (its real id is present and not optimistic);
  *  - otherwise collapse a matching optimistic bubble (same side + body + sent
  *    within 30 s) into the persisted row, so the sender's own message is not
@@ -106,6 +90,24 @@ function mergeIncoming(
 	return [...current, incoming];
 }
 
+/**
+ * Fold a freshly-fetched server transcript into the local list by replaying each
+ * row through mergeIncoming: rows we already have are ignored, the sender's own
+ * optimistic bubbles collapse into their persisted rows, and the counterpart's
+ * new replies append in order. Never drops an in-flight optimistic bubble that
+ * has not yet been persisted.
+ */
+function reconcileServer(
+	current: readonly MessageView[],
+	serverMessages: readonly Message[],
+): readonly MessageView[] {
+	let next = current;
+	for (const message of serverMessages) {
+		next = mergeIncoming(next, message);
+	}
+	return next;
+}
+
 export function MessageTranscript({
 	initialMessages,
 	conversationId,
@@ -118,39 +120,47 @@ export function MessageTranscript({
 	]);
 	const [error, setError] = useState<string | null>(null);
 
-	// A single anon-key Supabase client for the lifetime of this component. The
-	// messages channel is a public channel (RLS is not yet enabled), so the anon
-	// key is the correct credential per the realtime identity rules.
-	const [supabase] = useState<SupabaseClient>(
-		() => anonClient() as unknown as SupabaseClient,
-	);
-
 	const bottomRef = useRef<HTMLLIElement | null>(null);
 
-	// Subscribe to INSERTs on this conversation and append/reconcile them.
+	// Poll the RLS-scoped server action for new messages so the counterpart's
+	// replies appear without a manual refresh. (Supabase Realtime for `messages`
+	// requires an authenticated socket to satisfy the post-048 RLS SELECT policy;
+	// the short-lived Clerk token makes a live client channel impractical, so we
+	// poll instead — a clean authenticated-realtime channel can replace this
+	// later.) Skips work while the tab is hidden; failures are swallowed so a
+	// transient error never disrupts the open thread or the send path.
 	useEffect(() => {
-		const channel = supabase
-			.channel(`messages:${conversationId}`)
-			.on(
-				"postgres_changes",
-				{
-					event: "INSERT",
-					schema: "public",
-					table: "messages",
-					filter: `conversation_id=eq.${conversationId}`,
-				},
-				(payload: { new: Record<string, unknown> }) => {
-					const incoming = rowToMessage(payload.new);
-					if (!incoming.id) return;
-					setMessages((current) => mergeIncoming(current, incoming));
-				},
-			)
-			.subscribe();
+		let cancelled = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
 
-		return () => {
-			void supabase.removeChannel(channel);
+		const tick = async () => {
+			if (
+				typeof document !== "undefined" &&
+				document.visibilityState === "hidden"
+			) {
+				if (!cancelled) timer = setTimeout(tick, POLL_INTERVAL_MS);
+				return;
+			}
+			try {
+				const { fetchConversationMessagesAction } = await import(
+					"../../app/actions/messages"
+				);
+				const result = await fetchConversationMessagesAction(conversationId);
+				if (!cancelled && result.ok && result.messages.length > 0) {
+					setMessages((current) => reconcileServer(current, result.messages));
+				}
+			} catch {
+				// Ignore — the next tick retries; sending is unaffected.
+			}
+			if (!cancelled) timer = setTimeout(tick, POLL_INTERVAL_MS);
 		};
-	}, [supabase, conversationId]);
+
+		timer = setTimeout(tick, POLL_INTERVAL_MS);
+		return () => {
+			cancelled = true;
+			if (timer) clearTimeout(timer);
+		};
+	}, [conversationId]);
 
 	// Auto-scroll to the newest message whenever the count changes.
 	useEffect(() => {

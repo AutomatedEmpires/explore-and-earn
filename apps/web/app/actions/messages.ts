@@ -4,9 +4,11 @@ import { auth } from "@clerk/nextjs/server";
 import {
 	countConversationMessages,
 	getMessageEmailContext,
+	getMessages,
 	getNotificationPrefs,
 	markMessagesRead,
 	sendMessage,
+	type Message,
 } from "@explore-and-earn/db";
 import { revalidatePath } from "next/cache";
 
@@ -136,6 +138,39 @@ export async function sendMessageAction(
 			userId: await currentUserId(),
 		});
 		throw error;
+	}
+}
+
+export interface FetchMessagesActionResult {
+	readonly ok: boolean;
+	readonly messages: readonly Message[];
+}
+
+/**
+ * Returns the current transcript for a conversation the signed-in user
+ * participates in — the RLS-scoped read the client transcript polls so a
+ * counterpart's replies appear without a manual refresh. (Supabase Realtime for
+ * `messages` needs an authenticated socket to satisfy the post-048 RLS SELECT
+ * policy; the short-lived Clerk token makes a live client channel impractical,
+ * so we poll this instead.) Best-effort: returns an empty list rather than
+ * throwing, so a transient failure never breaks the open thread.
+ */
+export async function fetchConversationMessagesAction(
+	conversationId: string,
+): Promise<FetchMessagesActionResult> {
+	try {
+		const { userId, getToken } = await auth();
+		if (!userId) return { ok: false, messages: [] };
+		const token = await getToken({ template: "supabase" });
+		if (!token) return { ok: false, messages: [] };
+		const messages = await getMessages(token, userId, conversationId);
+		return { ok: true, messages };
+	} catch (error) {
+		reportError(error, {
+			action: "fetchConversationMessagesAction",
+			userId: await currentUserId(),
+		});
+		return { ok: false, messages: [] };
 	}
 }
 

@@ -19,6 +19,11 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up/(.*)",
   "/api/webhooks/(.*)",
   "/api/health",
+  // Vercel Cron invokes this with `Authorization: Bearer ${CRON_SECRET}`, not a
+  // Clerk session — so it must bypass Clerk's auth.protect() to reach the route
+  // handler, which validates the cron secret itself. Without this, the daily
+  // expire-listings job is rejected before its own auth check ever runs.
+  "/api/cron/(.*)",
   "/terms",
   "/privacy",
   "/cookies",
