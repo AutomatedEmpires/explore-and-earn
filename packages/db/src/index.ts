@@ -29,6 +29,7 @@ export * from "./adminClient";
 export * from "./queries/admin";
 export * from "./lib/matchScore";
 export * from "./lib/matchEngine";
+export * from "./queries/matchScores";
 export * from "./hostAnalytics";
 export * from "./queries/reports";
 export * from "./queries/moderation";
