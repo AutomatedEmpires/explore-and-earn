@@ -200,6 +200,101 @@ export async function computeAndStoreMatchForApplication(
   return { stored: 1 };
 }
 
+/** The strong-match floor (mirrors the ADR-040 "strong" band minScore). */
+export const STRONG_MATCH_MIN_SCORE = 75;
+
+/** A seeker who strongly matches a listing — the recipient of a new-match alert. */
+export interface StrongMatchRecipient {
+  readonly seekerProfileId: string;
+  readonly recipientClerkUserId: string | null;
+  readonly score: number;
+}
+
+export interface ListingMatchResult {
+  readonly stored: number;
+  readonly listingTitle: string;
+  /** Seekers scoring at/above the strong floor, best first (bounded). */
+  readonly strong: readonly StrongMatchRecipient[];
+}
+
+/** Max active seekers scored against one listing (bounded work). */
+const SEEKER_CANDIDATE_CAP = 500;
+/** Max strong-match recipients surfaced per listing (so one post can't spam). */
+const STRONG_NOTIFY_CAP = 25;
+
+/**
+ * Compute + persist match scores for one LIVE listing against active seekers,
+ * and return the strong matches (for the caller to notify). The inverse of
+ * {@link computeAndStoreMatchesForSeeker}: this is the listing-side activation
+ * that powers "a strong new match just posted" alerts.
+ *
+ * No-op (stored: 0) when the listing is missing or not live.
+ */
+export async function computeAndStoreMatchesForListing(
+  listingId: string,
+  nowMs: number = Date.now(),
+): Promise<ListingMatchResult> {
+  const client = db();
+
+  const { data: listing } = await client
+    .from("listings")
+    .select("*")
+    .eq("id", listingId)
+    .maybeSingle();
+  const listingRow = listing as Row | null;
+  const listingTitle = listingRow && typeof listingRow.title === "string" ? listingRow.title : "";
+  if (!listingRow || listingRow.status !== "live") {
+    return { stored: 0, listingTitle, strong: [] };
+  }
+
+  const { data: seekers } = await client
+    .from("seeker_profiles")
+    .select("*")
+    .is("deleted_at", null)
+    .limit(SEEKER_CANDIDATE_CAP);
+
+  const listingInput = toListingInput(listingRow);
+  const computedAt = new Date(nowMs).toISOString();
+
+  const rows: Record<string, unknown>[] = [];
+  const strong: StrongMatchRecipient[] = [];
+
+  for (const seeker of (seekers ?? []) as Row[]) {
+    const result = computeMatch(toSeekerInput(seeker), listingInput, { nowMs });
+    if (result.excluded !== null) continue;
+    const seekerProfileId = String(seeker.id);
+    rows.push({
+      seeker_profile_id: seekerProfileId,
+      listing_id: listingId,
+      score: result.score,
+      raw_score: result.rawScore,
+      band: result.band,
+      confidence: result.confidence,
+      components: result.components,
+      caps_applied: result.capsApplied,
+      computed_at: computedAt,
+    });
+    if (result.score >= STRONG_MATCH_MIN_SCORE) {
+      strong.push({
+        seekerProfileId,
+        recipientClerkUserId:
+          typeof seeker.clerk_user_id === "string" ? seeker.clerk_user_id : null,
+        score: result.score,
+      });
+    }
+  }
+
+  if (rows.length > 0) {
+    const { error } = await client
+      .from("match_scores")
+      .upsert(rows, { onConflict: "seeker_profile_id,listing_id" });
+    if (error) throw new Error(`matching: persist listing — ${error.message}`);
+  }
+
+  strong.sort((a, b) => b.score - a.score);
+  return { stored: rows.length, listingTitle, strong: strong.slice(0, STRONG_NOTIFY_CAP) };
+}
+
 /** A persisted match row, shaped for surfacing. */
 export interface StoredMatch {
   readonly listingId: string;
