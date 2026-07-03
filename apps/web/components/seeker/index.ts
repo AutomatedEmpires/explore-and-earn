@@ -1,5 +1,3 @@
-export { StatusStrip } from "./StatusStrip";
-export type { StatusStripProps } from "./StatusStrip";
 export { PrimaryActionCard } from "./PrimaryActionCard";
 export type { PrimaryActionCardProps } from "./PrimaryActionCard";
 export { LifecycleList } from "./LifecycleList";
