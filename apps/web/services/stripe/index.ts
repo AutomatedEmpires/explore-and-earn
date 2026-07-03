@@ -7,11 +7,11 @@ import {
   insertHostAnnouncement,
 } from "@explore-and-earn/db";
 import {
-  ANNOUNCEMENT_PRICING,
+  ANNOUNCEMENT_PRICE_CENTS,
+  ANNOUNCEMENT_RUN_DAYS,
   BOOST_DURATIONS,
   BOOST_PRICING,
   FOUNDER_LOCKED_PRICING,
-  type AnnouncementDuration,
   type BoostDuration,
 } from "@explore-and-earn/contracts";
 
@@ -226,20 +226,14 @@ async function syncAnnouncementPurchase(
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
   const clerkUserId = session.metadata?.clerkUserId ?? null;
   const hostProfileId = session.metadata?.hostProfileId ?? null;
-  const durationRaw = session.metadata?.durationDays;
-  const durationDays = durationRaw ? parseInt(durationRaw, 10) : null;
 
-  if (!clerkUserId || !hostProfileId || !durationDays) {
+  if (!clerkUserId || !hostProfileId) {
     return { action: "ignored_missing_announcement_metadata", clerkUserId, tier: null };
   }
 
-  const validDurations: AnnouncementDuration[] = [7, 14, 28];
-  if (!validDurations.includes(durationDays as AnnouncementDuration)) {
-    return { action: "ignored_invalid_announcement_duration", clerkUserId, tier: null };
-  }
-
+  // Flat 7-day run — no duration options (founder directive 2026-06-21).
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + durationDays);
+  expiresAt.setDate(expiresAt.getDate() + ANNOUNCEMENT_RUN_DAYS);
 
   const paymentIntentId =
     typeof session.payment_intent === "string" ? session.payment_intent : null;
@@ -255,8 +249,8 @@ async function syncAnnouncementPurchase(
     // Idempotency key: a retried checkout.session.completed must not create a
     // second paid draft (migration 049 + insertHostAnnouncement dedupe).
     stripeCheckoutSessionId:  session.id,
-    purchaseDurationDays:     durationDays,
-    purchaseAmountCents:      ANNOUNCEMENT_PRICING[durationDays as AnnouncementDuration],
+    purchaseDurationDays:     ANNOUNCEMENT_RUN_DAYS,
+    purchaseAmountCents:      ANNOUNCEMENT_PRICE_CENTS,
   });
 
   return { action: "created_announcement_draft", clerkUserId, tier: null };
@@ -508,25 +502,20 @@ export async function createCheckoutSession(params: {
   });
 }
 
-const ANNOUNCEMENT_PRICE_ENV: Record<AnnouncementDuration, string> = {
-  7:  "STRIPE_PRICE_ANNOUNCEMENT_7D",
-  14: "STRIPE_PRICE_ANNOUNCEMENT_14D",
-  28: "STRIPE_PRICE_ANNOUNCEMENT_28D",
-};
-
 function absoluteAppUrl(path: string): string {
   const base =
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") || "https://exploreandearn.com";
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+// Flat, single 7-day placement — no duration options (founder directive
+// 2026-06-21), so there is exactly one Stripe Price env var to resolve.
 export async function createAnnouncementCheckoutSession(params: {
   clerkUserId: string;
   hostProfileId: string;
-  durationDays: AnnouncementDuration;
 }): Promise<Stripe.Checkout.Session> {
   const stripe = getStripeClient();
-  const priceId = requireEnv(ANNOUNCEMENT_PRICE_ENV[params.durationDays]);
+  const priceId = requireEnv("STRIPE_PRICE_ANNOUNCEMENT");
 
   return stripe.checkout.sessions.create({
     mode: "payment",
@@ -537,7 +526,6 @@ export async function createAnnouncementCheckoutSession(params: {
       productType:   "announcement",
       hostProfileId: params.hostProfileId,
       clerkUserId:   params.clerkUserId,
-      durationDays:  String(params.durationDays),
     },
     line_items: [{ price: priceId, quantity: 1 }],
   });

@@ -13,7 +13,7 @@ import {
   activateDraftAnnouncementAction,
   createAnnouncementCheckoutAction,
   postHostAnnouncementAction,
-  ANNOUNCEMENT_PRICING,
+  ANNOUNCEMENT_PRICE_CENTS,
 } from "../../app/actions/community";
 import styles from "./HostAnnouncementComposer.module.css";
 
@@ -24,18 +24,11 @@ interface Props {
 }
 
 type AnnouncementKind = "general" | "hiring" | "event";
-type Duration = 7 | 14 | 28;
 
 const KIND_LABELS: Record<AnnouncementKind, string> = {
   general: "General",
   hiring:  "Now Hiring",
   event:   "Event",
-};
-
-const DURATION_META: Record<Duration, { label: string; tagline: string }> = {
-  7:  { label: "7-Day Boost",       tagline: "Reach seekers for a full week" },
-  14: { label: "14-Day Spotlight",  tagline: "Double coverage over two weeks" },
-  28: { label: "28-Day Feature",    tagline: "Max visibility for a full month" },
 };
 
 export function HostAnnouncementComposer({
@@ -95,10 +88,10 @@ export function HostAnnouncementComposer({
     });
   }
 
-  function handlePurchase(duration: Duration) {
+  function handlePurchase() {
     setError(null);
     startTransition(async () => {
-      const result: AnnouncementCheckoutResult = await createAnnouncementCheckoutAction(duration);
+      const result: AnnouncementCheckoutResult = await createAnnouncementCheckoutAction();
       if (result.ok) {
         window.location.href = result.sessionUrl;
       } else {
@@ -185,21 +178,18 @@ export function HostAnnouncementComposer({
           : "You've used your free posts for this month — purchase a timed slot"}
       </p>
       <div className={styles.pricingCards}>
-        {([7, 14, 28] as Duration[]).map((d) => (
-          <button
-            key={d}
-            type="button"
-            className={styles.pricingCard}
-            onClick={() => handlePurchase(d)}
-            disabled={isPending}
-          >
-            <span className={styles.pricingDuration}>{DURATION_META[d].label}</span>
-            <span className={styles.pricingPrice}>
-              ${(ANNOUNCEMENT_PRICING[d] / 100).toFixed(0)}
-            </span>
-            <span className={styles.pricingTagline}>{DURATION_META[d].tagline}</span>
-          </button>
-        ))}
+        <button
+          type="button"
+          className={styles.pricingCard}
+          onClick={handlePurchase}
+          disabled={isPending}
+        >
+          <span className={styles.pricingDuration}>7-Day Placement</span>
+          <span className={styles.pricingPrice}>
+            ${(ANNOUNCEMENT_PRICE_CENTS / 100).toFixed(0)}
+          </span>
+          <span className={styles.pricingTagline}>Reach seekers for a full week</span>
+        </button>
       </div>
       {error && <p className={styles.error}>{error}</p>}
     </div>

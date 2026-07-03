@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  ANNOUNCEMENT_PRICING,
+  ANNOUNCEMENT_PRICE_CENTS,
   BOOST_PRICING,
   FOUNDER_LOCKED_PRICING,
 } from "@explore-and-earn/contracts";
@@ -42,9 +42,7 @@ describe("stripe-seed catalog", () => {
     expect(amountFor("ee_professional_yearly")).toBe(FOUNDER_LOCKED_PRICING.professional.yearly);
     expect(amountFor("ee_enterprise_monthly")).toBe(FOUNDER_LOCKED_PRICING.enterprise.monthly);
     expect(amountFor("ee_enterprise_yearly")).toBe(FOUNDER_LOCKED_PRICING.enterprise.yearly);
-    expect(amountFor("ee_announcement_7d")).toBe(ANNOUNCEMENT_PRICING[7]);
-    expect(amountFor("ee_announcement_14d")).toBe(ANNOUNCEMENT_PRICING[14]);
-    expect(amountFor("ee_announcement_28d")).toBe(ANNOUNCEMENT_PRICING[28]);
+    expect(amountFor("ee_announcement")).toBe(ANNOUNCEMENT_PRICE_CENTS);
     expect(amountFor("ee_boost_7d")).toBe(BOOST_PRICING[7]);
     expect(amountFor("ee_boost_14d")).toBe(BOOST_PRICING[14]);
     expect(amountFor("ee_boost_28d")).toBe(BOOST_PRICING[28]);
@@ -57,14 +55,12 @@ describe("stripe-seed catalog", () => {
     expect(new Set(lookupKeys).size).toBe(lookupKeys.length);
   });
 
-  it("covers exactly the 9 required STRIPE_PRICE_* env vars the app requireEnv's", () => {
+  it("covers exactly the 7 required STRIPE_PRICE_* env vars the app requireEnv's", () => {
     const required = CATALOG.flatMap((p) =>
       p.prices.filter((x) => !x.optional).map((x) => x.envVar),
     ).sort();
     expect(required).toEqual([
-      "STRIPE_PRICE_ANNOUNCEMENT_14D",
-      "STRIPE_PRICE_ANNOUNCEMENT_28D",
-      "STRIPE_PRICE_ANNOUNCEMENT_7D",
+      "STRIPE_PRICE_ANNOUNCEMENT",
       "STRIPE_PRICE_ENTERPRISE_MONTHLY",
       "STRIPE_PRICE_ENTERPRISE_YEARLY",
       "STRIPE_PRICE_PROFESSIONAL_MONTHLY",

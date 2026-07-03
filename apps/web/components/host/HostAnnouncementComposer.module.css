@@ -133,15 +133,8 @@
 }
 
 .pricingCards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: var(--space-12);
-}
-
-@media (max-width: 480px) {
-  .pricingCards {
-    grid-template-columns: 1fr;
-  }
 }
 
 .pricingCard {
@@ -149,6 +142,8 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-6);
+  width: 100%;
+  max-width: 260px;
   padding: var(--space-16) var(--space-16);
   background: var(--color-surface);
   border: 1.5px solid var(--color-border);

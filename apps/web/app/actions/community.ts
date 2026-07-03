@@ -6,8 +6,7 @@ import { revalidatePath } from "next/cache";
 import {
   ANNOUNCEMENT_FREE_DURATION_DAYS,
   ANNOUNCEMENT_MONTHLY_QUOTA,
-  ANNOUNCEMENT_PRICING,
-  type AnnouncementDuration,
+  ANNOUNCEMENT_PRICE_CENTS,
   type AnnouncementKind,
 } from "@explore-and-earn/contracts";
 import {
@@ -212,15 +211,7 @@ export type AnnouncementCheckoutResult =
   | { ok: true; sessionUrl: string }
   | { ok: false; reason: "unauthenticated" | "not_host" | "checkout_failed" | "no_stripe_config" };
 
-const ANNOUNCEMENT_DURATION_SET = new Set<number>([7, 14, 28]);
-
-export async function createAnnouncementCheckoutAction(
-  durationDays: AnnouncementDuration,
-): Promise<AnnouncementCheckoutResult> {
-  if (!ANNOUNCEMENT_DURATION_SET.has(durationDays)) {
-    return { ok: false, reason: "checkout_failed" };
-  }
-
+export async function createAnnouncementCheckoutAction(): Promise<AnnouncementCheckoutResult> {
   if (!hasAnnouncementPriceConfig()) {
     return { ok: false, reason: "no_stripe_config" };
   }
@@ -235,7 +226,6 @@ export async function createAnnouncementCheckoutAction(
     const checkout = await createAnnouncementCheckoutSession({
       clerkUserId: session.userId,
       hostProfileId: host.hostProfileId,
-      durationDays,
     });
     const url = checkout.url;
     if (!url) return { ok: false, reason: "checkout_failed" };
@@ -247,9 +237,7 @@ export async function createAnnouncementCheckoutAction(
 
 function hasAnnouncementPriceConfig(): boolean {
   return (
-    Boolean(process.env.STRIPE_PRICE_ANNOUNCEMENT_7D) &&
-    Boolean(process.env.STRIPE_PRICE_ANNOUNCEMENT_14D) &&
-    Boolean(process.env.STRIPE_PRICE_ANNOUNCEMENT_28D) &&
+    Boolean(process.env.STRIPE_PRICE_ANNOUNCEMENT) &&
     Boolean(process.env.STRIPE_SECRET_KEY)
   );
 }
@@ -354,5 +342,5 @@ export async function removeCommentAction(commentId: string): Promise<RemoveComm
 }
 
 // Re-export types for use in components
-export type { AnnouncementDuration, AnnouncementKind };
-export { ANNOUNCEMENT_PRICING };
+export type { AnnouncementKind };
+export { ANNOUNCEMENT_PRICE_CENTS };
