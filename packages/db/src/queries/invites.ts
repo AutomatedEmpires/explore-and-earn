@@ -7,6 +7,7 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 
@@ -131,7 +132,7 @@ function rowToInviteListing(
       ? host.company_name
       : "Unknown Host";
   const verified =
-    host != null && host.attestation_status === "attested";
+    host != null && hasVerifiedHostSubscription(host.subscription_tier);
 
   const housingProvision: BenefitProvision =
     row.housing_included === true ? "provided" : "not_provided";
@@ -170,7 +171,7 @@ function rowToInviteListing(
 const INVITE_SELECT =
   "id, listing_id, host_profile_id, status, message, created_at, expires_at, " +
   "listings!listing_id(id, title, category, location_display, status, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, compensation_currency, timeline_summary), " +
-  "host_profiles!host_profile_id(company_name, attestation_status)";
+  "host_profiles!host_profile_id(company_name, subscription_tier)";
 
 export async function getSeekerInvites(
   clerkToken: string,

@@ -36,12 +36,19 @@ export interface OpportunityTriad {
 }
 
 /**
- * The Verified-Host badge ALWAYS carries this exact qualifier. There is no
- * implied platform verification — host trust is a permanent founder trust/legal
- * gate (guardrail G22). Do not change this string without founder approval.
+ * The Verified-Host badge is granted automatically to any host with an active
+ * paid subscription (any tier) — never self-declared, never an admin-toggle.
+ * Founder decision (2026-07-03, supersedes guardrail G22's self-declared
+ * qualifier): the badge does not certify identity, property, or claims — that
+ * disclosure lives on /about, not on the card itself.
  */
-export const VERIFIED_HOST_QUALIFIER = "Self-Declared by Host" as const
-export type VerifiedHostQualifier = typeof VERIFIED_HOST_QUALIFIER
+export function hasVerifiedHostSubscription(subscriptionTier: unknown): boolean {
+	return (
+		subscriptionTier === "starter" ||
+		subscriptionTier === "professional" ||
+		subscriptionTier === "enterprise"
+	)
+}
 
 /**
  * Surfaces rendered by the SINGLE Discovery Card component. One component serves

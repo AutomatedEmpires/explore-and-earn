@@ -147,6 +147,30 @@ export default function AboutPage() {
 				</p>
 			</section>
 
+			{/* Trust & safety */}
+			<section id="trust-safety" className={styles.section}>
+				<div className={styles.sectionHead}>
+					<span className={styles.sectionIcon}>
+						<Icon name="trust.verified_host" size={16} aria-hidden />
+					</span>
+					<h2 className={styles.sectionTitle}>Verified Host badge &amp; your safety</h2>
+				</div>
+				<p className={styles.body}>
+					A host earns the Verified Host badge automatically once they&rsquo;re on an active paid plan — it isn&rsquo;t self-declared, and it isn&rsquo;t something an admin manually grants. It shows a host has invested in the platform.
+				</p>
+				<div className={`${styles.callout} ${styles.calloutGold}`}>
+					<span className={styles.calloutIcon}>
+						<Icon name="system.warning" size={16} aria-hidden />
+					</span>
+					<div className={styles.calloutBody}>
+						<p className={styles.calloutTitle}>The badge is not an identity or background check.</p>
+						<p className={styles.calloutText}>
+							It does not mean we&rsquo;ve independently verified a host&rsquo;s identity, property, or the claims on their listing. Always research a host, ask questions, and confirm the details in writing before you travel to work with them.
+						</p>
+					</div>
+				</div>
+			</section>
+
 			{/* Why */}
 			<section id="why" className={styles.section}>
 				<div className={styles.sectionHead}>

@@ -9,7 +9,7 @@ import type {
   OpportunityCategory,
   OpportunityListing,
 } from "@explore-and-earn/contracts";
-import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
+import { MARKETPLACE_CATEGORIES, hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 import { getSeekerApplicationIds } from "./applications";
 
@@ -41,7 +41,7 @@ export interface ListingRow {
   gallery_photo_urls: string[] | null;
   host_profiles: {
     company_name: string;
-    attestation_status: string;
+    subscription_tier: string | null;
   } | null;
 }
 
@@ -71,7 +71,7 @@ type RawListingRow = {
   published_at: string | null;
   cover_photo_url: string | null;
   gallery_photo_urls: string[] | null;
-  host_profiles: { company_name: string; attestation_status: string } | null;
+  host_profiles: { company_name: string; subscription_tier: string | null } | null;
 };
 
 function formatOpportunityWindow(
@@ -123,7 +123,7 @@ function toListingRow(raw: RawListingRow): ListingRow {
 /** Maps a ListingRow to the DiscoveryListing view-model fields. */
 export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
   const hostName = row.host_profiles?.company_name ?? "Unknown Host";
-  const verified = row.host_profiles?.attestation_status === "attested";
+  const verified = hasVerifiedHostSubscription(row.host_profiles?.subscription_tier);
 
   const housingProvision: BenefitProvision = row.housing_included ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision = row.meals_included ? "provided" : "not_provided";
@@ -175,7 +175,7 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
 }
 
 const LISTING_COLUMNS =
-  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profiles(company_name,attestation_status)";
+  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profiles(company_name,subscription_tier)";
 
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;
@@ -623,7 +623,8 @@ export interface PublicListingDetailHost {
   photoUrl: string | null;
   about: string | null;
   primaryLocationName: string | null;
-  attestationStatus: string;
+  /** Active-paid-subscription gate — see hasVerifiedHostSubscription(). */
+  verified: boolean;
 }
 
 /**
@@ -663,7 +664,7 @@ const LISTING_DETAIL_COLUMNS =
   "housing_included,meals_included,compensation_summary,compensation_min_cents," +
   "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
   "begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profile_id," +
-  "host_profiles(id,company_name,photo_url,about,primary_location_name,attestation_status)";
+  "host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier)";
 
 function firstEmbed(value: unknown): Record<string, unknown> | null {
   const candidate = Array.isArray(value) ? value[0] : value;
@@ -704,10 +705,7 @@ export async function getListingDetailPublic(
           typeof hostRow.primary_location_name === "string"
             ? hostRow.primary_location_name
             : null,
-        attestationStatus:
-          typeof hostRow.attestation_status === "string"
-            ? hostRow.attestation_status
-            : "not_attested",
+        verified: hasVerifiedHostSubscription(hostRow.subscription_tier),
       }
     : null;
 

@@ -427,7 +427,7 @@ export default async function PublicHostProfilePage({ params }: Props) {
       {/* ── Trust band — triad-kept proof (renders only with reviews) ── */}
       <HostTrustBand
         summary={ratingSummary}
-        verified={host.attestationStatus === "attested"}
+        verified={host.verified}
         reviewsHref="#reviews-heading"
       />
 

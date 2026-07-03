@@ -199,7 +199,7 @@ export interface HelpItem {
 export const HELP_ITEMS: readonly HelpItem[] = [
 	{ id: "articles", icon: "system.info", title: "Help articles", detail: "Guides on profiles, applying, and offers.", href: "/faq" },
 	{ id: "application", icon: "action.apply", title: "Application help", detail: "Resume gates, applying, and tracking status.", href: "/faq" },
-	{ id: "safety", icon: "trust.verified_host", title: "Safety and trust", detail: "How verification and Self-Declared by Host works.", href: "/about" },
+	{ id: "safety", icon: "trust.verified_host", title: "Safety and trust", detail: "What the Verified Host badge means, and how to stay safe.", href: "/about" },
 	{ id: "report", icon: "system.warning", title: "Report an issue", detail: "Report a listing, host, message, or photo.", href: "mailto:jackson@automatedempires.com?subject=Report%20an%20issue" },
 	{ id: "account", icon: "system.lock", title: "Account help", detail: "Sign-in, security, and account controls.", href: "/settings" },
 	{ id: "contact", icon: "action.message", title: "Contact support", detail: "Reach the Explore&Earn team.", href: "mailto:jackson@automatedempires.com?subject=Support" },
@@ -333,12 +333,12 @@ export const HELP_FAQS: readonly HelpFaq[] = [
 		],
 	},
 	{
-		id: "self-declared",
+		id: "verified-host",
 		topic: "safety",
-		question: "What does 'Self-Declared by Host' mean?",
+		question: "What does the Verified Host badge mean?",
 		answer: [
-			"Some details on a listing are stated by the host and not yet independently checked by us — we label these Self-Declared by Host so you always know the source.",
-			"A Verified Host badge means we've confirmed the host's identity. Treat self-declared details as a starting point: ask questions, and trust your judgement.",
+			"A Verified Host badge means the host is on an active paid plan with Explore&Earn — it shows they've invested in the platform, not that we've independently confirmed their identity, property, or claims.",
+			"Listing details like housing and meals descriptions are stated by the host. Always research a host and message them with questions before you travel — treat every listing as a starting point, and trust your judgement.",
 		],
 		href: "/about",
 		hrefLabel: "How verification works",

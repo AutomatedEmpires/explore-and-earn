@@ -7,6 +7,7 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 
@@ -589,7 +590,7 @@ export type SeekerSettableStatus = (typeof SEEKER_SETTABLE_STATUSES)[number];
 
 /**
  * Richer listing view-model for /applied + offer detail, including the host
- * identity (company name + self-declared verification).
+ * identity (company name + subscription-gated verification).
  */
 export interface SeekerApplicationListing extends ApplicationListing {
   readonly coverImageUrl: string | null;
@@ -608,11 +609,7 @@ const SEEKER_APPLICATION_SELECT =
   "housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
   "compensation_currency, timeline_summary, cover_photo_url, begins_at, ends_at, " +
-  "host_profiles(company_name, attestation_status))";
-
-function isVerifiedAttestation(value: unknown): boolean {
-  return value === "attested";
-}
+  "host_profiles(company_name, subscription_tier))";
 
 function rowToSeekerApplicationListing(
   value: unknown,
@@ -627,7 +624,7 @@ function rowToSeekerApplicationListing(
     hostRaw.company_name.length > 0
       ? hostRaw.company_name
       : "Unknown Host";
-  const verified = hostRaw ? isVerifiedAttestation(hostRaw.attestation_status) : false;
+  const verified = hostRaw ? hasVerifiedHostSubscription(hostRaw.subscription_tier) : false;
 
   const housingProvision: BenefitProvision =
     row.housing_included === true ? "provided" : "not_provided";

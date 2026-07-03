@@ -7,6 +7,7 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 import type { SeekerApplicationListing } from "./applications";
@@ -82,10 +83,6 @@ function embeddedCompensationSummary(row: Record<string, unknown>): string {
   return "Negotiable";
 }
 
-function isVerifiedAttestation(value: unknown): boolean {
-  return value === "attested";
-}
-
 function rowToSeekerApplicationListing(
   value: unknown,
 ): SeekerApplicationListing | null {
@@ -100,7 +97,7 @@ function rowToSeekerApplicationListing(
       ? hostRaw.company_name
       : "Unknown Host";
   const verified = hostRaw
-    ? isVerifiedAttestation(hostRaw.attestation_status)
+    ? hasVerifiedHostSubscription(hostRaw.subscription_tier)
     : false;
 
   const housingProvision: BenefitProvision =
@@ -167,7 +164,7 @@ const RICH_SEEKER_APPLICATION_SELECT =
   "status, housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
   "compensation_currency, timeline_summary, cover_photo_url, " +
-  "host_profiles(company_name, attestation_status))";
+  "host_profiles(company_name, subscription_tier))";
 
 /**
  * All applications for the authed seeker, newest first, joined to listing +

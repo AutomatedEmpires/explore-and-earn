@@ -18,7 +18,6 @@ import { join } from "node:path"
 
 const CARD = "packages/contracts/src/card.ts"
 const CANON_DOC = "docs/product/discovery-card-v1.md"
-const VERIFIED_HOST_QUALIFIER = "Self-Declared by Host"
 
 const errors = []
 const notices = []
@@ -32,10 +31,11 @@ if (!existsSync(CANON_DOC)) {
 if (existsSync(CARD)) {
 	const card = readFileSync(CARD, "utf8")
 
-	// 2a) Verified-Host qualifier must be the exact canon string (G22).
-	if (!card.includes(`VERIFIED_HOST_QUALIFIER = "${VERIFIED_HOST_QUALIFIER}"`)) {
+	// 2a) Verified-Host badge must stay subscription-gated (founder decision
+	// 2026-07-03, supersedes the prior self-declared qualifier G22).
+	if (!card.includes("export function hasVerifiedHostSubscription(")) {
 		errors.push(
-			`G22: ${CARD} must define VERIFIED_HOST_QUALIFIER = "${VERIFIED_HOST_QUALIFIER}" exactly.`,
+			`G22: ${CARD} must define hasVerifiedHostSubscription() — the Verified Host badge is subscription-gated, not self-declared.`,
 		)
 	}
 

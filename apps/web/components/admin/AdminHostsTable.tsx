@@ -2,7 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Icon, MetricCard, MetricGrid, VerifiedHostBadge } from "@explore-and-earn/ui";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import { Badge, Button, Icon, MetricCard, MetricGrid, VerifiedHostBadge } from "@explore-and-earn/ui";
 
 import { unverifyHostAction, verifyHostAction } from "../../app/actions/admin";
 import styles from "./AdminHostsTable.module.css";
@@ -11,12 +12,14 @@ export interface AdminHostRowView {
   readonly id: string;
   readonly companyName: string;
   readonly clerkUserId: string;
+  /** Internal moderator trust flag — independent of the paid-subscription Verified Host badge. */
   readonly attestationStatus: string;
+  readonly subscriptionTier: string | null;
   readonly listingCount: number;
 }
 
-/** A host counts as verified once attestation is attested/verified. */
-function isVerified(status: string): boolean {
+/** A host counts as trust-attested once a moderator has manually reviewed and flagged them. */
+function isTrustAttested(status: string): boolean {
   return status === "attested" || status === "verified";
 }
 
@@ -45,18 +48,18 @@ function hostRef(clerkId: string): string {
 }
 
 /**
- * Honest trust gradient from REAL fields only — verification status + listing
- * footprint. No fabricated score: we tone the card and label the host by the
- * two facts the query actually exposes.
- *  - trusted   → attestation verified (highest trust)
- *  - active    → not yet verified but carrying live listings (real footprint,
+ * Honest trust gradient from REAL fields only — moderator trust-attestation +
+ * listing footprint. No fabricated score: we tone the card and label the host
+ * by the two facts the query actually exposes.
+ *  - trusted   → trust-attested by a moderator (highest trust)
+ *  - active    → not yet attested but carrying live listings (real footprint,
  *                review-worthy)
- *  - newcomer  → not yet verified and no listings (fresh, lowest signal)
+ *  - newcomer  → not yet attested and no listings (fresh, lowest signal)
  */
 type TrustTier = "trusted" | "active" | "newcomer";
 
 function trustTier(host: AdminHostRowView): TrustTier {
-  if (isVerified(host.attestationStatus)) {
+  if (isTrustAttested(host.attestationStatus)) {
     return "trusted";
   }
   return host.listingCount > 0 ? "active" : "newcomer";
@@ -64,10 +67,11 @@ function trustTier(host: AdminHostRowView): TrustTier {
 
 /**
  * Honest risk signal from REAL fields only. The only risk the host query
- * exposes is "unvetted host with public footprint": an UNVERIFIED host that
- * already carries listings is publishing to the marketplace without trust
- * review — that is the single, real, review-worthy flag. A new host with no
- * listings is low-signal, not risky; a verified host is cleared.
+ * exposes is "unvetted host with public footprint": a host with no moderator
+ * trust attestation that already carries listings is publishing to the
+ * marketplace without trust review — that is the single, real, review-worthy
+ * flag. A new host with no listings is low-signal, not risky; a trust-attested
+ * host is cleared.
  */
 type RiskLevel = "flagged" | "watch" | "clear";
 
@@ -79,27 +83,27 @@ interface HostRisk {
 }
 
 function hostRisk(host: AdminHostRowView): HostRisk {
-  if (isVerified(host.attestationStatus)) {
+  if (isTrustAttested(host.attestationStatus)) {
     return { level: "clear", label: "Trust cleared", weight: 0 };
   }
   if (host.listingCount >= 3) {
     return {
       level: "flagged",
-      label: "Unverified · live footprint",
+      label: "Unreviewed · live footprint",
       weight: 30 + host.listingCount,
     };
   }
   if (host.listingCount > 0) {
     return {
       level: "flagged",
-      label: "Unverified · publishing",
+      label: "Unreviewed · publishing",
       weight: 20 + host.listingCount,
     };
   }
   return { level: "watch", label: "New · unvetted", weight: 5 };
 }
 
-type SegmentKey = "all" | "flagged" | "verified" | "awaiting";
+type SegmentKey = "all" | "flagged" | "attested" | "awaiting";
 
 export function AdminHostsTable({
   hosts,
@@ -131,11 +135,15 @@ export function AdminHostsTable({
   }
 
   const total = hosts.length;
-  const verifiedCount = useMemo(
-    () => hosts.filter((host) => isVerified(host.attestationStatus)).length,
+  const attestedCount = useMemo(
+    () => hosts.filter((host) => isTrustAttested(host.attestationStatus)).length,
     [hosts],
   );
-  const pendingCount = total - verifiedCount;
+  const subscriptionVerifiedCount = useMemo(
+    () => hosts.filter((host) => hasVerifiedHostSubscription(host.subscriptionTier)).length,
+    [hosts],
+  );
+  const pendingCount = total - attestedCount;
   const flaggedCount = useMemo(
     () => hosts.filter((host) => hostRisk(host).level === "flagged").length,
     [hosts],
@@ -148,7 +156,7 @@ export function AdminHostsTable({
   }> = [
     { key: "all", label: "All", count: total },
     { key: "flagged", label: "Flagged", count: flaggedCount },
-    { key: "verified", label: "Verified", count: verifiedCount },
+    { key: "attested", label: "Trust attested", count: attestedCount },
     { key: "awaiting", label: "Awaiting", count: pendingCount },
   ];
 
@@ -156,10 +164,10 @@ export function AdminHostsTable({
     let rows: ReadonlyArray<AdminHostRowView>;
     if (segment === "flagged") {
       rows = hosts.filter((host) => hostRisk(host).level === "flagged");
-    } else if (segment === "verified") {
-      rows = hosts.filter((host) => isVerified(host.attestationStatus));
+    } else if (segment === "attested") {
+      rows = hosts.filter((host) => isTrustAttested(host.attestationStatus));
     } else if (segment === "awaiting") {
-      rows = hosts.filter((host) => !isVerified(host.attestationStatus));
+      rows = hosts.filter((host) => !isTrustAttested(host.attestationStatus));
     } else {
       rows = hosts;
     }
@@ -172,9 +180,9 @@ export function AdminHostsTable({
     <div className={styles.wrap}>
       <MetricGrid className={styles.metrics}>
         <MetricCard
-          label="Verified hosts"
-          value={verifiedCount}
-          trend={total > 0 ? `${Math.round((verifiedCount / total) * 100)}%` : "—"}
+          label="Verified Host badge"
+          value={subscriptionVerifiedCount}
+          trend={total > 0 ? `${Math.round((subscriptionVerifiedCount / total) * 100)}%` : "—"}
           trendTone="up"
         />
         <MetricCard
@@ -184,9 +192,9 @@ export function AdminHostsTable({
           trendTone={flaggedCount > 0 ? "down" : "up"}
         />
         <MetricCard
-          label="Awaiting review"
-          value={pendingCount}
-          trend={pendingCount > 0 ? "Verify" : "Clear"}
+          label="Trust attested"
+          value={attestedCount}
+          trend={pendingCount > 0 ? `${pendingCount} awaiting` : "Clear"}
           trendTone={pendingCount > 0 ? "down" : "up"}
         />
       </MetricGrid>
@@ -195,7 +203,7 @@ export function AdminHostsTable({
         <div
           className={styles.toolbar}
           role="group"
-          aria-label="Filter hosts by verification status"
+          aria-label="Filter hosts by trust-review status"
         >
           <span className={styles.toolbarIcon} aria-hidden="true">
             <Icon name="action.filter" size={16} />
@@ -231,8 +239,9 @@ export function AdminHostsTable({
           </span>
           <h3 className={styles.emptyTitle}>No host profiles yet</h3>
           <p className={styles.emptySub}>
-            When hosts create profiles they will land here for verification and
-            trust review.
+            When hosts create profiles they will land here for trust review. The
+            Verified Host badge itself is automatic once a host subscribes — it
+            is not set here.
           </p>
         </div>
       ) : visibleHosts.length === 0 ? (
@@ -243,23 +252,24 @@ export function AdminHostsTable({
           <h3 className={styles.emptyTitle}>
             {segment === "flagged"
               ? "No hosts flagged for review"
-              : segment === "verified"
-                ? "No verified hosts yet"
+              : segment === "attested"
+                ? "No trust-attested hosts yet"
                 : "Nothing awaiting review"}
           </h3>
           <p className={styles.emptySub}>
             {segment === "flagged"
-              ? "No unverified host is publishing listings — every public host is trust-cleared."
-              : segment === "verified"
-                ? "Verify a host below and they will appear in this segment."
-                : "Every host has been reviewed — the verification queue is clear."}
+              ? "No unreviewed host is publishing listings — every public host is trust-cleared."
+              : segment === "attested"
+                ? "Attest a host below and they will appear in this segment."
+                : "Every host has been reviewed — the trust-review queue is clear."}
           </p>
         </div>
       ) : (
         <div className={styles.grid} role="list">
           {visibleHosts.map((host) => {
             const busy = isPending && pendingId === host.id;
-            const verified = isVerified(host.attestationStatus);
+            const attested = isTrustAttested(host.attestationStatus);
+            const subscriptionVerified = hasVerifiedHostSubscription(host.subscriptionTier);
             const tier = trustTier(host);
             const risk = hostRisk(host);
             const company = host.companyName || "Unnamed host";
@@ -299,8 +309,9 @@ export function AdminHostsTable({
                 </div>
 
                 <div className={styles.verifyLine}>
-                  {verified ? (
-                    <VerifiedHostBadge />
+                  {subscriptionVerified ? <VerifiedHostBadge /> : null}
+                  {attested ? (
+                    <Badge label="Trust attested" icon="trust.verified_host" variant="success" />
                   ) : (
                     <span className={styles.pending}>
                       <Icon
@@ -350,24 +361,24 @@ export function AdminHostsTable({
                   <Button
                     variant="primary"
                     icon="trust.verified_host"
-                    disabled={busy || verified}
-                    aria-label={`Verify ${company}`}
+                    disabled={busy || attested}
+                    aria-label={`Mark ${company} as trust attested`}
                     onClick={() =>
                       runAction(host.id, () => verifyHostAction(host.id))
                     }
                   >
-                    Verify
+                    Attest
                   </Button>
                   <Button
                     variant="ghost"
                     icon="action.close"
-                    disabled={busy || !verified}
-                    aria-label={`Remove verification from ${company}`}
+                    disabled={busy || !attested}
+                    aria-label={`Remove trust attestation from ${company}`}
                     onClick={() =>
                       runAction(host.id, () => unverifyHostAction(host.id))
                     }
                   >
-                    Unverify
+                    Un-attest
                   </Button>
                 </div>
               </article>

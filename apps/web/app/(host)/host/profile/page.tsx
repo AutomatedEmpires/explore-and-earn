@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import {
   getHostApplications,
@@ -63,13 +64,16 @@ export default async function HostProfilePage() {
   // real source yet (messaging not built), so unreadMessages stays 0.
   const stats = deriveHostStats(listings, applicants, []);
 
-  // company name + verification come from the host_profiles embed on the host's
-  // own listings (rowToDiscoveryFields); about + location come straight from the
-  // host_profiles row. Contact name + tagline have no backing column yet, so
-  // the page uses neutral placeholders instead of sample fixture content.
+  // company name comes from the host_profiles embed on the host's own listings
+  // (rowToDiscoveryFields); about + location come straight from the host_profiles
+  // row. Contact name + tagline have no backing column yet, so the page uses
+  // neutral placeholders instead of sample fixture content. Verification is
+  // read straight from the host's own subscription tier — not derived from a
+  // listing embed, so it's correct even before the host has published anything.
   const realHost = listings
     .map((item) => item.listing.host)
     .find((host) => host.name && host.name !== "Unknown Host");
+  const verified = hasVerifiedHostSubscription(hostProfile?.subscriptionTier);
 
   const profile: HostProfileSummary = hostProfile
     ? {
@@ -77,12 +81,12 @@ export default async function HostProfilePage() {
         orgName: realHost?.name ?? hostProfile.companyName ?? "Your organization",
         location: hostProfile.primaryLocationName ?? undefined,
         bio: hostProfile.about ?? undefined,
-        verified: realHost?.verified ?? false,
+        verified,
       }
     : {
         hostName: realHost?.name ?? "Host",
         orgName: realHost?.name ?? "Your organization",
-        verified: realHost?.verified ?? false,
+        verified,
       };
 
   return (

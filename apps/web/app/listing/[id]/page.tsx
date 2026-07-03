@@ -220,9 +220,7 @@ export default async function ListingDetailPage({ params }: Props) {
                   >
                     {listing.host.companyName}
                   </Link>
-                  {listing.host.attestationStatus === "attested" && (
-                    <VerifiedHostBadge />
-                  )}
+                  {listing.host.verified && <VerifiedHostBadge />}
                 </div>
                 <div className={styles.hostDate}>{dateLabel}</div>
               </div>
@@ -285,8 +283,7 @@ export default async function ListingDetailPage({ params }: Props) {
                   id: listing.host.id,
                   name: listing.host.companyName,
                   location: listing.host.primaryLocationName ?? undefined,
-                  verified:
-                    listing.host.attestationStatus === "attested",
+                  verified: listing.host.verified,
                   tagline: listing.host.about ?? undefined,
                   avatar: listing.host.photoUrl
                     ? {

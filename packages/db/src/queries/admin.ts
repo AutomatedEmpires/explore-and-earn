@@ -6,6 +6,7 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { adminClient } from "../adminClient";
 import type { SeekerApplicationListing } from "./applications";
@@ -62,13 +63,26 @@ async function countRows(
   return count ?? 0;
 }
 
+/** Count host_profiles rows on an active paid subscription (any tier). */
+async function countVerifiedHosts(db: SupabaseClient): Promise<number> {
+  const { count, error } = await db
+    .from("host_profiles")
+    .select("*", { count: "exact", head: true })
+    .in("subscription_tier", ["starter", "professional", "enterprise"]);
+  if (error) {
+    throw new Error(`getMarketplaceStats(host_profiles verified): ${error.message}`);
+  }
+  return count ?? 0;
+}
+
 /**
  * Live marketplace counts for the admin dashboard.
  *
- * Status/attestation vocabularies:
+ * Status vocabularies:
  *   - pendingApplications  = applications with status 'applied' (awaiting first review)
  *   - acceptedApplications = applications with status 'accepted'
- *   - verifiedHosts        = host_profiles with attestation_status 'attested'
+ *   - verifiedHosts        = host_profiles on an active paid subscription (any tier) —
+ *                            the same gate that renders the seeker-facing Verified Host badge
  *   - totalSeekers         = count of seeker_profiles rows
  */
 export async function getMarketplaceStats(
@@ -96,7 +110,7 @@ export async function getMarketplaceStats(
     countRows(db, "applications", { status: "applied" }),
     countRows(db, "applications", { status: "accepted" }),
     countRows(db, "host_profiles"),
-    countRows(db, "host_profiles", { attestation_status: "attested" }),
+    countVerifiedHosts(db),
     countRows(db, "seeker_profiles"),
   ]);
 
@@ -167,7 +181,9 @@ export interface AdminHostRow {
   readonly id: string;
   readonly companyName: string;
   readonly clerkUserId: string;
+  /** Internal moderator trust flag — independent of the paid-subscription Verified Host badge. */
   readonly attestationStatus: string;
+  readonly subscriptionTier: string | null;
   readonly listingCount: number;
 }
 
@@ -183,7 +199,7 @@ export async function getAllHostProfiles(
 
   const { data: hostRows, error: hostError } = await db
     .from("host_profiles")
-    .select("id,company_name,clerk_user_id,attestation_status")
+    .select("id,company_name,clerk_user_id,attestation_status,subscription_tier")
     .order("created_at", { ascending: false });
   if (hostError) {
     throw new Error(`getAllHostProfiles: ${hostError.message}`);
@@ -220,6 +236,8 @@ export async function getAllHostProfiles(
         typeof r.attestation_status === "string"
           ? r.attestation_status
           : "",
+      subscriptionTier:
+        typeof r.subscription_tier === "string" ? r.subscription_tier : null,
       listingCount: listingCountByHost.get(id) ?? 0,
     } satisfies AdminHostRow;
   });
@@ -336,7 +354,7 @@ const ADMIN_LISTING_DETAIL_SELECT =
   "housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
   "compensation_currency, timeline_summary, cover_photo_url, " +
-  "host_profiles!host_profile_id(company_name, attestation_status)";
+  "host_profiles!host_profile_id(company_name, subscription_tier)";
 
 /**
  * Fetch a single listing by ID for the admin moderation detail view, bypassing
@@ -365,7 +383,7 @@ export async function getAdminListingDetail(
     hostRaw.company_name.length > 0
       ? hostRaw.company_name
       : "Unknown Host";
-  const verified = hostRaw ? hostRaw.attestation_status === "attested" : false;
+  const verified = hostRaw ? hasVerifiedHostSubscription(hostRaw.subscription_tier) : false;
 
   const housingProvision: BenefitProvision =
     row.housing_included === true ? "provided" : "not_provided";

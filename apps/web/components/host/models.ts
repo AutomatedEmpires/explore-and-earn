@@ -25,7 +25,7 @@ export interface HostProfileSummary {
   readonly location?: string;
   /** Longer "about" blurb shown on the host profile. */
   readonly bio?: string;
-  /** Self-declared verified host (G22). Rendered via VerifiedHostBadge. */
+  /** Subscription-gated verified host — automatic, not self-declared. Rendered via VerifiedHostBadge. */
   readonly verified: boolean;
   /** Host website URL. */
   readonly websiteUrl?: string;
