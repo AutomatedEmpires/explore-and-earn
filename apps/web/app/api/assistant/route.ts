@@ -9,7 +9,10 @@ import {
 import { auth } from "@clerk/nextjs/server";
 import { getHostProfile, getSeekerProfile } from "@explore-and-earn/db";
 
-import { logAssistantTurn } from "../../../services/assistant/persistence";
+import {
+  logAssistantTurn,
+  logHostAssistantTurn,
+} from "../../../services/assistant/persistence";
 import { buildHostTools } from "../../../services/assistant/hostTools";
 import { hostSystemPrompt, seekerSystemPrompt } from "../../../services/assistant/systemPrompt";
 import { buildSeekerTools } from "../../../services/assistant/tools";
@@ -50,11 +53,12 @@ export async function POST(req: Request): Promise<Response> {
   const messages = body.messages;
   const context = normalizeContext(body.context);
   const token = await getToken({ template: "supabase" });
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
 
   // ── Host (listing coach) ──────────────────────────────────────────────────
   // Only honored for real hosts; otherwise fall through to the seeker persona so
-  // a mis-declared context can never grant host tools. Host chat is ephemeral —
-  // assistant_threads is seeker-scoped, so there is nothing to persist.
+  // a mis-declared context can never grant host tools. Persisted per host, like
+  // the seeker guide (migration 055 made assistant_threads role-agnostic).
   if (context === "host") {
     const hostProfile = token ? await getHostProfile(token, userId) : null;
     if (hostProfile) {
@@ -67,6 +71,14 @@ export async function POST(req: Request): Promise<Response> {
         messages: await convertToModelMessages(messages),
         tools: token ? buildHostTools({ token, userId }) : {},
         stopWhen: stepCountIs(5),
+        onFinish: async ({ text }) => {
+          await logHostAssistantTurn({
+            hostProfileId: hostProfile.id,
+            clerkUserId: userId,
+            userParts: lastUserMessage?.parts ?? [],
+            assistantParts: [{ type: "text", text }],
+          });
+        },
       });
       return createUIMessageStreamResponse({
         stream: toUIMessageStream({ stream: result.stream }),
@@ -77,7 +89,6 @@ export async function POST(req: Request): Promise<Response> {
 
   // ── Seeker (discovery + resume coach), default ────────────────────────────
   const profile = token ? await getSeekerProfile(token, userId) : null;
-  const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
 
   const result = streamText({
     model: MODEL,
