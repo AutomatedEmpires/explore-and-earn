@@ -5,6 +5,7 @@ import {
   adminClient,
   activateBoostCampaignFromCheckout,
   insertHostAnnouncement,
+  type BoostPurchaseTier,
 } from "@explore-and-earn/db";
 import {
   ANNOUNCEMENT_PRICE_CENTS,
@@ -256,6 +257,19 @@ async function syncAnnouncementPurchase(
   return { action: "created_announcement_draft", clerkUserId, tier: null };
 }
 
+// Normalizes an arbitrary host subscription-tier string (including "none",
+// for a host with no active subscription, or a missing/stale metadata value
+// on a webhook retry from before this field existed) into a valid
+// listing_boost_campaigns.tier value. "none"/"starter" both land on
+// "starter" — the lowest real paid tier — rather than erroring, since a host
+// without a professional/enterprise subscription still gets the same
+// exposure-only boost, just without the higher ranking priority.
+function toBoostPurchaseTier(subscriptionTier: string): BoostPurchaseTier {
+  return subscriptionTier === "professional" || subscriptionTier === "enterprise"
+    ? subscriptionTier
+    : "starter";
+}
+
 async function syncBoostPurchase(
   session: Stripe.Checkout.Session,
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
@@ -264,6 +278,7 @@ async function syncBoostPurchase(
   const listingId = session.metadata?.listingId ?? null;
   const durationRaw = session.metadata?.durationDays;
   const durationDays = durationRaw ? parseInt(durationRaw, 10) : null;
+  const boostTier = toBoostPurchaseTier(session.metadata?.tier ?? "starter");
 
   if (!hostProfileId || !listingId || !durationDays) {
     return { action: "ignored_missing_boost_metadata", clerkUserId, tier: null };
@@ -290,6 +305,7 @@ async function syncBoostPurchase(
     hostProfileId,
     durationDays,
     amountCents,
+    tier:            boostTier,
   });
 
   return {
@@ -553,10 +569,15 @@ export async function createBoostCheckoutSession(params: {
   hostProfileId: string;
   listingId: string;
   durationDays: BoostDuration;
+  /** The host's subscription tier at purchase time — carried through to the
+   * webhook so the resulting campaign is ranked at the buyer's actual plan,
+   * not silently downgraded to the activateBoostCampaignFromCheckout default. */
+  hostSubscriptionTier: string;
 }): Promise<Stripe.Checkout.Session> {
   const stripe = getStripeClient();
   const envPriceId = process.env[BOOST_PRICE_ENV[params.durationDays]];
   const amountCents = BOOST_PRICING[params.durationDays];
+  const tier = toBoostPurchaseTier(params.hostSubscriptionTier);
 
   // Boost provenance is carried on session.metadata; the webhook reads it to
   // write the listing_boost_campaigns row. productType keys the webhook branch,
@@ -569,6 +590,7 @@ export async function createBoostCheckoutSession(params: {
     clerkUserId:   params.clerkUserId,
     durationDays:  String(params.durationDays),
     amountCents:   String(amountCents),
+    tier,
   } as const;
 
   const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = envPriceId
