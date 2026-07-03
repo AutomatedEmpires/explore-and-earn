@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { FOUNDER_LOCKED_PRICING } from "@explore-and-earn/contracts";
+import {
+  FOUNDER_LOCKED_PRICING,
+  FOUNDING_LOCKED_PRICING,
+  FOUNDING_SEAT_CAP,
+} from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import styles from "./page.module.css";
@@ -69,10 +73,30 @@ function priceLabel(cents: number): string {
   return `$${Math.round(cents / 100).toLocaleString()}`;
 }
 
-const TIERS: ReadonlyArray<{ name: string; monthly: number; blurb: string }> = [
-  { name: "Starter", monthly: FOUNDER_LOCKED_PRICING.starter.monthly, blurb: "1 active listing, basic analytics." },
-  { name: "Professional", monthly: FOUNDER_LOCKED_PRICING.professional.monthly, blurb: "5 listings, invite credits, full analytics." },
-  { name: "Enterprise", monthly: FOUNDER_LOCKED_PRICING.enterprise.monthly, blurb: "10 listings, more credits, a team seat." },
+const TIERS: ReadonlyArray<{
+  name: string;
+  monthly: number;
+  foundingMonthly: number;
+  blurb: string;
+}> = [
+  {
+    name: "Starter",
+    monthly: FOUNDER_LOCKED_PRICING.starter.monthly,
+    foundingMonthly: FOUNDING_LOCKED_PRICING.starter.monthly,
+    blurb: "1 active listing, basic analytics.",
+  },
+  {
+    name: "Professional",
+    monthly: FOUNDER_LOCKED_PRICING.professional.monthly,
+    foundingMonthly: FOUNDING_LOCKED_PRICING.professional.monthly,
+    blurb: "5 listings, invite credits, full analytics.",
+  },
+  {
+    name: "Enterprise",
+    monthly: FOUNDER_LOCKED_PRICING.enterprise.monthly,
+    foundingMonthly: FOUNDING_LOCKED_PRICING.enterprise.monthly,
+    blurb: "10 listings, more credits, a team seat.",
+  },
 ];
 
 export default function ForHostsPage() {
@@ -158,12 +182,28 @@ export default function ForHostsPage() {
       <section className={styles.pricing}>
         <h2 className={styles.sectionTitle}>Simple host plans</h2>
         <p className={styles.pricingSub}>Annual billing is two months free. Cancel anytime.</p>
+
+        <div className={styles.foundingBanner}>
+          <span className={styles.foundingBannerLabel}>Founding Host Program</span>
+          <p className={styles.foundingBannerBody}>
+            The first {FOUNDING_SEAT_CAP} paying hosts lock in a lower rate for
+            as long as they keep hosting — see the founding price on each plan
+            below. The rate is tied to your seat: it survives a tier change,
+            but it&rsquo;s given up for good if you ever cancel.
+          </p>
+        </div>
+
         <div className={styles.tierGrid}>
           {TIERS.map((tier) => (
             <article key={tier.name} className={styles.tier}>
               <h3 className={styles.tierName}>{tier.name}</h3>
               <p className={styles.tierPrice}>
                 {priceLabel(tier.monthly)}
+                <span className={styles.tierPer}>/mo</span>
+              </p>
+              <p className={styles.tierFounding}>
+                <span className={styles.tierFoundingLabel}>Founding Host</span>
+                {" "}{priceLabel(tier.foundingMonthly)}
                 <span className={styles.tierPer}>/mo</span>
               </p>
               <p className={styles.tierBlurb}>{tier.blurb}</p>

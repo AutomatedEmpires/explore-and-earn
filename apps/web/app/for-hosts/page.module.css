@@ -422,6 +422,50 @@
   color: var(--text-secondary);
 }
 
+.foundingBanner {
+  max-width: 760px;
+  margin: 0 auto var(--space-20);
+  padding: var(--space-16) var(--space-20);
+  border-radius: var(--radius-card);
+  background: var(--status-featured-bg);
+  text-align: left;
+}
+
+.foundingBannerLabel {
+  display: block;
+  margin-bottom: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--status-featured-fg);
+}
+
+.foundingBannerBody {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.55;
+  color: var(--status-featured-fg);
+}
+
+.tierFounding {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  color: var(--status-featured-fg);
+}
+
+.tierFoundingLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
 /* ── Final CTA ────────────────────────────────────────────────── */
 .finalCta {
   max-width: 640px;
