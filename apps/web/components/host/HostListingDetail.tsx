@@ -21,6 +21,7 @@ import {
   type HostListingItem,
   type HostListingState,
 } from "./models";
+import { ListingStatusControls } from "./ListingStatusControls";
 
 /** Map host listing management state to the canonical card state badge. */
 function hostStateToCardState(
@@ -97,6 +98,20 @@ export function HostListingDetail({
           <Icon name="action.forward" size={20} aria-hidden />
           <span>Edit listing</span>
         </Link>
+      ) : null}
+
+      {canEdit ? (
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Listing status</h3>
+          <p className={styles.hint}>
+            A draft is only visible to you. Submit it for review to publish it
+            to seekers.
+          </p>
+          <ListingStatusControls
+            listingId={listing.id}
+            currentStatus={listing.status}
+          />
+        </section>
       ) : null}
 
       <section className={styles.section} aria-labelledby={pipelineId}>
