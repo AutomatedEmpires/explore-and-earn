@@ -2,8 +2,9 @@
 
 import { auth } from "@clerk/nextjs/server"
 import { createHostProfile, updateHostProfileDetails, type SocialLinks } from "@explore-and-earn/db"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 
+import { HOST_PROFILES_CACHE_TAG } from "../../lib/serverCache"
 import { reportError } from "../../lib/sentry"
 
 /** Best-effort current Clerk user id for error attribution (catch paths only). */
@@ -124,6 +125,8 @@ async function updateHostProfileActionImpl(
 
 	revalidatePath("/host/profile")
 	revalidatePath("/host/profile/edit")
+	// Bust the cached public host profile (/host/[id]) so edits show immediately.
+	revalidateTag(HOST_PROFILES_CACHE_TAG)
 	return { ok: true }
 }
 

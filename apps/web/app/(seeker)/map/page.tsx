@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { getDiscoveryListingsWithCoords } from "../../../components/discovery/data";
-import { MapView } from "../../../components/map";
+import { MapViewLazy } from "../../../components/map";
 
 export const dynamic = "force-dynamic";
 
@@ -34,5 +34,5 @@ export default async function MapPage({
 		searchParams,
 		getDiscoveryListingsWithCoords(),
 	]);
-	return <MapView listings={listings} initialFocusId={firstValue(params.focus)} />;
+	return <MapViewLazy listings={listings} initialFocusId={firstValue(params.focus)} />;
 }

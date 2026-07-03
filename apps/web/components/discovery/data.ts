@@ -1,11 +1,11 @@
 import {
   getLiveListingsWithCoords,
-  getPublicListings,
   getPublicListingById,
   getSwipeBatch,
   rowToDiscoveryFields,
   SWIPE_BATCH_SIZE,
 } from "@explore-and-earn/db";
+import { getPublicListingsCached } from "../../lib/serverCache";
 import { isDevBenchEnabled } from "../../lib/devBench";
 import { DISCOVERY_FIXTURES } from "./fixtures";
 import type { DiscoveryListing } from "./listing";
@@ -53,7 +53,7 @@ export async function getDiscoveryListings(): Promise<DiscoveryListing[]> {
   }
 
   try {
-    const rows = await getPublicListings();
+    const rows = await getPublicListingsCached();
     return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
   } catch (error) {
     if (allowFixtureFallback) {

@@ -4,12 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import {
-  getPublicHostProfile,
   getPublicListingsByHost,
   getHostRatingSummary,
   getHostReviews,
   getReviewableEngagementForHost,
 } from "@explore-and-earn/db";
+import { getPublicHostProfileCached } from "../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
 import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 
@@ -31,7 +31,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const host = await getPublicHostProfile(id);
+  const host = await getPublicHostProfileCached(id);
   if (!host) return { title: "Host not found" };
 
   const tagline = host.tagline ?? host.about?.slice(0, 100);
@@ -365,7 +365,7 @@ function HousingMealsCard({
 export default async function PublicHostProfilePage({ params }: Props) {
   const { id } = await params;
   const [host, listings, ratingSummary, reviews] = await Promise.all([
-    getPublicHostProfile(id),
+    getPublicHostProfileCached(id),
     getPublicListingsByHost(id),
     getHostRatingSummary(id),
     getHostReviews(id),

@@ -22,7 +22,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const [listings, hostIds] = await Promise.all([
-      getPublicListings(),
+      // Sitemap wants near-complete URL coverage, so it overrides the feed's
+      // default candidate cap with a large explicit ceiling.
+      getPublicListings(5000),
       getHostIdsWithLiveListings(),
     ]);
 

@@ -62,6 +62,13 @@ const nextConfig: NextConfig = {
   // Don't leak the Next.js version via the X-Powered-By header.
   poweredByHeader: false,
   transpilePackages: ["@explore-and-earn/ui", "@explore-and-earn/contracts", "@explore-and-earn/db"],
+  experimental: {
+    // Tree-shake barrel imports: pulling one symbol from the @explore-and-earn/ui
+    // index (which `export *`s ~15 modules) otherwise risks dragging large sibling
+    // components into a route's bundle. This rewrites barrel imports to their
+    // direct source paths at build time.
+    optimizePackageImports: ["@explore-and-earn/ui"],
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

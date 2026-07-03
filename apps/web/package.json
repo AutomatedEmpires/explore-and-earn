@@ -20,7 +20,6 @@
 		"@sentry/nextjs": "^10.22.0",
 		"@supabase/supabase-js": "^2.107.0",
 		"mapbox-gl": "^3.6.0",
-		"motion": "^12.40.0",
 		"next": "^15.3.0",
 		"posthog-js": "^1.310.1",
 		"react": "^19.0.0",
