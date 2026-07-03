@@ -5,6 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { saveListingWithStatus } from "@explore-and-earn/db";
 
 import { getSwipeListings, type SwipeBatch } from "../../components/discovery/data";
+import { checkRateLimit } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 
 /**
@@ -45,7 +46,10 @@ function sanitizeIds(ids: unknown): string[] {
  * Persist a swipe-right / Save for the authenticated seeker.
  *
  * Returns `{ ok, alreadySaved }`. `ok` is false when signed out, the id is not
- * a UUID, or the write fails — the swipe gesture never blocks on the result.
+ * a UUID, rate-limited, or the write fails — the swipe gesture never blocks
+ * on the result. Rate limit is shared with savedListings.ts's
+ * saveListingAction (same `save:${userId}` bucket) since both write the same
+ * per-seeker saved set.
  */
 async function saveListingActionImpl(
 	listingId: string,
@@ -55,6 +59,10 @@ async function saveListingActionImpl(
 	}
 	const { userId, getToken } = await auth();
 	if (!userId) {
+		return { ok: false, alreadySaved: false };
+	}
+	const { allowed } = checkRateLimit(`save:${userId}`, 60, 5 * 60 * 1000);
+	if (!allowed) {
 		return { ok: false, alreadySaved: false };
 	}
 	const token = await getToken({ template: "supabase" });

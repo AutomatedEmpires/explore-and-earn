@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { saveListing, unsaveListing } from "@explore-and-earn/db";
 
 import { applyToListingAction } from "./applications";
+import { checkRateLimit } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 
 async function currentUserId(): Promise<string | undefined> {
@@ -17,13 +18,17 @@ async function currentUserId(): Promise<string | undefined> {
 
 /**
  * Persist a swipe-right / Save action for the current seeker.
- * Best-effort: never throws, never blocks the gesture.
+ * Best-effort: never throws, never blocks the gesture. Rate-limited (shared
+ * with the swipe-deck's own saveListingAction — same `save:${userId}` bucket)
+ * to bound scripted abuse while staying well above any real swiping session.
  */
 async function saveListingActionImpl(
 	listingId: string,
 ): Promise<{ ok: boolean }> {
 	const { userId, getToken } = await auth();
 	if (!userId) return { ok: false };
+	const { allowed } = checkRateLimit(`save:${userId}`, 60, 5 * 60 * 1000);
+	if (!allowed) return { ok: false };
 	const token = await getToken({ template: "supabase" });
 	if (!token) return { ok: false };
 	return saveListing(token, userId, listingId);
