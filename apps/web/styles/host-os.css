@@ -199,7 +199,7 @@
   .hostos-tact--msg, .hostos-tlabel { display: none; }
   .hostos-tact--p { padding: 0 var(--space-16); }
   .hostos-contentwrap { padding: var(--space-14); }
-  .hostos-mnav { display: grid; position: fixed; z-index: 70; left: 10px; right: 10px; bottom: 10px; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: var(--space-8); border-radius: 24px; background: var(--color-surface); border: 1px solid var(--hostos-line); box-shadow: var(--elevation-overlay); }
+  .hostos-mnav { display: grid; position: fixed; z-index: 70; left: 0; right: 0; bottom: 0; width: 100%; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: var(--space-8) var(--space-8) calc(var(--space-8) + env(safe-area-inset-bottom, 0px)); background: var(--color-surface); border-top: 1px solid var(--hostos-line); box-shadow: 0 -2px 12px color-mix(in srgb, var(--palette-ink) 7%, transparent); }
   .hostos-mtab { border: 0; background: transparent; color: var(--text-muted); border-radius: 18px; padding: 7px 4px; min-height: var(--tap-min, 44px); display: grid; place-items: center; gap: 3px; font-size: 10px; font-weight: 600; text-decoration: none; }
   .hostos-mtab[aria-current="page"] { background: var(--hostos-grad); color: var(--hostos-on-amber); }
   .hostos-drawer.open { display: block; position: fixed; inset: 0; z-index: 80; background: rgba(36, 34, 30, 0.5); }
