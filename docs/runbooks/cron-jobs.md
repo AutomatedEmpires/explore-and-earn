@@ -34,3 +34,27 @@ Invoke on a daily schedule with the secret header (Vercel Cron or any external s
 - `CRON_SECRET` — shared secret for the Bearer check.
 - `SUPABASE_SERVICE_ROLE_KEY` — service-role key used by `adminClient()` (server-only secret, never `NEXT_PUBLIC_`).
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL.
+
+## new-match-alerts
+
+Notifies seekers when a newly-published listing is a **strong** ADR-040 match for them — proactive, fit-based re-engagement (the complement to filter-based saved-search alerts).
+
+- **Endpoint:** `GET /api/cron/new-match-alerts`
+- **Handler:** `apps/web/app/api/cron/new-match-alerts/route.ts`
+- **Auth:** `Authorization: Bearer ${CRON_SECRET}` header. Missing/incorrect -> `401`.
+- **Action:** calls `runNewMatchAlerts()` (`apps/web/services/matching/newMatchAlerts.ts`), which, service-role:
+  1. Finds live listings published in the last 48h that have **no** `match_scores` rows yet (structural dedupe: a listing is scored + blasted at most once).
+  2. Scores each against the active-seeker pool (bounded) via the ADR-040 engine and persists to `match_scores`.
+  3. Notifies up to 25 seekers per listing who clear the strong-match floor (score ≥ 75), deep-linking to `/listing/{id}`. A per-`(listing, seeker)` `dedupe_key` prevents double-notifying.
+  - Best-effort per listing: one failure never blocks the sweep.
+- **Response:** `{ "ok": true, "listingsProcessed": n, "notified": n }`.
+
+### Scheduling
+
+A few times a day, with the secret header:
+
+```
+0 */6 * * *  curl -fsS -H "Authorization: Bearer $CRON_SECRET" https://<app-host>/api/cron/new-match-alerts
+```
+
+Same required environment as `expire-listings` above.
