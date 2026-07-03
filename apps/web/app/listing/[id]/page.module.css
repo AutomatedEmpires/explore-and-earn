@@ -3,16 +3,34 @@
 .page {
   background-color: var(--color-paper);
   min-height: 100vh;
-  padding-bottom: 80px;
+  /* --space-80 originally sized to just the .actionBar's own height (it sat at
+     bottom:0). .actionBar now floats above the bottom-nav dock instead, so the
+     same offset it uses has to be added here too, or the last bit of
+     scrollable content ends up hidden behind the repositioned bar. */
+  padding-bottom: calc(
+    var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px) + var(--space-80)
+  );
 }
 
-/* ─── Cover photo ─────────────────────────────────────────────────────────── */
+/* ─── Cover photo — framed photograph on the paper mat (frame, not filter) ──── */
 
 .cover {
   position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
+  margin: var(--space-16) var(--space-gutter) 0;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--elevation-card);
   background-color: var(--color-surface);
+}
+
+/* On wide screens the cover stays a contained, framed hero — not edge-to-edge. */
+@media (min-width: 64rem) {
+  .cover {
+    aspect-ratio: 21 / 9;
+    margin-top: var(--space-20);
+  }
 }
 
 .fillImg {
@@ -134,6 +152,10 @@
   margin-bottom: var(--space-section);
 }
 
+@media (max-width: 479px) {
+  .triad { grid-template-columns: 1fr; }
+}
+
 .triadCell {
   padding: var(--space-16);
   border-radius: var(--radius-card);
@@ -217,7 +239,13 @@
 
 .actionBar {
   position: fixed;
-  bottom: 0;
+  /* Clears the floating PublicBottomNav/SeekerBottomNav dock (BottomNav.module.css:
+     position:fixed, z-index:70, bottom: 10px + safe-area-inset) instead of
+     sitting under it at bottom:0 — same --size-bottom-nav token PublicShell
+     already uses to reserve scroll space for the same dock, so the two can't
+     drift apart. Without this, the nav dock renders on top of the Apply/Save
+     buttons on mobile, the one page whose entire purpose is that CTA. */
+  bottom: calc(var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px));
   left: 0;
   right: 0;
   background-color: var(--color-surface-raised);

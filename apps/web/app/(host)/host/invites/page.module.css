@@ -1,5 +1,356 @@
+/**
+ * Host Invites surface — benchmark `invitesView`: a metric command row, a
+ * "Campaign builder" glass panel beside live campaign cards, then the sent
+ * invites list. Semantic tokens only; the (host) shell resolves these to
+ * dark-glass + the amber scope accent, so nothing here hardcodes a color.
+ *
+ * Bench parity: docs/design/reference/_benchmarks/explore_earn_host_dashboard_worldclass.html
+ * → invitesView()/metric().
+ */
+
 .block {
   display: flex;
   flex-direction: column;
   gap: var(--space-section);
+}
+
+/* --- Section kicker (benchmark `title()` — chip + heading + lede) --------- */
+.section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-18);
+  flex-wrap: wrap;
+}
+
+.sectionText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.sectionLede {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* --- Split: campaign builder (wider) beside live campaigns ---------------- */
+.split {
+  display: grid;
+  gap: var(--space-16);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 1024px) {
+  .split {
+    grid-template-columns: 1.12fr 0.88fr;
+    align-items: start;
+  }
+}
+
+/* --- Panel (mirrors host-panel, sized for this surface) ------------------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-card);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  color: var(--text-primary);
+}
+
+.panelHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.panelTitles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.panelTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.panelSub {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* --- Campaign builder form (presentational planning surface) -------------- */
+.form {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 560px) {
+  .form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-12) var(--space-14);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-input);
+  background: var(--field-bg);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  outline: none;
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--field-placeholder);
+}
+
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible {
+  border-color: var(--field-border-focus);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-10);
+}
+
+.builderNote {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-12) var(--space-14);
+  border-radius: var(--radius-cell);
+  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 24%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.builderNote svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-cta);
+}
+
+/* --- Live campaign cards -------------------------------------------------- */
+.campaigns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.campaign {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.campaign:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-ink);
+}
+
+.campaignHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-10);
+}
+
+.campaignTitles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.campaignTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.campaignStats {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* status pill — tone is set via data-tone, mapped to status tokens */
+.pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-10);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pill[data-tone="hot"] {
+  color: var(--status-boosted-fg);
+  background: var(--status-boosted-bg);
+}
+
+.pill[data-tone="live"] {
+  color: var(--status-match-fg);
+  background: var(--status-match-bg);
+}
+
+.pill[data-tone="draft"] {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+}
+
+.campaignTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+/* funnel meter — sent → opened → applied progress */
+.funnel {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  overflow: hidden;
+}
+
+.funnelFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-cta);
+  transition: width var(--motion-base) var(--ease-standard);
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-32) var(--space-16);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty svg {
+  color: var(--color-cta);
+}
+
+.empty p {
+  margin: 0;
+  max-width: 36ch;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campaign,
+  .funnelFill {
+    transition: none;
+  }
+  .campaign:hover {
+    transform: none;
+  }
 }

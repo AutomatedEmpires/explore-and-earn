@@ -5,6 +5,7 @@ export * from "./Chip";
 export * from "./DiscoveryCard";
 export * from "./FoundingCountdown";
 export * from "./Meter";
+export * from "./MetricCard";
 export * from "./Modal";
 export * from "./Skeleton";
 export * from "./VerifiedHostBadge";

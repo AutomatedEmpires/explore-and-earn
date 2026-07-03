@@ -7,14 +7,17 @@ import { authedClient } from "../client";
 /**
  * Messaging data access — scoped seeker <-> host conversations + transcripts.
  *
- * SECURITY: Row Level Security is NOT yet enabled on `conversations` /
- * `messages`, and `authedClient()` talks to PostgREST with the anon key plus the
- * caller's Clerk JWT (the `anon` role performs no row-level enforcement). Every
- * function here is therefore scoped in application code: we resolve the caller's
- * `seeker_profiles.id` / `host_profiles.id` from the already-verified
- * `clerkUserId` (which comes from `auth().userId`, never decoded from the token)
- * and refuse any conversation the caller does not own. Keep these manual guards
- * even once RLS lands — they are defense in depth.
+ * SECURITY: Row Level Security IS enabled on `conversations` / `messages`
+ * (migration 048) and hardened in migration 050 — participant-scoped policies
+ * plus column-level UPDATE grants (only `messages.read_at` and
+ * `conversations.last_message_at` are writable by `authenticated`), and a
+ * conversation INSERT policy that requires a real host<->seeker application
+ * relationship. `authedClient()` talks to PostgREST with the anon key plus the
+ * caller's Clerk JWT, which resolves to the `authenticated` role under those
+ * policies. We ALSO scope every function in application code as defense in depth:
+ * we resolve the caller's `seeker_profiles.id` / `host_profiles.id` from the
+ * already-verified `clerkUserId` (from `auth().userId`, never decoded from the
+ * token) and refuse any conversation the caller does not own. Keep both layers.
  *
  * TYPES: `conversations` and `messages` are now present in the generated
  * `packages/db/src/types.gen.ts`. However, the participant guards below resolve
@@ -422,6 +425,73 @@ export async function getOrCreateConversation(
       return findConversation(db, seekerProfileId, hostProfileId, appId);
     }
     throw new Error(`getOrCreateConversation: ${error.message}`);
+  }
+  return data ? rowToConversation(data as Record<string, unknown>) : null;
+}
+
+/**
+ * Host-initiated find-or-create. The caller is the HOST (verified by `auth()`),
+ * so we resolve the host side from their Clerk id and take the seeker's PROFILE
+ * id directly — which is all the host UI has from an applicant row. The RLS
+ * INSERT policy (migration 048) permits this because the host owns the host
+ * side of the thread.
+ *
+ * This is the entry point the host applicant UI uses to OPEN a conversation:
+ * before this, `conversations` had no creator and messaging was unreachable.
+ *
+ * AUTHORIZATION: the host UI passes `seekerProfileId` from a query string, which
+ * a host could forge to target an arbitrary seeker. So we do NOT trust it as
+ * authorization evidence — we verify, under the host's own RLS-scoped token,
+ * that the seeker has actually applied to one of THIS host's listings before
+ * creating any thread. (Invite-only relationships, if a message entry point is
+ * ever added there, would need this check extended to the `invites` table.)
+ *
+ * Returns null when the host profile cannot be resolved, or when no
+ * host↔seeker application relationship exists.
+ */
+export async function getOrCreateConversationForHost(
+  clerkToken: string,
+  hostClerkUserId: string,
+  seekerProfileId: string,
+  applicationId?: string,
+): Promise<Conversation | null> {
+  const db = untypedClient(clerkToken);
+  const hostProfileId = await resolveHostProfileId(db, hostClerkUserId);
+  if (!hostProfileId) return null;
+
+  // Relationship gate: require an application from this seeker to a listing this
+  // host owns. Mirrors the getHostApplications embed (listings!listing_id!inner
+  // + filter on the embedded host_profile_id) and runs under the host's token.
+  const { data: relation, error: relationError } = await db
+    .from("applications")
+    .select("id, listings!listing_id!inner(host_profile_id)")
+    .eq("seeker_profile_id", seekerProfileId)
+    .eq("listings.host_profile_id", hostProfileId)
+    .limit(1);
+  if (relationError) {
+    throw new Error(`getOrCreateConversationForHost (relation): ${relationError.message}`);
+  }
+  if (!relation || relation.length === 0) return null;
+
+  const appId = applicationId ?? null;
+
+  const existing = await findConversation(db, seekerProfileId, hostProfileId, appId);
+  if (existing) return existing;
+
+  const { data, error } = await db
+    .from("conversations")
+    .insert({
+      seeker_profile_id: seekerProfileId,
+      host_profile_id: hostProfileId,
+      application_id: appId,
+    })
+    .select(CONVERSATION_COLUMNS)
+    .single();
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) {
+      return findConversation(db, seekerProfileId, hostProfileId, appId);
+    }
+    throw new Error(`getOrCreateConversationForHost: ${error.message}`);
   }
   return data ? rowToConversation(data as Record<string, unknown>) : null;
 }

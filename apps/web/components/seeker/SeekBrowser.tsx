@@ -28,6 +28,8 @@ import {
 } from "../public/FeaturedEmployersRail";
 import styles from "./SeekBrowser.module.css";
 import { SeekFilterPopup, type SeekFilterPopupValue } from "./SeekFilterPopup";
+import { SavedSearches, type SavedSearchView } from "./SavedSearches";
+import { SeekQuickFilters } from "./SeekQuickFilters";
 import { SeekSortPopup } from "./SeekSortPopup";
 
 type StartRangeMonths = 1 | 3 | 6;
@@ -101,13 +103,14 @@ export interface SeekBrowserProps {
 	readonly location?: string;
 	readonly payMin?: number;
 	readonly payUnit?: CompensationUnit;
+	readonly savedSearches?: readonly SavedSearchView[];
 }
 
 /**
- * SeekBrowser \u2014 the browsable Seek tab. All filter state (text query, category,
+ * SeekBrowser — the browsable Seek tab. All filter state (text query, category,
  * housing/meals, location, pay floor) lives in the URL query string: the server
  * page parses it, runs searchListings, and hands the already-filtered listings
- * here. The controls below only navigate \u2014 toggling a chip or typing in the
+ * here. The controls below only navigate — toggling a chip or typing in the
  * search box pushes a new URL, which re-renders the server page, so a filtered
  * view is shareable and bookmarkable. Sort is a client-only reordering of the
  * returned rows. The drawers (QuickPeek / HostProfile / BenefitBucket / Report)
@@ -125,6 +128,7 @@ export function SeekBrowser({
 	location,
 	payMin,
 	payUnit,
+	savedSearches = [],
 }: SeekBrowserProps) {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -260,6 +264,31 @@ export function SeekBrowser({
 
 	const filterCount = activeFilterChips.length;
 
+	// Current filter set + a human label, for the "save this search" affordance.
+	const currentFilters = {
+		q: query || undefined,
+		category: category || undefined,
+		housing: housing || undefined,
+		meals: meals || undefined,
+		visa: visaSupport || undefined,
+		startRangeMonths,
+		payMin: payMin && payMin > 0 ? payMin : undefined,
+		payUnit: payUnit || undefined,
+		location: location || undefined,
+	};
+	const currentLabel =
+		[
+			category ? CATEGORY_LABEL[category as OpportunityCategory] : null,
+			housing ? "Housing" : null,
+			meals ? "Meals" : null,
+			payMin ? `$${payMin}${payUnit ? `/${payUnit}` : ""}` : null,
+			startRangeMonths ? `${startRangeMonths}mo start` : null,
+			location || null,
+			query ? `“${query}”` : null,
+		]
+			.filter(Boolean)
+			.join(" · ") || "All opportunities";
+
 	const applyFilters = (value: SeekFilterPopupValue) => {
 		const next = new URLSearchParams(searchParams.toString());
 		if (value.housing) next.set("housing", "1");
@@ -284,6 +313,12 @@ export function SeekBrowser({
 		setSortOpen(false);
 	};
 
+	// Triad-first quick filters — each flips a single URL param via pushParam.
+	const toggleHousing = () => pushParam("housing", housing ? null : "1");
+	const toggleMeals = () => pushParam("meals", meals ? null : "1");
+	const selectLane = (lane: OpportunityCategory) =>
+		pushParam("category", category === lane ? null : lane);
+
 	const countLabel = `${results.length} ${
 		results.length === 1 ? "opportunity" : "opportunities"
 	}`;
@@ -293,10 +328,17 @@ export function SeekBrowser({
 			<header className={styles.header}>
 				<h1 className={styles.heading}>Seek opportunities</h1>
 				<p className={styles.subheading}>
-					Browse every open work-travel opportunity \u2014 housing, meals, and pay
+					Browse every open work-travel opportunity — housing, meals, and pay
 					from hosts worldwide.
 				</p>
 			</header>
+
+			<SavedSearches
+				searches={savedSearches}
+				currentFilters={currentFilters}
+				currentLabel={currentLabel}
+				canSave={hasActiveFilters}
+			/>
 
 			<div className={styles.filters}>
 				<label className={styles.search}>
@@ -304,7 +346,7 @@ export function SeekBrowser({
 					<input
 						type="search"
 						className={styles.searchInput}
-						placeholder="Search opportunities, locations\u2026"
+						placeholder="Search opportunities, locations…"
 						value={searchText}
 						onChange={(event) => setSearchText(event.target.value)}
 						aria-label="Search opportunities"
@@ -340,6 +382,17 @@ export function SeekBrowser({
 						</span>
 					</button>
 				</div>
+
+				<SeekQuickFilters
+					housing={housing}
+					meals={meals}
+					category={category ? (category as OpportunityCategory) : null}
+					onToggleHousing={toggleHousing}
+					onToggleMeals={toggleMeals}
+					onSelectLane={selectLane}
+					onMore={() => setFilterOpen(true)}
+					moreCount={filterCount}
+				/>
 
 				{category || activeFilterChips.length > 0 ? (
 					<div className={styles.activeBar}>
@@ -378,7 +431,7 @@ export function SeekBrowser({
 				) : null}
 			</div>
 
-			{/* \u2500\u2500 Featured Employers Rail \u2014 always above the listings \u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+			{/* \u2500\u2500 Featured Employers Rail — always above the listings \u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
 			{featuredEmployers.length > 0 ? (
 				<FeaturedEmployersRail employers={featuredEmployers} />
 			) : null}

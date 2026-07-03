@@ -4,24 +4,23 @@ import type { ReactNode } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
-  getSeekerProfile,
+  getCommunityUnreadCount,
   getUnreadNotificationCount,
 } from "@explore-and-earn/db";
 
-import { GlobalHeader } from "../../components/global";
-import { SeekerBottomNav } from "../../components/seeker";
+import { cachedSeekerProfile, getSupabaseToken } from "../../lib/serverCache";
+import { SeekerShell } from "../../components/seeker";
 import { DEV_USER_ID, devSeekerName, isDevBenchEnabled } from "../../lib/devBench";
 import { readDevRole } from "../../lib/devBench/server";
-import styles from "./layout.module.css";
+import "../../styles/seeker-os.css";
 
 /**
  * Seeker scope layout.
  *
  * Navigation is scoped per user type — there is no single global bottom nav.
  * The seeker-scope bottom navigation is founder-locked (Swipe · Map · Seek ·
- * Profile) and OWNED BY THE SEEKER LANE, so it is wired here inside the (seeker)
- * route group via <SeekerBottomNav>. The locked tab set and order must not
- * change.
+ * Profile) and OWNED BY THE SEEKER LANE. It is rendered by <SeekerShell>'s
+ * mobile dock (MOBILE_PRIMARY). The locked tab set and order must not change.
  *
  * This layout also acts as the Server Component wrapper that resolves the
  * authed seeker's unread notification count and Clerk user id, and passes them
@@ -41,8 +40,9 @@ interface SeekerShellState {
   readonly clerkUserId: string | null;
   readonly needsOnboarding: boolean;
   readonly seekerName: string | null;
-  // TODO(community-unreads): replace with real query against community_post_views
-  // once the community_posts table exists. Zero until then.
+  /** Profile readiness % shown in the Seeker OS sidebar meter. */
+  readonly profileScore: number;
+  /** "N new" badge on the Community nav — photos + announcements since last seen. */
   readonly unreadCommunity: number;
 }
 
@@ -68,32 +68,39 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
       clerkUserId: DEV_USER_ID,
       needsOnboarding: false,
       seekerName: devSeekerName(),
-      unreadCommunity: 0,
+      // Service-role query — works on the bench (bypasses the sentinel token).
+      unreadCommunity: await getCommunityUnreadCount(DEV_USER_ID),
+      profileScore: 78,
     };
   }
 
   try {
-    const { userId, getToken } = await auth();
+    const { userId } = await auth();
     if (!userId) {
-      return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0 };
+      return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
     }
-    const token = await getToken({ template: "supabase" });
+    // Request-scoped: this token is minted once and reused by the child page's
+    // data fetches (see lib/serverCache), so a seeker navigation no longer pays
+    // the Clerk getToken round-trip more than once.
+    const token = await getSupabaseToken();
     if (!token) {
-      return { unreadCount: 0, clerkUserId: userId, needsOnboarding: false, seekerName: null, unreadCommunity: 0 };
+      return { unreadCount: 0, clerkUserId: userId, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
     }
-    const [unreadCount, profile] = await Promise.all([
+    const [unreadCount, profile, unreadCommunity] = await Promise.all([
       getUnreadNotificationCount(token, userId),
-      getSeekerProfile(token, userId),
+      cachedSeekerProfile(token, userId),
+      getCommunityUnreadCount(userId),
     ]);
     return {
       unreadCount,
       clerkUserId: userId,
       needsOnboarding: profile !== null && !profile.onboardingComplete,
       seekerName: profile?.displayName?.trim() || null,
-      unreadCommunity: 0,
+      unreadCommunity,
+      profileScore: profile ? (profile.onboardingComplete ? 82 : 48) : 28,
     };
   } catch {
-    return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0 };
+    return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
   }
 }
 
@@ -102,7 +109,7 @@ export default async function SeekerLayout({
 }: {
   children: ReactNode;
 }) {
-  const { unreadCount, clerkUserId, needsOnboarding, seekerName, unreadCommunity } =
+  const { unreadCount, needsOnboarding, seekerName, unreadCommunity, profileScore } =
     await resolveSeekerShellState();
 
   // redirect() throws to interrupt rendering, so it must run OUTSIDE the
@@ -111,18 +118,19 @@ export default async function SeekerLayout({
     redirect("/onboarding");
   }
 
+  // Seeker OS — warm "Adventure Paper & Sky" command center (paper sidebar →
+  // mobile bottom-nav), sky accent. The scope token cascade (.seeker-os) flips
+  // the whole seeker experience; SeekerShell owns the chrome.
   return (
-    <div className={styles.shell}>
-      <GlobalHeader
-        scope="seeker"
-        isAuthenticated={!!clerkUserId}
-        userName={seekerName}
-        unreadCount={unreadCount}
+    <div className="seeker-os">
+      <SeekerShell
+        seekerName={seekerName}
+        unread={unreadCount}
         unreadCommunity={unreadCommunity}
-        clerkUserId={clerkUserId}
-      />
-      <main className={styles.main}>{children}</main>
-      <SeekerBottomNav />
+        profileScore={profileScore}
+      >
+        {children}
+      </SeekerShell>
     </div>
   );
 }

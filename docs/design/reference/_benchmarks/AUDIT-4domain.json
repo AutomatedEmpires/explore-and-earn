@@ -1,0 +1,523 @@
+{
+  "summary": "Parallel world-class design audit of Community/Public, Host, Admin, Seeker — discover routes, read code+CSS, assess vs benchmark family + scorecard, produce prioritized file-level improvement lists",
+  "agentCount": 4,
+  "logs": [
+    "Auditing 4 domains in parallel (read-only).",
+    "Audit complete: 51 weaknesses across 4 domains."
+  ],
+  "result": {
+    "domains": [
+      {
+        "domain": "Community / Public-facing (marketing home, search, community dashboard, discovery feed/cards, public shell + nav, legal/about)",
+        "routes": 11,
+        "weaknessCount": 13,
+        "critical": 2,
+        "high": 5,
+        "topPriorities": [
+          "Tokenize + dark-glass the marketing home (page.module.css, 40 raw rgba) and GlobalHeader (48 raw rgba) so the public entry surface reads as the same premium product as the three dashboard OSes — this is the highest-visibility, least-polished surface in the whole app.",
+          "Fix curation integrity on FeaturedEmployersRail: kill the fake-inventory duplicate-array auto-scroll, make small sets a static curated row (esp. at 390px), and promote the near-invisible 'Featured' paid-placement badge to a real curated marker.",
+          "Stop leaking the boosted-vs-fallback tier to users: remove the section-heading swap in page.tsx (single honest heading), and signal curation per-card via the existing DiscoveryCard boosted badge instead.",
+          "Unify the two competing public headers (GlobalHeader vs PublicEntryHeader) into one brand-consistent guest shell so the brand doesn't fracture when a guest opens About/legal.",
+          "Add a shared, reduced-motion-safe view-enter route transition to the public surfaces (home/search/legal) to match the dashboard family, and replace raw decorative glyphs (✦, ●, ≥— ASCII) with Streamline icons/tokens across the rail and DiscoveryCard.",
+          "Fix the broken Community teaser CTA (points to /seek instead of /community)."
+        ],
+        "weaknesses": [
+          {
+            "surface": "Marketing home",
+            "files": "apps/web/app/page.module.css",
+            "issue": "The public home — the single most-seen surface and the entry to the whole product — is a LIGHT paper/SaaS layout with 40 raw rgba() literals and zero dark-glass language. It feels like a different, lesser product than the host/seeker/admin dashboard OSes it is supposed to funnel into. Hero overlay, all CTAs, destination pills, employer tier table, and teaser are hand-rolled rgba(255,255,255,...) / rgba(20,16,10,...) — bypassing tokens entirely.",
+            "fix": "Replace every raw rgba() with semantic tokens (--overlay-*, --glass-*, --border-soft, --text-on-photo, scope CTA tokens). Re-establish the dark-glass benchmark depth on at least the employer card and community teaser so the home reads as the same premium family as the dashboards. Pull the hero overlay gradient and pill glass into reusable token-driven utilities rather than inline literals.",
+            "severity": "critical",
+            "mobile": false
+          },
+          {
+            "surface": "GlobalHeader",
+            "files": "apps/web/components/global/GlobalHeader.module.css",
+            "issue": "48 raw rgba/hex values — the worst token-drift offender in the domain. The guest header that frames the marketing home is hardcoded rather than composed from the locked glass/border/text tokens, so it cannot inherit the scope cascade or stay consistent with the dashboard shells.",
+            "fix": "Tokenize all 48 raw colors against tokens.css (glass surface, border-soft, text-primary/secondary/muted, focus ring). Verify the hide-on-scroll header and scopeBadge read correctly in dark-mode contrast. Ensure the wordmark/pin and scope badge match the dashboard shell header treatment.",
+            "severity": "critical",
+            "mobile": false
+          },
+          {
+            "surface": "Public shell consistency",
+            "files": "apps/web/components/global/GlobalHeader.tsx, apps/web/components/public/PublicEntryHeader.tsx, apps/web/app/(legal)/layout.tsx",
+            "issue": "Two different headers ship to the same guest user: the home renders GlobalHeader (capitalized 'Explore&Earn' wordmark, PinMark SVG, 'Seeker'/'Host' scope badge), while every legal/about page renders PublicEntryHeader (lowercase 'explore&earn', category.mix seal icon, hardcoded 'Seeker' pill, Sign up + Sign in). Different wordmark casing, different logo mark, different auth affordance — the brand fractures the moment a guest clicks About.",
+            "fix": "Collapse to ONE public header. Either delete PublicEntryHeader and have the legal layout use GlobalHeader scope='guest', or unify their markup/tokens so wordmark casing, logo mark, scope pill, and auth CTAs are identical. PublicEntryHeader also hardcodes the 'Seeker' pill on legal pages where no scope applies.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "FeaturedEmployersRail (curation integrity)",
+            "files": "apps/web/components/public/FeaturedEmployersRail.tsx, apps/web/components/public/FeaturedEmployersRail.module.css",
+            "issue": "The rail DUPLICATES the employer array to fake a seamless infinite auto-scroll. With a small curated set (the realistic case for paid featured campaigns), users see the SAME 2-3 employers cycle past twice — reading as fabricated inventory and undermining the 'curated, not dumped' goal. An always-on 36s auto-scroll on a CURATED rail also fights curation (curated things should hold still and invite reading, not conveyor-belt away). The 'Featured' paid-placement badge is muted-on-muted (--text-secondary on --color-surface-raised, 10px) so the one thing that signals paid curation is nearly invisible.",
+            "fix": "Drop the duplicate-array loop. For <=4 employers render a static, centered, evenly-spaced curated row (no auto-scroll); only enable scroll/drag when content genuinely overflows, and prefer manual scroll-snap over auto-advance. Promote the 'Featured' badge to a real curated marker (gold accent token, higher contrast, paired with the verified mark) so paid placement reads as intentional. Respect reduced-motion (already partly done).",
+            "severity": "high",
+            "mobile": true
+          },
+          {
+            "surface": "FeaturedEmployersRail (tokens + icons)",
+            "files": "apps/web/components/public/FeaturedEmployersRail.tsx, apps/web/components/public/FeaturedEmployersRail.module.css",
+            "issue": "Raw decorative glyphs used as iconography: '✦' sparkle in the section title and '●' location dot in the card — violates the Streamline-only icon rule (G30) and renders inconsistently across fonts/platforms. The EmployerSkeleton is built with inline-style px and raw rgba(0,0,0,0.07)/rgba(25,21,14,0.12) plus a #faf8f4 fallback hex. The module CSS carries 15 more raw rgba shadow/border literals.",
+            "fix": "Replace ✦ and ● with Streamline <Icon> (or a tokenized ::before dot using a color token). Rebuild EmployerSkeleton to reuse the shared Skeleton primitive from packages/ui with token-driven dimensions instead of inline px/hex. Tokenize the 15 raw rgba shadows/borders to --elevation-* and --border-ink-warm.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "Marketing home (fallback tier exposed)",
+            "files": "apps/web/app/page.tsx",
+            "issue": "The fallback-tier logic is visually leaked to the user: when boosted inventory is below threshold the feed heading literally swaps from 'Featured listings' to 'Explore opportunities' and the subheading changes. A visitor refreshing during low inventory sees the section rename itself, exposing the internal boosted-vs-fallback machinery. There is also no visual distinction framing boosted listings as curated vs fallback fill.",
+            "fix": "Keep a single stable, honest heading regardless of tier (e.g. 'Opportunities worth the trip'). If you want to signal curation, do it per-card (the DiscoveryCard already supports a boosted badge) rather than by renaming the whole section. Never let copy reveal which inventory tier the query layer returned.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "Marketing home (broken CTA target)",
+            "files": "apps/web/app/page.tsx",
+            "issue": "The Community teaser's 'Join the community' CTA links to /seek, not /community — the entire teaser is about the community feed but the button drops the user into the discovery feed. Mismatched affordance erodes trust on the primary marketing page.",
+            "fix": "Point the teaser CTA at /community (matching its copy). If /community requires auth, route guests to /sign-up?next=/community or soften the label to match the actual destination.",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "Route transitions (public)",
+            "files": "apps/web/app/page.tsx, apps/web/app/page.module.css, apps/web/app/(legal)/layout.tsx",
+            "issue": "The three dashboard OSes received view-enter route transitions, but the public surfaces (home, legal/about) have none — only a one-off hero-bg reveal on home. Navigating between Explore/Community/About feels static and cheaper than the authed product, breaking the 'same premium product' goal.",
+            "fix": "Add a tokenized view-enter transition (transform/opacity only, reduced-motion-safe) to the public main wrappers mirroring the dashboard treatment — ideally a shared utility so home, search results, and legal pages all inherit the same entrance.",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "FeaturedEmployersRail (mobile)",
+            "files": "apps/web/components/public/FeaturedEmployersRail.module.css",
+            "issue": "At 390px the rail cards are min-width 248px inside a parchment section padded var(--space-14) each side, while a 36s auto-scroll keeps moving cards out from under the thumb. Combined with the duplicate-array loop, mobile users get a card that slides away mid-read with no manual control (next button is display:none on mobile). The 56px edge-fade gradients also eat usable width on a 390px screen.",
+            "fix": "On mobile, disable auto-scroll entirely and use horizontal scroll-snap so the user controls pacing; reduce edge-fade width on small screens; ensure one card is comfortably readable within 390px minus gutters with no clipped badge.",
+            "severity": "high",
+            "mobile": true
+          },
+          {
+            "surface": "Category reel (home)",
+            "files": "apps/web/app/page.module.css, apps/web/app/page.tsx",
+            "issue": "The category reel duplicates 4 cards and auto-scrolls 28s infinitely with the duplicate set marked aria-hidden tabIndex=-1 — but on mobile (reelCard min-width 140px) this is a perpetually-moving carousel of only 4 real destinations, which reads as filler motion rather than purposeful hierarchy. Two competing auto-scrollers (category reel + employer rail) on one page create restless, unfocused motion against the 'one dominant element per module' rule.",
+            "fix": "Consider making the category reel a static 4-up grid on desktop and a scroll-snap row on mobile (4 categories don't need an infinite loop). At minimum, don't run two infinite auto-scrolls simultaneously — pick one signature motion moment for the page.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "DiscoveryShowcaseCard",
+            "files": "apps/web/components/discovery/DiscoveryShowcaseCard.tsx, apps/web/components/discovery/DiscoveryShowcaseCard.module.css",
+            "issue": "A second, parallel listing-card component exists alongside the canonical DiscoveryCard primitive, with its own hero/triad/CTA markup and 5 raw rgba values. Two divergent card systems for the same data violates the 'one unified component system' rule and risks visual drift (triad shows raw summary strings, different badge treatment than DiscoveryCard).",
+            "fix": "Audit whether DiscoveryShowcaseCard is still used; if so, either retire it in favor of DiscoveryCard (surface='discovery_feed') or document why a distinct showcase variant is needed and fold it into the primitive as a variant. Tokenize its remaining raw colors regardless.",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "PublicBottomNav (visual depth)",
+            "files": "apps/web/components/public/PublicBottomNav.module.css",
+            "issue": "The public bottom nav is a flat light bar with a single inset-ring active state — functional but visibly less premium than the dashboard shells' glass command bars. On the marketing home (light paper) it has almost no presence/depth, so the primary mobile navigation reads as an afterthought versus the authed product's nav.",
+            "fix": "Elevate to match the dashboard nav language: stronger glass token, a clearer active-tab treatment (e.g. accent underline or filled pill with category/scope accent), and ensure the active icon gets an accent color rather than only a background swap. Keep the 4-tab lock.",
+            "severity": "low",
+            "mobile": true
+          },
+          {
+            "surface": "DiscoveryCard CTA decoration",
+            "files": "packages/ui/src/DiscoveryCard.tsx",
+            "issue": "Schedule/Skip badges and buttons render literal ASCII decoration glyphs ('≥—' and '—≤') as faux flourishes (lines 573-577, 911-913). These are not iconography, read as mojibake to some users/AT, and are brittle across fonts.",
+            "fix": "Replace the ASCII decoration with a proper Streamline Icon or a tokenized CSS rule/divider element. They're aria-hidden, but they still render visually and cheapen an otherwise premium card.",
+            "severity": "low",
+            "mobile": false
+          }
+        ],
+        "alreadyStrong": [
+          "DiscoveryCard primitive is genuinely premium and category-aware: per-category accent/glow tokens, locked 7-zone skeleton, honest empty-state handling (hides 'Location not specified', collapses begins/ends to opportunity window, category watermark instead of fake photo), match/fill bars, full state machine (applied/boosted/matched/etc). Do not redesign.",
+          "EmptyState.module.css is fully tokenized (0 raw colors) and supports a framed paper-plate AppIllustration — the right premium dead-end treatment.",
+          "PublicBottomNav correctly honors the founder-locked 4-tab set (Seek/Map/Swipe/Profile) with focus-visible, active state via inset ring, safe-area inset, and backdrop blur — do not add a 5th tab.",
+          "QuickPeekDrawer composes the shared PopupShell + Button primitives, uses real server saveListingAction with saved/saving states, and never fabricates pay (falls back to provision label). Honest data handling.",
+          "About page (legal/about) has strong, on-brand copy and a real HOUSING/MEALS/PAY 'three questions' treatment — never collapses to 'Perks'.",
+          "DiscoveryFeed responsive grid (1→2→3 cols) is clean, tokenized, and mobile-first with no overflow risk at 390px.",
+          "Home/search/community correctly preserve the boosted-vs-fallback DB boundary and only fall back to fixtures when Supabase is unconfigured — business logic is sound."
+        ]
+      },
+      {
+        "domain": "Host dashboard (apps/web/app/(host)/** + components/host/**)",
+        "routes": 12,
+        "weaknessCount": 11,
+        "critical": 1,
+        "high": 4,
+        "topPriorities": [
+          "Fix the undefined-token rot that ships to users: re-tokenize InvitesList.module.css (LIVE, broken borders/contrast on dark scope) and delete or re-tokenize the orphaned ApplicantPipelineRow/HostStatStrip — these reference tokens that do not exist anywhere in tokens.css.",
+          "Remove fabricated data the query layer doesn't back: the invites '90%+ match seekers' audience targeting and the listings BOOST_SLOT_CAPACITY=12 paid-slot meter both present founder-gated/non-existent data as fact — reframe to honest, non-match facets and drop the fake denominator.",
+          "Make the analytics StageChart readable at 390px (cap stages or switch to a horizontal bar list) — up to 8 cramped 38px columns with wrapping labels is the one place analytics drops below the bar on mobile.",
+          "Close the mobile 'what should the host do next' gap: surface 'New listing' (and search) in the mobile chrome so the host's primary job isn't buried in the More drawer on deep pages.",
+          "Lift the overview 'Application pipeline' panel and the invites sent-rows to match the density/structure of their neighbors (radar, campaign funnels, HostApplicantCard) so no surface reads as a flat placeholder."
+        ],
+        "weaknesses": [
+          {
+            "surface": "Invites — sent list",
+            "files": "apps/web/app/(host)/host/invites/InvitesList.module.css",
+            "issue": "Renders LIVE but is built on undefined tokens: --color-border, --color-surface (raw, the colon-suffixed one is defined but bare --color-surface usage relies on it), --color-text-primary, --color-text-secondary, --color-text-link, --type-body-sm, --type-body-xs, --radius-md/--radius-sm are NOT defined in tokens.css repo-wide. Item borders, seeker-name color, listing-name color, message bg, and select border all fall back to inherited/initial values — on the dark host scope this means invisible or wrong-contrast borders and text. This is a real visual bug, not a nicety.",
+            "fix": "Re-tokenize against the locked set used everywhere else in host: --border-soft (borders), --color-surface-raised/--color-surface (surfaces), --text-primary/--text-secondary/--text-muted (text), --color-cta (link/focus), --type-meta-size/--type-body-size (type), --radius-card/--radius-cell/--radius-pill (radii). Add :focus-visible (box-shadow: var(--ui-focus-ring)) to .listingSelect instead of the bare border swap, and an :active state.",
+            "severity": "critical",
+            "mobile": true
+          },
+          {
+            "surface": "Dead components carrying undefined tokens",
+            "files": "apps/web/components/host/ApplicantPipelineRow.module.css + ApplicantPipelineRow.tsx; apps/web/components/host/HostStatStrip.* ",
+            "issue": "ApplicantPipelineRow and HostStatStrip are imported nowhere (grep-confirmed). ApplicantPipelineRow.module.css uses the same undefined tokens (--color-border, --type-body-sm/xs, --color-text-*, --radius-full) and has NO focus-visible, NO active, NO mobile media query — it is exactly the kind of flat, non-premium row the bar forbids. They are latent rot that will get copied.",
+            "fix": "Delete the orphaned ApplicantPipelineRow.* and HostStatStrip.* (the active equivalents are HostApplicantCard + the page-level MetricGrid). If kept for a planned use, re-tokenize and add focus-visible/active/390px reflow — but deletion is cleaner.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "Invites — campaign builder",
+            "files": "apps/web/app/(host)/host/invites/page.tsx (lines ~189-217)",
+            "issue": "The 'Audience' select hard-codes '90%+ match seekers' and the textarea/volume controls imply a real targeting engine, but nothing submits and match data is founder-gated / not exposed by the query layer. This fabricates a match capability the product doesn't have (violates the no-fabricated-match-data constraint) and reads as a dead, non-functional form (no button, selects do nothing) — a 'looks premium but does nothing' trap.",
+            "fix": "Reframe as an explicit planning aid that does not claim match %: relabel audience options to honest, non-match facets the data supports ('Housing-seeking', 'Ready now', 'By category') and remove the '90%+ match' language. Either wire the builder to pre-fill SeekerSearchDrawer (selectedListingId + message) on a real CTA, or demote it to a labeled 'draft your angle' note so the surface has no inert controls. Keep the live-campaigns funnel (that part is honest).",
+            "severity": "high",
+            "mobile": true
+          },
+          {
+            "surface": "Listings — boost capacity meter",
+            "files": "apps/web/app/(host)/host/listings/page.tsx (BOOST_SLOT_CAPACITY = 12, boostPct, the X/12 meter)",
+            "issue": "BOOST_SLOT_CAPACITY = 12 is an invented denominator; the meter shows boostedUsed/12 as if 12 paid homepage slots exist for this host. Boosted-slot inventory is explicitly named as a metric the query layer doesn't expose — this is fabricated billing-adjacent data presented as fact.",
+            "fix": "Drop the fake /12 denominator. Show only the honest numerator ('N listings boosted') as a count, or gate the capacity meter behind real plan inventory once exposed. If a meter is desired, base it on a real ratio (e.g. boosted of live listings) and label it as such, not as paid-slot capacity. Preserve the static BOOST_TIERS strategy copy (it drives nothing) but make sure it doesn't read as a live quota.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "Analytics — bar chart at 390px",
+            "files": "apps/web/components/host/HostAnalyticsDashboard.module.css (.chart / .chartLabel, @639px block)",
+            "issue": "StageChart renders one column per non-empty stage (up to 8: applied/reviewing/saved/offered/accepted/declined/withdrawn/not_selected). At 390px with grid-auto-columns:1fr and 8 columns, each column is ~38px; .chartLabel only drops to 0.6rem and stays horizontal — multi-word labels ('Not selected','Reviewing') will wrap to 3 lines or clip, and 3.25rem max bars crammed 8-across reads noisy. No overflow guard.",
+            "fix": "At <=639px cap visible stages (e.g. top 4 by count + an 'Other' aggregate) OR switch the chart to a horizontal bar list (label + value + track) which is far more readable on a 390px column and matches the radar-legend pattern already used on the overview. Keep role=img + aria-label.",
+            "severity": "high",
+            "mobile": true
+          },
+          {
+            "surface": "Applicants — recommended-seekers rail meter honesty",
+            "files": "apps/web/app/(host)/host/applicants/page.tsx (leadSignal, 70..96 band)",
+            "issue": "leadSignal() maps every applicant into a confident 70-96% 'Lead signal' meter derived only from how complete the LISTING's triad is — so two applicants to the same listing get identical meters, and the number says nothing about the seeker. It visually reads as a per-seeker match/quality score (which is founder-gated), risking the same fabricated-signal problem. The comment acknowledges this but the UI doesn't communicate it.",
+            "fix": "Either relabel the meter to what it actually measures ('Listing readiness' / 'Lead warmth — triad complete') so it can't be read as seeker fit, or replace the meter with honest per-applicant facts (stage chip + appliedOn + has-cover-note). Don't show a precise % that implies seeker scoring.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Shell — mobile bottom nav 'New listing' affordance",
+            "files": "apps/web/components/host/HostShell.tsx (hostos-top + hostos-mnav)",
+            "issue": "The primary 'New listing' CTA and CommandSearch live only in the desktop top bar (hostos-top). On mobile the bottom nav is Overview/Listings/Applicants/Messages/More — the single most important host action (create a listing) and search are not reachable from the mobile chrome; the hero CTA exists only on /host overview, so on any deep page the host's top job is buried in the More drawer.",
+            "fix": "Add a persistent mobile entry to create a listing (e.g. a floating compose action or surface 'New listing' + search in a mobile top bar) so the host's primary job isn't gated behind More. Keep the 4 primary tabs; this is additive chrome, not a 5th tab. (Host nav is not the founder-locked seeker 4-tab — that lock is seeker-only.)",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Overview — application pipeline panel feels thin",
+            "files": "apps/web/components/host/HostDashboard.tsx (twoCol → 'Application pipeline' section, lines ~289-312)",
+            "issue": "The left 'Application pipeline' panel is a single Meter + one line of text, sitting next to the visually rich Conversion radar. The asymmetry makes the left panel read as an empty/flat card — weak hierarchy and no dominant element on that half. On mobile the two stack and the thin meter panel looks like a placeholder.",
+            "fix": "Enrich the pipeline panel to match the radar's density: add the per-stage mini-breakdown (reuse the overview's own radarTrack/legend pattern or a compact StageChart) so 'reviewed N of M' is shown as a 3-4 stage bar, giving the panel a dominant visualization instead of a lone meter.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Invites — sent list rows generic",
+            "files": "apps/web/app/(host)/host/invites/InvitesList.tsx + InvitesList.module.css",
+            "issue": "Beyond the undefined-token bug, the sent-invite rows are flat stacked cards (name + badge + listing + date + Withdraw) with no avatar, no status-progress affordance, no scan rhythm — they look like default SaaS list items, weaker than the campaign funnel cards directly above them and inconsistent with HostApplicantCard's avatar+structured layout one tab over.",
+            "fix": "Bring the rows up to the applicant-card pattern: initials avatar, status as a progress pip (Sent→Delivered→Viewed→Applied), right-aligned Withdraw with proper Button states, and tokenized surfaces/borders. Mirror HostApplicantCard's structure so invites and applicants feel like one system.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Invites page — split layout at 390px",
+            "files": "apps/web/app/(host)/host/invites/page.module.css (.split)",
+            "issue": "The campaign builder + live campaigns sit in a .split grid. Need to confirm it collapses to 1fr at mobile and that the 5-field form (4 selects + textarea) doesn't overflow at 390px; the builder also adds significant vertical length before the host reaches the real 'Sent invites' flow, hurting mobile section rhythm.",
+            "fix": "Verify .split → single column at <=900/639px with no horizontal overflow; on mobile consider collapsing the (non-functional) builder into a disclosure so the real sent-invites/withdraw flow is reachable without a long scroll. Tighten section gaps on mobile.",
+            "severity": "low",
+            "mobile": true
+          },
+          {
+            "surface": "Profile hero — CTA/social link states",
+            "files": "apps/web/components/host/HostProfileHero.tsx + HostProfileHero.module.css",
+            "issue": "HostProfileHero is the host's public brand page but the social links + 'View listings' anchor need verification for focus-visible/hover/active and dark-mode contrast; as the brand surface it should feel the most editorial, and any flat pill chips (categories/benefit signals) risk reading generic if they reuse plain surface tokens without the framed/atmospheric treatment used on cards.",
+            "fix": "Confirm every anchor (ctaPrimary, socialLink) has focus-visible + hover + active and tokenized colors; give the category/benefit-signal chips the same lane-atmosphere accent the rest of host uses (category gradient tint) so the profile reads as a premium brand page, not a settings summary.",
+            "severity": "low",
+            "mobile": false
+          }
+        ],
+        "alreadyStrong": [
+          "HostAnalyticsDashboard: token bar chart + conversion radial + per-listing diagnosis cards are genuinely premium, honestly data-derived (sparkFromCount/conversionScore documented as non-fabricated), with staggered bar animation, reduced-motion guard, and a real tier-gate overlay — clears the ≥8 bar",
+          "HostDashboard overview: single dominant next-action hero (heroPrimary), 'Needs attention' triage list, conversion radar with explainable 3-signal legend, all-caught-up empty state — strong 'what to do next' logic that respects no-fabrication (radar built only from existing signals)",
+          "HostApplicantCard (the ACTIVE applicant row): fully tokenized, avatar + 3-up action grid that collapses to 1col at 639px, focus-visible ring on name link, hover elevation — scannable and on-system",
+          "HostShell OS chrome: scoped sidebar host-card, grouped nav with sub-labels, CommandSearch, plan-status foot (Current plan / Manage plan & boosts), unread badges, mobile bottom-nav + More drawer — a real command center, not a SaaS sidebar",
+          "HostListingCard: framed 16:9 cover with category gradient + paper-mat inner frame (frame-not-filter), HOUSING/MEALS/PAY triad pills (not 'Perks'), labeled gold Boost action, full focus-visible/hover/active/disabled states, 479px reflow",
+          "Invites campaign funnel cards (live campaigns): honest funnel derived from real invite statuses (sent/opened/applied/cold), tone pills, accessible role=meter funnel bar"
+        ]
+      },
+      {
+        "domain": "Admin / Moderator dashboard — apps/web/app/(admin)/** + apps/web/components/admin/**",
+        "routes": 9,
+        "weaknessCount": 15,
+        "critical": 2,
+        "high": 6,
+        "topPriorities": [
+          "FIX THE RAW-CLERK-ID LEAK on /hosts (AdminHostsTable.tsx 153-163) — it is a hard-constraint violation and reads as raw-database UI; reuse the applications table's derived '#XXXX' identity pattern.",
+          "FIX BROKEN MODERATION ROUTING — Review button, detail back-link, and all four revalidatePath calls point at non-existent /admin/* paths, so triage dead-ends and approve/verify never refresh the list (AdminListingsTable.tsx:286, listings/[id]/page.tsx:32, actions/admin.ts:43/70/101/131).",
+          "REBUILD /listings/[id] AS A REVIEW WORKBENCH — today it is a lone 22rem card on empty dark canvas with zero moderation context; add a 2-col checklist/decision panel. Highest-leverage missing surface and the worst desktop-composition score.",
+          "TOKENIZE + DARK-THEME /admin/email-preview — it is reachable from the sidebar yet built from raw hex/px/inline styles and renders light inside the dark Admin OS; convert to a token-driven CSS module.",
+          "STOP FABRICATING METRICS — remove the invented sparkline series on the overview MetricCards and the static 'Housing · Meals · Pay' chip on listing rows whose pay may be missing; design honest risk signals instead.",
+          "DELETE DEAD CHROME (AdminSidebar/AdminHeader/StatCard/AdminTable.module.css) and fix stale dev/surfaces.ts hrefs to keep AdminShell the single source of nav truth.",
+          "MOBILE TRIAGE: add the queue badge to the mobile Queue tab, segment/sort the applications & hosts queues by priority, add filter toolbars to Hosts & Applications, and give every queue row a working next-step action."
+        ],
+        "weaknesses": [
+          {
+            "surface": "/hosts",
+            "files": "apps/web/components/admin/AdminHostsTable.tsx (lines 153-163) + AdminHostsTable.module.css (.tag/.tagMono ~lines 201-234)",
+            "issue": "HARD-CONSTRAINT VIOLATION: the host entity card renders the raw Clerk user id verbatim as a visible mono tag ('{host.clerkUserId || \"No Clerk ID\"}') and also leaks it in a title attribute. The CSS comment literally says 'clerk identity facts'. This is exactly the 'never show raw Clerk IDs to users' prohibition, and it reads as raw-table/database feel — the antithesis of premium.",
+            "fix": "Delete the clerkUserId tag. Replace with the same derived reference the applications table uses (apply the applicantIdentity pattern from AdminApplicationsTable.tsx: short '#XXXX' tail + initials), or drop the identity tag entirely and keep only the listing-count fact. Never pass clerkUserId to a title attribute either.",
+            "severity": "critical",
+            "mobile": false
+          },
+          {
+            "surface": "/listings + /listings/[id]",
+            "files": "apps/web/components/admin/AdminListingsTable.tsx (line 286), apps/web/app/(admin)/listings/[id]/page.tsx (line 32), apps/web/app/actions/admin.ts (lines 43,70,101,131)",
+            "issue": "Broken routing: the actual routes are /listings, /hosts, /applications, /listings/[id] (top-level in the (admin) group), but the Review button pushes to '/admin/listings/${id}' (404), the detail back-link points to '/admin/listings' (404), and the approve/reject/verify server actions revalidatePath('/admin/listings' | '/admin/hosts') — the WRONG paths, so the real /listings and /hosts pages never refresh after a moderation action. Triage is literally dead-ended.",
+            "fix": "Change router.push to `/listings/${listing.id}`; change the back Link href to '/listings'; change all four revalidatePath calls to '/listings' and '/hosts' (and add revalidatePath('/admin') so the overview ops strip updates). Preserve the server-action logic otherwise.",
+            "severity": "critical",
+            "mobile": false
+          },
+          {
+            "surface": "/admin/email-preview",
+            "files": "apps/web/app/(admin)/admin/email-preview/page.tsx (lines 17-44, 58-80)",
+            "issue": "This reachable sidebar route ('Email templates') is built entirely from raw inline-style hex (#24221E, #6E685D, #E7E1D3), raw px font sizes (22px, 14px, 13px), and ad-hoc px radii (10px) — a direct zero-raw-hex / no-px-type / no-ad-hoc-radii violation. It renders LIGHT/paper-themed inside the dark-glass emerald Admin OS, so it looks like a different, unfinished app dropped into the command center.",
+            "fix": "Replace inline styles with a CSS module (email-preview.module.css) using semantic tokens (--text-primary/secondary, --color-surface(-raised), --border-soft, --type-* sizes, --radius-card/--radius-pill, --space-*). Compose the index as token-driven glass list rows matching the other (admin) surfaces so it inherits the dark scope. Keep the per-template iframe/render light if it must mirror real email, but the chrome must be Admin-OS dark.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "Whole domain (dead code / drift risk)",
+            "files": "apps/web/components/admin/AdminSidebar.tsx (+AdminSidebar.module.css), AdminHeader.tsx (+AdminHeader.module.css), StatCard.tsx (+StatCard.module.css), AdminTable.module.css; exports in apps/web/components/admin/index.ts (lines 2-4,11 partial)",
+            "issue": "AdminSidebar, AdminHeader, StatCard and AdminTable.module.css are imported by NO live route (layout uses AdminShell). AdminSidebar still hard-codes the broken /admin/listings, /admin/hosts, /admin/applications links — a live drift hazard if anyone re-mounts it. Dead chrome dilutes the single-source-of-truth shell.",
+            "fix": "Remove AdminSidebar, AdminHeader, StatCard, AdminTable.module.css and their exports from index.ts (verify no other importers first — grep confirmed none). Also fix the stale hrefs in apps/web/components/dev/surfaces.ts (lines 68-70) to the real /listings, /hosts, /applications.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "/applications (mobile triage)",
+            "files": "apps/web/components/admin/AdminApplicationsTable.module.css (.metricGrid lines 17-21) + AdminApplicationsTable.tsx",
+            "issue": "At 390px the four metric tiles use minmax(158px,1fr) auto-fit — 158px + gap forces a 2-up grid that is borderline but the .row stack and 4 separate metric tiles consume a tall scroll before the moderator reaches the first triable item; the queue has no priority sort surfaced (rows are raw recency order) and the per-row Review button is permanently disabled, so on mobile a moderator sees a wall of identical disabled cards with no actionable next step. First-impression and conversion both suffer.",
+            "fix": "On mobile, collapse the 4 metric tiles into a compact 2x2 or a single summary strip (reuse the overview .opsStrip pattern). Sort/segment the queue so aging (>7d) or 'awaiting review' items pin to the top with a visible 'Needs review' lane header. If no mutation action exists yet, replace the disabled Review button with an honest secondary action that DOES work (e.g. 'Open listing' → /listings/[id]) so every row has a real next step.",
+            "severity": "high",
+            "mobile": true
+          },
+          {
+            "surface": "/admin overview",
+            "files": "apps/web/app/(admin)/admin/page.tsx (lines 87-116, 92-114 spark arrays)",
+            "issue": "The MetricCard spark arrays are FABRICATED trend curves (e.g. [40,56,48,70,62,78, reviewQueue*8+20]) — invented time-series the query layer never returns. The benchmark constraint forbids fabricating DB-backed metrics; a sparkline implies historical movement that doesn't exist. Also 'Marketplace health' is a derived composite presented as a headline % with an authoritative meter, which can read as a real KPI it isn't.",
+            "fix": "Drop the synthetic spark prop on these overview MetricCards (or pass a flat/empty series so MetricCard renders without a fake trendline), and keep only the honest current-count value. Label health as 'composite (derived)' in the panelNote so it is not mistaken for a tracked metric. Do not invent movement.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "/listings risk communication",
+            "files": "apps/web/components/admin/AdminListingsTable.tsx (lines 239-244) + AdminListingsTable.module.css (.tag)",
+            "issue": "Every listing row shows a hard-coded literal 'Housing · Meals · Pay' tag regardless of whether the listing actually discloses pay/housing — and the moderation contract elsewhere flags 'Pay range pending'. Presenting a static triad chip on a row whose pay may be MISSING is dishonest and undercuts the moderator's risk read (the one thing they must catch). The benchmark's queue surfaces real risk ('Needs pay range', 'High risk').",
+            "fix": "Replace the static 'Housing · Meals · Pay' tag with real per-listing risk signals derived from the moderation data (e.g. 'Pay missing', 'No housing disclosed', 'Under review Nd') — or remove it. If the moderation query doesn't expose triad completeness, omit the chip rather than asserting it. Tie the .rowReview accent to actual risk reasons surfaced as a chip.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "All three tables (filter/search affordance)",
+            "files": "apps/web/components/admin/AdminApplicationsTable.tsx, AdminHostsTable.tsx (no toolbar), AdminListingsTable.tsx (lines 152-173)",
+            "issue": "Only Listings has filter tabs. Applications and Hosts have no filter, no sort, no in-page search — a moderator triaging hundreds of hosts/applications cannot narrow to 'pending verification' or 'aging > 7d'. The benchmark queue has a left review-rail + status segmentation. Filter affordance is inconsistent across the domain and absent where volume is highest (8.2k seekers / 412 hosts in the benchmark fixtures).",
+            "fix": "Add a shared filter/segment toolbar (extract the AdminListingsTable .tabs pattern into a small reusable client control) to Hosts (All / Verified / Awaiting review) and Applications (All / Awaiting / Decided / Aging). Wire the topbar CommandSearch to actually filter the active list rather than only submitting to /applications.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Catch-all loading state",
+            "files": "apps/web/app/(admin)/loading.tsx + loading.module.css (.statGrid 2-up, generic stat cards, table rows)",
+            "issue": "The shared loading skeleton is a GENERIC stat-grid + table-rows placeholder that matches none of the real content shapes (overview = board hero + MetricGrid + split panels; listings = photo-forward rows; hosts = 3-col entity cards). On every (admin) navigation the moderator sees a layout that then re-flows entirely, causing a perceived jump and a non-premium 'wireframe flash'. Comment even references the removed sidebar.",
+            "fix": "Make loading.tsx content-shaped: a board-hero block + a 4-up MetricCard skeleton row matching MetricGrid, plus a few card-shaped (not bare-bar) row skeletons. Ensure the Skeleton primitive uses shimmer (not opacity-pulse) per the scorecard. Update the stale 'header + sidebar' comment.",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "/listings/[id] detail",
+            "files": "apps/web/app/(admin)/listings/[id]/page.tsx (lines 29-45) + page.module.css (.cardWrap max-width:22rem)",
+            "issue": "The listing-review detail is a thin header + a single 22rem-wide DiscoveryCard floating on a huge empty dark canvas. There is NO moderation context a reviewer needs to decide: no host trust panel, no evidence/photos rail, no policy-check list (pay disclosed? housing disclosed? flagged reasons?), no audit trail. The benchmark review panel is a 3-row workbench (evidence grid + decision row). At ≥1024px this is a centered narrow column on a wide screen — exactly the ≤5 desktop-composition anti-pattern.",
+            "fix": "Rebuild as a 2-col review workbench at ≥1024px: left = the DiscoveryCard preview; right = a glass 'Moderation checklist' panel (pay range present, housing disclosed, host verified, prior flags) + the approve/warn/remove decision row pulled up from the card. Reuse overview .panel + .diagRow patterns. Collapse to single column on mobile. This is the highest-leverage missing surface.",
+            "severity": "high",
+            "mobile": true
+          },
+          {
+            "surface": "Overview → queue handoff",
+            "files": "apps/web/app/(admin)/admin/page.tsx (lines 142-201, 197-200)",
+            "issue": "The overview 'Live review queue' is purely informational — four static count rows with one bottom CTA to /applications. Rows are not clickable, so a moderator who sees 'Hosts pending verification: 5' cannot jump to that filtered view; they land on the generic applications list. The benchmark overview routes each ops node to its surface. Conversion/next-step is weak.",
+            "fix": "Make each queueRow a Link to its real destination (Applications awaiting → /applications, Listings under review → /listings?filter=under_review once the listings filter reads a query param, Hosts pending → /hosts?filter=pending). Add hover/active states matching .row. Wire the listings filter tabs to read an initial filter from searchParams.",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "Hosts trust card (risk depth)",
+            "files": "apps/web/components/admin/AdminHostsTable.tsx (lines 112-191) + AdminHostsTable.module.css",
+            "issue": "The host card communicates trust as a binary (VerifiedHostBadge vs 'Awaiting review') plus a listing count. There is no risk gradient — no signal for 'listing flagged', 'high conversion', 'new host', 'documents uploaded' that the benchmark hosts surface shows as tags. A moderator cannot triage WHICH unverified host to review first; all pending hosts look identical.",
+            "fix": "Add a tag/signal row driven by real fields (listing count, flagged-listing count if exposed, account age/new-host) and tone the card border by risk like .rowReview in listings. Keep it honest: only render signals the getAllHostProfiles query actually returns; if a field isn't available, omit rather than fabricate.",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "Mobile bottom nav (no badge)",
+            "files": "apps/web/components/admin/AdminShell.tsx (lines 154-164) + admin-os.css (.adminos-mtab ~line 510)",
+            "issue": "The desktop sidebar + topbar show the queue/unread badge, but the mobile bottom-nav 'Queue' tab carries NO badge — on mobile (the triage-on-the-go case the constraints care about) the moderator loses the single most important signal: how many items await review. Benchmark mobile nav carries the danger count.",
+            "fix": "Render the queueCount badge on the mobile Queue tab (a small absolutely-positioned .adminos-bdg--top style dot/count on the Applications mtab when queueCount>0), token-driven and reduced-motion-safe.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Listings actions density (mobile)",
+            "files": "apps/web/components/admin/AdminListingsTable.tsx (lines 260-291) + AdminListingsTable.module.css (.actions @max-width:639px lines 320-344)",
+            "issue": "Each listing row stacks THREE buttons (Approve / Reject / Review) that on mobile wrap into a cramped row inside .actionsStack alongside the figure; with primary+ghost+secondary all competing there is no single dominant action, violating 'one clear primary action'. At 390px three pill buttons + a figure in one flex row will crowd or wrap awkwardly.",
+            "fix": "Establish hierarchy: keep Approve as the single primary, demote Reject/Review into an overflow or a secondary group; on mobile make the primary full-width and the secondary actions a compact icon-button pair. Ensure each tap target stays ≥44px and the row never horizontally overflows at 390px.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Overview raw rem/unitless type",
+            "files": "apps/web/app/(admin)/admin/overview.module.css (e.g. lines 53,57,113,131-143,159,205,216,242,265,302,386-402)",
+            "issue": "overview.module.css uses many raw rem font-sizes and ad-hoc values (0.72rem, 0.7rem, 1.55rem, 1.5rem, 1.2rem, 0.86rem, 2.6rem, 1.05rem, 0.9rem, font-weight:700/600 literals) instead of the locked --type-* / --font-weight-* tokens used by the table CSS. It works but drifts from the token system and is inconsistent with the sibling components — a component-consistency / implementation-quality ding the scorecard penalizes.",
+            "fix": "Replace raw rem font-sizes with the nearest --type-*-size/-lh tokens and literal font-weights with --font-weight-* tokens, matching AdminListingsTable.module.css discipline. No visual redesign required — just tokenize.",
+            "severity": "low",
+            "mobile": false
+          }
+        ],
+        "alreadyStrong": [
+          "Shell chrome (apps/web/styles/admin-os.css) is genuinely benchmark-grade: glass sidebar, emerald-aurora background, conic brand mark, sticky topbar, focus-visible rings (2px paper + 4px emerald), :active press on nav/tact/account/mtab, view-enter (.adminos-view) re-mount transition, color-scheme:dark, reduced-motion blanket. Do not re-touch.",
+          "CommandSearch is wired into the topbar with proper :focus-within emerald ring and kbd hint — a real search affordance, not a fake input.",
+          "Overview board (overview.module.css) has a strong dark-glass hero with radial CTA wash, animated live-dot, ops strip with hot/good tones, and a health meter with role=meter + aria — a real command board, not a stat grid.",
+          "Empty states are designed across all three tables (queue-clear / no-hosts / clear-filter) with success-toned icon marks and honest copy, not bare 'No data'.",
+          "AdminApplicationsTable already solves the raw-Clerk-ID problem correctly: derives 'Seeker #XXXX' + initials, keeps the full id as the React key only — this is the pattern the hosts table should copy.",
+          "Token discipline in the live table CSS is clean: color-mix on semantic tokens, no raw hex, locked radii/space, reduced-motion guards on hover/spark.",
+          "Listing moderation rows encode risk with a featured-accent edge (.rowReview) and surface a 'Pay range pending' missing-figure in error-fg — honest, scannable triage."
+        ]
+      },
+      {
+        "domain": "Seeker dashboard (apps/web/app/(seeker)/** + components/seeker/** + components/map/**)",
+        "routes": 16,
+        "weaknessCount": 12,
+        "critical": 0,
+        "high": 4,
+        "topPriorities": [
+          "Make the Matched rail actually reason: add honest, listing-derived 'why this matches' chips (housing/pay/lane/timeline) and render the score band only when matchScore is real — turning the primary tab's hero rail from decorative cards into a trustworthy recommendation (MatchCardRail.tsx).",
+          "Fix mobile section rhythm at 390px: ProfileHub 5-cell statusRow (2-2-1 orphan) and the SeekerDashboard lifecycle teasers (3→2 orphan) both break exactly at the target width — move to auto-fit/3-col grids and cut the redundant teaser row that triples 'Offers'.",
+          "De-duplicate the two identity systems (SeekerHero vs ProfileHub) into one SeekerIdentityHero + StatCellRow primitive, and tokenize the score badges, category-pill tints, and focus rings so the off-system green is gone and dim-11/dim-13 drift across MatchCardRail/SeekerHero/ProfileHub is closed.",
+          "Cut resume-builder friction on mobile: replace the off-screen overflow-x step tabs with a compact 5-node segmented progress + live completion % + sticky 'Save & continue', and reuse that same % everywhere the dashboard claims '3× more invites' so the promise is honest.",
+          "Promote the one next-best-action callout to a filled, gradient, dominant CTA (offers/resume tones) so each module has a single dominant element, and turn flat empty states into completion-ring on-ramps that motivate profile completion."
+        ],
+        "weaknesses": [
+          {
+            "surface": "Matched-for-you rail",
+            "files": "apps/web/components/seeker/MatchCardRail.tsx; MatchCardRail.module.css",
+            "issue": "The 'match-reasoning' is a single binary pill ('Great match'/'Good match') derived from listing.matchScore. It tells the seeker NOTHING about WHY a listing matches (no 'Pays your range', 'Housing included', 'Starts when you're free', 'Maritime — your top lane'). This is the single biggest missed chance on the primary tab: the rail reads as decorative cards, not a reasoned recommendation. matchScore is also not honestly DB-backed everywhere — a hard-coded threshold pill on possibly-absent data risks fabricating confidence.",
+            "fix": "Add a 1–2 line reason strip under the title that composes 2 honest, query-derived tokens from the listing itself (housing.provision !== not_provided → 'Housing', payInsight present → '$X/'+unit, category ∈ profile.desiredCategories → lane label, beginsWithinRange of seekingTimeline → 'Starts in your window'). Render the score band ONLY when matchScore is truthy; otherwise show the reason chips with no score. Never invent a score.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "Matched-for-you rail",
+            "files": "apps/web/components/seeker/MatchCardRail.module.css",
+            "issue": "29 raw rgba()/#fff values: score badges (rgba(40,120,60) green, rgba(176,120,18) gold), focus ring (rgba(47,102,122,0.5)), benefit chips and pay chip all hardcode colors — scorecard dim 13 drift. The green/gold 'great/good' badges are off the V2 teal/gold token system and re-introduce the SaaS-green this repo just purged in commit 99dc512.",
+            "fix": "Replace score badge backgrounds with --status-match-* / --state-soon-* tokens; replace the focus box-shadow with var(--ui-focus-ring); keep only the photo-scrim rgba (legitimate frame-not-filter). On-photo white text/chips may stay rgba but the semantic status colors must tokenize.",
+            "severity": "high",
+            "mobile": false
+          },
+          {
+            "surface": "Profile hub identity + status",
+            "files": "apps/web/components/seeker/ProfileHub.module.css (statusRow ~L257-268)",
+            "issue": "statusRow is a 5-item grid that is repeat(2,1fr) until 640px — so on a 390px phone five stat cells render as 2-2-1 with an orphaned 'Upcoming' cell spanning oddly / unbalanced bottom row, breaking the section rhythm the audit calls out. The jump straight from 2-col to 5-col also skips the natural 3-col mid-band.",
+            "fix": "Use a single auto-fit grid (grid-template-columns: repeat(auto-fit, minmax(96px,1fr))) or 3-col at 390px so the five cells distribute evenly; reserve 5-col for ≥768px. Ensure each ui-stat cell stays ≥44px tap height at 390px.",
+            "severity": "high",
+            "mobile": true
+          },
+          {
+            "surface": "Dashboard ↔ Profile duplication",
+            "files": "apps/web/components/seeker/SeekerDashboard.tsx; SeekerHero.tsx; ProfileHub.tsx",
+            "issue": "There are TWO parallel seeker identity systems: SeekerHero (used on /seek) and ProfileHub's own hero+identityBar (used on /profile), each re-implementing avatar/cover/category-pills/bio-add/ReadinessSlider/stat cells with near-identical but drifting CSS (SeekerHero 45 raw colors, ProfileHub 12). They will visually desync. This is a component-consistency (dim 11) failure the scorecard penalizes.",
+            "fix": "Extract one SeekerIdentityHero primitive (cover + avatar + name + seeker badge + category pills + bio-add) and one StatCellRow, consume in both SeekerDashboard and ProfileHub. Single source for the identity treatment; delete the duplicated CSS.",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "Journey pipeline",
+            "files": "apps/web/components/seeker/JourneyPipeline.tsx; JourneyPipeline.module.css",
+            "issue": "The 5-step pipeline dots are only 38px (below the 44px tap target on the scorecard's mobile rule) and the labels are 10px uppercase — readable but thin. 'Matched' count is matchedListings.length which can be a fabricated/empty match set, and 'Accepted' shows a check from acceptedUpcoming truthiness with no date. The connector 'reached' logic marks the furthest-active step but doesn't communicate the CURRENT focus step.",
+            "fix": "Raise dot hit area to ≥44px (pad the Link, keep visual dot 38px) ; promote the current/most-urgent step with a subtly larger dot + the only colored label; when matched data is absent show 'Matched —' not a 0-count active dot. Tokenize the urgent amber (already uses --gradient-state-soon — good) and ensure label contrast ≥4.5.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Lifecycle teaser cards (/seek bottom)",
+            "files": "apps/web/components/seeker/SeekerDashboard.tsx (LifecycleTeasers); SeekerDashboard.module.css (~L212, L310)",
+            "issue": "Three teaser cards (Invites/Offers/Accepted) collapse to repeat(2,1fr) at ≤380px, leaving the 3rd card orphaned full-width on the bottom row — uneven rhythm exactly at the target breakpoint. They also duplicate the lifecycle nav already shown by JourneyPipeline + QuickStats higher on the same page (Offers appears 3×), diluting hierarchy.",
+            "fix": "Keep 3-col down to 360px (the icons+counts are narrow enough) OR collapse to a single horizontal row. Better: cut LifecycleTeasers entirely since JourneyPipeline + QuickStats already cover this lifecycle — replaces redundancy with a single dominant module per the one-dominant-element rule.",
+            "severity": "medium",
+            "mobile": true
+          },
+          {
+            "surface": "Resume builder",
+            "files": "apps/web/components/seeker/ResumeBuilder.tsx; ResumeBuilder.module.css (stepNav L40-51)",
+            "issue": "The 5-step wizard (Info/Experience/Education/Certs&Skills/Review) is the highest-friction surface (1658 lines) and the stepNav is a horizontal overflow-x scroller — on 390px the later steps ('Review') are off-screen with no progress %/affordance visible, so the seeker can't see how far they are or that 'Review' exists. The dashboard promises '3× more invites' but the builder doesn't surface live completion % or a per-step completeness check.",
+            "fix": "Replace the scrolling tab strip with a compact segmented progress bar (5 nodes + a live completion %, reusing the ResumeCallout ring logic) that fits 390px without scroll; mark each step complete/incomplete; add a sticky bottom 'Save & continue' so the primary action is always reachable. Surface the same completion % the dashboard cites so the claim is honest.",
+            "severity": "high",
+            "mobile": true
+          },
+          {
+            "surface": "Empty / motivational states",
+            "files": "apps/web/components/seeker/MatchCardRail.tsx (EmptyState); apps/web/app/(seeker)/saved|applied|offered/page.tsx",
+            "issue": "Match-rail empty state ('No matches yet → Build resume') and lifecycle empties are competent but flat — they don't motivate profile completion with a progress signal or preview of the reward. They read as dead-ends, not nudges. The dashboard's strongest motivator (the resume completion ring + '3× more invites') only appears in ResumeCallout, not in the empty states where motivation matters most.",
+            "fix": "In MatchCardRail EmptyState and the saved/applied empties, compose the resume completion ring + a one-line 'Finish your profile to unlock matches' with the live %, linking to /resume. Make the empty state the on-ramp, not a wall.",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "Map metric rail honesty",
+            "files": "apps/web/components/map/MapView.tsx (atlas useMemo L97-120)",
+            "issue": "The metric rail derives 'Top match X%' from listing.matchScore which may be unset (defaults to 0 → silently falls back to 'Verified hosts'); fine, but 'Regions in reach: Coast to coast' is a hard-coded trend label regardless of actual spread, and 'Housing on site' counts only coordinate-bearing listings, undercounting vs the seeker's real reachable set. Minor honesty/over-claim risk per the no-fabricated-metrics constraint.",
+            "fix": "Make the 'Coast to coast' trend conditional on actual region span (e.g. >1 timezone or >N regions), and label the housing metric 'Housing on mapped sites' so the scope is honest. Keep matchScore fallback as-is.",
+            "severity": "low",
+            "mobile": false
+          },
+          {
+            "surface": "SeekerHero cover overlay",
+            "files": "apps/web/components/seeker/SeekerHero.module.css (45 raw colors)",
+            "issue": "45 raw rgba/#fff — most are legitimate photo scrims/vignette, but the menuBtn/editBtn focus rings (rgba(255,255,255,.85)), the seeker badge dot glow (rgba(106,232,154,.8)) and avatar ring shadows hardcode values that exist as tokens, and the green dot glow re-introduces the off-system green. Dim-13 drift on an otherwise strong hero.",
+            "fix": "Tokenize the focus ring (a white-on-photo --ui-focus-ring-onphoto token if needed), the live-dot glow to --state-live-dot's shadow, and avatar ring shadows to --elevation tokens. Leave the gradient scrim rgba (photo-legitimate).",
+            "severity": "low",
+            "mobile": false
+          },
+          {
+            "surface": "Profile next-best-action callout",
+            "files": "apps/web/components/seeker/ProfileHub.tsx (resolveNextAction); ProfileHub.module.css (.callout)",
+            "issue": "The single next-action callout is good logic (offers → resume → ready), but visually it's a thin bordered row (1px --border-soft) that doesn't read as the page's dominant CTA — it competes with the 5 stat cells above it for the same visual weight. On the benchmark this would be the lit, gradient, dominant action.",
+            "fix": "Promote the callout: give the 'primary' (offers waiting) and 'soon' (finish resume) tones a filled gradient surface (--gradient-progress / --gradient-state-soon) with stronger elevation so it's unmistakably the one dominant element; keep the 'calm' state subtle. One dominant element per module (dim 4).",
+            "severity": "medium",
+            "mobile": false
+          },
+          {
+            "surface": "Category badges (cross-surface)",
+            "files": "apps/web/components/seeker/SeekerHero.module.css (.cat_* L284-288); ProfileHub.module.css (.catPill)",
+            "issue": "Category pill tints are hardcoded rgba per category in BOTH SeekerHero and ProfileHub (e.g. .cat_farm rgba(94,60,18,.6)) rather than reading the shared --gradient-category-* / lane tokens — two copies that will drift, and they don't match the lane atmospheres used by the hero background, so a 'maritime' seeker can show a hero-blue cover with a slightly different blue pill.",
+            "fix": "Derive the pill tint from the same --accent-<lane>-* / --gradient-category-* tokens the hero/matchrail already use, defined once (e.g. a shared .lane-pill--<cat> in a tokens-driven utility). Remove the duplicated per-component rgba.",
+            "severity": "medium",
+            "mobile": false
+          }
+        ],
+        "alreadyStrong": [
+          "SeekerShell dark-glass OS cascade (seekeros-*) with persistent sidebar, plan-status foot, CommandSearch, live dot — matches the benchmark command-center frame",
+          "QuickStats already rebuilt onto shared MetricCard/MetricGrid with trend pills + deterministic (non-random) sparklines and an honest sparkToward() curve — premium and reuses primitives",
+          "/map is a REAL interactive Mapbox map (dark-v11) with category pins, clustering, fly-to, swipe-up tray, metric rail, and graceful EmptyState when token/coords missing — genuinely useful, not a fake index",
+          "SeekerHero scrim/vignette multi-stop overlay is correctly frame-not-filter and guarantees legibility across any cover photo or category gradient",
+          "Category atmospheres are tokenized (--gradient-category-*) and shared across hero/profile/matchrail — no per-surface hex drift on the gradients themselves",
+          "ReadinessSlider has proper role=radio/aria-checked semantics, focus states, and a reduced-motion-safe 'now' pulse",
+          "Lifecycle pages compose the single canonical DiscoveryCard via LifecycleList + designed EmptyStates with illustrations and forward CTAs",
+          "View-enter route transition + :focus-visible/:active on shell controls already landed in Wave A+B"
+        ]
+      }
+    ]
+  }
+}

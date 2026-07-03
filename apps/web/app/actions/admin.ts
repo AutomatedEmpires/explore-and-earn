@@ -40,7 +40,8 @@ async function approveListingActionImpl(
   const result = await adminApproveListing(SERVICE_ROLE_KEY, listingId);
   if (!result.ok) return result;
 
-  revalidatePath("/admin/listings");
+  revalidatePath("/listings");
+  revalidatePath(`/listings/${listingId}`);
   revalidatePath("/admin");
   return { ok: true };
 }
@@ -67,7 +68,8 @@ async function rejectListingActionImpl(
   const result = await adminCloseListing(SERVICE_ROLE_KEY, listingId, reason);
   if (!result.ok) return result;
 
-  revalidatePath("/admin/listings");
+  revalidatePath("/listings");
+  revalidatePath(`/listings/${listingId}`);
   revalidatePath("/admin");
   return { ok: true };
 }
@@ -98,7 +100,7 @@ async function verifyHostActionImpl(
   );
   if (!result.ok) return result;
 
-  revalidatePath("/admin/hosts");
+  revalidatePath("/hosts");
   revalidatePath("/admin");
   return { ok: true };
 }
@@ -128,7 +130,7 @@ async function unverifyHostActionImpl(
   );
   if (!result.ok) return result;
 
-  revalidatePath("/admin/hosts");
+  revalidatePath("/hosts");
   revalidatePath("/admin");
   return { ok: true };
 }

@@ -14,9 +14,10 @@
   },
   "dependencies": {
     "@explore-and-earn/contracts": "workspace:*",
-    "@supabase/supabase-js": "^2.107.0"
+    "@supabase/supabase-js": "^2.110.0"
   },
   "devDependencies": {
-    "vitest": "^4.1.8"
+    "jose": "^5.10.0",
+    "vitest": "^4.1.9"
   }
 }

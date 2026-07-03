@@ -1,16 +1,256 @@
+/* Listing review workbench — seeker-facing preview (left) beside a glass
+   moderation checklist + decision rail (right). Every value is a locked token
+   so the surface inherits the Admin OS dark-glass scope. */
+
 .back {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  /* Grow the hit area to the 44px tap minimum with inline padding, then pull
+     the box back by that padding so the text/icon stay optically aligned. */
+  min-height: var(--tap-min, 44px);
+  padding-inline: var(--space-8);
+  margin-inline-start: calc(var(--space-8) * -1);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
   text-decoration: none;
+  transition: color var(--motion-fast, 120ms) var(--ease-standard, ease);
 }
 
 .back:hover {
   color: var(--text-primary);
 }
 
+.back:focus-visible {
+  outline: none;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* ── 2-col workbench: preview pinned, panel fluid ── */
+.workbench {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-20);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .workbench {
+    grid-template-columns: minmax(20rem, 23rem) minmax(0, 1fr);
+    gap: var(--space-32);
+  }
+}
+
+.previewCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.colLabel {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
 .cardWrap {
-  max-width: 22rem;
+  max-width: 23rem;
+}
+
+@media (min-width: 1024px) {
+  /* Keep the preview in view while scanning a long checklist. */
+  .previewCol {
+    position: sticky;
+    top: var(--space-20);
+  }
+}
+
+/* ── Glass moderation panel ── */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-card);
+}
+
+@media (min-width: 1024px) {
+  .panel {
+    padding: var(--space-32);
+  }
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.panelHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.panelEyebrow {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.panelTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+/* ── Readiness tally (token-bg data bar) ── */
+.tally {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.tallyTrack {
+  position: relative;
+  block-size: var(--space-8);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-surface-raised) 80%, transparent);
+  overflow: hidden;
+}
+
+.tallyFill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline: 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-cta) 70%, transparent),
+    var(--color-cta)
+  );
+  /* Full-width track; the fill ratio is driven by scaleX so we animate a
+     compositor-only property (transform) instead of inline-size → no layout
+     thrash. transform-origin pins the fill to the start edge. */
+  transform-origin: left;
+  transform: scaleX(var(--tally-fill, 0));
+  transition: transform var(--motion-base, 220ms) var(--ease-standard, ease);
+}
+
+.tallyText {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Checklist ── */
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-image);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface-raised) 50%, transparent);
+}
+
+.checkFlag {
+  border-color: color-mix(in srgb, var(--status-boosted-fg) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--status-boosted-fg) 9%, transparent);
+}
+
+.checkIcon {
+  display: grid;
+  place-items: center;
+  inline-size: 36px;
+  block-size: 36px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface-raised) 70%, transparent);
+  color: var(--text-secondary);
+}
+
+.checkBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.checkLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.checkDetail {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.checkState {
+  display: grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: var(--radius-pill);
+  color: var(--status-success-fg);
+}
+
+.checkFlag .checkState {
+  color: var(--status-boosted-fg);
+}
+
+.panelNote {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back,
+  .tallyFill {
+    transition: none;
+  }
 }

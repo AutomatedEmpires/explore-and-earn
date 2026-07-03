@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import {
   getConversations,
   getLastMessagesForConversations,
+  getOrCreateConversationForHost,
   getPublicListingsByIds,
   getSeekerDisplayNames,
 } from "@explore-and-earn/db";
@@ -29,7 +31,16 @@ function formatUpdatedOn(iso: string | null): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export default async function HostMessagesPage() {
+interface HostMessagesPageProps {
+  readonly searchParams: Promise<{
+    readonly seekerProfileId?: string;
+    readonly applicationId?: string;
+  }>;
+}
+
+export default async function HostMessagesPage({
+  searchParams,
+}: HostMessagesPageProps) {
   const { userId, getToken } = await auth();
   if (!userId) {
     return (
@@ -54,6 +65,23 @@ export default async function HostMessagesPage() {
         />
       </section>
     );
+  }
+
+  // Open-or-resume a thread with a specific applicant. The host applicant
+  // surfaces link here as /host/messages?seekerProfileId=… (the only place a
+  // conversation gets created). find-or-create, then hand off to the thread.
+  // getOrCreateConversationForHost is idempotent, so re-navigating is safe.
+  const { seekerProfileId, applicationId } = await searchParams;
+  if (seekerProfileId) {
+    const conversation = await getOrCreateConversationForHost(
+      token,
+      userId,
+      seekerProfileId,
+      applicationId,
+    );
+    if (conversation) {
+      redirect(`/host/messages/${conversation.id}`);
+    }
   }
 
   const conversations = await getConversations(token, userId, "host");

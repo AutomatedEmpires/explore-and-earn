@@ -1,0 +1,172 @@
+/**
+ * Email-preview QA index — renders inside the dark-glass `.admin-os` scope, so
+ * every token resolves to dark surfaces + the emerald scope accent. This route
+ * was previously raw inline-hex (light), which read as a foreign light card
+ * inside the Admin OS; it is now token-only (zero raw hex, zero px font-size,
+ * zero ad-hoc radii) so it belongs to the same premium family.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+  max-width: 760px;
+  padding: var(--space-section);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  align-self: flex-start;
+  padding: var(--space-6) var(--space-12);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cta) 10%, transparent);
+  color: var(--color-cta);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-page-size);
+  line-height: var(--type-page-lh);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.intro {
+  margin: 0;
+  max-width: 56ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.item {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-card);
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
+}
+
+.item:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-cta) 40%, var(--border-soft));
+  background: var(--color-surface-raised);
+}
+
+.link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-14);
+  min-height: var(--tap-min);
+  padding: var(--space-14) var(--space-16);
+  text-decoration: none;
+  border-radius: var(--radius-card);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-button);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 28%, var(--border-soft));
+  background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+  color: var(--color-cta);
+}
+
+.body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.subject {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  transition: transform var(--motion-base) var(--ease-standard);
+}
+
+.item:hover .chevron {
+  color: var(--color-cta);
+  transform: translateX(2px);
+}
+
+@media (max-width: 768px) {
+  .section {
+    padding: var(--space-gutter);
+  }
+
+  .subject {
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .chevron {
+    transition: none;
+  }
+
+  .item:hover {
+    transform: none;
+  }
+
+  .item:hover .chevron {
+    transform: none;
+  }
+}

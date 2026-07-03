@@ -96,6 +96,12 @@ export function GlobalHeader({
   const homeHref = scope === "host" ? "/host/listings" : "/";
   // Seekers' "Explore" should open the discovery feed, not the marketing root.
   const exploreHref = scope === "seeker" ? "/seek" : homeHref;
+  // Active section for the explore/community nav: Community anywhere under
+  // /community, Explore on the scope's own home/seek route.
+  const sectionActive: "explore" | "community" | null =
+    pathname.startsWith("/community") ? "community" :
+    pathname === exploreHref ? "explore" :
+    null;
   const profileHref = scope === "host" ? "/host/profile" : "/profile";
   const userInitial = userName?.trim().charAt(0).toUpperCase() ?? (scopeLabel?.charAt(0) ?? "E");
 
@@ -154,14 +160,16 @@ export function GlobalHeader({
         ) : (
           <nav className={styles.sectionNav} aria-label="Primary sections">
             <Link
-              className={styles.navLink}
+              className={`${styles.navLink}${sectionActive === "explore" ? ` ${styles.navLinkActive}` : ""}`}
               href={exploreHref}
+              aria-current={sectionActive === "explore" ? "page" : undefined}
             >
               Explore
             </Link>
             <Link
-              className={styles.navLink}
+              className={`${styles.navLink}${sectionActive === "community" ? ` ${styles.navLinkActive}` : ""}`}
               href="/community"
+              aria-current={sectionActive === "community" ? "page" : undefined}
             >
               Community
             </Link>

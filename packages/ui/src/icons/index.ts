@@ -8,4 +8,5 @@ export {
 	type CanonicalIconKey,
 	type DeprecatedIconKey,
 	type IconEntry,
+	type IconWeight,
 } from "./registry"

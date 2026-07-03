@@ -1,0 +1,494 @@
+/**
+ * Admin moderation queue — the recent-applications review workbench.
+ *
+ * Renders inside the dark-glass `.admin-os` scope, so every token below
+ * resolves to dark-glass surfaces + the emerald scope accent automatically.
+ * Token-only: zero raw hex, zero px font-sizes, zero ad-hoc radii. color-mix
+ * on tokens is the only computed color allowed.
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+/* ── Command metric row — totals by status, derived from the data ───────── */
+.metricGrid {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: 108px;
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(
+      circle at 84% -10%,
+      color-mix(in srgb, var(--color-cta) 16%, transparent),
+      transparent 60%
+    ),
+    var(--color-surface);
+  overflow: hidden;
+}
+
+.metricTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.metricLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.trend {
+  flex: none;
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.trendNeutral {
+  background: color-mix(in srgb, var(--color-cta) 16%, transparent);
+  color: var(--color-cta);
+}
+
+.trendUp {
+  background: color-mix(in srgb, var(--status-success-fg) 18%, transparent);
+  color: var(--status-success-fg);
+}
+
+.trendDown {
+  background: color-mix(in srgb, var(--status-warning-fg) 20%, transparent);
+  color: var(--status-warning-fg);
+}
+
+.metricValue {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-display-size);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+/* ── Triage toolbar — local segment filter + search, no new query ───────── */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.segments {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-14);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
+}
+
+.segment:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--color-cta) 10%, transparent);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.segment:active {
+  transform: translateY(1px);
+}
+
+.segmentActive,
+.segmentActive:hover {
+  color: var(--color-cta-text);
+  background: var(--color-cta);
+}
+
+.segmentCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  padding: 0 var(--space-6);
+  height: 1.4rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.segmentActive .segmentCount {
+  background: color-mix(in srgb, var(--color-cta-text) 20%, transparent);
+}
+
+.search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--space-12);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-12) var(--space-8) var(--space-32);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.4;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchInput:hover {
+  border-color: color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
+}
+
+.searchInput:focus-visible {
+  outline: none;
+  border-color: var(--color-cta);
+  background: var(--color-surface-raised);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-cta) 24%, transparent);
+}
+
+/* ── Result line — honest count of what the filter is showing ───────────── */
+.resultLine {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.resultLine strong {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Queue — applicant rows as glass review cards ───────────────────────── */
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-16);
+  padding: var(--space-14) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-card);
+  transition:
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
+}
+
+.row:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-cta) 40%, var(--border-soft));
+  background: var(--color-surface-raised);
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-button);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-cta) 30%, transparent),
+      color-mix(in srgb, var(--color-cta) 8%, transparent)
+    );
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+
+.identity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.name {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.sub {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listing {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.age {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-10);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.ageHot {
+  border-color: color-mix(in srgb, var(--status-warning-fg) 34%, transparent);
+  background: color-mix(in srgb, var(--status-warning-fg) 14%, transparent);
+  color: var(--status-warning-fg);
+}
+
+.date {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Designed empty state — never a bare "No data" string ───────────────── */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-8);
+  padding: var(--space-48) var(--space-24);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.emptyMark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--status-success-fg) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--status-success-fg) 14%, transparent);
+  color: var(--status-success-fg);
+}
+
+.emptyMarkNeutral {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+  color: var(--color-cta);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.emptyHint {
+  margin: 0;
+  max-width: 40ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Responsive: stack the row at narrow widths, no overflow ─────────────── */
+@media (max-width: 768px) {
+  /* Collapse the 4 tiles into a compact 2x2 so nothing overflows at 390px. */
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric {
+    min-height: 92px;
+    padding: var(--space-12);
+  }
+
+  /* Full-width search drops under the segment row on phones. */
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .segments {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .segment {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: var(--space-8) var(--space-10);
+  }
+
+  .search {
+    max-width: none;
+  }
+
+  .row {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "avatar identity"
+      "meta   meta"
+      "action action";
+    gap: var(--space-12);
+  }
+
+  .avatar {
+    grid-area: avatar;
+  }
+
+  .identity {
+    grid-area: identity;
+  }
+
+  .meta {
+    grid-area: meta;
+    flex-wrap: wrap;
+    padding-top: var(--space-10);
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .action {
+    grid-area: action;
+    justify-content: stretch;
+  }
+
+  .action :global(.ui-button) {
+    width: 100%;
+    min-height: var(--tap-min);
+  }
+
+  .date {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .segment,
+  .searchInput {
+    transition: none;
+  }
+
+  .row:hover {
+    transform: none;
+  }
+
+  .segment:active {
+    transform: none;
+  }
+}

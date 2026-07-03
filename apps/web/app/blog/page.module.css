@@ -1,0 +1,300 @@
+/* ─── Blog index — "The Field Guide" ─────────────────────────────────────── */
+
+.page {
+	width: 100%;
+	max-width: 64rem;
+	margin: 0 auto;
+	padding: var(--space-16) var(--space-gutter) 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-24);
+}
+
+/* ─── Masthead ───────────────────────────────────────────────────────────── */
+
+.masthead {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: var(--space-24) 0 var(--space-16);
+	border-bottom: 1px solid color-mix(in srgb, var(--border-ink) 14%, transparent);
+}
+
+.kicker {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	align-self: flex-start;
+	padding: var(--space-4) var(--space-10);
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--border-ink) 16%, transparent);
+	background: color-mix(in srgb, var(--palette-ink) 4%, transparent);
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+}
+
+.mastTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: clamp(2rem, 7vw, 3rem);
+	line-height: 1.05;
+	font-weight: var(--font-weight-regular);
+	color: var(--text-primary);
+}
+
+.mastSub {
+	margin: 0;
+	max-width: 38rem;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+/* ─── Tone plate (frame, not filter — token gradient keyed by --tone) ──────── */
+
+.leadPlate,
+.cardPlate {
+	position: relative;
+	display: grid;
+	place-items: center;
+	overflow: hidden;
+	isolation: isolate;
+	border-radius: var(--radius-image);
+	border: 1px solid var(--border-ink);
+	color: var(--tone, var(--color-cta));
+	background:
+		radial-gradient(
+			circle at 30% 20%,
+			color-mix(in srgb, var(--tone, var(--color-cta)) 30%, transparent),
+			transparent 64%
+		),
+		color-mix(in srgb, var(--tone, var(--color-cta)) 10%, var(--color-surface-raised));
+}
+
+/* Inner ink seam — the hand-drawn double frame on the paper mat. */
+.plateSeam {
+	position: absolute;
+	inset: var(--space-6);
+	border-radius: calc(var(--radius-image) - var(--space-4));
+	border: 1px solid color-mix(in srgb, var(--tone, var(--color-cta)) 32%, transparent);
+	pointer-events: none;
+}
+
+.plateIcon {
+	display: grid;
+	place-items: center;
+	width: 3rem;
+	height: 3rem;
+	border-radius: var(--radius-pill);
+	border: 1.5px solid color-mix(in srgb, var(--tone, var(--color-cta)) 40%, transparent);
+	background: color-mix(in srgb, var(--color-surface-raised) 70%, transparent);
+}
+
+.plateTone {
+	position: absolute;
+	bottom: var(--space-12);
+	left: var(--space-14);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--tone, var(--color-cta)) 86%, var(--palette-ink));
+}
+
+/* ─── Kind badge ─────────────────────────────────────────────────────────── */
+
+.kindBadge {
+	display: inline-flex;
+	align-self: flex-start;
+	align-items: center;
+	padding: var(--space-3) var(--space-10);
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--tone, var(--color-cta)) 32%, transparent);
+	background: color-mix(in srgb, var(--tone, var(--color-cta)) 12%, var(--color-surface-raised));
+	color: color-mix(in srgb, var(--tone, var(--color-cta)) 82%, var(--palette-ink));
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+}
+
+/* ─── Lead story ─────────────────────────────────────────────────────────── */
+
+.lead {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-ink);
+	background: var(--color-surface-raised);
+	text-decoration: none;
+	overflow: hidden;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-base) var(--ease-standard);
+}
+
+.leadPlate {
+	aspect-ratio: 16 / 9;
+	border: none;
+	border-bottom: 1px solid var(--border-ink);
+	border-radius: 0;
+}
+
+.leadBody {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding: var(--space-20);
+}
+
+.leadTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: clamp(1.6rem, 4.5vw, 2.2rem);
+	line-height: 1.12;
+	font-weight: var(--font-weight-regular);
+	color: var(--text-primary);
+}
+
+.leadExcerpt {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+/* ─── Grid of the rest ───────────────────────────────────────────────────── */
+
+.grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-16);
+}
+
+.card {
+	display: flex;
+	flex-direction: column;
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-ink);
+	background: var(--color-surface-raised);
+	text-decoration: none;
+	overflow: hidden;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-base) var(--ease-standard);
+}
+
+.cardPlate {
+	aspect-ratio: 16 / 9;
+	border: none;
+	border-bottom: 1px solid var(--border-ink);
+	border-radius: 0;
+}
+
+.cardBody {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding: var(--space-16);
+	flex: 1;
+}
+
+.cardTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	font-weight: var(--font-weight-regular);
+	color: var(--text-primary);
+}
+
+.cardExcerpt {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+/* ─── Meta line ──────────────────────────────────────────────────────────── */
+
+.meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-6);
+	margin: var(--space-4) 0 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-muted);
+}
+
+.metaAuthor {
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-secondary);
+}
+
+.metaDot {
+	color: color-mix(in srgb, var(--border-ink) 40%, transparent);
+}
+
+/* ─── Motion: tactile lift on pointer + keyboard focus ───────────────────── */
+
+.lead:hover,
+.card:hover {
+	transform: translateY(-2px);
+	box-shadow: var(--elevation-hover);
+}
+
+.lead:focus-visible,
+.card:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+/* ─── Desktop: lead goes side-by-side, the rest become two columns ───────── */
+
+@media (min-width: 48rem) {
+	.lead {
+		flex-direction: row;
+		align-items: stretch;
+	}
+
+	.leadPlate {
+		flex: 0 0 44%;
+		aspect-ratio: auto;
+		border-bottom: none;
+		border-right: 1px solid var(--border-ink);
+	}
+
+	.leadBody {
+		justify-content: center;
+		padding: var(--space-32);
+	}
+
+	.grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lead,
+	.card {
+		transition: none;
+	}
+
+	.lead:hover,
+	.card:hover {
+		transform: none;
+	}
+}

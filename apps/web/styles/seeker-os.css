@@ -1,0 +1,551 @@
+/**
+ * Seeker OS — warm "Adventure Paper & Sky" command surface for the (seeker) scope.
+ *
+ * Part of the SINGLE, flowing design system (founder mandate 2026-06-24): the
+ * dashboards speak the same warm paper + ink + framed-photo language as the
+ * marketing and discovery surfaces, so a seeker flows from the public site into
+ * their command center with no theme switch. The token-cascade strategy is
+ * unchanged — seeker surfaces read SEMANTIC tokens, so the scope keeps the warm
+ * root tokens (paper/ink/sky) and only sets the locked --seekeros-* chrome set
+ * (panels / lines / accent / sizes) + the shell chrome. Role identity is carried
+ * by the SKY accent + the brand/identity card, not by a separate palette.
+ * Host = gold ownership; Seeker = sky exploration; Admin = sky + warm danger.
+ *
+ * The one intentionally photographic element is the identity card: a framed
+ * photo with an ink scrim and bone text (brand's #1 lever), the same treatment
+ * the DiscoveryCard uses. Everything else is paper, ink hairlines, whisper lifts.
+ */
+.seeker-os {
+  /* ---- locked Seeker OS chrome set (warm) ---- */
+  --seekeros-panel:    var(--color-surface);        /* #FFFCF5 warm card surface */
+  --seekeros-panel-2:  var(--color-parchment);      /* #F0EAE0 warm panel */
+  --seekeros-panel-3:  var(--color-paper);          /* page paper */
+  --seekeros-line:     var(--border-soft);          /* #DDE2E3 chrome hairline */
+  --seekeros-line-2:   var(--border-soft);
+  --seekeros-ink-line: var(--border-ink);           /* ink hairline for emphasis */
+  --seekeros-accent:   var(--color-cta);            /* sky #2F667A — the brand action */
+  --seekeros-accent-deep: var(--palette-sky-dark);  /* deep sky for text-on-soft */
+  --seekeros-accent-soft: var(--color-action-soft); /* sky 12% on white */
+  --seekeros-ready:    var(--state-ready-fg);       /* pine — ready/explore */
+  --seekeros-on-accent: var(--color-cta-text);      /* white on sky */
+  --seekeros-grad:     var(--gradient-sky);         /* sky→teal for meter + active fills */
+  --seekeros-control:  46px;
+  --seekeros-avatar:   42px;
+  --seekeros-side:     286px;
+
+  color: var(--text-primary);
+  background:
+    radial-gradient(circle at 12% -2%, color-mix(in srgb, var(--palette-sky) 7%, transparent), transparent 30%),
+    radial-gradient(circle at 92% 4%, color-mix(in srgb, var(--palette-teal) 6%, transparent), transparent 28%),
+    var(--color-paper);
+  min-height: 100svh;
+}
+
+/* ── Shell grid ─────────────────────────────────────────────── */
+.seekeros-shell {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: var(--seekeros-side) 1fr;
+  min-height: 100svh;
+}
+
+/* ── Paper sidebar ──────────────────────────────────────────── */
+.seekeros-side {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  padding: 18px 14px;
+  border-right: 1px solid var(--seekeros-line);
+  background: var(--color-parchment);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.seekeros-brand {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 24px;
+  background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line);
+}
+
+.seekeros-mark {
+  width: var(--seekeros-avatar);
+  height: var(--seekeros-avatar);
+  flex: 0 0 auto;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--seekeros-on-accent);
+  font-weight: 900;
+  background:
+    radial-gradient(circle at 33% 24%, rgba(255, 255, 255, 0.85) 0 8%, transparent 9%),
+    var(--gradient-sky);
+  box-shadow: var(--elevation-card);
+}
+
+.seekeros-brand b {
+  display: block;
+  letter-spacing: -0.05em;
+  font-size: 1.08rem;
+  line-height: 0.95;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.seekeros-brand i {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.seekeros-livedot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--seekeros-ready);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--seekeros-ready) 55%, transparent);
+  animation: seekeros-pulse 1.9s infinite;
+}
+
+@keyframes seekeros-pulse {
+  70% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--seekeros-ready) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--seekeros-ready) 0%, transparent); }
+}
+
+/* Seeker identity card — framed photo + ink scrim + bone text (brand #1 lever).
+   The one intentionally photographic surface; everything else is paper. */
+.seekeros-card {
+  position: relative;
+  padding: 14px;
+  border-radius: 26px;
+  overflow: hidden;
+  border: 1px solid var(--seekeros-ink-line);
+  background:
+    var(--gradient-hero-scrim),
+    var(--gradient-cover-mountain);
+  min-height: 132px;
+  display: flex;
+  align-items: flex-end;
+  box-shadow: var(--elevation-card);
+}
+
+.seekeros-card .seekeros-avatarimg {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.seekeros-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  color: var(--seekeros-on-accent);
+  background: var(--gradient-sky);
+  flex: 0 0 auto;
+  box-shadow: var(--elevation-pin);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+}
+
+/* Text sits over the photo scrim → bone, not ink. */
+.seekeros-card b {
+  display: block;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #FBF7EE;
+}
+
+.seekeros-card span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(251, 247, 238, 0.85);
+  font-size: 0.74rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* Profile readiness meter */
+.seekeros-score {
+  padding: 12px;
+  border-radius: 22px;
+  background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line);
+}
+
+.seekeros-score-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  color: var(--text-muted);
+  margin-bottom: 9px;
+}
+
+.seekeros-meter {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--palette-steel);
+  overflow: hidden;
+}
+
+.seekeros-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--seekeros-grad);
+}
+
+/* Nav */
+.seekeros-navlabel {
+  margin: 4px 10px 6px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 800;
+}
+
+.seekeros-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.seekeros-nav:last-of-type {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.seekeros-nav::-webkit-scrollbar { display: none; }
+
+.seekeros-navitem {
+  width: 100%;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  background: transparent;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 17px;
+  text-align: left;
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+
+.seekeros-navitem .i {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--text-secondary);
+  background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line);
+}
+
+.seekeros-navitem b {
+  display: block;
+  color: inherit;
+  font-size: 0.92rem;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.seekeros-navitem s {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  text-decoration: none;
+}
+
+.seekeros-bdg {
+  min-width: 24px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.seekeros-navitem:hover {
+  background: var(--seekeros-accent-soft);
+  color: var(--seekeros-accent-deep);
+  transform: translateX(2px);
+}
+
+.seekeros-navitem[aria-current="page"] {
+  background: var(--seekeros-accent-soft);
+  border-color: color-mix(in srgb, var(--seekeros-accent) 38%, transparent);
+  color: var(--seekeros-accent-deep);
+  box-shadow: var(--elevation-card);
+}
+
+.seekeros-navitem[aria-current="page"] .i {
+  background: var(--seekeros-grad);
+  color: var(--seekeros-on-accent);
+  border-color: transparent;
+}
+
+/* ── Main + topbar ──────────────────────────────────────────── */
+.seekeros-main {
+  min-width: 0;
+  position: relative;
+}
+
+.seekeros-top {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--seekeros-line);
+  background: var(--color-surface);
+}
+
+.seekeros-search {
+  position: relative;
+  flex: 1;
+  max-width: 640px;
+  height: var(--seekeros-control);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.seekeros-tact {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--seekeros-control);
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--seekeros-line);
+  background: var(--seekeros-panel);
+  color: var(--text-primary);
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  position: relative;
+}
+
+.seekeros-tact--icon { width: var(--seekeros-control); padding: 0; }
+
+.seekeros-tact--p {
+  background: var(--seekeros-grad);
+  color: var(--seekeros-on-accent);
+  border-color: transparent;
+  box-shadow: var(--elevation-hover);
+}
+
+.seekeros-tact:hover { transform: translateY(-2px); border-color: var(--border-ink); }
+
+.seekeros-bdg--top {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--seekeros-accent);
+  color: var(--seekeros-on-accent);
+  font-size: 0.64rem;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+.seekeros-account {
+  display: inline-grid;
+  place-items: center;
+  width: var(--seekeros-control);
+  height: var(--seekeros-control);
+  border-radius: 999px;
+  border: 1px solid var(--seekeros-line);
+  background: var(--seekeros-panel);
+  text-decoration: none;
+}
+
+.seekeros-avatarmini {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  font-size: 0.82rem;
+  color: var(--seekeros-on-accent);
+  background: var(--seekeros-grad);
+}
+
+.seekeros-contentwrap {
+  padding: 24px;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+/* ── Mobile (≤1023px): hide sidebar, floating bottom nav ───────── */
+.seekeros-mnav, .seekeros-mtop { display: none; }
+
+@media (max-width: 1023px) {
+  .seekeros-shell { grid-template-columns: 1fr; }
+  .seekeros-side { display: none; }
+  .seekeros-contentwrap { padding: 16px 14px 96px; }
+  .seekeros-top { padding: 12px 14px; }
+  .seekeros-tlabel { display: none; }
+
+  .seekeros-mnav {
+    display: grid;
+    position: fixed;
+    z-index: 70;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 8px;
+    border-radius: 24px;
+    background: var(--color-surface);
+    border: 1px solid var(--seekeros-line);
+    box-shadow: var(--elevation-overlay);
+  }
+
+  .seekeros-mtab {
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: 16px;
+    padding: 7px 4px;
+    min-height: 44px;
+    display: grid;
+    place-items: center;
+    gap: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .seekeros-mtab[aria-current="page"] {
+    color: var(--seekeros-on-accent);
+    background: var(--seekeros-grad);
+  }
+}
+
+/* faint ink grid atmosphere on the scope (paper register) */
+.seeker-os::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(36, 34, 30, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 34, 30, 0.028) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+  z-index: 0;
+}
+
+/* Button primitive already paints the sky CTA via --color-cta; keep explicit so
+   a composed <Button variant="primary"> reads correctly inside the Seeker OS. */
+.seeker-os .ui-button--primary {
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  border-color: transparent;
+}
+
+/* ── Command-search inner elements (CommandSearch.tsx markup) ─────── */
+.seekeros-search { display: flex; align-items: center; gap: 10px; cursor: text; }
+.seekeros-search:focus-within {
+  border-color: var(--seekeros-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--seekeros-accent) 20%, transparent);
+}
+.seekeros-search .cmdsearch-i { flex: none; color: var(--text-muted); font-size: 1.05rem; line-height: 1; }
+.seekeros-search .cmdsearch-input {
+  flex: 1 1 auto; min-width: 0; height: 100%;
+  background: transparent; border: 0; outline: none; padding: 0;
+  color: var(--text-primary); font: inherit;
+}
+.seekeros-search .cmdsearch-input::placeholder { color: var(--text-muted); }
+.seekeros-search .cmdsearch-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.seekeros-search .cmdsearch-kbd {
+  flex: none; display: grid; place-items: center; min-width: 22px; height: 22px;
+  padding: 0 6px; border-radius: 7px; background: var(--seekeros-panel);
+  border: 1px solid var(--seekeros-line); color: var(--text-muted); font-size: 0.72rem;
+  font-family: var(--font-ui, ui-monospace, monospace);
+}
+@media (max-width: 1023px) { .seekeros-search .cmdsearch-kbd { display: none; } }
+
+/* ── View-enter: content settles into place on each navigation ─────
+   template.tsx re-mounts this wrapper on every route change, so the rise +
+   fade replays as the seeker moves between surfaces. Killed under
+   reduced-motion by the block below. */
+.seekeros-view { animation: seekeros-viewin 360ms var(--ease-standard, ease) both; }
+@keyframes seekeros-viewin {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Keyboard focus rings (sky, legible on paper) + tactile press ── */
+.seekeros-navitem:focus-visible,
+.seekeros-tact:focus-visible,
+.seekeros-account:focus-visible,
+.seekeros-mtab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--seekeros-accent);
+}
+.seekeros-navitem:active { transform: translateX(2px) scale(0.985); }
+.seekeros-tact:active,
+.seekeros-account:active,
+.seekeros-mtab:active { transform: translateY(1px) scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+  .seeker-os *, .seeker-os *::before, .seeker-os *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

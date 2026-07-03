@@ -8,6 +8,7 @@ import {
 	getFeedPhotos,
 	getHostTierAndProfile,
 	getPhotoReactionsBatch,
+	markCommunitySeen,
 } from "@explore-and-earn/db";
 
 import {
@@ -35,6 +36,9 @@ export default async function SeekerCommunityPage() {
 	const token = userId ? await getToken({ template: "supabase" }) : null;
 	const user = userId ? await currentUser() : null;
 	const fallbackName = user?.firstName ?? null;
+
+	// Opening the feed clears the "N new" badge (best-effort, service-role).
+	if (userId) await markCommunitySeen(userId);
 
 	const [status, matchedListings] = await Promise.all([
 		getSeekerStatus(token, userId, fallbackName),

@@ -1,3 +1,4 @@
+import type { MatchBand } from "@explore-and-earn/contracts";
 import type { IconKey } from "@explore-and-earn/ui";
 
 import type { DiscoveryListing } from "../discovery";
@@ -32,6 +33,12 @@ export interface HostProfileSummary {
   readonly instagram?: string;
   /** X (Twitter) handle (without @). */
   readonly twitter?: string | null;
+  /** Host-level "we generally provide housing" positioning. */
+  readonly housingOfferedGenerally?: boolean;
+  /** Host-level "we generally provide meals" positioning. */
+  readonly mealsOfferedGenerally?: boolean;
+  /** Marketplace categories this host operates in. */
+  readonly categoryScopes?: readonly string[];
 }
 
 export type HostListingState =
@@ -160,6 +167,10 @@ export interface HostApplicantItem {
   readonly note?: string;
   /** Links this applicant to their message thread (HostMessageThread.id). */
   readonly threadId?: string;
+  /** ADR-040 match score (0-100) for this applicant vs the listing, if computed. */
+  readonly matchScore?: number;
+  /** Match band for the score above (strong/developing/needs_attention). */
+  readonly matchBand?: MatchBand;
 }
 
 /** A single message inside a host <-> applicant conversation (UI-only). */

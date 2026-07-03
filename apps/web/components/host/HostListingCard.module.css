@@ -7,10 +7,63 @@
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
   box-shadow: var(--elevation-card);
+  overflow: hidden; /* clip the bled cover to the card radius */
   transition:
     box-shadow var(--motion-base) var(--ease-standard),
     transform var(--motion-base) var(--ease-standard),
     border-color var(--motion-base) var(--ease-standard);
+}
+
+/* ── Framed cover ────────────────────────────────────────────────── */
+.cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  /* bleed to the card edges; the head/body sit below at the flex gap */
+  margin: calc(-1 * var(--space-card)) calc(-1 * var(--space-card)) 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--gradient-category-default);
+  overflow: hidden;
+}
+
+.cover[data-lane="farm"] { background: var(--gradient-category-farm); }
+.cover[data-lane="maritime"] { background: var(--gradient-category-maritime); }
+.cover[data-lane="remote"] { background: var(--gradient-category-remote); }
+.cover[data-lane="seasonal"] { background: var(--gradient-category-seasonal); }
+.cover[data-lane="mix"] { background: var(--gradient-category-mix); }
+
+/* Paper-mat frame: a hairline inner highlight, no filter on the photo. */
+.cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+.coverImg {
+  object-fit: cover;
+}
+
+.coverPlaceholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+/* Large category watermark so an un-photographed cover reads as intentional. */
+.coverPlaceholder svg {
+  transform: scale(2.6);
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.22));
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card:hover .coverImg {
+    transform: scale(1.03);
+    transition: transform var(--motion-slow) var(--ease-standard);
+  }
 }
 
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {

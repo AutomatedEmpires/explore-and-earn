@@ -49,8 +49,10 @@
   font-size: var(--type-button-size);
   line-height: var(--type-button-lh);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-cta-text);
-  background: var(--color-cta);
+  /* Host primary action = the scope's gold accent (matches the topbar + hero
+     CTAs), falling back to the sky CTA outside the host scope. */
+  color: var(--hostos-on-accent, var(--color-cta-text));
+  background: var(--hostos-grad, var(--color-cta));
   text-decoration: none;
   transition: filter var(--motion-fast) var(--ease-standard);
 }

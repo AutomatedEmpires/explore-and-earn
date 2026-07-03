@@ -1,9 +1,10 @@
-/* JourneyPipeline — 5-step visual progress indicator */
+/* JourneyPipeline — 5-step visual progress indicator.
+   One promoted "you are here / do this next" dot reads above the rest. */
 
 .pipeline {
   display: flex;
   align-items: flex-start;
-  padding: 18px 20px 16px;
+  padding: var(--space-8) var(--space-20) var(--space-6);
   background: var(--color-surface-raised);
   border-bottom: 1px solid var(--border-soft);
   overflow-x: auto;
@@ -24,7 +25,7 @@
 .connector {
   flex: 1;
   height: 2px;
-  min-width: 16px;
+  min-width: var(--space-16);
   background: var(--border-soft);
   transition: background var(--motion-base) var(--ease-standard);
 }
@@ -33,89 +34,119 @@
   background: var(--gradient-progress);
 }
 
-/* ─── Each step: dot + label stacked ─── */
+/* ─── Each step: padded Link for a ≥44px hit area; dot+label stay compact ─── */
 .step {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-6);
+  /* Top/bottom padding lifts the tap target to ≥44px while the visible
+     dot stays ~38px — invisible hit area, no layout bloat. */
+  padding: var(--space-6) var(--space-8);
+  min-width: 44px;
+  min-height: 44px;
   text-decoration: none;
   flex-shrink: 0;
+  border-radius: var(--radius-card);
   transition: transform var(--motion-fast) var(--ease-standard);
 }
 
 .step:hover { transform: translateY(-2px); }
+@media (hover: hover) {
+  .step:active { transform: translateY(0); }
+}
 
 .step:focus-visible { outline: none; }
 .step:focus-visible .dot {
-  box-shadow: 0 0 0 3px rgba(47, 102, 122, 0.35);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-cta) 45%, transparent);
 }
 
 /* ─── Dot circle ─── */
 .dot {
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border: 2px solid var(--border-soft);
   background: var(--color-paper);
   display: flex;
   align-items: center;
   justify-content: center;
   transition:
+    width      var(--motion-base) var(--ease-standard),
+    height     var(--motion-base) var(--ease-standard),
     border-color var(--motion-fast) var(--ease-standard),
     background   var(--motion-fast) var(--ease-standard),
     box-shadow   var(--motion-fast) var(--ease-standard);
 }
 
-/* Active (has data) */
+/* Active (has data) — a quiet ring fill, never louder than the current step */
 .stepActive .dot {
-  border-color: var(--color-cta);
-  background: var(--gradient-progress);
-  box-shadow: 0 2px 10px rgba(47, 102, 122, 0.38);
+  border-color: color-mix(in srgb, var(--color-cta) 55%, var(--border-ink));
+  background: color-mix(in srgb, var(--color-cta) 16%, var(--color-paper));
 }
 
-/* Urgent (offers pending) — amber pulse */
-.stepUrgent .dot {
+/* Current ("you are here / do this next") — the ONE promoted, filled dot:
+   slightly larger + the gradient fill so the eye lands here first. */
+.stepCurrent .dot {
+  width: 46px;
+  height: 46px;
+  border-color: var(--color-cta);
+  background: var(--gradient-progress);
+  box-shadow:
+    0 4px 16px color-mix(in srgb, var(--color-cta) 42%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--color-cta-text) 28%, transparent);
+}
+
+/* Urgent (offers pending) — promoted AND amber, with a calm pulse */
+.stepUrgent.stepCurrent .dot {
   border-color: var(--state-soon-fg);
   background: var(--gradient-state-soon);
-  box-shadow: 0 2px 12px rgba(196, 138, 24, 0.48);
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--state-soon-fg) 52%, transparent);
   animation: urgent-pulse 2.4s ease-in-out infinite;
 }
 
 @keyframes urgent-pulse {
-  0%, 100% { box-shadow: 0 2px 12px rgba(196, 138, 24, 0.48); }
-  50%       { box-shadow: 0 4px 22px rgba(196, 138, 24, 0.75); }
+  0%, 100% { box-shadow: 0 4px 18px color-mix(in srgb, var(--state-soon-fg) 52%, transparent); }
+  50%      { box-shadow: 0 6px 26px color-mix(in srgb, var(--state-soon-fg) 78%, transparent); }
 }
 
 /* ─── Dot content ─── */
 .dotCount {
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--type-meta-size);
   font-weight: 700;
-  color: #fff;
+  color: var(--color-cta-text);
   line-height: 1;
 }
 
-/* Small white check circle for "active but no count" */
+.stepCurrent .dotCount {
+  font-size: var(--type-label-size);
+}
+
+/* Small check disc for "active but no count" */
 .dotCheck {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cta) 70%, transparent);
+}
+
+.stepCurrent .dotCheck {
+  background: color-mix(in srgb, var(--color-cta-text) 90%, transparent);
 }
 
 /* Empty ring inner fill */
 .dotEmpty {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--border-soft);
 }
 
 /* ─── Step label ─── */
 .stepLabel {
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: var(--type-label-size);
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -125,10 +156,24 @@
 }
 
 .stepActive .stepLabel {
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
-.stepUrgent .stepLabel {
-  color: var(--state-soon-fg);
+.stepCurrent .stepLabel {
+  color: var(--text-primary);
   font-weight: 700;
+}
+
+.stepUrgent.stepCurrent .stepLabel {
+  color: var(--state-soon-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step,
+  .dot,
+  .connector,
+  .stepUrgent.stepCurrent .dot {
+    transition: none;
+    animation: none;
+  }
 }

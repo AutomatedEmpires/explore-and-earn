@@ -1,0 +1,541 @@
+/* Admin Listings moderation — photo-forward queue.
+   Composes MetricGrid/MetricCard + Badge/Button/Icon primitives; every value is
+   a locked semantic token so the surface inherits the admin dark-glass scope. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+/* ── Command metric header ── */
+.metrics {
+  /* MetricGrid owns the responsive grid; nothing to add here. */
+}
+
+/* ── Filter tabs ── */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.tab {
+  min-height: 44px;
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    transform var(--motion-fast, 120ms) var(--ease-standard, ease),
+    background var(--motion-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--motion-fast, 120ms) var(--ease-standard, ease);
+}
+
+.tab:hover {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+}
+
+.tab[aria-pressed="true"] {
+  border-color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 16%, transparent);
+  color: var(--text-primary);
+}
+
+.tab:active {
+  transform: scale(0.97);
+}
+
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.count {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-muted);
+}
+
+.error {
+  margin: 0;
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 36%, transparent);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--status-error-fg);
+}
+
+/* ── Triage bar: search + sort, for faster moderation ── */
+.triageBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--space-12);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: var(--tap-min, 44px);
+  padding: var(--space-8) var(--space-12) var(--space-8) var(--space-32);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.4;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchInput:hover {
+  border-color: color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
+}
+
+.searchInput:focus-visible {
+  outline: none;
+  border-color: var(--color-cta);
+  background: var(--color-surface-raised);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-cta) 24%, transparent);
+}
+
+.sorts {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  padding-left: var(--space-12);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.sortIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.sort {
+  min-height: 36px;
+  padding: var(--space-6) var(--space-12);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    background var(--motion-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--motion-fast, 120ms) var(--ease-standard, ease);
+}
+
+.sort:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.sort[aria-pressed="true"] {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta) 26%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-cta) 40%, transparent);
+}
+
+.sort:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.sort:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .searchInput,
+  .sort {
+    transition: none;
+  }
+  .sort:active {
+    transform: none;
+  }
+}
+
+/* ── Listing rows ── */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) auto;
+  gap: var(--space-16);
+  align-items: stretch;
+  padding: var(--space-12);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-card);
+  transition:
+    transform var(--motion-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--motion-fast, 120ms) var(--ease-standard, ease),
+    background var(--motion-fast, 120ms) var(--ease-standard, ease);
+}
+
+.row:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-ink);
+  background: var(--color-surface-raised);
+}
+
+/* Flagged / under-review rows carry an accent edge so risk is scannable. */
+.rowReview {
+  border-color: color-mix(in srgb, var(--status-boosted-fg) 46%, var(--border-soft));
+  box-shadow:
+    var(--elevation-card),
+    inset 3px 0 0 0 color-mix(in srgb, var(--status-boosted-fg) 70%, transparent);
+}
+
+/* ── Cover: frame-not-filter on a category-tinted mat (no host photo in the
+   moderation data contract, so the cover is an editorial category plate). ── */
+.cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  min-height: 104px;
+  padding: var(--space-6);
+  border-radius: var(--radius-image);
+  border: 1px solid var(--border-ink);
+  background:
+    radial-gradient(
+      circle at 30% 22%,
+      color-mix(in srgb, var(--cover-accent, var(--color-cta)) 26%, transparent),
+      transparent 62%
+    ),
+    color-mix(in srgb, var(--color-surface-raised) 70%, transparent);
+  color: var(--cover-accent, var(--color-cta));
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.coverGrain {
+  position: absolute;
+  inset: var(--space-6);
+  border-radius: calc(var(--radius-image) - var(--space-4));
+  border: 1px solid color-mix(in srgb, var(--cover-accent, var(--color-cta)) 30%, transparent);
+  pointer-events: none;
+}
+
+.coverIcon {
+  display: grid;
+  place-items: center;
+}
+
+.coverCat {
+  position: absolute;
+  left: var(--space-8);
+  bottom: var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+/* ── Body ── */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.bodyTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.meta {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.host {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface-raised) 60%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+/* Tone-coded signal chips — the icon carries the colour so the label stays calm. */
+.tag_ok {
+  border-color: color-mix(in srgb, var(--status-success-fg) 38%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg) 12%, transparent);
+  color: var(--text-primary);
+}
+
+.tag_ok svg {
+  color: var(--status-success-fg);
+}
+
+.tag_warn {
+  border-color: color-mix(in srgb, var(--status-boosted-fg) 44%, transparent);
+  background: color-mix(in srgb, var(--status-boosted-fg) 14%, transparent);
+  color: var(--text-primary);
+}
+
+.tag_warn svg {
+  color: var(--status-boosted-fg);
+}
+
+.tag_neutral svg {
+  color: var(--text-muted);
+}
+
+/* ── Actions stack: prominent figure above the moderation buttons ── */
+.actionsStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-10);
+  min-width: 0;
+}
+
+.figure {
+  text-align: right;
+}
+
+.figureValue {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.figureValueMissing {
+  color: var(--status-error-fg);
+}
+
+.figureLabel {
+  display: block;
+  margin-top: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-8);
+}
+
+.actionsSecondary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* ── Empty state — a clear queue reads as success, not a void ── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-48) var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--status-success-fg) 36%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg) 14%, transparent);
+  color: var(--status-success-fg);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.emptyBody {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Mobile: stack cover over body, actions go full-width ── */
+@media (max-width: 639px) {
+  .row {
+    grid-template-columns: 1fr;
+    gap: var(--space-12);
+  }
+
+  .cover {
+    min-height: 148px;
+  }
+
+  /* Stack the decision rail: a single primary CTA, then a demoted secondary
+     pair — no three-button wrap-cramp at 390px. */
+  .actionsStack {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: var(--space-12);
+  }
+
+  .figure {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-8);
+    text-align: left;
+  }
+
+  .figureValue {
+    font-size: var(--type-card-size);
+  }
+
+  .figureLabel {
+    margin-top: 0;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-8);
+  }
+
+  .actions :global(.ui-button) {
+    width: 100%;
+  }
+
+  .actionsSecondary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-8);
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab,
+  .row {
+    transition: none;
+  }
+
+  .tab:active,
+  .row:hover {
+    transform: none;
+  }
+}

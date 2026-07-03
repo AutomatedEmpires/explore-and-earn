@@ -1,0 +1,211 @@
+/**
+ * Leave-a-review form — the write half of two-sided trust. Token-driven, light
+ * host-page scope, ≥44px controls, focus/press states, reduced-motion-safe.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
+  background:
+    radial-gradient(circle at 10% 0%, color-mix(in srgb, var(--color-cta) 8%, transparent), transparent 44%),
+    var(--color-surface);
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-h2-size, 1.5rem);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.sub {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Stars ─────────────────────────────────────────────────── */
+.stars {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.star {
+  display: grid;
+  place-items: center;
+  width: var(--tap-min, 44px);
+  height: var(--tap-min, 44px);
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+.starOn {
+  color: var(--color-gold, var(--palette-amber));
+}
+.star:hover {
+  color: var(--color-gold, var(--palette-amber));
+}
+.star:active {
+  transform: scale(0.9);
+}
+.star:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* ── Triad-trust promise toggles ───────────────────────────── */
+.promises {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.promiseRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.promiseLabel {
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.yesno {
+  display: inline-flex;
+  gap: var(--space-6);
+}
+
+.toggle {
+  min-width: 64px;
+  min-height: var(--tap-min, 44px);
+  padding: 0 var(--space-14);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+.toggle:active {
+  transform: scale(0.97);
+}
+.toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+.toggleYes {
+  background: color-mix(in srgb, var(--status-success-fg, var(--palette-teal)) 16%, transparent);
+  border-color: color-mix(in srgb, var(--status-success-fg, var(--palette-teal)) 45%, transparent);
+  color: var(--status-success-fg, var(--palette-teal));
+}
+.toggleNo {
+  background: color-mix(in srgb, var(--status-error-fg, var(--palette-error, currentColor)) 14%, transparent);
+  border-color: color-mix(in srgb, var(--status-error-fg, var(--palette-error, currentColor)) 45%, transparent);
+  color: var(--status-error-fg, var(--palette-error, currentColor));
+}
+
+/* ── Body ──────────────────────────────────────────────────── */
+.bodyLabel {
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 6rem;
+  padding: var(--space-12) var(--space-14);
+  border: 1px solid var(--field-border, var(--border-soft));
+  border-radius: var(--radius-input, var(--radius-card));
+  background: var(--field-bg, var(--color-surface-raised));
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  resize: vertical;
+  outline: none;
+}
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+.textarea:focus-visible {
+  border-color: var(--color-cta);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.error {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  color: var(--status-error-fg, var(--palette-error, currentColor));
+}
+
+.submit {
+  align-self: flex-start;
+  min-height: var(--tap-min, 44px);
+  padding: 0 var(--space-24);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size, var(--type-body-size));
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: opacity var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+.submit:hover {
+  opacity: 0.92;
+}
+.submit:active {
+  transform: scale(0.98);
+}
+.submit:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+.submit:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.thanks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  color: var(--status-success-fg, var(--palette-teal));
+}
+.thanks p {
+  margin: 0;
+  font-size: var(--type-body-size);
+  color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star,
+  .toggle,
+  .submit {
+    transition: none;
+  }
+  .star:active,
+  .toggle:active,
+  .submit:active {
+    transform: none;
+  }
+}

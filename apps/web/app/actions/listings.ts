@@ -1,8 +1,9 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
+import { LISTINGS_CACHE_TAG } from "../../lib/serverCache";
 import {
   createListing as createListingRow,
   duplicateListing as duplicateListingRow,
@@ -17,7 +18,18 @@ import {
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
-type HostManageableListingStatus = "live" | "paused" | "archived";
+import { isAllowedStorageUrl } from "../../lib/storageUrl";
+
+// Host-controllable transitions. The authoritative gate is canTransitionListing
+// in @explore-and-earn/db (draft↔under_review, live↔paused, →archived); this
+// union just lets the host UI submit a draft for review and withdraw it. Going
+// under_review → live remains an admin-only approval (adminApproveListing).
+type HostManageableListingStatus =
+  | "draft"
+  | "under_review"
+  | "live"
+  | "paused"
+  | "archived";
 
 interface HostAuth {
   userId: string;
@@ -63,20 +75,6 @@ function resolvePayPeriod(raw: FormDataEntryValue | null): CompensationUnit | un
   return (COMPENSATION_UNIT as readonly string[]).includes(value)
     ? (value as CompensationUnit)
     : undefined;
-}
-
-function isAllowedStorageUrl(url: string | undefined | null): boolean {
-  if (!url) return true;
-  try {
-    const { protocol, hostname, pathname } = new URL(url);
-    return (
-      protocol === "https:" &&
-      hostname.endsWith(".supabase.co") &&
-      pathname.startsWith("/storage/v1/object/")
-    );
-  } catch {
-    return false;
-  }
 }
 
 function parseAmount(raw: FormDataEntryValue | null): number | null | undefined {
@@ -181,6 +179,9 @@ export async function createListingAction(
   }
 
   revalidatePath("/host/listings");
+  // Bust the public discovery caches (feed, listing detail) so a publish/edit/
+  // status change is visible immediately, not after the 60s revalidate window.
+  revalidateTag(LISTINGS_CACHE_TAG);
   if (result.listingId) {
     revalidatePath(`/host/listings/${result.listingId}`);
   }
@@ -223,6 +224,9 @@ export async function updateListingAction(
   }
 
   revalidatePath("/host/listings");
+  // Bust the public discovery caches (feed, listing detail) so a publish/edit/
+  // status change is visible immediately, not after the 60s revalidate window.
+  revalidateTag(LISTINGS_CACHE_TAG);
   revalidatePath(`/host/listings/${listingId}`);
   return result;
 }
@@ -247,12 +251,23 @@ export async function updateListingStatusAction(
     newStatus,
   );
   if (!result.ok) {
-    return result;
+    // The canonical lifecycle fn rejects disallowed edges with 'invalid_transition'
+    // and a plan-capacity block with 'listing_cap_reached'.
+    const error =
+      result.error === "invalid_transition"
+        ? "That status change isn't allowed from the listing's current state."
+        : result.error === "listing_cap_reached"
+          ? "You've reached your plan's active listing limit. Pause or close another listing, or upgrade your plan, to publish this one."
+          : result.error;
+    return { ok: false, error };
   }
 
   revalidatePath("/host/listings");
+  // Bust the public discovery caches (feed, listing detail) so a publish/edit/
+  // status change is visible immediately, not after the 60s revalidate window.
+  revalidateTag(LISTINGS_CACHE_TAG);
   revalidatePath(`/host/listings/${listingId}`);
-  return result;
+  return { ok: true, status: newStatus };
 }
 
 export async function pauseListingAction(
@@ -298,6 +313,9 @@ export async function duplicateListingAction(
   }
 
   revalidatePath("/host/listings");
+  // Bust the public discovery caches (feed, listing detail) so a publish/edit/
+  // status change is visible immediately, not after the 60s revalidate window.
+  revalidateTag(LISTINGS_CACHE_TAG);
   if (result.newListingId) {
     revalidatePath(`/host/listings/${result.newListingId}`);
   }

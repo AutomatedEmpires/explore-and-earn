@@ -1,0 +1,40 @@
+# Migration numbering integrity guard.
+#
+# Fails any PR/push whose supabase/migrations files have a malformed name, a
+# duplicate numeric prefix, or a number not reserved in
+# tools/scripts/migration-allocations.json. This is the companion to the deploy
+# pipeline (db-migrate.yml): the guard stops two lanes from colliding on the
+# same number before merge; db-migrate then applies the clean set to prod.
+#
+# Zero dependencies — runs a standalone Node script, no pnpm install needed.
+# See docs/ci/migration-prefix-guard.md.
+
+name: Migration Guard
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "tools/scripts/migration-allocations.json"
+      - "tools/scripts/check-migration-prefixes.mjs"
+  merge_group:
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/migrations/**"
+      - "tools/scripts/migration-allocations.json"
+      - "tools/scripts/check-migration-prefixes.mjs"
+
+jobs:
+  migration-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0
+      - name: Check migration prefixes
+        run: node tools/scripts/check-migration-prefixes.mjs

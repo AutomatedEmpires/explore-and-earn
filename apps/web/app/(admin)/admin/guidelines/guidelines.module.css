@@ -1,0 +1,336 @@
+/*
+ * Moderation guidelines — static operating manual inside the dark-glass
+ * .admin-os scope. Token-only: no raw hex, no px font-size, no ad-hoc radii.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.head {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-32);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background:
+    radial-gradient(
+      120% 140% at 88% -10%,
+      color-mix(in srgb, var(--color-cta) 22%, transparent) 0%,
+      transparent 58%
+    ),
+    var(--color-surface-raised);
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  align-self: flex-start;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 38%, transparent);
+  background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--color-cta);
+}
+
+.title {
+  margin: 0;
+  max-width: 22ch;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4.8vw, 3rem);
+  line-height: 1.04;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.sub {
+  margin: 0;
+  max-width: 60ch;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Block scaffold ─────────────────────────────────────────────────────── */
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+}
+
+.blockTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  color: var(--text-primary);
+}
+
+.blockNote {
+  margin: -0.5rem 0 0;
+  max-width: 64ch;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Decision rubric ────────────────────────────────────────────────────── */
+.decisions {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: 1fr;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 60rem) {
+  .decisions {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-20);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface-raised) 56%, transparent);
+}
+
+.decisionIcon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+}
+
+.decision[data-verdict="approve"] .decisionIcon {
+  border-color: color-mix(in srgb, var(--status-success-fg) 42%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg) 12%, transparent);
+  color: var(--status-success-fg);
+}
+
+.decision[data-verdict="hold"] .decisionIcon {
+  border-color: color-mix(in srgb, var(--status-warning-fg) 46%, transparent);
+  background: color-mix(in srgb, var(--status-warning-fg) 12%, transparent);
+  color: var(--status-warning-fg);
+}
+
+.decision[data-verdict="reject"] .decisionIcon {
+  border-color: color-mix(in srgb, var(--status-error-fg) 40%, transparent);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
+  color: var(--status-error-fg);
+}
+
+.decisionBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.decisionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.decisionText {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Triad bar ──────────────────────────────────────────────────────────── */
+.triad {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: 1fr;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 48rem) {
+  .triad {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.triadItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 24%, var(--border-soft));
+  background: color-mix(in srgb, var(--color-cta) 6%, transparent);
+}
+
+.triadIcon {
+  display: grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, transparent);
+  background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+  color: var(--color-cta);
+}
+
+.triadLabel {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.triadBar {
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Escalation ladder ──────────────────────────────────────────────────── */
+.ladder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: none;
+}
+
+.ladderStep {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-16);
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-surface-raised) 56%, transparent);
+}
+
+.ladderNum {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 34%, transparent);
+  background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: 1;
+  color: var(--color-cta);
+}
+
+.ladderBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ladderTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.ladderText {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Foot CTAs ──────────────────────────────────────────────────────────── */
+.footRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+}
+
+.foot,
+.footGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 2.75rem;
+  padding: 0 var(--space-20);
+  border-radius: var(--radius-pill);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-button-size);
+  line-height: var(--type-button-lh);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform var(--motion-base) var(--ease-standard);
+}
+
+.foot {
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+}
+
+.footGhost {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+}
+
+.foot:hover,
+.footGhost:hover {
+  transform: translateY(-1px);
+}
+
+.foot:active,
+.footGhost:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.foot:focus-visible,
+.footGhost:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foot,
+  .footGhost {
+    transition: none;
+  }
+  .foot:hover,
+  .footGhost:hover,
+  .foot:active,
+  .footGhost:active {
+    transform: none;
+  }
+}

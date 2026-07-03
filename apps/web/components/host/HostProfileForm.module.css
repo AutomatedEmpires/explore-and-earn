@@ -14,6 +14,13 @@
   gap: var(--space-12);
 }
 
+/* Mobile-first: stack paired fields (host/location, social handles) into one column. */
+@media (max-width: 639px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -172,6 +179,88 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* ── Category chips + offering toggles ───────────────────────────── */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-8) var(--space-12);
+  border: 1.5px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.chip:hover {
+  border-color: var(--border-ink);
+}
+
+.chip:active {
+  transform: scale(0.97);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.chipActive {
+  border-color: color-mix(in srgb, var(--color-cta) 60%, var(--border-ink));
+  background: color-mix(in srgb, var(--color-cta) 16%, var(--color-surface));
+  color: var(--text-primary);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  cursor: pointer;
+}
+
+.toggleInput {
+  margin-top: 0.2rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  accent-color: var(--color-cta);
+  cursor: pointer;
+}
+
+.toggleText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.toggleTitle {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.toggleNote {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
   color: var(--text-secondary);
 }
 

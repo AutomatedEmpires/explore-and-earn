@@ -207,17 +207,19 @@ export default async function SearchPage({
 	}
 
 	return (
-		<SearchView
-			listings={listings}
-			query={query}
-			category={category}
-			housing={housing}
-			meals={meals}
-			payMin={payMin}
-			payUnit={payUnit}
-			location={location}
-			startAfter={startAfter}
-			startBefore={startBefore}
-		/>
+		<>
+			<SearchView
+				listings={listings}
+				query={query}
+				category={category}
+				housing={housing}
+				meals={meals}
+				payMin={payMin}
+				payUnit={payUnit}
+				location={location}
+				startAfter={startAfter}
+				startBefore={startBefore}
+			/>
+		</>
 	);
 }

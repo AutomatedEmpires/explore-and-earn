@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 
 /**
@@ -40,6 +41,12 @@ export interface HostProfileDetailsInput {
   websiteUrl?: string | null;
   photoUrl?: string | null;
   socialLinks?: SocialLinks;
+  /** Host-level "we generally provide housing" positioning (public profile). */
+  housingOfferedGenerally?: boolean;
+  /** Host-level "we generally provide meals" positioning (public profile). */
+  mealsOfferedGenerally?: boolean;
+  /** Marketplace categories this host operates in (subset of MARKETPLACE_CATEGORIES). */
+  categoryScopes?: string[];
 }
 
 function normalizeOptional(value: string | null | undefined): string | null | undefined {
@@ -172,6 +179,16 @@ export async function updateHostProfileDetails(
       instagram: normalizeOptional(fields.socialLinks.instagram) ?? null,
       twitter: normalizeOptional(fields.socialLinks.twitter) ?? null,
     };
+  }
+  if (fields.housingOfferedGenerally !== undefined)
+    patch.housing_offered_generally = fields.housingOfferedGenerally;
+  if (fields.mealsOfferedGenerally !== undefined)
+    patch.meals_offered_generally = fields.mealsOfferedGenerally;
+  if (fields.categoryScopes !== undefined) {
+    const allowed = MARKETPLACE_CATEGORIES as readonly string[];
+    patch.category_scopes = Array.from(
+      new Set(fields.categoryScopes.filter((c) => allowed.includes(c))),
+    );
   }
 
   if (Object.keys(patch).length === 0) return { ok: true };

@@ -1,12 +1,16 @@
-export const ANNOUNCEMENT_DURATIONS = [7, 14, 28] as const;
-export type AnnouncementDuration = (typeof ANNOUNCEMENT_DURATIONS)[number];
+import { ADDON_PRICING } from "./pricing";
 
-export const ANNOUNCEMENT_PRICING: Record<AnnouncementDuration, number> = {
-  7:  15000,
-  14: 25000,
-  28: 35000,
-};
+// Paid announcement placement (once the plan's free monthly quota is used) —
+// flat price, single 7-day run, no duration options (founder directive
+// 2026-06-21, pricing.ts ADDON_PRICING.additionalAnnouncement). DERIVED from
+// pricing.ts so the two can never drift out of sync again — this previously
+// existed as an independent 7/14/28-day ANNOUNCEMENT_PRICING record that
+// disagreed with the founder-locked constant.
+export const ANNOUNCEMENT_RUN_DAYS = ADDON_PRICING.additionalAnnouncement.runDays;
+export const ANNOUNCEMENT_PRICE_CENTS = ADDON_PRICING.additionalAnnouncement.priceCents;
 
+// Free, plan-included announcements (within ANNOUNCEMENT_MONTHLY_QUOTA) run
+// for a full month — a longer, unrelated window from the 7-day paid slot.
 export const ANNOUNCEMENT_FREE_DURATION_DAYS = 30;
 
 export const ANNOUNCEMENT_MONTHLY_QUOTA: Record<string, number> = {

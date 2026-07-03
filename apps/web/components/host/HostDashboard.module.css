@@ -1,26 +1,7 @@
 /* Dashboard-specific layout only — shared surfaces live in host.css (host-*). */
 
 .dashboard {
-  /* gap/rhythm comes from .host-page; nothing extra needed here */
-}
-
-/* Staggered reveal on load — scoped to the dashboard so other host routes are
-   untouched. One orchestrated entrance; reduced-motion shows everything at once. */
-@media (prefers-reduced-motion: no-preference) {
-  .dashboard > * {
-    animation: dashReveal var(--motion-base) var(--ease-standard) both;
-  }
-  .dashboard > *:nth-child(1) { animation-delay: 0ms; }
-  .dashboard > *:nth-child(2) { animation-delay: 45ms; }
-  .dashboard > *:nth-child(3) { animation-delay: 90ms; }
-  .dashboard > *:nth-child(4) { animation-delay: 135ms; }
-  .dashboard > *:nth-child(5) { animation-delay: 180ms; }
-  .dashboard > *:nth-child(n + 6) { animation-delay: 220ms; }
-}
-
-@keyframes dashReveal {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: none; }
+  /* layout column; the staggered entrance is handled by <StaggerReveal> (motion) */
 }
 
 .attentionList {
@@ -51,15 +32,287 @@
   }
 }
 
-.meterRow {
+/* ── Application pipeline (stage breakdown) ──────────────────────── */
+/* Matches the conversion radar's density: a dominant headline figure, then a
+   per-stage mini-meter list so the funnel is explainable, never a single bar.
+   Counts + percentages are real (analytics.totalApplicationsByStatus). */
+.pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.pipelineLede {
   display: flex;
   align-items: center;
   gap: var(--space-12);
 }
 
-.meterLabel {
+.pipelinePct {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 2.4rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pipelineLedeText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   font-size: var(--type-meta-size);
   color: var(--text-secondary);
+}
+
+.pipelineLedeSub {
+  font-size: var(--type-caption-size);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pipelineStages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+/* Each stage: label + hint on the left, count on the right, then a full-width
+   tonal mini-meter — the same grid rhythm as the radar legend rows. */
+.pipelineStage {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--space-4) var(--space-8);
+}
+
+.pipelineStageLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.pipelineStageHint {
+  font-size: var(--type-caption-size);
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.pipelineStageCount {
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pipelineStageTrack {
+  grid-column: 1 / -1;
+  height: 6px;
+  margin-top: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  overflow: hidden;
+}
+
+.pipelineStageTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  width: var(--pct, 0%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--stage-accent, var(--color-cta)) 55%, transparent),
+    var(--stage-accent, var(--color-cta))
+  );
+  transition: width 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Tonal accents per funnel stage — a cool→warm→accent progression so the eye
+   reads the pipeline left-to-right without good/bad coloring. */
+.pipelineStage[data-tone="new"] {
+  --stage-accent: var(--status-match-fg);
+}
+.pipelineStage[data-tone="review"] {
+  --stage-accent: var(--color-cta);
+}
+.pipelineStage[data-tone="advanced"] {
+  --stage-accent: var(--status-success-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipelineStageTrack > span {
+    transition: none;
+  }
+}
+
+/* ── Conversion radar (radial health donut) ──────────────────────── */
+/* A split: the radial gauge on the left, the actionable readout on the
+   right. Collapses to a single column under 30rem so the donut never
+   crowds the labels on a 380px viewport. */
+.radarSplit {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-20);
+}
+
+@media (max-width: 30rem) {
+  .radarSplit {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+}
+
+/* The donut: a token conic-gradient ring (scope accent → soft track) with a
+   surface-raised hole punched out by a radial-gradient. --pct drives the
+   filled sweep; the value sits dead-center. */
+
+/* Registered so the sweep can animate: a bare custom property isn't
+   interpolable, but a typed <number> is. --radar-pct draws from 0 → the real
+   score on mount (the gauge "fills in" rather than popping into place). */
+@property --radar-pct {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.radar {
+  position: relative;
+  width: 9.5rem;
+  height: 9.5rem;
+  flex: none;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  /* hold the final value by default (reduced-motion / no-animation path) */
+  --radar-pct: var(--pct, 0);
+  background:
+    radial-gradient(
+      circle at center,
+      var(--color-surface-raised) 0 55%,
+      transparent 56%
+    ),
+    conic-gradient(
+      var(--color-cta) 0 calc(var(--radar-pct) * 1%),
+      color-mix(in srgb, var(--text-muted) 22%, transparent) calc(var(--radar-pct) * 1%) 100%
+    );
+}
+
+/* Mount sweep — fill from empty to the real score once. transform/opacity rule
+   doesn't apply here (the animated property is the gauge value itself, not a
+   layout prop), and it's gated behind no-preference so reduced-motion users see
+   the final fill instantly. */
+@media (prefers-reduced-motion: no-preference) {
+  .radar {
+    animation: radar-sweep var(--motion-base) var(--ease-standard) both;
+  }
+}
+
+@keyframes radar-sweep {
+  from {
+    --radar-pct: 0;
+  }
+  to {
+    --radar-pct: var(--pct, 0);
+  }
+}
+
+/* Soft accent halo behind the ring — reads as a glowing command gauge on
+   dark glass without a drop shadow. */
+.radar::before {
+  content: "";
+  position: absolute;
+  inset: -6%;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--color-cta) 22%, transparent),
+    transparent 70%
+  );
+  z-index: -1;
+}
+
+.radarCore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.radarValue {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 2.4rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+}
+
+.radarCaption {
+  font-size: var(--type-caption-size);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* The breakdown: each health input as a labelled mini-meter so the score is
+   explainable, not a mystery number. */
+.radarLegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  width: 100%;
+}
+
+.radarLegendRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--space-8);
+}
+
+.radarLegendLabel {
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.radarLegendValue {
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.radarTrack {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  overflow: hidden;
+}
+
+.radarTrack > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  width: var(--pct, 0%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-cta) 60%, transparent),
+    var(--color-cta)
+  );
 }
 
 .muted {
@@ -153,4 +406,99 @@
   .activityTime {
     grid-column: 2;
   }
+}
+
+/* ── Resources / help band ──────────────────────────────────────── */
+.resources {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+  padding: var(--space-16) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-cta) 12%, transparent), transparent 52%),
+    var(--color-surface);
+}
+@media (min-width: 720px) {
+  .resources {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-20);
+  }
+}
+
+.resourcesIntro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+}
+
+.resourcesIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+  color: var(--color-cta);
+}
+
+.resourcesTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-card-size);
+  color: var(--text-primary);
+}
+
+.resourcesNote {
+  margin: 2px 0 0;
+  max-width: 48ch;
+  color: var(--text-secondary);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+}
+
+.resourcesLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.resourceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 40px;
+  padding: var(--space-8) var(--space-14);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--type-meta-size);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: transform 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.resourceChip:hover {
+  transform: translateY(-1px);
+  border-color: var(--color-cta);
+  color: var(--color-cta);
+}
+.resourceChip:active { transform: translateY(0); }
+.resourceChip:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resourceChip { transition: none; }
+  .resourceChip:hover { transform: none; }
 }

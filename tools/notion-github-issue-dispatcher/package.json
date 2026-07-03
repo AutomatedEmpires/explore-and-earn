@@ -12,10 +12,10 @@
     "exec": "ntn workers exec dispatchTaskToGithub"
   },
   "dependencies": {
-    "@notionhq/workers": ">=0.0.0"
+    "@notionhq/workers": "^0.4.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.13",
-    "typescript": "^5.8.3"
+    "@types/node": "^24.13.2",
+    "typescript": "^5.9.3"
   }
 }

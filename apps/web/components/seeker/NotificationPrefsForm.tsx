@@ -70,7 +70,7 @@ export function NotificationPrefsForm({
 
 	return (
 		<section className={styles.group} aria-label="Notification preferences">
-			<h2 className={styles.groupTitle}>Notification preferences</h2>
+			<h2 className={styles.srOnly}>Notification preferences</h2>
 			<ul className={styles.rows}>
 				{TOGGLES.map((item) => {
 					const checked = prefs[item.key];

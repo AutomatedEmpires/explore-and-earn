@@ -309,6 +309,40 @@ async function resolveHostProfileId(
   return data ? String((data as Record<string, unknown>).id) : null;
 }
 
+export type WithdrawInviteResult = { ok: boolean; error?: string };
+
+/**
+ * Host retracts a still-pending invite (created/delivered/viewed → withdrawn),
+ * scoped to the caller's own host profile. A no-op match — already actioned,
+ * expired, or not owned — returns ok:false so the UI can explain why.
+ * `clerkUserId` MUST come from auth().userId (never decoded from the token).
+ */
+export async function withdrawInvite(
+  clerkToken: string,
+  clerkUserId: string,
+  inviteId: string,
+): Promise<WithdrawInviteResult> {
+  if (!inviteId) return { ok: false, error: "Missing invite id." };
+
+  const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
+  if (!hostProfileId) {
+    return { ok: false, error: "No host profile found for your account." };
+  }
+
+  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data, error } = await untyped
+    .from("invites")
+    .update({ status: "withdrawn" })
+    .eq("id", inviteId)
+    .eq("host_profile_id", hostProfileId)
+    .in("status", ["created", "delivered", "viewed"])
+    .select("id")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data) return { ok: false, error: "That invite can no longer be withdrawn." };
+  return { ok: true };
+}
+
 function sanitizeSearchQuery(raw: string): string {
   return raw.slice(0, 100).replace(/[,()*%]/g, " ").replace(/\s+/g, " ").trim();
 }

@@ -1,0 +1,74 @@
+/* QuickStats — the seeker "grid four" metric command strip.
+   Composes the shared MetricCard/MetricGrid primitives; this module only owns
+   layout, the link wrapper (so each tile is a 44px+ tappable target), and the
+   token-driven "hot" accent ring for metrics that need attention. All color is
+   inherited from the seeker OS emerald scope via the locked tokens — zero hex. */
+
+.wrap {
+  padding: var(--space-16);
+}
+
+/* 2-up on mobile, 4-up from 640px — overrides the primitive's auto-fit so the
+   pipeline always reads as a deliberate row, never an orphaned single column.
+   Scoped under .wrap so it reliably wins over the primitive's single-class rule
+   regardless of stylesheet order. */
+.wrap .grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .wrap .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* The whole metric tile is a link. It wraps the MetricCard flush (the card owns
+   its own border/background), so the link is a transparent, focusable shell. */
+.tile {
+  display: block;
+  min-height: 44px;
+  border-radius: var(--radius-card);
+  text-decoration: none;
+  color: inherit;
+  outline: none;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.tile:hover {
+  transform: translateY(-2px);
+}
+
+.tile:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.tile:focus-visible {
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* "Hot" tile — an emerald-scope accent ring + lift for the metric that wants
+   action (offers waiting, unread inbox, or a resume that still blocks Apply).
+   Uses --color-cta so it tracks each OS scope; here that resolves to emerald. */
+.tileHot {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-cta) 55%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--color-cta) 14%, transparent);
+}
+
+.tileHot:hover {
+  box-shadow:
+    0 0 0 1px var(--color-cta),
+    0 0 0 5px color-mix(in srgb, var(--color-cta) 18%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    transition: none;
+  }
+  .tile:hover,
+  .tile:active {
+    transform: none;
+  }
+}

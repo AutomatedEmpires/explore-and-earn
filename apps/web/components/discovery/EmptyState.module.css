@@ -61,7 +61,14 @@
 
 @media (hover: hover) {
   .action:hover { filter: brightness(1.06) saturate(1.04); }
-  .action:active { transform: scale(0.98); }
+}
+
+/* Press feedback — works on touch as well as pointer */
+.action:active { transform: scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+  .action { transition: none; }
+  .action:active { transform: none; }
 }
 
 .action:focus-visible {

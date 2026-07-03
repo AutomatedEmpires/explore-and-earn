@@ -8,19 +8,28 @@
 .success,
 .error {
   margin: 0;
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
 }
 
 .pending {
   color: var(--text-secondary);
+  background: color-mix(in srgb, var(--color-surface-raised) 60%, transparent);
 }
 
 .success {
-  color: var(--text-primary);
+  color: var(--status-success-fg);
+  border-color: color-mix(in srgb, var(--status-success-fg) 36%, transparent);
+  background: color-mix(in srgb, var(--status-success-fg) 12%, transparent);
 }
 
 .error {
-  color: var(--status-warning-fg);
+  color: var(--status-error-fg);
+  border-color: color-mix(in srgb, var(--status-error-fg) 36%, transparent);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
 }

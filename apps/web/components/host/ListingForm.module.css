@@ -14,6 +14,42 @@
   gap: var(--space-12);
 }
 
+/* Mobile-first: stack paired fields (dates, pay) into one column. */
+@media (max-width: 639px) {
+  .row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Link from a free-text benefit field into the structured photo/amenity editor. */
+.benefitLink {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+  padding: var(--space-6) 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.benefitLink:hover {
+  color: color-mix(in srgb, var(--color-cta) 80%, var(--text-primary));
+  text-decoration: underline;
+}
+
+.benefitLink:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+  border-radius: var(--radius-cell);
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -93,6 +129,15 @@
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+/* Inline coaching under a field (e.g. what each category lane means). */
+.hint {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
   color: var(--text-secondary);
 }
 

@@ -49,6 +49,9 @@ export default async function HostProfileEditPage() {
     websiteUrl: hostProfile?.websiteUrl ?? undefined,
     instagram: hostProfile?.socialLinks.instagram ?? undefined,
     twitter: hostProfile?.socialLinks.twitter ?? undefined,
+    housingOfferedGenerally: hostProfile?.housingOfferedGenerally ?? false,
+    mealsOfferedGenerally: hostProfile?.mealsOfferedGenerally ?? false,
+    categoryScopes: hostProfile?.categoryScopes ?? [],
   };
 
   return (

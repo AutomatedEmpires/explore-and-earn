@@ -3,7 +3,9 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 
 import {
 	type SearchFilters,
+	getSavedSearches,
 	rowToDiscoveryFields,
+	savedSearchToQueryString,
 	searchListings,
 } from "@explore-and-earn/db";
 import {
@@ -23,7 +25,7 @@ import {
 import { SeekBrowser } from "../../../components/seeker";
 import { SeekerDashboard } from "../../../components/seeker/SeekerDashboard";
 import { getSeekerStatus, getMatchedListings } from "../../../components/seeker/data";
-import { getSeekerProfile } from "@explore-and-earn/db";
+import { cachedSeekerProfile, getSupabaseToken } from "../../../lib/serverCache";
 import { buildFeaturedEmployers } from "../../../lib/employer-utils";
 import styles from "./page.module.css";
 
@@ -157,8 +159,8 @@ export default async function SeekPage({
 	const params = await searchParams;
 
 	// Auth — optional; dashboard only renders when signed in
-	const { userId, getToken } = await auth();
-	const token = userId ? await getToken({ template: "supabase" }) : null;
+	const { userId } = await auth();
+	const token = userId ? await getSupabaseToken() : null;
 
 	// Parse discovery filters from URL
 	const query = firstValue(params.q);
@@ -237,6 +239,7 @@ export default async function SeekPage({
 
 	// Dashboard data — only fetched when signed in
 	let dashboardProps = null;
+	let savedSearchViews: { id: string; label: string; href: string }[] = [];
 	if (userId && token) {
 		const clerkUser = await currentUser();
 		const fallbackName =
@@ -244,11 +247,48 @@ export default async function SeekPage({
 				? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
 				: "Seeker";
 
-		const [status, matchedListings, profile] = await Promise.all([
+		const [status, matchedListings, profile, savedSearches] = await Promise.all([
 			getSeekerStatus(token, userId, fallbackName),
 			getMatchedListings(token, userId),
-			getSeekerProfile(token, userId),
+			cachedSeekerProfile(token, userId),
+			getSavedSearches(token, userId).catch(() => []),
 		]);
+
+		// Per saved search, count live listings published AFTER it was saved that
+		// still match its filters — the "N new" alert the seeker sees on return.
+		// searchListings is the public/anon path, so this works without the
+		// seeker token. Capped at 8 searches to bound page-load fan-out.
+		savedSearchViews = await Promise.all(
+			savedSearches.slice(0, 8).map(async (s) => {
+				const f = s.filters;
+				let newCount = 0;
+				try {
+					const rows = await searchListings({
+						query: f.q,
+						categories: f.category ? [f.category] : undefined,
+						hasHousing: f.housing,
+						hasMeals: f.meals,
+						visaSupport: f.visa,
+						startRangeMonths: f.startRangeMonths as SearchFilters["startRangeMonths"],
+						payMin: f.payMin,
+						payUnit: f.payUnit as SearchFilters["payUnit"],
+						location: f.location,
+						limit: 24,
+					});
+					newCount = rows.filter(
+						(r) => r.published_at != null && r.published_at > s.createdAt,
+					).length;
+				} catch {
+					/* count stays 0 — never block the page on an alert count */
+				}
+				return {
+					id: s.id,
+					label: s.label,
+					href: savedSearchToQueryString(s.filters),
+					newCount,
+				};
+			}),
+		);
 
 		dashboardProps = {
 			profile,
@@ -281,6 +321,7 @@ export default async function SeekPage({
 					location={location}
 					payMin={payMin}
 					payUnit={payUnit}
+					savedSearches={savedSearchViews}
 				/>
 			</div>
 

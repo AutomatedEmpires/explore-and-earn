@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect, useCallback, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+type CommunityTab = "feed" | "photos" | "announcements";
 import { Icon, AppIllustration, type IllustrationKey } from "@explore-and-earn/ui";
 import type { OpportunityCategory, ReactionKey } from "@explore-and-earn/contracts";
 import type {
@@ -18,6 +20,7 @@ import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import type { SeekerStatusSummary } from "./models";
 import { HostAnnouncementComposer } from "../host/HostAnnouncementComposer";
 import { uploadCommunityPhotoAction } from "../../app/actions/community";
+import { getEditorialPosts, type EditorialPost } from "../../lib/editorial";
 import styles from "./CommunityDashboard.module.css";
 
 // ─── Feed item types ──────────────────────────────────────────────────────────
@@ -51,16 +54,6 @@ type HostAnnouncement = {
   readonly isPurchased?: boolean;
 };
 
-type BlogPost = {
-  readonly kind: "blog";
-  readonly id: string;
-  readonly timestamp: string;
-  readonly title: string;
-  readonly excerpt: string;
-  readonly coverUrl?: string;
-  readonly reactions: readonly [number, number, number, number, number];
-};
-
 type BoostedListing = {
   readonly kind: "listing";
   readonly id: string;
@@ -75,9 +68,20 @@ type FeaturedEmployerCard = {
   readonly employer: FeaturedEmployer;
 };
 
-type FeedItem = SeekerPost | HostAnnouncement | BlogPost | BoostedListing | FeaturedEmployerCard;
+type EditorialCard = {
+  readonly kind: "editorial";
+  readonly id: string;
+  readonly post: EditorialPost;
+};
 
-type FeedSlotType = "seeker" | "blog" | "announcement" | "listing" | "employer";
+type FeedItem =
+  | SeekerPost
+  | HostAnnouncement
+  | BoostedListing
+  | FeaturedEmployerCard
+  | EditorialCard;
+
+type FeedSlotType = "seeker" | "announcement" | "listing" | "employer" | "editorial";
 
 interface CommunityDashboardProps {
   readonly tab: "feed" | "photos" | "announcements";
@@ -99,21 +103,10 @@ interface CommunityDashboardProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 
-const SEEKER_NAMES = ["Maya R.", "Ethan W.", "Jessica L.", "Sam K.", "Alex M."] as const;
-
 const POPULAR_TAGS = [
   "CabinLife", "TrailLife", "SunriseShift",
   "Adventure", "NowHiring", "Community",
 ] as const;
-
-const BLOG_POST_BASE = {
-  kind: "blog" as const,
-  id: "blog-travel-tips",
-  timestamp: "1d ago",
-  title: "7 Travel Tips for a Smoother Seasonal Work Adventure",
-  excerpt: "Seasonal work takes you to incredible places — and with the right prep, it can be one of the most rewarding experiences of your life. Here are 7 tips to help you travel smarter.",
-  reactions: [89, 67, 54, 41, 38] as [number, number, number, number, number],
-};
 
 const CATEGORY_ABBR: Record<OpportunityCategory, string> = {
   farm:     "FARM",
@@ -123,44 +116,92 @@ const CATEGORY_ABBR: Record<OpportunityCategory, string> = {
   mix:      "MIX",
 };
 
-const FEED_SLOT_TEMPLATE: readonly FeedSlotType[] = [
+/** Preferred cadence — a communal rhythm, never a spammy dump. The ranker honours
+ *  this order where supply exists, and the "no more than 2 of one type in a row"
+ *  rule below guarantees variety regardless of what's actually available. */
+const FEED_TYPE_RHYTHM: readonly FeedSlotType[] = [
   "seeker",
-  "seeker",
-  "blog",
   "seeker",
   "announcement",
-  "seeker",
-  "seeker",
   "listing",
-  "seeker",
-  "announcement",
+  "editorial",
   "seeker",
   "employer",
+  "announcement",
+  "seeker",
 ];
 
 // ─── Tab navigation ───────────────────────────────────────────────────────────
 
 const COMMUNITY_TABS = [
-  { id: "feed" as const, label: "Feed", href: "/community", icon: "nav.feed" as const },
-  { id: "photos" as const, label: "Photos", href: "/community/photos", icon: "nav.photos" as const },
-  { id: "announcements" as const, label: "Announcements", href: "/community/announcements", icon: "nav.announcements" as const },
+  { id: "feed" as const, label: "Feed", icon: "nav.feed" as const },
+  { id: "photos" as const, label: "Photos", icon: "nav.photos" as const },
+  { id: "announcements" as const, label: "Announcements", icon: "nav.announcements" as const },
 ] as const;
 
-function CommunityTabNav({ tab }: { readonly tab: "feed" | "photos" | "announcements" }) {
+const TAB_ORDER: readonly CommunityTab[] = ["feed", "photos", "announcements"];
+
+/**
+ * True ARIA tablist: role=tablist/tab with roving tabindex, arrow-key + Home/End
+ * navigation, and aria-selected. Switching is client-side (activeTab state) and
+ * mirrored into the URL via ?tab= so a panel is shareable. The underlying routes
+ * still exist for direct/SSR entry — they hydrate the matching tab.
+ */
+function CommunityTabNav({
+  activeTab,
+  onSelect,
+}: {
+  readonly activeTab: CommunityTab;
+  readonly onSelect: (tab: CommunityTab) => void;
+}) {
+  const tabRefs = useRef<Record<CommunityTab, HTMLButtonElement | null>>({
+    feed: null,
+    photos: null,
+    announcements: null,
+  });
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    let nextIndex: number | null = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      nextIndex = (index + 1) % TAB_ORDER.length;
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      nextIndex = (index - 1 + TAB_ORDER.length) % TAB_ORDER.length;
+    } else if (e.key === "Home") {
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      nextIndex = TAB_ORDER.length - 1;
+    }
+    if (nextIndex === null) return;
+    e.preventDefault();
+    const nextTab = TAB_ORDER[nextIndex]!;
+    onSelect(nextTab);
+    tabRefs.current[nextTab]?.focus();
+  }
+
   return (
-    <nav className={styles.tabNav} aria-label="Community sections">
-      {COMMUNITY_TABS.map(t => (
-        <Link
-          key={t.id}
-          href={t.href}
-          className={`${styles.tabLink}${tab === t.id ? ` ${styles.tabLinkActive}` : ""}`}
-          aria-current={tab === t.id ? "page" : undefined}
-        >
-          <Icon name={t.icon} size={16} aria-hidden />
-          {t.label}
-        </Link>
-      ))}
-    </nav>
+    <div className={styles.tabNav} role="tablist" aria-label="Community sections">
+      {COMMUNITY_TABS.map((t, index) => {
+        const selected = activeTab === t.id;
+        return (
+          <button
+            key={t.id}
+            ref={el => { tabRefs.current[t.id] = el; }}
+            type="button"
+            role="tab"
+            id={`community-tab-${t.id}`}
+            aria-selected={selected}
+            aria-controls={`community-panel-${t.id}`}
+            tabIndex={selected ? 0 : -1}
+            className={`${styles.tabLink}${selected ? ` ${styles.tabLinkActive}` : ""}`}
+            onClick={() => onSelect(t.id)}
+            onKeyDown={e => handleKeyDown(e, index)}
+          >
+            <Icon name={t.icon} size={16} aria-hidden />
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -184,33 +225,7 @@ function useToasts() {
 }
 
 
-// ─── Fixture generation ───────────────────────────────────────────────────────
-
-const CATEGORY_CAPTIONS: Record<OpportunityCategory, string> = {
-  farm: "Harvest season hits different when you're out here at golden hour. Grateful for these views and the people I work alongside. 🌾✨😊",
-  maritime: "Nothing beats the quiet before the morning catch. Clear skies, open water, and a crew that has your back. ⚓️🌅",
-  remote: "Signal is weak. Views are incredible. Work is meaningful. This is remote life done right. 💻🏔️✨",
-  seasonal: "First week in and already feels like home. These moments are exactly why we explore. 🏕️❤️✨",
-  mix: "Every opportunity is a new adventure. Grateful for the journey and everyone I've met along the way. 🗺️✨",
-};
-
-function hostAnnouncementText(listing: DiscoveryListing): string {
-  const includedBenefits: string[] = [];
-  if (listing.benefits.housing.provision === "provided") includedBenefits.push("housing included");
-  if (listing.benefits.meals.provision === "provided") includedBenefits.push("meals included");
-  const benefitsClause = includedBenefits.length
-    ? ` ${includedBenefits.join(" + ")} —`
-    : "";
-  return `We're opening positions at ${listing.location} for this season.${benefitsClause} Come join our team and explore! 🌲✨😊`;
-}
-
-function buildTags(listing: DiscoveryListing): readonly string[] {
-  const tags: string[] = [CATEGORY_LABEL[listing.category]];
-  if (listing.benefits.housing.provision === "provided") tags.push("HousingIncluded");
-  const loc = listing.location.split(",")[0]?.trim().replace(/\s+/g, "");
-  if (loc) tags.push(loc);
-  return tags.slice(0, 3);
-}
+// ─── Discovery → feed adapters (real data only) ───────────────────────────────
 
 function benefitLabel(provision: string, summary?: string): string {
   if (summary) return summary;
@@ -219,50 +234,15 @@ function benefitLabel(provision: string, summary?: string): string {
   return "Own arrange.";
 }
 
-// ─── Strategic feed builder ───────────────────────────────────────────────────
-
-function buildStrategicFeedItems(
-  listings: readonly DiscoveryListing[],
-  featuredEmployers: readonly FeaturedEmployer[],
-): FeedItem[] {
-  const sortedListings = [...listings].sort(
-    (a, b) => (b.coverImageUrl ? 1 : 0) - (a.coverImageUrl ? 1 : 0),
-  );
-  const seekerBucket: SeekerPost[] = sortedListings.map((listing, i): SeekerPost => ({
-    kind: "seeker",
-    id: `post-${listing.id}`,
-    authorName: SEEKER_NAMES[i % SEEKER_NAMES.length] ?? "Maya R.",
-    timestamp: `${i * 2 + 2}h ago`,
-    caption: CATEGORY_CAPTIONS[listing.category],
-    tags: buildTags(listing),
-    coverUrl: listing.coverImageUrl,
-    reactions: [Math.max(50, 156 - i * 3), Math.max(40, 123 - i * 2), Math.max(35, 101 - i), 82, 71],
-  }));
-
-  const seenHosts = new Set<string>();
-  const announcementBucket: HostAnnouncement[] = [];
-  listings.forEach((listing, i) => {
-    if (seenHosts.has(listing.host.name)) return;
-    seenHosts.add(listing.host.name);
-    announcementBucket.push({
-      kind: "announcement",
-      id: `ann-${listing.host.name.replace(/\s+/g, "-").toLowerCase()}`,
-      hostName: listing.host.name,
-      timestamp: i === 0 ? "3h ago" : `${Math.max(1, i - 1)}d ago`,
-      text: hostAnnouncementText(listing),
-      coverUrls: [listing.coverImageUrl].filter((u): u is string => Boolean(u)),
-      reactions: [Math.max(40, 128 - i * 4), Math.max(30, 96 - i * 3), Math.max(25, 84 - i * 2), 64, 52],
-      hostId: listing.host.id,
-    });
-  });
-
-  const listingBucket: BoostedListing[] = [...listings]
+/** Boosted / strongly-matched listings — real discovery data, surfaced as feed cards. */
+function buildListingFeedCards(listings: readonly DiscoveryListing[]): BoostedListing[] {
+  return [...listings]
     .filter(l =>
       l.conditionalBadges?.includes("boosted") ||
       (l.matchScore !== undefined && l.matchScore >= 60),
     )
     .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
-    .slice(0, 2)
+    .slice(0, 3)
     .map((l): BoostedListing => ({
       kind: "listing",
       id: `listing-card-${l.id}`,
@@ -270,37 +250,88 @@ function buildStrategicFeedItems(
       matchScore: l.matchScore,
       isBoosted: Boolean(l.conditionalBadges?.includes("boosted")),
     }));
+}
 
-  const employerBucket: FeaturedEmployerCard[] = featuredEmployers.slice(0, 2).map(
+function buildEmployerFeedCards(featuredEmployers: readonly FeaturedEmployer[]): FeaturedEmployerCard[] {
+  return featuredEmployers.slice(0, 2).map(
     (emp, i): FeaturedEmployerCard => ({
       kind: "employer",
       id: `employer-card-${emp.hostId ?? String(i)}`,
       employer: emp,
     }),
   );
+}
 
-  const blogBucket: BlogPost[] = [{
-    ...BLOG_POST_BASE,
-    coverUrl: sortedListings.find(l => l.coverImageUrl)?.coverImageUrl,
-  }];
+/** E&E "field guide" editorial posts, surfaced into the communal feed. Capped so
+ *  the guide complements the feed without ever dominating it (static source). */
+function buildEditorialFeedCards(): EditorialCard[] {
+  return getEditorialPosts().slice(0, 2).map((post): EditorialCard => ({
+    kind: "editorial",
+    id: `editorial-${post.slug}`,
+    post,
+  }));
+}
 
-  const buckets: Record<FeedSlotType, FeedItem[]> = {
-    seeker: seekerBucket,
-    blog: blogBucket,
-    announcement: announcementBucket,
-    listing: listingBucket,
-    employer: employerBucket,
+/**
+ * Ranked, communal interleaver. Inputs are REAL content buckets (seeker photos,
+ * host announcements, boosted listings, featured employers). It favours the
+ * preferred rhythm + recency, but enforces the anti-spam invariant: never more
+ * than two of the same content type in a row. Buckets are consumed front-to-back
+ * (callers pre-sort seeker/announcement buckets newest-first), so recency is
+ * preserved within a type while variety is preserved across types.
+ */
+function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[] {
+  const queues: Record<FeedSlotType, FeedItem[]> = {
+    seeker: [...buckets.seeker],
+    announcement: [...buckets.announcement],
+    listing: [...buckets.listing],
+    employer: [...buckets.employer],
+    editorial: [...buckets.editorial],
   };
 
   const result: FeedItem[] = [];
-  for (const slot of FEED_SLOT_TEMPLATE) {
-    const bucket = buckets[slot];
-    if (bucket.length > 0) {
-      result.push(bucket.shift()!);
-    } else if (buckets.seeker.length > 0) {
-      result.push(buckets.seeker.shift()!);
+  const remaining = () =>
+    queues.seeker.length + queues.announcement.length +
+    queues.listing.length + queues.employer.length + queues.editorial.length;
+
+  const runOf = (type: FeedSlotType): number => {
+    let run = 0;
+    for (let i = result.length - 1; i >= 0; i--) {
+      if (result[i]!.kind === type) run++;
+      else break;
     }
+    return run;
+  };
+
+  // Try the preferred rhythm first; on each step pick the best eligible type.
+  let rhythmIdx = 0;
+  while (remaining() > 0) {
+    const preferred = FEED_TYPE_RHYTHM[rhythmIdx % FEED_TYPE_RHYTHM.length]!;
+    rhythmIdx++;
+
+    // Eligible = has supply AND wouldn't create a 3-in-a-row of its type.
+    const order: FeedSlotType[] = [
+      preferred,
+      "seeker", "announcement", "listing", "employer", "editorial",
+    ];
+    let chosen: FeedSlotType | null = null;
+    for (const type of order) {
+      if (queues[type].length === 0) continue;
+      if (runOf(type) >= 2) continue;
+      chosen = type;
+      break;
+    }
+    // Fallback: nothing satisfies the anti-spam rule (e.g. only one type left) —
+    // take whatever remains so we never drop real content.
+    if (!chosen) {
+      chosen =
+        (["seeker", "announcement", "listing", "employer", "editorial"] as FeedSlotType[])
+          .find(t => queues[t].length > 0) ?? null;
+    }
+    if (!chosen) break;
+    result.push(queues[chosen].shift()!);
   }
+
   return result;
 }
 
@@ -578,7 +609,9 @@ function PostMenu({ postId, onClose, onHide, onToast }: PostMenuProps) {
     <div ref={menuRef} className={styles.postMenu} role="menu" aria-label="Post options">
       {reported ? (
         <div className={styles.postMenuConfirm}>
-          <span className={styles.postMenuConfirmIcon} aria-hidden>✓</span>
+          <span className={styles.postMenuConfirmIcon} aria-hidden>
+            <Icon name="system.success" size={16} aria-hidden />
+          </span>
           Thanks — we'll review this soon
         </div>
       ) : (
@@ -723,38 +756,22 @@ function AnnouncementCard({ post }: { readonly post: HostAnnouncement }) {
   );
 }
 
-// ─── Blog post card ───────────────────────────────────────────────────────────
+// ─── Seekers-read announcements intro (non-host) ──────────────────────────────
 
-function BlogCard({ post }: { readonly post: BlogPost }) {
+function SeekerAnnouncementsIntro() {
   return (
-    <article className={styles.blogCard}>
-      <div className={post.coverUrl ? styles.blogLayout : styles.blogLayoutFull}>
-        <div className={styles.blogText}>
-          <div className={styles.blogMeta}>
-            <span className={styles.blogBrand} aria-hidden>
-              <Icon name="nav.feed" size={16} aria-hidden />
-            </span>
-            <span className={styles.blogBadge}>Blog</span>
-            <span className={styles.cardTime}>{post.timestamp}</span>
-          </div>
-          <h3 className={styles.blogTitle}>{post.title}</h3>
-          <div className={styles.blogTreeRule} aria-hidden>&#x25C4;&#x2022;&#x2022;&#x2022;&#x25BA;</div>
-          <p className={styles.blogExcerpt}>{post.excerpt}</p>
-          <Link className={styles.readMoreBtn} href="/help">
-            Read more
-            <Icon name="action.forward" size={16} aria-hidden />
-          </Link>
-        </div>
-        {post.coverUrl ? (
-          <div className={styles.blogImageWrap}>
-            <div className={styles.blogImageMat}>
-              <img className={styles.blogImage} src={post.coverUrl} alt="" aria-hidden="true" loading="lazy" decoding="async" />
-            </div>
-          </div>
-        ) : null}
+    <div className={styles.annIntro}>
+      <span className={styles.annIntroIcon} aria-hidden>
+        <Icon name="nav.announcements" size={24} aria-hidden />
+      </span>
+      <div className={styles.annIntroText}>
+        <p className={styles.annIntroTitle}>Announcements from verified hosts</p>
+        <p className={styles.annIntroSub}>
+          Seasonal openings, housing updates, and hiring calls — posted by hosts, read free by every
+          seeker. Built by seekers, for seekers.
+        </p>
       </div>
-      <PostEngagement postId={post.id} initialReactions={post.reactions} />
-    </article>
+    </div>
   );
 }
 
@@ -871,7 +888,9 @@ function EmployerFeedCard({ item }: { readonly item: FeaturedEmployerCard }) {
       <div className={styles.employerEyebrow}>
         <Icon name="trust.featured_employer" size={16} aria-hidden />
         <span>Featured employer</span>
-        <span className={styles.employerStar} aria-hidden>✦</span>
+        <span className={styles.employerStar} aria-hidden>
+          <Icon name="status.featured" size={16} aria-hidden />
+        </span>
       </div>
       <div className={styles.employerImageSection}>
         <div className={styles.employerImageWrap}>
@@ -919,13 +938,50 @@ function EmployerFeedCard({ item }: { readonly item: FeaturedEmployerCard }) {
   );
 }
 
+// ─── Editorial / field-guide feed card ────────────────────────────────────────
+
+/** E&E field-guide post in the feed. Reuses the `.blog*` card family (text-only
+ *  layout — editorial posts carry no cover image) and links to the /blog route. */
+function EditorialFeedCard({ item }: { readonly item: EditorialCard }) {
+  const { post } = item;
+  const formatted = new Date(post.publishedAt).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+  });
+  return (
+    <article className={styles.blogCard}>
+      <div className={styles.blogLayoutFull}>
+        <div className={styles.blogText}>
+          <div className={styles.blogMeta}>
+            <span className={styles.blogBrand} aria-hidden>
+              <Icon name="nav.feed" size={16} aria-hidden />
+            </span>
+            <span className={styles.blogBadge}>{post.kind}</span>
+            <span className={styles.blogTreeRule} aria-hidden>
+              {formatted} · {post.readMinutes} min read
+            </span>
+          </div>
+          <h3 className={styles.blogTitle}>{post.title}</h3>
+          <p className={styles.blogExcerpt}>{post.excerpt}</p>
+          <Link href={`/blog/${post.slug}`} className={styles.readMoreBtn}>
+            Read the guide
+            <Icon name="action.forward" size={16} aria-hidden />
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 // ─── Feed end marker ──────────────────────────────────────────────────────────
 
 function FeedEndMarker() {
   return (
     <div className={styles.feedEnd} aria-label="End of feed">
       <div className={styles.feedEndRule} aria-hidden>
-        <span className={styles.feedEndIcon}>🌲</span>
+        <span className={styles.feedEndIcon}>
+          <Icon name="category.seasonal" size={20} aria-hidden />
+        </span>
       </div>
       <h3 className={styles.feedEndHeading}>You&rsquo;re all caught up</h3>
       <p className={styles.feedEndSub}>
@@ -1128,6 +1184,17 @@ function WelcomeBar({ status, tab }: { readonly status: SeekerStatusSummary; rea
         </span>
         <h1 className={styles.mastheadTitle}>{section.eyebrow}</h1>
         <p className={styles.mastheadBlurb}>{section.blurb}</p>
+        <div className={styles.mastheadTaglines}>
+          <span className={styles.mastheadTagline}>
+            <Icon name="trust.verified_host" size={16} aria-hidden />
+            Built by seekers, for seekers
+          </span>
+          <span className={styles.mastheadTaglineDot} aria-hidden />
+          <span className={styles.mastheadTagline}>
+            <Icon name="system.success" size={16} aria-hidden />
+            Seekers are free forever
+          </span>
+        </div>
       </div>
       <div className={styles.welcomeBarInner}>
         <div className={styles.welcomeAvatar} aria-hidden>
@@ -1293,142 +1360,177 @@ export function CommunityDashboard({
     });
   }
 
-  // Merge real DB data into feed: real items override fixture items of the same type
-  const hasRealPhotos = Boolean(serverPhotos?.length);
-  const hasRealAnnouncements = Boolean(serverAnnouncements?.length);
+  // Client-controlled active tab (seeds from the route's `tab` prop, mirrors ?tab=).
+  const [activeTab, setActiveTab] = useState<CommunityTab>(tab);
 
-  const realSeekerPosts = hasRealPhotos ? photosToSeekerPosts(serverPhotos!) : [];
-  const realAnnouncementItems = hasRealAnnouncements ? announcementsToFeedItems(serverAnnouncements!) : [];
+  useEffect(() => { setActiveTab(tab); }, [tab]);
 
-  const fixtureFeed = buildStrategicFeedItems(listings, featuredEmployers);
+  // Honour a shared ?tab= on first paint and keep state in sync with back/forward.
+  useEffect(() => {
+    function syncFromUrl() {
+      const param = new URLSearchParams(window.location.search).get("tab");
+      if (param === "feed" || param === "photos" || param === "announcements") {
+        setActiveTab(param);
+      }
+    }
+    syncFromUrl();
+    window.addEventListener("popstate", syncFromUrl);
+    return () => window.removeEventListener("popstate", syncFromUrl);
+  }, []);
 
-  // For the feed tab: inject real items at the front of their respective slots, rest is fixtures
-  const feedItems: FeedItem[] = (() => {
-    if (!hasRealPhotos && !hasRealAnnouncements) return fixtureFeed;
-    const realSeeker = [...realSeekerPosts];
-    const realAnn    = [...realAnnouncementItems];
-    return fixtureFeed.map(item => {
-      if (item.kind === "seeker" && realSeeker.length > 0) return realSeeker.shift()!;
-      if (item.kind === "announcement" && realAnn.length > 0) return realAnn.shift()!;
-      return item;
-    }).concat(realSeeker, realAnn);
-  })();
+  const selectTab = useCallback((next: CommunityTab) => {
+    setActiveTab(next);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", next);
+      // Shallow URL update so the panel is shareable without a server round-trip.
+      window.history.replaceState(window.history.state, "", url.toString());
+    } catch { /* URL unavailable (non-browser) */ }
+  }, []);
 
-  const photoItems: SeekerPost[] = hasRealPhotos
-    ? realSeekerPosts
-    : fixtureFeed.filter((item): item is SeekerPost => item.kind === "seeker" && Boolean(item.coverUrl));
+  // ─── Real content only — no fabricated authors, captions, or counts ───────────
+  const realSeekerPosts = serverPhotos?.length ? photosToSeekerPosts(serverPhotos) : [];
+  const realAnnouncementItems = serverAnnouncements?.length
+    ? announcementsToFeedItems(serverAnnouncements)
+    : [];
+  const listingCards = buildListingFeedCards(listings);
+  const employerCards = buildEmployerFeedCards(featuredEmployers);
+  const editorialCards = buildEditorialFeedCards();
 
-  const announcementItems: HostAnnouncement[] = hasRealAnnouncements
-    ? realAnnouncementItems
-    : fixtureFeed.filter((item): item is HostAnnouncement => item.kind === "announcement");
+  // Ranked communal feed: real photos + announcements + boosted listings +
+  // featured employers + E&E field-guide posts, interleaved with the
+  // no-more-than-two-in-a-row rule.
+  const feedItems: FeedItem[] = rankCommunityFeed({
+    seeker: realSeekerPosts,
+    announcement: realAnnouncementItems,
+    listing: listingCards,
+    employer: employerCards,
+    editorial: editorialCards,
+  });
 
-  const mainItems: FeedItem[] = (
-    tab === "photos" ? photoItems :
-    tab === "announcements" ? announcementItems :
-    feedItems
-  ).filter(item => !hiddenIds.has(item.id));
+  const photoItems: SeekerPost[] = realSeekerPosts;
+  const announcementItems: HostAnnouncement[] = realAnnouncementItems;
+
+  const visibleFeed = feedItems.filter(item => !hiddenIds.has(item.id));
+  const visibleAnnouncements = announcementItems.filter(item => !hiddenIds.has(item.id));
 
   const seekerInitial = status.seekerName.charAt(0).toUpperCase() || "S";
 
+  function panelProps(id: CommunityTab) {
+    return {
+      role: "tabpanel" as const,
+      id: `community-panel-${id}`,
+      "aria-labelledby": `community-tab-${id}`,
+      hidden: activeTab !== id,
+    };
+  }
+
   return (
     <div className={styles.dashboard}>
-      <WelcomeBar status={status} tab={tab} />
-      <CommunityTabNav tab={tab} />
+      <WelcomeBar status={status} tab={activeTab} />
+      <CommunityTabNav activeTab={activeTab} onSelect={selectTab} />
       <MobileProfileStrip status={status} listings={listings} />
 
       <div className={styles.layout}>
         <div className={styles.mainCol}>
-          {tab === "feed" ? (
-            <ShareComposer seekerInitial={seekerInitial} />
-          ) : null}
+          {/* ─── Feed panel ─── */}
+          <div {...panelProps("feed")} className={styles.tabPanel}>
+            {activeTab === "feed" ? (
+              <>
+                <ShareComposer seekerInitial={seekerInitial} />
+                {visibleFeed.length === 0 ? (
+                  <CommunityEmptyState
+                    icon="nav.feed"
+                    illustration="empty.community"
+                    heading="Built by seekers, for seekers"
+                    sub="As seekers post photos and hosts share announcements, your communal feed fills up right here. Seekers are free forever — start by sharing a moment."
+                    ctaLabel="Share a photo"
+                    ctaHref="/community?tab=photos"
+                  />
+                ) : (
+                  <>
+                    {visibleFeed.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className={styles.feedItem}
+                        style={{ "--card-delay": `${index * 55}ms` } as React.CSSProperties}
+                      >
+                        {item.kind === "seeker" ? (
+                          <SeekerCard
+                            post={item}
+                            onHide={() => hidePost(item.id)}
+                            onToast={addToast}
+                          />
+                        ) : item.kind === "announcement" ? (
+                          <AnnouncementCard post={item} />
+                        ) : item.kind === "listing" ? (
+                          <ListingFeedCard item={item} />
+                        ) : item.kind === "employer" ? (
+                          <EmployerFeedCard item={item} />
+                        ) : item.kind === "editorial" ? (
+                          <EditorialFeedCard item={item} />
+                        ) : null}
+                      </div>
+                    ))}
+                    <FeedEndMarker />
+                  </>
+                )}
+              </>
+            ) : null}
+          </div>
 
-          {tab === "photos" ? (
-            <>
-              <PhotoUploadForm
-                completionScore={completionScore}
-                onSuccess={() => { router.refresh(); }}
-                onToast={addToast}
-              />
-              <PhotoMasonryGrid photos={photoItems} />
-            </>
-          ) : tab === "announcements" && isHost ? (
-            <>
-              <HostAnnouncementComposer
-                subscriptionTier={hostTier}
-                usedThisMonth={hostUsedThisMonth}
-                draftAnnouncementId={hostDraftAnnouncementId}
-              />
-              {mainItems.length === 0 ? (
-                <CommunityEmptyState
-                  icon="nav.announcements"
-                  illustration="empty.announcements"
-                  heading="No announcements yet"
-                  sub="Your published announcements will appear here. Share a seasonal opening, housing update, or event using the composer above."
+          {/* ─── Photos panel ─── */}
+          <div {...panelProps("photos")} className={styles.tabPanel}>
+            {activeTab === "photos" ? (
+              <>
+                <PhotoUploadForm
+                  completionScore={completionScore}
+                  onSuccess={() => { router.refresh(); }}
+                  onToast={addToast}
                 />
-              ) : (
-                <>
-                  {mainItems.map((item, index) => (
+                <PhotoMasonryGrid photos={photoItems} />
+              </>
+            ) : null}
+          </div>
+
+          {/* ─── Announcements panel ─── */}
+          <div {...panelProps("announcements")} className={styles.tabPanel}>
+            {activeTab === "announcements" ? (
+              <>
+                {isHost ? (
+                  <HostAnnouncementComposer
+                    subscriptionTier={hostTier}
+                    usedThisMonth={hostUsedThisMonth}
+                    draftAnnouncementId={hostDraftAnnouncementId}
+                  />
+                ) : (
+                  <SeekerAnnouncementsIntro />
+                )}
+                {visibleAnnouncements.length === 0 ? (
+                  <CommunityEmptyState
+                    icon="nav.announcements"
+                    illustration="empty.announcements"
+                    heading="No announcements yet"
+                    sub={isHost
+                      ? "Your published announcements will appear here. Share a seasonal opening, housing update, or event using the composer above."
+                      : "Verified hosts share seasonal openings, housing updates, and hiring news here. Check back soon."}
+                    ctaLabel={isHost ? undefined : "Explore listings"}
+                    ctaHref={isHost ? undefined : "/seek"}
+                  />
+                ) : (
+                  visibleAnnouncements.map((item, index) => (
                     <div
                       key={item.id}
                       className={styles.feedItem}
                       style={{ "--card-delay": `${index * 55}ms` } as React.CSSProperties}
                     >
-                      {item.kind === "announcement" ? (
-                        <AnnouncementCard post={item} />
-                      ) : null}
+                      <AnnouncementCard post={item} />
                     </div>
-                  ))}
-                </>
-              )}
-            </>
-          ) : mainItems.length === 0 ? (
-            tab === "announcements" ? (
-              <CommunityEmptyState
-                icon="nav.announcements"
-                illustration="empty.announcements"
-                heading="No announcements yet"
-                sub="Verified hosts share seasonal openings, housing updates, and hiring news here. Check back soon."
-                ctaLabel="Explore listings"
-                ctaHref="/seek"
-              />
-            ) : (
-              <CommunityEmptyState
-                icon="nav.feed"
-                illustration="empty.community"
-                heading="Your feed is just getting started"
-                sub="As seekers and hosts post photos and announcements, they'll show up right here."
-                ctaLabel="Share a photo"
-                ctaHref="/community/photos"
-              />
-            )
-          ) : (
-            <>
-              {mainItems.map((item, index) => (
-                <div
-                  key={item.id}
-                  className={styles.feedItem}
-                  style={{ "--card-delay": `${index * 55}ms` } as React.CSSProperties}
-                >
-                  {item.kind === "seeker" ? (
-                    <SeekerCard
-                      post={item}
-                      onHide={() => hidePost(item.id)}
-                      onToast={addToast}
-                    />
-                  ) : item.kind === "announcement" ? (
-                    <AnnouncementCard post={item} />
-                  ) : item.kind === "blog" ? (
-                    <BlogCard post={item} />
-                  ) : item.kind === "listing" ? (
-                    <ListingFeedCard item={item} />
-                  ) : item.kind === "employer" ? (
-                    <EmployerFeedCard item={item} />
-                  ) : null}
-                </div>
-              ))}
-              {tab === "feed" ? <FeedEndMarker /> : null}
-            </>
-          )}
+                  ))
+                )}
+              </>
+            ) : null}
+          </div>
         </div>
 
         <aside className={styles.aside}>
@@ -1444,7 +1546,9 @@ export function CommunityDashboard({
             </div>
             <div className={styles.widgetMeter}>
               <div className={styles.widgetMeterRow}>
-                <span className={styles.widgetMeterIcon} aria-hidden>🌱</span>
+                <span className={styles.widgetMeterIcon} aria-hidden>
+                  <Icon name="category.farm" size={16} aria-hidden />
+                </span>
                 <span className={styles.widgetMeterLabel}>
                   Level {Math.max(1, Math.ceil(status.resumeCompletion / 20))} Explorer
                 </span>

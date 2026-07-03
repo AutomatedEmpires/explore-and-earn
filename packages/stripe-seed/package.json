@@ -4,7 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "seed": "node seed.mjs",
+    "test": "vitest run",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@explore-and-earn/contracts": "workspace:*",
+    "stripe": "^22.2.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.9"
   }
 }

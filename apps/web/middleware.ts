@@ -6,16 +6,32 @@ import { DEV_ROLE_COOKIE, isDevBenchEnabled } from "./lib/devBench";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/search",
+  // Public discovery surfaces. These live in the (seeker) route group but its
+  // layout renders safe defaults for signed-out visitors (no userId → no
+  // redirect), and their data (live listings) is public. The homepage hero
+  // CTAs, robots.txt, sitemap, and llms.txt all advertise /seek + /map as
+  // public — they MUST be reachable without a login or the funnel dead-ends.
+  "/seek",
+  "/map",
   "/listing/(.*)",
   "/host/(.*)", // Public host profiles (/host/{id}) + layout-gated authed routes
   "/sign-in/(.*)",
   "/sign-up/(.*)",
   "/api/webhooks/(.*)",
   "/api/health",
+  // Vercel Cron invokes this with `Authorization: Bearer ${CRON_SECRET}`, not a
+  // Clerk session — so it must bypass Clerk's auth.protect() to reach the route
+  // handler, which validates the cron secret itself. Without this, the daily
+  // expire-listings job is rejected before its own auth check ever runs.
+  "/api/cron/(.*)",
   "/terms",
   "/privacy",
   "/cookies",
   "/about",
+  "/faq", // Advertised in sitemap + llms.txt; legal/marketing content, no auth.
+  "/for-hosts", // Prospect-facing host preview — MUST be reachable without a login.
+  "/blog", // Editorial marketing surface (PublicBottomNav-chrome'd).
+  "/blog/(.*)",
   "/sitemap.xml",
   "/robots.txt",
   // Seeker onboarding is auth-required, but excluded from the post-auth gate so

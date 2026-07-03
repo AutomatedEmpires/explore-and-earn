@@ -120,7 +120,7 @@
 
 .avatarInitials {
   background: var(--color-cta);
-  color: #fff;
+  color: var(--color-cta-text);
   font-family: var(--font-display);
   font-size: 28px;
   display: flex;
@@ -207,17 +207,40 @@
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-soft);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--type-caption-size);
   font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
   text-transform: capitalize;
 }
 
-.cat_maritime { background: var(--accent-maritime-bg); border-color: var(--accent-maritime-fg); color: var(--accent-maritime-fg); }
-.cat_farm     { background: var(--accent-farm-bg);     border-color: var(--accent-farm-fg);     color: var(--accent-farm-fg); }
-.cat_remote   { background: var(--accent-remote-bg);   border-color: var(--accent-remote-fg);   color: var(--accent-remote-fg); }
-.cat_seasonal { background: var(--accent-seasonal-bg); border-color: var(--accent-seasonal-fg); color: var(--accent-seasonal-fg); }
-.cat_mix      { background: var(--accent-mix-bg);      border-color: var(--accent-mix-fg);      color: var(--accent-mix-fg); }
+/* Lane tints derive entirely from the locked --accent-<lane>-* tokens:
+   accent bg fills, a softened (color-mixed) accent fg draws the border so
+   the pill reads as a quiet tint rather than a saturated outline. */
+.cat_maritime {
+  background: var(--accent-maritime-bg);
+  border-color: color-mix(in srgb, var(--accent-maritime-fg) 32%, transparent);
+  color: var(--accent-maritime-fg);
+}
+.cat_farm {
+  background: var(--accent-farm-bg);
+  border-color: color-mix(in srgb, var(--accent-farm-fg) 32%, transparent);
+  color: var(--accent-farm-fg);
+}
+.cat_remote {
+  background: var(--accent-remote-bg);
+  border-color: color-mix(in srgb, var(--accent-remote-fg) 32%, transparent);
+  color: var(--accent-remote-fg);
+}
+.cat_seasonal {
+  background: var(--accent-seasonal-bg);
+  border-color: color-mix(in srgb, var(--accent-seasonal-fg) 32%, transparent);
+  color: var(--accent-seasonal-fg);
+}
+.cat_mix {
+  background: var(--accent-mix-bg);
+  border-color: color-mix(in srgb, var(--accent-mix-fg) 32%, transparent);
+  color: var(--accent-mix-fg);
+}
 
 .bio {
   margin: 0;
@@ -259,12 +282,21 @@
   margin: var(--space-16) var(--space-16) 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* Five cells distribute evenly with no orphan: 3-up on phones,
+     auto-fitting to 5-up as width allows. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-8);
 }
 
+.statusRow > li { min-width: 0; }
+.statusRow > li > .statCell { height: 100%; }
+
+@media (min-width: 480px) {
+  .statusRow { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
+}
+
 @media (min-width: 640px) {
-  .statusRow { grid-template-columns: repeat(5, 1fr); }
+  .statusRow { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 
 .statusRow :global(.ui-stat__label) {
@@ -277,40 +309,61 @@
   text-decoration: none;
   transition:
     border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
     box-shadow var(--motion-fast) var(--ease-standard);
 }
 
 .statCell:hover {
   border-color: var(--border-ink);
   box-shadow: var(--elevation-hover);
+  transform: translateY(-1px);
 }
+
+.statCell:active { transform: translateY(0); }
 
 .statCell:focus-visible {
   outline: none;
   box-shadow: var(--ui-focus-ring);
 }
 
-/* ── Next-best-action callout ── */
+/* ── Next-best-action callout — the dominant element of the hub ── */
 .callout {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-12);
+  gap: var(--space-14);
   margin: var(--space-16) var(--space-16) 0;
-  padding: var(--space-14) var(--space-16);
+  padding: var(--space-16);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
   color: var(--text-secondary);
   text-decoration: none;
+  isolation: isolate;
+  overflow: hidden;
   transition:
     border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
     box-shadow var(--motion-fast) var(--ease-standard);
 }
 
-.callout:hover { box-shadow: var(--elevation-hover); }
+.callout:hover { transform: translateY(-1px); }
+.callout:active { transform: translateY(0); }
 
 .callout:focus-visible {
   outline: none;
   box-shadow: var(--ui-focus-ring);
+}
+
+/* ── Leading icon medallion ── */
+.calloutIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
 }
 
 .calloutText {
@@ -318,13 +371,23 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
+}
+
+.calloutEyebrow {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .calloutTitle {
-  font-family: var(--font-ui);
-  font-size: var(--type-body-size);
-  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: 1.15;
+  font-weight: var(--font-weight-regular);
   color: var(--text-primary);
 }
 
@@ -335,37 +398,122 @@
   color: var(--text-secondary);
 }
 
+/* ── Trailing CTA chip ── */
+.calloutCta {
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.calloutCtaLabel { letter-spacing: 0.01em; }
+
+.callout:hover .calloutCta { transform: translateX(2px); }
+
+/* ── FILLED tones: primary + soon read as the dominant module ── */
 .primary {
-  background: var(--status-match-bg);
-  border-color: var(--status-match-fg);
-  color: var(--status-match-fg);
+  border-color: transparent;
+  color: var(--color-cta-text);
+  background: var(--gradient-progress);
+  box-shadow: var(--elevation-overlay), 0 10px 30px -8px color-mix(in srgb, var(--color-cta) 55%, transparent);
 }
-.primary .calloutTitle { color: var(--status-match-fg); }
-
 .soon {
-  background: var(--state-soon-bg);
-  border-color: var(--state-soon-fg);
-  color: var(--state-soon-fg);
+  border-color: transparent;
+  color: var(--color-cta-text);
+  background: var(--gradient-state-soon);
+  box-shadow: var(--elevation-overlay), 0 10px 30px -8px color-mix(in srgb, var(--state-soon-fg) 55%, transparent);
 }
-.soon .calloutTitle { color: var(--state-soon-fg); }
 
+/* Inner glow lifts the filled surface off the page */
+.primary::before,
+.soon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    120% 140% at 88% -20%,
+    color-mix(in srgb, var(--color-cta-text) 26%, transparent) 0%,
+    transparent 60%
+  );
+}
+
+/* Crisp ring against the colored fill (the standard ink ring would vanish). */
+.primary:focus-visible,
+.soon:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--color-paper),
+    0 0 0 4px var(--color-cta-text);
+}
+
+.primary:hover,
+.soon:hover {
+  box-shadow: var(--elevation-overlay), 0 14px 38px -8px color-mix(in srgb, var(--color-cta) 60%, transparent);
+}
+.soon:hover {
+  box-shadow: var(--elevation-overlay), 0 14px 38px -8px color-mix(in srgb, var(--state-soon-fg) 60%, transparent);
+}
+
+.primary .calloutIcon,
+.soon .calloutIcon {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta-text) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta-text) 30%, transparent);
+}
+
+.primary .calloutEyebrow,
+.soon .calloutEyebrow { color: color-mix(in srgb, var(--color-cta-text) 82%, transparent); }
+
+.primary .calloutTitle,
+.soon .calloutTitle { color: var(--color-cta-text); }
+
+.primary .calloutSub,
+.soon .calloutSub { color: color-mix(in srgb, var(--color-cta-text) 86%, transparent); }
+
+.primary .calloutCta,
+.soon .calloutCta {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta-text) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta-text) 28%, transparent);
+}
+
+/* ── Calm tone: quiet, bordered (it is not an action that demands attention) ── */
 .calm {
   background: var(--color-surface-raised);
-  color: var(--text-muted);
+  box-shadow: var(--elevation-card);
+}
+.calm:hover { box-shadow: var(--elevation-hover); }
+.calm .calloutIcon {
+  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+  color: var(--color-cta);
+}
+.calm .calloutCta {
+  color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
 }
 
+/* ── Progress meter (soon tone) ── */
 .progressTrack {
-  height: 6px;
-  margin-top: var(--space-2);
+  height: 7px;
+  margin-top: var(--space-6);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--state-soon-fg) 22%, transparent);
+  background: color-mix(in srgb, var(--color-cta-text) 28%, transparent);
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--gradient-state-soon);
+  background: color-mix(in srgb, var(--color-cta-text) 92%, transparent);
   transition: width var(--motion-base) var(--ease-standard);
 }
 
@@ -458,4 +606,11 @@
 @media (prefers-reduced-motion: reduce) {
   .seekerDot { animation: none; }
   .progressFill { transition: none; }
+  .statCell,
+  .callout,
+  .calloutCta { transition: none; }
+  .statCell:hover,
+  .callout:hover,
+  .callout:active,
+  .callout:hover .calloutCta { transform: none; }
 }

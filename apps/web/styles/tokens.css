@@ -100,6 +100,7 @@
 
   /* spacing scale (2px base) */
   --space-2:  2px;
+  --space-3:  3px;
   --space-4:  4px;
   --space-6:  6px;
   --space-8:  8px;
@@ -113,6 +114,8 @@
   --space-32: 32px;
   --space-40: 40px;
   --space-48: 48px;
+  --space-64: 64px;
+  --space-80: 80px;
   --space-card:     16px;
   --space-row-gap:  12px;
   --space-section:  24px;
@@ -177,6 +180,7 @@
   --font-weight-regular:  400;
   --font-weight-medium:   500;
   --font-weight-semibold: 600;
+  --font-weight-bold:     700;
 
   /* =============================================================== */
   /* V2 — INTERACTIVE / CHROME TOKENS                                */
@@ -209,6 +213,8 @@
   --color-header-bg:  var(--palette-header);
   --color-cta:        var(--palette-sky);
   --color-cta-text:   #FFFFFF;
+  --color-action-soft: color-mix(in srgb, var(--palette-sky) 12%, var(--palette-white));
+  --color-panel-dark: #38322A;   /* warm dark charcoal panel (employer/CTA blocks) */
   --color-teal:       var(--palette-teal);
   --color-gold:       var(--palette-amber);
   --color-gold-text:  #24221E;
@@ -239,6 +245,55 @@
   --gradient-category-seasonal: linear-gradient(155deg, #0C1E08 0%, #204015 35%, #38701E 68%, #76B03A 100%);
   --gradient-category-mix:      linear-gradient(155deg, #18082A 0%, #341256 38%, #64228C 70%, #A44060 100%);
   --gradient-category-default:  linear-gradient(155deg, #1A2030 0%, #2C3E58 38%, #406080 70%, #6090B0 100%);
+
+  /* LIGHT category atmospheres — the warm "field-journal" register for cards/rails
+     (DiscoveryCard, FeaturedEmployersRail). ONE source so a "farm" card and a
+     "farm" rail render the same gold. Layers: body (card fill), cover (cover/frame
+     fallback), cell (info-cell tint), accent (top border), glow (inset ambient). */
+  --cat-farm-body:
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(255, 240, 180, 0.62) 0%, transparent 52%),
+    radial-gradient(ellipse 90% 70% at 20% 95%, rgba(201, 139, 27, 0.22) 0%, transparent 65%),
+    linear-gradient(158deg, #FAF0CC 0%, #EED990 55%, #D4B84A 100%);
+  --cat-farm-cover: linear-gradient(145deg, #C4A854 0%, #E8CC80 50%, #F4DFA0 100%);
+  --cat-farm-cell: linear-gradient(180deg, rgba(250, 240, 200, 0.64) 0%, rgba(238, 215, 130, 0.48) 100%);
+  --cat-farm-accent: #C98B1B;
+  --cat-farm-glow: rgba(201, 139, 27, 0.18);
+
+  --cat-maritime-body:
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(200, 235, 255, 0.58) 0%, transparent 52%),
+    radial-gradient(ellipse 90% 70% at 80% 95%, rgba(26, 78, 114, 0.20) 0%, transparent 65%),
+    linear-gradient(158deg, #EAF4FF 0%, #B8D8F4 55%, #88B8E0 100%);
+  --cat-maritime-cover: linear-gradient(145deg, #5C9CC8 0%, #8EC4E4 50%, #B4D8F0 100%);
+  --cat-maritime-cell: linear-gradient(180deg, rgba(234, 244, 255, 0.68) 0%, rgba(180, 210, 244, 0.52) 100%);
+  --cat-maritime-accent: #1A4E72;
+  --cat-maritime-glow: rgba(26, 78, 114, 0.16);
+
+  --cat-remote-body:
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(210, 200, 255, 0.52) 0%, transparent 52%),
+    radial-gradient(ellipse 90% 70% at 20% 95%, rgba(48, 56, 152, 0.18) 0%, transparent 65%),
+    linear-gradient(158deg, #F0EAFF 0%, #C8B8F4 55%, #A090D8 100%);
+  --cat-remote-cover: linear-gradient(145deg, #7870B8 0%, #A898D8 50%, #C8C0EC 100%);
+  --cat-remote-cell: linear-gradient(180deg, rgba(240, 234, 255, 0.66) 0%, rgba(196, 180, 244, 0.50) 100%);
+  --cat-remote-accent: #303898;
+  --cat-remote-glow: rgba(48, 56, 152, 0.15);
+
+  --cat-seasonal-body:
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(190, 248, 210, 0.55) 0%, transparent 52%),
+    radial-gradient(ellipse 90% 70% at 20% 95%, rgba(26, 94, 56, 0.18) 0%, transparent 65%),
+    linear-gradient(158deg, #EAFAE0 0%, #B8DCA0 55%, #84BC68 100%);
+  --cat-seasonal-cover: linear-gradient(145deg, #5A9C60 0%, #8CC480 50%, #B0D898 100%);
+  --cat-seasonal-cell: linear-gradient(180deg, rgba(234, 250, 224, 0.66) 0%, rgba(180, 220, 152, 0.50) 100%);
+  --cat-seasonal-accent: #1A5E38;
+  --cat-seasonal-glow: rgba(26, 94, 56, 0.16);
+
+  --cat-mix-body:
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(248, 244, 238, 0.58) 0%, transparent 52%),
+    radial-gradient(ellipse 90% 70% at 20% 95%, rgba(42, 62, 106, 0.14) 0%, transparent 65%),
+    linear-gradient(158deg, #F5ECD8 0%, #D8C4A4 55%, #BCA880 100%);
+  --cat-mix-cover: linear-gradient(145deg, #A890A0 0%, #C8B0B8 50%, #DED0C8 100%);
+  --cat-mix-cell: linear-gradient(180deg, rgba(245, 236, 215, 0.64) 0%, rgba(214, 193, 155, 0.48) 100%);
+  --cat-mix-accent: #2A3E6A;
+  --cat-mix-glow: rgba(42, 62, 106, 0.13);
 
   /* Cover-theme presets — user-selectable hero backgrounds beyond the lanes */
   --gradient-cover-wilderness:  linear-gradient(160deg, #1A1E0E 0%, #2D3A1A 50%, #5A6B3D 100%);

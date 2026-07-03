@@ -210,12 +210,13 @@
 	z-index: 20;
 }
 
+/* Gesture-feedback tints, tokenized: pass = warm (soon), save = pine (ready). */
 .feedbackPass {
-	background: color-mix(in srgb, #fff5e7 88%, var(--color-surface-raised) 12%);
+	background: color-mix(in srgb, var(--state-soon-bg) 70%, var(--color-surface-raised));
 }
 
 .feedbackSave {
-	background: color-mix(in srgb, #edf5e9 88%, var(--color-surface-raised) 12%);
+	background: color-mix(in srgb, var(--state-ready-bg) 70%, var(--color-surface-raised));
 }
 
 .hint {

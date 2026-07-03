@@ -75,6 +75,18 @@ export default function OnboardingSkillsPage() {
     });
   }
 
+  function skip() {
+    startTransition(async () => {
+      // This is the final onboarding step, so Skip must still mark
+      // onboarding_complete — otherwise a seeker who skips here lands on the
+      // "You're all set!" page while onboarding_complete stays false, and the
+      // (seeker) layout's gate bounces them straight back to /onboarding on
+      // their next visit.
+      await saveOnboardingStep({ complete: true });
+      router.push("/onboarding/done");
+    });
+  }
+
   return (
     <div className={styles.shell}>
       <div className={styles.progress} aria-hidden>
@@ -161,7 +173,7 @@ export default function OnboardingSkillsPage() {
         <button
           type="button"
           className={styles.linkButton}
-          onClick={() => router.push("/onboarding/done")}
+          onClick={skip}
           disabled={pending}
         >
           Skip

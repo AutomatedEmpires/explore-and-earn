@@ -1,7 +1,18 @@
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 
-import { BucketPage, NotificationPrefsForm } from "../../../components/seeker";
+import {
+	NotificationPrefsForm,
+	SectionHeading,
+	SeekerPage,
+	SettingsAssurances,
+	SettingsPanel,
+	SETTINGS_ASSURANCES,
+	buildAccountGroups,
+} from "../../../components/seeker";
+import { getClerkContact } from "../../../lib/clerkUser";
 import { getNotificationPrefsAction } from "../../actions/notificationPrefs";
+import styles from "./settings.module.css";
 
 export const metadata: Metadata = {
 	title: "Settings",
@@ -9,15 +20,51 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+async function resolveEmail(): Promise<string | null> {
+	try {
+		const { userId } = await auth();
+		if (!userId) return null;
+		const { email } = await getClerkContact(userId);
+		return email;
+	} catch {
+		return null;
+	}
+}
+
 export default async function SettingsPage() {
-	const prefs = await getNotificationPrefsAction();
+	const [prefs, email] = await Promise.all([
+		getNotificationPrefsAction(),
+		resolveEmail(),
+	]);
+	const groups = buildAccountGroups(email);
 
 	return (
-		<BucketPage
+		<SeekerPage
 			title="Settings"
-			description="Manage email notifications for invites, status changes, and messages."
+			description="Manage your notifications, privacy, and account — and see what to expect from Explore&Earn."
 		>
-			<NotificationPrefsForm initialPrefs={prefs} />
-		</BucketPage>
+			<div className={styles.stack}>
+				<section className={styles.section}>
+					<SectionHeading
+						title="Notifications"
+						description="Choose which emails you get. Changes save the moment you toggle them."
+					/>
+					<NotificationPrefsForm initialPrefs={prefs} />
+				</section>
+
+				<section className={styles.section}>
+					<SectionHeading
+						title="Account & privacy"
+						description="Your details and who can see them."
+					/>
+					<SettingsPanel groups={groups} />
+				</section>
+
+				<section className={styles.section}>
+					<SectionHeading title="What to expect" />
+					<SettingsAssurances assurances={SETTINGS_ASSURANCES} />
+				</section>
+			</div>
+		</SeekerPage>
 	);
 }

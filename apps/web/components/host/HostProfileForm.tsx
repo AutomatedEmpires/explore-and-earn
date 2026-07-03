@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
 import { uploadProfilePhoto } from "@explore-and-earn/db/client";
+import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 
 import { ImageUpload } from "../ImageUpload";
 import { updateHostProfileAction } from "../../app/actions/hostProfile";
@@ -22,6 +23,10 @@ const ERROR_TEXT: Record<string, string> = {
   unauthenticated: "You must be signed in to save your profile.",
 };
 
+function categoryLabel(category: string): string {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
 export function HostProfileForm({
   profile,
   hostProfileId,
@@ -30,10 +35,25 @@ export function HostProfileForm({
   const { getToken } = useAuth();
   const [isPending, startTransition] = useTransition();
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl ?? "");
+  const [housingOffered, setHousingOffered] = useState(
+    profile.housingOfferedGenerally ?? false,
+  );
+  const [mealsOffered, setMealsOffered] = useState(
+    profile.mealsOfferedGenerally ?? false,
+  );
+  const [categoryScopes, setCategoryScopes] = useState<string[]>(() => [
+    ...(profile.categoryScopes ?? []),
+  ]);
   const [message, setMessage] = useState<{
     readonly ok: boolean;
     readonly text: string;
   } | null>(null);
+
+  function toggleCategory(cat: string) {
+    setCategoryScopes((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  }
 
   async function uploadPhoto(file: File): Promise<string> {
     if (!hostProfileId) {
@@ -65,6 +85,9 @@ export function HostProfileForm({
         instagram: instagram || null,
         twitter: twitter || null,
       },
+      housingOfferedGenerally: housingOffered,
+      mealsOfferedGenerally: mealsOffered,
+      categoryScopes,
     };
 
     setMessage(null);
@@ -165,6 +188,60 @@ export function HostProfileForm({
           defaultValue={profile.bio ?? ""}
           placeholder="Tell seekers about your farm, crew, and what a season looks like."
         />
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <p className={styles.fieldGroupHeading}>What you offer</p>
+
+        <div className={styles.field}>
+          <span className={styles.label}>Categories you operate in</span>
+          <div className={styles.chips} role="group" aria-label="Marketplace categories">
+            {MARKETPLACE_CATEGORIES.map((cat) => {
+              const active = categoryScopes.includes(cat);
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  className={active ? `${styles.chip} ${styles.chipActive}` : styles.chip}
+                  aria-pressed={active}
+                  onClick={() => toggleCategory(cat)}
+                >
+                  {categoryLabel(cat)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <label className={styles.toggleRow}>
+          <input
+            type="checkbox"
+            className={styles.toggleInput}
+            checked={housingOffered}
+            onChange={(event) => setHousingOffered(event.target.checked)}
+          />
+          <span className={styles.toggleText}>
+            <span className={styles.toggleTitle}>We generally provide housing</span>
+            <span className={styles.toggleNote}>
+              Shown on your public profile as a host-level promise to seekers.
+            </span>
+          </span>
+        </label>
+
+        <label className={styles.toggleRow}>
+          <input
+            type="checkbox"
+            className={styles.toggleInput}
+            checked={mealsOffered}
+            onChange={(event) => setMealsOffered(event.target.checked)}
+          />
+          <span className={styles.toggleText}>
+            <span className={styles.toggleTitle}>We generally provide meals</span>
+            <span className={styles.toggleNote}>
+              Shown on your public profile as a host-level promise to seekers.
+            </span>
+          </span>
+        </label>
       </div>
 
       <div className={styles.fieldGroup}>

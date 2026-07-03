@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 import { useAuth } from "@clerk/nextjs";
 
-import { Button } from "@explore-and-earn/ui";
+import { Button, Icon } from "@explore-and-earn/ui";
 import {
   uploadListingMedia,
   deleteListingMedia,
@@ -19,6 +19,7 @@ import {
 } from "@explore-and-earn/contracts";
 
 import { ImageUpload } from "../ImageUpload";
+import { BenefitTrustModal, type BenefitKind } from "../discovery";
 import { MediaGalleryUpload, type GalleryItem } from "./MediaGalleryUpload";
 import { createListingAction, updateListingAction } from "../../app/actions/listings";
 import styles from "./ListingForm.module.css";
@@ -42,6 +43,7 @@ export interface ListingFormInitialValues {
   readonly payPeriod?: CompensationUnit;
   readonly summary?: string;
   readonly startDate?: string;
+  readonly endDate?: string;
   readonly coverPhotoUrl?: string;
   readonly galleryUrls?: ReadonlyArray<string>;
 }
@@ -76,7 +78,7 @@ function categoryLabel(category: MarketplaceCategory): string {
 
 /**
  * Shared create/edit listing form. Client component that gathers the listing
- * basics plus the Housing / Meals / Pay triad (product law \u2014 never "Perks";
+ * basics plus the Housing / Meals / Pay triad (product law — never "Perks";
  * see AGENTS.md and packages/contracts/src/benefits.ts) and submits to the
  * listing server actions. Token-only styling via the CSS module.
  */
@@ -112,28 +114,33 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
   );
   const [summary, setSummary] = useState(initial?.summary ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
+  const [endDate, setEndDate] = useState(initial?.endDate ?? "");
+  // The structured benefit editor (photos + amenities) only works once a listing
+  // exists to attach uploads to — offered in edit mode alongside the free-text.
+  const [benefitKind, setBenefitKind] = useState<BenefitKind | null>(null);
+  const canEditBenefits = mode === "edit" && Boolean(listingId);
 
   const submitLabel = mode === "create" ? "Create listing" : "Save changes";
   const cancelHref = listingId ? `/host/listings/${listingId}` : "/host/listings";
 
   async function uploadCover(file: File): Promise<string> {
     if (!hostProfileId) {
-      throw new Error("Missing host profile \u2014 reload the page and try again.");
+      throw new Error("Missing host profile — reload the page and try again.");
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-      throw new Error("Your session has expired \u2014 sign in again.");
+      throw new Error("Your session has expired — sign in again.");
     }
     return uploadListingMedia(token, hostProfileId, file, "cover");
   }
 
   async function uploadGallerySlot(file: File, slotIndex: number): Promise<string> {
     if (!hostProfileId) {
-      throw new Error("Missing host profile \u2014 reload the page and try again.");
+      throw new Error("Missing host profile — reload the page and try again.");
     }
     const token = await getToken({ template: "supabase" });
     if (!token) {
-      throw new Error("Your session has expired \u2014 sign in again.");
+      throw new Error("Your session has expired — sign in again.");
     }
     return uploadListingMedia(token, hostProfileId, file, slotIndex);
   }
@@ -179,6 +186,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
     formData.set("payPeriod", payPeriod);
     formData.set("summary", summary.trim());
     formData.set("startDate", startDate.trim());
+    formData.set("endDate", endDate.trim());
     formData.set("coverPhotoUrl", coverPhotoUrl);
     formData.set("galleryUrls", JSON.stringify(galleryImages.map((img) => img.url)));
 
@@ -207,6 +215,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
   }
 
   return (
+    <>
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       {error ? (
         <p className={styles.error} role="alert">
@@ -280,6 +289,12 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
               </option>
             ))}
           </select>
+          <p className={styles.hint}>
+            The lane seekers browse by — Farm (ranch, orchard, agriculture),
+            Maritime (fishing, docks, vessels), Remote (backcountry, lodges,
+            off-grid), Seasonal (resorts, events, hospitality), or Mix if it
+            spans several.
+          </p>
         </div>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="listing-location">
@@ -313,9 +328,10 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
       </div>
 
       <fieldset className={styles.fieldset}>
-        <legend className={styles.legend}>Housing \u00b7 Meals \u00b7 Pay</legend>
+        <legend className={styles.legend}>Housing · Meals · Pay</legend>
         <p className={styles.fieldsetNote}>
-          Housing, Meals, and Pay are the core promise to seekers.
+          Housing, Meals, and Pay are the core promise to seekers — the three
+          things they decide on, shown on every card. Be specific and honest.
         </p>
 
         <div className={styles.field}>
@@ -331,6 +347,16 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
             onChange={(event) => setHousingDescription(event.target.value)}
             placeholder="On-site private cabin, utilities included."
           />
+          {canEditBenefits ? (
+            <button
+              type="button"
+              className={styles.benefitLink}
+              onClick={() => setBenefitKind("housing")}
+            >
+              <Icon name="nav.photos" size={16} aria-hidden />
+              Add housing photos &amp; amenities
+            </button>
+          ) : null}
         </div>
 
         <div className={styles.field}>
@@ -346,6 +372,16 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
             onChange={(event) => setMealsDescription(event.target.value)}
             placeholder="Three daily meals provided during the season."
           />
+          {canEditBenefits ? (
+            <button
+              type="button"
+              className={styles.benefitLink}
+              onClick={() => setBenefitKind("meals")}
+            >
+              <Icon name="nav.photos" size={16} aria-hidden />
+              Add meal photos &amp; details
+            </button>
+          ) : null}
         </div>
 
         <div className={styles.row}>
@@ -407,28 +443,57 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
         </p>
       </fieldset>
 
-      <div className={styles.field}>
-        <label className={styles.label} htmlFor="listing-start-date">
-          Start date
-        </label>
-        <input
-          className={styles.input}
-          id="listing-start-date"
-          name="startDate"
-          type="date"
-          value={startDate}
-          onChange={(event) => setStartDate(event.target.value)}
-        />
+      <div className={styles.row}>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="listing-start-date">
+            Start date
+          </label>
+          <input
+            className={styles.input}
+            id="listing-start-date"
+            name="startDate"
+            type="date"
+            value={startDate}
+            onChange={(event) => setStartDate(event.target.value)}
+          />
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="listing-end-date">
+            End date
+          </label>
+          <input
+            className={styles.input}
+            id="listing-end-date"
+            name="endDate"
+            type="date"
+            value={endDate}
+            min={startDate || undefined}
+            onChange={(event) => setEndDate(event.target.value)}
+          />
+        </div>
       </div>
 
       <div className={styles.actions}>
         <Button type="submit" variant="primary" icon="action.forward" disabled={isPending}>
-          {isPending ? "Saving\u2026" : submitLabel}
+          {isPending ? "Saving…" : submitLabel}
         </Button>
         <Link className={styles.cancel} href={cancelHref}>
           Cancel
         </Link>
       </div>
     </form>
+
+    {/* Structured benefit editor — mounted OUTSIDE the form so its Save never
+        submits the listing form. Edit mode only (needs a saved listing id). */}
+    {canEditBenefits && listingId ? (
+      <BenefitTrustModal
+        mode="edit"
+        open={benefitKind !== null}
+        kind={benefitKind ?? "housing"}
+        onClose={() => setBenefitKind(null)}
+        listingId={listingId}
+      />
+    ) : null}
+    </>
   );
 }

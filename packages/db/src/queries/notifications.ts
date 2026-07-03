@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "../client";
+import { adminClient } from "../adminClient";
 
 /**
  * Notifications data access for the seeker notification feed + unread badge,
@@ -235,8 +236,13 @@ export async function notifyHostOfApplication(
   clerkToken: string,
   listingId: string,
 ): Promise<{ ok: boolean }> {
+  // A notification is a cross-user write (the seeker creates a row the host
+  // reads), so it must go through the service-role client — under the RLS added
+  // in migration 043 the seeker's authed client has no INSERT policy. The
+  // clerkToken stays in the signature for call-site compatibility.
+  void clerkToken;
   try {
-    const db = untypedClient(clerkToken);
+    const db = adminClient() as unknown as SupabaseClient;
 
     const { data: listing, error: listingError } = await db
       .from("listings")
@@ -293,4 +299,60 @@ export async function notifyHostOfApplication(
   } catch {
     return { ok: false };
   }
+}
+
+/**
+ * Notify a set of seekers that a new listing is a strong match for them.
+ *
+ * Cross-user writes → service role (parity with notifyHostOfApplication). Idempotent
+ * via a per-(listing, seeker) dedupe_key: already-sent recipients are filtered out
+ * before insert, so a re-run (e.g. a re-published listing) never double-notifies.
+ * Best-effort — returns how many fresh notifications were written.
+ */
+export async function insertStrongMatchNotifications(args: {
+  listingId: string;
+  listingTitle: string;
+  recipientClerkUserIds: readonly string[];
+}): Promise<{ inserted: number }> {
+  const recipients = [...new Set(args.recipientClerkUserIds.filter((id) => Boolean(id)))];
+  if (recipients.length === 0) return { inserted: 0 };
+
+  const db = adminClient() as unknown as SupabaseClient;
+  const title = args.listingTitle
+    ? `New strong match: ${args.listingTitle}`
+    : "A strong new match just posted";
+  const body = args.listingTitle
+    ? `"${args.listingTitle}" looks like a strong fit for you — take a look before it fills.`
+    : "A new opportunity looks like a strong fit for you.";
+
+  const rows = recipients.map((clerkId) => ({
+    recipient_user_id: null,
+    recipient_clerk_user_id: clerkId,
+    category: "system",
+    priority: "informational",
+    channel: "in_app",
+    title,
+    body,
+    subject_type: "listing",
+    subject_id: args.listingId,
+    action_url: `/listing/${args.listingId}`,
+    dedupe_key: `strong_match:${args.listingId}:${clerkId}`,
+  }));
+
+  // Filter out recipients we've already alerted for this listing (the dedupe_key
+  // has a unique index; check-then-insert avoids a partial-index upsert).
+  const keys = rows.map((row) => row.dedupe_key);
+  const { data: existing } = await db
+    .from("notifications")
+    .select("dedupe_key")
+    .in("dedupe_key", keys);
+  const seen = new Set(
+    ((existing ?? []) as Array<{ dedupe_key: string | null }>).map((row) => row.dedupe_key),
+  );
+  const fresh = rows.filter((row) => !seen.has(row.dedupe_key));
+  if (fresh.length === 0) return { inserted: 0 };
+
+  const { error } = await db.from("notifications").insert(fresh);
+  if (error) throw new Error(`insertStrongMatchNotifications: ${error.message}`);
+  return { inserted: fresh.length };
 }

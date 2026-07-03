@@ -89,6 +89,71 @@
 
 /* ── Plan grid ───────────────────────────────────────────────────── */
 
+/* ── Billing interval toggle ─────────────────────────────────────── */
+.intervalToggle {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: var(--space-3);
+  gap: var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.intervalOption {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 2.25rem;
+  padding: 0 var(--space-16);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.intervalOption:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.intervalActive {
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+}
+
+.intervalBadge {
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cta) 22%, transparent);
+  color: var(--color-cta);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.intervalActive .intervalBadge {
+  background: color-mix(in srgb, var(--color-cta) 32%, transparent);
+  color: var(--color-cta-text, #fff);
+}
+
+.planSaveNote {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--status-success-fg);
+}
+
 .planGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -112,10 +177,10 @@
 }
 
 .planHighlighted {
-  border-color: color-mix(in srgb, var(--palette-sky) 60%, transparent);
+  border-color: color-mix(in srgb, var(--color-cta) 60%, transparent);
   background: linear-gradient(
     160deg,
-    color-mix(in srgb, var(--palette-sky) 5%, var(--color-surface-raised) 95%),
+    color-mix(in srgb, var(--color-cta) 8%, var(--color-surface-raised) 92%),
     var(--color-surface-raised)
   );
 }
@@ -132,8 +197,8 @@
   padding: var(--space-4) var(--space-12);
   border-radius: var(--radius-pill);
   border: 1px solid var(--border-ink);
-  background: var(--text-primary);
-  color: var(--color-surface-raised);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
@@ -217,22 +282,53 @@
   margin-top: 1px;
 }
 
+/* Form wrapper is layout-transparent so the button stays a direct flex child of
+ * the plan card (stretches full width like the prior <a>). */
+.ctaForm {
+  display: contents;
+}
+
 .planCta {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   min-height: 2.5rem;
   padding: 0 var(--space-16);
   border: 1px solid var(--border-ink);
   border-radius: var(--radius-pill);
-  background: var(--text-primary);
-  color: var(--color-surface-raised);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-button-size);
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
   text-align: center;
-  transition: opacity var(--motion-base) var(--ease-standard);
+  cursor: pointer;
+  appearance: none;
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.planCta:hover {
+  opacity: 0.92;
+}
+
+.planCta:active {
+  transform: translateY(1px);
+}
+
+.planCta:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+/* Current subscriber → clickable "Manage billing" (Stripe portal), secondary look. */
+.planCtaManage {
+  background: var(--color-surface);
+  color: var(--text-primary);
+  border-color: var(--border-ink);
 }
 
 .planCta:hover {
@@ -244,6 +340,83 @@
   color: var(--text-secondary);
   border-color: var(--border-soft);
   pointer-events: none;
+}
+
+/* ── Add-ons ────────────────────────────────────────────── */
+
+.addonSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin-top: var(--space-24);
+  padding-top: var(--space-24);
+  border-top: 1px solid var(--border-soft);
+}
+
+.addonHeading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.addonIntro {
+  margin: calc(-1 * var(--space-8)) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+.addonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-12);
+}
+
+.addonCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-16);
+  border: 1.5px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  transition: border-color var(--motion-base) var(--ease-standard);
+}
+
+.addonCard:hover {
+  border-color: var(--border-ink);
+}
+
+.addonCardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.addonName {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.addonPrice {
+  font-family: var(--font-display);
+  font-size: var(--type-body-size);
+  color: var(--color-cta);
+  white-space: nowrap;
+}
+
+.addonDesc {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .billingNote {
@@ -413,8 +586,8 @@
   padding: 0 var(--space-20);
   border: 1px solid var(--border-ink);
   border-radius: var(--radius-pill);
-  background: var(--text-primary);
-  color: var(--color-surface-raised);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-button-size);
   font-weight: var(--font-weight-semibold);

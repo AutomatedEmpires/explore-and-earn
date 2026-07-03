@@ -1,5 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { Patrick_Hand, Cabin_Sketch, Inter } from "next/font/google";
+import { Patrick_Hand, Cabin_Sketch, Inter, Fraunces } from "next/font/google";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -26,8 +26,17 @@ const inter = Inter({
 	variable: "--font-inter",
 	display: "swap",
 });
+
+// Fraunces — variable editorial serif. Design System V2 display face (host scope
+// titles/numerals via --font-fraunces); see docs/superpowers/specs/2026-06-21-*.
+const fraunces = Fraunces({
+	subsets: ["latin"],
+	variable: "--font-fraunces",
+	display: "swap",
+});
 import { CookieBanner } from "../components/CookieBanner";
 import { SiteFooter } from "../components/SiteFooter";
+import { HideOnHost } from "../components/HideOnHost";
 import { SentryUserProvider } from "../components/providers/SentryUserProvider";
 import { AppShell } from "../components/shell";
 import { DevBenchToolbar } from "../components/dev/DevBenchToolbar";
@@ -71,12 +80,14 @@ function AuthBoundary({ children }: { children: ReactNode }) {
 export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
 		<AuthBoundary>
-			<html lang="en" className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable}`}>
+			<html lang="en" className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable} ${fraunces.variable}`}>
 				<body>
 					<SentryUserProvider />
 					<Providers>
 						<AppShell>{children}</AppShell>
-						<SiteFooter />
+						<HideOnHost>
+							<SiteFooter />
+						</HideOnHost>
 						<CookieBanner />
 					</Providers>
 					{isDevBenchEnabled() && <DevBenchToolbar />}

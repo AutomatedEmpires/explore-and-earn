@@ -1,0 +1,107 @@
+/**
+ * MetricCard — the benchmark "grid four" metric tile: label + trend pill, a big
+ * editorial value, and an animated sparkline. Token-driven only, so it inherits
+ * each OS scope's accent (host amber / seeker + admin emerald) with zero per-
+ * scope code. Mirrors the dashboard benchmark `metric(label,val,trend,bars)`.
+ */
+
+.grid {
+  display: grid;
+  gap: var(--space-12, 12px);
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-12, 12px);
+  min-height: 134px;
+  padding: var(--space-16, 16px);
+  border-radius: var(--radius-card, 18px);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8, 8px);
+}
+
+.label {
+  font-size: var(--type-label-size);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.trend {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill, 999px);
+  font-size: var(--type-caption-size);
+  font-weight: 700;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--color-cta) 16%, transparent);
+  color: var(--color-cta);
+}
+
+.trendUp {
+  background: color-mix(in srgb, var(--status-success-fg, #36f49c) 18%, transparent);
+  color: var(--status-success-fg, #36f49c);
+}
+
+.trendDown {
+  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
+  color: var(--text-secondary);
+}
+
+.value {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--type-display-size);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  /* The headline leads on mount; the sparkline (below) follows ~a beat later. */
+  animation: metriccard-value-in var(--motion-base, 200ms) var(--ease-standard, ease) both;
+}
+
+@keyframes metriccard-value-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 34px;
+}
+
+.spark > i {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 3px 3px 0 0;
+  background: color-mix(in srgb, var(--color-cta) 50%, transparent);
+  transform-origin: bottom;
+  animation: metriccard-rise 0.5s var(--ease-standard, ease) both;
+}
+
+.spark > i:last-child {
+  background: var(--color-cta);
+}
+
+@keyframes metriccard-rise {
+  from { transform: scaleY(0); opacity: 0; }
+  to   { transform: scaleY(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spark > i,
+  .value { animation: none; }
+}

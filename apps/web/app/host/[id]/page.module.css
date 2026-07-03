@@ -6,7 +6,8 @@
 .page {
   min-height: 100dvh;
   background: var(--color-paper);
-  padding-bottom: var(--space-48);
+  /* Clear the fixed PublicBottomNav so the last content isn't occluded. */
+  padding-bottom: var(--space-80);
 }
 
 /* ── Quick facts strip ─────────────────────────────────────────── */

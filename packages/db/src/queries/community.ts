@@ -224,28 +224,62 @@ export interface InsertHostAnnouncementParams {
   readonly stripePaymentIntentId?: string | null;
   readonly purchaseDurationDays?: number | null;
   readonly purchaseAmountCents?: number | null;
+  /**
+   * Originating Stripe Checkout Session id. When set, the insert is idempotent
+   * on it (migration 049) so a retried at-least-once webhook does not grant a
+   * second paid draft. Mirrors the boost activation guard.
+   */
+  readonly stripeCheckoutSessionId?: string | null;
 }
 
 export async function insertHostAnnouncement(
   params: InsertHostAnnouncementParams,
 ): Promise<{ id: string }> {
   const admin = adminClient() as unknown as SupabaseClient;
+
+  // Idempotency: Stripe delivers checkout.session.completed at least once, so a
+  // retried webhook must not insert a second paid draft. Dedupe on the Checkout
+  // Session id before inserting (matches activateBoostCampaignFromCheckout).
+  if (params.stripeCheckoutSessionId) {
+    const { data: existing, error: lookupError } = await admin
+      .from("host_announcements")
+      .select("id")
+      .eq("stripe_checkout_session_id", params.stripeCheckoutSessionId)
+      .maybeSingle();
+    if (lookupError) {
+      throw new Error(`insertHostAnnouncement (lookup): ${lookupError.message}`);
+    }
+    if (existing) return { id: (existing as { id: string }).id };
+  }
+
   const { data, error } = await admin
     .from("host_announcements")
     .insert({
-      host_profile_id:          params.hostProfileId,
-      title:                    params.title,
-      body:                     params.body,
-      kind:                     params.kind,
-      expires_at:               params.expiresAt,
-      status:                   params.status,
-      stripe_payment_intent_id: params.stripePaymentIntentId ?? null,
-      purchase_duration_days:   params.purchaseDurationDays ?? null,
-      purchase_amount_cents:    params.purchaseAmountCents ?? null,
+      host_profile_id:            params.hostProfileId,
+      title:                      params.title,
+      body:                       params.body,
+      kind:                       params.kind,
+      expires_at:                 params.expiresAt,
+      status:                     params.status,
+      stripe_payment_intent_id:   params.stripePaymentIntentId ?? null,
+      stripe_checkout_session_id: params.stripeCheckoutSessionId ?? null,
+      purchase_duration_days:     params.purchaseDurationDays ?? null,
+      purchase_amount_cents:      params.purchaseAmountCents ?? null,
     })
     .select("id")
     .single();
-  if (error) throw new Error(`insertHostAnnouncement: ${error.message}`);
+  if (error) {
+    // Lost a race against a concurrent insert on the unique session key — re-read.
+    if (error.code === "23505" && params.stripeCheckoutSessionId) {
+      const { data: raced } = await admin
+        .from("host_announcements")
+        .select("id")
+        .eq("stripe_checkout_session_id", params.stripeCheckoutSessionId)
+        .maybeSingle();
+      if (raced) return { id: (raced as { id: string }).id };
+    }
+    throw new Error(`insertHostAnnouncement: ${error.message}`);
+  }
   return { id: data.id as string };
 }
 
@@ -293,6 +327,74 @@ export async function getOwnedPhotoPath(
 
 // ─── Reactions — toggle ───────────────────────────────────────────────────────
 
+/**
+ * Best-effort: tell a community photo's owner that a fellow seeker reacted.
+ *
+ * This is a cross-user write (the reactor creates a row the owner reads), so it
+ * goes through the service-role `admin` client. It is coalesced by `dedupe_key`
+ * — one notification per (photo, reactor) for all time — so repeated
+ * react/un-react cycles never spam the owner, and it never fires for a
+ * self-reaction. It NEVER throws: a notification failure must not break the
+ * reaction itself, which is the user's primary action.
+ */
+async function notifyPhotoReaction(
+  admin: SupabaseClient,
+  photoId: string,
+  reactorClerkUserId: string,
+): Promise<void> {
+  try {
+    const { data: photo } = await admin
+      .from("community_photos")
+      .select("caption, seeker_profiles(clerk_user_id)")
+      .eq("id", photoId)
+      .maybeSingle();
+    if (!photo) return;
+
+    // PostgREST types a to-one embed as an array; normalize array-or-object.
+    const row = photo as unknown as {
+      caption?: string | null;
+      seeker_profiles?: unknown;
+    };
+    const rel = row.seeker_profiles;
+    const owner = (Array.isArray(rel) ? rel[0] : rel) as
+      | { clerk_user_id?: string | null }
+      | null
+      | undefined;
+    const ownerClerkId = owner?.clerk_user_id ?? null;
+    // No resolvable recipient, or a seeker reacting to their own photo.
+    if (!ownerClerkId || ownerClerkId === reactorClerkUserId) return;
+
+    const { data: reactor } = await admin
+      .from("seeker_profiles")
+      .select("display_name")
+      .eq("clerk_user_id", reactorClerkUserId)
+      .maybeSingle();
+    const reactorName =
+      (reactor?.display_name as string | null)?.trim() || "A fellow seeker";
+    const caption = row.caption ?? null;
+
+    await admin.from("notifications").insert({
+      recipient_user_id: null,
+      recipient_clerk_user_id: ownerClerkId,
+      category: "community",
+      priority: "informational",
+      channel: "in_app",
+      title: `${reactorName} reacted to your photo`,
+      body: caption
+        ? `Your photo “${caption}” picked up a new reaction in the community.`
+        : "Your community photo picked up a new reaction.",
+      subject_type: "community_photo",
+      subject_id: photoId,
+      action_url: "/community/photos",
+      // The unique dedupe index swallows repeat react/un-react cycles, so the
+      // owner gets exactly one reaction notification per fellow seeker, ever.
+      dedupe_key: `photo_reaction:${photoId}:${reactorClerkUserId}`,
+    });
+  } catch {
+    // Best-effort only — swallow so the reaction always succeeds.
+  }
+}
+
 export async function togglePhotoReaction(
   clerkUserId: string,
   photoId: string,
@@ -304,7 +406,11 @@ export async function togglePhotoReaction(
     clerk_user_id: clerkUserId,
     reaction,
   });
-  if (!error) return { added: true };
+  if (!error) {
+    // Fire the owner notification on a fresh reaction (best-effort, never throws).
+    await notifyPhotoReaction(admin, photoId, clerkUserId);
+    return { added: true };
+  }
   if (error.code === "23505") {
     await admin.from("community_photo_reactions").delete()
       .eq("photo_id",      photoId)
@@ -313,6 +419,66 @@ export async function togglePhotoReaction(
     return { added: false };
   }
   throw new Error(`togglePhotoReaction: ${error.message}`);
+}
+
+/**
+ * Best-effort: tell a host that a seeker reacted to their announcement. Mirrors
+ * {@link notifyPhotoReaction} — service-role write, coalesced by dedupe_key, no
+ * self-reaction, never throws.
+ */
+async function notifyAnnouncementReaction(
+  admin: SupabaseClient,
+  announcementId: string,
+  reactorClerkUserId: string,
+): Promise<void> {
+  try {
+    const { data: ann } = await admin
+      .from("host_announcements")
+      .select("title, host_profiles(clerk_user_id)")
+      .eq("id", announcementId)
+      .maybeSingle();
+    if (!ann) return;
+
+    // PostgREST types a to-one embed as an array; normalize array-or-object.
+    const row = ann as unknown as {
+      title?: string | null;
+      host_profiles?: unknown;
+    };
+    const rel = row.host_profiles;
+    const owner = (Array.isArray(rel) ? rel[0] : rel) as
+      | { clerk_user_id?: string | null }
+      | null
+      | undefined;
+    const ownerClerkId = owner?.clerk_user_id ?? null;
+    if (!ownerClerkId || ownerClerkId === reactorClerkUserId) return;
+
+    const { data: reactor } = await admin
+      .from("seeker_profiles")
+      .select("display_name")
+      .eq("clerk_user_id", reactorClerkUserId)
+      .maybeSingle();
+    const reactorName =
+      (reactor?.display_name as string | null)?.trim() || "A seeker";
+    const title = row.title ?? null;
+
+    await admin.from("notifications").insert({
+      recipient_user_id: null,
+      recipient_clerk_user_id: ownerClerkId,
+      category: "community",
+      priority: "informational",
+      channel: "in_app",
+      title: `${reactorName} reacted to your announcement`,
+      body: title
+        ? `Your announcement “${title}” is resonating with seekers.`
+        : "Your community announcement is resonating with seekers.",
+      subject_type: "host_announcement",
+      subject_id: announcementId,
+      action_url: "/community/announcements",
+      dedupe_key: `ann_reaction:${announcementId}:${reactorClerkUserId}`,
+    });
+  } catch {
+    // Best-effort only — swallow so the reaction always succeeds.
+  }
 }
 
 export async function toggleAnnouncementReaction(
@@ -326,7 +492,10 @@ export async function toggleAnnouncementReaction(
     clerk_user_id:   clerkUserId,
     reaction,
   });
-  if (!error) return { added: true };
+  if (!error) {
+    await notifyAnnouncementReaction(admin, announcementId, clerkUserId);
+    return { added: true };
+  }
   if (error.code === "23505") {
     await admin.from("community_announcement_reactions").delete()
       .eq("announcement_id", announcementId)

@@ -1,0 +1,42 @@
+/* Host dashboard loading skeleton. Mirrors the real dashboard so load→loaded
+   never jumps: a hero band, the four-tile KPI grid, then two panel blocks.
+   Sizing fills the shared Skeleton spans to each region's real footprint. */
+
+.page {
+	/* inherits .host-page (flex column, --space-20 gap) */
+}
+
+/* Hero band — matches .host-hero radius + a comparable height so the dominant
+   element lands in the same place when content arrives. */
+.hero :global(.ui-skeleton) {
+	width: 100%;
+	height: calc(var(--space-80) + var(--space-48));
+	border-radius: var(--radius-card);
+}
+
+/* KPI tiles — match .host-kpi radius + min-height. */
+.kpi :global(.ui-skeleton) {
+	width: 100%;
+	height: var(--space-80);
+	border-radius: var(--radius-cell);
+}
+
+/* Panel blocks — match .host-panel radius + a comparable block height so the
+   two-up stack reserves the same space the real panels occupy. */
+.panel :global(.ui-skeleton) {
+	width: 100%;
+	height: calc(var(--space-80) + var(--space-64));
+	border-radius: var(--radius-card);
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}

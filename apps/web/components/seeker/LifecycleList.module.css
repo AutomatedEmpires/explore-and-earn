@@ -15,3 +15,33 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* Each card sits in a cell so it can stagger in independently while the
+   DiscoveryCard keeps full width of its grid track. */
+.cell {
+  display: flex;
+}
+
+.cell > * {
+  width: 100%;
+}
+
+/* Capped staggered reveal — saved/lifecycle cards settle into place on first
+   paint. Only the first ~6 stagger (delay clamps), so the grid never drags. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cell {
+    animation: rise var(--motion-base) var(--ease-standard) both;
+    animation-delay: calc(min(var(--i, 0), 6) * 40ms);
+  }
+}

@@ -1,0 +1,269 @@
+/**
+ * Host OS — warm "Adventure Paper & Sky" command surface for the (host) scope.
+ *
+ * Part of the SINGLE, flowing design system (founder mandate 2026-06-24): the
+ * dashboards speak the same warm paper + ink + framed-photo language as the
+ * marketing and discovery surfaces, so a host flows from the public site into
+ * their command center with no theme switch. The token-cascade strategy is
+ * unchanged — host surfaces read SEMANTIC tokens, so the scope keeps the warm
+ * root tokens (paper/ink/gold) and only sets the locked --hostos-* chrome set
+ * (panels / lines / accent / sizes) + the shell chrome. Role identity is carried
+ * by the GOLD accent + the brand/identity card, not by a separate palette.
+ * Host = gold ownership; Seeker = sky exploration; Admin = sky + warm danger.
+ *
+ * The one intentionally photographic element is the identity card: a framed
+ * photo with an ink scrim and bone text (brand's #1 lever), the same treatment
+ * the DiscoveryCard uses. Everything else is paper, ink hairlines, whisper lifts.
+ */
+
+.host-os {
+  /* ---- locked Host OS chrome set (warm) ---- */
+  --hostos-panel:    var(--color-surface);        /* #FFFCF5 warm card surface */
+  --hostos-panel-2:  var(--color-parchment);      /* #F0EAE0 warm panel */
+  --hostos-panel-3:  var(--color-paper);          /* page paper */
+  --hostos-line:     var(--border-soft);          /* #DDE2E3 chrome hairline */
+  --hostos-line-2:   var(--border-soft);
+  --hostos-ink-line: var(--border-ink);           /* ink hairline for emphasis */
+  --hostos-accent:   var(--color-gold);           /* gold #D8A84E — host ownership */
+  --hostos-accent-deep: #7A5A12;                  /* deep gold for text-on-soft */
+  --hostos-accent-soft: color-mix(in srgb, var(--color-gold) 16%, var(--color-surface));
+  --hostos-amber:    var(--color-gold);           /* legacy alias → gold */
+  --hostos-amber-glow: color-mix(in srgb, var(--color-gold) 22%, transparent);
+  --hostos-gold:     var(--color-gold);
+  --hostos-teal:     var(--state-ready-fg);       /* pine for live dot */
+  --hostos-bone:     #FBF7EE;                      /* text on framed photo */
+  --hostos-on-amber: var(--color-gold-text);      /* DARK ink on gold (contrast) */
+  --hostos-on-accent: var(--color-gold-text);     /* DARK ink on gold */
+  --hostos-grad:     var(--gradient-gold);         /* gold for meter + active fills */
+  --hostos-control:  46px;                          /* topbar control height */
+  --hostos-avatar:   42px;
+  --hostos-side:     280px;                          /* sidebar width */
+
+  position: relative;
+  min-height: 100vh;
+  color: var(--text-primary);
+  background:
+    radial-gradient(circle at 16% -2%, color-mix(in srgb, var(--color-gold) 9%, transparent), transparent 34%),
+    radial-gradient(circle at 90% 8%, color-mix(in srgb, var(--color-gold) 6%, transparent), transparent 30%),
+    radial-gradient(circle at 72% 98%, color-mix(in srgb, var(--palette-amber-light) 30%, transparent), transparent 32%),
+    var(--color-paper);
+}
+
+/* faint ink grid atmosphere on the scope (paper register) */
+.host-os::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(36, 34, 30, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(36, 34, 30, 0.028) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: linear-gradient(#000, transparent 78%);
+  mask-image: linear-gradient(#000, transparent 78%);
+}
+.host-os > * { position: relative; z-index: 1; }
+
+.host-os .host-page { gap: var(--space-20); }
+
+/* ---- warm paper panels (paper is opaque, not glass) ---- */
+.host-os .host-panel,
+.host-os .host-kpi,
+.host-os .host-action-tile,
+.host-os .host-attention {
+  background: var(--hostos-panel);
+  border-color: var(--hostos-line);
+}
+.host-os .host-panel--raised { box-shadow: var(--elevation-card); }
+
+/* promoted KPI / primary tile glow in gold */
+.host-os .host-kpi--primary {
+  background: var(--hostos-accent-soft);
+  border-color: color-mix(in srgb, var(--color-gold) 38%, transparent);
+}
+.host-os .host-kpi--primary .host-kpi__value,
+.host-os .host-kpi--primary .host-kpi__label,
+.host-os .host-kpi--primary .host-kpi__top { color: var(--hostos-accent-deep); }
+
+.host-os .host-action-tile--primary {
+  background: var(--hostos-accent-soft);
+  border-color: color-mix(in srgb, var(--color-gold) 38%, transparent);
+}
+.host-os .host-action-tile--primary .host-action-tile__icon {
+  background: var(--hostos-grad);
+  color: var(--hostos-on-amber);
+}
+
+/* hero → framed photo + ink scrim over a category/adventure cover fallback,
+   bone text for legibility (WCAG). The one photographic surface besides the
+   identity card. */
+.host-os .host-hero {
+  background:
+    var(--gradient-hero-scrim),
+    var(--gradient-cover-adventure);
+  border: 1px solid var(--hostos-ink-line);
+  box-shadow: var(--elevation-card);
+}
+.host-os .host-hero[data-lane="farm"]     { background: var(--gradient-hero-scrim), var(--gradient-category-farm); }
+.host-os .host-hero[data-lane="maritime"] { background: var(--gradient-hero-scrim), var(--gradient-category-maritime); }
+.host-os .host-hero[data-lane="remote"]   { background: var(--gradient-hero-scrim), var(--gradient-category-remote); }
+.host-os .host-hero[data-lane="seasonal"] { background: var(--gradient-hero-scrim), var(--gradient-category-seasonal); }
+.host-os .host-hero[data-lane="mix"]      { background: var(--gradient-hero-scrim), var(--gradient-category-mix); }
+.host-os .host-hero__cta { background: var(--hostos-grad); color: var(--hostos-on-amber); }
+
+/* Floating hero KPI — command-center signature. Stacks below the hero
+   copy on mobile; overlaps bottom-right on desktop. Sits over the photo
+   scrim → framed bone-text panel. */
+.hostos-herokpi {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+  padding: var(--space-12);
+  border-radius: var(--radius-card);
+  background: var(--gradient-hero-scrim);
+  border: 1px solid color-mix(in srgb, #FBF7EE 28%, transparent);
+}
+.hostos-herokpi > div { padding: var(--space-10); border-radius: var(--radius-cell); background: color-mix(in srgb, #FBF7EE 12%, transparent); border: 1px solid color-mix(in srgb, #FBF7EE 18%, transparent); }
+.hostos-herokpi b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 30px; line-height: 1; letter-spacing: -0.03em; color: var(--hostos-bone); }
+.hostos-herokpi span { font-size: 11px; font-weight: 700; color: rgba(251, 247, 238, 0.78); }
+@media (min-width: 64rem) {
+  .hostos-herokpi { position: absolute; right: var(--space-20); bottom: var(--space-20); width: 430px; margin: 0; }
+}
+
+/* =================================================================== */
+/* HOST OS SHELL — sidebar (desktop) → mobile bottom-nav + drawer       */
+/* =================================================================== */
+.hostos-shell { display: grid; grid-template-columns: var(--hostos-side) 1fr; min-height: 100vh; }
+.hostos-side {
+  position: sticky; top: 0; height: 100vh; padding: var(--space-16) var(--space-12); overflow: auto;
+  border-right: 1px solid var(--hostos-line);
+  background: var(--color-parchment);
+  display: flex; flex-direction: column; gap: var(--space-12); scrollbar-width: none;
+}
+.hostos-side::-webkit-scrollbar { display: none; }
+.hostos-brand { display: flex; align-items: center; gap: var(--space-10); padding: var(--space-10); border-radius: 22px; background: var(--hostos-panel); border: 1px solid var(--hostos-line); }
+.hostos-mark { width: var(--hostos-avatar); height: var(--hostos-avatar); border-radius: 14px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; font-size: 20px; color: var(--hostos-on-amber); background: var(--gradient-gold); box-shadow: var(--elevation-card); }
+.hostos-brand b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: .9; color: var(--text-primary); }
+.hostos-brand i { font-style: normal; display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+.hostos-livedot { width: 7px; height: 7px; border-radius: 50%; background: var(--hostos-teal); box-shadow: 0 0 0 0 color-mix(in srgb, var(--hostos-teal) 55%, transparent); animation: hostos-pulse 1.9s infinite; }
+@keyframes hostos-pulse { 70% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--hostos-teal) 0%, transparent); } 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--hostos-teal) 0%, transparent); } }
+/* Host identity card — framed photo + ink scrim + bone text (brand #1 lever).
+   The one intentionally photographic surface; everything else is paper. */
+.hostos-hostcard { position: relative; min-height: 128px; border-radius: 22px; overflow: hidden; padding: var(--space-12); border: 1px solid var(--hostos-ink-line); background-size: cover; background-position: center; display: flex; align-items: flex-end; box-shadow: var(--elevation-card); }
+.hostos-hostcard::before { content: ""; position: absolute; inset: 0; background: var(--gradient-hero-scrim), var(--gradient-cover-adventure); }
+.hostos-hostcard b { position: relative; font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: .98; letter-spacing: -.02em; color: var(--hostos-bone); }
+.hostos-chip { position: absolute; top: 11px; left: 11px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-pill); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--hostos-bone); background: var(--gradient-hero-scrim); border: 1px solid color-mix(in srgb, #FBF7EE 24%, transparent); }
+.hostos-navlabel { margin: 4px 10px 1px; font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--text-muted); }
+.hostos-nav { display: grid; gap: 5px; }
+.hostos-navitem { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: var(--space-10); padding: var(--space-8) var(--space-10); border-radius: 16px; color: var(--text-secondary); border: 1px solid transparent; text-decoration: none; transition: background var(--motion-fast, 140ms) var(--ease-standard), transform var(--motion-fast, 140ms) var(--ease-standard); }
+.hostos-navitem:hover { background: var(--hostos-accent-soft); color: var(--hostos-accent-deep); transform: translateX(2px); }
+.hostos-navitem .i { width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--hostos-panel); border: 1px solid var(--hostos-line); color: currentColor; }
+.hostos-navitem b { display: block; font-size: 14px; font-weight: 600; line-height: 1.1; }
+.hostos-navitem s { display: block; font-size: 11px; color: var(--text-muted); text-decoration: none; }
+.hostos-navitem[aria-current="page"] { color: var(--hostos-accent-deep); background: var(--hostos-accent-soft); border-color: color-mix(in srgb, var(--color-gold) 38%, transparent); box-shadow: var(--elevation-card); }
+.hostos-navitem[aria-current="page"] .i { background: var(--hostos-grad); color: var(--hostos-on-amber); border-color: transparent; }
+.hostos-bdg { min-width: 24px; height: 22px; padding: 0 7px; border-radius: var(--radius-pill); display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--text-secondary); background: var(--hostos-panel); border: 1px solid var(--hostos-line); }
+.hostos-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: var(--space-12);
+  border-radius: 18px;
+  border: 1px solid var(--hostos-line);
+  background: var(--hostos-accent-soft);
+  text-decoration: none;
+  transition: border-color var(--motion-fast, 140ms) var(--ease-standard), transform var(--motion-fast, 140ms) var(--ease-standard);
+}
+.hostos-foot:hover { border-color: color-mix(in srgb, var(--color-gold) 38%, transparent); transform: translateY(-1px); }
+.hostos-foot__row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hostos-foot__label { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-muted); }
+.hostos-foot__tier { font-family: var(--font-display); font-weight: 600; font-size: 15px; letter-spacing: -.02em; color: var(--hostos-accent-deep); }
+.hostos-foot__cta { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.hostos-main { min-width: 0; display: flex; flex-direction: column; }
+.hostos-top { position: sticky; top: 0; z-index: 30; display: flex; gap: var(--space-10); align-items: center; padding: var(--space-12) var(--space-20); border-bottom: 1px solid var(--hostos-line); background: var(--color-surface); }
+.hostos-search { flex: 1 1 auto; min-width: 0; max-width: 560px; height: var(--hostos-control); line-height: calc(var(--hostos-control) - 2px); border-radius: var(--radius-pill); border: 1px solid var(--field-border); background: var(--field-bg); padding: 0 var(--space-18); color: var(--text-muted); font-size: var(--type-meta-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hostos-tact { min-height: var(--hostos-control); border-radius: var(--radius-pill); border: 1px solid var(--hostos-line); background: var(--hostos-panel); color: var(--text-primary); padding: 0 var(--space-16); font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 7px; text-decoration: none; }
+.hostos-tact--p { background: var(--hostos-grad); color: var(--hostos-on-amber); border-color: transparent; box-shadow: var(--elevation-hover); }
+.hostos-account { display: inline-grid; place-items: center; flex: none; }
+.hostos-avatar { width: var(--hostos-avatar); height: var(--hostos-avatar); border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--hostos-on-amber); background: var(--hostos-grad); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: var(--elevation-pin); }
+.hostos-account:hover .hostos-avatar { filter: brightness(1.06); }
+.hostos-contentwrap { padding: var(--space-20); }
+.hostos-mnav, .hostos-drawer { display: none; }
+@media (max-width: 1023px) {
+  .hostos-shell { display: block; padding-bottom: 96px; }
+  .hostos-side { display: none; }
+  .hostos-top { padding: var(--space-10) var(--space-14); gap: var(--space-8); }
+  /* keep the topbar to one row: search truncates, messages lives in the bottom
+     nav, and "New listing" collapses to its "+" glyph */
+  .hostos-tact--msg, .hostos-tlabel { display: none; }
+  .hostos-tact--p { padding: 0 var(--space-16); }
+  .hostos-contentwrap { padding: var(--space-14); }
+  .hostos-mnav { display: grid; position: fixed; z-index: 70; left: 10px; right: 10px; bottom: 10px; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: var(--space-8); border-radius: 24px; background: var(--color-surface); border: 1px solid var(--hostos-line); box-shadow: var(--elevation-overlay); }
+  .hostos-mtab { border: 0; background: transparent; color: var(--text-muted); border-radius: 18px; padding: 7px 4px; min-height: var(--tap-min, 44px); display: grid; place-items: center; gap: 3px; font-size: 10px; font-weight: 600; text-decoration: none; }
+  .hostos-mtab[aria-current="page"] { background: var(--hostos-grad); color: var(--hostos-on-amber); }
+  .hostos-drawer.open { display: block; position: fixed; inset: 0; z-index: 80; background: rgba(36, 34, 30, 0.5); }
+  .hostos-drawerpanel { position: absolute; left: 10px; right: 10px; bottom: 92px; padding: var(--space-12); border-radius: 26px; border: 1px solid var(--hostos-line); background: var(--color-surface); display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-8); box-shadow: var(--elevation-overlay); }
+}
+
+/* Button primitive already paints the primary fill via --color-cta; keep explicit
+   so a composed <Button variant="primary"> reads correctly inside the Host OS.
+   Host's primary is GOLD (dark ink text for contrast). */
+.host-os .ui-button--primary {
+  background: var(--hostos-grad);
+  color: var(--hostos-on-amber);
+  border-color: transparent;
+}
+
+/* ── Command-search inner elements (CommandSearch.tsx markup) ─────── */
+.hostos-search { display: flex; align-items: center; gap: 10px; line-height: normal; cursor: text; }
+.hostos-search:focus-within {
+  border-color: var(--hostos-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hostos-accent) 20%, transparent);
+}
+.hostos-search .cmdsearch-i { flex: none; color: var(--text-muted); font-size: 1.05rem; line-height: 1; }
+.hostos-search .cmdsearch-input {
+  flex: 1 1 auto; min-width: 0; height: 100%;
+  background: transparent; border: 0; outline: none; padding: 0;
+  color: var(--text-primary); font: inherit;
+}
+.hostos-search .cmdsearch-input::placeholder { color: var(--text-muted); }
+.hostos-search .cmdsearch-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+.hostos-search .cmdsearch-kbd {
+  flex: none; display: grid; place-items: center; min-width: 22px; height: 22px;
+  padding: 0 6px; border-radius: 7px; background: var(--hostos-panel);
+  border: 1px solid var(--hostos-line); color: var(--text-muted); font-size: 0.72rem;
+  font-family: var(--font-ui, ui-monospace, monospace);
+}
+@media (max-width: 1023px) { .hostos-search .cmdsearch-kbd { display: none; } }
+
+/* ── View-enter: content settles into place on each navigation ─────
+   template.tsx re-mounts this wrapper on every route change, so the rise +
+   fade replays as the host moves between surfaces — the command-center
+   signature. Killed under reduced-motion by the block below. */
+.hostos-view { animation: hostos-viewin 360ms var(--ease-standard) both; }
+@keyframes hostos-viewin {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Keyboard focus rings (gold, legible on paper) + tactile press ── */
+.hostos-navitem:focus-visible,
+.hostos-tact:focus-visible,
+.hostos-account:focus-visible,
+.hostos-mtab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--hostos-accent);
+}
+.hostos-navitem:active { transform: translateX(2px) scale(0.985); }
+.hostos-tact:active,
+.hostos-account:active,
+.hostos-mtab:active { transform: translateY(1px) scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+  .host-os *, .host-os *::before, .host-os *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

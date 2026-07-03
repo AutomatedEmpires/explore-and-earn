@@ -121,44 +121,112 @@ function formatDateRange(
   return "";
 }
 
-// ─── Step nav ─────────────────────────────────────────────────────────────────
+// ─── Step progress ──────────────────────────────────────────────────────────
 
-interface StepNavProps {
+interface CompletionRingProps {
+  pct: number;
+}
+
+/* Live completion ring — mirrors the ResumeCallout ring on the seeker dashboard
+   so the same "how done am I" signal reads consistently across surfaces. */
+function CompletionRing({ pct }: CompletionRingProps) {
+  const r = 19;
+  const circ = 2 * Math.PI * r;
+  const dash = (Math.max(0, Math.min(100, pct)) / 100) * circ;
+  const complete = pct >= 100;
+
+  return (
+    <div className={complete ? styles.ringWrapComplete : styles.ringWrap}>
+      <svg className={styles.ring} viewBox="0 0 44 44" aria-hidden="true">
+        <circle
+          className={styles.ringTrack}
+          cx="22"
+          cy="22"
+          r={r}
+          fill="none"
+        />
+        <circle
+          className={styles.ringValue}
+          cx="22"
+          cy="22"
+          r={r}
+          fill="none"
+          strokeDasharray={`${dash} ${circ - dash}`}
+          strokeLinecap="round"
+          transform="rotate(-90 22 22)"
+        />
+      </svg>
+      <span className={styles.ringPct}>
+        {complete ? <Icon name="action.apply" size={20} aria-hidden /> : `${pct}%`}
+      </span>
+    </div>
+  );
+}
+
+interface StepProgressProps {
   current: StepId;
   completed: Set<number>;
+  completion: number;
   onStep: (step: StepId) => void;
 }
 
-function StepNav({ current, completed, onStep }: StepNavProps) {
+/* Compact segmented stepper: a completion ring + a 5-node rail that never
+   horizontally overflows (each node flexes equally). The current step is
+   emphasized; finished steps carry a check. The active step's full title sits
+   below the rail so labels never crowd the track on narrow screens. */
+function StepProgress({ current, completed, completion, onStep }: StepProgressProps) {
+  const active = STEPS[current];
+  const completionLabel =
+    completion >= 100 ? "Resume complete" : `${completion}% complete`;
+
   return (
-    <nav className={styles.stepNav} aria-label="Resume builder steps">
-      {STEPS.map((step, index) => {
-        const isActive = index === current;
-        const isDone = completed.has(index);
-        const cls = isActive
-          ? styles.stepBtnActive
-          : isDone
-            ? styles.stepBtnDone
-            : styles.stepBtn;
-        return (
-          <button
-            key={step.label}
-            type="button"
-            className={cls}
-            onClick={() => { onStep(index as StepId); }}
-            aria-current={isActive ? "step" : undefined}
-          >
-            <span className={styles.stepIconWrap}>
-              <Icon name={step.icon} size={20} aria-hidden />
-              {isDone && !isActive && (
-                <span className={styles.stepCheck} aria-hidden>✓</span>
-              )}
-            </span>
-            <span className={styles.stepLabel}>{step.label}</span>
-          </button>
-        );
-      })}
-    </nav>
+    <div className={styles.stepper}>
+      <div className={styles.stepperTop}>
+        <CompletionRing pct={completion} />
+        <div className={styles.stepperHead}>
+          <p className={styles.stepperStatus}>{completionLabel}</p>
+          <p className={styles.stepperTitle}>
+            <Icon name={active.icon} size={20} aria-hidden />
+            {active.label}
+          </p>
+        </div>
+        <span className={styles.stepperCount} aria-hidden="true">
+          {current + 1}
+          <span className={styles.stepperCountTotal}>/{STEPS.length}</span>
+        </span>
+      </div>
+
+      <nav className={styles.rail} aria-label="Resume builder steps">
+        {STEPS.map((step, index) => {
+          const isActive = index === current;
+          const isDone = completed.has(index) && !isActive;
+          const cls = isActive
+            ? styles.nodeActive
+            : isDone
+              ? styles.nodeDone
+              : styles.node;
+          return (
+            <button
+              key={step.label}
+              type="button"
+              className={cls}
+              onClick={() => { onStep(index as StepId); }}
+              aria-current={isActive ? "step" : undefined}
+              aria-label={`Step ${index + 1}: ${step.label}${isDone ? " (done)" : ""}`}
+            >
+              <span className={styles.nodeDot}>
+                {isDone ? (
+                  <Icon name="action.apply" size={16} aria-hidden />
+                ) : (
+                  <span className={styles.nodeNum}>{index + 1}</span>
+                )}
+              </span>
+              <span className={styles.nodeLabel}>{step.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </div>
   );
 }
 
@@ -1557,29 +1625,23 @@ export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
     setCompleted((prev) => new Set([...prev, stepIndex]));
   }
 
-  const completionLabel =
-    completion === 100 ? "Complete" : `${completion}% complete`;
-
   return (
     <div className={styles.builder}>
-      {/* Progress bar */}
+      {/* Progress + step rail */}
       <div
-        className={styles.progressBar}
         role="progressbar"
         aria-valuenow={completion}
         aria-valuemin={0}
         aria-valuemax={100}
+        aria-label="Resume completion"
       >
-        <div className={styles.progressFill} style={{ width: `${completion}%` }} />
-        <span className={styles.progressLabel}>{completionLabel}</span>
+        <StepProgress
+          current={step}
+          completed={completed}
+          completion={completion}
+          onStep={(s) => { setStep(s); }}
+        />
       </div>
-
-      {/* Step nav */}
-      <StepNav
-        current={step}
-        completed={completed}
-        onStep={(s) => { setStep(s); }}
-      />
 
       {/* Step panels */}
       {step === 0 && (
@@ -1628,28 +1690,32 @@ export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
         </div>
       )}
 
-      {/* Step footer nav */}
+      {/* Step footer nav — sticky on mobile so advancing is always reachable */}
       <div className={styles.stepFooter}>
-        {step > 0 && (
+        {step > 0 ? (
           <button
             type="button"
-            className={styles.ghostBtn}
+            className={styles.backBtn}
             onClick={() => { setStep((s) => (s - 1) as StepId); }}
           >
             <Icon name="action.back" size={16} aria-hidden /> Back
           </button>
+        ) : (
+          <span className={styles.stepCounter} aria-hidden="true">
+            Step {step + 1} of {STEPS.length}
+          </span>
         )}
-        <span className={styles.stepCounter}>{step + 1} / {STEPS.length}</span>
         {step < 4 && (
           <button
             type="button"
-            className={styles.primaryBtn}
+            className={styles.continueBtn}
             onClick={() => {
               markDone(step);
               setStep((s) => (s + 1) as StepId);
             }}
           >
-            {step === 3 ? "Review →" : "Next →"}
+            {step === 3 ? "Review resume" : "Save & continue"}
+            <Icon name="action.forward" size={16} aria-hidden />
           </button>
         )}
       </div>

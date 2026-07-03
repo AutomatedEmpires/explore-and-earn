@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import type { DiscoveryListing } from "../discovery";
 import {
   APPLIED_ITEMS,
@@ -19,18 +17,17 @@ import type {
 } from "./models";
 import {
   MATCH_SCORE_HIDE_THRESHOLD,
-  authedClient,
-  getPublicListings,
   getSavedListingIds,
   getSeekerApplicationIds,
   getSeekerApplications,
   getSeekerApplicationsWithListings,
-  getSeekerProfile,
   getSeekerResume,
   getUnreadNotificationCount,
   rowToDiscoveryFields,
   scoreListingForSeeker,
 } from "@explore-and-earn/db";
+
+import { cachedSeekerProfile, getPublicListingsCached } from "../../lib/serverCache";
 
 const allowFixtureFallback = process.env.NODE_ENV !== "production";
 
@@ -70,7 +67,7 @@ export function getSeekerStatusFallback(
  */
 
 type SeekerResumeData = Awaited<ReturnType<typeof getSeekerResume>>;
-type BaseSeekerProfile = NonNullable<Awaited<ReturnType<typeof getSeekerProfile>>>;
+type BaseSeekerProfile = NonNullable<Awaited<ReturnType<typeof cachedSeekerProfile>>>;
 
 interface MatchProfile {
   readonly desiredCategories: readonly string[];
@@ -102,63 +99,21 @@ function estimateResumeCompletion(resume: SeekerResumeData): number {
   return Math.min(100, score);
 }
 
-function untypedClient(clerkToken: string): SupabaseClient {
-  return authedClient(clerkToken) as unknown as SupabaseClient;
-}
-
-async function getMatchProfile(
-  token: string,
-  clerkUserId: string,
-  baseProfile: BaseSeekerProfile,
-): Promise<MatchProfile> {
-  try {
-    const db = untypedClient(token);
-    const { data, error } = await db
-      .from("seeker_profiles")
-      .select(
-        "desired_categories, housing_preference, meals_preference, location_pref, pay_expectation_min_cents",
-      )
-      .eq("clerk_user_id", clerkUserId)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (error || !data) {
-      return {
-        desiredCategories: baseProfile.desiredCategories,
-        housingPreference: baseProfile.housingPreference,
-        mealsPreference: null,
-        locationPref: baseProfile.locationPref,
-        payExpectationMinCents: null,
-      };
-    }
-
-    const row = data as Record<string, unknown>;
-    return {
-      desiredCategories: Array.isArray(row.desired_categories)
-        ? row.desired_categories.filter((value): value is string => typeof value === "string")
-        : baseProfile.desiredCategories,
-      housingPreference:
-        typeof row.housing_preference === "string"
-          ? row.housing_preference
-          : baseProfile.housingPreference,
-      mealsPreference:
-        typeof row.meals_preference === "string" ? row.meals_preference : null,
-      locationPref:
-        typeof row.location_pref === "string" ? row.location_pref : baseProfile.locationPref,
-      payExpectationMinCents:
-        typeof row.pay_expectation_min_cents === "number"
-          ? row.pay_expectation_min_cents
-          : null,
-    };
-  } catch {
-    return {
-      desiredCategories: baseProfile.desiredCategories,
-      housingPreference: baseProfile.housingPreference,
-      mealsPreference: null,
-      locationPref: baseProfile.locationPref,
-      payExpectationMinCents: null,
-    };
-  }
+/**
+ * Project the match-relevant fields off the already-loaded seeker profile.
+ *
+ * These columns all live on {@link SeekerProfileRecord}, which the caller has
+ * already fetched — so this is a pure in-memory projection, NOT a second
+ * `seeker_profiles` round-trip (it used to be one, redundantly).
+ */
+function toMatchProfile(baseProfile: BaseSeekerProfile): MatchProfile {
+  return {
+    desiredCategories: baseProfile.desiredCategories,
+    housingPreference: baseProfile.housingPreference,
+    mealsPreference: baseProfile.mealsPreference,
+    locationPref: baseProfile.locationPref,
+    payExpectationMinCents: baseProfile.payExpectationMinCents,
+  };
 }
 
 /** The seeker's at-a-glance status summary (counts, resume completion, etc.). */
@@ -174,7 +129,7 @@ export async function getSeekerStatus(
   try {
     const [profile, savedIds, applications, acceptedWithListings, unread, resume] =
       await Promise.all([
-        getSeekerProfile(token, clerkUserId),
+        cachedSeekerProfile(token, clerkUserId),
         getSavedListingIds(token, clerkUserId),
         getSeekerApplications(token, clerkUserId),
         getSeekerApplicationsWithListings(token, clerkUserId, ["accepted"]),
@@ -273,8 +228,8 @@ export async function getMatchedListings(
 
   try {
     const [baseProfile, listings, appliedIds, savedIds] = await Promise.all([
-      getSeekerProfile(token, clerkUserId),
-      getPublicListings(),
+      cachedSeekerProfile(token, clerkUserId),
+      getPublicListingsCached(),
       getSeekerApplicationIds(token, clerkUserId),
       getSavedListingIds(token, clerkUserId),
     ]);
@@ -283,7 +238,7 @@ export async function getMatchedListings(
       return [];
     }
 
-    const profile = await getMatchProfile(token, clerkUserId, baseProfile);
+    const profile = toMatchProfile(baseProfile);
     const applied = new Set(appliedIds);
     const saved = new Set(savedIds);
 

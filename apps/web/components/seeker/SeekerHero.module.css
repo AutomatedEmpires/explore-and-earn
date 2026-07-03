@@ -1,7 +1,23 @@
-/* SeekerHero — immersive dashboard hero with photo/gradient background */
+/* SeekerHero — immersive dashboard hero with photo/gradient background.
+   On-photo chrome (controls, avatar, badges) always renders against a dark
+   photographic field, so it uses a small set of *on-photo* locals derived from
+   the locked white/ink tokens — never raw hex. The scrim + vignette gradients
+   below remain pure-ink photographic legibility gradients (intentionally raw,
+   per photo-language: they tune the photo, they are not UI color). */
 
-/* ─── Hero container ─── */
 .hero {
+  /* On-photo tokens (local, token-derived) — frosted white chrome over photos */
+  --on-photo-line:        color-mix(in srgb, var(--palette-white) 22%, transparent);
+  --on-photo-line-strong: color-mix(in srgb, var(--palette-white) 28%, transparent);
+  --on-photo-fill:        color-mix(in srgb, var(--color-ink) 28%, transparent);
+  --on-photo-fill-hover:  color-mix(in srgb, var(--color-ink) 46%, transparent);
+  --on-photo-glass:       color-mix(in srgb, var(--palette-white) 16%, transparent);
+  --on-photo-text:        var(--palette-white);
+  --on-photo-text-soft:   color-mix(in srgb, var(--palette-white) 92%, transparent);
+  --on-photo-text-mute:   color-mix(in srgb, var(--palette-white) 60%, transparent);
+  /* White-on-photo focus ring — high-contrast halo that reads on any photo */
+  --on-photo-focus:       0 0 0 2.5px color-mix(in srgb, var(--palette-white) 85%, transparent);
+
   position: relative;
   width: 100%;
   min-height: 300px;
@@ -74,9 +90,9 @@
   width: 44px;
   height: 44px;
   border-radius: var(--radius-button);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(0, 0, 0, 0.28);
-  color: #fff;
+  border: 1px solid var(--on-photo-line);
+  background: var(--on-photo-fill);
+  color: var(--on-photo-text);
   cursor: pointer;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -86,13 +102,15 @@
 }
 
 .menuBtn:hover {
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--on-photo-fill-hover);
   transform: scale(1.05);
 }
 
+.menuBtn:active { transform: scale(0.98); }
+
 .menuBtn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, 0.85);
+  box-shadow: var(--on-photo-focus);
 }
 
 .editBtn {
@@ -101,11 +119,11 @@
   gap: var(--space-6);
   padding: 8px 14px;
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(0, 0, 0, 0.3);
-  color: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--on-photo-line-strong);
+  background: var(--on-photo-fill);
+  color: var(--on-photo-text-soft);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--type-label-size);
   font-weight: 600;
   cursor: pointer;
   backdrop-filter: blur(10px);
@@ -117,13 +135,15 @@
 }
 
 .editBtn:hover {
-  background: rgba(0, 0, 0, 0.48);
+  background: var(--on-photo-fill-hover);
   transform: scale(1.02);
 }
 
+.editBtn:active { transform: scale(0.99); }
+
 .editBtn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, 0.85);
+  box-shadow: var(--on-photo-focus);
 }
 
 /* ─── Identity block — pinned to bottom ─── */
@@ -148,30 +168,30 @@
   border-radius: 50%;
   object-fit: cover;
   display: block;
-  border: 3px solid rgba(255, 255, 255, 0.88);
+  border: 3px solid color-mix(in srgb, var(--palette-white) 88%, transparent);
   box-shadow:
-    0 0 0 4px rgba(255, 255, 255, 0.12),
-    0 6px 24px rgba(0, 0, 0, 0.45);
+    0 0 0 4px color-mix(in srgb, var(--palette-white) 12%, transparent),
+    0 6px 24px color-mix(in srgb, var(--color-ink) 45%, transparent);
 }
 
 .avatarInitials {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--on-photo-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 3px solid rgba(255, 255, 255, 0.65);
-  color: #fff;
+  border: 3px solid color-mix(in srgb, var(--palette-white) 65%, transparent);
+  color: var(--on-photo-text);
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: var(--type-page-size);
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
-    0 0 0 4px rgba(255, 255, 255, 0.1),
-    0 6px 24px rgba(0, 0, 0, 0.4);
+    0 0 0 4px color-mix(in srgb, var(--palette-white) 10%, transparent),
+    0 6px 24px color-mix(in srgb, var(--color-ink) 40%, transparent);
 }
 
 @media (min-width: 480px) {
@@ -181,7 +201,7 @@
     height: 84px;
   }
   .avatarInitials {
-    font-size: 30px;
+    font-size: var(--type-display-size);
   }
 }
 
@@ -214,14 +234,14 @@
   gap: var(--space-4);
   padding: 3px 9px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--on-photo-glass);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--on-photo-line-strong);
   font-family: var(--font-ui);
-  font-size: 10px;
+  font-size: var(--type-label-size);
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--on-photo-text-soft);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   width: fit-content;
@@ -233,7 +253,7 @@
   border-radius: 50%;
   background: var(--state-live-dot);
   flex-shrink: 0;
-  box-shadow: 0 0 6px rgba(106, 232, 154, 0.8);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--state-live-dot) 80%, transparent);
   animation: badge-pulse 3s ease-in-out infinite;
 }
 
@@ -247,10 +267,10 @@
   font-family: var(--font-display);
   font-size: clamp(22px, 6cqi, 32px);
   font-weight: 700;
-  color: #fff;
+  color: var(--on-photo-text);
   line-height: 1.05;
   margin: 0;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 2px 12px color-mix(in srgb, var(--color-ink) 50%, transparent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -268,35 +288,51 @@
   align-items: center;
   padding: 3px 10px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--on-photo-glass);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--on-photo-line-strong);
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: var(--type-label-size);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--on-photo-text-soft);
   letter-spacing: 0.04em;
   text-transform: capitalize;
 }
 
-/* Category-specific tints using semantic bg tokens */
-.cat_farm     { background: rgba(94, 60, 18, 0.6);  border-color: rgba(196, 149, 62, 0.55); }
-.cat_maritime { background: rgba(15, 80, 128, 0.6);  border-color: rgba(74, 162, 210, 0.55); }
-.cat_remote   { background: rgba(30, 50, 78, 0.6);   border-color: rgba(91, 137, 178, 0.55); }
-.cat_seasonal { background: rgba(37, 74, 26, 0.6);   border-color: rgba(138, 191, 78, 0.55); }
-.cat_mix      { background: rgba(90, 34, 106, 0.6);  border-color: rgba(196, 96, 128, 0.55); }
+/* Category-specific tints — per-lane accent identity over the photo, mixed
+   from the locked lane accent tokens so they theme with the design system. */
+.cat_farm {
+  background: color-mix(in srgb, var(--accent-farm-fg) 62%, transparent);
+  border-color: color-mix(in srgb, var(--accent-farm-fg) 45%, var(--palette-white));
+}
+.cat_maritime {
+  background: color-mix(in srgb, var(--accent-maritime-fg) 62%, transparent);
+  border-color: color-mix(in srgb, var(--accent-maritime-fg) 45%, var(--palette-white));
+}
+.cat_remote {
+  background: color-mix(in srgb, var(--accent-remote-fg) 62%, transparent);
+  border-color: color-mix(in srgb, var(--accent-remote-fg) 45%, var(--palette-white));
+}
+.cat_seasonal {
+  background: color-mix(in srgb, var(--accent-seasonal-fg) 62%, transparent);
+  border-color: color-mix(in srgb, var(--accent-seasonal-fg) 45%, var(--palette-white));
+}
+.cat_mix {
+  background: color-mix(in srgb, var(--accent-mix-fg) 62%, transparent);
+  border-color: color-mix(in srgb, var(--accent-mix-fg) 45%, var(--palette-white));
+}
 
 /* Bio add link — shown when no bio exists */
 .bioAdd {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--type-label-size);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--on-photo-text-mute);
   text-decoration: none;
-  border: 1px dashed rgba(255, 255, 255, 0.38);
+  border: 1px dashed color-mix(in srgb, var(--palette-white) 38%, transparent);
   padding: 3px 10px;
   border-radius: var(--radius-pill);
   width: fit-content;
@@ -306,26 +342,48 @@
 }
 
 .bioAdd:hover {
-  color: rgba(255, 255, 255, 0.88);
-  border-color: rgba(255, 255, 255, 0.62);
+  color: color-mix(in srgb, var(--palette-white) 88%, transparent);
+  border-color: color-mix(in srgb, var(--palette-white) 62%, transparent);
+}
+
+.bioAdd:focus-visible {
+  outline: none;
+  box-shadow: var(--on-photo-focus);
 }
 
 /* ─── Bio ─── */
 .bio {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: var(--type-meta-size);
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.82);
+  color: color-mix(in srgb, var(--palette-white) 82%, transparent);
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 6px color-mix(in srgb, var(--color-ink) 35%, transparent);
 }
 
 @media (min-width: 480px) {
   .bio {
     -webkit-line-clamp: 3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menuBtn,
+  .editBtn,
+  .bioAdd {
+    transition: none;
+  }
+  .menuBtn:hover,
+  .editBtn:hover,
+  .menuBtn:active,
+  .editBtn:active {
+    transform: none;
+  }
+  .seekerBadgeDot {
+    animation: none;
   }
 }

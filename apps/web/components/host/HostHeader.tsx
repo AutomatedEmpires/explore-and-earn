@@ -12,10 +12,10 @@ export interface HostHeaderProps {
 /**
  * Host context header (greeting + scope + secondary quick links).
  *
- * Primary scope navigation lives in the host bottom nav (<HostBottomNav>:
- * Dashboard · Listings · Applicants · Messages · Profile). Navigation is scoped
- * per user type (founder canon) — the host lane owns its own bottom nav and does
- * not reuse the generic app-shell tab set. The header carries only secondary
+ * Primary scope navigation lives in the host shell's bottom dock
+ * (<HostShell> MOBILE_PRIMARY). Navigation is scoped per user type (founder
+ * canon) — the host lane owns its own bottom nav and does not reuse the generic
+ * app-shell tab set. The header carries only secondary
  * quick links (messages, profile).
  */
 export function HostHeader({

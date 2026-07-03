@@ -189,8 +189,8 @@
 }
 
 .commentDelete:hover {
-  color: var(--color-error, #ef4444);
-  background: color-mix(in srgb, var(--color-error, #ef4444) 8%, transparent);
+  color: var(--status-error-fg);
+  background: color-mix(in srgb, var(--status-error-fg) 8%, transparent);
 }
 
 .commentText {
@@ -259,7 +259,7 @@
 
 .commentError {
   font-size: var(--font-size-xs);
-  color: var(--color-error, #ef4444);
+  color: var(--status-error-fg);
   margin: 0;
 }
 

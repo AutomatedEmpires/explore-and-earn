@@ -1,0 +1,876 @@
+{
+  "summary": "World-class audit of all three dashboard OSes (Host/Seeker/Admin) — benchmark fidelity, scorecard, interactions, motion, resizing, flows; synthesize a prioritized execution work-list",
+  "agentCount": 10,
+  "logs": [
+    "Audited 9/9 OS×dimension cells; 78 issues"
+  ],
+  "result": {
+    "cells": 9,
+    "audits": [
+      {
+        "scope": "Host OS shell + chrome (sidebar / topbar / mobile bottom-nav) and its motion + interaction states — apps/web/styles/host-os.css, components/host/HostShell.tsx, app/(host)/layout.tsx, components/host/StaggerReveal.tsx, HostDetailSkeleton — measured against docs/design/reference/_benchmarks/explore_earn_host_dashboard_worldclass.html.",
+        "verdict": "The static chrome is genuinely close to the benchmark — the golden-amber dark-glass sidebar, brand mark, host photo card, sticky blurred topbar and 5-up floating mobile nav all match the mockup's geometry and the dashboard content view is the benchmark's rich hero+KPI+pipeline build. But on the SHELL-MOTION dimension it is half-finished: the topbar \"search\" is a dead non-focusable div (the benchmark's command bar is a real keyboard-operable input), nav/topbar/mobile-tab controls have hover-only states with NO press(:active) and NO :focus-visible ring, the benchmark's animated view-enter transition exists on exactly one of eight surfaces (StaggerReveal on the dashboard only — the other seven navigate dead-still), and the sidebar \"Boost capacity\" meter from the benchmark foot is missing entirely. It looks world-class frozen in a screenshot, but it does not yet feel world-class under a cursor or a keyboard.",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "interaction",
+            "title": "Topbar \"search\" is a dead, non-focusable div — not the benchmark's command input",
+            "surface": "Host shell topbar (all host routes)",
+            "file": "apps/web/components/host/HostShell.tsx",
+            "change": "Line 113: replace the static `<div className=\"hostos-search\">⌕ Search…</div>` with a real `<input>` (or a focusable button that opens a command palette) — it has no tabindex, no hover, no focus ring, no onKeyDown, and clicking/typing does nothing. The benchmark's `.search input` is a 48px keyboard-operable field that fires a command-search modal on Enter. Add hover/focus-visible styling on `.hostos-search` in host-os.css.",
+            "mobile": true
+          },
+          {
+            "severity": "high",
+            "dimension": "interaction",
+            "title": "No press(:active) or :focus-visible on any shell control — keyboard users get no visible focus",
+            "surface": "Sidebar nav + topbar buttons + mobile bottom-nav",
+            "file": "apps/web/styles/host-os.css",
+            "change": "`.hostos-navitem` (216-217) has hover only; `.hostos-tact`, `.hostos-tact--p`, `.hostos-account`, `.hostos-avatar` (228-232) and `.hostos-mtab` (245-246) have NO transition, no `:active`, no `:focus-visible`. There is also no global focus-visible default. Add `:focus-visible { box-shadow: var(--ui-focus-ring) }` and `:active { transform: scale(0.97) }` to every nav/topbar/mobile-tab control (mirror host.css lines 425-429 which already do this for content tiles). The benchmark's `.navbtn`/`.btn`/`.primary` all animate on hover via `transition:.2s` and translateY.",
+            "mobile": true
+          },
+          {
+            "severity": "high",
+            "dimension": "motion",
+            "title": "View-enter transition exists on only 1 of 8 surfaces — 7 host views navigate dead-still",
+            "surface": "listings, applicants, invites, messages, profile, analytics, settings",
+            "file": "apps/web/app/(host)/layout.tsx",
+            "change": "The benchmark gives every view `.view{animation:enter .42s ease both}` (rise+fade). In the real app only HostDashboard wraps content in StaggerReveal (HostDashboard.tsx:110); the other seven page.tsx render with no entrance. Add a `(host)/template.tsx` that wraps `{children}` in a reduced-motion-aware mount fade/rise (transform+opacity), or apply StaggerReveal/a lightweight view-enter to each content surface, so route changes inside the shell read as intentional motion rather than an instant swap.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Sidebar \"Boost capacity\" foot meter from the benchmark is missing",
+            "surface": "Host sidebar (desktop)",
+            "file": "apps/web/components/host/HostShell.tsx",
+            "change": "The benchmark sidebar `.foot` shows a live \"Boost capacity — 8 of 12 premium slots used / 76%\" with a gradient `.meter span` glowing in green→gold — a signature command-center status element. The real shell renders only an empty `<div className=\"hostos-foot\" />` (line 108). Populate it with a tier/boost-capacity Meter (compose the existing `Meter` primitive) so the sidebar foot carries real status, not dead space.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "a11y",
+            "title": "Live-dot is decorative-only and topbar avatar/messages rely on suppressed default focus",
+            "surface": "Host sidebar brand + topbar",
+            "file": "apps/web/styles/host-os.css",
+            "change": "`.hostos-livedot` (208) is a pure pulsing dot with no accessible text pairing the \"Host OS / Live\" status — fine as the label text exists beside it, but verify it stays icon+text. More importantly the topbar `.hostos-account`/`.hostos-tact` are links with aria-labels but no `:focus-visible` ring (see issue above) — keyboard tabbing through the topbar shows nothing on dark glass. Pair the focus-ring fix with a contrast check on `.hostos-navitem s` sub-labels (text-muted at 0.46 alpha on dark) which sit near the 4.5:1 floor.",
+            "mobile": false
+          },
+          {
+            "severity": "low",
+            "dimension": "motion",
+            "title": "Reduced-motion block kills animation but leaves transform transitions live",
+            "surface": "Host shell (all)",
+            "file": "apps/web/styles/host-os.css",
+            "change": "The `@media (prefers-reduced-motion: reduce)` block (251-253) only sets `animation: none !important` — it does NOT neutralize the `transition: transform` on `.hostos-navitem` (translateX hover) or any transitions added per the press/focus fix. Extend the block to also set `transition: none !important` and `scroll-behavior: auto`, matching the benchmark's reduced-motion rule which disables animation, transition, and scroll-behavior together.",
+            "mobile": false
+          }
+        ]
+      },
+      {
+        "scope": "Host OS content views (overview, listings, applicants, profile, analytics, invites, settings, messages) vs explore_earn_host_dashboard_worldclass.html — content-fidelity dimension.",
+        "verdict": "The shell is world-class and the OVERVIEW is genuinely rebuilt to the benchmark (golden-hour hero + floating glass KPI + KPI grid + attention rail + action tiles), so the dark-glass command-center promise lands on the landing surface. But every OTHER content view is the old light surface flipped dark via the host.css/host-os.css token cascade: listings, applicants, profile, invites, settings and analytics all open with a bare HostSectionHeading and NONE carry the benchmark's per-surface command-header metric row (`title()` kicker + `grid four` sparkline metric cards). Analytics is the worst regression — a flat 3-StatCard + HTML `<table>` instead of the benchmark's animated sparkline metrics, \"Applications by day\" bar chart, radial conversion score, and per-role diagnosis cards — and applicants is a read-only board missing its metric strip and \"Recommended seekers\" rail. This is roughly 60% to the benchmark: one hero surface is there, the operational depth on the other seven is not.",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "Analytics is the old light view flipped dark — no sparkline metrics, no bar chart, no radial",
+            "surface": "/host/analytics",
+            "file": "apps/web/components/host/HostAnalyticsDashboard.tsx",
+            "change": "Replace the 3 flat StatCards + HTML <table> with the benchmark analyticsView modules: a `grid four` of animated `metric()` cards (Views/Saves/Applicants/Hires each with a `.spark` sparkline + `.trend` pill), an 'Applications by day' animated `.chart` bar set, a `.radial` conversion-score donut, and per-listing `.listing` diagnosis cards with tag chips — compose on host-panel/host-kpi tokens instead of styles.statCard + styles.table.",
+            "mobile": false
+          },
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "Applicants view has no command metric row and no 'Recommended seekers' rail",
+            "surface": "/host/applicants",
+            "file": "apps/web/app/(host)/host/applicants/page.tsx",
+            "change": "Above HostPipelineBoard, add the benchmark applicantsView header metric row (`grid four`: New / Interviews / Offers / Avg. fit as host-kpi tiles) and add the 'Recommended seekers' three-up rail (avatar + match `.line` meter + Invite action) the benchmark renders below the pipeline. Currently the page is just HostSectionHeading + read-only board.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Listings view drops the benchmark's command metric strip (Active / Drafts / Boosted slots / Applications)",
+            "surface": "/host/listings",
+            "file": "apps/web/app/(host)/host/listings/page.tsx",
+            "change": "Add a host-kpiGrid metric row matching listingsView (Active=2, Drafts, Boosted slots 8/12 w/ Meter, Applications↑) plus the benchmark's 'Boost strategy' Enterprise→Pro→Starter fallback explainer cards (host-panel three-up). The counts already exist in models (countListingsByState) — surface them as KPI tiles, not just filter pills.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Overview swaps the benchmark's 4 animated sparkline metrics + radar + next-best-action for a single meter and a stat list",
+            "surface": "/host",
+            "file": "apps/web/components/host/HostDashboard.tsx",
+            "change": "The benchmark overview leads with a `grid four` of sparkline `metric()` cards (Listing views / Apply rate / Avg match / Time to reply) and a split of a 'Conversion radar' radial + a paper 'Next best action' card. The real Invite-performance panel is a flat host-statList and the pipeline panel is one Meter — add sparkline KPI cards (host-kpi can host a mini spark) and a radial conversion tile so the overview reads as a metric command center, not a label/value list.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "interaction",
+            "title": "Applicant pipeline is fully read-only — no per-card View/Advance actions the benchmark shows",
+            "surface": "/host/applicants",
+            "file": "apps/web/components/host/HostPipelineBoard.tsx",
+            "change": "The benchmark applicant cards carry inline `.small View` + `.small green Advance` buttons under each candidate; here cards only link to detail. Add at least a View action (Advance is founder-gated, so render it disabled-with-tooltip or omit) so the kanban is operable, not a static list. Document why stage-change is gated rather than leaving dead affordance gaps.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Profile surface is a minimal panel, not the benchmark's cinematic profileHero + strength metrics + checklist",
+            "surface": "/host/profile",
+            "file": "apps/web/components/host/HostProfilePanel.tsx",
+            "change": "HostProfilePanel renders an icon avatar + 2 facts. The benchmark profileView leads with a full-bleed `.profileHero` photo + glass `.profileCard` overlay, a `grid three` of metric cards (Profile strength 91% / Host rating / Seeker saves), and a 'Profile checklist' conversion card. Promote to a hero treatment (HostProfileHero already exists in components/host — wire it in) and add the strength/checklist modules.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "interaction",
+            "title": "Topbar search is a non-interactive div, not the benchmark's focusable command input",
+            "surface": "all host routes (shell)",
+            "file": "apps/web/components/host/HostShell.tsx",
+            "change": "`.hostos-search` is a static <div> with placeholder text and no hover/focus/press or keyboard entry; the benchmark search is a real <input> that opens a command-result panel on Enter. Make it a button or input that opens a command palette (or at minimum a focusable control with a focus-visible ring) so the signature topbar search isn't a dead element.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Invites view has no campaign metric row or campaign-builder form — the benchmark's richest module is absent",
+            "surface": "/host/invites",
+            "file": "apps/web/app/(host)/host/invites/page.tsx",
+            "change": "Benchmark invitesView opens with a `grid three` metrics (Sent / Open rate / Invite-to-apply) and a split 'Campaign builder' form (role/audience/timeline/volume/message) beside campaign-status cards. The real page is HostSectionHeading + InvitesList only. Add the metric row and a campaign-builder panel (compose host-panel + field tokens).",
+            "mobile": false
+          },
+          {
+            "severity": "low",
+            "dimension": "a11y",
+            "title": "Floating hero KPI is aria-hidden, so its live/applicant/reviewed numbers are invisible to screen readers",
+            "surface": "/host",
+            "file": "apps/web/components/host/HostDashboard.tsx",
+            "change": "The `.hostos-herokpi` block (live listings / applicants / reviewed) is marked aria-hidden — those headline numbers are decorative-only to AT. Either expose them with proper labels or ensure the same figures are reachable in the KPI grid (they partially are), and drop aria-hidden from the meaningful metric, keeping it only on purely decorative chrome.",
+            "mobile": true
+          }
+        ]
+      },
+      {
+        "scope": "Host OS (golden command) — resize / flows / a11y dimension across the shell (host-os.css + HostShell.tsx + (host)/layout.tsx) and all content surfaces (overview, listings, listings/[id], applicants, invites, messages, profile, analytics, settings), judged against docs/design/reference/_benchmarks/explore_earn_host_dashboard_worldclass.html.",
+        "verdict": "The shell is genuinely world-class — sidebar→bottom-nav+drawer collapse, golden-hour glass, sticky topbar that holds one row at 380px, and the Overview surface faithfully rebuilds the benchmark hero + floatKpi + KPI + attention modules. But several content views are still old LIGHT surfaces flipped dark by the token cascade, and the seams show: the Settings/billing primary CTA, plan badge, and active billing toggle render near-white text on a near-white pill (invisible) because they bake `background:var(--text-primary)` + `color:var(--color-surface-raised)`. The topbar's signature \"command-center search\" is a dead, non-focusable `<div>` — the benchmark's real input+command-search is gone — and the hero CTA / action-tile icons / panel actions still pull un-overridden light-blue `--palette-sky-*` tokens instead of amber/teal, so the brand drifts. Close the contrast and token-drift gaps and this is an A.",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "a11y",
+            "title": "Settings primary CTA + plan badge + active toggle are near-white text on near-white pills (invisible on dark glass)",
+            "surface": "/host/settings",
+            "file": "apps/web/components/host/HostSettings.module.css",
+            "change": ".planCta / .planBadge / .intervalActive / .gateBlockBtn all set `background: var(--text-primary)` (#FBF6EC bone) with `color: var(--color-surface-raised)` (rgba(255,255,255,.075)) — invisible on host-os. Repoint to the amber primary: `background: var(--color-cta)` + `color: var(--color-cta-text)` (the same pair the hero/section CTAs use), so the upgrade/billing action is legible and on-brand.",
+            "mobile": true
+          },
+          {
+            "severity": "high",
+            "dimension": "a11y",
+            "title": "Topbar 'command search' is a non-interactive <div> — not focusable, not keyboard-operable, no action",
+            "surface": "shell (all host surfaces)",
+            "file": "apps/web/components/host/HostShell.tsx",
+            "change": "`<div className=\"hostos-search\">⌕ Search…</div>` (line 113) is dead chrome — benchmark has a real <input> that opens a command-search modal. At minimum make it a real control: a focusable <button>/<input> with an accessible label that links to or opens search; today it fails keyboard operability and is a dead primary affordance occupying the full topbar at 380px.",
+            "mobile": true
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Hero CTA, action-tile icons, and panel actions pull un-overridden light-blue --palette-sky-* tokens (brand drifts off golden-amber)",
+            "surface": "/host (overview) + every panel",
+            "file": "apps/web/styles/host-os.css",
+            "change": "host-os.css overrides --color-cta/match/boosted but NOT --palette-sky/-light/-dark, so host.css `.host-hero__cta { color: var(--palette-sky-dark) }` (dark blue text on the amber hero), `.host-hero__cta:focus-visible` ring (blue), `.host-action-tile__icon { background: --palette-sky-light }` (pale blue), and `.host-panel__action { background: --palette-sky-light }` render blue. Add `--palette-sky/-light/-dark` overrides to .host-os mapped to teal/amber (e.g. sky-dark → --hostos-on-amber for CTA text, sky-light → translucent teal for icon chips).",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Messages list view is a flat single-column thread list, not the benchmark's cinematic split inbox",
+            "surface": "/host/messages",
+            "file": "apps/web/components/host/HostThreadGroups.module.css",
+            "change": "Benchmark `messagesView` is a 2-col `.inbox` (360px thread rail + live thread with bubbles + composer) at 1024px. HostThreadGroups is a stacked list that always routes to /messages/[id]. At 1024px this reads as a stretched mobile column. Add a desktop split: thread rail + selected-thread pane so the inbox reflows denser instead of one tall list (list→detail is fine on mobile).",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "flow",
+            "title": "Signed-out / zero-data empty states on applicants & messages are dead ends (no CTA)",
+            "surface": "/host/applicants, /host/messages",
+            "file": "apps/web/app/(host)/host/applicants/page.tsx",
+            "change": "The EmptyState calls here pass only title+message (e.g. 'No applicants yet', 'No messages yet') with no actionLabel/actionHref — EmptyState already supports a forward CTA (used well on the pipeline board's own empty). Add `actionLabel=\"Invite seekers\" actionHref=\"/host/invites\"` (applicants) and a New-listing CTA where relevant so an empty pipeline points to the next action instead of stopping.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Settings highlighted plan card tints with un-overridden --palette-sky (blue wash on dark glass)",
+            "surface": "/host/settings",
+            "file": "apps/web/components/host/HostSettings.module.css",
+            "change": ".planHighlighted border + gradient use `color-mix(... --palette-sky ...)` (line 180/183) — a cool blue on the golden theme. Retint to the host accent (amber/teal) via --color-cta or --status-match-fg so the 'most popular' plan reads as part of the golden-hour command center, not a leftover blue SaaS card.",
+            "mobile": false
+          },
+          {
+            "severity": "low",
+            "dimension": "resizing",
+            "title": "Analytics stat cards stay 3-across down to 640px before collapsing — no 2-col step",
+            "surface": "/host/analytics",
+            "file": "apps/web/components/host/HostAnalyticsDashboard.module.css",
+            "change": ".statCards is `repeat(3, minmax(0,1fr))` collapsing straight to 1 col at ≤639px. It's safe at 380px (1-col) but cramped 480–640px. Use `repeat(auto-fit, minmax(150px, 1fr))` (matching the KPI grid pattern) for a graceful 3→2→1 reflow instead of a hard jump.",
+            "mobile": true
+          },
+          {
+            "severity": "low",
+            "dimension": "interaction",
+            "title": "Sidebar host-card and topbar avatar lack a visible focus-visible ring / press state",
+            "surface": "shell (desktop sidebar + topbar)",
+            "file": "apps/web/styles/host-os.css",
+            "change": ".hostos-navitem has hover but no :focus-visible ring or :active press; .hostos-account/.hostos-avatar has only `filter:brightness` on hover. Add `:focus-visible { box-shadow: var(--ui-focus-ring) }` and a `:active { transform: scale(.97) }` to .hostos-navitem, .hostos-mtab, and .hostos-account so keyboard users see focus and taps feel physical (the host.css content controls already do this; the shell chrome was missed).",
+            "mobile": true
+          }
+        ]
+      },
+      {
+        "scope": "Seeker OS shell + chrome (seeker-os.css, SeekerShell.tsx, (seeker)/layout.tsx) and its motion/interaction layer, compared to docs/design/reference/_benchmarks/explore_earn_seeker_dashboard_worldclass.html. Focus: sidebar / topbar / mobile bottom-nav, hover/press/focus, view-enter transitions, live-dot/meter, reduced-motion.",
+        "verdict": "The static shell chrome is a near-pixel port of the benchmark — same glass sidebar, live-dot pulse, emerald nav-active, mobile bottom-nav — and that part is genuinely world-class. But it is undermined by three structural failures the benchmark does NOT have: the /seek home renders the OLD light-surface SeekerDashboard with its OWN 260px SeekerSidebar nested INSIDE the new 286px glass sidebar (two sidebars on desktop), the topbar \"search\" is a dead non-interactive div with no input/focus, and the benchmark's signature view-enter animation is dead CSS no page ever applies. Interaction polish is half-built: every chrome control has hover but zero :active/press and no glass-matched focus-visible ring — so the OS feels static and untouchable next to the benchmark's responsive, animated surface.",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "Two sidebars: old light SeekerDashboard chrome nested inside the new glass shell on /seek",
+            "surface": "/seek (home)",
+            "file": "apps/web/components/seeker/SeekerDashboard.tsx",
+            "change": "SeekerDashboard renders <SeekerSidebar> (260px light-surface, display:flex @768px) and a grid-template-columns:260px 1fr wrapper INSIDE the shell content column that already owns the benchmark glass sidebar (seekeros-side, 286px). Curl of /seek confirms BOTH .seekeros-side and .SeekerSidebar_sidebar render. Remove SeekerSidebar + the .dashboard grid from SeekerDashboard.tsx/SeekerDashboard.module.css so the home is a single content column under the one shell sidebar — the benchmark home is a hero-board + grid, never a nested sidebar.",
+            "mobile": false
+          },
+          {
+            "severity": "critical",
+            "dimension": "interaction",
+            "title": "Topbar global search is a dead non-interactive div (no input, no focus, no role)",
+            "surface": "topbar (all seeker surfaces)",
+            "file": "apps/web/components/seeker/SeekerShell.tsx",
+            "change": "Line 152 renders <div className=\"seekeros-search\">⌕ Search opportunities…</div> — a static label, not a control. Benchmark uses a real <input> with placeholder + ::before glyph + visible focus. Replace with a Link/button to /seek (or a real input) that is keyboard-focusable, and add .seekeros-search:focus-visible/:hover states in seeker-os.css with a box-shadow ring on --seekeros-emerald.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "motion",
+            "title": "Benchmark view-enter animation is dead CSS — zero route transitions",
+            "surface": "all seeker content views",
+            "file": "apps/web/styles/seeker-os.css",
+            "change": "Line 530 references .view in the reduced-motion block but NO real page/component ever uses class 'view' (grep returns nothing); the benchmark's `.view{animation:enter .46s ease both}` (opacity+translateY(18px)+scale) is never wired. Add a `@keyframes seekeros-enter` and apply it to .seekeros-contentwrap > * or wrap children, so every route reflows in with the benchmark's physical enter; keep the existing reduced-motion guard.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "interaction",
+            "title": "No press (:active) or glass-matched focus-visible on any chrome control",
+            "surface": "sidebar nav, topbar actions, mobile bottom-nav",
+            "file": "apps/web/styles/seeker-os.css",
+            "change": "seekeros-navitem, seekeros-tact, seekeros-account and seekeros-mtab define :hover only (lines 331, 419) — no :active press feedback and no custom :focus-visible (they fall back to the generic 2px outline, which reads poorly on dark glass). Add :active { transform: scale(.97)/translateY(0) } and :focus-visible { box-shadow: 0 0 0 2px var(--seekeros-emerald) } to each so the OS feels physically clickable like the benchmark's transition:.2s controls.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "interaction",
+            "title": "Mobile bottom-nav tabs have no active-press and rely on generic focus ring",
+            "surface": "mobile bottom-nav (≤1023px)",
+            "file": "apps/web/styles/seeker-os.css",
+            "change": ".seekeros-mtab (line 493) has min-height:44px (good) and aria-current styling, but no :active and no :focus-visible — on touch there is no press feedback. Add .seekeros-mtab:active { transform: scale(.94) } and a focus-visible ring; this is the primary nav on mobile (the founder-locked Swipe·Map·Seek·Profile set) so press feedback matters most here.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Sidebar readiness meter is a flat fill — missing the benchmark's animated/illuminated treatment integration",
+            "surface": "sidebar profile-score meter",
+            "file": "apps/web/components/seeker/SeekerShell.tsx",
+            "change": "The shell meter (seekeros-meter, line 137) renders a static width with no transition, so optimistic profileScore changes snap. Benchmark meter uses the emerald→gold grad with a glow; add `transition: width var(--motion-base) var(--ease-standard)` to .seekeros-meter > span so readiness changes animate, matching the lit-meter feel.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Shell sidebar omits the benchmark's tiny 'Seeker' live label + richer identity context",
+            "surface": "sidebar seeker identity card",
+            "file": "apps/web/components/seeker/SeekerShell.tsx",
+            "change": "Benchmark .seeker-card carries a `.tiny-label` ('● Seeker') pill AND a category/readiness sub-line ('Farm • Seasonal • Ready now'); the shell card (lines 119-130) only shows name + 'Ready to explore' and never surfaces the seeker's real categories/timeline that the layout already resolves. Add the tiny-label pill and wire the readiness/category sub-line so the identity card matches the benchmark's information density.",
+            "mobile": false
+          },
+          {
+            "severity": "low",
+            "dimension": "a11y",
+            "title": "live-dot is decorative but the topbar 'Find work' label is hidden on mobile leaving an icon-only CTA",
+            "surface": "topbar primary action (mobile)",
+            "file": "apps/web/styles/seeker-os.css",
+            "change": ".seekeros-tlabel is display:none ≤1023px (line 474), so the primary CTA becomes icon-only; it has aria-label=\"Find work\" (good) but verify the forward-arrow icon reads as 'find work' to sighted users — consider keeping a short label or a distinct glyph. Low risk since aria-label exists, but the icon alone is ambiguous on the most-used breakpoint.",
+            "mobile": true
+          }
+        ]
+      },
+      {
+        "scope": "Seeker OS (emerald) content-fidelity audit — the CONTENT VIEWS inside the (seeker) shell (seek/home, saved, applied, journey, map, settings, travel + discovery components) vs docs/design/reference/_benchmarks/explore_earn_seeker_dashboard_worldclass.html. Shell (sidebar/topbar/mobile-nav in SeekerShell.tsx + seeker-os.css) is solid and on-benchmark; the assessment is the content inside it.",
+        "verdict": "The shell is a faithful, premium dark-glass emerald command center — but the content inside it is largely the OLD light marketplace flipped dark by token cascade, and the cascade is incomplete, so the views read as a half-converted product, not the benchmark. The flagship /seek \"home\" doesn't render the benchmark's cinematic hero-board (sheen + Ready-Now readiness pills + matched/saved/applied/offer/accepted journey-line + 4-up spark metric grid); it renders the legacy SeekerDashboard that embeds a SECOND 260px sidebar inside the shell's 286px glass sidebar, plus light sky-blue pipeline connectors, #EAEFEF steel teaser icons, and an amber resume band — because seeker-os.css overrides ZERO of --gradient-progress / --state-soon-fg / --palette-amber-light / --color-steel. The bucket surfaces (saved/applied/journey/settings/travel) are a bare SeekerPage header over token-cascaded cards with none of the benchmark's metric-card grids, pipeline columns, or paper \"decision-score\" panels, and the map is fully light (#fff8ea parchment) instead of the dark emerald-pin map. The HOUSING/MEALS/PAY triad is correctly preserved (no \"Perks\").",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "/seek home is the legacy light dashboard, not the benchmark hero-board — and it double-stacks a sidebar",
+            "surface": "Seeker home (/seek)",
+            "file": "apps/web/components/seeker/SeekerDashboard.tsx",
+            "change": "SeekerDashboard renders its own <SeekerSidebar> (260px grid col, line 244 + .dashboard grid-template-columns:260px 1fr) INSIDE the shell that already owns the 286px glass sidebar — two sidebars. Drop the embedded SeekerSidebar + the 2-col grid entirely (the shell owns nav), and rebuild the home body as the benchmark's `.hero-board` module: full-bleed photo + 90deg dark scrim + animated `sheen`, gradient H1, then the `.floating-status` card containing the 4-up `.readiness` Ready-Now/1mo/3mo/6mo pills and the 5-node `.journey-line` (Matched/Saved/Applied/Offer/Accepted). This is the single most-missing benchmark module.",
+            "mobile": false
+          },
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "Token cascade leaks light/amber primitives onto dark glass (incomplete de-drift)",
+            "surface": "Home pipeline, stats, resume callout (all seeker views)",
+            "file": "apps/web/styles/seeker-os.css",
+            "change": "seeker-os.css overrides 0 of --gradient-progress (light sky-blue, drives JourneyPipeline.connectorFilled + dots), --state-soon-fg/--gradient-state-soon (amber urgent dot), --state-ready-fg, --palette-amber-light (resume callout band), and --color-steel #EAEFEF (teaserIcon bg). On the #07120f forest bg these render as washed light-blue connectors, a pale-amber resume strip and a near-white steel icon chip — instantly reading 'light UI flipped dark'. Add emerald-family overrides for each: --gradient-progress → emerald→gold grad, --color-steel → rgba(255,255,255,.07), --palette-amber-light → a dark amber-glass, --state-soon-fg → #ffe09a.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "No metric-card / spark grid on any seeker surface",
+            "surface": "Home, Saved, Invites (benchmark has 4-up metric grids on each)",
+            "file": "apps/web/components/seeker/SeekerDashboard.tsx",
+            "change": "Benchmark home/saved/invites each open with a `.grid.four` of `.metric-card` (big number + trend pill + animated `.spark` bars with barIn). The app only has a flat horizontal `.statsBar` of tiny chips (SeekerDashboard.module.css .statChip) and the bucket pages have nothing. Build a SeekerMetricGrid primitive (metric value + trend + spark) and place a 4-up on home (Resume/Saved/Applications/Offers) and on saved (Saved roles/Housing/Avg match/Urgent) to match the benchmark's data richness.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Map view is fully light parchment, not the dark emerald-pin map",
+            "surface": "Map (/map)",
+            "file": "apps/web/components/map/MapView.module.css",
+            "change": "MapView hardcodes #fff8ea / #f6ead1 parchment panel + legend backgrounds (lines 38,103) which stay cream-on-dark inside the emerald shell. Benchmark map is `.map` dark glass (radial emerald/aqua glows + grid) with `.pin` emerald-gold teardrops (pinPulse) and a `.map-card` dark-glass overlay. Tokenize the map chrome (panel/legend/popup) to seeker glass surfaces and restyle pins to the emerald-gold grad so the map joins the OS instead of fighting it.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Bucket surfaces are bare header + light cards — missing benchmark's split layouts",
+            "surface": "Saved, Applied, Journey, Settings, Travel, Offers, Accepted",
+            "file": "apps/web/components/seeker/SeekerPage.module.css",
+            "change": "BucketPage/SeekerPage give every sub-page only a title+description header then a single-column token-cascaded card body — none of the benchmark's `.grid.main-split`/`.grid.left-split` layouts: applied's 5-column `.pipeline` stage board, offers' side-by-side offer card + paper `.decision-score` panel, accepted's map + checklist split, travel's map + travel-wallet split. Rebuild applied around a dark pipeline-column board and offers/accepted/travel around the main-split + dark-glass 'paper' decision/checklist panel so the lane has the benchmark's two-pane density at 1024px instead of a stretched mobile column.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "motion",
+            "title": "Loading states are bare surface blocks + a spinner, not shimmer skeletons",
+            "surface": "Saved / Map / Applied / shell loading",
+            "file": "apps/web/app/(seeker)/saved/loading.module.css",
+            "change": "Loading skeletons are flat `var(--color-surface)` blocks (saved/loading) and map/loading uses a `spin` spinner — no shimmer. Benchmark content animates in (`.spark` barIn, `.view` enter). Add a tokenized shimmer keyframe (translateX gradient sweep, reduced-motion fallback to static) to the skeleton blocks and a view-enter transition on bucket bodies so surfaces feel alive rather than dead-still then snap.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Resume / Profile / Settings panels lack the benchmark's dark 'paper' strength panel",
+            "surface": "Profile, Resume, Settings",
+            "file": "apps/web/components/seeker/SettingsPanel.module.css",
+            "change": "Benchmark profile/resume/settings pair an editor card with a side `.card.paper` 'Profile strength / Resume score' panel (meter + checklist of recommendations with ✓/+). The app's panels are single light `var(--color-surface-raised)` lists with no strength/score companion and no main-split. Add the dark-glass score panel (readiness meter + recommendation rows) beside the editors to hit the benchmark's 'matching-engine, not a form' intent.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "a11y",
+            "title": "Topbar search is a non-interactive div; primary action is dim emerald-on-emerald text contrast risk",
+            "surface": "Shell topbar (all seeker views)",
+            "file": "apps/web/components/seeker/SeekerShell.tsx",
+            "change": "The topbar 'search' (SeekerShell line 152) is a static <div> with placeholder text — a dead control where the benchmark has a real focusable input; either make it a button that routes to /seek search or a real input. Separately, .seekeros-search text uses --text-muted (rgba(246,255,248,.46)) which is borderline <4.5:1 on the glass — bump muted placeholder/label contrast on dark glass.",
+            "mobile": false
+          }
+        ]
+      },
+      {
+        "scope": "Seeker OS (emerald) resize/flow/a11y audit — shell (seeker-os.css + SeekerShell.tsx + (seeker)/layout.tsx) and all content surfaces (seek, swipe, map, saved, applied, invites, messages, journey, community, profile, settings) vs explore_earn_seeker_dashboard_worldclass.html. Assessed from code; one curl of /seek confirmed render.",
+        "verdict": "The shell chrome (glass sidebar -> floating bottom-nav, topbar, mobile collapse) is a faithful 1:1 port of the benchmark and the swipe/empty/loading states are genuinely strong (real Button primitives, keyboard hints, shimmer skeletons, mint focus rings that pass on dark glass). But the flagship /seek surface is broken: the bespoke SeekerDashboard ships its OWN 260px sidebar that renders SIMULTANEOUSLY with the shell's 286px sidebar at >=1024px (confirmed: two SeekerSidebar instances + seekeros-side in one DOM), producing ~546px of duplicate nav, two identity cards and two readiness meters — nothing like the benchmark's single-sidebar hero-board. Compounding it, the topbar's primary \"Search opportunities\" control is a dead non-interactive <div> (not an input, not focusable, not typeable), the dashboard's teaser icons render a near-white #EAEFEF block on dark glass because seeker-os.css never overrides --color-steel, and muted text drops to 4.07:1 on the brighter glass tiles. This OS is close on the frame and far on the content.",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "resizing",
+            "title": "Two stacked sidebars on /seek at >=1024px (shell sidebar + dashboard's own sidebar both render)",
+            "surface": "/seek",
+            "file": "apps/web/components/seeker/SeekerDashboard.tsx + apps/web/components/seeker/SeekerSidebar.module.css + apps/web/styles/seeker-os.css",
+            "change": "SeekerShell renders .seekeros-side (286px, shown at min-width:1024px) and SeekerDashboard ALSO renders <SeekerSidebar> (260px, shown at min-width:768px). Curl of /seek confirms 2x SeekerSidebar_sidebar + 1x seekeros-side in one DOM => ~546px of duplicate nav, two seeker identity cards, two readiness meters at desktop. Benchmark has ONE sidebar. Fix: drop <SeekerSidebar> and the .dashboard 768px grid-template-columns:260px 1fr entirely from SeekerDashboard; the shell already owns the sidebar. Render the dashboard main column full-width inside seekeros-contentwrap.",
+            "mobile": false
+          },
+          {
+            "severity": "critical",
+            "dimension": "a11y",
+            "title": "Topbar 'Search opportunities, places, hosts' is a dead non-interactive div, not an input",
+            "surface": "all seeker surfaces (shell topbar)",
+            "file": "apps/web/components/seeker/SeekerShell.tsx (line 152) + apps/web/styles/seeker-os.css (.seekeros-search)",
+            "change": "The primary search affordance is <div className=\"seekeros-search\">⌕ Search…</div> — confirmed via curl. It cannot be focused, typed into, or reached by keyboard; placeholder text uses --text-muted (~4.5:1). Benchmark uses a real <input> with placeholder. Replace with a <form action=\"/seek\"><input name=\"q\" type=\"search\" aria-label=\"Search opportunities\" placeholder=\"…\"></form> (or a <Link>/<button> that opens search), so the most prominent control on every screen is actually operable.",
+            "mobile": true
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "/seek content is the OLD light SeekBrowser grid flipped dark, not the benchmark hero-board command center",
+            "surface": "/seek",
+            "file": "apps/web/app/(seeker)/seek/page.tsx (lines 268-285) + apps/web/components/seeker/SeekBrowser.module.css",
+            "change": "Below the bespoke dashboard, /seek stacks a full SeekBrowser whose .wrap is background:var(--color-paper); min-height:100vh — the pre-existing light discovery feed surviving only via the .seeker-os token cascade. It re-creates a second 100vh scroll region with its own heading and gutter, duplicating discovery. Benchmark module missing: the single hero-board (sheen + floating-status with readiness pills + journey-line) as the ONE dominant element, with matched cards as a rail beneath — not dashboard-then-separate-feed. Fold matched listings into the hero-board column; do not render a full-height paper feed under it.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "a11y",
+            "title": "Dashboard teaser/lifecycle icons render a near-white #EAEFEF tile on dark glass (--color-steel not scoped)",
+            "surface": "/seek (lifecycle teasers), any surface using --color-steel",
+            "file": "apps/web/styles/seeker-os.css (missing override) + apps/web/components/seeker/SeekerDashboard.module.css (.teaserIcon background:var(--color-steel,#EAEFEF))",
+            "change": "host-os.css sets --color-steel: rgba(255,255,255,0.06) so its chips read as dark glass; seeker-os.css omits it, so --color-steel falls back to --palette-steel #EAEFEF — a light steel block on the #07120f surface (jarring, and the --text-secondary glyph on it inverts contrast). Add --color-steel: rgba(255,255,255,0.06); to the .seeker-os block (mirroring host-os.css line 25).",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "a11y",
+            "title": "Muted text (--text-muted 0.46) fails 4.5:1 on the brighter glass tiles",
+            "surface": "shell nav sub-labels, search placeholder, ready-pill/badge captions",
+            "file": "apps/web/styles/seeker-os.css (--text-muted: rgba(246,255,248,0.46))",
+            "change": "Muted bone at 0.46 computes ~4.07:1 on --seekeros-glass-2 (0.11 white) and ~4.57:1 on base glass — at/below AA for normal text. The nav 's' sub-labels (.seekeros-navitem s) and search placeholder ride this token. Raise --text-muted to ~rgba(246,255,248,0.58) (benchmark uses .58-.67 for equivalent muted text) so every muted string clears 4.5:1 on the lighter tiles.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "flow",
+            "title": "Mobile bottom-nav (4 locked tabs) leaves 7 surfaces unreachable on mobile with no More/overflow",
+            "surface": "mobile, all surfaces — saved, applied, invites, messages, journey, community, settings",
+            "file": "apps/web/components/seeker/SeekerShell.tsx (MOBILE_PRIMARY) + apps/web/styles/seeker-os.css (.seekeros-mnav)",
+            "change": "Bottom nav is Swipe/Map/Seek/Profile only (founder-locked, fine). But unlike the benchmark's drawer (More -> full nav grid), there is no overflow affordance, and the topbar search is dead and the only other entries are the icon-only notifications/find-work buttons. On a 380px viewport a seeker cannot reach Saved, Applied, Invites, Messages, Journey, Community, or Settings except via in-content deep links. Add a 5th 'More' tab (or a header menu) that opens a drawer listing the Pipeline + You groups, matching the benchmark drawer.",
+            "mobile": true
+          },
+          {
+            "severity": "low",
+            "dimension": "motion",
+            "title": "No view-enter transition in the real shell (benchmark animates each route in)",
+            "surface": "all surfaces (route changes)",
+            "file": "apps/web/styles/seeker-os.css (reduced-motion references .view but no .view element/@keyframes enter exists)",
+            "change": "seeker-os.css line 530 disables a .view transition under reduced-motion, but there is no .view class or @keyframes enter in the real app — routes pop in with no motion, unlike the benchmark's enter keyframe (opacity + translateY(18px)). Wrap seekeros-contentwrap children in a transform/opacity enter animation (respecting prefers-reduced-motion) so navigation reads as physical, fast, and interruptible.",
+            "mobile": true
+          }
+        ]
+      },
+      {
+        "scope": "Admin OS (emerald moderation) — SHELL + chrome (sidebar/topbar/mobile bottom-nav) + MOTION + INTERACTIONS. Files: apps/web/styles/admin-os.css, components/admin/AdminShell.tsx, app/(admin)/layout.tsx, plus content surfaces (page.tsx, applications/, listings/, hosts/, admin/email-preview/) and admin/* components (StatCard, AdminListingsTable, AdminTable.module.css, loading.tsx). Benchmarked against docs/design/reference/_benchmarks/explore_earn_admin_dashboard_worldclass.html.",
+        "verdict": "The shell chrome is a faithful, pixel-close port of the benchmark sidebar/topbar/mobile-nav — glass, emerald aurora, live-dot pulse and meter all match — but it is a beautiful frame around a hollow, dead-still interior. The single biggest failure is motion: the benchmark's signature `.view { animation: enter .46s }` view-enter transition is referenced in the reduced-motion block yet never actually defined or applied to any content surface, so every route loads with zero entrance motion, and the hero-board sheen / spark metric cards / floating-ops modules are entirely absent (the Overview is a flat StatCard grid). Interactions are half-built: the topbar \"search\" is a non-functional `<div>` (not the benchmark `<input>`), and not a single shell control (.adminos-navitem, .adminos-tact, .adminos-mtab, .adminos-account) has a press(:active) or a tuned :focus-visible ring — they fall back to a generic global 2px outline that is wrong on dark glass.",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "motion",
+            "title": "View-enter transition is declared dead but never built — every route loads dead-still",
+            "surface": "All admin content routes (Overview / Applications / Listings / Hosts / Email)",
+            "file": "apps/web/styles/admin-os.css",
+            "change": "admin-os.css references `.view` only in the reduced-motion block (line 540: `.view, .adminos-navitem { transition: none; }`) but the benchmark's `@keyframes enter { from { opacity:0; transform: translateY(18px) scale(.992) } }` and `.view { animation: enter .46s ease both }` (benchmark lines 458-468) are NEVER defined, and no content surface wraps children in `.view`. Add the `.view` class + `enter` keyframe to admin-os.css and wrap `{children}` in AdminShell's `.adminos-contentwrap` (or each page.tsx section) so route changes animate in. This is the benchmark's headline motion primitive and it is missing.",
+            "mobile": false
+          },
+          {
+            "severity": "critical",
+            "dimension": "interaction",
+            "title": "Topbar global search is a non-interactive <div>, not an input — dead primary affordance",
+            "surface": "Topbar (every admin route)",
+            "file": "apps/web/components/admin/AdminShell.tsx",
+            "change": "Line 136 renders `<div className=\"adminos-search\">⌕ Search listings, hosts, applications…</div>` — un-focusable, un-typeable, no keyboard access. The benchmark ships a real `<input placeholder=...>` with `:focus` and a ⌘ hint (benchmark lines 375-397). Replace with an `<input type=\"search\" aria-label=\"Search listings, hosts, applications\">` (or a Link to a search route if search isn't built yet), and give `.adminos-search input` a `:focus-visible` ring. As-is it reads as a world-class chrome with a fake search bar.",
+            "mobile": true
+          },
+          {
+            "severity": "high",
+            "dimension": "interaction",
+            "title": "No press(:active) and no tuned :focus-visible on ANY shell control",
+            "surface": "Sidebar nav, topbar actions, mobile bottom-nav, account button",
+            "file": "apps/web/styles/admin-os.css",
+            "change": "admin-os.css has `grep :active` = 0 and zero `:focus-visible` rules — `.adminos-navitem`, `.adminos-tact`, `.adminos-mtab`, `.adminos-account` only define `:hover`. They inherit the generic global `:where(...):focus-visible { outline: 2px solid var(--color-cta) }` (primitives.css:734), a hard emerald box that clips on the dark glass and pill radii. Add per-control `:focus-visible` (inset emerald ring matched to each radius) and `:active { transform: translateY(0) scale(.98) }` press feedback. Most-skipped states (press + focus) are entirely absent on the command center's primary navigation.",
+            "mobile": true
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Overview content is a flat StatCard grid, not the benchmark hero-board + spark metric cards + floating-ops",
+            "surface": "Overview (/)",
+            "file": "apps/web/app/(admin)/page.tsx",
+            "change": "page.tsx renders 10 plain `StatCard` label+value tiles via shared.module.css (old light surface flipped dark via token cascade). The benchmark Overview leads with a `.hero-board` (sheen animation + gradient headline + `.floating-ops` 4-up node grid) and `.metric-card`s with `.trend` pills and animated `.spark` bars (benchmark lines 470-767). Rebuild the Overview against the benchmark: a hero-board command header, then metric cards with trend + spark, so the richest admin surface stops looking like a generic SaaS KPI grid.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "motion",
+            "title": "Live-dot pulse and meter present, but the meter fill never animates in (benchmark sparks/bars animate)",
+            "surface": "Sidebar marketplace-health meter + spark/bar charts",
+            "file": "apps/web/styles/admin-os.css",
+            "change": "`.adminos-meter > span` (line 250) sets width inline with no transition, so the health bar snaps to 100% with no grow-in. Benchmark animates bars via `@keyframes barIn { from { transform: scaleY(.15) } }` (lines 764-767) on sparks/charts. Add a `transition: width .6s var(--ease-standard)` or a grow keyframe to the meter fill (guarded by reduced-motion) so the health meter reads as a live gauge, not a static block.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "fidelity",
+            "title": "Sidebar identity card lost its benchmark richness (photo + tiny-label + Platform Control headline)",
+            "surface": "Sidebar identity/ops card",
+            "file": "apps/web/components/admin/AdminShell.tsx",
+            "change": "The benchmark `.ops-card` is a 158px photo-backed glass card with a `.tiny-label` Moderator chip and a 'Platform Control / Trust, safety, inventory, and operations' headline (benchmark lines 1367-1373). The real `.adminos-card` (AdminShell lines 106-114, CSS 168-221) drops the photo for a flat gradient and shows only an avatar + name. Restore the photo-mat treatment + tiny-label so the sidebar matches the benchmark's editorial weight.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "interaction",
+            "title": "Mobile bottom-nav has no press/focus state and is missing the benchmark's 5th 'More' tab + drawer",
+            "surface": "Mobile bottom-nav (≤1023px)",
+            "file": "apps/web/styles/admin-os.css",
+            "change": "`.adminos-mtab` (lines 503-521) defines only `[aria-current=page]` and base — no `:active`, no `:focus-visible`. Tap targets are 44px (ok) but there is no pressed feedback on a touch surface where it matters most. The benchmark also ships a 5-up bar with a 'More' tab opening a `.drawer` of secondary routes (benchmark lines 1133-1205, 1535-1546); the real shell only exposes 4 tabs and silently omits Tools/Email-templates on mobile. Add `:active` scale feedback and either a More-drawer or surface the Tools group on mobile.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "flow",
+            "title": "Empty / no-data states are bare text, not designed states",
+            "surface": "Listings / Applications / Hosts tables",
+            "file": "apps/web/components/admin/AdminTable.module.css",
+            "change": "AdminListingsTable renders `No listings in this view.` in a plain `.empty` cell (AdminListingsTable.tsx:107, AdminTable.module.css:81); applications/hosts are the same. The benchmark's moderation queue is a rich `.queue-layout` with avatars, status pills, and risk tags. Replace bare strings with a designed empty state (icon + emerald headline + 'queue is clear' affirmation) so a clean queue reads as success, not an error/void.",
+            "mobile": true
+          },
+          {
+            "severity": "low",
+            "dimension": "a11y",
+            "title": "Topbar 'Review queue' badge count is decorative-only — count not announced",
+            "surface": "Topbar primary action + Applications nav badge",
+            "file": "apps/web/components/admin/AdminShell.tsx",
+            "change": "The queue count renders as a bare `<span className=\"adminos-bdg--top\">{queueCount}</span>` (line 140) and nav `<span className=\"adminos-bdg\">{b}</span>` (line 90) with no accessible text, so a screen reader on the 'Review queue' link hears only the label, not 'N pending'. Add an `aria-label` like `Review queue, ${queueCount} pending` on the Link (and visually-hidden text on the nav badge). Icon+number pills need text equivalents.",
+            "mobile": true
+          },
+          {
+            "severity": "low",
+            "dimension": "motion",
+            "title": "Nav hover uses transform: translateX but reduced-motion only kills transition, not the live-dot glow ring",
+            "surface": "Sidebar nav + live-dot",
+            "file": "apps/web/styles/admin-os.css",
+            "change": "The reduced-motion block (lines 538-541) correctly stops `.adminos-livedot` animation and nav transitions — good — but the `.adminos-tact:hover { transform: translateY(-2px) }` and `.adminos-navitem:hover { transform: translateX(2px) }` still fire under reduced-motion because only `transition` is nulled, not the hover transform target. Acceptable (hover transforms are user-initiated), but add the not-yet-built `:focus-visible`/`:active` rules into this same reduced-motion guard when you add them so press scale is disabled too.",
+            "mobile": false
+          }
+        ]
+      },
+      {
+        "scope": "Admin OS (emerald moderation) — content-fidelity dimension. Compared real (admin) content views [page.tsx + shared.module.css + StatCard + AdminTable + AdminListingsTable/AdminApplicationsTable/AdminHostsTable + listings/[id] + admin/email-preview] against docs/design/reference/_benchmarks/explore_earn_admin_dashboard_worldclass.html (role=admin). Shell (AdminShell.tsx + admin-os.css + layout.tsx) reviewed for context. Dev server was down (curl HTTP 000) so assessed from code.",
+        "verdict": "The shell is genuinely world-class — adminos-side/top/mnav faithfully rebuild the benchmark's glass sidebar, emerald-aurora chrome, and mobile bottom-nav — but the moderator never gets a command center inside it. Every content view (Overview, Applications, Listings, Hosts, listing detail, email-preview) is the OLD light SaaS surface flipped dark by token cascade: a flat StatCard grid and a generic HTML table where the benchmark has a cinematic hero-board, sparkline metric cards with trend pills, a 360px+1fr queue/review-panel workbench with evidence boxes, and entity cards. Zero of the benchmark's rich modules (hero-board, metric-card, queue-layout, review-panel, ops-grid, entity-card) exist in admin-os.css or components/admin — content fidelity is roughly 25% of the benchmark.",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "Overview is a flat StatCard grid, not the benchmark hero-board + sparkline metric grid + moderation workbench",
+            "surface": "Admin Overview (/)",
+            "file": "apps/web/app/(admin)/page.tsx",
+            "change": "Replace the StatCard auto-fill grid with the benchmark's overviewView: (1) a .hero-board (cinematic photo, animated .sheen, gradient H1 'Moderate the marketplace without losing platform momentum', primary/ghost actions, and a glass .floating-ops card with a 4-up .ops-grid of hot/good nodes Queue/Reports/Listings/MRR); (2) a 4-up .metric-card row (Open queue / Reports / Verified hosts / Boost health) each with a .trend pill + animated .spark bars; (3) a .grid.main-split 'Priority moderation workbench' = live .queue-list + a .card.paper 'Next best action'. Add .adminos-hero/.adminos-metric/.adminos-spark/.adminos-opsgrid primitives to admin-os.css using the locked --adminos-* tokens.",
+            "mobile": false
+          },
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "StatCard has no trend pill, no sparkline, no accent ring — it is the generic dashboard tile the brand forbids",
+            "surface": "Admin Overview (/)",
+            "file": "apps/web/components/admin/StatCard.tsx",
+            "change": "Rebuild as the benchmark .metric-card: min-height ~154px, isolate, a ::before radial accent glow, a .metric-top row (label + .trend pill that goes danger when value is a warning), the big -0.075em metric number, and a .spark row of animated bars (barIn keyframe). Add a `tone: 'danger'|'good'` prop so Open queue / Under review read as hot and Verified hosts reads as good — right now all ten tiles are identical flat rgba(255,255,255,.075) cards.",
+            "mobile": false
+          },
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "Applications queue is a bare HTML table, not the benchmark queue-layout + review-panel workbench",
+            "surface": "Admin Applications (/applications)",
+            "file": "apps/web/app/(admin)/applications/page.tsx",
+            "change": "This is the moderation queue (badged 'Review queue' in the shell) yet it renders AdminApplicationsTable — a read-only <table> with a 'Seeker (Clerk ID)' raw-ID column. Build the benchmark queueView: a 4-up metric row (Open/High risk/Avg age/Resolved today) then a .queue-layout (360px .queue-list of .queue-item person+avatar+risk-tags  |  1fr .review-panel with evidence boxes + a .decision-row of Resolve/Request info/Freeze). Surface risk, reason, and evidence — not a Clerk-ID grid.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Listings moderation is a status table, missing the benchmark photo-led .listing-row card + metric header",
+            "surface": "Admin Listings (/listings)",
+            "file": "apps/web/components/admin/AdminListingsTable.tsx",
+            "change": "Benchmark listingsView leads with a 4-up metric row (Listings/Boosted/Incomplete/Avg quality) then .listing-row cards: 132px listing photo (frame-not-filter) + status-pill + title/host/location + tag row + a right-aligned actions-stack showing the PAY range prominently ('$21–$26/hr' / 'Missing'). The current table drops the photo and the pay/housing signal entirely — the triad is invisible on the governance surface. Keep the existing approve/reject server actions, restructure to the card layout.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Hosts view is a table, not the benchmark .entity-card grid with plan/verification/risk at a glance",
+            "surface": "Admin Hosts (/hosts)",
+            "file": "apps/web/app/(admin)/hosts/page.tsx",
+            "change": "Benchmark hostsView = a 4-up metric row (Hosts/Enterprise/Pending/Reported) + an .entity-grid of cards (avatar, name, 'Enterprise • 2 active listings', tag row, Inspect + Verified/Pending action with danger styling on review states). Replace AdminHostsTable with this entity-card grid so verification posture is scannable instead of buried in a row.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "email-preview is a raw inline-styled light page with hardcoded hex — fully off the dark-glass system",
+            "surface": "Admin Email templates (/admin/email-preview)",
+            "file": "apps/web/app/(admin)/admin/email-preview/page.tsx",
+            "change": "The page uses inline CSSProperties with raw hex (#24221E text, #6E685D muted, #E7E1D3 borders) — a white card inside the emerald dark-glass shell, and a token/hex violation per the locked rules. Move to a .module.css using --text-primary/--text-secondary/--border-soft/--color-surface-raised so it inherits the .admin-os cascade like every other surface.",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "flow",
+            "title": "Shell exposes 5 nav items; benchmark has 12 grouped surfaces — Reports/Verification/Billing/Analytics/Audit/Settings/Support are absent",
+            "surface": "Admin shell + IA",
+            "file": "apps/web/components/admin/AdminShell.tsx",
+            "change": "NAV has only Overview/Applications/Listings/Hosts/Email templates in two groups. Benchmark groups twelve routes (Command: Overview, Moderation Queue; People & Inventory: Seekers, Hosts, Listings; Trust & Revenue: Reports, Verification, Billing; Operations: Analytics, Audit, Settings, Support). At minimum scaffold Reports (trust & safety) and Audit log surfaces with designed views — a moderation OS with no reports or audit surface is incomplete. Note the shell's group label says 'Moderation' but routes to the read-only Applications table.",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "interaction",
+            "title": "Sidebar nav items and topbar actions lack a focus-visible ring; search is a non-interactive div",
+            "surface": "Admin shell",
+            "file": "apps/web/styles/admin-os.css",
+            "change": "admin-os.css defines :hover for .adminos-navitem/.adminos-tact and aria-current active styling, but no :focus-visible ring and no :active/press state — the two most-skipped states. Add box-shadow focus rings (var(--ui-focus-ring)) and a translateY(0)/scale press on .adminos-navitem, .adminos-tact, .adminos-mtab, .adminos-account. Also .adminos-search is a static <div> reading 'Search listings, hosts, applications…' — it looks like an input but does nothing; either wire it to a command palette or make it a real <input>/<button> (the benchmark search opens a result modal on Enter).",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "motion",
+            "title": "No view-enter transition and no signature sheen/spark motion — content is dead-still vs the benchmark",
+            "surface": "All admin content views",
+            "file": "apps/web/styles/admin-os.css",
+            "change": "The benchmark uses an 'enter' keyframe (opacity + translateY(18px) + scale .992) on every .view, a 7s .sheen sweep on the hero, and barIn on .spark/.bar charts. admin-os.css references .view in the reduced-motion block but never defines the enter animation, and no hero/spark exist to animate. Add the view-enter transition to .adminos-contentwrap children and the sheen/barIn keyframes when the hero-board and metric sparklines are built. (Skeleton already shimmers by default — loading.tsx is fine.)",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "resizing",
+            "title": "At 1024px content is a single stretched column, not the benchmark's denser rails/splits",
+            "surface": "Admin Overview / Applications / Hosts",
+            "file": "apps/web/app/(admin)/shared.module.css",
+            "change": "shared.module.css .grid is a single auto-fill StatCard grid and the tables span full width, so at 1024px the moderator sees a wide stretched mobile column. The benchmark reflows to .grid.main-split (1.14fr/.86fr), .queue-layout (360px/1fr), and .grid.four metric rows at desktop, collapsing to 1fr only below 900px. Introduce these split/rail layouts so 1024px reads denser than 380px.",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "flow",
+            "title": "Empty + table states are bare 'No data' strings, not designed empty states",
+            "surface": "Admin Listings / Applications",
+            "file": "apps/web/components/admin/AdminTable.module.css",
+            "change": "Empty states are a single centered muted line ('No listings in this view.' / 'No applications yet.'). The benchmark queue/report surfaces always show evidence-rich context. Add a designed empty state (icon + headline + 'queue is clear' affirmative copy) so an empty moderation queue reads as a healthy signal, not a missing-data error. Error boundary (error.tsx) is already well-designed; bring empties to that bar.",
+            "mobile": false
+          },
+          {
+            "severity": "low",
+            "dimension": "a11y",
+            "title": "Sidebar marketplace-health meter and live-dot convey status by color/animation only, no text/role",
+            "surface": "Admin shell sidebar",
+            "file": "apps/web/components/admin/AdminShell.tsx",
+            "change": "The .adminos-meter health bar has the % in adjacent text (good) but no role=progressbar/aria-valuenow; the pulsing .adminos-livedot 'Moderation online' relies on a green dot. Add role=progressbar + aria-valuenow/min/max to the meter span, and ensure the live-dot pairs with its existing text label for icon+text status. Verify --text-muted rgba(246,255,248,.46) on the dark forest bg clears 4.5:1 for the nav sub-labels (.adminos-navitem s) — at .46 alpha it is borderline.",
+            "mobile": false
+          }
+        ]
+      },
+      {
+        "scope": "Admin OS (emerald moderation) — resize / flow / a11y across the shell (admin-os.css, AdminShell.tsx, (admin)/layout.tsx) and all content surfaces (overview, applications, listings, listings/[id], hosts, admin/email-preview) vs explore_earn_admin_dashboard_worldclass.html.",
+        "verdict": "The shell is a faithful, well-built copy of the benchmark chrome — sidebar collapses to a floating bottom-nav at 1023px, the mobile table reflow is genuinely good, and the locked emerald tokens are clean. But the CONTENT is a different, weaker product: every view is the old light moderation UI flipped dark via the token cascade — a flat StatCard grid and three bare HTML tables where the benchmark ships a hero-board (sheen), spark metric-cards, a main-split review workbench, entity-grid cards and rich listing-rows. On flow + a11y it's worse than it looks: the topbar \"search\" is a dead non-interactive div, the entire custom shell chrome has no focus-visible ring, the filter chips miss the 44px tap target, empty states are bare \"No data\" strings, and the email-preview page hardcodes light hex inside the dark scope.",
+        "topIssues": [
+          {
+            "severity": "critical",
+            "dimension": "fidelity",
+            "title": "Overview is a flat StatCard grid, not the benchmark command center (hero-board + metric-cards + queue workbench)",
+            "surface": "Admin Overview (/)",
+            "file": "apps/web/app/(admin)/page.tsx + components/admin/StatCard.module.css",
+            "change": "Replace the 10x plain StatCard tiles with the benchmark overview modules: a `.hero-board` (sheen, gradient headline, floating-ops snapshot), a 4-up `.metric-card` row (trend pill + spark bars), and a `.grid main-split` Live review queue + Next-best-action — port these as real .adminos-* classes instead of leaning on --color-surface-raised tiles",
+            "mobile": false
+          },
+          {
+            "severity": "critical",
+            "dimension": "interaction",
+            "title": "Topbar global search is a non-interactive <div> — a dead no-op on every surface",
+            "surface": "Shell topbar (all surfaces)",
+            "file": "apps/web/components/admin/AdminShell.tsx (line 136) + apps/web/styles/admin-os.css (.adminos-search)",
+            "change": "Replace the `<div className=\"adminos-search\">⌕ Search…</div>` with a real `<input type=\"search\" aria-label=\"Search listings, hosts, applications\">` (benchmark topbar input with ⌘ hint); add hover/focus-visible styling so it is keyboard-reachable, not decorative",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "a11y",
+            "title": "Entire custom shell chrome has no :focus-visible ring (nav items, topbar action, account, mobile tabs)",
+            "surface": "Shell sidebar + topbar + mobile nav (all surfaces)",
+            "file": "apps/web/styles/admin-os.css (.adminos-navitem / .adminos-tact / .adminos-mtab / .adminos-account)",
+            "change": "Add `:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }` to each interactive chrome class — the host scope already does this in host.css; admin-os.css defines zero focus rules so keyboard users get no visible focus on the whole nav",
+            "mobile": true
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Applications/Listings/Hosts are bare HTML tables, not the benchmark's entity-grid cards / rich listing-rows / queue-layout",
+            "surface": "Applications, Listings, Hosts",
+            "file": "apps/web/components/admin/AdminApplicationsTable.tsx, AdminListingsTable.tsx, AdminHostsTable.tsx + AdminTable.module.css",
+            "change": "Rebuild against the benchmark `entityCard()` (avatar + person + tags + Inspect/Moderate) and `listingRow()` (132px image + status-pill + pay + actions-stack); Listings detail should reuse the `queue-layout` review-panel with evidence boxes. The token-cascade dark table is generic SaaS, not the emerald command center",
+            "mobile": false
+          },
+          {
+            "severity": "high",
+            "dimension": "fidelity",
+            "title": "Email-preview surface hardcodes light hex inside the dark .admin-os scope — unreadable, bypasses tokens",
+            "surface": "Email templates index",
+            "file": "apps/web/app/(admin)/admin/email-preview/page.tsx (inline #24221E / #6E685D / #E7E1D3)",
+            "change": "Delete the inline CSSProperties light hex and use the shared `shared.module.css` page/heading/subtitle + token vars (--text-primary, --border-soft); on the dark emerald scope the #24221E heading text is near-invisible and fails contrast",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "resizing",
+            "title": "AdminTable filter chips fall below the 44px tap target on mobile",
+            "surface": "Listings (status filter tabs)",
+            "file": "apps/web/components/admin/AdminTable.module.css (.tab)",
+            "change": "`.tab` is `padding: var(--space-8) var(--space-16)` ≈ 33px tall; add `min-height: var(--tap-min)` so the All/Under Review/Live/Draft chips are thumb-tappable at 380px",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "flow",
+            "title": "Empty states are bare 'No data' strings, not designed empty states",
+            "surface": "Applications / Listings / Hosts",
+            "file": "AdminApplicationsTable.tsx ('No applications yet.'), AdminListingsTable.tsx ('No listings in this view.'), AdminHostsTable.tsx ('No host profiles yet.')",
+            "change": "Replace the single muted <td> string with a designed empty state (icon + headline + one-line guidance, e.g. 'Queue clear — nothing waiting on review'), matching the benchmark's evidence-rich, never-bare moderation tone",
+            "mobile": true
+          },
+          {
+            "severity": "medium",
+            "dimension": "resizing",
+            "title": "Listing-detail review surface is a single 22rem card, never reflows denser at 1024px",
+            "surface": "Listing review (/listings/[id])",
+            "file": "apps/web/app/(admin)/listings/[id]/page.module.css (.cardWrap max-width: 22rem)",
+            "change": "At ≥1024px the benchmark uses `review-panel` (evidence grid + decision-row of Resolve/Request/Freeze actions). The current page caps a discovery card at 22rem and offers no moderation decision controls — add a split layout (card + evidence/decision rail) so 1024px isn't a centered phone column",
+            "mobile": false
+          },
+          {
+            "severity": "medium",
+            "dimension": "a11y",
+            "title": "Status conveyed by Badge color alone in tables — not a reliable icon+text status",
+            "surface": "Listings / Hosts / Applications (Status column)",
+            "file": "apps/web/components/admin/status.ts (listingStatusVariant / attestationVariant) + Badge usage",
+            "change": "Badge carries the text label (good) but the live/under_review/flagged distinction rides on color variant only; add a leading status icon (check/clock/alert) inside the Badge per benchmark status-pill (live/gold/danger) so state is icon+text+color, not color-dependent",
+            "mobile": false
+          },
+          {
+            "severity": "low",
+            "dimension": "motion",
+            "title": "No view-enter transition; sidebar live-dot pulse is the only motion (benchmark has enter + sheen + barIn)",
+            "surface": "All admin surfaces",
+            "file": "apps/web/styles/admin-os.css (.view referenced in reduced-motion block but no @keyframes enter defined)",
+            "change": "admin-os.css guards `.view` transition under prefers-reduced-motion but never defines a view-enter animation; add the benchmark `@keyframes enter` (opacity + translateY(18px)) on content mount so surface changes clarify navigation, with the existing reduced-motion fallback",
+            "mobile": false
+          }
+        ]
+      }
+    ],
+    "synthesis": {
+      "verdict": "probe-ceiling",
+      "sharedInfra": [
+        {
+          "name": "View-enter transition",
+          "why": ".view referenced in 3 reduced-motion blocks but defined nowhere.",
+          "files": "NEW components/shared/ViewEnter.tsx + 3 templates"
+        },
+        {
+          "name": "Glass focus/press",
+          "why": "--ui-focus-ring unused on shell controls.",
+          "files": "host/seeker/admin-os.css"
+        },
+        {
+          "name": "Command-search",
+          "why": "3 shells render a dead search div.",
+          "files": "NEW CommandSearch.tsx + 3 shells"
+        },
+        {
+          "name": "De-drift tokens",
+          "why": "--color-cta/--color-steel/--palette-sky leak light onto glass.",
+          "files": "seeker/host/admin-os.css"
+        },
+        {
+          "name": "MetricCard",
+          "why": "Benchmark metric grid-four absent.",
+          "files": "NEW packages/ui/MetricCard.tsx; admin StatCard"
+        },
+        {
+          "name": "EmptyState reuse",
+          "why": "Admin/host empties skip its CTA.",
+          "files": "components/discovery/EmptyState.tsx"
+        },
+        {
+          "name": "Reduced-motion blocks",
+          "why": "Add transition:none + scroll-behavior.",
+          "files": "host/seeker/admin-os.css"
+        }
+      ],
+      "recommendedOrder": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "workItems": [
+        {
+          "title": "Remove the double sidebar on /seek",
+          "os": "seeker",
+          "dimension": "resizing",
+          "severity": "critical",
+          "effort": "M",
+          "mobile": false,
+          "files": "components/seeker/SeekerDashboard.tsx (import 15, render 244, grid 242)",
+          "change": "/seek renders 2x SeekerSidebar + 1x seekeros-side = ~546px duplicate nav, two identity cards, two readiness meters at >=1024px. Delete the SeekerSidebar render + .dashboard grid; full-width in seekeros-contentwrap."
+        },
+        {
+          "title": "Replace 3 dead search divs with one command-search + :focus-visible/:active on shell controls",
+          "os": "all",
+          "dimension": "interaction",
+          "severity": "critical",
+          "effort": "M",
+          "mobile": true,
+          "files": "HostShell.tsx:113, SeekerShell.tsx:152, AdminShell.tsx:136 + NEW CommandSearch.tsx; host/seeker/admin-os.css",
+          "change": "Dead non-focusable search div in all 3 shells -> shared CommandSearch with :focus-visible. No shell control has :active/:focus-visible -> apply focus-ring + scale(.97) press to all nav/topbar/mobile-tab/account."
+        },
+        {
+          "title": "Fix invisible Settings CTAs + de-drift tokens + wire view-enter",
+          "os": "all",
+          "dimension": "fidelity",
+          "severity": "critical",
+          "effort": "M",
+          "mobile": true,
+          "files": "HostSettings.module.css; seeker/host/admin-os.css; NEW templates",
+          "change": "Settings .planCta/.planBadge/.intervalActive/.gateBlockBtn bone-on-glass invisible -> --color-cta/--color-cta-text. De-drift --color-cta/--color-steel (seeker omits host's override)/--palette-sky. Wire ViewEnter template.tsx."
+        },
+        {
+          "title": "Rebuild Admin content (Overview + Applications + Listings/Hosts)",
+          "os": "admin",
+          "dimension": "fidelity",
+          "severity": "critical",
+          "effort": "L",
+          "mobile": false,
+          "files": "app/(admin)/page.tsx, applications, hosts; StatCard, AdminApplicationsTable, AdminListingsTable",
+          "change": "Old light tables/StatCards (~25%). Overview hero-board+MetricCard; Applications (badged queue, raw Clerk-ID table) queue-layout+review-panel; Listings photo-row PAY; Hosts entity-cards."
+        },
+        {
+          "title": "Rebuild Host content (Analytics + Applicants + Listings + overview/profile + Invites)",
+          "os": "host",
+          "dimension": "fidelity",
+          "severity": "critical",
+          "effort": "L",
+          "mobile": true,
+          "files": "host/HostAnalyticsDashboard.tsx, HostPipelineBoard.tsx, HostDashboard.tsx, HostProfilePanel.tsx, HostShell.tsx; host/applicants|listings|invites",
+          "change": "Analytics: StatCards+table -> grid-four+bars+radial, fix .statCards repeat(3) at 639px. Applicants grid-four+seekers rail+View. Listings host-kpiGrid+Boost-strategy. Overview MetricCard+radial+.hostos-foot Meter. Profile HostProfileHero. Invites Campaign-builder."
+        },
+        {
+          "title": "Rebuild Seeker /seek + Map + buckets + a11y batch",
+          "os": "seeker",
+          "dimension": "fidelity",
+          "severity": "high",
+          "effort": "L",
+          "mobile": true,
+          "files": "SeekerDashboard.tsx, SeekerPage.module.css, MapView.module.css (38,103); seek/page.tsx (268-285); admin email-preview, status.ts; SeekerShell, AdminShell",
+          "change": "/seek -> ONE hero-board (readiness pills+journey-line+MetricGrid), drop 2nd SeekBrowser feed (page.tsx:268). Map #fff8ea -> glass+emerald pins. Buckets -> grid.main-split. a11y: email-preview hex -> tokens; Badge icon+text+meter progressbar; --text-muted .46->.58; 5th mobile More drawer."
+        }
+      ]
+    }
+  }
+}

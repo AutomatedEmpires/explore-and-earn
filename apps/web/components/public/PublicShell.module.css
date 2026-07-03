@@ -1,0 +1,16 @@
+.frame {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  background: var(--color-paper);
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  /* Clear the fixed public bottom nav so nothing hides behind it. Individual
+     pages own their own max-width / horizontal layout. */
+  padding-bottom: calc(
+    var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom, 0px)
+  );
+}

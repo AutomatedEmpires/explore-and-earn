@@ -10,6 +10,7 @@ import type {
 
 import { Meter } from "./Meter"
 import { Icon, type IconKey } from "./icons"
+import styles from "./DiscoveryCard.module.css"
 
 /**
  * DiscoveryCard — canonical Explore&Earn listing card.
@@ -91,72 +92,14 @@ export interface DiscoveryCardProps {
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 
-const INK       = "#1A2B3C"
-const INK_SOFT  = "rgba(26,43,60,0.46)"
-const PAPER     = "#FEFAF4"
+// V2 "Golden Hour Hybrid" — warm ink + warm surface, via tokens (no raw hex).
+const INK       = "var(--palette-ink)"
+const INK_SOFT  = "var(--palette-ink-muted)"
+const PAPER     = "var(--palette-surface)"
 
-const H_INK = "#185848"   /* green  — housing/meals available */
-const P_INK = "#184878"   /* blue   — pay */
+const H_INK = "color-mix(in srgb, var(--palette-teal) 78%, var(--palette-ink))"   /* teal — housing/meals available */
+const P_INK = "color-mix(in srgb, var(--palette-amber) 52%, var(--palette-ink))"  /* deep gold — pay (money) */
 
-/** Per-category card body — top-lit, atmospheric, inviting */
-const CAT_CARD: Record<MarketplaceCategory, string> = {
-	farm:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(255,240,180,0.62) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 20% 95%, rgba(201,139,27,0.22) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #FAF0CC 0%, #EED990 55%, #D4B84A 100%)",
-	maritime:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(200,235,255,0.58) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 80% 95%, rgba(26,78,114,0.20) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #EAF4FF 0%, #B8D8F4 55%, #88B8E0 100%)",
-	remote:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(210,200,255,0.52) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 20% 95%, rgba(48,56,152,0.18) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #F0EAFF 0%, #C8B8F4 55%, #A090D8 100%)",
-	seasonal:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(190,248,210,0.55) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 20% 95%, rgba(26,94,56,0.18) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #EAFAE0 0%, #B8DCA0 55%, #84BC68 100%)",
-	mix:
-		"radial-gradient(ellipse 180% 60% at 50% -5%, rgba(248,244,238,0.58) 0%, transparent 52%)," +
-		"radial-gradient(ellipse 90% 70% at 20% 95%, rgba(42,62,106,0.14) 0%, transparent 65%)," +
-		"linear-gradient(158deg, #F5ECD8 0%, #D8C4A4 55%, #BCA880 100%)",
-}
-
-/** Per-category hero fallback (no cover image) */
-const CAT_HERO: Record<MarketplaceCategory, string> = {
-	farm:     "linear-gradient(145deg, #C4A854 0%, #E8CC80 50%, #F4DFA0 100%)",
-	maritime: "linear-gradient(145deg, #5C9CC8 0%, #8EC4E4 50%, #B4D8F0 100%)",
-	remote:   "linear-gradient(145deg, #7870B8 0%, #A898D8 50%, #C8C0EC 100%)",
-	seasonal: "linear-gradient(145deg, #5A9C60 0%, #8CC480 50%, #B0D898 100%)",
-	mix:      "linear-gradient(145deg, #A890A0 0%, #C8B0B8 50%, #DED0C8 100%)",
-}
-
-/** Per-category top accent border — aligned with V2 category fg tokens */
-const CAT_ACCENT: Record<MarketplaceCategory, string> = {
-	farm:     "#C98B1B",    /* warm gold — farm is intentionally warm */
-	maritime: "#1A4E72",    /* V2 maritime fg */
-	remote:   "#303898",    /* V2 remote fg */
-	seasonal: "#1A5E38",    /* V2 seasonal fg */
-	mix:      "#2A3E6A",    /* V2 mix fg — cool navy, not warm purple */
-}
-
-/** Per-category ambient glow (inset bottom) — makes each card feel lit from within */
-const CAT_GLOW: Record<MarketplaceCategory, string> = {
-	farm:     "rgba(201,139,27,0.18)",
-	maritime: "rgba(26,78,114,0.16)",
-	remote:   "rgba(48,56,152,0.15)",
-	seasonal: "rgba(26,94,56,0.16)",
-	mix:      "rgba(42,62,106,0.13)",
-}
-
-/** Per-category info-cell bg — tinted gradient pulls each cell into the card's color identity */
-const CAT_CELL_BG: Record<MarketplaceCategory, string> = {
-	farm:     "linear-gradient(180deg, rgba(250,240,200,0.64) 0%, rgba(238,215,130,0.48) 100%)",
-	maritime: "linear-gradient(180deg, rgba(234,244,255,0.68) 0%, rgba(180,210,244,0.52) 100%)",
-	remote:   "linear-gradient(180deg, rgba(240,234,255,0.66) 0%, rgba(196,180,244,0.50) 100%)",
-	seasonal: "linear-gradient(180deg, rgba(234,250,224,0.66) 0%, rgba(180,220,152,0.50) 100%)",
-	mix:      "linear-gradient(180deg, rgba(245,236,215,0.64) 0%, rgba(214,193,155,0.48) 100%)",
-}
 
 const CAT_LABEL: Record<MarketplaceCategory, string> = {
 	farm: "Farm", maritime: "Maritime", remote: "Remote", seasonal: "Seasonal", mix: "Mix",
@@ -177,15 +120,16 @@ const MAPPIN: Record<MarketplaceCategory, IconKey> = {
 // Housing & Meals share a green/red signal: provided = green, not_provided = light red.
 // Pay is always blue — it always has a dollar value so it never reads as "unavailable".
 
-const RED_INK = "rgba(180,44,28,0.72)"
+// "Not provided" is information, not an error — muted neutral, never alarming red.
+const RED_INK = "var(--palette-ink-muted)"
 
-// Housing / Meals
-const HM_GREEN_BG     = "linear-gradient(180deg, rgba(228,248,240,0.97) 0%, rgba(196,232,220,0.94) 100%)"
-const HM_GREEN_BORDER = `2px solid ${H_INK}`
-const HM_GREEN_SHADOW = `inset 0 1.5px 0 rgba(255,255,255,0.82), 0 3px 8px rgba(24,88,72,0.22), 0 1px 3px rgba(24,88,72,0.14)`
-const HM_RED_BG       = "linear-gradient(180deg, rgba(255,240,238,0.97) 0%, rgba(252,222,218,0.93) 100%)"
-const HM_RED_BORDER   = `1.5px solid rgba(180,44,28,0.28)`
-const HM_RED_SHADOW   = "inset 0 1.5px 3px rgba(180,44,28,0.07), inset 0 1px 0 rgba(255,255,255,0.55)"
+// Housing / Meals — provided = warm teal, not-provided = muted neutral
+const HM_GREEN_BG     = "color-mix(in srgb, var(--palette-teal) 13%, var(--palette-surface))"
+const HM_GREEN_BORDER = `1.5px solid color-mix(in srgb, var(--palette-teal) 42%, var(--palette-line))`
+const HM_GREEN_SHADOW = "var(--elevation-card)"
+const HM_RED_BG       = "color-mix(in srgb, var(--palette-ink) 4%, var(--palette-surface))"
+const HM_RED_BORDER   = "1px solid var(--palette-line)"
+const HM_RED_SHADOW   = "none"
 
 // partial is treated identically to provided — "available" is the single signal
 function hmBg(p: BenefitProvision | undefined):     string { return (p === "provided" || p === "partial") ? HM_GREEN_BG     : HM_RED_BG     }
@@ -194,10 +138,11 @@ function hmColor(p: BenefitProvision | undefined):  string { return (p === "prov
 function hmShadow(p: BenefitProvision | undefined): string { return (p === "provided" || p === "partial") ? HM_GREEN_SHADOW : HM_RED_SHADOW }
 
 // Pay — always blue regardless of provision
-const PAY_BG     = "linear-gradient(180deg, rgba(222,240,252,0.97) 0%, rgba(192,220,244,0.94) 100%)"
-const PAY_BORDER = `2px solid ${P_INK}`
+// Pay — always present (money), warm gold accent
+const PAY_BG     = "color-mix(in srgb, var(--palette-amber) 15%, var(--palette-surface))"
+const PAY_BORDER = `1.5px solid color-mix(in srgb, var(--palette-amber) 52%, var(--palette-line))`
 const PAY_COLOR  = P_INK
-const PAY_SHADOW = `inset 0 1.5px 0 rgba(255,255,255,0.82), 0 3px 8px rgba(24,72,120,0.22), 0 1px 3px rgba(24,72,120,0.14)`
+const PAY_SHADOW = "var(--elevation-card)"
 
 // ─── Fill bar helpers ─────────────────────────────────────────────────────────
 
@@ -222,29 +167,29 @@ const STAMP: CSSProperties = {
 	fontFamily: DISPLAY_FONT,
 	fontSize: "11px", fontWeight: 700,
 	letterSpacing: "0.08em", textTransform: "uppercase",
-	background: "rgba(255,248,225,0.96)",
+	background: "color-mix(in srgb, var(--palette-paper) 88%, var(--palette-amber))",
 	backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-	boxShadow: "0 2px 10px rgba(23,19,13,0.24), 0 1px 0 rgba(255,255,255,0.90) inset",
+	boxShadow: "var(--elevation-card), 0 1px 0 rgba(255,255,255,0.55) inset",
 	whiteSpace: "nowrap",
 }
 
-/** Info row cell (name / job / location) — debossed tray feel */
+/** Info row cell (name / job / location) — clean warm tray, V2 soft depth */
 const ROW_CELL: CSSProperties = {
 	display: "flex", alignItems: "center", justifyContent: "center",
-	gap: "6px", padding: "9px 14px",
-	background: PAPER, border: "1.5px solid rgba(26,43,60,0.16)",
-	borderRadius: "10px", textAlign: "center",
-	boxShadow: "inset 0 2px 4px rgba(26,43,60,0.08), inset 0 1px 0 rgba(0,0,0,0.04), 0 1.5px 0 rgba(255,255,255,0.72)",
+	gap: "6px", padding: "10px 14px",
+	background: PAPER, border: "1px solid var(--palette-line)",
+	borderRadius: "12px", textAlign: "center",
+	boxShadow: "var(--elevation-card)",
 }
 
-/** Strip cell — stacked (begins/ends columns) — debossed tray feel */
+/** Strip cell — stacked (begins/ends columns) — clean warm tray */
 const STRIP_CELL: CSSProperties = {
 	display: "flex", flexDirection: "column",
 	alignItems: "center", justifyContent: "center",
-	gap: "3px", padding: "8px 6px",
-	background: PAPER, border: "1.5px solid rgba(26,43,60,0.16)",
-	borderRadius: "10px", textAlign: "center",
-	boxShadow: "inset 0 2px 4px rgba(26,43,60,0.08), inset 0 1px 0 rgba(0,0,0,0.04), 0 1.5px 0 rgba(255,255,255,0.72)",
+	gap: "3px", padding: "9px 6px",
+	background: PAPER, border: "1px solid var(--palette-line)",
+	borderRadius: "12px", textAlign: "center",
+	boxShadow: "var(--elevation-card)",
 }
 
 /** Benefit cell — inline icon + label (housing / meals / pay) */
@@ -310,7 +255,13 @@ export function DiscoveryCard({
 }: DiscoveryCardProps) {
 	const cat      = data.category
 	const roleText = data.positionTitle ?? data.title
-	const cellBg          = CAT_CELL_BG[cat]
+	// Don't render placeholder content as if it were real — hide an empty/unknown
+	// location, and collapse the begins|ends strip to the opportunity window when
+	// no concrete dates exist (so the card never shows "LOCATION NOT SPECIFIED" or
+	// a row of em-dashes).
+	const hasLocation = Boolean(data.location) && data.location !== "Location not specified"
+	const hasDates    = Boolean(data.begins || data.ends)
+	const cellBg          = "var(--cat-cell)"
 	const ROW_CELL_CAT:   CSSProperties = { ...ROW_CELL,   background: cellBg }
 	const STRIP_CELL_CAT: CSSProperties = { ...STRIP_CELL, background: cellBg }
 	const verified = data.verifiedHost === true
@@ -363,9 +314,9 @@ export function DiscoveryCard({
 		isApplied    ? { label: "Applied",  color: INK,    decoration: false }
 		: isScheduled ? { label: "Schedule", color: INK,    decoration: true  }
 		: isDraft     ? { label: "Draft",    color: INK,    decoration: false }
-		: isFilled    ? { label: "Filled",   color: "#fff", bg: "linear-gradient(135deg, #1D5026 0%, #2F6B3F 100%)", decoration: false }
-		: isReported  ? { label: data.reportCount ? `${data.reportCount} Reports` : "Reported", color: "#fff", bg: "linear-gradient(135deg, #C93824 0%, #E84020 100%)", decoration: false }
-		: isBoosted   ? { label: "Boosted",  color: "#fff", bg: "linear-gradient(135deg, #B8780A 0%, #D4960C 50%, #E8A820 100%)", icon: "status.boosted" as IconKey, decoration: false }
+		: isFilled    ? { label: "Filled",   color: "var(--palette-paper)", bg: "var(--status-success-fg)", decoration: false }
+		: isReported  ? { label: data.reportCount ? `${data.reportCount} Reports` : "Reported", color: "var(--palette-paper)", bg: "var(--status-error-fg)", decoration: false }
+		: isBoosted   ? { label: "Boosted",  color: "var(--palette-paper)", bg: "var(--palette-amber)", icon: "status.boosted" as IconKey, decoration: false }
 		: null
 
 	// R1 right secondary: passive state badges only (boosted moved to center)
@@ -373,16 +324,16 @@ export function DiscoveryCard({
 	type SecondaryBadge = { label: string; ink: string }
 	const matchBadgeLabel = typeof data.matchScore === "number" ? `${data.matchScore}% Match` : "Matched"
 	const secondaryBadge: SecondaryBadge | null =
-		isSaved       ? { label: "Saved",          ink: "#1D5026" }
-		: isOffered   ? { label: "Offered",         ink: "#1D5026" }
-		: isAccepted  ? { label: "Accepted",        ink: "#1D5026" }
-		: isMatched   ? { label: matchBadgeLabel,   ink: "#0D3E6A" }
-		: isInvited   ? { label: "Invited",         ink: "#7A5A10" }
+		isSaved       ? { label: "Saved",          ink: "var(--status-success-fg)" }
+		: isOffered   ? { label: "Offered",         ink: "var(--status-success-fg)" }
+		: isAccepted  ? { label: "Accepted",        ink: "var(--status-success-fg)" }
+		: isMatched   ? { label: matchBadgeLabel,   ink: "var(--palette-teal)" }
+		: isInvited   ? { label: "Invited",         ink: "var(--status-warning-fg)" }
 		: isNotSelected ? { label: "Passed",        ink: INK_SOFT  }
 		: isWithdrawn ? { label: "Withdrawn",       ink: INK_SOFT  }
-		: isPaused    ? { label: "Paused",          ink: "#7A5A10" }
+		: isPaused    ? { label: "Paused",          ink: "var(--status-warning-fg)" }
 		: isExpired   ? { label: "Expired",         ink: INK_SOFT  }
-		: isReported && data.reportCategory ? { label: data.reportCategory, ink: "#8B1A1A" }
+		: isReported && data.reportCategory ? { label: data.reportCategory, ink: "var(--status-error-fg)" }
 		: null
 
 	// Match bar: always-on for host_applicant_review (boosted doesn't apply to seeker cards);
@@ -439,28 +390,24 @@ export function DiscoveryCard({
 		display: "flex", flexDirection: "column",
 		width: "min(100%, 360px)",
 		overflow: "hidden",
-		background: CAT_CARD[cat],
-		border: `2px solid ${INK}`,
-		borderTop: `5px solid ${CAT_ACCENT[cat]}`,
-		borderRadius: "24px",
+		background: "var(--cat-body)",
+		border: `1px solid var(--palette-line)`,
+		borderTop: `3px solid var(--cat-accent)`,
+		borderRadius: "20px",
 		color: INK,
 		opacity: isDisabled ? 0.6 : 1,
 		boxShadow: [
-			"inset 0 0 0 1.5px rgba(255,253,246,0.80)",   /* inner rim highlight */
-			"inset 0 5px 0 rgba(255,255,255,0.46)",        /* top surface catch-light */
-			`inset 0 -52px 68px ${CAT_GLOW[cat]}`,         /* category ambient from below */
-			"inset 0 0 120px rgba(26,43,60,0.03)",          /* subtle depth vignette */
-			"5px 8px 0 rgba(26,43,60,0.26)",               /* hard offset shadow */
-			"0 1px 0 rgba(26,43,60,0.48)",                 /* ground contact shadow */
-			"0 20px 52px rgba(26,43,60,0.18)",             /* soft lift shadow */
+			"inset 0 1px 0 rgba(255,255,255,0.55)",        /* top catch-light */
+			`inset 0 -44px 56px var(--cat-glow)`,         /* category ambient from below */
+			"var(--elevation-card)",                        /* V2 soft depth */
 		].join(", "),
 	}
 
 	const heroStyle: CSSProperties = {
-		position: "relative", width: "100%", aspectRatio: "4 / 3",
+		position: "relative", width: "100%", aspectRatio: "16 / 10",
 		overflow: "hidden", flexShrink: 0,
-		background: CAT_HERO[cat],
-		borderBottom: `2px solid ${INK}`,
+		background: "var(--cat-cover)",
+		borderBottom: `1px solid var(--palette-line)`,
 	}
 
 	const hostCircle: CSSProperties = {
@@ -468,7 +415,7 @@ export function DiscoveryCard({
 		borderRadius: "50%",
 		border: "3px solid rgba(255,248,225,0.95)",
 		// dark ring + category-colored glow ring + deep shadow
-		boxShadow: `0 0 0 2.5px ${INK}, 0 0 0 5px ${CAT_ACCENT[cat]}, 0 6px 20px rgba(26,43,60,0.40)`,
+		boxShadow: `0 0 0 2.5px ${INK}, 0 0 0 5px var(--cat-accent), 0 6px 20px rgba(26,43,60,0.40)`,
 		background: data.hostAvatarUrl ? "transparent" : "rgba(255,248,225,0.22)",
 		backdropFilter: data.hostAvatarUrl ? "none" : "blur(4px)",
 		WebkitBackdropFilter: data.hostAvatarUrl ? "none" : "blur(4px)",
@@ -515,7 +462,7 @@ export function DiscoveryCard({
 			}
 		`}</style>
 		<article
-			className="ui-card--discovery"
+			className={`ui-card--discovery ${styles.card}`}
 			style={cardStyle}
 			data-category={cat}
 			data-surface={surface}
@@ -528,9 +475,26 @@ export function DiscoveryCard({
 					<img
 						src={data.coverImageUrl}
 						alt={`${data.hostName} cover`}
+						loading="lazy"
+						decoding="async"
 						style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
 					/>
-				) : null}
+				) : (
+					/* No cover yet — a large category watermark so the frame reads as
+					   intentional, not empty (placeholder, not a filter on a photo). */
+					<span
+						aria-hidden
+						style={{
+							position: "absolute", inset: 0,
+							display: "flex", alignItems: "center", justifyContent: "center",
+							color: "rgba(255,255,255,0.40)",
+							transform: "scale(2.7)",
+							filter: "drop-shadow(0 2px 6px rgba(23,19,13,0.18))",
+						}}
+					>
+						<Icon name={CAT_ICON[cat]} size={24} />
+					</span>
+				)}
 
 				{/* Gradient scrim — top shadow for badges, bottom shadow, warm golden side wash */}
 				<div
@@ -557,6 +521,8 @@ export function DiscoveryCard({
 							<img
 								src={data.hostAvatarUrl}
 								alt={`${data.hostName} host avatar`}
+								loading="lazy"
+								decoding="async"
 								style={{ width: "100%", height: "100%", objectFit: "cover" }}
 							/>
 						) : (
@@ -577,11 +543,11 @@ export function DiscoveryCard({
 							style={{
 								position: "absolute", bottom: "-4px", right: "-4px", zIndex: 4,
 								width: "18px", height: "18px", borderRadius: "50%",
-								background: "#155DA8",
-								border: "2px solid rgba(255,248,225,0.95)",
+								background: "var(--palette-teal)",
+								border: "2px solid var(--palette-surface)",
 								boxShadow: `0 0 0 1px ${INK}, 0 2px 6px rgba(0,0,0,0.32)`,
 								display: "flex", alignItems: "center", justifyContent: "center",
-								color: "#fff", flexShrink: 0,
+								color: "var(--palette-paper)", flexShrink: 0,
 							}}
 							aria-label="Verified Host"
 						>
@@ -608,11 +574,11 @@ export function DiscoveryCard({
 						}}>
 							{centerBadge.icon && <Icon name={centerBadge.icon} size={16} aria-hidden />}
 							{centerBadge.decoration && (
-								<span aria-hidden style={{ fontFamily: UI_FONT, fontSize: "11px", opacity: 0.6, letterSpacing: 0 }}>≥—</span>
+								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
 							)}
 							{centerBadge.label}
 							{centerBadge.decoration && (
-								<span aria-hidden style={{ fontFamily: UI_FONT, fontSize: "11px", opacity: 0.6, letterSpacing: 0 }}>—≤</span>
+								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
 							)}
 						</span>
 					</div>
@@ -639,7 +605,7 @@ export function DiscoveryCard({
 						<div style={{
 							height: "9px", borderRadius: "5px",
 							border: "1.5px solid rgba(23,19,13,0.30)",
-							background: "linear-gradient(90deg, #C93824 0%, #E87520 28%, #E8C020 55%, #5AA830 100%)",
+							background: "linear-gradient(90deg, var(--status-error-fg) 0%, var(--palette-amber) 48%, var(--status-success-fg) 100%)",
 							boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
 						}} />
 						<div style={{
@@ -675,7 +641,7 @@ export function DiscoveryCard({
 						<div style={{
 							height: "9px", borderRadius: "5px",
 							border: "1.5px solid rgba(23,19,13,0.30)",
-							background: "linear-gradient(90deg, #C93824 0%, #E87520 28%, #E8C020 55%, #5AA830 100%)",
+							background: "linear-gradient(90deg, var(--status-error-fg) 0%, var(--palette-amber) 48%, var(--status-success-fg) 100%)",
 							boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
 						}} />
 						<div style={{
@@ -698,8 +664,8 @@ export function DiscoveryCard({
 					{/* Category stamp — always ONE, always here; colored fill = instant recognition */}
 					<span style={{
 						...STAMP,
-						background: CAT_ACCENT[cat],
-						color: "#FFFAF0",
+						background: "var(--cat-accent)",
+						color: "var(--palette-paper)",
 						boxShadow: `0 3px 12px rgba(23,19,13,0.32), 0 1px 0 rgba(255,255,255,0.22) inset`,
 					}}>
 						<Icon name={CAT_ICON[cat]} size={16} aria-hidden />
@@ -711,7 +677,7 @@ export function DiscoveryCard({
 						<span style={{
 							...STAMP,
 							color: secondaryBadge.ink,
-							border: `1px solid ${secondaryBadge.ink === INK_SOFT ? "rgba(23,19,13,0.18)" : secondaryBadge.ink + "50"}`,
+							border: `1px solid color-mix(in srgb, ${secondaryBadge.ink} 32%, transparent)`,
 						}}>
 							{secondaryBadge.label}
 						</span>
@@ -770,36 +736,45 @@ export function DiscoveryCard({
 					</div>
 				)}
 
-				{/* 4. LOCATION */}
-				{onLocationClick ? (
-					<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={() => onLocationClick(data.id)}>
-						<Icon name={MAPPIN[cat]} size={20} aria-hidden />
-						<span style={locationText}>{data.location}</span>
-					</button>
+				{/* 4. LOCATION — only when a real place is known */}
+				{hasLocation ? (
+					onLocationClick ? (
+						<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={() => onLocationClick(data.id)}>
+							<Icon name={MAPPIN[cat]} size={20} aria-hidden />
+							<span style={locationText}>{data.location}</span>
+						</button>
+					) : (
+						<div style={ROW_CELL_CAT}>
+							<Icon name={MAPPIN[cat]} size={20} aria-hidden />
+							<span style={locationText}>{data.location}</span>
+						</div>
+					)
+				) : null}
+
+				{/* 5. TIMING — concrete BEGINS | ENDS when known, else the opportunity window */}
+				{hasDates ? (
+					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
+						<div style={STRIP_CELL_CAT}>
+							<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+								<Icon name="status.begins" size={16} aria-hidden />
+								<span style={stripLabel}>Begins</span>
+							</span>
+							<span style={stripValue}>{data.begins ?? "Flexible"}</span>
+						</div>
+						<div style={STRIP_CELL_CAT}>
+							<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+								<Icon name="status.ends" size={16} aria-hidden />
+								<span style={stripLabel}>Ends</span>
+							</span>
+							<span style={stripValue}>{data.ends ?? "Flexible"}</span>
+						</div>
+					</div>
 				) : (
-					<div style={ROW_CELL_CAT}>
-						<Icon name={MAPPIN[cat]} size={20} aria-hidden />
-						<span style={locationText}>{data.location}</span>
+					<div style={{ ...STRIP_CELL_CAT, flexDirection: "row", gap: "7px", padding: "9px 14px" }}>
+						<Icon name="status.begins" size={16} aria-hidden />
+						<span style={locationText}>{data.opportunityWindow || "Open timing"}</span>
 					</div>
 				)}
-
-				{/* 5. BEGINS | ENDS — own 2-column row, never collapses */}
-				<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
-					<div style={STRIP_CELL_CAT}>
-						<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-							<Icon name="status.begins" size={16} aria-hidden />
-							<span style={stripLabel}>Begins</span>
-						</span>
-						<span style={stripValue}>{data.begins ?? "—"}</span>
-					</div>
-					<div style={STRIP_CELL_CAT}>
-						<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
-							<Icon name="status.ends" size={16} aria-hidden />
-							<span style={stripLabel}>Ends</span>
-						</span>
-						<span style={stripValue}>{data.ends ?? "—"}</span>
-					</div>
-				</div>
 
 				{/* 6. SKILLS (applicant review) or HOUSING | MEALS | PAY */}
 				{isApplicantReview && data.skills && data.skills.length > 0 ? (
@@ -874,8 +849,8 @@ export function DiscoveryCard({
 								type="button"
 								onClick={onApprove ? () => onApprove(data.id) : undefined}
 								style={{
-									background: "#1D5026", color: "#fff",
-									border: "3px solid #1D5026", borderRadius: "10px",
+									background: "var(--status-success-fg)", color: "var(--palette-paper)",
+									border: "3px solid var(--status-success-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
 									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
@@ -891,8 +866,8 @@ export function DiscoveryCard({
 								type="button"
 								onClick={onWarn ? () => onWarn(data.id) : undefined}
 								style={{
-									background: "transparent", color: "#7A5A10",
-									border: "2px dashed #B8780A", borderRadius: "10px",
+									background: "transparent", color: "var(--status-warning-fg)",
+									border: "2px dashed var(--status-warning-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
 									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
@@ -907,8 +882,8 @@ export function DiscoveryCard({
 								type="button"
 								onClick={onRemove ? () => onRemove(data.id) : undefined}
 								style={{
-									background: "transparent", color: "#C93824",
-									border: "2px dashed #C93824", borderRadius: "10px",
+									background: "transparent", color: "var(--status-error-fg)",
+									border: "2px dashed var(--status-error-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
 									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
@@ -937,9 +912,9 @@ export function DiscoveryCard({
 									boxShadow: "3px 3px 0 rgba(23,19,13,0.30)",
 								}}
 							>
-								<span aria-hidden style={{ fontFamily: UI_FONT, fontSize: "12px", opacity: 0.6 }}>≥—</span>
+								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
 								Skip
-								<span aria-hidden style={{ fontFamily: UI_FONT, fontSize: "12px", opacity: 0.6 }}>—≤</span>
+								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
 							</button>
 
 							{/* SAVE — neutral bordered */}

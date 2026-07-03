@@ -140,6 +140,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-8);
+  min-height: var(--tap-min);
   padding: var(--space-12) var(--space-20);
   border: 1px solid transparent;
   border-radius: var(--radius-button);
@@ -151,12 +152,19 @@
   transition:
     background var(--motion-fast) var(--ease-standard),
     border-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .ui-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Tactile press — confirms the tap registered (the most-skipped state). One
+   rule lifts every composed <Button> across all four scopes. */
+.ui-button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .ui-button--primary {
@@ -193,7 +201,12 @@
   cursor: pointer;
   transition:
     background var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard);
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.ui-chip:active {
+  transform: scale(0.97);
 }
 
 .ui-chip--selected {
@@ -231,6 +244,38 @@
   font-family: var(--font-display);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
+}
+
+/* =================================================================== */
+/* Countdown -- Founding Host Program seat counter                      */
+/* =================================================================== */
+.ui-countdown {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-card);
+  background: var(--status-featured-bg);
+  color: var(--status-featured-fg);
+  font-family: var(--font-ui);
+}
+
+.ui-countdown__label {
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.ui-countdown__value {
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.ui-countdown--soldout {
+  background: var(--color-surface);
+  color: var(--text-secondary);
 }
 
 /* =================================================================== */

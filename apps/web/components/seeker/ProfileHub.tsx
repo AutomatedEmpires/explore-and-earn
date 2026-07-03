@@ -50,8 +50,11 @@ interface StatCell {
 /** The one next-best-action surfaced above the fold. Always resolves to one. */
 interface NextAction {
   readonly tone: "primary" | "soon" | "calm";
+  readonly eyebrow: string;
   readonly title: string;
   readonly sub: string;
+  readonly cta: string;
+  readonly icon: IconKey;
   readonly href: string;
   readonly progress?: number;
 }
@@ -60,24 +63,33 @@ function resolveNextAction(status: SeekerStatusSummary, resumeReady: boolean): N
   if (status.offersCount > 0) {
     return {
       tone: "primary",
+      eyebrow: "Offer waiting",
       title: status.offersCount === 1 ? "You have an offer" : `You have ${status.offersCount} offers`,
       sub: "Review and respond before they expire.",
+      cta: "Review",
+      icon: "status.match",
       href: "/offered",
     };
   }
   if (!resumeReady) {
     return {
       tone: "soon",
+      eyebrow: "Almost there",
       title: "Finish your resume",
       sub: `${status.resumeCompletion}% — reach ${RESUME_APPLY_THRESHOLD}% to unlock applications.`,
+      cta: "Continue",
+      icon: "profile.resume",
       href: "/resume",
       progress: status.resumeCompletion,
     };
   }
   return {
     tone: "calm",
+    eyebrow: "You're set",
     title: "You're ready to apply",
     sub: "Keep exploring opportunities matched to you.",
+    cta: "Explore",
+    icon: "nav.seek",
     href: "/seek",
   };
 }
@@ -246,9 +258,13 @@ export function ProfileHub({
         })}
       </ul>
 
-      {/* ── One next-best-action ── */}
+      {/* ── One next-best-action — the module's dominant element ── */}
       <Link href={nextAction.href} className={`${styles.callout} ${styles[nextAction.tone]}`}>
+        <span className={styles.calloutIcon} aria-hidden="true">
+          <Icon name={nextAction.icon} size={24} />
+        </span>
         <div className={styles.calloutText}>
+          <span className={styles.calloutEyebrow}>{nextAction.eyebrow}</span>
           <span className={styles.calloutTitle}>{nextAction.title}</span>
           <span className={styles.calloutSub}>{nextAction.sub}</span>
           {nextAction.progress != null && (
@@ -257,7 +273,10 @@ export function ProfileHub({
             </div>
           )}
         </div>
-        <Icon name="action.forward" size={20} aria-hidden />
+        <span className={styles.calloutCta}>
+          <span className={styles.calloutCtaLabel}>{nextAction.cta}</span>
+          <Icon name="action.forward" size={20} aria-hidden />
+        </span>
       </Link>
 
       {/* ── Lower stack: matched · featured · directory · badges ── */}

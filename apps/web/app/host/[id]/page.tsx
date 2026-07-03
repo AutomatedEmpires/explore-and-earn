@@ -2,11 +2,21 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { getPublicHostProfile, getPublicListingsByHost } from "@explore-and-earn/db";
+import { auth } from "@clerk/nextjs/server";
+import {
+  getPublicListingsByHost,
+  getHostRatingSummary,
+  getHostReviews,
+  getReviewableEngagementForHost,
+} from "@explore-and-earn/db";
+import { getPublicHostProfileCached } from "../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
 import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 
 import { HostProfileHero } from "../../../components/host/HostProfileHero";
+import { HostTrustBand } from "../../../components/host/HostTrustBand";
+import { HostReviews } from "../../../components/host/HostReviews";
+import { LeaveReview } from "../../../components/host/LeaveReview";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { generateBreadcrumbJsonLd } from "../../../lib/seo";
 import styles from "./page.module.css";
@@ -21,7 +31,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const host = await getPublicHostProfile(id);
+  const host = await getPublicHostProfileCached(id);
   if (!host) return { title: "Host not found" };
 
   const tagline = host.tagline ?? host.about?.slice(0, 100);
@@ -354,11 +364,25 @@ function HousingMealsCard({
 
 export default async function PublicHostProfilePage({ params }: Props) {
   const { id } = await params;
-  const [host, listings] = await Promise.all([
-    getPublicHostProfile(id),
+  const [host, listings, ratingSummary, reviews] = await Promise.all([
+    getPublicHostProfileCached(id),
     getPublicListingsByHost(id),
+    getHostRatingSummary(id),
+    getHostReviews(id),
   ]);
   if (!host) notFound();
+
+  // Eligibility for the write flow: a logged-in seeker with a completed/active
+  // engagement here who hasn't reviewed yet. Resolved server-side; null for
+  // guests, non-seekers, and the ineligible — so the public page stays public.
+  const { userId, getToken } = await auth();
+  let reviewable: Awaited<ReturnType<typeof getReviewableEngagementForHost>> = null;
+  if (userId) {
+    const seekerToken = await getToken({ template: "supabase" });
+    if (seekerToken) {
+      reviewable = await getReviewableEngagementForHost(seekerToken, userId, id);
+    }
+  }
 
   const coverPhotoUrl =
     listings.find((l) => l.coverPhotoUrl != null)?.coverPhotoUrl ?? null;
@@ -383,7 +407,7 @@ export default async function PublicHostProfilePage({ params }: Props) {
       type="application/ld+json"
       dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }}
     />
-    <main className={styles.page}>
+    <div className={styles.page}>
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <HostProfileHero
         host={host}
@@ -400,11 +424,30 @@ export default async function PublicHostProfilePage({ params }: Props) {
         hostingSinceYear={hostingSinceYear}
       />
 
+      {/* ── Trust band — triad-kept proof (renders only with reviews) ── */}
+      <HostTrustBand
+        summary={ratingSummary}
+        verified={host.attestationStatus === "attested"}
+        reviewsHref="#reviews-heading"
+      />
+
       {/* ── Content grid: main col + sidebar ─────────────────── */}
       <div className={hasSidebar ? styles.contentGrid : styles.contentSingle}>
         {/* Main column: about + listings */}
         <div className={styles.mainCol}>
           {host.about ? <AboutSection about={host.about} /> : null}
+          {reviewable ? (
+            <LeaveReview
+              hostName={host.companyName}
+              hostProfileId={id}
+              applicationId={reviewable.applicationId}
+            />
+          ) : null}
+          <HostReviews
+            hostName={host.companyName}
+            summary={ratingSummary}
+            reviews={reviews}
+          />
           <ListingsSection listings={listings} />
         </div>
 
@@ -423,7 +466,7 @@ export default async function PublicHostProfilePage({ params }: Props) {
           </aside>
         ) : null}
       </div>
-    </main>
+    </div>
     </>
   );
 }

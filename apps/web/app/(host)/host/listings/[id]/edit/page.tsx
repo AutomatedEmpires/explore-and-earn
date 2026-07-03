@@ -49,13 +49,20 @@ export default async function HostListingEditPage({
     category: listing.category,
     locationName: listing.location_display ?? undefined,
     summary: listing.description ?? undefined,
+    // Hydrate every field the form submits — otherwise a blank field re-saves as
+    // empty and wipes the stored value (housing/meals flipping included→false,
+    // the gallery emptying, the end date dropping).
+    housingDescription: listing.housing_description ?? undefined,
+    mealsDescription: listing.meals_description ?? undefined,
     payMin: centsToInput(listing.compensation_min_cents),
     payMax: centsToInput(listing.compensation_max_cents),
     payPeriod: listing.compensation_unit
       ? (listing.compensation_unit as CompensationUnit)
       : undefined,
     startDate: listing.begins_at ? listing.begins_at.slice(0, 10) : undefined,
+    endDate: listing.ends_at ? listing.ends_at.slice(0, 10) : undefined,
     coverPhotoUrl: listing.cover_photo_url ?? undefined,
+    galleryUrls: listing.gallery_photo_urls ?? undefined,
   };
 
   return (

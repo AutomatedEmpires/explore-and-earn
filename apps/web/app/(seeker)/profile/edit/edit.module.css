@@ -57,9 +57,17 @@
 	line-height: var(--type-body-lh);
 	color: var(--text-primary);
 	background: var(--color-surface-raised);
-	border: none;
+	border: 1px solid var(--border-soft);
 	border-radius: var(--radius-cell);
 	padding: var(--space-12);
+	transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.input:focus,
+.textarea:focus {
+	outline: none;
+	border-color: var(--field-border-focus);
+	box-shadow: var(--ui-focus-ring);
 }
 
 .textarea {

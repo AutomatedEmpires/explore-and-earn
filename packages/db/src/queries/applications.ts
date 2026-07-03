@@ -312,6 +312,24 @@ export async function getApplicationCountsByListing(
   return counts;
 }
 
+/**
+ * Per-listing count of NEW (status='applied') applications — the host hasn't
+ * triaged these yet. Backs the "N new" badge on the listings manager, which was
+ * previously hardcoded to 0. Same single fetch shape as the total counts above.
+ */
+export async function getNewApplicationCountsByListing(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<Record<string, number>> {
+  const applications = await getHostApplications(clerkToken, clerkUserId);
+  const counts: Record<string, number> = {};
+  for (const application of applications) {
+    if (application.status !== "applied") continue;
+    counts[application.listingId] = (counts[application.listingId] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export const HOST_SETTABLE_STATUSES = [
   "reviewing",
   "saved_by_host",

@@ -6,9 +6,11 @@
  * AGENTS.md: never hardcode raw colors where semantic tokens exist.
  */
 .dashboard {
-  --community-green:    #2A5724;
-  --community-green-deep: #1E4018;
-  --community-green-bg: #EDF4EC;
+  /* On-system: the community "green" is now V2 teal (a forest green-teal), so the
+     whole surface inherits the brand secondary instead of a bespoke off-palette green. */
+  --community-green:      color-mix(in srgb, var(--palette-teal) 82%, var(--palette-ink));
+  --community-green-deep: color-mix(in srgb, var(--palette-teal) 62%, var(--palette-ink));
+  --community-green-bg:   color-mix(in srgb, var(--palette-teal) 10%, var(--palette-surface));
 }
 
 .dashboard {
@@ -26,10 +28,10 @@
 
 .welcomeBar {
   background:
-    radial-gradient(ellipse 90% 140% at 5% 70%, rgba(112, 192, 84, 0.30) 0%, transparent 55%),
-    radial-gradient(ellipse 55% 70% at 95% 15%, rgba(30, 64, 24, 0.40) 0%, transparent 50%),
+    radial-gradient(ellipse 90% 140% at 5% 70%, color-mix(in srgb, var(--palette-teal) 24%, transparent) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 70% at 95% 15%, rgba(36, 34, 30, 0.34) 0%, transparent 50%),
     var(--community-green);
-  color: rgba(255, 255, 255, 0.95);
+  color: #FBF7EE;
   /* Full-bleed — no side margins, no border-radius */
   border-radius: 0;
   border: none;
@@ -67,7 +69,7 @@
   font-size: clamp(1.625rem, 6vw, 2.125rem);
   font-weight: var(--font-weight-regular);
   line-height: 1.1;
-  color: #FFFFFF;
+  color: var(--palette-white);
 }
 
 .mastheadBlurb {
@@ -77,6 +79,35 @@
   font-size: 0.875rem;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.78);
+}
+
+/* ─── Brand taglines (always present, prominent) ─────────────────────────────── */
+
+.mastheadTaglines {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-12);
+  margin-top: var(--space-8);
+}
+
+.mastheadTagline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  color: var(--palette-white);
+  padding: var(--space-4) var(--space-10);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mastheadTaglineDot {
+  display: none;
 }
 
 .welcomeBarInner {
@@ -98,7 +129,7 @@
   font-family: var(--font-display);
   font-size: 1.25rem;
   font-weight: var(--font-weight-regular);
-  color: #FFFFFF;
+  color: var(--palette-white);
   flex-shrink: 0;
   user-select: none;
 }
@@ -118,7 +149,7 @@
 }
 
 .welcomeGreeting strong {
-  color: #FFFFFF;
+  color: var(--palette-white);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -154,7 +185,7 @@
   font-family: var(--font-display);
   font-size: 1.125rem;
   line-height: 1;
-  color: #FFFFFF;
+  color: var(--palette-white);
 }
 
 .xpLevelWord {
@@ -184,7 +215,7 @@
 .xpFill {
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, #7FD063, #A8E87A);
+  background: linear-gradient(90deg, var(--palette-teal), color-mix(in srgb, var(--palette-teal) 55%, var(--palette-surface)));
   transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -220,8 +251,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
-  height: 2rem;
-  padding: 0 var(--space-12);
+  min-height: 44px;
+  padding: var(--space-8) var(--space-14);
   border: 1px solid rgba(255, 255, 255, 0.20);
   border-radius: var(--radius-pill);
   background: transparent;
@@ -232,10 +263,12 @@
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
+  cursor: pointer;
   transition:
     border-color var(--motion-fast) var(--ease-standard),
     background var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .tabLink:hover {
@@ -244,16 +277,40 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+.tabLink:focus-visible {
+  outline: 2px solid var(--palette-white);
+  outline-offset: 2px;
+}
+
+.tabLink:active {
+  transform: scale(0.97);
+}
+
 .tabLinkActive {
   border-color: rgba(255, 255, 255, 0.55);
   background: rgba(255, 255, 255, 0.16);
-  color: #FFFFFF;
+  color: var(--palette-white);
 }
 
 .tabLinkActive:hover {
   border-color: rgba(255, 255, 255, 0.70);
   background: rgba(255, 255, 255, 0.20);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .tabLink { transition: none; }
+  .tabLink:active { transform: none; }
+}
+
+/* ─── Tab panels ───────────────────────────────────────────────────────────────── */
+
+.tabPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.tabPanel[hidden] { display: none; }
 
 /* ─── Mobile profile strip ────────────────────────────────────────────────────── */
 
@@ -477,7 +534,7 @@
   transition: background var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
 }
 
-.emptyStateCta:hover { background: var(--community-green); color: #FFFFFF; }
+.emptyStateCta:hover { background: var(--community-green); color: var(--palette-white); }
 
 /* ─── Loading skeletons ──────────────────────────────────────────────────────── */
 
@@ -1251,8 +1308,10 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .widgetMeterIcon {
-  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
   line-height: 1;
+  color: var(--community-green);
 }
 
 .widgetMeterLabel {
@@ -1588,7 +1647,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 
 .listingCta:hover {
   background: var(--community-green);
-  color: #FFFFFF;
+  color: var(--palette-white);
 }
 
 /* ─── Featured employer feed card ─────────────────────────────────────────────── */
@@ -1626,10 +1685,10 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .employerStar {
+  display: inline-flex;
+  align-items: center;
   margin-left: auto;
-  font-size: 0.5625rem;
-  letter-spacing: 0.2em;
-  opacity: 0.45;
+  opacity: 0.55;
   user-select: none;
 }
 
@@ -1873,8 +1932,11 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .feedEndIcon {
-  font-size: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
+  color: var(--community-green);
   user-select: none;
 }
 
@@ -1914,7 +1976,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 
 .feedEndCta:hover {
   background: var(--community-green);
-  color: #FFFFFF;
+  color: var(--palette-white);
 }
 
 /* ─── Feed item entrance animation ──────────────────────────────────────────── */
@@ -2142,7 +2204,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 
 .composerCtaBtn:hover {
   background: var(--community-green);
-  color: #FFFFFF;
+  color: var(--palette-white);
 }
 
 @media (max-width: 480px) {
@@ -2469,7 +2531,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 
 .photoFileInput::file-selector-button:hover {
   background: var(--community-green);
-  color: #FFFFFF;
+  color: var(--palette-white);
 }
 
 .photoField {
@@ -2537,7 +2599,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   min-height: var(--tap-min);
   padding: var(--space-10) var(--space-20);
   background: var(--community-green);
-  color: #FFFFFF;
+  color: var(--palette-white);
   border: 1.5px solid var(--community-green-deep);
   border-radius: var(--radius-pill);
   font-family: var(--font-ui);
@@ -2633,6 +2695,54 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .photoGateCta:hover { filter: brightness(1.05); }
+
+/* ─── Seeker announcements intro (read-only banner) ──────────────────────────── */
+
+.annIntro {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--community-green-bg);
+}
+
+.annIntroIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-cell);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface-raised, var(--color-surface));
+  color: var(--community-green);
+  flex-shrink: 0;
+}
+
+.annIntroText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.annIntroTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.annIntroSub {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
 
 /* ─── Reduced motion ─────────────────────────────────────────────────────────── */
 

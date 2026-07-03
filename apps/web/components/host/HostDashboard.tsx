@@ -1,12 +1,15 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
-import { Icon, Meter } from "@explore-and-earn/ui";
+import { Badge, Icon } from "@explore-and-earn/ui";
 
 import type {
   HostAnalytics,
   HostDashboardStats,
   RecentActivity,
 } from "@explore-and-earn/db";
+import { HostSetupChecklist } from "./HostSetupChecklist";
 import styles from "./HostDashboard.module.css";
+import { StaggerReveal } from "./StaggerReveal";
 
 export interface HostDashboardProps {
   readonly stats: HostDashboardStats;
@@ -61,33 +64,90 @@ export function HostDashboard({
   primaryLane,
   analytics,
 }: HostDashboardProps) {
-  const liveCount = stats.listingsByStatus["live"] ?? 0;
-  const draftCount = stats.listingsByStatus["draft"] ?? 0;
-  const totalListings = Object.values(stats.listingsByStatus).reduce(
-    (sum, n) => sum + n,
-    0,
-  );
+  // Primary counts come from analytics — getHostAnalytics is the reliable host
+  // resolver (live listings + applications by status); the month-scoped stats
+  // are used only for the "this month" figures, with all-time fallbacks so a
+  // stats hiccup never blanks the dashboard to zeros.
+  const totalListings = analytics.perListingStats.length;
+  const liveCount = analytics.activeListingCount;
+  const draftCount =
+    stats.listingsByStatus["draft"] ??
+    analytics.perListingStats.filter((l) => l.listingStatus === "draft").length;
 
-  const newApps = stats.applicationsThisMonth["applied"] ?? 0;
-  const totalAppsMonth = Object.values(stats.applicationsThisMonth).reduce(
-    (sum, n) => sum + n,
-    0,
-  );
-
-  // "Pipeline fill" as a 0–100 percentage for the Meter, based on how many
-  // of this month's applications have moved past "applied".
-  const reviewed = totalAppsMonth - newApps;
-  const pipelineFill =
-    totalAppsMonth > 0 ? Math.round((reviewed / totalAppsMonth) * 100) : 0;
-
-  // Analytics-derived figures for the performance cards.
-  const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
   const totalApplicationsAllTime = Object.values(
     analytics.totalApplicationsByStatus,
   ).reduce((sum, n) => sum + n, 0);
+  const pendingReview = analytics.totalApplicationsByStatus["applied"] ?? 0;
+
+  const monthApps = Object.values(stats.applicationsThisMonth).reduce(
+    (sum, n) => sum + n,
+    0,
+  );
+  const totalAppsMonth = monthApps > 0 ? monthApps : totalApplicationsAllTime;
+  const newApps = stats.applicationsThisMonth["applied"] ?? pendingReview;
+
+  // "Pipeline fill" — share of applications moved past "applied".
+  const reviewed = totalApplicationsAllTime - pendingReview;
+  const pipelineFill =
+    totalApplicationsAllTime > 0
+      ? Math.round((reviewed / totalApplicationsAllTime) * 100)
+      : 0;
+
+  // ── Pipeline stage breakdown ────────────────────────────────────────
+  // Group the host's REAL all-time application counts (the same source the
+  // radar reads) into three honest funnel stages so the pipeline panel is as
+  // explainable as the radar — never a single mystery meter. Counts come
+  // straight from analytics.totalApplicationsByStatus (no fabrication); the
+  // denominator is the all-time total so the bars always sum to the pipeline.
+  const appsByStatus = analytics.totalApplicationsByStatus;
+  const stageNew = appsByStatus["applied"] ?? 0;
+  const stageReview =
+    (appsByStatus["reviewing"] ?? 0) + (appsByStatus["saved_by_host"] ?? 0);
+  const stageAdvanced =
+    (appsByStatus["offered"] ?? 0) +
+    (appsByStatus["accepted"] ?? 0) +
+    (appsByStatus["active"] ?? 0) +
+    (appsByStatus["completed"] ?? 0);
+  const pipelineTotal = totalApplicationsAllTime;
+  const pipelineStages = [
+    { label: "New", hint: "Awaiting first look", count: stageNew, tone: "new" },
+    {
+      label: "In review",
+      hint: "Reviewing & shortlisted",
+      count: stageReview,
+      tone: "review",
+    },
+    {
+      label: "Advanced",
+      hint: "Offered & onward",
+      count: stageAdvanced,
+      tone: "advanced",
+    },
+  ] as const;
+
+  const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
   const topListings = analytics.perListingStats.slice(0, 5);
 
-  const pending = stats.pendingActions;
+  // ── Conversion radar ────────────────────────────────────────────────
+  // A composite "operational health" score, computed only from data that
+  // already exists on this dashboard — never fabricated. Three real signals,
+  // each surfaced individually in the legend so the headline % is explainable:
+  //   • Pipeline   — share of applications moved past "applied" (responsiveness)
+  //   • Outreach   — invite acceptance rate (recruiting effectiveness)
+  //   • Inventory  — whether the host has live listings collecting demand
+  const inventoryPct = totalListings > 0 ? (liveCount > 0 ? 100 : 40) : 0;
+  const radarInputs = [
+    { label: "Pipeline movement", value: pipelineFill },
+    { label: "Invite acceptance", value: acceptancePct },
+    { label: "Listing inventory", value: inventoryPct },
+  ] as const;
+  const conversionScore = Math.round(
+    radarInputs.reduce((sum, s) => sum + s.value, 0) / radarInputs.length,
+  );
+  const radarTone =
+    conversionScore >= 70 ? "Healthy" : conversionScore >= 40 ? "Building" : "Needs work";
+
+  const pending = stats.pendingActions > 0 ? stats.pendingActions : pendingReview;
   const isNewHost = totalListings === 0;
   // Exactly one KPI leads as the dominant tile — the host's most urgent job
   // (pending review > new applicants). Avoids two competing "primary" tiles.
@@ -100,7 +160,7 @@ export function HostDashboard({
       : { href: "/host/listings/new", label: "Create a listing", icon: "status.open" as const };
 
   return (
-    <div className={`host-page ${styles.dashboard}`}>
+    <StaggerReveal className={`host-page ${styles.dashboard}`}>
       {/* ── Identity hero + strongest next action ──────────────────── */}
       <section className="host-hero" data-lane={primaryLane ?? undefined}>
         <div>
@@ -126,7 +186,23 @@ export function HostDashboard({
             </Link>
           ) : null}
         </div>
+        {!isNewHost ? (
+          <div className="hostos-herokpi" aria-hidden>
+            <div><b>{liveCount}</b><span>live listings</span></div>
+            <div><b>{totalApplicationsAllTime}</b><span>applicants</span></div>
+            <div><b>{pipelineFill}%</b><span>reviewed</span></div>
+          </div>
+        ) : null}
       </section>
+
+      {/* ── First-run setup checklist — until the host has a live listing ─ */}
+      {liveCount === 0 ? (
+        <HostSetupChecklist
+          hasProfile={companyName !== null}
+          listingCount={totalListings}
+          liveCount={liveCount}
+        />
+      ) : null}
 
       {/* ── KPI row ─────────────────────────────────────────────────── */}
       <div className="host-kpiGrid">
@@ -237,6 +313,11 @@ export function HostDashboard({
             <span className="host-action-tile__label">Messages</span>
             <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
           </Link>
+          <Link className="host-action-tile" href="/host/announcements">
+            <span className="host-action-tile__icon"><Icon name="nav.announcements" size={20} aria-hidden /></span>
+            <span className="host-action-tile__label">Announcements</span>
+            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
+          </Link>
           <Link className="host-action-tile" href="/host/profile/edit">
             <span className="host-action-tile__icon"><Icon name="nav.profile" size={20} aria-hidden /></span>
             <span className="host-action-tile__label">Edit profile</span>
@@ -263,17 +344,49 @@ export function HostDashboard({
               <Icon name="action.forward" size={16} aria-hidden />
             </Link>
           </div>
-          {totalAppsMonth > 0 ? (
-            <>
-              <div className={styles.meterRow}>
-                <Meter value={pipelineFill} label="REVIEWED" />
-                <span className={styles.meterLabel}>
-                  {reviewed} of {totalAppsMonth} reviewed
+          {pipelineTotal > 0 ? (
+            <div className={styles.pipeline}>
+              <div className={styles.pipelineLede}>
+                <span className={styles.pipelinePct}>{pipelineFill}%</span>
+                <span className={styles.pipelineLedeText}>
+                  moved past first review
+                  <span className={styles.pipelineLedeSub}>
+                    {reviewed} of {pipelineTotal} applicants
+                  </span>
                 </span>
               </div>
-            </>
+              <ul className={styles.pipelineStages}>
+                {pipelineStages.map((stage) => {
+                  const pct =
+                    pipelineTotal > 0
+                      ? Math.round((stage.count / pipelineTotal) * 100)
+                      : 0;
+                  return (
+                    <li
+                      key={stage.label}
+                      className={styles.pipelineStage}
+                      data-tone={stage.tone}
+                      style={{ "--pct": `${pct}%` } as CSSProperties}
+                    >
+                      <span className={styles.pipelineStageLabel}>
+                        {stage.label}
+                        <span className={styles.pipelineStageHint}>
+                          {stage.hint}
+                        </span>
+                      </span>
+                      <span className={styles.pipelineStageCount}>
+                        {stage.count}
+                      </span>
+                      <span className={styles.pipelineStageTrack} aria-hidden>
+                        <span />
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           ) : (
-            <p className={styles.muted}>No applications yet this month.</p>
+            <p className={styles.muted}>No applications yet.</p>
           )}
         </section>
 
@@ -281,23 +394,44 @@ export function HostDashboard({
           <div className="host-panel__head">
             <div className="host-panel__titles">
               <span className="host-panel__eyebrow">Reach</span>
-              <h2 className="host-panel__title">Invite performance</h2>
+              <h2 className="host-panel__title">Conversion radar</h2>
             </div>
+            <Badge
+              variant={conversionScore >= 70 ? "success" : "neutral"}
+              label={radarTone}
+            />
           </div>
-          <dl className="host-statList">
-            <div className="host-stat">
-              <dt className="host-stat__label">Active listings</dt>
-              <dd className="host-stat__value">{analytics.activeListingCount}</dd>
+          <div className={styles.radarSplit}>
+            <div
+              className={styles.radar}
+              style={{ "--pct": conversionScore } as CSSProperties}
+              role="meter"
+              aria-valuenow={conversionScore}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Operational health ${conversionScore} percent — ${radarTone}`}
+            >
+              <span className={styles.radarCore} aria-hidden>
+                <span className={styles.radarValue}>{conversionScore}%</span>
+                <span className={styles.radarCaption}>Health</span>
+              </span>
             </div>
-            <div className="host-stat">
-              <dt className="host-stat__label">Total applications</dt>
-              <dd className="host-stat__value">{totalApplicationsAllTime}</dd>
-            </div>
-            <div className="host-stat">
-              <dt className="host-stat__label">Invite acceptance</dt>
-              <dd className="host-stat__value">{acceptancePct}%</dd>
-            </div>
-          </dl>
+            <ul className={styles.radarLegend}>
+              {radarInputs.map((input) => (
+                <li
+                  key={input.label}
+                  className={styles.radarLegendRow}
+                  style={{ "--pct": `${input.value}%` } as CSSProperties}
+                >
+                  <span className={styles.radarLegendLabel}>{input.label}</span>
+                  <span className={styles.radarLegendValue}>{input.value}%</span>
+                  <span className={styles.radarTrack} aria-hidden>
+                    <span />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
       </div>
 
@@ -363,6 +497,38 @@ export function HostDashboard({
           </ol>
         </section>
       ) : null}
-    </div>
+
+      {/* ── Resources / help ────────────────────────────────────────── */}
+      <section className={styles.resources} aria-labelledby="resources-heading">
+        <div className={styles.resourcesIntro}>
+          <span className={styles.resourcesIcon} aria-hidden>
+            <Icon name="nav.help" size={20} aria-hidden />
+          </span>
+          <div>
+            <h2 id="resources-heading" className={styles.resourcesTitle}>
+              Hosting resources
+            </h2>
+            <p className={styles.resourcesNote}>
+              New here, or stuck on a step? Answers for posting, boosting,
+              applicants, billing, and trust.
+            </p>
+          </div>
+        </div>
+        <div className={styles.resourcesLinks}>
+          <Link className={styles.resourceChip} href="/host/help">
+            <Icon name="nav.help" size={16} aria-hidden />
+            Help &amp; FAQ
+          </Link>
+          <Link className={styles.resourceChip} href="/host/help">
+            <Icon name="status.boosted" size={16} aria-hidden />
+            Boosting guide
+          </Link>
+          <Link className={styles.resourceChip} href="/host/help">
+            <Icon name="trust.verified_host" size={16} aria-hidden />
+            Get verified
+          </Link>
+        </div>
+      </section>
+    </StaggerReveal>
   );
 }

@@ -1,4 +1,5 @@
-import type { HostApplication } from "@explore-and-earn/db";
+import type { HostApplication, ListingMatchScore } from "@explore-and-earn/db";
+import { matchScoreKey } from "@explore-and-earn/db";
 
 import type { DiscoveryListing } from "../../../../components/discovery";
 import type { ApplicantStage, HostApplicantItem } from "../../../../components/host";
@@ -83,7 +84,13 @@ export function toApplicantItem(
   application: HostApplication,
   listingsById: ReadonlyMap<string, DiscoveryListing>,
   displayNames?: ReadonlyMap<string, string>,
+  threadsByApplicationId?: ReadonlyMap<string, string>,
+  matchScores?: ReadonlyMap<string, ListingMatchScore>,
 ): HostApplicantItem {
+  const threadId = threadsByApplicationId?.get(application.id);
+  const match = matchScores?.get(
+    matchScoreKey(application.listingId, application.seekerProfileId),
+  );
   return {
     id: application.id,
     applicantName: displayNames?.get(application.seekerProfileId) ?? applicantLabel(application),
@@ -91,5 +98,22 @@ export function toApplicantItem(
     stage: statusToStage(application.status),
     appliedOn: formatAppliedOn(application.submittedAt),
     ...(application.coverMessage ? { note: application.coverMessage } : {}),
+    ...(threadId ? { threadId } : {}),
+    ...(match ? { matchScore: match.score, matchBand: match.band } : {}),
   };
+}
+
+/**
+ * Build an applicationId → conversationId lookup from the host's conversations,
+ * so applicant items can deep-link to an existing message thread. Conversations
+ * with no application_id (general threads) are skipped.
+ */
+export function threadsByApplicationId(
+  conversations: ReadonlyArray<{ id: string; applicationId: string | null }>,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const c of conversations) {
+    if (c.applicationId) map.set(c.applicationId, c.id);
+  }
+  return map;
 }

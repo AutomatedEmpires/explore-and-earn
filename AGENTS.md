@@ -25,7 +25,7 @@ Never reduce this triad to a generic "Perks" label.
 - **VS Code (Copilot / Codex / Cursor / Claude)** = implementation workers.
 - **The Notion (Opus) agent** = architect / reviewer / orchestrator.
 - **Figma** = *optional* visual reference — **not** a required gate.
-- **Streamline Freehand** = the icon language.
+- **Phosphor** = the icon language (via the `<Icon>` registry; free MIT set, replaced paid Streamline 2026-07-02).
 
 Mantra: **Notion decides and builds. GitHub reviews and ships. Figma shows. Everything else runs.**
 
@@ -67,8 +67,8 @@ The founder's biggest concern is **visual quality**. Do not ship generic, ugly, 
 
 - Read [`docs/design/design-system-v1.md`](./docs/design/design-system-v1.md) and use the **locked tokens** verbatim. Never hardcode colors, type, spacing, or radius that bypass tokens.
 - Use **one unified component system** across all lifestyle categories (Farm, Maritime, Remote, Seasonal). Vary imagery + accent color, never the component system.
-- **One icon system only: Streamline Freehand**, via the `<Icon name="domain.name"/>` registry in `packages/ui`. No Lucide / Heroicons / Font Awesome / Material / react-icons / ad-hoc inline SVG in feature code (CI guardrail **G30**).
-- **Never commit paid/proprietary Streamline asset files** to this public repo. Use placeholder icon components with stable names + TODO comments. See [`docs/design/icon-system.md`](./docs/design/icon-system.md).
+- **One icon system only: Phosphor** (free MIT `@phosphor-icons/react`), via the `<Icon name="domain.name"/>` registry in `packages/ui`. No Lucide / Heroicons / Font Awesome / Material / react-icons / ad-hoc inline SVG in feature code (CI guardrail **G30**, a `no-restricted-imports` eslint rule). Re-map an icon by editing one registry entry; the whole set is swappable from `registry.ts` alone.
+- Icons ship as a normal dependency — **nothing fetched at runtime, no icon assets committed**. (The separate `visual-assets` illustration system still uses Cloudinary; that migration is a tracked follow-up.) See [`docs/design/icon-system.md`](./docs/design/icon-system.md).
 - Photos get a **hand-drawn frame + paper mat around them** — never filters/overlays *on* host photos. See [`docs/design/photo-language.md`](./docs/design/photo-language.md) and [`docs/design/media-buckets.md`](./docs/design/media-buckets.md).
 
 ## 7. Setup & commands

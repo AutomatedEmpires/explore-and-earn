@@ -1,25 +1,24 @@
 import { auth } from "@clerk/nextjs/server";
-import { getHostProfile, getUnreadMessageCount } from "@explore-and-earn/db";
+import { getUnreadMessageCount } from "@explore-and-earn/db";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { GlobalHeader } from "../../components/global";
-import { HostBottomNav } from "../../components/host";
+import { cachedHostProfile, getSupabaseToken } from "../../lib/serverCache";
+import { HostShell } from "../../components/host/HostShell";
 import { devHostProfile, isDevBenchEnabled } from "../../lib/devBench";
 import { readDevRole } from "../../lib/devBench/server";
 import "../../styles/host.css";
-import styles from "./layout.module.css";
+import "../../styles/host-os.css";
 
 /**
  * Host scope layout.
  *
  * Navigation is scoped per user type (founder canon) — there is no single
- * global bottom nav. The host-scope bottom navigation (Dashboard · Listings ·
- * Applicants · Messages · Profile) is OWNED BY THE HOST LANE and wired here
- * inside the (host) route group via <HostBottomNav>. It does not reuse the
- * app-shell tab set or the locked seeker nav. Host routes live under the /host
- * URL prefix so they never collide with the seeker scope's top-level routes.
+ * global bottom nav. The host-scope bottom navigation is OWNED BY THE HOST LANE
+ * and rendered by <HostShell>'s mobile dock (MOBILE_PRIMARY). It does not reuse
+ * the app-shell tab set or the locked seeker nav. Host routes live under the
+ * /host URL prefix so they never collide with the seeker scope's top-level routes.
  *
  * PROFILE GATE: the Clerk webhook creates a seeker_profiles row on signup but
  * never a host_profiles row, so any authenticated user reaching the host lane
@@ -51,29 +50,29 @@ export default async function HostLayout({
   if (isDevBenchEnabled() && (await readDevRole())) {
     const hostProfile = devHostProfile();
     return (
-      <div className={styles.shell}>
-        <GlobalHeader
-          scope="host"
-          isAuthenticated={true}
-          userName={hostProfile.companyName}
-          unreadCount={0}
-        />
-        <main className={styles.main}>{children}</main>
-        <HostBottomNav />
+      <div className="host-os">
+        <HostShell
+          companyName={hostProfile.companyName}
+          photoUrl={hostProfile.photoUrl}
+          tier={hostProfile.subscriptionTier}
+          unread={0}
+        >
+          {children}
+        </HostShell>
       </div>
     );
   }
 
-  const { userId, getToken } = await auth();
+  const { userId } = await auth();
   if (!userId) {
     redirect("/sign-in");
   }
-  const token = await getToken({ template: "supabase" });
+  const token = await getSupabaseToken();
   if (!token) {
     redirect("/sign-in");
   }
   const [hostProfile, unreadMessages] = await Promise.all([
-    getHostProfile(token, userId),
+    cachedHostProfile(token, userId),
     getUnreadMessageCount(token, userId),
   ]);
   if (!hostProfile) {
@@ -81,15 +80,15 @@ export default async function HostLayout({
   }
 
   return (
-    <div className={styles.shell}>
-      <GlobalHeader
-        scope="host"
-        isAuthenticated={true}
-        userName={hostProfile.companyName ?? null}
-        unreadCount={unreadMessages}
-      />
-      <main className={styles.main}>{children}</main>
-      <HostBottomNav />
+    <div className="host-os">
+      <HostShell
+        companyName={hostProfile.companyName ?? null}
+        photoUrl={hostProfile.photoUrl ?? null}
+        tier={hostProfile.subscriptionTier ?? null}
+        unread={unreadMessages}
+      >
+        {children}
+      </HostShell>
     </div>
   );
 }

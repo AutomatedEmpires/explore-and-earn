@@ -1,0 +1,527 @@
+.page {
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 16% -2%, color-mix(in srgb, var(--color-gold) 9%, transparent), transparent 34%),
+    radial-gradient(circle at 90% 6%, color-mix(in srgb, var(--palette-amber-light) 26%, transparent), transparent 30%),
+    var(--color-paper);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top bar ──────────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding: var(--space-16) var(--space-20);
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-family: var(--font-display);
+  font-size: var(--type-h4-size, 1.25rem);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.brandMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-cell);
+  background: var(--color-gold);
+  color: var(--color-gold-text);
+  font-family: var(--font-ui);
+  font-weight: var(--font-weight-bold);
+}
+
+.topActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.signIn {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.startBtn,
+.startBtnLg {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-gold);
+  color: var(--color-gold-text);
+  font-family: var(--font-ui);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform var(--motion-base, 160ms) var(--ease-standard, ease);
+}
+
+.startBtn {
+  padding: var(--space-8) var(--space-16);
+  font-size: var(--type-meta-size);
+}
+
+.startBtnLg {
+  padding: var(--space-12) var(--space-24);
+  font-size: var(--type-body-size);
+}
+
+.startBtn:hover,
+.startBtnLg:hover {
+  transform: translateY(-1px);
+}
+
+/* ── Hero ─────────────────────────────────────────────────────── */
+.hero {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-32) var(--space-20) var(--space-24);
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--hostos-accent-deep, #7a5a12);
+}
+
+.heroTitle {
+  margin: 0 0 var(--space-12);
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 6vw, 3.5rem);
+  line-height: 1.05;
+  color: var(--text-primary);
+}
+
+.heroSub {
+  margin: 0 auto;
+  max-width: 56ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-lede-size, 1.125rem);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-12);
+  margin-top: var(--space-24);
+}
+
+.ghostBtnLg {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-12) var(--space-24);
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--border-ink);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+/* ── Dashboard preview ────────────────────────────────────────── */
+.previewWrap {
+  max-width: 960px;
+  width: 100%;
+  margin: var(--space-16) auto 0;
+  padding: 0 var(--space-20);
+}
+
+.previewFrame {
+  position: relative;
+  border: 1px solid var(--border-ink);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-card);
+  padding: var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.previewTag {
+  position: absolute;
+  top: calc(-1 * var(--space-10));
+  left: var(--space-16);
+  padding: 2px var(--space-10);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-gold);
+  color: var(--color-gold-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.previewHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+}
+
+.previewEyebrow {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.previewTitle {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 3vw, 1.6rem);
+  color: var(--text-primary);
+}
+
+.previewCta {
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-gold);
+  color: var(--color-gold-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12);
+}
+
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-14) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background: var(--color-paper);
+}
+
+.kpiValue {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  color: var(--text-primary);
+}
+
+.kpiLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.previewChecklist {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background: var(--color-paper);
+  padding: var(--space-16);
+}
+
+.previewChecklistTitle {
+  display: block;
+  margin-bottom: var(--space-10);
+  font-family: var(--font-ui);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.previewChecklist ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.previewChecklist li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+}
+
+.stepMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  color: var(--state-ready-fg);
+  flex-shrink: 0;
+}
+
+.stepDone .stepMark {
+  border-color: color-mix(in srgb, var(--state-ready-fg) 40%, transparent);
+  background: color-mix(in srgb, var(--state-ready-bg) 50%, var(--color-surface));
+}
+
+.stepTodo {
+  color: var(--text-secondary);
+}
+
+.previewNote {
+  margin: var(--space-12) 0 0;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+/* ── Sections ─────────────────────────────────────────────────── */
+.sectionTitle {
+  margin: 0 0 var(--space-20);
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 2.25rem);
+  color: var(--text-primary);
+}
+
+.flows {
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-40) var(--space-20) var(--space-24);
+}
+
+.flowGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-16);
+}
+
+.flowCard {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  padding: var(--space-20);
+}
+
+.flowIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-cell);
+  background: var(--hostos-accent-soft, color-mix(in srgb, var(--color-gold) 16%, var(--color-surface)));
+  color: var(--hostos-accent-deep, #7a5a12);
+  margin-bottom: var(--space-12);
+}
+
+.flowTitle {
+  margin: 0 0 var(--space-6);
+  font-family: var(--font-ui);
+  font-size: var(--type-h5-size, 1.1rem);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.flowBody {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* ── Pricing ──────────────────────────────────────────────────── */
+.pricing {
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-24) var(--space-20);
+  text-align: center;
+}
+
+.pricingSub {
+  margin: calc(-1 * var(--space-12)) 0 var(--space-20);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--text-secondary);
+}
+
+.tierGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-16);
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.tier {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  padding: var(--space-20);
+  text-align: left;
+}
+
+.tierName {
+  margin: 0 0 var(--space-6);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.tierPrice {
+  margin: 0 0 var(--space-6);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--text-primary);
+}
+
+.tierPer {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.tierBlurb {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.foundingBanner {
+  max-width: 760px;
+  margin: 0 auto var(--space-20);
+  padding: var(--space-16) var(--space-20);
+  border-radius: var(--radius-card);
+  background: var(--status-featured-bg);
+  text-align: left;
+}
+
+.foundingBannerLabel {
+  display: block;
+  margin-bottom: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--status-featured-fg);
+}
+
+.foundingBannerBody {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.55;
+  color: var(--status-featured-fg);
+}
+
+.tierFounding {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  color: var(--status-featured-fg);
+}
+
+.tierFoundingLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* ── Final CTA ────────────────────────────────────────────────── */
+.finalCta {
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-40) var(--space-20);
+  text-align: center;
+}
+
+.finalTitle {
+  margin: 0 0 var(--space-10);
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 2.25rem);
+  color: var(--text-primary);
+}
+
+.finalSub {
+  margin: 0 auto var(--space-20);
+  max-width: 48ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* ── Footer ───────────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-24) var(--space-20) var(--space-32);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.footer a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  color: var(--text-primary);
+}
+
+/* ── Desktop ──────────────────────────────────────────────────── */
+@media (min-width: 720px) {
+  .kpiRow {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .flowGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .tierGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

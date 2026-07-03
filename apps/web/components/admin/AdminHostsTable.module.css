@@ -1,0 +1,480 @@
+/*
+ * Admin Hosts verification — trust-forward entity cards inside the admin (emerald)
+ * dark-glass OS. Token-driven only: every color/space/radius resolves through the
+ * .admin-os scope cascade, so the surface themes itself to emerald automatically.
+ *
+ * Trust gradient: each card carries an honest trust tier derived from REAL fields
+ * only (verification status + listing footprint) — trusted / active / newcomer.
+ * The tier tones the left edge, the avatar glow, and the footprint tag; it never
+ * invents a numeric score.
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+/* ── Metric header row (Verified / Pending / Total) ─────────────────────── */
+.metrics {
+  margin: 0;
+}
+
+/* ── Local segment toolbar (All / Verified / Awaiting) ──────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-6);
+  padding-left: var(--space-14);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.toolbarIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--text-muted);
+}
+
+.segments {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 36px;
+  padding: var(--space-6) var(--space-14);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  transition:
+    color var(--motion-fast, 0.15s) var(--ease-standard, ease),
+    background var(--motion-fast, 0.15s) var(--ease-standard, ease),
+    border-color var(--motion-fast, 0.15s) var(--ease-standard, ease);
+}
+
+.segment:hover {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.segment:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+.segment:active {
+  transform: translateY(1px);
+}
+
+.segmentActive {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta) 26%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-cta) 40%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-cta) 18%, transparent);
+}
+
+.segmentActive:hover {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta) 32%, var(--color-surface));
+}
+
+.segmentLabel {
+  letter-spacing: 0.01em;
+}
+
+.segmentCount {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.segmentActive .segmentCount {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta-text) 16%, transparent);
+}
+
+/* ── Error alert (business logic preserved) ─────────────────────────────── */
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 30%, transparent);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--status-error-fg);
+}
+
+.errorIcon {
+  flex: none;
+  color: var(--status-error-fg);
+}
+
+/* ── Entity-card grid ───────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-16);
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-20);
+  padding-left: var(--space-24);
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-card);
+  transition:
+    transform var(--motion-base, 0.2s) var(--ease-standard, ease),
+    border-color var(--motion-base, 0.2s) var(--ease-standard, ease),
+    box-shadow var(--motion-base, 0.2s) var(--ease-standard, ease),
+    background var(--motion-base, 0.2s) var(--ease-standard, ease);
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-ink);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-hover);
+}
+
+/* Trust edge — a left rail toned by tier; the card's primary trust signal */
+.tierEdge {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: var(--radius-pill);
+}
+
+.tier_trusted {
+  border-color: color-mix(in srgb, var(--color-cta) 26%, var(--border-soft));
+}
+.tier_trusted .tierEdge {
+  background: linear-gradient(
+    to bottom,
+    var(--color-cta),
+    color-mix(in srgb, var(--color-cta) 30%, transparent)
+  );
+}
+
+.tier_active {
+  border-color: color-mix(in srgb, var(--status-warning-fg) 24%, var(--border-soft));
+}
+.tier_active .tierEdge {
+  background: linear-gradient(
+    to bottom,
+    var(--status-warning-fg),
+    color-mix(in srgb, var(--status-warning-fg) 26%, transparent)
+  );
+}
+
+.tier_newcomer .tierEdge {
+  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
+}
+
+/* Identity row: avatar + name + sub-line */
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.avatar {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--text-primary) 8%, var(--color-surface));
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Avatar glow tracks the trust tier */
+.avatar_trusted {
+  background: color-mix(in srgb, var(--color-cta) 22%, var(--color-surface));
+  color: var(--color-cta-text);
+  border-color: color-mix(in srgb, var(--color-cta) 34%, transparent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--color-cta) 18%, transparent);
+}
+
+.avatar_active {
+  background: color-mix(in srgb, var(--status-warning-fg) 18%, var(--color-surface));
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--status-warning-fg) 30%, transparent);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--status-warning-fg) 14%, transparent);
+}
+
+.avatar_newcomer {
+  background: color-mix(in srgb, var(--text-primary) 8%, var(--color-surface));
+  color: var(--text-secondary);
+}
+
+.identityText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.name {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+.metaDot {
+  flex: none;
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+}
+
+/* Verification line: badge or "awaiting review" pill */
+.verifyLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.pending {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--status-warning-fg);
+  background: color-mix(in srgb, var(--status-warning-fg) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-warning-fg) 24%, transparent);
+}
+
+.pendingIcon {
+  flex: none;
+  color: var(--status-warning-fg);
+}
+
+/* Risk flag — only on hosts that are unverified yet already publishing.
+   The single, honest trust-and-safety signal the host query exposes. */
+.riskFlag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--status-error-fg);
+  background: color-mix(in srgb, var(--status-error-fg) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 28%, transparent);
+}
+
+.riskFlagIcon {
+  flex: none;
+  color: var(--status-error-fg);
+}
+
+/* A flagged card pulls a danger-toned border + edge so it reads as priority
+   the instant the moderator squints at the grid. */
+.card[data-risk="flagged"] {
+  border-color: color-mix(in srgb, var(--status-error-fg) 34%, var(--border-soft));
+}
+
+.card[data-risk="flagged"] .tierEdge {
+  background: linear-gradient(
+    to bottom,
+    var(--status-error-fg),
+    color-mix(in srgb, var(--status-error-fg) 28%, transparent)
+  );
+}
+
+/* Tag row: footprint + listing trust facts (real fields only) */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  border: 1px solid var(--border-soft);
+  max-width: 100%;
+}
+
+.tagIcon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+/* Footprint tag inherits the trust tone */
+.tag_trusted {
+  color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-cta) 24%, transparent);
+}
+.tag_trusted .tagIcon {
+  color: var(--color-cta);
+}
+
+.tag_active {
+  color: var(--status-warning-fg);
+  background: color-mix(in srgb, var(--status-warning-fg) 12%, transparent);
+  border-color: color-mix(in srgb, var(--status-warning-fg) 22%, transparent);
+}
+.tag_active .tagIcon {
+  color: var(--status-warning-fg);
+}
+
+/* newcomer keeps the neutral base tag styling */
+
+/* Action row — pinned to the card foot */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: auto;
+  padding-top: var(--space-12);
+  border-top: 1px solid var(--border-soft);
+}
+
+.actions > * {
+  flex: 1 1 auto;
+  min-height: 44px;
+}
+
+/* ── Empty state — a clear queue reads as success, not a void ────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-32) var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-card);
+  color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 24%, transparent);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.emptySub {
+  margin: 0;
+  max-width: 36ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .segment {
+    transition: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+  .segment:active {
+    transform: none;
+  }
+}
