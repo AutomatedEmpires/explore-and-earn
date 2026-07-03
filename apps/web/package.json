@@ -12,6 +12,7 @@
 		"test:e2e": "playwright test --config tests/playwright.config.mjs"
 	},
 	"dependencies": {
+		"@ai-sdk/react": "^4.0.15",
 		"@clerk/nextjs": "^7.4.2",
 		"@explore-and-earn/contracts": "workspace:*",
 		"@explore-and-earn/db": "workspace:*",
@@ -19,6 +20,7 @@
 		"@explore-and-earn/ui": "workspace:*",
 		"@sentry/nextjs": "^10.22.0",
 		"@supabase/supabase-js": "^2.107.0",
+		"ai": "^7.0.14",
 		"mapbox-gl": "^3.6.0",
 		"motion": "^12.40.0",
 		"next": "^15.3.0",
@@ -27,6 +29,7 @@
 		"react-dom": "^19.0.0",
 		"react-map-gl": "^7.1.7",
 		"stripe": "^22.2.0",
-		"svix": "^1.42.0"
+		"svix": "^1.42.0",
+		"zod": "^4.4.3"
 	}
 }

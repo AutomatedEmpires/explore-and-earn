@@ -27,6 +27,7 @@ const NAV: readonly NavGroup[] = [
       { href: "/swipe", label: "Swipe", sub: "Quick-decide", icon: "category.mix" },
       { href: "/map", label: "Map", sub: "By place", icon: "status.open" },
       { href: "/saved", label: "Saved", sub: "Your shortlist", icon: "action.forward" },
+      { href: "/assistant", label: "Assistant", sub: "Your guide", icon: "action.message" },
     ],
   },
   {
