@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { ListingStatus } from "@explore-and-earn/contracts";
+import { PLAN_ENTITLEMENTS, type ListingStatus, type PlanTier } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
 
@@ -26,6 +26,23 @@ const LISTING_STATUS_TRANSITIONS: Record<ListingStatus, readonly ListingStatus[]
 /** True when `from -> to` is a permitted host listing transition. */
 export function canTransitionListing(from: ListingStatus, to: ListingStatus): boolean {
   return (LISTING_STATUS_TRANSITIONS[from] ?? []).includes(to);
+}
+
+/**
+ * Statuses that count toward PLAN_ENTITLEMENTS[tier].listings (ADR-039) —
+ * "each active (live or paused) listing counts toward your plan limit; you
+ * can have unlimited drafts on any plan" per the host-facing FAQ copy
+ * (HostSettings.tsx AddOnsSection), which already stated this policy before
+ * any code enforced it.
+ */
+const CAP_COUNTED_STATUSES: readonly ListingStatus[] = ["live", "paused"];
+
+/** "none" (no active subscription) is floored at the starter entitlement,
+ * same policy as the boost-purchase tier fallback — the lowest real paid
+ * tier, not zero and not unlimited. */
+function listingCapFor(tier: PlanTier): number {
+  const entitlementTier = tier === "professional" || tier === "enterprise" ? tier : "starter";
+  return PLAN_ENTITLEMENTS[entitlementTier].listings;
 }
 
 /**
@@ -87,6 +104,34 @@ export async function updateListingStatus(
   if (current === newStatus) return { ok: true, status: newStatus };
   if (!canTransitionListing(current, newStatus)) {
     return { ok: false, error: "invalid_transition" };
+  }
+
+  // Enforce PLAN_ENTITLEMENTS.listings at the one host-initiated transition
+  // that can newly consume a slot: submitting a draft for review. (live<->paused
+  // don't need this check — both already count as "active" per
+  // CAP_COUNTED_STATUSES, so pausing/resuming never changes the count.)
+  if (newStatus === "under_review") {
+    const { data: hostProfile, error: tierError } = await db
+      .from("host_profiles")
+      .select("subscription_tier")
+      .eq("id", hostProfileId)
+      .maybeSingle();
+    if (tierError) return { ok: false, error: tierError.message };
+
+    const tier = ((hostProfile as { subscription_tier: string | null } | null)
+      ?.subscription_tier ?? "none") as PlanTier;
+    const cap = listingCapFor(tier);
+
+    const { count: activeCount, error: countError } = await db
+      .from("listings")
+      .select("id", { count: "exact", head: true })
+      .eq("host_profile_id", hostProfileId)
+      .in("status", CAP_COUNTED_STATUSES);
+    if (countError) return { ok: false, error: countError.message };
+
+    if ((activeCount ?? 0) >= cap) {
+      return { ok: false, error: "listing_cap_reached" };
+    }
   }
 
   const nowIso = new Date().toISOString();

@@ -251,11 +251,14 @@ export async function updateListingStatusAction(
     newStatus,
   );
   if (!result.ok) {
-    // The canonical lifecycle fn rejects disallowed edges with 'invalid_transition'.
+    // The canonical lifecycle fn rejects disallowed edges with 'invalid_transition'
+    // and a plan-capacity block with 'listing_cap_reached'.
     const error =
       result.error === "invalid_transition"
         ? "That status change isn't allowed from the listing's current state."
-        : result.error;
+        : result.error === "listing_cap_reached"
+          ? "You've reached your plan's active listing limit. Pause or close another listing, or upgrade your plan, to publish this one."
+          : result.error;
     return { ok: false, error };
   }
 
