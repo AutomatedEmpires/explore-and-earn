@@ -32,11 +32,9 @@
     {
       "key": "announcement",
       "name": "Explore & Earn — Community Announcement",
-      "description": "One-time community announcement placement (7 / 14 / 28-day run).",
+      "description": "One-time community announcement placement — flat 7-day run, no duration options.",
       "prices": [
-        { "envVar": "STRIPE_PRICE_ANNOUNCEMENT_7D", "lookupKey": "ee_announcement_7d", "unitAmountCents": 15000, "type": "one_time" },
-        { "envVar": "STRIPE_PRICE_ANNOUNCEMENT_14D", "lookupKey": "ee_announcement_14d", "unitAmountCents": 25000, "type": "one_time" },
-        { "envVar": "STRIPE_PRICE_ANNOUNCEMENT_28D", "lookupKey": "ee_announcement_28d", "unitAmountCents": 35000, "type": "one_time" }
+        { "envVar": "STRIPE_PRICE_ANNOUNCEMENT", "lookupKey": "ee_announcement", "unitAmountCents": 14900, "type": "one_time" }
       ]
     },
     {

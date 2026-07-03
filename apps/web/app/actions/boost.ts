@@ -18,7 +18,7 @@ import {
 } from "../../services/stripe";
 
 // Re-export the launch boost pricing so the client popup imports tiers from the
-// action module (mirrors HostAnnouncementComposer importing ANNOUNCEMENT_PRICING
+// action module (mirrors HostAnnouncementComposer importing ANNOUNCEMENT_PRICE_CENTS
 // through the community action).
 export { BOOST_DURATIONS, BOOST_PRICING };
 
