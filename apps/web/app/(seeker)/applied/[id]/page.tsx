@@ -17,6 +17,7 @@ import {
 
 import { BucketPage } from "../../../../components/seeker";
 import { CATEGORY_ICON } from "../../../../components/discovery";
+import { WithdrawButton } from "../WithdrawButton";
 import styles from "./detail.module.css";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +67,13 @@ const STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
   withdrawn: "neutral",
   expired: "neutral",
 };
+
+/**
+ * Statuses a seeker may withdraw from — mirrors WITHDRAWABLE_STATUSES in
+ * packages/db/src/queries/seekerApplicationsRich.ts. `offered` is excluded:
+ * that has its own accept/decline path instead of a withdraw.
+ */
+const WITHDRAWABLE_STATUSES = new Set<string>(["applied", "reviewing", "saved_by_host"]);
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
@@ -127,6 +135,7 @@ export default async function AppliedDetailPage({ params }: Props) {
   const { listing, status } = application;
   const label = STATUS_LABEL[status] ?? "Applied";
   const variant = STATUS_VARIANT[status] ?? "neutral";
+  const canWithdraw = WITHDRAWABLE_STATUSES.has(status);
   const timeline = buildTimeline(application);
 
   return (
@@ -179,6 +188,9 @@ export default async function AppliedDetailPage({ params }: Props) {
             >
               View listing
             </Link>
+          ) : null}
+          {canWithdraw ? (
+            <WithdrawButton applicationId={application.id} />
           ) : null}
         </div>
       </article>

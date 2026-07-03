@@ -37,6 +37,13 @@ const ACTIVE_STATUSES = new Set<string>([
   "offered",
 ]);
 
+/**
+ * Statuses a seeker may withdraw from — mirrors WITHDRAWABLE_STATUSES in
+ * packages/db/src/queries/seekerApplicationsRich.ts. `offered` is excluded:
+ * that has its own accept/decline path instead of a withdraw.
+ */
+const WITHDRAWABLE_STATUSES = new Set<string>(["applied", "reviewing", "saved_by_host"]);
+
 const STATUS_LABEL: Record<string, string> = {
   applied: "Applied",
   reviewing: "Reviewing",
@@ -90,7 +97,7 @@ function ApplicationRow({
   const label = STATUS_LABEL[status] ?? "Applied";
   const variant = STATUS_VARIANT[status] ?? "neutral";
   const submitted = formatSubmitted(application.submittedAt);
-  const canWithdraw = status === "applied";
+  const canWithdraw = WITHDRAWABLE_STATUSES.has(status);
 
   if (!listing) {
     return (
