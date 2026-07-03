@@ -10,10 +10,11 @@
 import { describe, expect, it } from "vitest";
 import { MATCH_SCORE_CAPS, matchBandFor } from "@explore-and-earn/contracts";
 
-import type { PublicListingDetail } from "../src/queries/listings";
+import type { ListingRow, PublicListingDetail } from "../src/queries/listings";
 import type { SeekerProfileRecord } from "../src/queries/seekerProfiles";
 import {
   computeSeekerListingFit,
+  scoreSeekerListingRow,
   seekerHasMatchInputs,
   toPublicListingMatchInput,
 } from "../src/lib/seekerListingFit";
@@ -143,5 +144,62 @@ describe("toPublicListingMatchInput — adapter", () => {
     expect(input.housingIncluded).toBe(true);
     expect(input.compensationMinCents).toBe(300_000);
     expect(input.status).toBe("live");
+  });
+});
+
+/** A raw ListingRow with the SAME match-relevant values as the listing() detail. */
+function listingRow(overrides: Partial<ListingRow> = {}): ListingRow {
+  return {
+    id: "listing-1",
+    host_profile_id: "host-1",
+    title: "Orchard harvest crew",
+    category: "farm",
+    description: "Pick apples in Sonoma.",
+    location_display: "Sonoma, CA",
+    latitude: null,
+    longitude: null,
+    status: "live",
+    housing_included: true,
+    meals_included: true,
+    housing_description: null,
+    meals_description: null,
+    visa_support: false,
+    compensation_summary: null,
+    compensation_min_cents: 300_000,
+    compensation_max_cents: 400_000,
+    compensation_unit: "month",
+    compensation_currency: "USD",
+    timeline_summary: null,
+    begins_at: "2026-07-01T00:00:00Z",
+    ends_at: "2026-09-01T00:00:00Z",
+    published_at: "2026-06-01T00:00:00Z",
+    cover_photo_url: null,
+    gallery_photo_urls: [],
+    host_profiles: null,
+    ...overrides,
+  };
+}
+
+describe("scoreSeekerListingRow — feed/detail consistency", () => {
+  it("returns the SAME score the detail page computes for the same pairing", () => {
+    const rowScore = scoreSeekerListingRow(seeker(), listingRow(), NOW);
+    const detailScore = computeSeekerListingFit(seeker(), listing(), NOW).score;
+    expect(rowScore).toBe(detailScore);
+  });
+
+  it("moves with alignment (remote/no-benefits row scores lower)", () => {
+    const aligned = scoreSeekerListingRow(seeker(), listingRow(), NOW);
+    const misaligned = scoreSeekerListingRow(
+      seeker(),
+      listingRow({
+        category: "remote",
+        housing_included: false,
+        meals_included: false,
+        compensation_min_cents: 80_000,
+        compensation_max_cents: 80_000,
+      }),
+      NOW,
+    );
+    expect(aligned).toBeGreaterThan(misaligned);
   });
 });

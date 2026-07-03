@@ -1,23 +1,53 @@
 import type { MatchResult } from "@explore-and-earn/contracts";
 
-import type { PublicListingDetail } from "../queries/listings";
+import type { ListingRow, PublicListingDetail } from "../queries/listings";
 import type { SeekerProfileRecord } from "../queries/seekerProfiles";
 import { computeMatch, type MatchListingInput, type MatchSeekerInput } from "./matchEngine";
 
 /**
- * Seeker-facing fit computation for a SINGLE listing on the public detail page.
+ * Seeker-facing fit computation for one listing.
  *
- * Pure & deterministic: adapts the public listing + the seeker's own profile
- * into the ADR-040 engine inputs and returns the full {@link MatchResult}
- * (band, score, components, caps). This is the same engine and the same
- * mapping the assistant's explain_match uses — one source of truth for "how
- * well does this fit me", so the detail page never drifts from the assistant or
- * the persisted match_scores.
+ * Pure & deterministic: adapts a listing + the seeker's own profile into the
+ * ADR-040 engine inputs. The listing-detail page uses the full {@link MatchResult}
+ * (band, score, components, caps); the /seek + /search feeds use the score only.
  *
- * Note: PublicListingDetail intentionally omits visa/skill/cert fields (not in
- * the anon SELECT), so those optional inputs are left null — matching the
- * assistant's behaviour exactly. Bands stay correct for the common case.
+ * ONE SOURCE OF TRUTH: every surface funnels through {@link toSeekerMatchInput}
+ * and {@link fitFieldsToMatchInput}, so a listing's fit is identical on the
+ * card, on the detail page, and in the assistant's explain_match — the score on
+ * a feed card can never disagree with the score on the listing it opens.
+ *
+ * Note: the visa/skill/cert engine inputs are intentionally left null (not in
+ * the seeker profile record / the public SELECT), matching the assistant.
  */
+
+/** The listing fields the seeker-facing fit reads — source-shape-agnostic. */
+interface FitListingFields {
+  readonly category: string | null;
+  readonly housingIncluded: boolean;
+  readonly mealsIncluded: boolean | null;
+  readonly compensationMinCents: number | null;
+  readonly compensationMaxCents: number | null;
+  readonly locationDisplay: string | null;
+  readonly beginsAt: string | null;
+  readonly endsAt: string | null;
+  readonly status: string | null;
+}
+
+/** The single listing→engine mapping every surface shares (no drift possible). */
+function fitFieldsToMatchInput(fields: FitListingFields): MatchListingInput {
+  return {
+    category: fields.category,
+    housingIncluded: fields.housingIncluded,
+    mealsIncluded: fields.mealsIncluded,
+    compensationMinCents: fields.compensationMinCents,
+    compensationMaxCents: fields.compensationMaxCents,
+    isRemote: fields.category === "remote",
+    locationDisplay: fields.locationDisplay,
+    beginsAt: fields.beginsAt,
+    endsAt: fields.endsAt,
+    status: fields.status,
+  };
+}
 
 /** Map the seeker's profile record to the engine's seeker input. */
 export function toSeekerMatchInput(profile: SeekerProfileRecord): MatchSeekerInput {
@@ -32,20 +62,34 @@ export function toSeekerMatchInput(profile: SeekerProfileRecord): MatchSeekerInp
   };
 }
 
-/** Map a public listing detail to the engine's listing input. */
+/** Map a public listing detail (camelCase view shape) to the engine's input. */
 export function toPublicListingMatchInput(listing: PublicListingDetail): MatchListingInput {
-  return {
+  return fitFieldsToMatchInput({
     category: listing.category,
     housingIncluded: listing.housingIncluded,
     mealsIncluded: listing.mealsIncluded,
     compensationMinCents: listing.compensationMinCents,
     compensationMaxCents: listing.compensationMaxCents,
-    isRemote: listing.category === "remote",
     locationDisplay: listing.locationDisplay,
     beginsAt: listing.beginsAt,
     endsAt: listing.endsAt,
     status: listing.status,
-  };
+  });
+}
+
+/** Map a raw listing row (snake_case DB shape, from searchListings) to the input. */
+export function toListingRowMatchInput(row: ListingRow): MatchListingInput {
+  return fitFieldsToMatchInput({
+    category: row.category,
+    housingIncluded: row.housing_included,
+    mealsIncluded: row.meals_included,
+    compensationMinCents: row.compensation_min_cents,
+    compensationMaxCents: row.compensation_max_cents,
+    locationDisplay: row.location_display,
+    beginsAt: row.begins_at,
+    endsAt: row.ends_at,
+    status: row.status,
+  });
 }
 
 /**
@@ -64,7 +108,7 @@ export function seekerHasMatchInputs(profile: SeekerProfileRecord): boolean {
   );
 }
 
-/** Compute the full ADR-040 fit of one listing for one seeker. */
+/** Compute the full ADR-040 fit of one listing for one seeker (detail page). */
 export function computeSeekerListingFit(
   profile: SeekerProfileRecord,
   listing: PublicListingDetail,
@@ -75,4 +119,21 @@ export function computeSeekerListingFit(
     toPublicListingMatchInput(listing),
     nowMs !== undefined ? { nowMs } : {},
   );
+}
+
+/**
+ * Score-only fit of a raw listing row for a seeker (the /seek + /search feeds).
+ * Returns the same post-cap 0–100 score {@link computeSeekerListingFit} would —
+ * so a feed card's badge always agrees with the listing it opens.
+ */
+export function scoreSeekerListingRow(
+  profile: SeekerProfileRecord,
+  row: ListingRow,
+  nowMs?: number,
+): number {
+  return computeMatch(
+    toSeekerMatchInput(profile),
+    toListingRowMatchInput(row),
+    nowMs !== undefined ? { nowMs } : {},
+  ).score;
 }
