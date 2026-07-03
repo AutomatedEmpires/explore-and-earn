@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 
 import { getPublicListings, getHostIdsWithLiveListings } from "@explore-and-earn/db";
 
+import { getEditorialPosts } from "../lib/editorial";
+
 export const dynamic = "force-dynamic";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com";
@@ -10,12 +12,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticEntries: MetadataRoute.Sitemap = [
     { url: `${baseUrl}/`, changeFrequency: "daily", priority: 1 },
     { url: `${baseUrl}/seek`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${baseUrl}/search`, changeFrequency: "daily", priority: 0.7 },
+    { url: `${baseUrl}/for-hosts`, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${baseUrl}/blog`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${baseUrl}/about`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${baseUrl}/faq`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${baseUrl}/terms`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${baseUrl}/privacy`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${baseUrl}/cookies`, changeFrequency: "monthly", priority: 0.2 },
   ];
+
+  const blogEntries: MetadataRoute.Sitemap = getEditorialPosts().map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: post.publishedAt,
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+  }));
 
   let listingEntries: MetadataRoute.Sitemap = [];
   let hostEntries: MetadataRoute.Sitemap = [];
@@ -44,5 +56,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // If queries fail (e.g. env not configured), still emit static entries.
   }
 
-  return [...staticEntries, ...listingEntries, ...hostEntries];
+  return [...staticEntries, ...blogEntries, ...listingEntries, ...hostEntries];
 }
