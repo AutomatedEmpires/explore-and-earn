@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Icon, MetricCard, MetricGrid, VerifiedHostBadge } from "@explore-and-earn/ui";
 
-import { unverifyHostAction, verifyHostAction } from "../../app/actions/admin";
+import { clearHostFlagAction, unverifyHostAction, verifyHostAction } from "../../app/actions/admin";
 import styles from "./AdminHostsTable.module.css";
 
 export interface AdminHostRowView {
@@ -12,6 +12,9 @@ export interface AdminHostRowView {
   readonly companyName: string;
   readonly clerkUserId: string;
   readonly attestationStatus: string;
+  /** Set automatically after >3 non-dismissed spam reports in a rolling 30 days. */
+  readonly flaggedForReview: boolean;
+  readonly flaggedReason: string | null;
   readonly listingCount: number;
 }
 
@@ -323,6 +326,17 @@ export function AdminHostsTable({
                       {risk.label}
                     </span>
                   ) : null}
+                  {host.flaggedForReview ? (
+                    <span className={styles.riskFlag}>
+                      <Icon
+                        aria-hidden
+                        name="system.warning"
+                        size={16}
+                        className={styles.riskFlagIcon}
+                      />
+                      Spam reports · flagged
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className={styles.tags}>
@@ -369,6 +383,19 @@ export function AdminHostsTable({
                   >
                     Unverify
                   </Button>
+                  {host.flaggedForReview ? (
+                    <Button
+                      variant="ghost"
+                      icon="action.close"
+                      disabled={busy}
+                      aria-label={`Clear the spam-report flag on ${company}`}
+                      onClick={() =>
+                        runAction(host.id, () => clearHostFlagAction(host.id))
+                      }
+                    >
+                      Clear flag
+                    </Button>
+                  ) : null}
                 </div>
               </article>
             );

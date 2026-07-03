@@ -17,7 +17,8 @@ interface ReportReason {
 const REPORT_REASONS: readonly ReportReason[] = [
 	{ id: "unsafe", label: "Safety concern", icon: "system.warning" },
 	{ id: "inaccurate", label: "Misleading details", icon: "system.info" },
-	{ id: "scam", label: "Scam or spam", icon: "action.report" },
+	{ id: "scam", label: "Scam or fraud", icon: "action.report" },
+	{ id: "spam", label: "Spam", icon: "action.report" },
 	{ id: "inappropriate", label: "Inappropriate content", icon: "action.message" },
 	{ id: "housing_pay", label: "Housing or pay issue", icon: "benefit.housing" },
 	{ id: "other", label: "Other", icon: "system.info" },
@@ -27,6 +28,7 @@ const REPORT_REASON_SHORT: Record<string, string> = {
 	inaccurate: "Inaccurate",
 	unsafe: "Unsafe",
 	scam: "Scam",
+	spam: "Spam",
 	inappropriate: "Inappropriate",
 	housing_pay: "Housing or pay",
 	other: "Other",
