@@ -17,3 +17,5 @@ export { AdminMarketHealth } from "./AdminMarketHealth";
 export type { AdminMarketHealthStats } from "./AdminMarketHealth";
 export { AdminShell } from "./AdminShell";
 export type { AdminShellProps } from "./AdminShell";
+export { AdminPager } from "./AdminPager";
+export type { AdminPagerProps } from "./AdminPager";
