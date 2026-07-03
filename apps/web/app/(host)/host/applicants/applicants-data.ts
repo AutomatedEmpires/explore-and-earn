@@ -1,4 +1,5 @@
-import type { HostApplication } from "@explore-and-earn/db";
+import type { HostApplication, ListingMatchScore } from "@explore-and-earn/db";
+import { matchScoreKey } from "@explore-and-earn/db";
 
 import type { DiscoveryListing } from "../../../../components/discovery";
 import type { ApplicantStage, HostApplicantItem } from "../../../../components/host";
@@ -84,8 +85,12 @@ export function toApplicantItem(
   listingsById: ReadonlyMap<string, DiscoveryListing>,
   displayNames?: ReadonlyMap<string, string>,
   threadsByApplicationId?: ReadonlyMap<string, string>,
+  matchScores?: ReadonlyMap<string, ListingMatchScore>,
 ): HostApplicantItem {
   const threadId = threadsByApplicationId?.get(application.id);
+  const match = matchScores?.get(
+    matchScoreKey(application.listingId, application.seekerProfileId),
+  );
   return {
     id: application.id,
     applicantName: displayNames?.get(application.seekerProfileId) ?? applicantLabel(application),
@@ -94,6 +99,7 @@ export function toApplicantItem(
     appliedOn: formatAppliedOn(application.submittedAt),
     ...(application.coverMessage ? { note: application.coverMessage } : {}),
     ...(threadId ? { threadId } : {}),
+    ...(match ? { matchScore: match.score, matchBand: match.band } : {}),
   };
 }
 

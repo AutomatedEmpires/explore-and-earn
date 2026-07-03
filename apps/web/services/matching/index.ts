@@ -146,6 +146,60 @@ export async function computeAndStoreMatchesForSeeker(
   return { stored: rows.length };
 }
 
+/**
+ * Compute + persist the single (this seeker × this listing) match score.
+ *
+ * The targeted, cheap variant used on apply: when a seeker applies to a listing
+ * we only need that one pair scored (so the host's applicant ranking has real
+ * fit), not the seeker's whole feed. Resolves the seeker by Clerk id via the
+ * service role. No-op (stored: 0) if the seeker/listing can't be loaded or the
+ * pairing is excluded.
+ */
+export async function computeAndStoreMatchForApplication(
+  clerkUserId: string,
+  listingId: string,
+  nowMs: number = Date.now(),
+): Promise<{ stored: number }> {
+  const client = db();
+
+  const [{ data: profile }, { data: listing }] = await Promise.all([
+    client
+      .from("seeker_profiles")
+      .select("*")
+      .eq("clerk_user_id", clerkUserId)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    client.from("listings").select("*").eq("id", listingId).maybeSingle(),
+  ]);
+  if (!profile || !listing) return { stored: 0 };
+
+  const seekerProfileId = String((profile as Row).id);
+  const result = computeMatch(
+    toSeekerInput(profile as Row),
+    toListingInput(listing as Row),
+    { nowMs },
+  );
+  if (result.excluded !== null) return { stored: 0 };
+
+  const { error } = await client.from("match_scores").upsert(
+    {
+      seeker_profile_id: seekerProfileId,
+      listing_id: listingId,
+      score: result.score,
+      raw_score: result.rawScore,
+      band: result.band,
+      confidence: result.confidence,
+      components: result.components,
+      caps_applied: result.capsApplied,
+      computed_at: new Date(nowMs).toISOString(),
+    },
+    { onConflict: "seeker_profile_id,listing_id" },
+  );
+  if (error) throw new Error(`matching: persist pair — ${error.message}`);
+
+  return { stored: 1 };
+}
+
 /** A persisted match row, shaped for surfacing. */
 export interface StoredMatch {
   readonly listingId: string;

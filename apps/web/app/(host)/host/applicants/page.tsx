@@ -6,6 +6,7 @@ import {
   getConversations,
   getHostApplications,
   getHostListings,
+  getMatchScoresForHost,
   getSeekerDisplayNames,
   rowToDiscoveryFields,
 } from "@explore-and-earn/db";
@@ -68,6 +69,13 @@ function leadSignal(item: HostApplicantItem): number {
   return 70 + provided * 8 + hasNote * 2;
 }
 
+/** Presentation labels for the ADR-040 match bands (render-time only). */
+const BAND_LABEL: Record<string, string> = {
+  strong: "Strong match",
+  developing: "Developing match",
+  needs_attention: "Needs attention",
+};
+
 export default async function HostApplicantsPage({
   searchParams,
 }: {
@@ -98,10 +106,13 @@ export default async function HostApplicantsPage({
 
   // Applications carry only listingId/listingTitle; load the host's listings to
   // resolve each application's full DiscoveryListing for the canonical card.
-  const [applications, listingRows, conversations] = await Promise.all([
+  const [applications, listingRows, conversations, matchScores] = await Promise.all([
     getHostApplications(token, userId),
     getHostListings(token, userId).catch(() => []),
     getConversations(token, userId, "host").catch(() => []),
+    // Real ADR-040 fit for the host's applicants (populated on apply). Resilient:
+    // an empty map when no scores exist yet, so the rail degrades to lead signal.
+    getMatchScoresForHost(token).catch(() => new Map()),
   ]);
   const threadsMap = threadsByApplicationId(conversations);
 
@@ -133,7 +144,7 @@ export default async function HostApplicantsPage({
     : ownedApplications;
 
   const applicants = filteredApplications.map((application) =>
-    toApplicantItem(application, listingsById, displayNames, threadsMap),
+    toApplicantItem(application, listingsById, displayNames, threadsMap, matchScores),
   );
 
   const filterListing = filterListingId
@@ -146,11 +157,13 @@ export default async function HostApplicantsPage({
   const counts = countByStage(applicants);
   const total = applicants.length;
 
-  // Warm leads for the "Recommended seekers" rail: the newest applicants worth
-  // re-engaging before the pool goes cold. Sourced from real applicant data
-  // (no recommendation engine — matching is founder-gated), newest stages first.
+  // Best-fit early applicants for the "Recommended seekers" rail — ranked by the
+  // real ADR-040 match score when it has been computed (populated on apply), and
+  // gracefully falling back to the triad lead-signal for applicants not yet scored.
+  const rankSignal = (a: HostApplicantItem): number => a.matchScore ?? leadSignal(a);
   const recommended = applicants
     .filter((a) => a.stage === "new" || a.stage === "reviewing")
+    .sort((a, b) => rankSignal(b) - rankSignal(a))
     .slice(0, 3);
 
   return (
@@ -220,7 +233,9 @@ export default async function HostApplicantsPage({
               </header>
               <ul className={styles.railGrid}>
                 {recommended.map((item) => {
-                  const signal = leadSignal(item);
+                  // Real match when scored (populated on apply); else the triad lead signal.
+                  const signal = item.matchScore ?? leadSignal(item);
+                  const meterLabel = item.matchBand ? BAND_LABEL[item.matchBand] : "Lead signal";
                   const href = item.threadId
                     ? `/host/messages/${item.threadId}`
                     : `/host/applicants/${item.id}`;
@@ -240,7 +255,7 @@ export default async function HostApplicantsPage({
                         </div>
                       </div>
                       <div className={styles.matchMeter}>
-                        <Meter value={signal} label="Lead signal" />
+                        <Meter value={signal} label={meterLabel} />
                       </div>
                       <div
                         className={styles.matchTrack}

@@ -9,6 +9,9 @@ import {
 	type ApplyResult,
 } from "@explore-and-earn/db"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
+
+import { computeAndStoreMatchForApplication } from "../../services/matching"
 
 import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
@@ -75,6 +78,17 @@ async function applyToListingActionImpl(
 		} catch (error) {
 			console.error("[email] application notification failed:", error)
 		}
+
+		// Populate the ADR-040 match score for this applicant×listing pair AFTER
+		// the response is sent, so the host's applicant ranking has real fit without
+		// slowing the apply. Best-effort: a scoring failure never affects the apply.
+		after(async () => {
+			try {
+				await computeAndStoreMatchForApplication(userId, listingId)
+			} catch (error) {
+				reportError(error, { action: "computeAndStoreMatchForApplication", userId })
+			}
+		})
 	}
 
 	revalidatePath(`/listing/${listingId}`)
