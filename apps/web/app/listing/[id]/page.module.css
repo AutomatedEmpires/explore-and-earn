@@ -255,3 +255,25 @@
   justify-content: center;
   z-index: 50;
 }
+
+/* Gentle nudge shown to seekers whose profile is too thin to compute an honest
+   fit — links to onboarding. Borders-first, token-only, matches the fit panel. */
+.fitPrompt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-bottom: var(--space-section);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--border-ink);
+  background-color: var(--color-surface);
+  color: var(--text-primary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  text-decoration: none;
+}
+
+.fitPrompt span {
+  flex: 1;
+}
+

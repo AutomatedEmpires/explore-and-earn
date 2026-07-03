@@ -4,7 +4,12 @@ import { auth } from "@clerk/nextjs/server";
 import Image from "next/image";
 import Link from "next/link";
 
-import { hasApplied, hasSaved } from "@explore-and-earn/db";
+import {
+  computeSeekerListingFit,
+  hasApplied,
+  hasSaved,
+  seekerHasMatchInputs,
+} from "@explore-and-earn/db";
 import {
   cachedHostProfile,
   cachedSeekerProfile,
@@ -14,6 +19,7 @@ import {
 import { Icon } from "@explore-and-earn/ui";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
+import { SeekerFitSignal } from "../../../components/listing/SeekerFitSignal";
 import { TrueValue } from "../../../components/listing/TrueValue";
 import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
@@ -98,17 +104,29 @@ export default async function ListingDetailPage({ params }: Props) {
   let alreadyApplied = false;
   let alreadySaved = false;
   let onboardingComplete = false;
+  let seekerProfile: Awaited<ReturnType<typeof cachedSeekerProfile>> = null;
 
   if (userId && token && viewerRole === "seeker") {
-    const [applied, saved, seekerProfile] = await Promise.all([
+    const [applied, saved, profile] = await Promise.all([
       hasApplied(token, userId, listing.id),
       hasSaved(token, userId, listing.id),
       cachedSeekerProfile(token, userId),
     ]);
     alreadyApplied = applied;
     alreadySaved = saved;
-    onboardingComplete = seekerProfile?.onboardingComplete === true;
+    seekerProfile = profile;
+    onboardingComplete = profile?.onboardingComplete === true;
   }
+
+  // Seeker-facing ADR-040 fit signal: computed on the fly with the same engine
+  // the assistant uses. Shown only to seekers who have enough profile signal for
+  // an honest band; otherwise a gentle prompt to complete their profile.
+  const fit =
+    viewerRole === "seeker" && seekerProfile && seekerHasMatchInputs(seekerProfile)
+      ? computeSeekerListingFit(seekerProfile, listing)
+      : null;
+  const seekerNeedsProfileForFit =
+    viewerRole === "seeker" && (!seekerProfile || !seekerHasMatchInputs(seekerProfile));
 
   // Build benefit triad data
   const housingLabel = listing.housingIncluded ? "Included" : "Not included";
@@ -227,6 +245,16 @@ export default async function ListingDetailPage({ params }: Props) {
                 <div className={styles.hostDate}>{dateLabel}</div>
               </div>
             </div>
+          )}
+
+          {/* Seeker fit signal (ADR-040) — the decision-point payoff */}
+          {fit && <SeekerFitSignal result={fit} />}
+          {seekerNeedsProfileForFit && (
+            <Link href="/onboarding" className={styles.fitPrompt}>
+              <Icon name="status.match" size={20} aria-hidden />
+              <span>Finish your profile to see how well this opportunity fits you.</span>
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
           )}
 
           {/* Benefit triad */}
