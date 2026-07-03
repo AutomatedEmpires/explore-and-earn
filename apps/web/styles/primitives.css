@@ -247,6 +247,38 @@
 }
 
 /* =================================================================== */
+/* Countdown -- Founding Host Program seat counter                      */
+/* =================================================================== */
+.ui-countdown {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-card);
+  background: var(--status-featured-bg);
+  color: var(--status-featured-fg);
+  font-family: var(--font-ui);
+}
+
+.ui-countdown__label {
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.ui-countdown__value {
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.ui-countdown--soldout {
+  background: var(--color-surface);
+  color: var(--text-secondary);
+}
+
+/* =================================================================== */
 /* Skeleton -- loading placeholder                                      */
 /* =================================================================== */
 .ui-skeleton {
