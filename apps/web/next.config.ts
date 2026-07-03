@@ -88,14 +88,21 @@ const nextConfig: NextConfig = {
     ]
   },
   webpack(config, { isServer }) {
-    // DEV MOCK BENCH (review tooling only). Outside production, alias the
-    // Clerk server import to a shim that can return a synthetic session while
-    // impersonating a role — so the bench needs no Clerk login. Gated on
-    // NODE_ENV so the shim is never bundled in a production (or preview) build,
-    // and scoped to the server build since "@clerk/nextjs/server" is server-only.
-    // The `$` suffix is an exact-match alias: deep imports are untouched, and
-    // the shim's own `clerk-real/server` import resolves to the real file rather
-    // than aliasing back to itself.
+    // DEV MOCK BENCH (review tooling only) — webpack path.
+    //
+    // The default `dev` script now uses Turbopack (`next dev --turbopack`), which
+    // is much faster to boot but whose `resolveAlias` cannot express this shim
+    // cleanly (no absolute-path targets, and the real-Clerk re-alias would loop).
+    // So the bench lives on the WEBPACK dev path only: run `pnpm dev:webpack` to
+    // use role-impersonation. Turbopack dev uses real Clerk (normal login).
+    //
+    // Outside production, alias the Clerk server import to a shim that can return
+    // a synthetic session while impersonating a role — so the bench needs no
+    // Clerk login. Gated on NODE_ENV so the shim is never bundled in a production
+    // (or preview) build, and scoped to the server build since
+    // "@clerk/nextjs/server" is server-only. The `$` suffix is an exact-match
+    // alias: deep imports are untouched, and the shim's own `clerk-real/server`
+    // import resolves to the real file rather than aliasing back to itself.
     if (process.env.NODE_ENV !== "production" && isServer) {
       config.resolve = config.resolve ?? {};
       config.resolve.alias = {
@@ -115,7 +122,10 @@ export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: !process.env.CI,
-  autoInstrumentServerFunctions: true,
+  // Moved under `webpack` — the top-level option was deprecated in @sentry/nextjs.
+  webpack: {
+    autoInstrumentServerFunctions: true
+  },
   hideSourceMaps: true,
   tunnelRoute: "/monitoring"
 });
