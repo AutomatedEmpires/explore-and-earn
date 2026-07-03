@@ -22,7 +22,6 @@ export { SeekerDirectory } from "./SeekerDirectory";
 export type { SeekerDirectoryProps } from "./SeekerDirectory";
 export { UnreadBadge } from "./UnreadBadge";
 export type { UnreadBadgeProps } from "./UnreadBadge";
-export { SeekerBottomNav } from "./SeekerBottomNav";
 export { SwipeDeck } from "./SwipeDeck";
 export type { SwipeDeckProps } from "./SwipeDeck";
 export { OpportunityMap } from "./OpportunityMap";

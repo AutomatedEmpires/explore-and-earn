@@ -14,11 +14,10 @@ import "../../styles/host-os.css";
  * Host scope layout.
  *
  * Navigation is scoped per user type (founder canon) — there is no single
- * global bottom nav. The host-scope bottom navigation (Dashboard · Listings ·
- * Applicants · Messages · Profile) is OWNED BY THE HOST LANE and wired here
- * inside the (host) route group via <HostBottomNav>. It does not reuse the
- * app-shell tab set or the locked seeker nav. Host routes live under the /host
- * URL prefix so they never collide with the seeker scope's top-level routes.
+ * global bottom nav. The host-scope bottom navigation is OWNED BY THE HOST LANE
+ * and rendered by <HostShell>'s mobile dock (MOBILE_PRIMARY). It does not reuse
+ * the app-shell tab set or the locked seeker nav. Host routes live under the
+ * /host URL prefix so they never collide with the seeker scope's top-level routes.
  *
  * PROFILE GATE: the Clerk webhook creates a seeker_profiles row on signup but
  * never a host_profiles row, so any authenticated user reaching the host lane

@@ -19,9 +19,8 @@ import "../../styles/seeker-os.css";
  *
  * Navigation is scoped per user type — there is no single global bottom nav.
  * The seeker-scope bottom navigation is founder-locked (Swipe · Map · Seek ·
- * Profile) and OWNED BY THE SEEKER LANE, so it is wired here inside the (seeker)
- * route group via <SeekerBottomNav>. The locked tab set and order must not
- * change.
+ * Profile) and OWNED BY THE SEEKER LANE. It is rendered by <SeekerShell>'s
+ * mobile dock (MOBILE_PRIMARY). The locked tab set and order must not change.
  *
  * This layout also acts as the Server Component wrapper that resolves the
  * authed seeker's unread notification count and Clerk user id, and passes them

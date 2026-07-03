@@ -1,5 +1,4 @@
 export { HostHeader } from "./HostHeader";
-export { HostBottomNav } from "./HostBottomNav";
 export { HostSectionHeading } from "./HostSectionHeading";
 export type { HostSectionHeadingProps } from "./HostSectionHeading";
 export { HostListingCard } from "./HostListingCard";
@@ -39,8 +38,6 @@ export type { HostProfileFormProps } from "./HostProfileForm";
 export { HostDetailSkeleton } from "./HostDetailSkeleton";
 export { BoostListingPopup } from "./BoostListingPopup";
 export type { BoostListingPopupProps } from "./BoostListingPopup";
-export { HostMoreMenu } from "./HostMoreMenu";
-export type { HostMoreMenuProps } from "./HostMoreMenu";
 export { HostAnalyticsDashboard } from "./HostAnalyticsDashboard";
 export type { HostAnalyticsDashboardProps } from "./HostAnalyticsDashboard";
 export { HostSettings } from "./HostSettings";
