@@ -8,9 +8,11 @@ import styles from "../onboarding.module.css";
  * Onboarding completion page.
  *
  * onboarding_complete is set server-side by the skills step's saveOnboardingStep
- * call (with complete: true) before the router navigates here — not in a useEffect.
- * This page is a static confirmation screen; the seeker navigates to /swipe
- * via the link below.
+ * call (with complete: true) before the router navigates here — both the
+ * "Continue" and "Skip" paths on that step call it, so reaching this page
+ * always implies the flag is set. Not set in a useEffect. This page is a
+ * static confirmation screen; the seeker navigates to /swipe via the link
+ * below.
  */
 export default function OnboardingDonePage() {
   return (
