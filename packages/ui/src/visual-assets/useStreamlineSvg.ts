@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react"
 import DOMPurify from "dompurify"
 import type { Config as DOMPurifyConfig } from "dompurify"
-import { CLOUDINARY_ICON_BASE } from "../icons/registry"
+
+// Cloudinary delivery base for the curated illustration/element assets (the
+// `explore-and-earn/icons` folder). This system is the last consumer of the
+// runtime-fetch pattern; the <Icon> UI set moved to Phosphor (no fetch). See
+// docs/superpowers/specs/2026-07-02-phosphor-icon-swap-design.md (§9 follow-up).
+const CLOUDINARY_ICON_BASE = "https://res.cloudinary.com/dwiwyt9vi/image/upload"
 
 /**
  * Shared Cloudinary inline-SVG loader for AppIllustration / AppElement.

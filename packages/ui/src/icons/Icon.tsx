@@ -1,125 +1,65 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import DOMPurify from "dompurify"
-import type { Config as DOMPurifyConfig } from "dompurify"
-import { getIcon, getIconUrl, type IconKey } from "./registry"
 import type { CSSProperties } from "react"
 
-// SVG-safe DOMPurify config: allow SVG elements/attrs, strip scripts and externals.
-const PURIFY_CONFIG: DOMPurifyConfig = {
-	USE_PROFILES: { svg: true, svgFilters: true },
-	FORBID_TAGS: ["script", "use"],
-	FORBID_ATTR: ["xlink:href", "href"],
-}
+import { getIcon, type IconKey, type IconWeight } from "./registry"
 
 /**
  * <Icon> — the ONLY sanctioned way to render an icon in Explore&Earn.
  *
- * Resolves the stable `name` key through the Streamline Freehand registry,
- * fetches the processed SVG from Cloudinary, and inlines it so that
- * `currentColor` / CSS `color` tinting works (critical for mappin.* pins).
+ * Resolves the stable `name` key through the registry and renders the mapped
+ * Phosphor glyph synchronously (no runtime fetch, no client-side sanitizing, no
+ * skeleton flash). Color tints via `currentColor` so the same glyph inherits
+ * theme tokens — used by `mappin.*` for per-category accent colors.
  *
- * Falls back to the emoji placeholder while the asset is loading or when no
- * Cloudinary asset has been uploaded yet (keys without `cloudinaryId`).
+ * Customization (see registry.ts for the full contract):
+ *   - global default weight  → DEFAULT_ICON_WEIGHT below
+ *   - per-key default weight → the registry entry's `weight` (e.g. map pins)
+ *   - per-call override      → pass `weight` / `size` / `color`
  *
- * Do NOT import lucide-react / heroicons / react-icons / font-awesome / mui
- * icons, and do NOT hand-roll inline <svg> in feature code. CI guardrail G30
- * enforces this. See docs/design/icon-system.md.
+ * Do NOT import lucide / heroicons / react-icons / font-awesome / mui icons, and
+ * do NOT hand-roll inline <svg> in feature code. CI guardrail G30 enforces this.
+ * See docs/design/icon-system.md.
  */
 
-// Module-level SVG cache — shared across all Icon instances, survives re-renders.
-// Keyed by Cloudinary public ID. "" = fetch failed; skip retry, show placeholder.
-const _svgCache = new Map<string, string>()
-
-function useIconSvg(cloudinaryId: string | undefined): string | null {
-	const [svg, setSvg] = useState<string | null>(() =>
-		cloudinaryId != null ? (_svgCache.get(cloudinaryId) ?? null) : null,
-	)
-
-	useEffect(() => {
-		if (cloudinaryId == null) return
-		const cached = _svgCache.get(cloudinaryId)
-		if (cached != null) {
-			setSvg(cached)
-			return
-		}
-		const url = getIconUrl({ cloudinaryId } as Parameters<typeof getIconUrl>[0])
-		if (!url) return
-		fetch(url)
-			.then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
-			.then((text) => {
-				const clean = DOMPurify.sanitize(text, PURIFY_CONFIG) as string
-				_svgCache.set(cloudinaryId, clean)
-				setSvg(clean)
-			})
-			.catch(() => {
-				_svgCache.set(cloudinaryId, "")
-			})
-	}, [cloudinaryId])
-
-	return svg
-}
+/** App-wide default weight — change here to restyle every icon at once. */
+const DEFAULT_ICON_WEIGHT: IconWeight = "regular"
 
 export interface IconProps {
 	name: IconKey
-	/** 16 | 20 | 24 per tokens; chip sizes 36/40 handled by container. */
+	/** 16 | 20 | 24 per tokens; chip sizes 36/40 handled by the container. */
 	size?: 16 | 20 | 24
+	/** Override the resolved weight for this one render (e.g. "fill" for active tabs). */
+	weight?: IconWeight
 	"aria-hidden"?: boolean
 	title?: string
-	/** Override CSS color for tinting — used by mappin.* for category accent colors. */
+	/** Override color for tinting — used by mappin.* for category accent colors. */
 	color?: string
-	/** Optional class on the rendered span (used by AppIcon to forward styling). */
+	/** Optional class on the rendered svg (used by AppIcon to forward styling). */
 	className?: string
 }
 
-export function Icon({ name, size = 24, title, color, className, ...rest }: IconProps) {
+export function Icon({ name, size = 24, weight, color, title, className, ...rest }: IconProps) {
 	const entry = getIcon(name)
-	const label = title ?? entry.label
+	const Glyph = entry.icon
 	const hidden = rest["aria-hidden"]
-	const svgText = useIconSvg(entry.cloudinaryId)
+	const label = title ?? entry.label
 
-	const baseStyle: CSSProperties = {
-		display: "inline-flex",
-		alignItems: "center",
-		justifyContent: "center",
-		width: size,
-		height: size,
-		flexShrink: 0,
-		...(color ? { color } : {}),
-	}
+	// Keep icons from shrinking inside flex rows and align them with adjacent
+	// text — the layout contract the previous <Icon> span provided.
+	const style: CSSProperties = { flexShrink: 0, verticalAlign: "middle" }
 
-	if (svgText) {
-		return (
-			<span
-				role="img"
-				aria-label={hidden ? undefined : label}
-				aria-hidden={hidden}
-				data-icon={name}
-				className={className}
-				style={{ ...baseStyle, lineHeight: 0 }}
-				dangerouslySetInnerHTML={{ __html: svgText }}
-			/>
-		)
-	}
-
-	// Skeleton fallback — same footprint as the real icon, no emoji bleed-through.
-	// A rounded grey slab communicates "icon goes here" without emitting
-	// platform-specific emoji glyphs that vary wildly across OS/browser combos.
 	return (
-		<span
-			role="img"
-			aria-label={hidden ? undefined : label}
-			aria-hidden={hidden}
-			data-icon={name}
-			data-streamline={entry.streamline}
+		<Glyph
+			size={size}
+			weight={weight ?? entry.weight ?? DEFAULT_ICON_WEIGHT}
+			color={color ?? "currentColor"}
 			className={className}
-			style={{
-				...baseStyle,
-				borderRadius: "30%",
-				background: "currentColor",
-				opacity: 0.12,
-			}}
+			style={style}
+			data-icon={name}
+			role="img"
+			aria-hidden={hidden}
+			aria-label={hidden ? undefined : label}
 		/>
 	)
 }

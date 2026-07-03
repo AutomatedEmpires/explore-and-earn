@@ -30,7 +30,31 @@ export default tseslint.config(
       }
     },
     rules: {
-      "no-console": "off"
+      "no-console": "off",
+      // G30 (ADR-044): one icon system only. Icons render through the
+      // <Icon name="domain.name"/> registry (packages/ui), which is backed by
+      // Phosphor. Ban every other icon library so the set can't drift.
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            { name: "lucide-react", message: "G30: use <Icon> (packages/ui) — Phosphor is the only icon set." }
+          ],
+          patterns: [
+            {
+              group: [
+                "@heroicons/*",
+                "react-icons",
+                "react-icons/*",
+                "@fortawesome/*",
+                "@mui/icons-material",
+                "@mui/icons-material/*"
+              ],
+              message: "G30: use <Icon> (packages/ui) — Phosphor is the only icon set."
+            }
+          ]
+        }
+      ]
     }
   }
 );

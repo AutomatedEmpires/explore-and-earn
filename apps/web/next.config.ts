@@ -62,6 +62,12 @@ const nextConfig: NextConfig = {
   // Don't leak the Next.js version via the X-Powered-By header.
   poweredByHeader: false,
   transpilePackages: ["@explore-and-earn/ui", "@explore-and-earn/contracts", "@explore-and-earn/db"],
+  experimental: {
+    // Tree-shake barrel imports so only the referenced symbols ship. Critical
+    // for @phosphor-icons/react (importing ~100 icons from its index must not
+    // pull the full ~9,000-icon set) and for the @explore-and-earn/ui barrel.
+    optimizePackageImports: ["@phosphor-icons/react", "@explore-and-earn/ui"],
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
