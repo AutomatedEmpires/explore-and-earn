@@ -7,8 +7,6 @@ Owned by the App Shell & Navigation lane.
 - `AppShell.tsx` — root chrome wrapper. Provides the `shell-frame` structural
   container only. Header and bottom navigation are **not** rendered here.
   Imports `shell.css`.
-- `TopBar.tsx` — brand bar (server component). Available for scope layouts to
-  use; not rendered globally.
 - `shell.css` — global, namespaced chrome styles (`shell-*`), semantic tokens
   only. Plain global CSS mirrors the repo convention (`primitives.css` uses
   global `ui-*` classes) and keeps `tsc -b` free of `*.module.css` ambient-type
@@ -20,10 +18,10 @@ Owned by the App Shell & Navigation lane.
 > bottom nav. Each user-type scope owns and renders its own header and bottom
 > nav inside its route-group layout.**
 
-- `(seeker)` layout owns `SeekerHeader` + `SeekerBottomNav` (Swipe · Map · Seek · Profile).
+- `(seeker)` layout owns its header (`GlobalHeader`) + `SeekerBottomNav` (Swipe · Map · Seek · Profile).
 - `(host)` layout owns `HostHeader` + `HostBottomNav`.
-- Non-feature groups (`(marketing)`, `(public)`) supply their own minimal chrome
-  or intentionally have none.
+- Public/marketing routes render `PublicShell` (shared header + `PublicBottomNav`);
+  unscoped routes may intentionally have no app chrome.
 
 `AppShell` must **never** render a global bottom nav or header.
 
