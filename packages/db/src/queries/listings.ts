@@ -341,6 +341,29 @@ function sanitizeSearchTerm(term: string): string {
   return term.slice(0, 200).replace(/[,()*%]/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Build the fuzzy free-text search filter as a PostgREST `or()` group.
+ *
+ * Combines three signals so a query hits the way people actually type:
+ *   1. `search_vector` full-text (stemmed title+description, migration 035) —
+ *      "farms" finds "farm", handles word order.
+ *   2. trigram-indexed `title ILIKE '%term%'` (migration 051) — partial words
+ *      and prefixes ("maritim" → "Maritime deckhand") that stemming misses.
+ *   3. trigram-indexed `location_display ILIKE '%term%'` — place names, which
+ *      the search_vector does not index.
+ *
+ * `term` MUST already be run through {@link sanitizeSearchTerm} (it strips the
+ * PostgREST-reserved `, ( ) * %` so the or() string can't be broken/injected).
+ */
+export function buildSearchTermFilter(term: string): string {
+  const like = `*${term}*`;
+  return [
+    `search_vector.plfts(english).${term}`,
+    `title.ilike.${like}`,
+    `location_display.ilike.${like}`,
+  ].join(",");
+}
+
 export async function searchListings(filters: SearchFilters): Promise<ListingRow[]> {
   let builder = anonClient()
     .from("listings")
@@ -349,13 +372,11 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
 
   const term = filters.query ? sanitizeSearchTerm(filters.query) : "";
   if (term) {
-    // Full-text path: query the generated `search_vector` tsvector (migration
-    // 022) via plainto_tsquery. The non-text paths below (location ilike,
-    // category, benefits, pay, date range) still apply for empty/null queries.
-    builder = builder.textSearch("search_vector", term, {
-      type: "plain",
-      config: "english",
-    });
+    // Fuzzy free-text path: full-text (stemmed) OR trigram-indexed partial
+    // matches on title + location, so typos/partials and place names also hit.
+    // The non-text paths below (category, benefits, pay, date range) still apply
+    // for empty/null queries. See buildSearchTermFilter.
+    builder = builder.or(buildSearchTermFilter(term));
   }
 
   const categories = (filters.categories ?? []).filter((category) =>
