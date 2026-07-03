@@ -87,6 +87,7 @@ export async function createBoostCheckoutAction(
       hostProfileId: host.hostProfileId,
       listingId,
       durationDays,
+      hostSubscriptionTier: host.subscriptionTier,
     });
     const url = checkout.url;
     if (!url) return { ok: false, reason: "checkout_failed" };
