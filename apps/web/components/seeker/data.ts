@@ -28,6 +28,7 @@ import {
 } from "@explore-and-earn/db";
 
 import { cachedSeekerProfile, getPublicListingsCached } from "../../lib/serverCache";
+import { computeResumeCompletion } from "./resumeAdapter";
 
 const allowFixtureFallback = process.env.NODE_ENV !== "production";
 
@@ -66,7 +67,6 @@ export function getSeekerStatusFallback(
  * Arrays are returned as fresh copies so callers can never mutate the source.
  */
 
-type SeekerResumeData = Awaited<ReturnType<typeof getSeekerResume>>;
 type BaseSeekerProfile = NonNullable<Awaited<ReturnType<typeof cachedSeekerProfile>>>;
 
 interface MatchProfile {
@@ -75,28 +75,6 @@ interface MatchProfile {
   readonly mealsPreference: string | null;
   readonly locationPref: string | null;
   readonly payExpectationMinCents: number | null;
-}
-
-/**
- * Derive a 0..100 resume-completion estimate. getSeekerResume returns the raw
- * profile/experiences/educations (not a percentage), so completion is computed
- * here deterministically: bio (+40), at least one experience (+40), at least
- * one education (+20). Kept module-local (NOT exported) to avoid colliding with
- * the resume-lane helpers re-exported through the seeker barrel.
- */
-function estimateResumeCompletion(resume: SeekerResumeData): number {
-  let score = 0;
-  const bio = resume.profile?.bio;
-  if (typeof bio === "string" && bio.trim().length > 0) {
-    score += 40;
-  }
-  if (resume.experiences.length > 0) {
-    score += 40;
-  }
-  if (resume.educations.length > 0) {
-    score += 20;
-  }
-  return Math.min(100, score);
 }
 
 /**
@@ -150,7 +128,7 @@ export async function getSeekerStatus(
 
     return {
       seekerName,
-      resumeCompletion: estimateResumeCompletion(resume),
+      resumeCompletion: computeResumeCompletion(resume),
       savedCount: savedIds.length,
       appliedCount: applications.length,
       offersCount,
