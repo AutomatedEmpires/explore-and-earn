@@ -78,7 +78,7 @@ export function QuickStats({ status }: QuickStatsProps) {
   const resumeReady = status.resumeCompletion >= RESUME_APPLY_THRESHOLD;
   const hasApplied = status.appliedCount > 0;
   const hasOffers = status.offersCount > 0;
-  const hasInbox = status.unreadNotifications > 0;
+  const hasInbox = status.invitesCount > 0;
 
   return (
     <section className={styles.wrap} aria-label="Your activity">
@@ -128,13 +128,13 @@ export function QuickStats({ status }: QuickStatsProps) {
       {hasInbox ? (
         <MetricLink
           href="/invites"
-          label="Inbox"
-          value={String(status.unreadNotifications)}
-          trend="Unread"
+          label="Invites"
+          value={String(status.invitesCount)}
+          trend="New"
           trendTone="up"
-          spark={sparkToward(Math.min(100, 24 + status.unreadNotifications * 14))}
+          spark={sparkToward(Math.min(100, 24 + status.invitesCount * 14))}
           highlight
-          ariaLabel={`${status.unreadNotifications} unread invites and messages`}
+          ariaLabel={`${status.invitesCount} pending host invites`}
         />
       ) : null}
       </MetricGrid>
