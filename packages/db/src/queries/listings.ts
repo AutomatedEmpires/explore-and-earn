@@ -180,13 +180,25 @@ const LISTING_COLUMNS =
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;
 
-/** Public live listings \u2014 no auth required. */
-export async function getPublicListings(): Promise<ListingRow[]> {
+/**
+ * Default candidate cap for the public live-listings feed. Discovery scores and
+ * re-ranks in Node, then slices to ~20, so pulling the entire `listings` table
+ * on every render is pure waste. 200 most-recently-published live listings is a
+ * generous candidate pool for scoring at launch scale; callers that genuinely
+ * need the full set (e.g. the sitemap) pass an explicit higher cap.
+ */
+export const PUBLIC_LISTINGS_FEED_CAP = 200;
+
+/** Public live listings \u2014 no auth required. Bounded to `limit` most-recent. */
+export async function getPublicListings(
+  limit: number = PUBLIC_LISTINGS_FEED_CAP,
+): Promise<ListingRow[]> {
   const { data, error } = await anonClient()
     .from("listings")
     .select(LISTING_COLUMNS)
     .eq("status", "live")
-    .order("published_at", { ascending: false });
+    .order("published_at", { ascending: false })
+    .limit(limit);
 
   if (error) throw new Error(`getPublicListings: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);

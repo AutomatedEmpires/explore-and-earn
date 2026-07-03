@@ -475,6 +475,8 @@ export function DiscoveryCard({
 					<img
 						src={data.coverImageUrl}
 						alt={`${data.hostName} cover`}
+						loading="lazy"
+						decoding="async"
 						style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
 					/>
 				) : (
@@ -519,6 +521,8 @@ export function DiscoveryCard({
 							<img
 								src={data.hostAvatarUrl}
 								alt={`${data.hostName} host avatar`}
+								loading="lazy"
+								decoding="async"
 								style={{ width: "100%", height: "100%", objectFit: "cover" }}
 							/>
 						) : (

@@ -5,10 +5,10 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
   getCommunityUnreadCount,
-  getSeekerProfile,
   getUnreadNotificationCount,
 } from "@explore-and-earn/db";
 
+import { cachedSeekerProfile, getSupabaseToken } from "../../lib/serverCache";
 import { SeekerShell } from "../../components/seeker";
 import { DEV_USER_ID, devSeekerName, isDevBenchEnabled } from "../../lib/devBench";
 import { readDevRole } from "../../lib/devBench/server";
@@ -75,17 +75,20 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
   }
 
   try {
-    const { userId, getToken } = await auth();
+    const { userId } = await auth();
     if (!userId) {
       return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
     }
-    const token = await getToken({ template: "supabase" });
+    // Request-scoped: this token is minted once and reused by the child page's
+    // data fetches (see lib/serverCache), so a seeker navigation no longer pays
+    // the Clerk getToken round-trip more than once.
+    const token = await getSupabaseToken();
     if (!token) {
       return { unreadCount: 0, clerkUserId: userId, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
     }
     const [unreadCount, profile, unreadCommunity] = await Promise.all([
       getUnreadNotificationCount(token, userId),
-      getSeekerProfile(token, userId),
+      cachedSeekerProfile(token, userId),
       getCommunityUnreadCount(userId),
     ]);
     return {

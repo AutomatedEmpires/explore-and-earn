@@ -1,9 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
-import { getHostProfile, getUnreadMessageCount } from "@explore-and-earn/db";
+import { getUnreadMessageCount } from "@explore-and-earn/db";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { cachedHostProfile, getSupabaseToken } from "../../lib/serverCache";
 import { HostShell } from "../../components/host/HostShell";
 import { devHostProfile, isDevBenchEnabled } from "../../lib/devBench";
 import { readDevRole } from "../../lib/devBench/server";
@@ -62,16 +63,16 @@ export default async function HostLayout({
     );
   }
 
-  const { userId, getToken } = await auth();
+  const { userId } = await auth();
   if (!userId) {
     redirect("/sign-in");
   }
-  const token = await getToken({ template: "supabase" });
+  const token = await getSupabaseToken();
   if (!token) {
     redirect("/sign-in");
   }
   const [hostProfile, unreadMessages] = await Promise.all([
-    getHostProfile(token, userId),
+    cachedHostProfile(token, userId),
     getUnreadMessageCount(token, userId),
   ]);
   if (!hostProfile) {

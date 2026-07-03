@@ -4,13 +4,13 @@ import { auth } from "@clerk/nextjs/server";
 import Image from "next/image";
 import Link from "next/link";
 
+import { hasApplied, hasSaved } from "@explore-and-earn/db";
 import {
-  getListingDetailPublic,
-  getHostProfile,
-  getSeekerProfile,
-  hasApplied,
-  hasSaved,
-} from "@explore-and-earn/db";
+  cachedHostProfile,
+  cachedSeekerProfile,
+  getListingDetailPublicCached,
+  getSupabaseToken,
+} from "../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
@@ -31,7 +31,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const listing = await getListingDetailPublic(id);
+  const listing = await getListingDetailPublicCached(id);
 
   if (!listing) {
     return { title: "Listing not found" };
@@ -67,12 +67,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ListingDetailPage({ params }: Props) {
   const { id } = await params;
-  const listing = await getListingDetailPublic(id);
+  const listing = await getListingDetailPublicCached(id);
 
   if (!listing) notFound();
 
-  const { userId, getToken } = await auth();
-  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const { userId } = await auth();
+  const token = userId ? await getSupabaseToken() : null;
 
   // Determine viewer role and ownership
   let viewerRole: "guest" | "seeker" | "owner" = "guest";
@@ -80,7 +80,7 @@ export default async function ListingDetailPage({ params }: Props) {
 
   if (userId && token) {
     try {
-      const hostProfile = await getHostProfile(token, userId);
+      const hostProfile = await cachedHostProfile(token, userId);
       isOwner = hostProfile?.id === listing.hostProfileId;
       viewerRole = isOwner ? "owner" : "seeker";
     } catch {
@@ -103,7 +103,7 @@ export default async function ListingDetailPage({ params }: Props) {
     const [applied, saved, seekerProfile] = await Promise.all([
       hasApplied(token, userId, listing.id),
       hasSaved(token, userId, listing.id),
-      getSeekerProfile(token, userId),
+      cachedSeekerProfile(token, userId),
     ]);
     alreadyApplied = applied;
     alreadySaved = saved;

@@ -25,7 +25,7 @@ import {
 import { SeekBrowser } from "../../../components/seeker";
 import { SeekerDashboard } from "../../../components/seeker/SeekerDashboard";
 import { getSeekerStatus, getMatchedListings } from "../../../components/seeker/data";
-import { getSeekerProfile } from "@explore-and-earn/db";
+import { cachedSeekerProfile, getSupabaseToken } from "../../../lib/serverCache";
 import { buildFeaturedEmployers } from "../../../lib/employer-utils";
 import styles from "./page.module.css";
 
@@ -159,8 +159,8 @@ export default async function SeekPage({
 	const params = await searchParams;
 
 	// Auth — optional; dashboard only renders when signed in
-	const { userId, getToken } = await auth();
-	const token = userId ? await getToken({ template: "supabase" }) : null;
+	const { userId } = await auth();
+	const token = userId ? await getSupabaseToken() : null;
 
 	// Parse discovery filters from URL
 	const query = firstValue(params.q);
@@ -250,7 +250,7 @@ export default async function SeekPage({
 		const [status, matchedListings, profile, savedSearches] = await Promise.all([
 			getSeekerStatus(token, userId, fallbackName),
 			getMatchedListings(token, userId),
-			getSeekerProfile(token, userId),
+			cachedSeekerProfile(token, userId),
 			getSavedSearches(token, userId).catch(() => []),
 		]);
 
