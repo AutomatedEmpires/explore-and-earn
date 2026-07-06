@@ -2,6 +2,8 @@ import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import exploreAndEarnPlugin from "./tools/eslint-plugin-explore-and-earn/index.ts";
+
 export default tseslint.config(
   {
     ignores: [
@@ -29,8 +31,21 @@ export default tseslint.config(
         ...globals.browser
       }
     },
+    plugins: {
+      "explore-and-earn": exploreAndEarnPlugin
+    },
     rules: {
       "no-console": "off",
+      // G-REFUND: the only rule in @explore-and-earn/eslint-plugin with a real
+      // implementation — see tools/eslint-plugin-explore-and-earn/index.ts for
+      // why the other five stay "off" (either superseded by a working
+      // tools/scripts/check-*.mjs guardrail, or still an unimplemented stub).
+      "explore-and-earn/no-direct-stripe-refund": "error",
+      "explore-and-earn/no-pricing-literals": "off",
+      "explore-and-earn/no-external-calendar-sync": "off",
+      "explore-and-earn/no-lifecycle-string-literals": "off",
+      "explore-and-earn/no-monetization-in-match": "off",
+      "explore-and-earn/verified-host-via-component-only": "off",
       // G30 (ADR-044): one icon system only. Icons render through the
       // <Icon name="domain.name"/> registry (packages/ui), which is backed by
       // Phosphor. Ban every other icon library so the set can't drift.
