@@ -1,5 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { Patrick_Hand, Cabin_Sketch, Inter, Fraunces } from "next/font/google";
+import { Patrick_Hand, Cabin_Sketch, Inter, Fraunces, Geist } from "next/font/google";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
@@ -27,11 +27,19 @@ const inter = Inter({
 	display: "swap",
 });
 
-// Fraunces — variable editorial serif. Design System V2 display face (host scope
-// titles/numerals via --font-fraunces); see docs/superpowers/specs/2026-06-21-*.
+// Fraunces — variable editorial serif. Design System v3 (Modern Editorial):
+// the sitewide DISPLAY face (hero, headings, section titles) via --font-display.
 const fraunces = Fraunces({
 	subsets: ["latin"],
 	variable: "--font-fraunces",
+	display: "swap",
+});
+
+// Geist — Vercel's clean modern grotesk. Design System v3: the sitewide UI + body
+// face via --font-ui. Replaces Inter/Patrick Hand for all non-display text.
+const geist = Geist({
+	subsets: ["latin"],
+	variable: "--font-geist",
 	display: "swap",
 });
 import { CookieBanner } from "../components/CookieBanner";
@@ -80,7 +88,7 @@ function AuthBoundary({ children }: { children: ReactNode }) {
 export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
 		<AuthBoundary>
-			<html lang="en" className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable} ${fraunces.variable}`}>
+			<html lang="en" className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable} ${fraunces.variable} ${geist.variable}`}>
 				<body>
 					<SentryUserProvider />
 					<Providers>

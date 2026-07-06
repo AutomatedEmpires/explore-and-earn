@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import posthog from "posthog-js";
 import { PostHogProvider } from "posthog-js/react";
 
+import { ReducedMotionProvider } from "../components/motion";
+
 const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST;
 
@@ -17,8 +19,12 @@ if (typeof window !== "undefined" && posthogKey) {
 
 export function Providers({ children }: { children: ReactNode }) {
 	if (!posthogKey) {
-		return <>{children}</>;
+		return <ReducedMotionProvider>{children}</ReducedMotionProvider>;
 	}
 
-	return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
+	return (
+		<ReducedMotionProvider>
+			<PostHogProvider client={posthog}>{children}</PostHogProvider>
+		</ReducedMotionProvider>
+	);
 }

@@ -6,20 +6,19 @@ import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import styles from "../navigation/BottomNav.module.css";
 
-// The user-scope dock. Logged-out visitors get the SAME nav as seekers — same
-// destinations, same order (matching the seeker OS mobile dock's MOBILE_TABS),
-// same floating-capsule design — so the bottom bar never shifts as a visitor
-// crosses from a public page into the seeker scope. Locked: Swipe · Map · Seek
-// · Profile, with the same icons the seeker dock uses.
+// The user-scope dock (logged-out / public). Same floating-capsule design as the
+// seeker OS dock so the bottom bar never shifts as a visitor crosses into the
+// seeker scope. Tabs: Seek · Swipe · Map · Profile · Community.
 const TABS: ReadonlyArray<{
 	href: string;
 	label: string;
 	icon: IconKey;
 }> = [
-	{ href: "/swipe", label: "Swipe", icon: "category.mix" },
-	{ href: "/map", label: "Map", icon: "status.open" },
-	{ href: "/seek", label: "Seek", icon: "nav.feed" },
+	{ href: "/seek", label: "Seek", icon: "nav.seek" },
+	{ href: "/swipe", label: "Swipe", icon: "nav.swipe" },
+	{ href: "/map", label: "Map", icon: "nav.map" },
 	{ href: "/profile", label: "Profile", icon: "nav.profile" },
+	{ href: "/community", label: "Community", icon: "nav.feed" },
 ];
 
 export function PublicBottomNav() {
@@ -39,7 +38,7 @@ export function PublicBottomNav() {
 								href={tab.href}
 								aria-current={active ? "page" : undefined}
 							>
-								<Icon name={tab.icon} size={20} aria-hidden />
+								<Icon name={tab.icon} size={24} aria-hidden />
 								<span className={styles.label}>{tab.label}</span>
 							</Link>
 						</li>

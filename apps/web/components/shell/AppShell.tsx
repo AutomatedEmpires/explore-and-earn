@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { RouteTransitionShell } from "../motion";
 import "./shell.css";
 
 export interface AppShellProps {
@@ -18,5 +19,9 @@ export interface AppShellProps {
  * Mobile-first, flat/borders-first (no shadows), safe-area aware.
  */
 export function AppShell({ children }: AppShellProps) {
-	return <div className="shell-frame">{children}</div>;
+	return (
+		<div className="shell-frame">
+			<RouteTransitionShell>{children}</RouteTransitionShell>
+		</div>
+	);
 }
