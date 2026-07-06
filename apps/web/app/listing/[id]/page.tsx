@@ -200,6 +200,10 @@ export default async function ListingDetailPage({ params }: Props) {
               fill
               className={styles.fillImg}
               priority
+              // .cover is gutter-inset on mobile and width-constrained on
+              // desktop — without sizes the srcset assumed 100vw and
+              // over-fetched the LCP image.
+              sizes="(max-width: 1023px) 92vw, 960px"
             />
           </div>
         )}

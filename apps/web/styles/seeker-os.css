@@ -83,7 +83,7 @@
   display: grid;
   place-items: center;
   color: var(--seekeros-on-accent);
-  font-weight: 900;
+  font-weight: 700;
   background:
     radial-gradient(circle at 33% 24%, rgba(255, 255, 255, 0.85) 0 8%, transparent 9%),
     var(--gradient-sky);
@@ -95,7 +95,7 @@
   letter-spacing: -0.05em;
   font-size: 1.08rem;
   line-height: 0.95;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -108,7 +108,7 @@
   margin-top: 4px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-weight: 800;
+  font-weight: 700;
   font-style: normal;
 }
 
@@ -155,7 +155,7 @@
   border-radius: 16px;
   display: grid;
   place-items: center;
-  font-weight: 900;
+  font-weight: 700;
   color: var(--seekeros-on-accent);
   background: var(--gradient-sky);
   flex: 0 0 auto;
@@ -170,7 +170,7 @@
   letter-spacing: -0.04em;
   line-height: 0.95;
   font-size: 1.1rem;
-  font-weight: 800;
+  font-weight: 700;
   color: #FBF7EE;
 }
 
@@ -199,7 +199,7 @@
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-muted);
   margin-bottom: 9px;
 }
@@ -225,7 +225,7 @@
   font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .seekeros-nav {
@@ -293,7 +293,7 @@
   background: var(--seekeros-panel);
   border: 1px solid var(--seekeros-line);
   font-size: 0.7rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .seekeros-navitem:hover {
@@ -394,7 +394,7 @@
   background: var(--seekeros-accent);
   color: var(--seekeros-on-accent);
   font-size: 0.64rem;
-  font-weight: 900;
+  font-weight: 700;
   display: grid;
   place-items: center;
 }
@@ -416,7 +416,7 @@
   border-radius: 999px;
   display: grid;
   place-items: center;
-  font-weight: 900;
+  font-weight: 700;
   font-size: 0.82rem;
   color: var(--seekeros-on-accent);
   background: var(--seekeros-grad);
