@@ -6,11 +6,14 @@ import {
 	getSavedSearches,
 	rowToDiscoveryFields,
 	savedSearchToQueryString,
+	scoreSeekerListingRow,
 	searchListings,
+	seekerHasMatchInputs,
 } from "@explore-and-earn/db";
 import {
 	type CompensationUnit,
 	MARKETPLACE_CATEGORIES,
+	matchBandFor,
 } from "@explore-and-earn/contracts";
 
 import {
@@ -198,11 +201,15 @@ export default async function SeekPage({
 
 	let hasNextPage = false;
 	let listings: DiscoveryListing[] = [];
+	// Raw rows kept alongside `listings` (same order) so a signed-in seeker's
+	// fit can be scored per card below. Empty on the fixture path.
+	let scorableRows: Awaited<ReturnType<typeof searchListings>> = [];
 
 	if (hasPublicDataConfig) {
 		const rows = await searchListings(filters);
 		hasNextPage = rows.length > PAGE_SIZE;
 		const pageRows = hasNextPage ? rows.slice(0, PAGE_SIZE) : rows;
+		scorableRows = pageRows;
 		listings = pageRows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
 	} else if (canUseFixtures) {
 		const filtered = DISCOVERY_FIXTURES.filter((listing) =>
@@ -297,6 +304,18 @@ export default async function SeekPage({
 			seekerName: status.seekerName,
 			featuredEmployers,
 		};
+
+		// Stamp each grid card with the seeker's ADR-040 fit — the SAME score the
+		// listing it opens will show. Only developing+ bands are surfaced, so the
+		// grid highlights genuine fits instead of labelling every card.
+		if (profile && seekerHasMatchInputs(profile) && scorableRows.length === listings.length) {
+			listings = listings.map((listing, index) => {
+				const score = scoreSeekerListingRow(profile, scorableRows[index]);
+				return matchBandFor(score) === "needs_attention"
+					? listing
+					: { ...listing, matchScore: score };
+			});
+		}
 	}
 
 	return (

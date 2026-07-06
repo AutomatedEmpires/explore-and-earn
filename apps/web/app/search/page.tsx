@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
 
+import { auth } from "@clerk/nextjs/server";
+
 import type { ListingRow, SearchFilters } from "@explore-and-earn/db";
-import { rowToDiscoveryFields, searchListings } from "@explore-and-earn/db";
+import {
+	rowToDiscoveryFields,
+	scoreSeekerListingRow,
+	searchListings,
+	seekerHasMatchInputs,
+} from "@explore-and-earn/db";
 import type { CompensationUnit, MarketplaceCategory } from "@explore-and-earn/contracts";
-import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
+import { MARKETPLACE_CATEGORIES, matchBandFor } from "@explore-and-earn/contracts";
 
 import type { SearchListing } from "../../components/search/listing";
 import { SEARCH_FIXTURES } from "../../components/search/fixtures";
 import { SearchView } from "../../components/search/SearchView";
+import { cachedSeekerProfile, getSupabaseToken } from "../../lib/serverCache";
 
 export const dynamic = "force-dynamic";
 
@@ -176,6 +184,9 @@ export default async function SearchPage({
 	const startBefore = parseDate(params.start_before);
 
 	let listings: readonly SearchListing[];
+	// Raw rows kept alongside `listings` (same order) to score a signed-in
+	// seeker's fit per card below. Empty on the fixture path.
+	let scorableRows: ListingRow[] = [];
 
 	if (hasPublicDataConfig) {
 		// Server-side DB query — uses the search_vector GIN index (migration 022)
@@ -193,6 +204,7 @@ export default async function SearchPage({
 			limit: 48,
 		};
 		const rows = await searchListings(filters);
+		scorableRows = rows;
 		listings = rows.map(rowToSearchListing);
 	} else {
 		// Dev / preview: filter the typed fixture set locally.
@@ -204,6 +216,23 @@ export default async function SearchPage({
 			payMin,
 			location,
 		});
+	}
+
+	// Stamp each result with the signed-in seeker's ADR-040 fit — the SAME score
+	// the listing detail shows. Only developing+ bands are surfaced. Anonymous
+	// visitors (and thin profiles) see the plain results, unchanged.
+	const { userId } = await auth();
+	if (userId && scorableRows.length === listings.length) {
+		const token = await getSupabaseToken();
+		const profile = token ? await cachedSeekerProfile(token, userId) : null;
+		if (profile && seekerHasMatchInputs(profile)) {
+			listings = listings.map((listing, index) => {
+				const score = scoreSeekerListingRow(profile, scorableRows[index]);
+				return matchBandFor(score) === "needs_attention"
+					? listing
+					: { ...listing, matchScore: score };
+			});
+		}
 	}
 
 	return (

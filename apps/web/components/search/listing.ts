@@ -31,4 +31,6 @@ export interface SearchListing {
 	readonly benefits: SearchBenefits;
 	readonly verifiedHost?: boolean;
 	readonly conditionalBadges?: readonly DiscoveryCardConditionalBadge[];
+	/** 0–100 ADR-040 fit for the signed-in seeker; absent for anon/thin profiles. */
+	readonly matchScore?: number;
 }

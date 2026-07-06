@@ -74,5 +74,6 @@ export function toDiscoveryCardData(listing: SearchListing): DiscoveryCardData {
 		},
 		verifiedHost: listing.verifiedHost,
 		conditionalBadges: listing.conditionalBadges,
+		matchScore: listing.matchScore,
 	};
 }

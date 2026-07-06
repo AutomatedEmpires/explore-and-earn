@@ -268,6 +268,7 @@ export function DiscoveryCard({
 	const isDisabled            = variant === "disabled"
 	const isApplicantReview     = surface === "host_applicant_review"
 	const isAdminReview         = surface === "admin_review"
+	const isDiscoveryFeed       = surface === "discovery_feed"
 	const isSeekerSurface       = isApplicantReview  // alias kept for CTA compat
 	const circleLabel           = isApplicantReview ? "SEEKER" : "HOST"
 
@@ -337,10 +338,12 @@ export function DiscoveryCard({
 		: null
 
 	// Match bar: always-on for host_applicant_review (boosted doesn't apply to seeker cards);
-	// on other surfaces, only when matched + no center badge (boosted wins center, score falls to R1)
+	// on the discovery feed, whenever a seeker fit score is present (the ADR-040
+	// signal at browse time); on other surfaces, only when matched + no center
+	// badge (boosted wins center, score falls to R1)
 	const showMatchBar = isApplicantReview
 		? typeof data.matchScore === "number"
-		: !centerBadge && isMatched && typeof data.matchScore === "number"
+		: (isDiscoveryFeed || isMatched) && !centerBadge && typeof data.matchScore === "number"
 	const showHeroBar  = !centerBadge && !showMatchBar && typeof data.fillPercent === "number"
 
 	// ── CTA resolution ────────────────────────────────────────────────────────
