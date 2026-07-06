@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
 
+import { getHostProfile } from "@explore-and-earn/db";
+
 import { AssistantChat } from "../../../../components/assistant/AssistantChat";
 import styles from "../../../../components/assistant/assistant.module.css";
+import { optionalAuth } from "../../../../lib/optionalAuth";
+import { getSupabaseToken } from "../../../../lib/serverCache";
+import {
+  readHostThreadMessages,
+  type PersistedAssistantMessage,
+} from "../../../../services/assistant/persistence";
 
 export const metadata: Metadata = {
   title: "Assistant",
@@ -23,8 +31,18 @@ const HOST_SUGGESTIONS = [
  * applicants by real ADR-040 fit. Gates on AI_GATEWAY_API_KEY so environments
  * without AI configured show a graceful "not available" state.
  */
-export default function HostAssistantPage() {
+export default async function HostAssistantPage() {
   const configured = Boolean(process.env.AI_GATEWAY_API_KEY);
+
+  let initialMessages: PersistedAssistantMessage[] = [];
+  const { userId } = await optionalAuth();
+  if (configured && userId) {
+    const token = await getSupabaseToken();
+    const profile = token ? await getHostProfile(token, userId) : null;
+    if (profile) {
+      initialMessages = await readHostThreadMessages(profile.id);
+    }
+  }
 
   return (
     <main className={styles.page}>
@@ -38,6 +56,7 @@ export default function HostAssistantPage() {
       {configured ? (
         <AssistantChat
           context="host"
+          initialMessages={initialMessages}
           emptyTitle="Ask your listing coach"
           emptySub="Sharpen your listings against Housing / Meals / Pay, and rank applicants by real fit."
           suggestions={HOST_SUGGESTIONS}

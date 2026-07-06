@@ -82,6 +82,64 @@ async function logTurn(
   }
 }
 
+/** One persisted transcript message, shaped for useChat's initial messages. */
+export interface PersistedAssistantMessage {
+  readonly id: string;
+  readonly role: "user" | "assistant";
+  readonly parts: unknown[];
+}
+
+/**
+ * Read the owner's most recent thread transcript (oldest → newest, last 40)
+ * so a chat mount RESUMES the conversation instead of starting blank —
+ * migrations 053/055 built owner-scoped reads for exactly this.
+ */
+async function readThreadMessages(owner: ThreadOwner): Promise<PersistedAssistantMessage[]> {
+  try {
+    const client = db();
+    const { column, value } = ownerColumn(owner);
+    const { data: thread } = await client
+      .from("assistant_threads")
+      .select("id")
+      .eq(column, value)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!thread) return [];
+
+    const { data: rows } = await client
+      .from("assistant_messages")
+      .select("id, role, parts, created_at")
+      .eq("thread_id", String((thread as { id: unknown }).id))
+      .order("created_at", { ascending: false })
+      .limit(40);
+
+    return ((rows ?? []) as Array<Record<string, unknown>>)
+      .reverse()
+      .filter((r) => r.role === "user" || r.role === "assistant")
+      .map((r) => ({
+        id: String(r.id),
+        role: r.role as "user" | "assistant",
+        parts: Array.isArray(r.parts) ? (r.parts as unknown[]) : [],
+      }))
+      .filter((m) => m.parts.length > 0);
+  } catch {
+    return []; // resume is an enhancement — a failed read starts a fresh chat
+  }
+}
+
+export async function readSeekerThreadMessages(
+  seekerProfileId: string,
+): Promise<PersistedAssistantMessage[]> {
+  return readThreadMessages({ kind: "seeker", seekerProfileId });
+}
+
+export async function readHostThreadMessages(
+  hostProfileId: string,
+): Promise<PersistedAssistantMessage[]> {
+  return readThreadMessages({ kind: "host", hostProfileId });
+}
+
 /**
  * Persist one seeker turn (user message + assistant reply). Parts are the AI SDK
  * UIMessage parts (transcript) — no separate free-text explanation is stored.

@@ -67,13 +67,32 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const body = (await req.json().catch(() => null)) as
-    | { messages?: unknown; context?: unknown }
+    | { messages?: unknown; context?: unknown; page?: unknown }
     | null;
   if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
     return new Response("Invalid request body.", { status: 400 });
   }
   const messages = body.messages.slice(-MAX_MESSAGES) as UIMessage[];
   const context = normalizeContext(body.context);
+  // What the visitor is looking at — lets "is this right for me?" work with
+  // zero typing (explain_match needs a listing id the user would never type).
+  const rawPage = (body.page ?? null) as {
+    pathname?: unknown;
+    listingId?: unknown;
+    listingTitle?: unknown;
+  } | null;
+  const pageLine = rawPage
+    ? [
+        typeof rawPage.pathname === "string" && rawPage.pathname.startsWith("/")
+          ? `The user is currently on ${rawPage.pathname.slice(0, 120)}.`
+          : null,
+        typeof rawPage.listingId === "string" && /^[0-9a-f-]{36}$/i.test(rawPage.listingId)
+          ? `They are viewing listing ${typeof rawPage.listingTitle === "string" ? `"${rawPage.listingTitle.slice(0, 120)}" ` : ""}(id ${rawPage.listingId}).`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "";
   const token = await getToken({ template: "supabase" });
   const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
 
@@ -86,10 +105,11 @@ export async function POST(req: Request): Promise<Response> {
     if (hostProfile) {
       const result = streamText({
         model: MODEL,
-        system: hostSystemPrompt({
-          hostName: hostProfile.hostName,
-          companyName: hostProfile.companyName,
-        }),
+        system:
+          hostSystemPrompt({
+            hostName: hostProfile.hostName,
+            companyName: hostProfile.companyName,
+          }) + (pageLine ? `\n\n${pageLine}` : ""),
         messages: await convertToModelMessages(messages),
         tools: token ? buildHostTools({ token, userId }) : {},
         stopWhen: stepCountIs(5),
@@ -115,10 +135,11 @@ export async function POST(req: Request): Promise<Response> {
 
   const result = streamText({
     model: MODEL,
-    system: seekerSystemPrompt({
-      seekerName: profile?.displayName ?? null,
-      onboardingComplete: profile?.onboardingComplete ?? false,
-    }),
+    system:
+      seekerSystemPrompt({
+        seekerName: profile?.displayName ?? null,
+        onboardingComplete: profile?.onboardingComplete ?? false,
+      }) + (pageLine ? `\n\n${pageLine}` : ""),
     messages: await convertToModelMessages(messages),
     // Identity is closed over inside the tools; the model cannot act as anyone
     // but this seeker. No token → no tools (the model can still converse).
