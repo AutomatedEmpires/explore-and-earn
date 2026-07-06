@@ -57,10 +57,9 @@ test.describe("public surfaces (guest)", () => {
 
     await expect(publicNav(page)).toHaveCount(1);
     await expect(hostNav(page)).toHaveCount(0);
-    // KNOWN-RED until migration 056 applies (CI db-migrate on merge): the
-    // live DB lacks the anon subscription_tier grant this branch's public
-    // queries need, so anonymous /search error-boundaries. This assertion is
-    // the proof it's fixed — do not weaken it.
+    // Guards the anon data path end-to-end (migration 056's grant): a missing
+    // RLS column grant previously crashed anonymous /search behind HTTP 200.
+    // Do not weaken this assertion.
     await expect(page.getByText(/something went sideways/i)).toHaveCount(0);
   });
 
