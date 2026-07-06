@@ -72,8 +72,8 @@ function buildChecklist(profile: HostProfileSummary): readonly ChecklistRow[] {
       ),
     },
     {
-      label: "Get verified by the trust team",
-      hint: "Verified hosts convert more seekers per listing view.",
+      label: "Get your Verified Host badge",
+      hint: "Automatic on any active paid plan — verified hosts convert more seekers per listing view.",
       done: profile.verified,
     },
   ];

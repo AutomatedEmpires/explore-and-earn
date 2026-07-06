@@ -16,18 +16,21 @@ import type {
   SeekerStatusSummary,
 } from "./models";
 import {
-  MATCH_SCORE_HIDE_THRESHOLD,
   getSavedListingIds,
   getSeekerApplicationIds,
   getSeekerApplications,
   getSeekerApplicationsWithListings,
+  getSeekerInvites,
   getSeekerResume,
   getUnreadNotificationCount,
   rowToDiscoveryFields,
-  scoreListingForSeeker,
+  scoreSeekerListingRow,
+  seekerHasMatchInputs,
 } from "@explore-and-earn/db";
+import { matchBandFor } from "@explore-and-earn/contracts";
 
 import { cachedSeekerProfile, getPublicListingsCached } from "../../lib/serverCache";
+import { computeResumeCompletion } from "./resumeAdapter";
 
 const allowFixtureFallback = process.env.NODE_ENV !== "production";
 
@@ -39,6 +42,7 @@ const EMPTY_SEEKER_STATUS: SeekerStatusSummary = {
   offersCount: 0,
   acceptedUpcoming: undefined,
   unreadNotifications: 0,
+  invitesCount: 0,
 };
 
 export function getSeekerStatusFallback(
@@ -66,55 +70,6 @@ export function getSeekerStatusFallback(
  * Arrays are returned as fresh copies so callers can never mutate the source.
  */
 
-type SeekerResumeData = Awaited<ReturnType<typeof getSeekerResume>>;
-type BaseSeekerProfile = NonNullable<Awaited<ReturnType<typeof cachedSeekerProfile>>>;
-
-interface MatchProfile {
-  readonly desiredCategories: readonly string[];
-  readonly housingPreference: string | null;
-  readonly mealsPreference: string | null;
-  readonly locationPref: string | null;
-  readonly payExpectationMinCents: number | null;
-}
-
-/**
- * Derive a 0..100 resume-completion estimate. getSeekerResume returns the raw
- * profile/experiences/educations (not a percentage), so completion is computed
- * here deterministically: bio (+40), at least one experience (+40), at least
- * one education (+20). Kept module-local (NOT exported) to avoid colliding with
- * the resume-lane helpers re-exported through the seeker barrel.
- */
-function estimateResumeCompletion(resume: SeekerResumeData): number {
-  let score = 0;
-  const bio = resume.profile?.bio;
-  if (typeof bio === "string" && bio.trim().length > 0) {
-    score += 40;
-  }
-  if (resume.experiences.length > 0) {
-    score += 40;
-  }
-  if (resume.educations.length > 0) {
-    score += 20;
-  }
-  return Math.min(100, score);
-}
-
-/**
- * Project the match-relevant fields off the already-loaded seeker profile.
- *
- * These columns all live on {@link SeekerProfileRecord}, which the caller has
- * already fetched — so this is a pure in-memory projection, NOT a second
- * `seeker_profiles` round-trip (it used to be one, redundantly).
- */
-function toMatchProfile(baseProfile: BaseSeekerProfile): MatchProfile {
-  return {
-    desiredCategories: baseProfile.desiredCategories,
-    housingPreference: baseProfile.housingPreference,
-    mealsPreference: baseProfile.mealsPreference,
-    locationPref: baseProfile.locationPref,
-    payExpectationMinCents: baseProfile.payExpectationMinCents,
-  };
-}
 
 /** The seeker's at-a-glance status summary (counts, resume completion, etc.). */
 export async function getSeekerStatus(
@@ -127,7 +82,7 @@ export async function getSeekerStatus(
 		return fallback;
   }
   try {
-    const [profile, savedIds, applications, acceptedWithListings, unread, resume] =
+    const [profile, savedIds, applications, acceptedWithListings, unread, resume, invites] =
       await Promise.all([
         cachedSeekerProfile(token, clerkUserId),
         getSavedListingIds(token, clerkUserId),
@@ -135,6 +90,7 @@ export async function getSeekerStatus(
         getSeekerApplicationsWithListings(token, clerkUserId, ["accepted"]),
         getUnreadNotificationCount(token, clerkUserId),
         getSeekerResume(token, clerkUserId),
+        getSeekerInvites(token, clerkUserId),
       ]);
 
     const seekerName =
@@ -147,15 +103,19 @@ export async function getSeekerStatus(
     const acceptedUpcoming = acceptedWithListings.find(
       (application) => application.listing,
     )?.listing?.title;
+    // Matches the /invites page's own filter — an invite whose listing failed
+    // to resolve (e.g. deleted) isn't shown there, so it shouldn't count here.
+    const invitesCount = invites.filter((entry) => entry.listing).length;
 
     return {
       seekerName,
-      resumeCompletion: estimateResumeCompletion(resume),
+      resumeCompletion: computeResumeCompletion(resume),
       savedCount: savedIds.length,
       appliedCount: applications.length,
       offersCount,
       acceptedUpcoming,
       unreadNotifications: unread,
+      invitesCount,
     };
   } catch {
 		return fallback;
@@ -234,35 +194,22 @@ export async function getMatchedListings(
       getSavedListingIds(token, clerkUserId),
     ]);
 
-    if (!baseProfile) {
+    if (!baseProfile || !seekerHasMatchInputs(baseProfile)) {
+      // No honest signal to rank with — an empty rail prompts profile
+      // completion instead of showing scores derived from nothing.
       return [];
     }
 
-    const profile = toMatchProfile(baseProfile);
     const applied = new Set(appliedIds);
     const saved = new Set(savedIds);
 
+    // ADR-040: the SAME engine as the /seek grid, /search, the swipe deck,
+    // and the listing detail — the rail's fit % can never disagree with the
+    // card it opens.
     return listings
       .filter((listing) => !applied.has(listing.id))
       .map((listing) => {
-        const matchScore = scoreListingForSeeker(
-          {
-            category: listing.category,
-            housingIncluded: listing.housing_included,
-            compensationMinCents: listing.compensation_min_cents,
-            locationDisplay: listing.location_display,
-          },
-          {
-            desiredCategories: profile.desiredCategories,
-            housingPreference: profile.housingPreference,
-            locationPref: profile.locationPref,
-            payExpectationMin:
-              profile.payExpectationMinCents != null
-                ? profile.payExpectationMinCents / 100
-                : null,
-          },
-        );
-
+        const matchScore = scoreSeekerListingRow(baseProfile, listing);
         return {
           listing: {
             ...(rowToDiscoveryFields(listing) as DiscoveryListing),
@@ -272,7 +219,7 @@ export async function getMatchedListings(
           saved: saved.has(listing.id),
         };
       })
-      .filter((item) => item.matchScore >= MATCH_SCORE_HIDE_THRESHOLD)
+      .filter((item) => matchBandFor(item.matchScore) !== "needs_attention")
       .sort((a, b) => {
         if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
         return Number(b.saved) - Number(a.saved);

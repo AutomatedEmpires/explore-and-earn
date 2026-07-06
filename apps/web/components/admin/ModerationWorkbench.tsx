@@ -70,7 +70,7 @@ type Severity = "critical" | "elevated" | "routine";
 
 function severityOf(reason: string): Severity {
   if (reason === "unsafe" || reason === "scam") return "critical";
-  if (reason === "housing_pay" || reason === "inappropriate") return "elevated";
+  if (reason === "housing_pay" || reason === "inappropriate" || reason === "spam") return "elevated";
   return "routine";
 }
 
@@ -83,6 +83,8 @@ function reasonLabel(reason: string): string {
       return "Unsafe";
     case "scam":
       return "Scam / fraud";
+    case "spam":
+      return "Spam";
     case "inaccurate":
       return "Inaccurate";
     case "inappropriate":
@@ -142,10 +144,13 @@ const DECISIONS: ReadonlyArray<{
  * Each card is one seeker report (real columns only: reason, detail, status,
  * derived reporter ref, listing + host). A moderator can Dismiss, Warn, Remove
  * content, or Suspend; every decision posts to takeModerationActionAction, which
- * writes the moderation_actions audit row and advances the report status. The UI
- * is optimistic-ish: the acting card shows a busy state via useTransition, then
- * router.refresh() repaints from the server so the lane counts re-settle. Raw
- * Clerk reporter ids are NEVER rendered — only the `#XXXX` ref from the query.
+ * writes the moderation_actions audit row, advances the report status, and — for
+ * Remove content / Suspend — archives the reported listing itself (dropping it
+ * from public search/seek/map immediately), so the decision has real teeth, not
+ * just an audit trail. The UI is optimistic-ish: the acting card shows a busy
+ * state via useTransition, then router.refresh() repaints from the server so the
+ * lane counts re-settle. Raw Clerk reporter ids are NEVER rendered — only the
+ * `#XXXX` ref from the query.
  */
 export function ModerationWorkbench({
   reports,
@@ -164,6 +169,17 @@ export function ModerationWorkbench({
     report: ModerationReportRowView,
     action: ModerationActionInput["action"],
   ) {
+    // content_removed/suspended now actually archive the listing (it drops
+    // out of public search/seek/map immediately) — confirm before firing,
+    // same as any other can't-be-undone-from-here action in this app.
+    if (
+      (action === "content_removed" || action === "suspended") &&
+      !window.confirm(
+        `${action === "suspended" ? "Suspend" : "Remove"} "${report.listingTitle}"? It will come down from public search immediately.`,
+      )
+    ) {
+      return;
+    }
     setError(null);
     setPendingId(report.id);
     startTransition(async () => {

@@ -4,7 +4,7 @@
 
 ## Existing primitives — your starting palette (do not re-implement)
 
-`packages/ui`: `Button` · `Card` · `Badge` · `Chip` · `Meter` · `Skeleton` · `Modal` · `DiscoveryCard` · `VerifiedHostBadge` · `FoundingCountdown` · `Icon` (Streamline registry) · `visual-assets` (AppIcon/AppElement/AppIllustration).
+`packages/ui`: `Button` · `Card` · `Badge` · `Chip` · `Meter` · `Skeleton` · `Modal` · `DiscoveryCard` · `VerifiedHostBadge` · `FoundingCountdown` · `Icon` (Phosphor registry) · `visual-assets` (`AppIllustration` framed plates over the same registry).
 Class primitives in CSS: `ui-button` `ui-card` `ui-badge` `ui-chip` `ui-meter` `ui-skeleton`(+shimmer) `ui-modal` `ui-section-head` `ui-empty` `ui-stat` `ui-category-badge` `ui-avatar` `ui-rail` `ui-response-actions`.
 **Known biggest gap:** there is **no shared form field primitive** — forms re-invent inputs everywhere. Building `ui-field` / `ui-input` / `ui-textarea` is the highest-value primitive work (see §Forms).
 
@@ -49,7 +49,7 @@ Antidote to "reads like a generic admin template":
 
 Empty is an **invitation**, never a blank or a bare placeholder (documented defect: generic placeholder rails with no story/CTA).
 
-- Use `ui-empty`: an illustration (`AppIllustration`/Streamline) + a one-line Patrick-Hand headline + a plain supporting line + **one clear CTA**.
+- Use `ui-empty`: an illustration (`AppIllustration` — framed Phosphor plate) + a one-line Patrick-Hand headline + a plain supporting line + **one clear CTA**.
 - Speak from the user's side ("No saved places yet — start exploring"), action-oriented, in the product's voice.
 - **Real content must never look worse than fixtures** — if real listings/announcements lack images, supply the lane atmosphere gradient + silhouette, never a naked text block.
 
@@ -108,7 +108,7 @@ Trust is the product's core promise — design it to be *believed*, not decorate
 ## Per-component review gate (use before calling any component done)
 
 - [ ] Reuses an existing primitive (or justifies a new one with a citation).
-- [ ] Borders-first; tokens only; zero raw hex; Streamline icons only.
+- [ ] Borders-first; tokens only; zero raw hex; Phosphor registry icons only.
 - [ ] All required states present (esp. **tap/press, focus, loading, empty, error**).
 - [ ] ≥44px targets; collapses at 380px; visible focus; reduced-motion ok; contrast pass.
 - [ ] Triad never collapsed; status never color-only; verified qualifier intact.

@@ -138,8 +138,8 @@ const TOPICS: readonly FaqTopic[] = [
     items: [
       {
         q: "How do I become a Verified Host?",
-        a: "Complete your host profile and attest to your Housing / Meals / Pay terms. Once attested, the Verified Host badge appears on your public page and listings — the single strongest trust signal a seeker sees.",
-        tags: ["verify", "attest", "badge"],
+        a: "It's automatic — any host on an active paid plan (Starter, Professional, or Enterprise) gets the Verified Host badge on their public page and listings. There's nothing to fill out or submit. The badge shows you've invested in the platform; it isn't an identity or property check, so seekers are still encouraged to do their own research.",
+        tags: ["verify", "badge", "subscription"],
       },
       {
         q: "Where do reviews come from?",

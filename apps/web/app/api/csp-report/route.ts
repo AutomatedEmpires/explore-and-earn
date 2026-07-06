@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { checkRateLimit } from "../../../lib/rateLimit";
+
 import { reportMessage } from "../../../lib/sentry";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +30,18 @@ function summarize(report: Record<string, unknown>): string {
 
 export async function POST(request: Request): Promise<NextResponse> {
 	try {
+		// Unauthenticated public sink — cap the amplification surface: a bounded
+		// body, a bounded number of forwarded reports, and a per-IP budget.
+		const contentLength = Number(request.headers.get("content-length") ?? 0);
+		if (contentLength > 64 * 1024) {
+			return new NextResponse(null, { status: 204 });
+		}
+		const ip =
+			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+		if (!checkRateLimit(`csp-report:${ip}`, 30, 60 * 1000).allowed) {
+			return new NextResponse(null, { status: 204 });
+		}
+
 		const raw = (await request.json()) as unknown;
 
 		// Legacy `application/csp-report`: { "csp-report": {...} }.
@@ -43,7 +57,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 			reports.push(legacy ?? (raw as Record<string, unknown>));
 		}
 
-		for (const report of reports) {
+		for (const report of reports.slice(0, 5)) {
 			const summary = summarize(report);
 			console.warn("[csp-report]", summary, report);
 			reportMessage(summary, "warning", { route: "/api/csp-report", action: "csp_violation" });

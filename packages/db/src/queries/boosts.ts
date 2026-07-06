@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { OpportunityCategory, OpportunityListing } from "@explore-and-earn/contracts";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { anonClient } from "../client";
 import { rowToDiscoveryFields, type ListingRow } from "./listings";
@@ -129,7 +130,7 @@ export async function getHomepageBoostedListings(
         compensation_unit, compensation_currency,
         timeline_summary, begins_at, ends_at, published_at,
         cover_photo_url,
-        host_profiles ( company_name, attestation_status )
+        host_profiles ( company_name, subscription_tier )
       )
     `,
     )
@@ -206,7 +207,7 @@ export async function getHomepageFeaturedEmployers(
       pin_priority,
       host:host_profiles!inner (
         id, company_name, tagline, primary_location_name,
-        photo_url, attestation_status
+        photo_url, subscription_tier
       )
     `,
     )
@@ -227,7 +228,7 @@ export async function getHomepageFeaturedEmployers(
       tagline: string | null;
       primary_location_name: string | null;
       photo_url: string | null;
-      attestation_status: string;
+      subscription_tier: string | null;
     };
   };
 
@@ -266,9 +267,7 @@ export async function getHomepageFeaturedEmployers(
       listingId: first?.id ?? "",
       location: hp.primary_location_name ?? "",
       listingCount: hostListings.length,
-      verified:
-        hp.attestation_status === "attested" ||
-        hp.attestation_status === "attested_stale",
+      verified: hasVerifiedHostSubscription(hp.subscription_tier),
       tagline: hp.tagline ?? undefined,
       coverImageUrl: first?.cover_photo_url ?? hp.photo_url ?? undefined,
       category: ((first?.category ?? "mix") as OpportunityCategory),
@@ -310,7 +309,7 @@ export async function getHomepageFallbackListings(
        compensation_unit, compensation_currency,
        timeline_summary, begins_at, ends_at, published_at,
        cover_photo_url,
-       host_profiles ( company_name, attestation_status, subscription_tier )`,
+       host_profiles ( company_name, subscription_tier )`,
     )
     .eq("status", "live")
     .not("host_profile_id", "is", null)
@@ -320,7 +319,7 @@ export async function getHomepageFallbackListings(
   if (error || !data) return [];
 
   type FallbackRow = ListingRow & {
-    host_profiles: { company_name: string; attestation_status: string; subscription_tier: string } | null;
+    host_profiles: { company_name: string; subscription_tier: string } | null;
   };
 
   const rows = (data as unknown as FallbackRow[]).filter((r) => r.host_profiles !== null);

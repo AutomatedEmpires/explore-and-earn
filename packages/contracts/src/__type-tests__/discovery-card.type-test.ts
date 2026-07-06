@@ -11,7 +11,7 @@ import {
 	DISCOVERY_CARD_ACTIONS,
 	DISCOVERY_CARD_FIELD_REQUIREMENT,
 	DISCOVERY_CARD_FIELDS,
-	VERIFIED_HOST_QUALIFIER,
+	hasVerifiedHostSubscription,
 	type DiscoveryCardAction,
 	type DiscoveryCardField,
 	type DiscoveryCardSurface,
@@ -25,9 +25,9 @@ type Equal<A, B> =
 		? true
 		: false
 
-// 1. The Verified-Host qualifier is exactly the canon string (G22).
-export const _qualifierIsCanon: Expect<
-	Equal<typeof VERIFIED_HOST_QUALIFIER, "Self-Declared by Host">
+// 1. The Verified-Host badge is subscription-gated, never self-declared (founder decision 2026-07-03).
+export const _verifiedHostIsSubscriptionGated: Expect<
+	Equal<ReturnType<typeof hasVerifiedHostSubscription>, boolean>
 > = true
 
 // 2. The triad is exactly Housing / Meals / Pay — never "Perks."

@@ -57,9 +57,12 @@ async function takeModerationActionImpl(
   });
   if (!result.ok) return result;
 
-  // Repaint the workbench and the overview (its queue counts shift).
+  // Repaint the workbench, the overview (its queue counts shift), and the
+  // listings moderation table (a content_removed/suspended/reinstated
+  // decision against a listing subject writes its status).
   revalidatePath("/admin/reports");
   revalidatePath("/admin");
+  revalidatePath("/listings");
   return { ok: true };
 }
 

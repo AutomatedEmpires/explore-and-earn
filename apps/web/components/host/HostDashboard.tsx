@@ -282,10 +282,24 @@ export function HostDashboard({
             </Link>
           ) : null}
           {pending === 0 && newApps === 0 && draftCount === 0 ? (
-            <p className={styles.allClear}>
-              <Icon name="system.success" size={20} aria-hidden />
-              You&rsquo;re all caught up.
-            </p>
+            isNewHost ? (
+              // A brand-new host is NOT "caught up" — the next action is the
+              // setup path (saying otherwise contradicted the 0/3 checklist
+              // rendered above it).
+              <Link className="host-attention" href="/host/listings/new">
+                <span className="host-attention__count">1</span>
+                <span className="host-attention__text">
+                  <span className="host-attention__title">Get your first opportunity live</span>
+                  <span className="host-attention__sub">Post a role with Housing, Meals &amp; Pay to start reaching seekers</span>
+                </span>
+                <Icon name="action.forward" size={20} aria-hidden />
+              </Link>
+            ) : (
+              <p className={styles.allClear}>
+                <Icon name="system.success" size={20} aria-hidden />
+                You&rsquo;re all caught up.
+              </p>
+            )
           ) : null}
         </div>
       </section>
@@ -396,11 +410,21 @@ export function HostDashboard({
               <span className="host-panel__eyebrow">Reach</span>
               <h2 className="host-panel__title">Conversion radar</h2>
             </div>
-            <Badge
-              variant={conversionScore >= 70 ? "success" : "neutral"}
-              label={radarTone}
-            />
+            {!isNewHost ? (
+              <Badge
+                variant={conversionScore >= 70 ? "success" : "neutral"}
+                label={radarTone}
+              />
+            ) : null}
           </div>
+          {isNewHost ? (
+            // Pre-launch: there is nothing to measure yet — a punishing
+            // "0% NEEDS WORK" on day one misreads setup as failure.
+            <p className={styles.allClear}>
+              <Icon name="system.info" size={20} aria-hidden />
+              Health tracking starts once your first listing is live.
+            </p>
+          ) : (
           <div className={styles.radarSplit}>
             <div
               className={styles.radar}
@@ -432,6 +456,7 @@ export function HostDashboard({
               ))}
             </ul>
           </div>
+          )}
         </section>
       </div>
 

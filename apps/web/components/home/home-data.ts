@@ -1,0 +1,268 @@
+/**
+ * Home view-models — the marketplace homepage's content layer.
+ *
+ * Two honesty rules govern the numbers here (founder: "never seed mock data in
+ * prod; real employers only"):
+ *   1. Real, derived counts always win when they exist.
+ *   2. Curated demo counts fill in ONLY outside production, so the prototype
+ *      reads as a populated marketplace while a live/empty DB never shows a
+ *      fabricated number — it shows an honest "New season" chip instead.
+ *
+ * This mirrors the existing NODE_ENV fixture-fallback pattern used across the
+ * discovery + seeker data seams.
+ */
+
+import { cloudinaryPhoto, type PhotoCategory } from "@explore-and-earn/ui";
+import {
+  FOUNDER_LOCKED_PRICING,
+  PLAN_ENTITLEMENTS,
+  type OpportunityCategory,
+} from "@explore-and-earn/contracts";
+
+import type { DiscoveryListing } from "../discovery";
+import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
+
+const IS_PREVIEW = process.env.NODE_ENV !== "production";
+
+/** cloudinaryPhoto only serves the four lane folders; map generic lanes onto them. */
+function lanePhoto(category: PhotoCategory, slug: string, size: "card" | "hero" = "card") {
+  return cloudinaryPhoto(category, slug, size);
+}
+
+// ─── Hero ───────────────────────────────────────────────────────────────────
+
+/** A deliberately scenic, warm "working landscape" hero — not a data cover. */
+export const HOME_HERO = {
+  imageUrl: cloudinaryPhoto("farm", "venti-views-n-ndvlwtfde", "hero"),
+  category: "farm" as OpportunityCategory,
+};
+
+// ─── Destinations ("Where will you go next?") ──────────────────────────────
+
+export interface HomeDestination {
+  readonly slug: string;
+  readonly name: string;
+  readonly imageUrl: string;
+  readonly imageCategory: OpportunityCategory;
+  readonly season: string;
+  readonly categories: readonly string[];
+  readonly href: string;
+  /** Resolved: real count if known, else demo (preview only), else undefined. */
+  readonly jobCount?: number;
+  readonly hostCount?: number;
+}
+
+interface DestinationSeed {
+  readonly slug: string;
+  readonly name: string;
+  readonly imageCategory: OpportunityCategory;
+  readonly imageSlug: string;
+  readonly season: string;
+  readonly categories: readonly string[];
+  /** Strong seasonal-market demo figures — preview only, never shipped to prod. */
+  readonly demoJobs: number;
+  readonly demoHosts: number;
+}
+
+const DESTINATION_SEEDS: readonly DestinationSeed[] = [
+  { slug: "alaska", name: "Alaska", imageCategory: "maritime", imageSlug: "venti-views-asmavys4azm", season: "Summer salmon season", categories: ["Lodges", "Fishing", "Parks", "Remote"], demoJobs: 148, demoHosts: 32 },
+  { slug: "colorado", name: "Colorado", imageCategory: "seasonal", imageSlug: "yuhan-du-zi9z-e8cxge", season: "Winter & summer", categories: ["Resorts", "Ranches", "Guiding"], demoJobs: 96, demoHosts: 24 },
+  { slug: "montana", name: "Montana", imageCategory: "farm", imageSlug: "annie-spratt-jmjnnq2xfoy", season: "Spring–Fall", categories: ["Ranch", "Lodges", "Trail crews"], demoJobs: 74, demoHosts: 19 },
+  { slug: "wyoming", name: "Wyoming", imageCategory: "seasonal", imageSlug: "vincent-guth-62v7ntlkgl8", season: "Park season", categories: ["Parks", "Ranch", "Hospitality"], demoJobs: 61, demoHosts: 15 },
+  { slug: "maine", name: "Maine", imageCategory: "maritime", imageSlug: "werner-hilversum-vfljehs-y5w", season: "Summer coast", categories: ["Camps", "Coastal", "Hospitality"], demoJobs: 53, demoHosts: 14 },
+  { slug: "california", name: "California", imageCategory: "farm", imageSlug: "meric-tuna-ce1ovmrzumq", season: "Harvest season", categories: ["Vineyards", "Farms", "Parks"], demoJobs: 88, demoHosts: 21 },
+];
+
+/** US-state token → slug, for parsing freeform `location_display` ("Sitka, Alaska"). */
+const STATE_SLUGS: Record<string, string> = {
+  alaska: "alaska", colorado: "colorado", montana: "montana",
+  wyoming: "wyoming", maine: "maine", california: "california",
+};
+
+function realCountsByState(listings: readonly DiscoveryListing[]) {
+  const jobs = new Map<string, number>();
+  const hosts = new Map<string, Set<string>>();
+  for (const l of listings) {
+    const tail = l.location.split(",").pop()?.trim().toLowerCase() ?? "";
+    const slug = STATE_SLUGS[tail];
+    if (!slug) continue;
+    jobs.set(slug, (jobs.get(slug) ?? 0) + 1);
+    const set = hosts.get(slug) ?? new Set<string>();
+    set.add(l.host.name);
+    hosts.set(slug, set);
+  }
+  return { jobs, hosts };
+}
+
+export function buildDestinations(
+  listings: readonly DiscoveryListing[],
+): readonly HomeDestination[] {
+  const { jobs, hosts } = realCountsByState(listings);
+  return DESTINATION_SEEDS.map((seed) => {
+    // Preview reads as a populated seasonal marketplace via the curated demo
+    // figures; production shows only real derived counts (0 → "New season"),
+    // so a live/empty DB never displays a fabricated number.
+    const jobCount = IS_PREVIEW ? seed.demoJobs : jobs.get(seed.slug);
+    const hostCount = IS_PREVIEW ? seed.demoHosts : hosts.get(seed.slug)?.size;
+    return {
+      slug: seed.slug,
+      name: seed.name,
+      imageUrl: lanePhoto(seed.imageCategory as PhotoCategory, seed.imageSlug, "card"),
+      imageCategory: seed.imageCategory,
+      season: seed.season,
+      categories: seed.categories,
+      // /seek filters location as a freeform substring, so pass the state name
+      // ("Alaska" matches "Sitka, Alaska"). No dedicated state filter exists.
+      href: `/seek?location=${encodeURIComponent(seed.name)}`,
+      jobCount,
+      hostCount,
+    };
+  });
+}
+
+// ─── Browse by category ────────────────────────────────────────────────────
+
+export interface HomeCategory {
+  readonly key: string;
+  readonly label: string;
+  readonly imageCategory: OpportunityCategory;
+  readonly imageUrl: string;
+  readonly href: string;
+  readonly blurb: string;
+}
+
+/**
+ * Eight browse cards mapped onto the locked five-lane taxonomy: the four real
+ * lanes plus seasonal facets (hospitality / parks / resorts / guide) that filter
+ * the `seasonal` lane — never inventing a sixth category.
+ */
+export const HOME_CATEGORIES: readonly HomeCategory[] = [
+  { key: "farm", label: "Farm & Ranch", imageCategory: "farm", imageUrl: lanePhoto("farm", "young-sung-jang-7-6pulwb1d0"), href: "/seek?category=farm", blurb: "Orchards, ranches, harvests" },
+  { key: "maritime", label: "Maritime", imageCategory: "maritime", imageUrl: lanePhoto("maritime", "vidar-nordli-mathisen-pjiv1ekevzk"), href: "/seek?category=maritime", blurb: "Boats, docks, fisheries" },
+  { key: "remote", label: "Remote & Wilderness", imageCategory: "remote", imageUrl: lanePhoto("remote", "justin-kauffman-fpohihximhg"), href: "/seek?category=remote", blurb: "Cabins, ops, off-grid" },
+  { key: "hospitality", label: "Hospitality", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vojtech-bruzek-yrxr3bspds0"), href: "/seek?category=seasonal&role=hospitality", blurb: "Lodges, front desk, service" },
+  { key: "parks", label: "Parks & Tourism", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vincent-guth-62v7ntlkgl8"), href: "/seek?category=seasonal&role=parks", blurb: "Trails, tours, gateways" },
+  { key: "resorts", label: "Resorts", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "valeriia-bugaiova-pphgehz1uk"), href: "/seek?category=seasonal&role=resort", blurb: "Ski & summer resorts" },
+  { key: "guide", label: "Adventure & Guiding", imageCategory: "remote", imageUrl: lanePhoto("seasonal", "rasmus-gundorff-saederup-v1wgkhdi6du"), href: "/seek?category=seasonal&role=guide", blurb: "Guides, outfitters, crews" },
+  { key: "trades", label: "Maintenance & Trades", imageCategory: "farm", imageUrl: lanePhoto("farm", "venti-views-n-ndvlwtfde"), href: "/seek?category=seasonal&role=trades", blurb: "Facilities, repair, build" },
+];
+
+// ─── Rolling announcements (monetized rail) ────────────────────────────────
+
+export type AnnouncementLabel = "Featured Host" | "Boosted" | "Sponsored" | "Enterprise";
+
+export interface HomeAnnouncement {
+  readonly id: string;
+  readonly label: AnnouncementLabel;
+  readonly category: OpportunityCategory;
+  readonly text: string;
+  readonly href: string;
+}
+
+// Demo units lead with the paid taxonomy (Boosted / Sponsored / Enterprise) so
+// the monetization surface reads clearly in preview.
+const DEMO_ANNOUNCEMENTS: readonly HomeAnnouncement[] = [
+  { id: "a1", label: "Boosted", category: "maritime", text: "Housing included · 42 new Alaska lodge roles", href: "/seek?location=Alaska" },
+  { id: "a2", label: "Sponsored", category: "farm", text: "Ranch hands needed for the fall season", href: "/seek?category=farm" },
+  { id: "a3", label: "Enterprise", category: "seasonal", text: "Mountain resort hiring across 5 locations", href: "/for-hosts" },
+  { id: "a4", label: "Featured Host", category: "seasonal", text: "Glacier Ridge Lodge is hiring cooks & housekeepers", href: "/for-hosts" },
+  { id: "a5", label: "Boosted", category: "remote", text: "Remote ops roles — apply this week", href: "/seek?category=remote" },
+];
+
+/**
+ * Real featured-employer campaigns become "Featured Host" announcements; in
+ * preview they're interleaved with the demo taxonomy so the paid surface reads
+ * fully. In an empty prod marketplace the rail carries only the founding-host
+ * invitation — never a fabricated listing count.
+ */
+export function buildAnnouncements(
+  employers: readonly FeaturedEmployer[],
+): readonly HomeAnnouncement[] {
+  const fromEmployers: HomeAnnouncement[] = employers.slice(0, 4).map((e, i) => ({
+    id: `emp_${e.listingId}_${i}`,
+    label: "Featured Host",
+    category: e.category,
+    text: `${e.hostName} is hiring in ${e.location}`,
+    href: e.hostId ? `/host/${e.hostId}` : `/listing/${e.listingId}`,
+  }));
+
+  if (IS_PREVIEW) {
+    const merged: HomeAnnouncement[] = [];
+    const len = Math.max(fromEmployers.length, DEMO_ANNOUNCEMENTS.length);
+    for (let i = 0; i < len; i++) {
+      if (DEMO_ANNOUNCEMENTS[i]) merged.push(DEMO_ANNOUNCEMENTS[i]);
+      if (fromEmployers[i]) merged.push(fromEmployers[i]);
+    }
+    return merged.slice(0, 8);
+  }
+
+  if (fromEmployers.length > 0) return fromEmployers;
+  return [{
+    id: "founding",
+    label: "Featured Host",
+    category: "seasonal",
+    text: "Founding hosts are onboarding now — housing, meals & pay upfront",
+    href: "/for-hosts",
+  }];
+}
+
+// ─── Host plans (real, founder-locked pricing) ─────────────────────────────
+
+export interface HomePlan {
+  readonly key: "starter" | "professional" | "enterprise";
+  readonly name: string;
+  readonly priceMonthlyCents: number;
+  readonly blurb: string;
+  readonly features: readonly string[];
+  readonly featured?: boolean;
+  readonly cta: string;
+}
+
+export const HOME_PLANS: readonly HomePlan[] = [
+  {
+    key: "starter",
+    name: "Starter",
+    priceMonthlyCents: FOUNDER_LOCKED_PRICING.starter.monthly,
+    blurb: "A single location getting its first season staffed.",
+    features: [
+      `${PLAN_ENTITLEMENTS.starter.listings} active listing`,
+      "Applicant inbox",
+      "Verified-host badge",
+      "Community host profile",
+    ],
+    cta: "Start hiring",
+  },
+  {
+    key: "professional",
+    name: "Professional",
+    priceMonthlyCents: FOUNDER_LOCKED_PRICING.professional.monthly,
+    blurb: "Hosts hiring across a full season.",
+    features: [
+      `Up to ${PLAN_ENTITLEMENTS.professional.listings} active listings`,
+      "Boosted placement",
+      `${PLAN_ENTITLEMENTS.professional.monthlyAnnouncements} announcement / month`,
+      "Applicant pipeline + full analytics",
+      "Featured-employer eligibility",
+    ],
+    featured: true,
+    cta: "Go Professional",
+  },
+  {
+    key: "enterprise",
+    name: "Enterprise",
+    priceMonthlyCents: FOUNDER_LOCKED_PRICING.enterprise.monthly,
+    blurb: "Multi-location operators hiring at scale.",
+    features: [
+      `${PLAN_ENTITLEMENTS.enterprise.listings}+ active listings`,
+      "Homepage placement",
+      `${PLAN_ENTITLEMENTS.enterprise.monthlyAnnouncements} announcements / month`,
+      "Multi-location + team seats",
+      "Priority support & trust tools",
+    ],
+    cta: "Talk to us",
+  },
+];
+
+export function formatUsd(cents: number): string {
+  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
+}

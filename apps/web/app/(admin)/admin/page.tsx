@@ -261,7 +261,7 @@ export default async function AdminDashboardPage() {
               <span className={styles.diagBody}>
                 <span className={styles.diagLabel}>Host verification</span>
                 <span className={styles.diagMeta}>
-                  {stats.verifiedHosts} of {stats.totalHosts} hosts attested
+                  {stats.verifiedHosts} of {stats.totalHosts} hosts verified
                 </span>
               </span>
               <span className={styles.diagValue}>{verifiedPct}%</span>

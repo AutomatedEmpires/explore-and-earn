@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import {
   getHostListings,
@@ -45,7 +46,7 @@ export default async function HostProfileEditPage() {
     tagline: hostProfile?.tagline ?? undefined,
     location: hostProfile?.primaryLocationName ?? undefined,
     bio: hostProfile?.about ?? undefined,
-    verified: realHost?.verified ?? false,
+    verified: hasVerifiedHostSubscription(hostProfile?.subscriptionTier),
     websiteUrl: hostProfile?.websiteUrl ?? undefined,
     instagram: hostProfile?.socialLinks.instagram ?? undefined,
     twitter: hostProfile?.socialLinks.twitter ?? undefined,

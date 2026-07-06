@@ -5,10 +5,12 @@ import {
   adminApproveListing,
   adminCloseListing,
   adminSetHostAttestationStatus,
+  clearHostFlag,
 } from "@explore-and-earn/db";
 
 import { isCurrentUserAdmin } from "../../lib/admin";
 import { reportError } from "../../lib/sentry";
+import { computeAndStoreMatchesForListing } from "../../services/matching";
 
 interface ActionResult {
   ok: boolean;
@@ -39,6 +41,16 @@ async function approveListingActionImpl(
 
   const result = await adminApproveListing(SERVICE_ROLE_KEY, listingId);
   if (!result.ok) return result;
+
+  // The listing just went LIVE — compute its match scores now so host
+  // applicant intelligence and strong-match alerts don't wait for the next
+  // cron cycle. Best-effort: approval never fails on scoring (the daily
+  // new-match cron dedupes anything already scored here).
+  try {
+    await computeAndStoreMatchesForListing(listingId);
+  } catch (error) {
+    reportError(error, { action: "approveListingAction:computeMatches" });
+  }
 
   revalidatePath("/listings");
   revalidatePath(`/listings/${listingId}`);
@@ -142,6 +154,33 @@ export async function unverifyHostAction(
     return await unverifyHostActionImpl(hostProfileId);
   } catch (error) {
     reportError(error, { action: "unverifyHostAction" });
+    throw error;
+  }
+}
+
+async function clearHostFlagActionImpl(
+  hostProfileId: string,
+): Promise<ActionResult> {
+  const denied = await guardAdmin();
+  if (denied) return denied;
+  if (!hostProfileId) return { ok: false, error: "Missing host profile id." };
+
+  const result = await clearHostFlag(SERVICE_ROLE_KEY, hostProfileId);
+  if (!result.ok) return result;
+
+  revalidatePath("/hosts");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Clear a host's automatic spam-report flag (admin-only). */
+export async function clearHostFlagAction(
+  hostProfileId: string,
+): Promise<ActionResult> {
+  try {
+    return await clearHostFlagActionImpl(hostProfileId);
+  } catch (error) {
+    reportError(error, { action: "clearHostFlagAction" });
     throw error;
   }
 }

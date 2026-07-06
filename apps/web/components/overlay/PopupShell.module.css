@@ -1,7 +1,9 @@
 .scrim {
 	position: fixed;
 	inset: 0;
-	z-index: 70;
+	/* Overlay layer — explicitly above the z-70 docks (was a fragile tie at 70
+	   that only DOM/portal order resolved). */
+	z-index: var(--z-overlay);
 	display: flex;
 	align-items: center;
 	justify-content: center;

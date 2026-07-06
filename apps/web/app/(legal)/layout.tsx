@@ -1,20 +1,16 @@
 import type { ReactNode } from "react";
 
-import { GlobalHeader } from "../../components/global";
-import { PublicBottomNav } from "../../components/public/PublicBottomNav";
+import { PublicShell } from "../../components/public/PublicShell";
 import { LegalPageNav } from "./LegalPageNav";
 import styles from "./legal.module.css";
 
 export default function LegalLayout({ children }: { children: ReactNode }) {
+	// One shared public chrome (PublicShell owns header/bottom-nav/clearance);
+	// this layout owns the narrow reading column + the legal quick-nav FAB.
 	return (
-		<div className={styles.frame}>
-			{/* One unified public header — guest mode (no scope pill applies on legal/about). */}
-			<GlobalHeader scope="guest" isAuthenticated={false} />
-			<main className={styles.main}>
-				{children}
-			</main>
+		<PublicShell>
+			<div className={styles.inner}>{children}</div>
 			<LegalPageNav />
-			<PublicBottomNav />
-		</div>
+		</PublicShell>
 	);
 }

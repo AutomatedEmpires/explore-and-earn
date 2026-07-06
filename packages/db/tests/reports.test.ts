@@ -112,6 +112,7 @@ describe("insertReport — input validation", () => {
       "unsafe",
       "inaccurate",
       "scam",
+      "spam",
       "inappropriate",
       "housing_pay",
       "other",

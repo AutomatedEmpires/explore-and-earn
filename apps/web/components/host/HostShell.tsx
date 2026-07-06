@@ -34,6 +34,7 @@ const NAV: readonly NavGroup[] = [
   {
     group: "Insights",
     items: [
+      { href: "/host/assistant", label: "Assistant", sub: "Listing coach", icon: "action.message" },
       { href: "/host/profile", label: "Profile", sub: "Public page", icon: "nav.profile" },
       { href: "/host/analytics", label: "Analytics", sub: "Performance", icon: "analytics.meter" },
       { href: "/host/settings", label: "Settings", sub: "Plan + team", icon: "system.info" },
@@ -126,6 +127,11 @@ export function HostShell({ companyName, photoUrl, tier, unread = 0, children }:
             action="/host/listings"
             placeholder="Search applicants, listings, messages…"
           />
+          {/* Topbar entry keeps the listing coach reachable on mobile — the
+              sidebar link disappears ≤1023px. */}
+          <Link className="hostos-tact hostos-tact--msg" href="/host/assistant" aria-label="Listing coach (AI assistant)">
+            <Icon name="action.message" size={20} aria-hidden />
+          </Link>
           <Link className="hostos-tact hostos-tact--msg" href="/host/messages" aria-label="Messages">
             <Icon name="nav.messages" size={20} aria-hidden />
             {unread > 0 ? <span className="hostos-bdg">{unread}</span> : null}

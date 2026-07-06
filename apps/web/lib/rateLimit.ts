@@ -18,12 +18,25 @@ const store = new Map<string, RateWindow>();
  * @returns `{ allowed: true }` while under the limit, `{ allowed: false }` once
  *   the limit is reached for the current window.
  */
+/** Lazy eviction: expired windows are only ever replaced on their own next
+ * hit, so distinct keys accumulate forever on a long-lived instance. Sweep
+ * opportunistically (amortized, bounded). */
+let lastSweep = 0;
+function sweep(now: number): void {
+	if (now - lastSweep < 60_000) return;
+	lastSweep = now;
+	for (const [key, win] of store) {
+		if (now > win.resetAt) store.delete(key);
+	}
+}
+
 export function checkRateLimit(
 	key: string,
 	limit: number,
 	windowMs: number,
 ): { allowed: boolean } {
 	const now = Date.now();
+	sweep(now);
 	const existing = store.get(key);
 
 	if (!existing || now > existing.resetAt) {

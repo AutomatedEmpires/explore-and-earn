@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
+import { MARKETPLACE_CATEGORIES, hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 
 /**
@@ -252,14 +252,15 @@ export interface PublicHostProfile {
   categoryScopes: string[];
   housingOfferedGenerally: boolean;
   mealsOfferedGenerally: boolean;
-  attestationStatus: string;
+  /** Active-paid-subscription gate — see hasVerifiedHostSubscription(). */
+  verified: boolean;
   createdAt: string | null;
 }
 
 const PUBLIC_PROFILE_SELECT =
   "id,company_name,host_name,tagline,about,primary_location_name,photo_url," +
   "website_url,social_links,category_scopes,housing_offered_generally," +
-  "meals_offered_generally,attestation_status,created_at";
+  "meals_offered_generally,subscription_tier,created_at";
 
 /**
  * Fetch a host's public profile by host_profiles.id. Anon client — no auth
@@ -297,8 +298,7 @@ export async function getPublicHostProfile(
     categoryScopes: Array.isArray(row.category_scopes) ? (row.category_scopes as string[]) : [],
     housingOfferedGenerally: row.housing_offered_generally === true,
     mealsOfferedGenerally: row.meals_offered_generally === true,
-    attestationStatus:
-      typeof row.attestation_status === "string" ? row.attestation_status : "not_attested",
+    verified: hasVerifiedHostSubscription(row.subscription_tier),
     createdAt: typeof row.created_at === "string" ? row.created_at : null,
   };
 }

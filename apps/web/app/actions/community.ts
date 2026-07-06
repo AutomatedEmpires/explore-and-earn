@@ -3,6 +3,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
+import { checkRateLimit } from "../../lib/rateLimit";
+
 import {
   ANNOUNCEMENT_FREE_DURATION_DAYS,
   ANNOUNCEMENT_MONTHLY_QUOTA,
@@ -57,6 +59,10 @@ export type UploadPhotoResult =
 export async function uploadCommunityPhotoAction(fd: FormData): Promise<UploadPhotoResult> {
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
+  // Service-role writes get no RLS backstop — rate limits are the guard.
+  if (!checkRateLimit(`community-photo:${session.userId}`, 10, 60 * 60 * 1000).allowed) {
+    return { ok: false, reason: "upload_failed" };
+  }
 
   const identity = await getSeekerCompletionScore(session.token, session.userId);
   if (!identity) return { ok: false, reason: "not_seeker" };
@@ -218,6 +224,10 @@ export async function createAnnouncementCheckoutAction(): Promise<AnnouncementCh
 
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
+  // Each call mints a Stripe Checkout Session — cap the mint rate.
+  if (!checkRateLimit(`announce-checkout:${session.userId}`, 5, 60 * 60 * 1000).allowed) {
+    return { ok: false, reason: "checkout_failed" };
+  }
 
   const host = await getHostTierAndProfile(session.token, session.userId);
   if (!host) return { ok: false, reason: "not_host" };
@@ -255,6 +265,9 @@ export async function toggleReactionAction(
 ): Promise<ToggleReactionResult> {
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
+  if (!checkRateLimit(`community-react:${session.userId}`, 60, 5 * 60 * 1000).allowed) {
+    return { ok: false, reason: "toggle_failed" };
+  }
 
   const VALID: readonly string[] = ["smile", "heart", "hundred", "clap", "sparkle"];
   if (!VALID.includes(reaction)) return { ok: false, reason: "toggle_failed" };
@@ -296,6 +309,9 @@ export type AddCommentResult =
 export async function addCommentAction(fd: FormData): Promise<AddCommentResult> {
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
+  if (!checkRateLimit(`community-comment:${session.userId}`, 20, 5 * 60 * 1000).allowed) {
+    return { ok: false, reason: "insert_failed" };
+  }
 
   const targetType = fd.get("targetType") as string | null;
   const targetId   = fd.get("targetId")   as string | null;

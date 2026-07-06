@@ -83,6 +83,12 @@ export interface DiscoveryCardProps {
 	readonly onWarn?: (id: string) => void
 	readonly onRemove?: (id: string) => void
 	readonly actions?: ReactNode
+	/**
+	 * Above-the-fold cards should pass "eager": the cover then loads with
+	 * fetchpriority=high (LCP + deterministic screenshots). Default "lazy" —
+	 * feeds keep below-fold covers off the critical path.
+	 */
+	readonly imageLoading?: "eager" | "lazy"
 	readonly cardState?:
 		| "saved" | "applied" | "offered" | "scheduled"
 		| "accepted" | "matched" | "not_selected" | "withdrawn"
@@ -200,17 +206,18 @@ const BENEFIT_CELL: CSSProperties = {
 	background: PAPER, borderRadius: "10px", textAlign: "center",
 }
 
+/* Hierarchy: the ROLE is the card's primary object; the host is trust
+   context. Title outranks host name (it was inverted before). */
 const hostNameText: CSSProperties = {
-	fontFamily: DISPLAY_FONT, fontSize: "clamp(15px, 4.0vw, 18px)",
-	fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
-	lineHeight: 1.15, color: INK, textAlign: "center",
-	textShadow: "0 1px 0 rgba(255,255,255,0.65)",
+	fontFamily: UI_FONT, fontSize: "clamp(11px, 2.9vw, 13px)",
+	fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em",
+	lineHeight: 1.2, color: INK_SOFT, textAlign: "center",
 }
 
 const jobTitleText: CSSProperties = {
-	fontFamily: DISPLAY_FONT, fontSize: "clamp(13px, 3.4vw, 16px)",
-	fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
-	lineHeight: 1.2, color: INK, textAlign: "center",
+	fontFamily: DISPLAY_FONT, fontSize: "clamp(16px, 4.4vw, 19px)",
+	fontWeight: 700, letterSpacing: "0.02em",
+	lineHeight: 1.15, color: INK, textAlign: "center",
 }
 
 const locationText: CSSProperties = {
@@ -252,6 +259,7 @@ export function DiscoveryCard({
 	onWarn,
 	onRemove,
 	actions,
+	imageLoading = "lazy",
 }: DiscoveryCardProps) {
 	const cat      = data.category
 	const roleText = data.positionTitle ?? data.title
@@ -268,6 +276,7 @@ export function DiscoveryCard({
 	const isDisabled            = variant === "disabled"
 	const isApplicantReview     = surface === "host_applicant_review"
 	const isAdminReview         = surface === "admin_review"
+	const isDiscoveryFeed       = surface === "discovery_feed"
 	const isSeekerSurface       = isApplicantReview  // alias kept for CTA compat
 	const circleLabel           = isApplicantReview ? "SEEKER" : "HOST"
 
@@ -337,10 +346,12 @@ export function DiscoveryCard({
 		: null
 
 	// Match bar: always-on for host_applicant_review (boosted doesn't apply to seeker cards);
-	// on other surfaces, only when matched + no center badge (boosted wins center, score falls to R1)
+	// on the discovery feed, whenever a seeker fit score is present (the ADR-040
+	// signal at browse time); on other surfaces, only when matched + no center
+	// badge (boosted wins center, score falls to R1)
 	const showMatchBar = isApplicantReview
 		? typeof data.matchScore === "number"
-		: !centerBadge && isMatched && typeof data.matchScore === "number"
+		: (isDiscoveryFeed || isMatched) && !centerBadge && typeof data.matchScore === "number"
 	const showHeroBar  = !centerBadge && !showMatchBar && typeof data.fillPercent === "number"
 
 	// ── CTA resolution ────────────────────────────────────────────────────────
@@ -475,7 +486,8 @@ export function DiscoveryCard({
 					<img
 						src={data.coverImageUrl}
 						alt={`${data.hostName} cover`}
-						loading="lazy"
+						loading={imageLoading}
+						fetchPriority={imageLoading === "eager" ? "high" : undefined}
 						decoding="async"
 						style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
 					/>
@@ -528,7 +540,7 @@ export function DiscoveryCard({
 						) : (
 							<span style={{
 								fontFamily: DISPLAY_FONT, fontSize: "clamp(10px, 2.6vw, 13px)",
-								fontWeight: 900, letterSpacing: "0.10em", textTransform: "uppercase",
+								fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
 								color: PAPER, textShadow: "0 1px 3px rgba(23,19,13,0.4)",
 								lineHeight: 1, userSelect: "none",
 							}}>
@@ -852,7 +864,7 @@ export function DiscoveryCard({
 									background: "var(--status-success-fg)", color: "var(--palette-paper)",
 									border: "3px solid var(--status-success-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
+									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
 									display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
 									cursor: onApprove ? "pointer" : "default",
@@ -869,7 +881,7 @@ export function DiscoveryCard({
 									background: "transparent", color: "var(--status-warning-fg)",
 									border: "2px dashed var(--status-warning-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
+									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
 									display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
 									cursor: onWarn ? "pointer" : "default",
@@ -885,7 +897,7 @@ export function DiscoveryCard({
 									background: "transparent", color: "var(--status-error-fg)",
 									border: "2px dashed var(--status-error-fg)", borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
+									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
 									display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
 									cursor: onRemove ? "pointer" : "default",
@@ -905,7 +917,7 @@ export function DiscoveryCard({
 									background: INK, color: PAPER,
 									border: `3px solid ${INK}`, borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
+									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
 									display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
 									cursor: onSkip ? "pointer" : "default",
@@ -925,7 +937,7 @@ export function DiscoveryCard({
 									background: "transparent", color: INK,
 									border: `2px dashed ${INK_SOFT}`, borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
+									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
 									display: "flex", alignItems: "center", justifyContent: "center",
 									cursor: onSave ? "pointer" : "default",
@@ -942,7 +954,7 @@ export function DiscoveryCard({
 									background: "transparent", color: P_INK,
 									border: `2px dashed ${P_INK}`, borderRadius: "10px",
 									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase",
+									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
 									padding: "12px 6px",
 									display: "flex", alignItems: "center", justifyContent: "center",
 									cursor: "pointer",
@@ -964,7 +976,7 @@ export function DiscoveryCard({
 								borderRadius: "10px",
 								fontFamily: DISPLAY_FONT,
 								fontSize: "clamp(14px, 3.5vw, 17px)",
-								fontWeight: 900,
+								fontWeight: 700,
 								letterSpacing: "0.10em",
 								textTransform: "uppercase",
 								padding: "11px 16px",

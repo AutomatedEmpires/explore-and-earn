@@ -19,6 +19,11 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up/(.*)",
   "/api/webhooks/(.*)",
   "/api/health",
+  // Browser CSP violation reports are fired by the UA with no Clerk session —
+  // most of them from signed-out visitors on public pages. Without this entry,
+  // clerkMiddleware rejects every report before the handler runs and the
+  // report-only rollout collects nothing.
+  "/api/csp-report",
   // Vercel Cron invokes this with `Authorization: Bearer ${CRON_SECRET}`, not a
   // Clerk session — so it must bypass Clerk's auth.protect() to reach the route
   // handler, which validates the cron secret itself. Without this, the daily
@@ -34,6 +39,9 @@ const isPublicRoute = createRouteMatcher([
   "/blog/(.*)",
   "/sitemap.xml",
   "/robots.txt",
+  // Advertised AI site guide (linked from robots + docs) — must be readable
+  // by anonymous crawlers/agents, exactly like robots.txt and the sitemap.
+  "/llms.txt",
   // Seeker onboarding is auth-required, but excluded from the post-auth gate so
   // the (seeker) layout's onboarding redirect never loops back on itself.
   "/onboarding",
@@ -68,6 +76,19 @@ export default hasClerkMiddlewareConfig
       }
     })
   : function authFallbackMiddleware(request: Request) {
+      // DEV MOCK BENCH: same impersonation bypass the Clerk branch has, so
+      // keyless local QA (and the keyless Playwright harness) can traverse
+      // role shells with the ee_dev_role cookie. isDevBenchEnabled() is
+      // compile-time false in production builds — this can never open a
+      // deployed environment.
+      if (
+        isDevBenchEnabled() &&
+        (request as { cookies?: { get(name: string): unknown } }).cookies?.get(
+          DEV_ROLE_COOKIE,
+        )
+      ) {
+        return NextResponse.next();
+      }
       // Fail closed: when Clerk is not configured (local/dev only, since
       // production and preview throw above), protected routes are denied
       // rather than silently opened.

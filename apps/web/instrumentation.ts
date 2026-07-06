@@ -12,6 +12,15 @@ const release = process.env.NEXT_PUBLIC_APP_VERSION;
  * Sentry.init() silently no-ops when the DSN is undefined (CI / local).
  */
 export function register() {
+	// No DSN → skip init entirely instead of relying on Sentry's internal
+	// no-op. init() still installs OpenTelemetry request hooks even without a
+	// DSN, and under `next dev --turbopack` those hooks (import-in-the-middle)
+	// can't be resolved as externals — every request then hangs ~30s and 500s
+	// (the audit's "socket hang up" e2e failure). Deployed envs set the DSN,
+	// so production observability is unaffected.
+	if (!process.env.SENTRY_DSN) {
+		return;
+	}
 	if (process.env.NEXT_RUNTIME === "edge") {
 		Sentry.init({
 			dsn: process.env.SENTRY_DSN,

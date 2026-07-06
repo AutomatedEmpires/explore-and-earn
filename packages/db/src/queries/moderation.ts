@@ -31,11 +31,12 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-/** Report reason vocabulary (mirrors the CHECK in 028_reports.sql). */
+/** Report reason vocabulary (mirrors the CHECK in 054_host_spam_report_flagging.sql). */
 export type ModerationReportReason =
   | "unsafe"
   | "inaccurate"
   | "scam"
+  | "spam"
   | "inappropriate"
   | "housing_pay"
   | "other";
@@ -144,6 +145,8 @@ function reasonWeight(reason: string): number {
       return 50;
     case "scam":
       return 40;
+    case "spam":
+      return 35;
     case "housing_pay":
       return 30;
     case "inappropriate":
@@ -305,11 +308,49 @@ export async function getModerationStats(
 }
 
 /**
- * Record a moderation decision: insert one moderation_actions audit row AND, when
- * the action came from a filed report, advance that report to its terminal status
- * with resolution stamps. Two writes (insert, then conditional report update);
- * the audit insert is the source of truth, so a report-update failure surfaces as
- * not-ok rather than silently dropping the trail.
+ * Listing status to write for a moderation decision against a `listing`
+ * subject, or null when the action carries no subject mutation (dismissed —
+ * no action taken; warned — a notice to the host, not a content change).
+ *
+ * content_removed and suspended both resolve to 'archived': the listings
+ * enum (draft/under_review/live/paused/closed/archived) has no dedicated
+ * "suspended" state, and inventing one is a schema change beyond what wiring
+ * up an existing admin action calls for — archived already means "no longer
+ * publicly visible, terminal," which both actions require. WHICH kind of
+ * removal happened is preserved in moderation_actions.action, not here.
+ * reinstated is the inverse: back to 'live'.
+ *
+ * Only `listing` is handled — it's the only subject type any admin surface
+ * produces today (ModerationWorkbench hardcodes subjectType: "listing"; the
+ * report schema itself only has a listing_id FK, no host/message/photo/
+ * announcement report path exists yet). host/seeker/message/photo/
+ * announcement stay audit-log-only until a real mutation target exists for
+ * each — silently guessing at one risks writing to founder-approval-gated
+ * territory (host account suspension) with no verified schema to write to.
+ */
+function listingUpdateFor(
+  action: ModerationActionKind,
+): { status: "archived" | "live"; archived_at: string | null } | null {
+  const nowIso = new Date().toISOString();
+  switch (action) {
+    case "content_removed":
+    case "suspended":
+      return { status: "archived", archived_at: nowIso };
+    case "reinstated":
+      return { status: "live", archived_at: null };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Record a moderation decision: insert one moderation_actions audit row,
+ * then — when the action came from a filed report — advance that report to
+ * its terminal status with resolution stamps, then — for a `listing` subject
+ * with a mutating action — actually change the listing's status. Each write
+ * is sequential and the audit insert is the source of truth: a later write
+ * failing surfaces as not-ok (so the moderator sees it and can retry) rather
+ * than silently leaving the trail and the real state inconsistent.
  *
  * Report status mapping:
  *   - dismissed                       -> 'dismissed'
@@ -368,6 +409,23 @@ export async function takeModerationAction(
       .eq("id", reportId);
     if (updateError) {
       return { ok: false, error: updateError.message };
+    }
+  }
+
+  if (subjectType === "listing") {
+    const listingUpdate = listingUpdateFor(action);
+    if (listingUpdate) {
+      const { data, error: listingError } = await db
+        .from("listings")
+        .update(listingUpdate)
+        .eq("id", subjectId)
+        .select("id");
+      if (listingError) {
+        return { ok: false, error: listingError.message };
+      }
+      if (!data || data.length === 0) {
+        return { ok: false, error: "Listing not found." };
+      }
     }
   }
 

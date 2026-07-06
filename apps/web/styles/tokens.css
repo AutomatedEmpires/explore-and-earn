@@ -68,7 +68,8 @@
   --color-ink:            var(--palette-ink);    /* backward compat alias */
   --color-parchment:      var(--palette-parchment);
   --color-card-warm:      var(--palette-card-warm);
-  --color-gold:           var(--palette-gold);
+  /* (--color-gold is defined once, in the semantic block below, off
+     --palette-amber; --palette-gold remains for star/sparkle marks.) */
   --border-soft:          var(--palette-line);
   --border-ink:           var(--palette-ink-stroke);
   --border-ink-warm:      var(--palette-ink-warm);
@@ -120,7 +121,20 @@
   --space-row-gap:  12px;
   --space-section:  24px;
   --space-gutter:   16px;
-  --size-bottom-nav: 64px;
+  /* True dock height: 8px list padding ×2 + ~52px tab + 1px border. Keep in
+     sync with BottomNav.module.css and the OS mnav rules — every content
+     reservation and floating bar offsets from this. */
+  --size-bottom-nav: 70px;
+
+  /* z-scale — one explicit stacking order for fixed chrome. Ad-hoc z-index
+     ties (dock vs overlay vs lightbox at 70) previously resolved only by DOM
+     order; always take the layer's token instead of inventing a number.
+       content bars < docks < banners < overlays < lightbox            */
+  --z-content-bar: 50;   /* in-page fixed bars (listing apply bar)     */
+  --z-dock:        70;   /* bottom navigation docks (public + role OS) */
+  --z-banner:      80;   /* consent banner, role drawers above docks   */
+  --z-overlay:     100;  /* modal/popup scrims (portal to body)        */
+  --z-lightbox:    300;  /* full-screen media viewers                  */
 
   /* radius */
   --radius-pill:   999px;
@@ -188,7 +202,7 @@
   /* =============================================================== */
 
   /* Header — deep sky */
-  --palette-header:     #2F667A;
+  --palette-header:     var(--palette-sky); /* header IS the sky — one source */
   --palette-header-mid: #3A7287;
 
   /* Sky blue — primary CTA, active links, interactive */
@@ -330,11 +344,9 @@
   --field-disabled-bg:   var(--palette-steel);
 
   /* =============================================================== */
-  /* DEPRECATED — Sprint Zero stub aliases                           */
+  /* DEPRECATED — Sprint Zero stub aliases (migrate on touch,        */
+  /* then delete; unused aliases have already been removed)          */
   /* =============================================================== */
-  --surface-default:  var(--color-surface-raised);
-  --surface-raised:   var(--color-surface);
   --border-default:   var(--border-soft);
   --radius-md:        var(--radius-button);
-  --space-md:         var(--space-16);
 }

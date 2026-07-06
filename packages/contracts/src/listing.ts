@@ -25,8 +25,9 @@ export interface ListingHost {
   readonly id?: string;
   readonly name: string;
   /**
-   * Self-declared verified host. The badge always renders the exact qualifier
-   * "Self-Declared by Host" (G22) via the VerifiedHostBadge primitive.
+   * Whether the host is on an active paid subscription (any tier) — see
+   * hasVerifiedHostSubscription() in ./card. Automatic, never self-declared
+   * or admin-toggled. Rendered via the VerifiedHostBadge primitive.
    */
   readonly verified: boolean;
   /** Short employer tagline for the featured-employer rail (1–2 punchy sentences). */

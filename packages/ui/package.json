@@ -13,8 +13,6 @@
   },
   "dependencies": {
     "@explore-and-earn/contracts": "workspace:*",
-    "@phosphor-icons/react": "^2.1.0",
-    "@types/dompurify": "^3.2.0",
-    "dompurify": "^3.4.11"
+    "@phosphor-icons/react": "^2.1.0"
   }
 }

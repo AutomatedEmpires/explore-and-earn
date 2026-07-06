@@ -68,8 +68,8 @@ function LifecycleTeasers({ status }: { status: SeekerStatusSummary }) {
       href: "/invites",
       label: "Invites",
       icon: "action.message" as const,
-      count: status.unreadNotifications,
-      highlight: status.unreadNotifications > 0,
+      count: status.invitesCount,
+      highlight: status.invitesCount > 0,
     },
     {
       href: "/offered",

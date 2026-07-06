@@ -239,8 +239,8 @@
 
 .actionBar {
   position: fixed;
-  /* Clears the floating PublicBottomNav/SeekerBottomNav dock (BottomNav.module.css:
-     position:fixed, z-index:70, bottom: 10px + safe-area-inset) instead of
+  /* Floats above the pinned full-bleed bottom dock (BottomNav.module.css:
+     position:fixed, z-index:70, bottom:0 + safe-area padding) instead of
      sitting under it at bottom:0 — same --size-bottom-nav token PublicShell
      already uses to reserve scroll space for the same dock, so the two can't
      drift apart. Without this, the nav dock renders on top of the Apply/Save
@@ -253,5 +253,27 @@
   padding: var(--space-16);
   display: flex;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-content-bar);
 }
+
+/* Gentle nudge shown to seekers whose profile is too thin to compute an honest
+   fit — links to onboarding. Borders-first, token-only, matches the fit panel. */
+.fitPrompt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-bottom: var(--space-section);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--border-ink);
+  background-color: var(--color-surface);
+  color: var(--text-primary);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  text-decoration: none;
+}
+
+.fitPrompt span {
+  flex: 1;
+}
+

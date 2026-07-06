@@ -6,6 +6,7 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { adminClient } from "../adminClient";
 import type { SeekerApplicationListing } from "./applications";
@@ -62,13 +63,26 @@ async function countRows(
   return count ?? 0;
 }
 
+/** Count host_profiles rows on an active paid subscription (any tier). */
+async function countVerifiedHosts(db: SupabaseClient): Promise<number> {
+  const { count, error } = await db
+    .from("host_profiles")
+    .select("*", { count: "exact", head: true })
+    .in("subscription_tier", ["starter", "professional", "enterprise"]);
+  if (error) {
+    throw new Error(`getMarketplaceStats(host_profiles verified): ${error.message}`);
+  }
+  return count ?? 0;
+}
+
 /**
  * Live marketplace counts for the admin dashboard.
  *
- * Status/attestation vocabularies:
+ * Status vocabularies:
  *   - pendingApplications  = applications with status 'applied' (awaiting first review)
  *   - acceptedApplications = applications with status 'accepted'
- *   - verifiedHosts        = host_profiles with attestation_status 'attested'
+ *   - verifiedHosts        = host_profiles on an active paid subscription (any tier) —
+ *                            the same gate that renders the seeker-facing Verified Host badge
  *   - totalSeekers         = count of seeker_profiles rows
  */
 export async function getMarketplaceStats(
@@ -96,7 +110,7 @@ export async function getMarketplaceStats(
     countRows(db, "applications", { status: "applied" }),
     countRows(db, "applications", { status: "accepted" }),
     countRows(db, "host_profiles"),
-    countRows(db, "host_profiles", { attestation_status: "attested" }),
+    countVerifiedHosts(db),
     countRows(db, "seeker_profiles"),
   ]);
 
@@ -124,27 +138,62 @@ export interface AdminListingRow {
   readonly hostCompanyName: string;
 }
 
+/** A single page of an admin list query, plus enough to render a pager. */
+export interface AdminPage<T> {
+  readonly rows: readonly T[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
+/** Default page size for admin list queries — mirrors getRecentApplications' limit. */
+export const ADMIN_PAGE_SIZE = 50;
+
+function toPage<T>(
+  rows: readonly T[],
+  total: number,
+  page: number,
+  pageSize: number,
+): AdminPage<T> {
+  return {
+    rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
 /**
- * Every listing across all statuses (draft / under_review / live / paused /
- * closed / archived), newest first, with the owning host's company name.
+ * One page of listings across all statuses (draft / under_review / live /
+ * paused / closed / archived), newest first, with the owning host's company
+ * name. `page` is 1-indexed; out-of-range pages return an empty row set
+ * rather than erroring.
  */
 export async function getAllListingsForModeration(
   serviceRoleToken: string,
-): Promise<AdminListingRow[]> {
+  page = 1,
+  pageSize = ADMIN_PAGE_SIZE,
+): Promise<AdminPage<AdminListingRow>> {
   const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
+  const from = Math.max(0, page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
-  const { data, error } = await db
+  const { data, error, count } = await db
     .from("listings")
     .select(
       "id,title,category,status,published_at,host_profiles!host_profile_id(company_name)",
+      { count: "exact" },
     )
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (error) {
     throw new Error(`getAllListingsForModeration: ${error.message}`);
   }
 
-  return (data ?? []).map((raw) => {
+  const rows = (data ?? []).map((raw) => {
     const r = raw as Record<string, unknown>;
     const host = firstOf(r.host_profiles);
     return {
@@ -160,6 +209,8 @@ export async function getAllListingsForModeration(
           : "Unknown host",
     } satisfies AdminListingRow;
   });
+
+  return toPage(rows, count ?? rows.length, page, pageSize);
 }
 
 /** One host row for the verification table. */
@@ -167,47 +218,67 @@ export interface AdminHostRow {
   readonly id: string;
   readonly companyName: string;
   readonly clerkUserId: string;
+  /** Internal moderator trust flag — independent of the paid-subscription Verified Host badge. */
   readonly attestationStatus: string;
+  readonly subscriptionTier: string | null;
+  /** Set automatically after >3 non-dismissed spam reports in a rolling 30 days. */
+  readonly flaggedForReview: boolean;
+  readonly flaggedReason: string | null;
+  readonly flaggedAt: string | null;
   readonly listingCount: number;
 }
 
 /**
- * Every host_profiles row, newest first, with a per-host listing count. The
- * count is tallied in JS from a single listings scan (the admin set is small
- * enough that one pass beats N per-host count queries).
+ * One page of host_profiles rows, newest first, with a per-host listing
+ * count. The count query is scoped to just this page's host ids (`.in(...)`)
+ * rather than scanning every listing in the marketplace — the old
+ * implementation fetched both tables in full, which stopped scaling as soon
+ * as either table grew past a trivial size. `page` is 1-indexed.
  */
 export async function getAllHostProfiles(
   serviceRoleToken: string,
-): Promise<AdminHostRow[]> {
+  page = 1,
+  pageSize = ADMIN_PAGE_SIZE,
+): Promise<AdminPage<AdminHostRow>> {
   const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
+  const from = Math.max(0, page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
-  const { data: hostRows, error: hostError } = await db
+  const { data: hostRows, error: hostError, count } = await db
     .from("host_profiles")
-    .select("id,company_name,clerk_user_id,attestation_status")
-    .order("created_at", { ascending: false });
+    .select(
+      "id,company_name,clerk_user_id,attestation_status,subscription_tier,flagged_for_review,flagged_reason,flagged_at",
+      { count: "exact" },
+    )
+    .order("created_at", { ascending: false })
+    .range(from, to);
   if (hostError) {
     throw new Error(`getAllHostProfiles: ${hostError.message}`);
   }
 
-  const { data: listingRows, error: listingError } = await db
-    .from("listings")
-    .select("host_profile_id");
-  if (listingError) {
-    throw new Error(`getAllHostProfiles(listings): ${listingError.message}`);
-  }
+  const hostIds = (hostRows ?? []).map((raw) => String((raw as Record<string, unknown>).id));
 
   const listingCountByHost = new Map<string, number>();
-  for (const raw of listingRows ?? []) {
-    const hostProfileId = String(
-      (raw as Record<string, unknown>).host_profile_id,
-    );
-    listingCountByHost.set(
-      hostProfileId,
-      (listingCountByHost.get(hostProfileId) ?? 0) + 1,
-    );
+  if (hostIds.length > 0) {
+    const { data: listingRows, error: listingError } = await db
+      .from("listings")
+      .select("host_profile_id")
+      .in("host_profile_id", hostIds);
+    if (listingError) {
+      throw new Error(`getAllHostProfiles(listings): ${listingError.message}`);
+    }
+    for (const raw of listingRows ?? []) {
+      const hostProfileId = String(
+        (raw as Record<string, unknown>).host_profile_id,
+      );
+      listingCountByHost.set(
+        hostProfileId,
+        (listingCountByHost.get(hostProfileId) ?? 0) + 1,
+      );
+    }
   }
 
-  return (hostRows ?? []).map((raw) => {
+  const rows = (hostRows ?? []).map((raw) => {
     const r = raw as Record<string, unknown>;
     const id = String(r.id);
     return {
@@ -220,9 +291,40 @@ export async function getAllHostProfiles(
         typeof r.attestation_status === "string"
           ? r.attestation_status
           : "",
+      subscriptionTier:
+        typeof r.subscription_tier === "string" ? r.subscription_tier : null,
+      flaggedForReview: r.flagged_for_review === true,
+      flaggedReason:
+        typeof r.flagged_reason === "string" ? r.flagged_reason : null,
+      flaggedAt: typeof r.flagged_at === "string" ? r.flagged_at : null,
       listingCount: listingCountByHost.get(id) ?? 0,
     } satisfies AdminHostRow;
   });
+
+  return toPage(rows, count ?? rows.length, page, pageSize);
+}
+
+/**
+ * Clear a host's spam-report flag (admin-only, service-role write). The flag
+ * itself is set only by the trg_flag_host_on_spam_reports DB trigger (054);
+ * this is the sole app-layer path that clears it, mirroring
+ * adminSetHostAttestationStatus below.
+ */
+export async function clearHostFlag(
+  serviceRoleToken: string,
+  hostProfileId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
+
+  const { error } = await db
+    .from("host_profiles")
+    .update({ flagged_for_review: false, flagged_reason: null, flagged_at: null })
+    .eq("id", hostProfileId);
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true };
 }
 
 /** One application row for the read-only pipeline table. */
@@ -336,7 +438,7 @@ const ADMIN_LISTING_DETAIL_SELECT =
   "housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
   "compensation_currency, timeline_summary, cover_photo_url, " +
-  "host_profiles!host_profile_id(company_name, attestation_status)";
+  "host_profiles!host_profile_id(company_name, subscription_tier)";
 
 /**
  * Fetch a single listing by ID for the admin moderation detail view, bypassing
@@ -365,7 +467,7 @@ export async function getAdminListingDetail(
     hostRaw.company_name.length > 0
       ? hostRaw.company_name
       : "Unknown Host";
-  const verified = hostRaw ? hostRaw.attestation_status === "attested" : false;
+  const verified = hostRaw ? hasVerifiedHostSubscription(hostRaw.subscription_tier) : false;
 
   const housingProvision: BenefitProvision =
     row.housing_included === true ? "provided" : "not_provided";

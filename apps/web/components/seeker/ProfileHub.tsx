@@ -17,14 +17,18 @@ import { RESUME_APPLY_THRESHOLD, type SeekerStatusSummary } from "./models";
 import styles from "./ProfileHub.module.css";
 
 // Category atmospheres are tokenized in styles/tokens.css (shared with SeekerHero).
+/* Photo-less hero fallback: the SCENIC cover treatment (hero scrim over a
+   landscape gradient) — the same language as the host hero and the sidebar
+   identity card, never the retired dark category atmospheres. */
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  maritime: "var(--gradient-category-maritime)",
-  farm:     "var(--gradient-category-farm)",
-  remote:   "var(--gradient-category-remote)",
-  seasonal: "var(--gradient-category-seasonal)",
-  mix:      "var(--gradient-category-mix)",
+  maritime: "var(--gradient-hero-scrim), var(--gradient-cover-coastal)",
+  farm:     "var(--gradient-hero-scrim), var(--gradient-cover-wilderness)",
+  remote:   "var(--gradient-hero-scrim), var(--gradient-cover-mountain)",
+  seasonal: "var(--gradient-hero-scrim), var(--gradient-cover-adventure)",
+  mix:      "var(--gradient-hero-scrim), var(--gradient-cover-sunset)",
 };
-const DEFAULT_GRADIENT = "var(--gradient-category-default)";
+const DEFAULT_GRADIENT =
+  "var(--gradient-hero-scrim), var(--gradient-cover-adventure)";
 
 const CATEGORY_LABELS: Record<string, string> = {
   maritime: "Maritime",

@@ -156,6 +156,12 @@ export function SeekerShell({
             action="/seek"
             placeholder="Search opportunities, places, hosts…"
           />
+          {/* Topbar entry keeps the assistant reachable on mobile — the
+              sidebar link disappears ≤1023px and the four dock tabs are
+              founder-locked. */}
+          <Link className="seekeros-tact seekeros-tact--icon" href="/assistant" aria-label="Your guide (AI assistant)">
+            <Icon name="action.message" size={20} aria-hidden />
+          </Link>
           <Link className="seekeros-tact seekeros-tact--icon" href="/notifications" aria-label="Notifications">
             <Icon name="system.info" size={20} aria-hidden />
             {unread > 0 ? <span className="seekeros-bdg--top">{unread}</span> : null}

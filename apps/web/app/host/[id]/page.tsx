@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
+import { optionalAuth } from "../../../lib/optionalAuth";
 import {
   getPublicListingsByHost,
   getHostRatingSummary,
@@ -19,6 +19,7 @@ import { HostReviews } from "../../../components/host/HostReviews";
 import { LeaveReview } from "../../../components/host/LeaveReview";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { generateBreadcrumbJsonLd } from "../../../lib/seo";
+import { isUuid } from "../../../lib/ids";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -31,11 +32,15 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const host = await getPublicHostProfileCached(id);
-  if (!host) return { title: "Host not found" };
+  // host_profiles.id is a Postgres uuid — non-UUID params can't exist and
+  // would throw 22P02 into the error boundary instead of 404ing.
+  const host = isUuid(id) ? await getPublicHostProfileCached(id) : null;
+  // notFound() (pre-stream) so dead host URLs carry a real 404 instead of a
+  // soft-404 with fallback metadata — mirrors listing/[id].
+  if (!host) notFound();
 
   const tagline = host.tagline ?? host.about?.slice(0, 100);
-  const title = `${host.companyName} · Explore & Earn`;
+  const title = host.companyName;
   const description = tagline
     ? tagline.slice(0, 155)
     : `View open opportunities from ${host.companyName} on Explore & Earn.`;
@@ -364,6 +369,7 @@ function HousingMealsCard({
 
 export default async function PublicHostProfilePage({ params }: Props) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const [host, listings, ratingSummary, reviews] = await Promise.all([
     getPublicHostProfileCached(id),
     getPublicListingsByHost(id),
@@ -375,9 +381,9 @@ export default async function PublicHostProfilePage({ params }: Props) {
   // Eligibility for the write flow: a logged-in seeker with a completed/active
   // engagement here who hasn't reviewed yet. Resolved server-side; null for
   // guests, non-seekers, and the ineligible — so the public page stays public.
-  const { userId, getToken } = await auth();
+  const { userId, getToken } = await optionalAuth();
   let reviewable: Awaited<ReturnType<typeof getReviewableEngagementForHost>> = null;
-  if (userId) {
+  if (userId && getToken) {
     const seekerToken = await getToken({ template: "supabase" });
     if (seekerToken) {
       reviewable = await getReviewableEngagementForHost(seekerToken, userId, id);
@@ -427,7 +433,7 @@ export default async function PublicHostProfilePage({ params }: Props) {
       {/* ── Trust band — triad-kept proof (renders only with reviews) ── */}
       <HostTrustBand
         summary={ratingSummary}
-        verified={host.attestationStatus === "attested"}
+        verified={host.verified}
         reviewsHref="#reviews-heading"
       />
 

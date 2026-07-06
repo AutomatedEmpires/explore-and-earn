@@ -7,6 +7,7 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
+import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 import type { SeekerApplicationListing } from "./applications";
@@ -82,10 +83,6 @@ function embeddedCompensationSummary(row: Record<string, unknown>): string {
   return "Negotiable";
 }
 
-function isVerifiedAttestation(value: unknown): boolean {
-  return value === "attested";
-}
-
 function rowToSeekerApplicationListing(
   value: unknown,
 ): SeekerApplicationListing | null {
@@ -100,7 +97,7 @@ function rowToSeekerApplicationListing(
       ? hostRaw.company_name
       : "Unknown Host";
   const verified = hostRaw
-    ? isVerifiedAttestation(hostRaw.attestation_status)
+    ? hasVerifiedHostSubscription(hostRaw.subscription_tier)
     : false;
 
   const housingProvision: BenefitProvision =
@@ -167,7 +164,7 @@ const RICH_SEEKER_APPLICATION_SELECT =
   "status, housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
   "compensation_currency, timeline_summary, cover_photo_url, " +
-  "host_profiles(company_name, attestation_status))";
+  "host_profiles(company_name, subscription_tier))";
 
 /**
  * All applications for the authed seeker, newest first, joined to listing +
@@ -255,16 +252,26 @@ export interface WithdrawApplicationResult {
 }
 
 /**
+ * Statuses a seeker may withdraw from. Mirrors APPLICATION_TRANSITIONS
+ * (packages/contracts/src/lifecycles.ts): applied/reviewing/saved_by_host ->
+ * withdrawn are all permitted lifecycle edges. `offered` is deliberately
+ * excluded — a seeker already has a distinct accept/decline path for an offer
+ * (SEEKER_SETTABLE_STATUSES in applications.ts); withdrawing from an active
+ * offer would be a second, conflicting way to say the same thing.
+ */
+const WITHDRAWABLE_STATUSES = new Set(["applied", "reviewing", "saved_by_host"]);
+
+/**
  * Withdraw the authed seeker's own application.
  *
  * App-level guards (RLS is gated to a separate change):
  * - profile_not_found — no seeker_profiles row
  * - not_found         — application id does not exist (or not visible)
  * - forbidden         — application belongs to a different seeker
- * - invalid_status    — only an `applied` application may be withdrawn
+ * - invalid_status    — only applied/reviewing/saved_by_host may be withdrawn
  *
- * applied -> withdrawn is a permitted lifecycle transition, so the DB-side
- * lifecycle trigger accepts the update.
+ * Every one of those source statuses -> withdrawn is a permitted lifecycle
+ * transition, so the DB-side lifecycle trigger accepts the update.
  */
 export async function withdrawApplication(
   clerkToken: string,
@@ -293,7 +300,7 @@ export async function withdrawApplication(
   if (String(row.seeker_profile_id) !== seekerProfileId) {
     return { ok: false, error: "forbidden" };
   }
-  if (row.status !== "applied") {
+  if (typeof row.status !== "string" || !WITHDRAWABLE_STATUSES.has(row.status)) {
     return { ok: false, error: "invalid_status" };
   }
 

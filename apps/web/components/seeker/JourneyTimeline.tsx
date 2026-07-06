@@ -23,6 +23,8 @@ export function JourneyTimeline({ stops }: JourneyTimelineProps) {
 			<EmptyState
 				title="Your journey starts here"
 				message="Completed and upcoming roles will map out your adventure over time."
+				actionLabel="Find your first season"
+				actionHref="/seek"
 			/>
 		);
 	}

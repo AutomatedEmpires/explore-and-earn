@@ -41,7 +41,7 @@ export function HostProfileHero({
   coverPhotoUrl,
   listingCount,
 }: HostProfileHeroProps) {
-  const verified = host.attestationStatus === "attested";
+  const verified = host.verified;
   const hasListings = listingCount > 0;
   const hostingSinceYear = host.createdAt
     ? new Date(host.createdAt).getFullYear()

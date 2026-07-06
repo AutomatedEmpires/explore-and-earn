@@ -17,7 +17,7 @@ Explore&Earn is a **premium outdoor/seasonal-work marketplace** (Patagonia × Ai
 - **Never produce generic SaaS UI.** No flat gray cards, drop-shadow depth, random gradients, "Perks" instead of HOUSING/MEALS/PAY, or default-component-library looks. If it could only live on a B2B SaaS site, it's wrong.
 - **Inspect before editing.** Read the route/component, its CSS module, the primitives it uses, its data deps, and its 380px + 1024px behavior. Render it before judging it.
 - **Preserve business logic.** Never break auth, data contracts, routing, Stripe, Supabase/RLS, server/client boundaries, SEO metadata, or the a11y baseline. Restructure the UI, not the logic.
-- **Compose, don't reinvent.** Use `packages/ui` + `ui-*` primitives and the locked tokens (`apps/web/styles/tokens.css`). Zero raw hex / px type / ad-hoc radii. Borders-first, Streamline icons only, frame-not-filter on photos.
+- **Compose, don't reinvent.** Use `packages/ui` + `ui-*` primitives and the locked tokens (`apps/web/styles/tokens.css`). Zero raw hex / px type / ad-hoc radii. Borders-first, Phosphor icons only (via the `<Icon>` registry), frame-not-filter on photos.
 - **Design mobile-first**, with intentional hierarchy (one dominant element per module) and **purposeful, physical motion** (transform/opacity only; name every animation's meaning or cut it).
 - **Run checks** (`pnpm lint && pnpm typecheck && pnpm build`) and **render/screenshot** the result (Playwright / chrome-devtools MCP) at 380px + 1024px and with reduced-motion.
 - **Self-critique before "done."** Score the rendered surface with `docs/design/page-scorecard.md`; it is not done until every dimension ≥ 8.

@@ -1,18 +1,14 @@
 import type { ReactNode } from "react";
 
-import { GlobalHeader } from "../../components/global";
-import { PublicBottomNav } from "../../components/public/PublicBottomNav";
+import { PublicShell } from "../../components/public/PublicShell";
 import styles from "./blog.module.css";
 
 export default function BlogLayout({ children }: { children: ReactNode }) {
+	// One shared public chrome (PublicShell owns header/bottom-nav/clearance);
+	// this layout only owns the blog's inner column rhythm.
 	return (
-		<div className={styles.frame}>
-			{/* One unified public header — guest mode (the field guide is fully public). */}
-			<GlobalHeader scope="guest" isAuthenticated={false} />
-			<main className={styles.main}>
-				{children}
-			</main>
-			<PublicBottomNav />
-		</div>
+		<PublicShell>
+			<div className={styles.inner}>{children}</div>
+		</PublicShell>
 	);
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import posthog from "posthog-js";
 
 import { Button } from "@explore-and-earn/ui";
 
@@ -41,11 +40,17 @@ export function CookieBanner() {
 			// Ignore storage failures — the choice still applies for this session.
 		}
 
-		if (consent === "accepted") {
-			posthog.opt_in_capturing();
-		} else {
-			posthog.opt_out_capturing();
-		}
+		// Dynamic import on purpose — a static one would weld the ~200 kB SDK
+		// into every route's first load just to flip this toggle. Providers
+		// also reads the stored choice at init, so the toggle here is a
+		// same-session convenience, not the source of truth.
+		void import("posthog-js").then(({ default: posthog }) => {
+			if (consent === "accepted") {
+				posthog.opt_in_capturing();
+			} else {
+				posthog.opt_out_capturing();
+			}
+		});
 
 		setVisible(false);
 	}

@@ -15,7 +15,7 @@ export const dynamic = "force-static";
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com";
 
-const TITLE = "Field Guide · Explore & Earn";
+const TITLE = "Field Guide";
 const DESCRIPTION =
 	"Honest guides, field notes, and playbooks for seasonal work — how to read housing, meals, and pay before you pack.";
 
@@ -45,7 +45,7 @@ function toneAccent(tone: EditorialTone): string {
 	}
 }
 
-/** Per-tone Streamline registry icon (category lanes). */
+/** Per-tone registry icon (category lanes). */
 function toneIcon(tone: EditorialTone): IconKey {
 	switch (tone) {
 		case "farm":

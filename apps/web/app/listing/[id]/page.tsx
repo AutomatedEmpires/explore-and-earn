@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import Image from "next/image";
 import Link from "next/link";
 
-import { hasApplied, hasSaved } from "@explore-and-earn/db";
+import {
+  computeSeekerListingFit,
+  hasApplied,
+  hasSaved,
+  seekerHasMatchInputs,
+} from "@explore-and-earn/db";
 import {
   cachedHostProfile,
   cachedSeekerProfile,
@@ -14,10 +18,14 @@ import {
 import { Icon } from "@explore-and-earn/ui";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
+import { SeekerFitSignal } from "../../../components/listing/SeekerFitSignal";
 import { TrueValue } from "../../../components/listing/TrueValue";
 import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../lib/seo";
+import { isUuid } from "../../../lib/ids";
+import { optionalAuth } from "../../../lib/optionalAuth";
+import { getFixtureListingDetail } from "../../../components/discovery/fixtureDetail";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -29,15 +37,32 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * listings.id is a Postgres uuid — a non-UUID param can never exist in the DB
+ * and would throw 22P02 into the error boundary (behind HTTP 200). Guarding
+ * here turns unknown ids into honest 404s, and lets dev/preview fixture ids
+ * (lst_*) resolve so the fixture discover → inspect journey stays connected.
+ */
+async function resolveListingDetail(id: string) {
+  if (isUuid(id)) return getListingDetailPublicCached(id);
+  return getFixtureListingDetail(id);
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const listing = await getListingDetailPublicCached(id);
+  const listing = await resolveListingDetail(id);
 
   if (!listing) {
-    return { title: "Listing not found" };
+    // Thrown HERE (pre-stream) so the response carries a real 404 status —
+    // the route has a loading.tsx, so by the time the page body calls
+    // notFound() the 200 status has already been flushed with the skeleton.
+    notFound();
   }
 
-  const title = `${listing.title} — ${listing.host?.companyName ?? "Explore & Earn"} · Explore & Earn`;
+  // The root template appends "| Explore & Earn" — don't bake the brand in twice.
+  const title = listing.host?.companyName
+    ? `${listing.title} — ${listing.host.companyName}`
+    : listing.title;
   const description = listing.description
     ? listing.description.slice(0, 155)
     : `${listing.title} opportunity at ${listing.host?.companyName ?? "a host organization"}. Housing ${listing.housingIncluded ? "included" : "not included"}, meals ${listing.mealsIncluded ? "included" : "not included"}.`;
@@ -67,11 +92,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ListingDetailPage({ params }: Props) {
   const { id } = await params;
-  const listing = await getListingDetailPublicCached(id);
+  const listing = await resolveListingDetail(id);
 
   if (!listing) notFound();
 
-  const { userId } = await auth();
+  // Fixture-backed listings (dev/preview only) have non-UUID ids that must
+  // never reach the uuid-typed seeker-state queries below.
+  const isFixtureListing = !isUuid(listing.id);
+
+  const { userId } = await optionalAuth();
   const token = userId ? await getSupabaseToken() : null;
 
   // Determine viewer role and ownership
@@ -98,17 +127,29 @@ export default async function ListingDetailPage({ params }: Props) {
   let alreadyApplied = false;
   let alreadySaved = false;
   let onboardingComplete = false;
+  let seekerProfile: Awaited<ReturnType<typeof cachedSeekerProfile>> = null;
 
-  if (userId && token && viewerRole === "seeker") {
-    const [applied, saved, seekerProfile] = await Promise.all([
+  if (userId && token && viewerRole === "seeker" && !isFixtureListing) {
+    const [applied, saved, profile] = await Promise.all([
       hasApplied(token, userId, listing.id),
       hasSaved(token, userId, listing.id),
       cachedSeekerProfile(token, userId),
     ]);
     alreadyApplied = applied;
     alreadySaved = saved;
-    onboardingComplete = seekerProfile?.onboardingComplete === true;
+    seekerProfile = profile;
+    onboardingComplete = profile?.onboardingComplete === true;
   }
+
+  // Seeker-facing ADR-040 fit signal: computed on the fly with the same engine
+  // the assistant uses. Shown only to seekers who have enough profile signal for
+  // an honest band; otherwise a gentle prompt to complete their profile.
+  const fit =
+    viewerRole === "seeker" && seekerProfile && seekerHasMatchInputs(seekerProfile)
+      ? computeSeekerListingFit(seekerProfile, listing)
+      : null;
+  const seekerNeedsProfileForFit =
+    viewerRole === "seeker" && (!seekerProfile || !seekerHasMatchInputs(seekerProfile));
 
   // Build benefit triad data
   const housingLabel = listing.housingIncluded ? "Included" : "Not included";
@@ -133,7 +174,7 @@ export default async function ListingDetailPage({ params }: Props) {
   const jsonLd = generateJobPostingJsonLd(listing, listing.host, baseUrl);
   const breadcrumbJsonLd = generateBreadcrumbJsonLd([
     { name: "Explore & Earn", url: baseUrl },
-    ...(listing.host
+    ...(listing.host && listing.host.id
       ? [{ name: listing.host.companyName, url: `${baseUrl}/host/${listing.host.id}` }]
       : []),
     { name: listing.title, url: `${baseUrl}/listing/${listing.id}` },
@@ -159,6 +200,10 @@ export default async function ListingDetailPage({ params }: Props) {
               fill
               className={styles.fillImg}
               priority
+              // .cover is gutter-inset on mobile and width-constrained on
+              // desktop — without sizes the srcset assumed 100vw and
+              // over-fetched the LCP image.
+              sizes="(max-width: 1023px) 92vw, 960px"
             />
           </div>
         )}
@@ -214,19 +259,33 @@ export default async function ListingDetailPage({ params }: Props) {
               )}
               <div className={styles.hostInfo}>
                 <div className={styles.hostNameRow}>
-                  <Link
-                    href={`/host/${listing.host.id}`}
-                    className={styles.hostName}
-                  >
-                    {listing.host.companyName}
-                  </Link>
-                  {listing.host.attestationStatus === "attested" && (
-                    <VerifiedHostBadge />
+                  {listing.host.id ? (
+                    <Link
+                      href={`/host/${listing.host.id}`}
+                      className={styles.hostName}
+                    >
+                      {listing.host.companyName}
+                    </Link>
+                  ) : (
+                    <span className={styles.hostName}>
+                      {listing.host.companyName}
+                    </span>
                   )}
+                  {listing.host.verified && <VerifiedHostBadge />}
                 </div>
                 <div className={styles.hostDate}>{dateLabel}</div>
               </div>
             </div>
+          )}
+
+          {/* Seeker fit signal (ADR-040) — the decision-point payoff */}
+          {fit && <SeekerFitSignal result={fit} />}
+          {seekerNeedsProfileForFit && (
+            <Link href="/onboarding" className={styles.fitPrompt}>
+              <Icon name="status.match" size={20} aria-hidden />
+              <span>Finish your profile to see how well this opportunity fits you.</span>
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
           )}
 
           {/* Benefit triad */}
@@ -285,8 +344,7 @@ export default async function ListingDetailPage({ params }: Props) {
                   id: listing.host.id,
                   name: listing.host.companyName,
                   location: listing.host.primaryLocationName ?? undefined,
-                  verified:
-                    listing.host.attestationStatus === "attested",
+                  verified: listing.host.verified,
                   tagline: listing.host.about ?? undefined,
                   avatar: listing.host.photoUrl
                     ? {

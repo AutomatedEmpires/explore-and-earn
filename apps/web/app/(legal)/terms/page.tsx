@@ -165,6 +165,17 @@ export default function TermsPage() {
 				<p className={styles.body}>
 					We don&rsquo;t guarantee that you&rsquo;ll find an opportunity, be selected, or that any listing is accurately described. You are responsible for your own due diligence before accepting or offering any opportunity.
 				</p>
+				<div className={`${styles.callout} ${styles.calloutGold}`}>
+					<span className={styles.calloutIcon}>
+						<Icon name="trust.verified_host" size={16} aria-hidden />
+					</span>
+					<div className={styles.calloutBody}>
+						<p className={styles.calloutTitle}>The Verified Host badge is not a background or identity check.</p>
+						<p className={styles.calloutText}>
+							The badge is granted automatically to hosts on an active paid subscription. It does not mean Automated Empires has independently verified a host&rsquo;s identity, property, or the claims in their listing. Always research a host and confirm the details of any arrangement before you travel.
+						</p>
+					</div>
+				</div>
 				<p className={styles.body}>
 					To the fullest extent permitted by law, Automated Empires is not liable for any indirect, incidental, or consequential damages arising from your use of the platform. Our total liability is limited to the greater of fees you paid us in the preceding 12 months or $100. These terms are governed by Delaware law.
 				</p>

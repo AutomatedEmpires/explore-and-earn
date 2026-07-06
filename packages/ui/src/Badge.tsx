@@ -9,7 +9,7 @@ import { Icon, type IconKey } from "./icons";
 export interface BadgeProps {
 	readonly label: string;
 	readonly icon?: IconKey;
-	/** Optional qualifier line (e.g. "Self-Declared by Host"). */
+	/** Optional qualifier line (e.g. "Founding Host"). */
 	readonly qualifier?: string;
 	/**
 	 * Semantic variant -> token-driven classname.

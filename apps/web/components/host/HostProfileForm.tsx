@@ -307,7 +307,9 @@ export function HostProfileForm({
           )}
         </div>
         <p className={styles.note}>
-          Verification is managed by the trust team and cannot be edited here.
+          {profile.verified
+            ? "Verified Host is automatic on any active paid plan — it isn't editable here."
+            : "Verified Host is granted automatically once you're on an active paid plan."}
         </p>
       </div>
 

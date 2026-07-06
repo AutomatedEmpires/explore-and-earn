@@ -6,7 +6,10 @@ import { MapViewLazy } from "../../../components/map";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-	title: "Map",
+	title: "Explore opportunities on the map",
+	description:
+		"Browse seasonal work by place — clustered opportunities with housing, meals, and pay on every pin. Location is a first-class way to choose your next season.",
+	alternates: { canonical: "/map" },
 };
 
 type MapSearchParams = {

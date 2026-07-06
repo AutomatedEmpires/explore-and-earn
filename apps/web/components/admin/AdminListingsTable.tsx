@@ -61,7 +61,7 @@ function priorityRank(status: string): number {
   }
 }
 
-/** Category lane -> Streamline registry icon + a tint hook for the cover mat. */
+/** Category lane -> registry icon + a tint hook for the cover mat. */
 const CATEGORY_ICON: Record<string, IconKey> = {
   farm: "category.farm",
   maritime: "category.maritime",

@@ -6,11 +6,14 @@ import {
 	getSavedSearches,
 	rowToDiscoveryFields,
 	savedSearchToQueryString,
+	scoreSeekerListingRow,
 	searchListings,
+	seekerHasMatchInputs,
 } from "@explore-and-earn/db";
 import {
 	type CompensationUnit,
 	MARKETPLACE_CATEGORIES,
+	matchBandFor,
 } from "@explore-and-earn/contracts";
 
 import {
@@ -32,7 +35,10 @@ import styles from "./page.module.css";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-	title: "Seek",
+	title: "Browse seasonal jobs — housing, meals & pay upfront",
+	description:
+		"Browse live seasonal opportunities across farm, maritime, remote, and resort work. Every listing answers housing, meals, and pay before you apply.",
+	alternates: { canonical: "/seek" },
 };
 
 const PAGE_SIZE = 48;
@@ -198,11 +204,15 @@ export default async function SeekPage({
 
 	let hasNextPage = false;
 	let listings: DiscoveryListing[] = [];
+	// Raw rows kept alongside `listings` (same order) so a signed-in seeker's
+	// fit can be scored per card below. Empty on the fixture path.
+	let scorableRows: Awaited<ReturnType<typeof searchListings>> = [];
 
 	if (hasPublicDataConfig) {
 		const rows = await searchListings(filters);
 		hasNextPage = rows.length > PAGE_SIZE;
 		const pageRows = hasNextPage ? rows.slice(0, PAGE_SIZE) : rows;
+		scorableRows = pageRows;
 		listings = pageRows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
 	} else if (canUseFixtures) {
 		const filtered = DISCOVERY_FIXTURES.filter((listing) =>
@@ -215,7 +225,12 @@ export default async function SeekPage({
 		warnIfDiscoveryDataMissingInProduction("seek/page");
 	}
 
-	const featuredEmployers = buildFeaturedEmployers(DISCOVERY_FIXTURES);
+	// The employer rail derives from the same inventory as the results: real
+	// rows when the DB is configured, fixtures only where fixtures are allowed.
+	// Never fixture employers in production — their lst_* links cannot resolve.
+	const featuredEmployers = buildFeaturedEmployers(
+		hasPublicDataConfig ? listings : canUseFixtures ? DISCOVERY_FIXTURES : [],
+	);
 
 	const buildPageHref = (targetPage: number): string => {
 		const sp = new URLSearchParams();
@@ -297,6 +312,26 @@ export default async function SeekPage({
 			seekerName: status.seekerName,
 			featuredEmployers,
 		};
+
+		// Stamp each grid card with the seeker's ADR-040 fit — the SAME score the
+		// listing it opens will show. Only developing+ bands are surfaced, so the
+		// grid highlights genuine fits instead of labelling every card.
+		if (profile && seekerHasMatchInputs(profile) && scorableRows.length === listings.length) {
+			listings = listings.map((listing, index) => {
+				const score = scoreSeekerListingRow(profile, scorableRows[index]);
+				return matchBandFor(score) === "needs_attention"
+					? listing
+					: { ...listing, matchScore: score };
+			});
+			// Browsing (no text query): lead with the best fits. In-page re-rank
+			// only — published_at pagination is unchanged underneath. A typed
+			// query keeps search relevance order.
+			if (!query) {
+				listings = [...listings].sort(
+					(a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1),
+				);
+			}
+		}
 	}
 
 	return (

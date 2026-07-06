@@ -2,12 +2,15 @@ import Link from "next/link";
 
 import styles from "./SiteFooter.module.css";
 
-const LEGAL_LINKS = [
-	{ label: "About",   href: "/about"   },
-	{ label: "FAQ",     href: "/faq"     },
-	{ label: "Terms",   href: "/terms"   },
-	{ label: "Privacy", href: "/privacy" },
-	{ label: "Cookies", href: "/cookies" },
+const FOOTER_LINKS = [
+	{ label: "About",     href: "/about"     },
+	{ label: "Search",    href: "/search"    },
+	{ label: "For Hosts", href: "/for-hosts" },
+	{ label: "Field Guide", href: "/blog"    },
+	{ label: "FAQ",       href: "/faq"       },
+	{ label: "Terms",     href: "/terms"     },
+	{ label: "Privacy",   href: "/privacy"   },
+	{ label: "Cookies",   href: "/cookies"   },
 ] as const;
 
 export function SiteFooter() {
@@ -43,10 +46,10 @@ export function SiteFooter() {
 
 				{/* Row 2: legal nav */}
 				<nav className={styles.legalNav} aria-label="Footer navigation">
-					{LEGAL_LINKS.map((l, i) => (
+					{FOOTER_LINKS.map((l, i) => (
 						<span key={l.href} className={styles.legalItem}>
 							<Link className={styles.legalLink} href={l.href}>{l.label}</Link>
-							{i < LEGAL_LINKS.length - 1 && (
+							{i < FOOTER_LINKS.length - 1 && (
 								<span className={styles.dot} aria-hidden="true">·</span>
 							)}
 						</span>

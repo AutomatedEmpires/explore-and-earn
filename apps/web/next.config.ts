@@ -27,7 +27,11 @@ const CSP_DIRECTIVES = [
   "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev https://js.clerk.dev https://challenges.cloudflare.com https://browser.sentry-cdn.com https://us.posthog.com https://us-assets.i.posthog.com",
   "style-src 'self' 'unsafe-inline' https://api.tiles.mapbox.com https://api.mapbox.com",
   "img-src 'self' blob: data: https://img.clerk.com https://*.supabase.co https://*.mapbox.com https://res.cloudinary.com",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://*.clerk.accounts.dev https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://eu.posthog.com https://sentry.io https://*.ingest.sentry.io",
+  // res.cloudinary.com: the visual-assets layer fetch()es illustration SVGs at
+  // runtime (packages/ui/src/visual-assets/useStreamlineSvg.ts) — img-src alone
+  // does not cover fetch(), so without this the illustrations break the moment
+  // CSP switches from report-only to enforcing.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://*.clerk.accounts.dev https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://eu.posthog.com https://sentry.io https://*.ingest.sentry.io https://res.cloudinary.com",
   "font-src 'self' data:",
   "frame-src 'self' https://*.clerk.accounts.dev https://accounts.clerk.dev https://challenges.cloudflare.com https://accounts.google.com",
   "worker-src 'self' blob:",

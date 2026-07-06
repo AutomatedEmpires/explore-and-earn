@@ -455,7 +455,8 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 									</span>
 								</>
 							) : null}
-							<DiscoveryCard data={toDiscoveryCardData(listing)} surface="swipe" actions={<></>} />
+							{/* Deck covers are the whole viewport — the visible stack loads eagerly. */}
+							<DiscoveryCard data={toDiscoveryCardData(listing)} surface="swipe" actions={<></>} imageLoading="eager" />
 						</div>
 					);
 				})}
