@@ -640,7 +640,9 @@ export function MarketplaceHome({
       <HomeHero heroImage={HOME_HERO.imageUrl} heroCategory={HOME_HERO.category} peek={heroListing} />
       <AnnouncementRail items={announcements} />
 
-      <FeaturedEmployersRail employers={employers} />
+      {/* Server-rendered: an empty employer set is real emptiness, not loading —
+          skip the rail rather than show skeletons that never resolve. */}
+      {employers.length > 0 ? <FeaturedEmployersRail employers={employers} /> : null}
       <FeaturedJobs listings={listings} />
       <CategoryGrid />
       <DestinationGrid destinations={destinations} />

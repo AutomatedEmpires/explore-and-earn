@@ -24,9 +24,18 @@ import { generateOrganizationJsonLd, generateWebSiteJsonLd } from "../lib/seo";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
-	title: "Watch seasonal opportunity form",
+	title: {
+		absolute: "Explore & Earn — Seasonal jobs with housing, meals & pay upfront",
+	},
 	description:
-		"Explore & Earn connects seekers, hosts, places, housing, meals, pay, and timing into one premium seasonal work marketplace.",
+		"Discover seasonal work in places worth living — farms, coasts, resorts, and remote roles. Every opportunity answers the three questions that matter before you apply: where you'll sleep, what you'll eat, and what you'll earn.",
+	alternates: { canonical: "/" },
+	openGraph: {
+		title: "Explore & Earn — Seasonal jobs with housing, meals & pay upfront",
+		description:
+			"A discovery marketplace for seasonal work and real-world exploration. Housing, meals, and pay — answered on every listing.",
+		url: "/",
+	},
 };
 
 export const dynamic = "force-dynamic";
@@ -75,14 +84,18 @@ export default async function HomePage() {
 		}
 	}
 
+	// Preview-only visual fullness: a configured-but-empty dev DB still renders a
+	// populated homepage. Production never shows fixture inventory — an empty
+	// marketplace falls through to the honest founding-season empty states.
+	const isPreview = process.env.NODE_ENV !== "production";
 	const landingListings =
-		feedListings.length > 0
-			? feedListings
-			: DISCOVERY_FIXTURES.slice(0, HOMEPAGE_LISTING_SLOTS);
+		feedListings.length === 0 && isPreview
+			? DISCOVERY_FIXTURES.slice(0, HOMEPAGE_LISTING_SLOTS)
+			: feedListings;
 	const landingEmployers =
-		featuredEmployers.length > 0
-			? featuredEmployers
-			: buildFeaturedEmployers(DISCOVERY_FIXTURES);
+		featuredEmployers.length === 0 && isPreview
+			? buildFeaturedEmployers(DISCOVERY_FIXTURES)
+			: featuredEmployers;
 
 	// Destination + announcement view-models. Real, derived values win; curated
 	// demo figures only fill in outside production (see home-data honesty rules).
