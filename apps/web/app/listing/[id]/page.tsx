@@ -53,7 +53,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const listing = await resolveListingDetail(id);
 
   if (!listing) {
-    return { title: "Listing not found" };
+    // Thrown HERE (pre-stream) so the response carries a real 404 status —
+    // the route has a loading.tsx, so by the time the page body calls
+    // notFound() the 200 status has already been flushed with the skeleton.
+    notFound();
   }
 
   // The root template appends "| Explore & Earn" — don't bake the brand in twice.

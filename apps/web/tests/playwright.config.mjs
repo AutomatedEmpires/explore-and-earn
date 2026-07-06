@@ -26,14 +26,23 @@ if (!process.env.PW_REUSE_SERVER && !process.env.TEST_WORKER_INDEX) {
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
-  timeout: 60000,
+  // Must exceed a single cold-route navigation: dev per-route compiles run
+  // 60-120s on this box, so a 60s test budget made failures nondeterministic
+  // (whichever routes were cold that run blew up). Warm-cache tests finish in
+  // seconds regardless.
+  timeout: 240000,
   workers: 1,
   // Diagnostics: without retries+trace+reporter a webServer timeout is
   // indistinguishable from a test failure (.last-run.json just says "failed").
   retries: process.env.CI ? 2 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
+  // Dev-server reality on this box: a cold per-route webpack compile can take
+  // 60-120s (the /faq compile measured 74s), far beyond Playwright's 30s
+  // default navigation budget.
+  expect: { timeout: 15000 },
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
+    navigationTimeout: 180000,
     trace: "on-first-retry"
   },
   webServer: {

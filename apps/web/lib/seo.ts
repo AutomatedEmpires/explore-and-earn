@@ -35,7 +35,9 @@ export function generateJobPostingJsonLd(
     ? {
         "@type": "Organization",
         name: host.companyName,
-        sameAs: `${baseUrl}/host/${host.id}`,
+        // Only link a public profile that exists — fixture/preview hosts have
+        // no id and must not emit a dead /host/ URL to crawlers.
+        ...(host.id ? { sameAs: `${baseUrl}/host/${host.id}` } : {}),
       }
     : undefined;
 
