@@ -287,6 +287,18 @@ export default async function ListingDetailPage({ params }: Props) {
               <Icon name="action.forward" size={16} aria-hidden />
             </Link>
           )}
+          {/* Contextual guide: opens the assistant pre-loaded with THIS
+              listing (the fixture path has no real id to reason over). */}
+          {viewerRole === "seeker" && !isFixtureListing && (
+            <Link
+              href={`/assistant?listingId=${listing.id}&listingTitle=${encodeURIComponent(listing.title)}`}
+              className={styles.fitPrompt}
+            >
+              <Icon name="action.message" size={20} aria-hidden />
+              <span>Ask your guide about this role — fit, life there, next steps.</span>
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
+          )}
 
           {/* Benefit triad */}
           <div className={styles.triad}>
