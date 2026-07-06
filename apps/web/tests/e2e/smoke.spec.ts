@@ -50,15 +50,24 @@ test.describe("public surfaces (guest)", () => {
     await expect(hostNav(page)).toHaveCount(0);
   });
 
-  test("/search renders the shared public dock", async ({ page }) => {
+  test("/search renders the shared public dock and never error-boundaries", async ({
+    page,
+  }) => {
     await expectRouteToLoad("/search", page);
 
     await expect(publicNav(page)).toHaveCount(1);
     await expect(hostNav(page)).toHaveCount(0);
+    await expect(page.getByText(/something went sideways/i)).toHaveCount(0);
   });
 
-  test("/seek is reachable for signed-out visitors", async ({ page }) => {
+  test("/seek is reachable for signed-out visitors and never error-boundaries", async ({
+    page,
+  }) => {
     await expectRouteToLoad("/seek", page);
+    // A data-layer failure (e.g. an RLS column grant missing for anon) renders
+    // the route error boundary behind HTTP 200 — assert the real content
+    // world rendered instead. (Caught live: migration 056.)
+    await expect(page.getByText(/something went sideways/i)).toHaveCount(0);
   });
 
   test("fixture listing detail renders end-to-end (discover → inspect)", async ({
