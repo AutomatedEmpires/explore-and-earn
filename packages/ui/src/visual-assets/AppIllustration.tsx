@@ -1,21 +1,19 @@
-"use client"
-
-import type { CSSProperties } from "react"
-import { useStreamlineSvg } from "./useStreamlineSvg"
+import { Icon } from "../icons"
 import { getIllustration, type IllustrationKey } from "./illustrations"
 import { ILLUSTRATION_SIZE, type IllustrationSize } from "./types"
 
 /**
- * <AppIllustration> — Streamline Freehand spot art for empty states, onboarding,
- * heroes, success, and error surfaces.
+ * <AppIllustration> — spot art for empty states, onboarding, heroes, success,
+ * and error surfaces.
  *
- * Renders the asset large inside a framed warm-paper "plate" (matching the
- * frame-not-filter photo language) so the black line art reads on any theme. The
- * shared loader scales the 24x24 source to fill and swaps black -> currentColor so
- * the ink follows the plate's token color.
+ * Renders the registry glyph large inside a framed warm-paper "plate"
+ * (matching the frame-not-filter photo language) so the line art reads on any
+ * theme. Fully local (Phosphor via <Icon>) — no runtime fetching, renders on
+ * the server with zero client JS.
  *
- * Illustrations are decorative by default (the adjacent heading carries meaning) →
- * aria-hidden. Pass `aria-label` to make one a meaningful standalone image.
+ * Illustrations are decorative by default (the adjacent heading carries
+ * meaning) → aria-hidden. Pass `aria-label` to make one a meaningful
+ * standalone image.
  *
  *   <AppIllustration name="empty.savedListings" />
  *   <AppIllustration name="hero.discover" size="lg" framed={false} />
@@ -41,28 +39,13 @@ export function AppIllustration({
 }: AppIllustrationProps) {
 	const entry = getIllustration(name)
 	const px = typeof size === "number" ? size : ILLUSTRATION_SIZE[size]
-	const svg = useStreamlineSvg(entry.cloudinaryId)
 
 	const ariaLabel = rest["aria-label"]
 	// Decorative by default; labelled => meaningful image.
 	const hidden = ariaLabel ? false : (rest["aria-hidden"] ?? true)
 
-	const glyphStyle: CSSProperties = {
-		display: "block",
-		width: "100%",
-		height: "100%",
-		lineHeight: 0,
-	}
-
-	const glyph = svg ? (
-		<span aria-hidden style={glyphStyle} dangerouslySetInnerHTML={{ __html: svg }} />
-	) : (
-		// Placeholder plate footprint while loading or when no asset is wired yet.
-		<span
-			aria-hidden
-			style={{ ...glyphStyle, borderRadius: "12%", background: "currentColor", opacity: 0.1 }}
-		/>
-	)
+	const padding = framed ? Math.round(px * 0.18) : 0
+	const glyphPx = px - padding * 2
 
 	const shared = {
 		role: hidden ? undefined : ("img" as const),
@@ -87,7 +70,7 @@ export function AppIllustration({
 					flexShrink: 0,
 				}}
 			>
-				{glyph}
+				<Icon name={entry.icon} size={glyphPx} aria-hidden />
 			</span>
 		)
 	}
@@ -103,7 +86,7 @@ export function AppIllustration({
 				width: px,
 				height: px,
 				maxWidth: "100%",
-				padding: Math.round(px * 0.18),
+				padding,
 				borderRadius: "var(--radius-card)",
 				background: "var(--color-paper)",
 				border: "1px solid var(--border-soft)",
@@ -111,7 +94,7 @@ export function AppIllustration({
 				flexShrink: 0,
 			}}
 		>
-			{glyph}
+			<Icon name={entry.icon} size={glyphPx} aria-hidden />
 		</span>
 	)
 }

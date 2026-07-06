@@ -74,7 +74,7 @@ function purchaseLabel(type: string): string {
   }
 }
 
-/** Registry icon for a purchase type (Streamline keys only). */
+/** Registry icon for a purchase type (registry keys only). */
 function purchaseIcon(type: string): IconKey {
   switch (type) {
     case "announcement":

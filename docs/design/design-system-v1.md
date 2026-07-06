@@ -30,7 +30,14 @@ Rules: uppercase only on labels + badges (Inter, +0.06em tracking); titles + met
 | Button | 15 | 1.0 | Inter | 600 |
 | Label / Badge | 12 | 1.0 | Inter | 600 (uppercase, +0.06em) |
 
-## Color (locked)
+## Color (superseded by V2 — see note)
+
+> **⚠️ Value tables below are V1-era and SUPERSEDED.** The founder locked the
+> V2 "Adventure Paper & Sky" palette on 2026-06-10 — the live, canonical
+> values are [`apps/web/styles/tokens.css`](../../apps/web/styles/tokens.css)
+> (e.g. paper is now `#F6F1E7`, sky action `#2F667A`, gold `#D8A84E`). The
+> newer lock wins. The tables are kept for historical context only — never
+> copy hex from here into code; reference semantic tokens.
 
 Always pair accents with **icon + text** (never color-only). All fg/bg pairs target WCAG AA; verify at implementation.
 

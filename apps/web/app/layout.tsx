@@ -1,11 +1,13 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { Patrick_Hand, Cabin_Sketch, Inter, Fraunces } from "next/font/google";
+import { Patrick_Hand, Cabin_Sketch, Inter } from "next/font/google";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "../styles/tokens.css";
 import "../styles/primitives.css";
 
+// The locked 3-font stack (visual-system.md §2): Patrick Hand display,
+// Inter UI, Cabin Sketch marketing accents. Nothing else ships.
 const patrickHand = Patrick_Hand({
 	weight: "400",
 	subsets: ["latin"],
@@ -24,14 +26,6 @@ const inter = Inter({
 	weight: ["400", "500", "600"],
 	subsets: ["latin"],
 	variable: "--font-inter",
-	display: "swap",
-});
-
-// Fraunces — variable editorial serif. Design System V2 display face (host scope
-// titles/numerals via --font-fraunces); see docs/superpowers/specs/2026-06-21-*.
-const fraunces = Fraunces({
-	subsets: ["latin"],
-	variable: "--font-fraunces",
 	display: "swap",
 });
 import { CookieBanner } from "../components/CookieBanner";
@@ -80,7 +74,7 @@ function AuthBoundary({ children }: { children: ReactNode }) {
 export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
 		<AuthBoundary>
-			<html lang="en" className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable} ${fraunces.variable}`}>
+			<html lang="en" className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable}`}>
 				<body>
 					<SentryUserProvider />
 					<Providers>

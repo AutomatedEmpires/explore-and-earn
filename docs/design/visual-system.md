@@ -8,7 +8,7 @@
 1. **Tokens are law.** No raw hex, raw px type sizes, or ad-hoc radii in feature code. Reference semantic tokens only. (CI raw-hex check is planned.)
 2. **Borders-first, not shadow-first.** Cards and rows = hand-drawn ink border (`--border-ink`) + **no shadow**. Shadows (`--elevation-overlay`, `--elevation-pin`) are reserved for *overlays and map pins only*.
 3. **Frame, not filter, on host photos.** Never mutate a host photo. Frame *around* it (paper mat + ink border). Scrims for legibility use `--gradient-hero-scrim` only.
-4. **One icon system:** Streamline Freehand via `<Icon name="domain.name"/>`. No Lucide / Heroicons / Material / inline SVG in feature code (CI **G30**).
+4. **One icon system:** Phosphor via the `<Icon name="domain.name"/>` registry (swapped from Streamline 2026-07-02 — see [`icon-system.md`](./icon-system.md)). No Lucide / Heroicons / Material / inline SVG in feature code (CI **G30**).
 5. **No color-only meaning.** Status = icon **+** text (+ optional color). The triad and verification follow the same rule.
 
 ---
@@ -86,7 +86,7 @@ Hover/active depth is allowed via the locked `--elevation-hover` lift **on inter
 
 ## 6. Icons & badges
 
-- **Icons:** `<Icon name="domain.name"/>` (Streamline Freehand) only. `category.*` keys mirror the lanes exactly. Sizes from `--icon-sm|md|lg|chip` (16/20/24/40). Consistent stroke, consistent size per layer. **No emoji as structural icons. No icon spam** — an icon earns its place by adding meaning.
+- **Icons:** `<Icon name="domain.name"/>` (Phosphor registry) only. `category.*` keys mirror the lanes exactly. Sizes from `--icon-sm|md|lg|chip` (16/20/24/40). Consistent stroke, consistent size per layer. **No emoji as structural icons. No icon spam** — an icon earns its place by adding meaning.
 - **Badges/chips:** compose `Badge` / `Chip` / category + status primitives. Always **bg+fg pair** from the token set (`--status-*`, `--accent-*-*`, `--benefit-*`). Always **icon + label**. Gold (`--status-boosted`, `--color-gold`) = boosted/premium/pay highlight; reserve it so it stays special.
 - **Triad chips (HOUSING/MEALS/PAY):** first-class, never "Perks." Use `--benefit-housing|meals|pay` pairs. (CI **G22** enforces the Verified-Host badge + "Self-Declared by Host" qualifier.)
 
@@ -132,7 +132,7 @@ The founder's sharpest critique is "reads as a generic admin template." Antidote
 - [ ] One dominant element per module; hierarchy obvious in a 0.5s squint.
 - [ ] All color from tokens; zero raw hex; gradients from the locked set.
 - [ ] Photos framed (not filtered), `next/image`, space reserved.
-- [ ] Streamline icons only; status = icon + text; triad never "Perks."
+- [ ] Phosphor registry icons only; status = icon + text; triad never "Perks."
 - [ ] Collapses cleanly at 380px; all tap targets ≥44px; visible focus; reduced-motion ok.
 - [ ] Empty/loading/error designed, not default.
 - [ ] Could it hang in a Patagonia store? If it only fits a B2B SaaS site, redo it.

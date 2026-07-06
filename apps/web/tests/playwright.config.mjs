@@ -34,10 +34,14 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   webServer: {
-    // Turbopack matches the repo's `dev` script and cuts WSL2 cold-compile time
-    // substantially — the old webpack dev boot was the main startup-timeout
-    // culprit.
-    command: `corepack pnpm exec next dev --turbopack --hostname 127.0.0.1 --port ${PORT}`,
+    // WEBPACK dev on purpose — NOT --turbopack. The webpack dev build aliases
+    // @clerk/nextjs/server to the dev-bench shim (next.config.ts webpack()),
+    // which is what lets the smoke specs traverse seeker/host shells without
+    // real Clerk sessions AND is why requests don't hang here: under
+    // --turbopack the alias can't be expressed, real clerkMiddleware runs,
+    // and its first-request fetch hangs ~30s per request on WSL2 (the
+    // audit's historic "socket hang up" / ECONNRESET failure).
+    command: `corepack pnpm exec next dev --hostname 127.0.0.1 --port ${PORT}`,
     cwd: webRoot,
     reuseExistingServer: Boolean(process.env.PW_REUSE_SERVER),
     // next dev cold-compiles the first request; in WSL2 this can exceed the old

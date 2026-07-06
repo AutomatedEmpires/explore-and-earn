@@ -12,8 +12,8 @@
 :root {
   /* shared a11y focus ring (paper gap + match-ink halo) */
   --ui-focus-ring: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--status-match-fg);
-  /* modal scrim -- derived from --palette-ink (#1A2B3C = rgb(26,43,60)) */
-  --ui-scrim: rgba(26, 43, 60, 0.48);
+  /* modal scrim -- derived from the live ink token (was a stale V1 rgb) */
+  --ui-scrim: color-mix(in srgb, var(--palette-ink) 48%, transparent);
   /* Wire next/font CSS variables into token system so Patrick Hand & Inter
      self-host correctly. The var() fallback keeps tokens resolving even if
      the font variable hasn't been applied yet (e.g. during SSR). */

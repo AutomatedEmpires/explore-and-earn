@@ -39,6 +39,9 @@ const isPublicRoute = createRouteMatcher([
   "/blog/(.*)",
   "/sitemap.xml",
   "/robots.txt",
+  // Advertised AI site guide (linked from robots + docs) — must be readable
+  // by anonymous crawlers/agents, exactly like robots.txt and the sitemap.
+  "/llms.txt",
   // Seeker onboarding is auth-required, but excluded from the post-auth gate so
   // the (seeker) layout's onboarding redirect never loops back on itself.
   "/onboarding",

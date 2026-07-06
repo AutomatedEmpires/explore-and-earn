@@ -35,7 +35,7 @@ function toneAccent(tone: EditorialTone): string {
 	}
 }
 
-/** Per-tone Streamline registry icon (category lanes). */
+/** Per-tone registry icon (category lanes). */
 function toneIcon(tone: EditorialTone): IconKey {
 	switch (tone) {
 		case "farm":

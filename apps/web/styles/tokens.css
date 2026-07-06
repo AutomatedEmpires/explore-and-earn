@@ -68,7 +68,8 @@
   --color-ink:            var(--palette-ink);    /* backward compat alias */
   --color-parchment:      var(--palette-parchment);
   --color-card-warm:      var(--palette-card-warm);
-  --color-gold:           var(--palette-gold);
+  /* (--color-gold is defined once, in the semantic block below, off
+     --palette-amber; --palette-gold remains for star/sparkle marks.) */
   --border-soft:          var(--palette-line);
   --border-ink:           var(--palette-ink-stroke);
   --border-ink-warm:      var(--palette-ink-warm);
@@ -191,7 +192,7 @@
   /* =============================================================== */
 
   /* Header — deep sky */
-  --palette-header:     #2F667A;
+  --palette-header:     var(--palette-sky); /* header IS the sky — one source */
   --palette-header-mid: #3A7287;
 
   /* Sky blue — primary CTA, active links, interactive */
@@ -333,11 +334,9 @@
   --field-disabled-bg:   var(--palette-steel);
 
   /* =============================================================== */
-  /* DEPRECATED — Sprint Zero stub aliases                           */
+  /* DEPRECATED — Sprint Zero stub aliases (migrate on touch,        */
+  /* then delete; unused aliases have already been removed)          */
   /* =============================================================== */
-  --surface-default:  var(--color-surface-raised);
-  --surface-raised:   var(--color-surface);
   --border-default:   var(--border-soft);
   --radius-md:        var(--radius-button);
-  --space-md:         var(--space-16);
 }

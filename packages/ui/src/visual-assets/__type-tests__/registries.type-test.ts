@@ -1,12 +1,15 @@
 /**
- * Compile-time completeness tests for the illustration & element registries.
- * Runs under `tsc --noEmit` (package typecheck + CI), no runtime cost. If a key is
- * added to a union but not its KEYS array (or vice-versa), the build fails here.
+ * Compile-time completeness test for the illustration registry.
+ * Runs under `tsc --noEmit` (package typecheck + CI), no runtime cost. If a
+ * key is added to the union but not the registry (or vice-versa), the build
+ * fails here.
  *
  * Lives under __type-tests__ so the canon-contract guardrail's repo-wide scans skip it.
  */
-import { ILLUSTRATION_KEYS, type IllustrationKey } from "../illustrations"
-import { ELEMENT_KEYS, type ElementKey } from "../elements"
+import {
+	ILLUSTRATION_REGISTRY,
+	type IllustrationKey,
+} from "../illustrations"
 
 type Expect<T extends true> = T
 type Equal<A, B> =
@@ -14,12 +17,7 @@ type Equal<A, B> =
 		? true
 		: false
 
-// Every illustration key appears exactly once in ILLUSTRATION_KEYS — no missing, no extra.
-export type _IllustrationKeysComplete = Expect<
-	Equal<(typeof ILLUSTRATION_KEYS)[number], IllustrationKey>
->
-
-// Every element key appears exactly once in ELEMENT_KEYS.
-export type _ElementKeysComplete = Expect<
-	Equal<(typeof ELEMENT_KEYS)[number], ElementKey>
+// The registry covers every illustration key — no missing, no extra.
+export type _IllustrationRegistryComplete = Expect<
+	Equal<keyof typeof ILLUSTRATION_REGISTRY, IllustrationKey>
 >

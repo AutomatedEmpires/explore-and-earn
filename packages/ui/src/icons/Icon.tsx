@@ -27,8 +27,12 @@ const DEFAULT_ICON_WEIGHT: IconWeight = "regular"
 
 export interface IconProps {
 	name: IconKey
-	/** 16 | 20 | 24 per tokens; chip sizes 36/40 handled by the container. */
-	size?: 16 | 20 | 24
+	/**
+	 * 16 | 20 | 24 per tokens in product UI; chip sizes 36/40 handled by the
+	 * container. Arbitrary sizes are reserved for the AppIllustration plate,
+	 * which renders registry glyphs large as spot art.
+	 */
+	size?: 16 | 20 | 24 | (number & {})
 	/** Override the resolved weight for this one render (e.g. "fill" for active tabs). */
 	weight?: IconWeight
 	"aria-hidden"?: boolean
