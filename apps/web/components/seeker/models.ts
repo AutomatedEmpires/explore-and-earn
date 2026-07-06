@@ -28,6 +28,8 @@ export interface SeekerStatusSummary {
   /** Title of the next confirmed/upcoming role, if any. */
   readonly acceptedUpcoming?: string;
   readonly unreadNotifications: number;
+  /** Pending host invites — awaiting a response, mirrors the /invites page. */
+  readonly invitesCount: number;
 }
 
 export type ApplicationStatus =

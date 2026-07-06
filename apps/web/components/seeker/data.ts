@@ -21,6 +21,7 @@ import {
   getSeekerApplicationIds,
   getSeekerApplications,
   getSeekerApplicationsWithListings,
+  getSeekerInvites,
   getSeekerResume,
   getUnreadNotificationCount,
   rowToDiscoveryFields,
@@ -39,6 +40,7 @@ const EMPTY_SEEKER_STATUS: SeekerStatusSummary = {
   offersCount: 0,
   acceptedUpcoming: undefined,
   unreadNotifications: 0,
+  invitesCount: 0,
 };
 
 export function getSeekerStatusFallback(
@@ -127,7 +129,7 @@ export async function getSeekerStatus(
 		return fallback;
   }
   try {
-    const [profile, savedIds, applications, acceptedWithListings, unread, resume] =
+    const [profile, savedIds, applications, acceptedWithListings, unread, resume, invites] =
       await Promise.all([
         cachedSeekerProfile(token, clerkUserId),
         getSavedListingIds(token, clerkUserId),
@@ -135,6 +137,7 @@ export async function getSeekerStatus(
         getSeekerApplicationsWithListings(token, clerkUserId, ["accepted"]),
         getUnreadNotificationCount(token, clerkUserId),
         getSeekerResume(token, clerkUserId),
+        getSeekerInvites(token, clerkUserId),
       ]);
 
     const seekerName =
@@ -147,6 +150,9 @@ export async function getSeekerStatus(
     const acceptedUpcoming = acceptedWithListings.find(
       (application) => application.listing,
     )?.listing?.title;
+    // Matches the /invites page's own filter — an invite whose listing failed
+    // to resolve (e.g. deleted) isn't shown there, so it shouldn't count here.
+    const invitesCount = invites.filter((entry) => entry.listing).length;
 
     return {
       seekerName,
@@ -156,6 +162,7 @@ export async function getSeekerStatus(
       offersCount,
       acceptedUpcoming,
       unreadNotifications: unread,
+      invitesCount,
     };
   } catch {
 		return fallback;

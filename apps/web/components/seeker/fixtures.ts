@@ -32,6 +32,7 @@ export const SEEKER_STATUS: SeekerStatusSummary = {
   offersCount: 1,
   acceptedUpcoming: "Ski Resort Front Desk",
   unreadNotifications: 4,
+  invitesCount: 2,
 };
 
 export const SAVED_ITEMS: readonly SavedItem[] = [
