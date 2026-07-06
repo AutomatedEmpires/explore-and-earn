@@ -19,7 +19,7 @@
 	left: 0;
 	right: 0;
 	bottom: 0;
-	z-index: 70;
+	z-index: var(--z-dock);
 	width: 100%;
 	background: var(--color-surface);
 	border-top: 1px solid var(--border-ink-warm);

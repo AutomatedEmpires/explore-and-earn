@@ -126,6 +126,16 @@
      reservation and floating bar offsets from this. */
   --size-bottom-nav: 70px;
 
+  /* z-scale — one explicit stacking order for fixed chrome. Ad-hoc z-index
+     ties (dock vs overlay vs lightbox at 70) previously resolved only by DOM
+     order; always take the layer's token instead of inventing a number.
+       content bars < docks < banners < overlays < lightbox            */
+  --z-content-bar: 50;   /* in-page fixed bars (listing apply bar)     */
+  --z-dock:        70;   /* bottom navigation docks (public + role OS) */
+  --z-banner:      80;   /* consent banner, role drawers above docks   */
+  --z-overlay:     100;  /* modal/popup scrims (portal to body)        */
+  --z-lightbox:    300;  /* full-screen media viewers                  */
+
   /* radius */
   --radius-pill:   999px;
   --radius-input:  12px;

@@ -253,7 +253,7 @@
   padding: var(--space-16);
   display: flex;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-content-bar);
 }
 
 /* Gentle nudge shown to seekers whose profile is too thin to compute an honest

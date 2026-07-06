@@ -2225,7 +2225,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   bottom: calc(var(--size-bottom-nav) + var(--space-12) + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
-  z-index: 60;
+  z-index: var(--z-banner);
   display: flex;
   flex-direction: column-reverse;
   align-items: center;
@@ -2364,7 +2364,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   inset: 0;
   /* Above the z-70 mobile dock — at 70 the later-DOM dock painted over the
      open lightbox and stayed clickable on top of it. */
-  z-index: 300;
+  z-index: var(--z-lightbox);
   background: rgba(14, 11, 6, 0.92);
   display: flex;
   align-items: center;

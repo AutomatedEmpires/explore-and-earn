@@ -460,7 +460,7 @@
   .adminos-mnav {
     display: grid;
     position: fixed;
-    z-index: 70;
+    z-index: var(--z-dock);
     left: 0;
     right: 0;
     bottom: 0;
