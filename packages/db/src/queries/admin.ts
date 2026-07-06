@@ -138,27 +138,62 @@ export interface AdminListingRow {
   readonly hostCompanyName: string;
 }
 
+/** A single page of an admin list query, plus enough to render a pager. */
+export interface AdminPage<T> {
+  readonly rows: readonly T[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly total: number;
+  readonly totalPages: number;
+}
+
+/** Default page size for admin list queries — mirrors getRecentApplications' limit. */
+export const ADMIN_PAGE_SIZE = 50;
+
+function toPage<T>(
+  rows: readonly T[],
+  total: number,
+  page: number,
+  pageSize: number,
+): AdminPage<T> {
+  return {
+    rows,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
 /**
- * Every listing across all statuses (draft / under_review / live / paused /
- * closed / archived), newest first, with the owning host's company name.
+ * One page of listings across all statuses (draft / under_review / live /
+ * paused / closed / archived), newest first, with the owning host's company
+ * name. `page` is 1-indexed; out-of-range pages return an empty row set
+ * rather than erroring.
  */
 export async function getAllListingsForModeration(
   serviceRoleToken: string,
-): Promise<AdminListingRow[]> {
+  page = 1,
+  pageSize = ADMIN_PAGE_SIZE,
+): Promise<AdminPage<AdminListingRow>> {
   const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
+  const from = Math.max(0, page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
-  const { data, error } = await db
+  const { data, error, count } = await db
     .from("listings")
     .select(
       "id,title,category,status,published_at,host_profiles!host_profile_id(company_name)",
+      { count: "exact" },
     )
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   if (error) {
     throw new Error(`getAllListingsForModeration: ${error.message}`);
   }
 
-  return (data ?? []).map((raw) => {
+  const rows = (data ?? []).map((raw) => {
     const r = raw as Record<string, unknown>;
     const host = firstOf(r.host_profiles);
     return {
@@ -174,6 +209,8 @@ export async function getAllListingsForModeration(
           : "Unknown host",
     } satisfies AdminListingRow;
   });
+
+  return toPage(rows, count ?? rows.length, page, pageSize);
 }
 
 /** One host row for the verification table. */
@@ -192,44 +229,56 @@ export interface AdminHostRow {
 }
 
 /**
- * Every host_profiles row, newest first, with a per-host listing count. The
- * count is tallied in JS from a single listings scan (the admin set is small
- * enough that one pass beats N per-host count queries).
+ * One page of host_profiles rows, newest first, with a per-host listing
+ * count. The count query is scoped to just this page's host ids (`.in(...)`)
+ * rather than scanning every listing in the marketplace — the old
+ * implementation fetched both tables in full, which stopped scaling as soon
+ * as either table grew past a trivial size. `page` is 1-indexed.
  */
 export async function getAllHostProfiles(
   serviceRoleToken: string,
-): Promise<AdminHostRow[]> {
+  page = 1,
+  pageSize = ADMIN_PAGE_SIZE,
+): Promise<AdminPage<AdminHostRow>> {
   const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
+  const from = Math.max(0, page - 1) * pageSize;
+  const to = from + pageSize - 1;
 
-  const { data: hostRows, error: hostError } = await db
+  const { data: hostRows, error: hostError, count } = await db
     .from("host_profiles")
     .select(
       "id,company_name,clerk_user_id,attestation_status,subscription_tier,flagged_for_review,flagged_reason,flagged_at",
+      { count: "exact" },
     )
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
   if (hostError) {
     throw new Error(`getAllHostProfiles: ${hostError.message}`);
   }
 
-  const { data: listingRows, error: listingError } = await db
-    .from("listings")
-    .select("host_profile_id");
-  if (listingError) {
-    throw new Error(`getAllHostProfiles(listings): ${listingError.message}`);
-  }
+  const hostIds = (hostRows ?? []).map((raw) => String((raw as Record<string, unknown>).id));
 
   const listingCountByHost = new Map<string, number>();
-  for (const raw of listingRows ?? []) {
-    const hostProfileId = String(
-      (raw as Record<string, unknown>).host_profile_id,
-    );
-    listingCountByHost.set(
-      hostProfileId,
-      (listingCountByHost.get(hostProfileId) ?? 0) + 1,
-    );
+  if (hostIds.length > 0) {
+    const { data: listingRows, error: listingError } = await db
+      .from("listings")
+      .select("host_profile_id")
+      .in("host_profile_id", hostIds);
+    if (listingError) {
+      throw new Error(`getAllHostProfiles(listings): ${listingError.message}`);
+    }
+    for (const raw of listingRows ?? []) {
+      const hostProfileId = String(
+        (raw as Record<string, unknown>).host_profile_id,
+      );
+      listingCountByHost.set(
+        hostProfileId,
+        (listingCountByHost.get(hostProfileId) ?? 0) + 1,
+      );
+    }
   }
 
-  return (hostRows ?? []).map((raw) => {
+  const rows = (hostRows ?? []).map((raw) => {
     const r = raw as Record<string, unknown>;
     const id = String(r.id);
     return {
@@ -251,6 +300,8 @@ export async function getAllHostProfiles(
       listingCount: listingCountByHost.get(id) ?? 0,
     } satisfies AdminHostRow;
   });
+
+  return toPage(rows, count ?? rows.length, page, pageSize);
 }
 
 /**
