@@ -16,7 +16,6 @@ import type {
   SeekerStatusSummary,
 } from "./models";
 import {
-  MATCH_SCORE_HIDE_THRESHOLD,
   getSavedListingIds,
   getSeekerApplicationIds,
   getSeekerApplications,
@@ -25,8 +24,10 @@ import {
   getSeekerResume,
   getUnreadNotificationCount,
   rowToDiscoveryFields,
-  scoreListingForSeeker,
+  scoreSeekerListingRow,
+  seekerHasMatchInputs,
 } from "@explore-and-earn/db";
+import { matchBandFor } from "@explore-and-earn/contracts";
 
 import { cachedSeekerProfile, getPublicListingsCached } from "../../lib/serverCache";
 import { computeResumeCompletion } from "./resumeAdapter";
@@ -69,32 +70,6 @@ export function getSeekerStatusFallback(
  * Arrays are returned as fresh copies so callers can never mutate the source.
  */
 
-type BaseSeekerProfile = NonNullable<Awaited<ReturnType<typeof cachedSeekerProfile>>>;
-
-interface MatchProfile {
-  readonly desiredCategories: readonly string[];
-  readonly housingPreference: string | null;
-  readonly mealsPreference: string | null;
-  readonly locationPref: string | null;
-  readonly payExpectationMinCents: number | null;
-}
-
-/**
- * Project the match-relevant fields off the already-loaded seeker profile.
- *
- * These columns all live on {@link SeekerProfileRecord}, which the caller has
- * already fetched — so this is a pure in-memory projection, NOT a second
- * `seeker_profiles` round-trip (it used to be one, redundantly).
- */
-function toMatchProfile(baseProfile: BaseSeekerProfile): MatchProfile {
-  return {
-    desiredCategories: baseProfile.desiredCategories,
-    housingPreference: baseProfile.housingPreference,
-    mealsPreference: baseProfile.mealsPreference,
-    locationPref: baseProfile.locationPref,
-    payExpectationMinCents: baseProfile.payExpectationMinCents,
-  };
-}
 
 /** The seeker's at-a-glance status summary (counts, resume completion, etc.). */
 export async function getSeekerStatus(
@@ -219,35 +194,22 @@ export async function getMatchedListings(
       getSavedListingIds(token, clerkUserId),
     ]);
 
-    if (!baseProfile) {
+    if (!baseProfile || !seekerHasMatchInputs(baseProfile)) {
+      // No honest signal to rank with — an empty rail prompts profile
+      // completion instead of showing scores derived from nothing.
       return [];
     }
 
-    const profile = toMatchProfile(baseProfile);
     const applied = new Set(appliedIds);
     const saved = new Set(savedIds);
 
+    // ADR-040: the SAME engine as the /seek grid, /search, the swipe deck,
+    // and the listing detail — the rail's fit % can never disagree with the
+    // card it opens.
     return listings
       .filter((listing) => !applied.has(listing.id))
       .map((listing) => {
-        const matchScore = scoreListingForSeeker(
-          {
-            category: listing.category,
-            housingIncluded: listing.housing_included,
-            compensationMinCents: listing.compensation_min_cents,
-            locationDisplay: listing.location_display,
-          },
-          {
-            desiredCategories: profile.desiredCategories,
-            housingPreference: profile.housingPreference,
-            locationPref: profile.locationPref,
-            payExpectationMin:
-              profile.payExpectationMinCents != null
-                ? profile.payExpectationMinCents / 100
-                : null,
-          },
-        );
-
+        const matchScore = scoreSeekerListingRow(baseProfile, listing);
         return {
           listing: {
             ...(rowToDiscoveryFields(listing) as DiscoveryListing),
@@ -257,7 +219,7 @@ export async function getMatchedListings(
           saved: saved.has(listing.id),
         };
       })
-      .filter((item) => item.matchScore >= MATCH_SCORE_HIDE_THRESHOLD)
+      .filter((item) => matchBandFor(item.matchScore) !== "needs_attention")
       .sort((a, b) => {
         if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
         return Number(b.saved) - Number(a.saved);

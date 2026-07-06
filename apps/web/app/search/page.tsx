@@ -234,6 +234,13 @@ export default async function SearchPage({
 					? listing
 					: { ...listing, matchScore: score };
 			});
+			// Browsing (no text query): lead with the best fits — same rule as
+			// /seek, so the two discovery doors rank identically.
+			if (!query) {
+				listings = [...listings].sort(
+					(a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1),
+				);
+			}
 		}
 	}
 

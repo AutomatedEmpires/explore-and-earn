@@ -10,6 +10,7 @@ import {
 
 import { isCurrentUserAdmin } from "../../lib/admin";
 import { reportError } from "../../lib/sentry";
+import { computeAndStoreMatchesForListing } from "../../services/matching";
 
 interface ActionResult {
   ok: boolean;
@@ -40,6 +41,16 @@ async function approveListingActionImpl(
 
   const result = await adminApproveListing(SERVICE_ROLE_KEY, listingId);
   if (!result.ok) return result;
+
+  // The listing just went LIVE — compute its match scores now so host
+  // applicant intelligence and strong-match alerts don't wait for the next
+  // cron cycle. Best-effort: approval never fails on scoring (the daily
+  // new-match cron dedupes anything already scored here).
+  try {
+    await computeAndStoreMatchesForListing(listingId);
+  } catch (error) {
+    reportError(error, { action: "approveListingAction:computeMatches" });
+  }
 
   revalidatePath("/listings");
   revalidatePath(`/listings/${listingId}`);

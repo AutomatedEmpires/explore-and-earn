@@ -323,6 +323,14 @@ export default async function SeekPage({
 					? listing
 					: { ...listing, matchScore: score };
 			});
+			// Browsing (no text query): lead with the best fits. In-page re-rank
+			// only — published_at pagination is unchanged underneath. A typed
+			// query keeps search relevance order.
+			if (!query) {
+				listings = [...listings].sort(
+					(a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1),
+				);
+			}
 		}
 	}
 
