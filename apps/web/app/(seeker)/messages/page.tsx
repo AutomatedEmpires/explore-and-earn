@@ -74,6 +74,8 @@ export default async function MessagesPage() {
 				<EmptyState
 					title="No messages yet"
 					message="Conversations with hosts appear here once you apply, get invited, or receive an offer."
+					actionLabel="Browse opportunities"
+					actionHref="/seek"
 				/>
 			</BucketPage>
 		);
