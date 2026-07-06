@@ -17,11 +17,12 @@ import { authedClient } from "../client";
  * NEVER decoded from the Clerk JWT client-side.
  */
 
-/** Allowed report reason values, mirroring the CHECK constraint in 027_reports.sql. */
+/** Allowed report reason values, mirroring the CHECK constraint in 054_host_spam_report_flagging.sql. */
 export type ReportReason =
   | "unsafe"
   | "inaccurate"
   | "scam"
+  | "spam"
   | "inappropriate"
   | "housing_pay"
   | "other";
@@ -60,6 +61,7 @@ const ALLOWED_REASONS = new Set<string>([
   "unsafe",
   "inaccurate",
   "scam",
+  "spam",
   "inappropriate",
   "housing_pay",
   "other",

@@ -31,11 +31,12 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-/** Report reason vocabulary (mirrors the CHECK in 028_reports.sql). */
+/** Report reason vocabulary (mirrors the CHECK in 054_host_spam_report_flagging.sql). */
 export type ModerationReportReason =
   | "unsafe"
   | "inaccurate"
   | "scam"
+  | "spam"
   | "inappropriate"
   | "housing_pay"
   | "other";
@@ -144,6 +145,8 @@ function reasonWeight(reason: string): number {
       return 50;
     case "scam":
       return 40;
+    case "spam":
+      return 35;
     case "housing_pay":
       return 30;
     case "inappropriate":

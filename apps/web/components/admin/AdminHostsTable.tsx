@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 import { Badge, Button, Icon, MetricCard, MetricGrid, VerifiedHostBadge } from "@explore-and-earn/ui";
 
-import { unverifyHostAction, verifyHostAction } from "../../app/actions/admin";
+import { clearHostFlagAction, unverifyHostAction, verifyHostAction } from "../../app/actions/admin";
 import styles from "./AdminHostsTable.module.css";
 
 export interface AdminHostRowView {
@@ -15,6 +15,9 @@ export interface AdminHostRowView {
   /** Internal moderator trust flag — independent of the paid-subscription Verified Host badge. */
   readonly attestationStatus: string;
   readonly subscriptionTier: string | null;
+  /** Set automatically after >3 non-dismissed spam reports in a rolling 30 days. */
+  readonly flaggedForReview: boolean;
+  readonly flaggedReason: string | null;
   readonly listingCount: number;
 }
 
@@ -334,6 +337,17 @@ export function AdminHostsTable({
                       {risk.label}
                     </span>
                   ) : null}
+                  {host.flaggedForReview ? (
+                    <span className={styles.riskFlag}>
+                      <Icon
+                        aria-hidden
+                        name="system.warning"
+                        size={16}
+                        className={styles.riskFlagIcon}
+                      />
+                      Spam reports · flagged
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className={styles.tags}>
@@ -380,6 +394,19 @@ export function AdminHostsTable({
                   >
                     Un-attest
                   </Button>
+                  {host.flaggedForReview ? (
+                    <Button
+                      variant="ghost"
+                      icon="action.close"
+                      disabled={busy}
+                      aria-label={`Clear the spam-report flag on ${company}`}
+                      onClick={() =>
+                        runAction(host.id, () => clearHostFlagAction(host.id))
+                      }
+                    >
+                      Clear flag
+                    </Button>
+                  ) : null}
                 </div>
               </article>
             );

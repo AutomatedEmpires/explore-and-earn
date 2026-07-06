@@ -70,7 +70,7 @@ type Severity = "critical" | "elevated" | "routine";
 
 function severityOf(reason: string): Severity {
   if (reason === "unsafe" || reason === "scam") return "critical";
-  if (reason === "housing_pay" || reason === "inappropriate") return "elevated";
+  if (reason === "housing_pay" || reason === "inappropriate" || reason === "spam") return "elevated";
   return "routine";
 }
 
@@ -83,6 +83,8 @@ function reasonLabel(reason: string): string {
       return "Unsafe";
     case "scam":
       return "Scam / fraud";
+    case "spam":
+      return "Spam";
     case "inaccurate":
       return "Inaccurate";
     case "inappropriate":

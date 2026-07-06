@@ -184,6 +184,10 @@ export interface AdminHostRow {
   /** Internal moderator trust flag — independent of the paid-subscription Verified Host badge. */
   readonly attestationStatus: string;
   readonly subscriptionTier: string | null;
+  /** Set automatically after >3 non-dismissed spam reports in a rolling 30 days. */
+  readonly flaggedForReview: boolean;
+  readonly flaggedReason: string | null;
+  readonly flaggedAt: string | null;
   readonly listingCount: number;
 }
 
@@ -199,7 +203,9 @@ export async function getAllHostProfiles(
 
   const { data: hostRows, error: hostError } = await db
     .from("host_profiles")
-    .select("id,company_name,clerk_user_id,attestation_status,subscription_tier")
+    .select(
+      "id,company_name,clerk_user_id,attestation_status,subscription_tier,flagged_for_review,flagged_reason,flagged_at",
+    )
     .order("created_at", { ascending: false });
   if (hostError) {
     throw new Error(`getAllHostProfiles: ${hostError.message}`);
@@ -238,9 +244,36 @@ export async function getAllHostProfiles(
           : "",
       subscriptionTier:
         typeof r.subscription_tier === "string" ? r.subscription_tier : null,
+      flaggedForReview: r.flagged_for_review === true,
+      flaggedReason:
+        typeof r.flagged_reason === "string" ? r.flagged_reason : null,
+      flaggedAt: typeof r.flagged_at === "string" ? r.flagged_at : null,
       listingCount: listingCountByHost.get(id) ?? 0,
     } satisfies AdminHostRow;
   });
+}
+
+/**
+ * Clear a host's spam-report flag (admin-only, service-role write). The flag
+ * itself is set only by the trg_flag_host_on_spam_reports DB trigger (054);
+ * this is the sole app-layer path that clears it, mirroring
+ * adminSetHostAttestationStatus below.
+ */
+export async function clearHostFlag(
+  serviceRoleToken: string,
+  hostProfileId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
+
+  const { error } = await db
+    .from("host_profiles")
+    .update({ flagged_for_review: false, flagged_reason: null, flagged_at: null })
+    .eq("id", hostProfileId);
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true };
 }
 
 /** One application row for the read-only pipeline table. */
