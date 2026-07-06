@@ -93,6 +93,7 @@ export async function POST(req: Request): Promise<Response> {
         messages: await convertToModelMessages(messages),
         tools: token ? buildHostTools({ token, userId }) : {},
         stopWhen: stepCountIs(5),
+        maxOutputTokens: 1500,
         onFinish: async ({ text }) => {
           await logHostAssistantTurn({
             hostProfileId: hostProfile.id,
@@ -124,6 +125,7 @@ export async function POST(req: Request): Promise<Response> {
     tools: token ? buildSeekerTools({ token, userId }) : {},
     // Bound tool-loop for cost + runaway control.
     stopWhen: stepCountIs(5),
+    maxOutputTokens: 1500,
     onFinish: async ({ text }) => {
       if (!profile) return;
       await logAssistantTurn({
