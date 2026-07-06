@@ -9,7 +9,11 @@ import {
 } from "@explore-and-earn/db";
 
 import { cachedSeekerProfile, getSupabaseToken } from "../../lib/serverCache";
-import { SeekerShell } from "../../components/seeker";
+// Deep import on purpose: the components/seeker barrel re-exports 30+
+// "use client" surfaces (SwipeDeck, CommunityDashboard, ResumeBuilder, …) and
+// importing the shell through it welds ALL of them into the shared client
+// chunk of every seeker route.
+import { SeekerShell } from "../../components/seeker/SeekerShell";
 import { DEV_USER_ID, devSeekerName, isDevBenchEnabled } from "../../lib/devBench";
 import { readDevRole } from "../../lib/devBench/server";
 import "../../styles/seeker-os.css";
