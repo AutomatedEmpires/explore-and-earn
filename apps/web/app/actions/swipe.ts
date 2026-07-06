@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 
-import { saveListingWithStatus } from "@explore-and-earn/db";
+import { passListing, saveListingWithStatus, unpassListing } from "@explore-and-earn/db";
 
 import { getSwipeListings, type SwipeBatch } from "../../components/discovery/data";
 import { checkRateLimit } from "../../lib/rateLimit";
@@ -82,6 +82,51 @@ export async function saveListingAction(
 			action: "saveListingAction",
 			userId: await currentUserId(),
 		});
+		throw error;
+	}
+}
+
+/**
+ * Persist a swipe-left / pass (migration 057). Best-effort like Save: never
+ * blocks the gesture. Passed listings stop resurfacing in future decks and
+ * become the demotion signal for future ranking work. Swiping is rapid-fire,
+ * so the budget is generous.
+ */
+async function passListingActionImpl(listingId: string): Promise<{ ok: boolean }> {
+	if (typeof listingId !== "string" || !UUID_RE.test(listingId)) {
+		return { ok: false };
+	}
+	const { userId, getToken } = await auth();
+	if (!userId) return { ok: false };
+	const { allowed } = checkRateLimit(`pass:${userId}`, 200, 5 * 60 * 1000);
+	if (!allowed) return { ok: false };
+	const token = await getToken({ template: "supabase" });
+	if (!token) return { ok: false };
+	return passListing(token, userId, listingId);
+}
+
+export async function passListingAction(listingId: string): Promise<{ ok: boolean }> {
+	try {
+		return await passListingActionImpl(listingId);
+	} catch (error) {
+		reportError(error, { action: "passListingAction", userId: await currentUserId() });
+		throw error;
+	}
+}
+
+/** Remove a persisted pass — the deck's Undo. */
+export async function unpassListingAction(listingId: string): Promise<{ ok: boolean }> {
+	try {
+		if (typeof listingId !== "string" || !UUID_RE.test(listingId)) {
+			return { ok: false };
+		}
+		const { userId, getToken } = await auth();
+		if (!userId) return { ok: false };
+		const token = await getToken({ template: "supabase" });
+		if (!token) return { ok: false };
+		return unpassListing(token, userId, listingId);
+	} catch (error) {
+		reportError(error, { action: "unpassListingAction", userId: await currentUserId() });
 		throw error;
 	}
 }

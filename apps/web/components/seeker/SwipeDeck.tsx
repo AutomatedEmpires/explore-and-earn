@@ -21,7 +21,12 @@ import {
 	toDiscoveryCardData,
 	type DiscoveryListing,
 } from "../discovery";
-import { getSwipeBatchAction, saveListingAction } from "../../app/actions/swipe";
+import {
+	getSwipeBatchAction,
+	passListingAction,
+	saveListingAction,
+	unpassListingAction,
+} from "../../app/actions/swipe";
 import styles from "./SwipeDeck.module.css";
 
 type SwipeAction = "pass" | "save" | "apply";
@@ -191,6 +196,16 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 					});
 				});
 			}
+			if (action === "pass") {
+				// Persist the pass (057) so this card never resurfaces in a later
+				// session — a pass is a real preference signal. Same best-effort
+				// contract as Save.
+				startTransition(() => {
+					void passListingAction(card.id).catch(() => {
+						/* best-effort; passing must never block the swipe UX */
+					});
+				});
+			}
 			setDecisions((prev) => [...prev, { id: card.id, action }]);
 			setDragging(false);
 			setLeaving(action);
@@ -228,10 +243,20 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		if (!isAuthenticated || leaving) {
 			return;
 		}
-		setDecisions((prev) => (prev.length === 0 ? prev : prev.slice(0, -1)));
+		setDecisions((prev) => {
+			const last = prev[prev.length - 1];
+			// Undoing a pass removes the persisted pass so the card can
+			// resurface in future decks (best-effort, mirrors the write).
+			if (last?.action === "pass") {
+				void unpassListingAction(last.id).catch(() => {
+					/* best-effort */
+				});
+			}
+			return prev.length === 0 ? prev : prev.slice(0, -1);
+		});
 		setIndex((value) => Math.max(0, value - 1));
 		setOffset({ x: 0, y: 0 });
-	}, [leaving]);
+	}, [isAuthenticated, leaving]);
 
 	const restart = useCallback(() => {
 		setIndex(0);

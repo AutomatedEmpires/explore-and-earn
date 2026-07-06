@@ -12,6 +12,7 @@ import type {
 import { MARKETPLACE_CATEGORIES, hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 import { getSeekerApplicationIds } from "./applications";
+import { getPassedListingIds } from "./passedListings";
 
 export interface ListingRow {
   id: string;
@@ -259,8 +260,14 @@ export async function getSwipeBatch(
   excludeIds: string[],
   cursor?: string,
 ): Promise<ListingRow[]> {
-  const appliedIds = await getSeekerApplicationIds(clerkToken, clerkUserId);
-  const exclude = Array.from(new Set([...excludeIds, ...appliedIds]));
+  // Server-resolved exclusions: applications AND persisted passes (057) —
+  // a passed card never resurfaces in a later session. Best-effort on the
+  // pass read so a transient failure degrades to a fuller deck, not a crash.
+  const [appliedIds, passedIds] = await Promise.all([
+    getSeekerApplicationIds(clerkToken, clerkUserId),
+    getPassedListingIds(clerkToken, clerkUserId).catch(() => [] as string[]),
+  ]);
+  const exclude = Array.from(new Set([...excludeIds, ...appliedIds, ...passedIds]));
 
   let builder = authedClient(clerkToken)
     .from("listings")
