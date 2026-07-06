@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -25,6 +24,7 @@ import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../lib/seo";
 import { isUuid } from "../../../lib/ids";
+import { optionalAuth } from "../../../lib/optionalAuth";
 import { getFixtureListingDetail } from "../../../components/discovery/fixtureDetail";
 import styles from "./page.module.css";
 
@@ -100,7 +100,7 @@ export default async function ListingDetailPage({ params }: Props) {
   // never reach the uuid-typed seeker-state queries below.
   const isFixtureListing = !isUuid(listing.id);
 
-  const { userId } = await auth();
+  const { userId } = await optionalAuth();
   const token = userId ? await getSupabaseToken() : null;
 
   // Determine viewer role and ownership

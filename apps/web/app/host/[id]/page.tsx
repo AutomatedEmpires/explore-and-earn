@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
+import { optionalAuth } from "../../../lib/optionalAuth";
 import {
   getPublicListingsByHost,
   getHostRatingSummary,
@@ -379,9 +379,9 @@ export default async function PublicHostProfilePage({ params }: Props) {
   // Eligibility for the write flow: a logged-in seeker with a completed/active
   // engagement here who hasn't reviewed yet. Resolved server-side; null for
   // guests, non-seekers, and the ineligible — so the public page stays public.
-  const { userId, getToken } = await auth();
+  const { userId, getToken } = await optionalAuth();
   let reviewable: Awaited<ReturnType<typeof getReviewableEngagementForHost>> = null;
-  if (userId) {
+  if (userId && getToken) {
     const seekerToken = await getToken({ template: "supabase" });
     if (seekerToken) {
       reviewable = await getReviewableEngagementForHost(seekerToken, userId, id);

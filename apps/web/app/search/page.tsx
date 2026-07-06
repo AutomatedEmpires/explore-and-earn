@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { auth } from "@clerk/nextjs/server";
+import { optionalAuth } from "../../lib/optionalAuth";
 
 import type { ListingRow, SearchFilters } from "@explore-and-earn/db";
 import {
@@ -223,7 +223,7 @@ export default async function SearchPage({
 	// Stamp each result with the signed-in seeker's ADR-040 fit — the SAME score
 	// the listing detail shows. Only developing+ bands are surfaced. Anonymous
 	// visitors (and thin profiles) see the plain results, unchanged.
-	const { userId } = await auth();
+	const { userId } = await optionalAuth();
 	if (userId && scorableRows.length === listings.length) {
 		const token = await getSupabaseToken();
 		const profile = token ? await cachedSeekerProfile(token, userId) : null;
