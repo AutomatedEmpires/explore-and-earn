@@ -451,24 +451,26 @@
 @media (max-width: 1023px) {
   .adminos-shell { grid-template-columns: 1fr; }
   .adminos-side { display: none; }
-  .adminos-contentwrap { padding: 16px 14px 96px; }
+  .adminos-contentwrap { padding: 16px 14px calc(var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom, 0px)); }
   .adminos-top { padding: 12px 14px; }
   .adminos-tlabel { display: none; }
 
+  /* Pinned full-bleed dock — same structural pattern as the seeker/host/public
+     docks (founder rule: never a detached floating pill). */
   .adminos-mnav {
     display: grid;
     position: fixed;
     z-index: 70;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
     grid-template-columns: repeat(4, 1fr);
     gap: 4px;
-    padding: 8px;
-    border-radius: 24px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
     background: var(--color-surface);
-    border: 1px solid var(--adminos-line);
-    box-shadow: var(--elevation-overlay);
+    border-top: 1px solid var(--adminos-line);
+    box-shadow: 0 -2px 12px color-mix(in srgb, var(--palette-ink) 7%, transparent);
   }
 
   .adminos-mtab {

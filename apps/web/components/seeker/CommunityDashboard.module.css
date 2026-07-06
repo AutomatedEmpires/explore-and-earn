@@ -2222,7 +2222,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 
 .toastStack {
   position: fixed;
-  bottom: calc(64px + var(--space-12));
+  bottom: calc(var(--size-bottom-nav) + var(--space-12) + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 60;
@@ -2362,7 +2362,9 @@ a.widgetFooter:hover { color: var(--text-primary); }
 .lightbox {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  /* Above the z-70 mobile dock — at 70 the later-DOM dock painted over the
+     open lightbox and stayed clickable on top of it. */
+  z-index: 300;
   background: rgba(14, 11, 6, 0.92);
   display: flex;
   align-items: center;

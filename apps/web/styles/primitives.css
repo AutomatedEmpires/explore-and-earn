@@ -22,6 +22,14 @@
   --font-accent: var(--font-cabin-sketch, "Cabin Sketch", "Patrick Hand", cursive);
 }
 
+/* Belt-and-braces horizontal overflow guard: full-bleed breakouts that use
+   100vw math (e.g. MapView) can overflow by the classic-scrollbar width on
+   desktop. `clip` (not `hidden`) so no new scroll container is created and
+   position: sticky descendants keep working. */
+body {
+  overflow-x: clip;
+}
+
 .ui-button:focus-visible,
 .ui-chip:focus-visible {
   outline: none;

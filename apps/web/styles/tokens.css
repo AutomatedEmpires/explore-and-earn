@@ -120,7 +120,10 @@
   --space-row-gap:  12px;
   --space-section:  24px;
   --space-gutter:   16px;
-  --size-bottom-nav: 64px;
+  /* True dock height: 8px list padding ×2 + ~52px tab + 1px border. Keep in
+     sync with BottomNav.module.css and the OS mnav rules — every content
+     reservation and floating bar offsets from this. */
+  --size-bottom-nav: 70px;
 
   /* radius */
   --radius-pill:   999px;

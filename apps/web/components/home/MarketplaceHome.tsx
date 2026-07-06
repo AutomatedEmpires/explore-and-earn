@@ -456,11 +456,12 @@ function MapDiscovery({ listings }: { listings: readonly DiscoveryListing[] }) {
 
 // ─── Product previews (seeker dashboard + community) ───────────────────────
 
+// Capability statements, not fabricated live numbers (no-mock-data rule).
 const SEEKER_MODULES: ReadonlyArray<{ label: string; value: string; icon: IconKey }> = [
-  { label: "Saved places", value: "12 watched roles", icon: "nav.saved" },
-  { label: "Applications", value: "3 in motion", icon: "status.applied" },
-  { label: "Recommended", value: "Matched to your skills", icon: "status.match" },
-  { label: "Profile readiness", value: "Available Aug–Oct", icon: "system.success" },
+  { label: "Saved places", value: "Watch roles across seasons", icon: "nav.saved" },
+  { label: "Applications", value: "Track every application, end to end", icon: "status.applied" },
+  { label: "Recommended", value: "Matched to your skills & timing", icon: "status.match" },
+  { label: "Profile readiness", value: "Tell hosts exactly when you're free", icon: "system.success" },
 ];
 
 const COMMUNITY_TOPICS: ReadonlyArray<{ label: string; icon: IconKey }> = [
