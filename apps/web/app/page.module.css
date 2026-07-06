@@ -9,13 +9,11 @@
  */
 .page {
 	position: relative;
-	min-height: 100vh;
-	background: var(--color-paper);
 	color: var(--text-primary);
 	padding-top: var(--space-16);
-	/* The floating dock capsule sits over content at every width, so reserve
-	   its clearance on all breakpoints. */
-	padding-bottom: calc(var(--size-bottom-nav) + var(--space-40) + env(safe-area-inset-bottom, 0px));
+	/* PublicShell owns the paper ground + the bottom-nav clearance; this only
+	   adds breathing room beneath the final CTA. */
+	padding-bottom: var(--space-24);
 }
 
 @media (min-width: 1024px) {

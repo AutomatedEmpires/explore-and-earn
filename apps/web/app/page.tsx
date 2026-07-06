@@ -16,8 +16,7 @@ import {
 	canUseDiscoveryFixtureFallback,
 	hasDiscoveryPublicDataConfig,
 } from "../components/discovery/data";
-import { GlobalHeader } from "../components/global";
-import { PublicBottomNav } from "../components/public/PublicBottomNav";
+import { PublicShell } from "../components/public/PublicShell";
 import type { FeaturedEmployer } from "../components/public/FeaturedEmployersRail";
 import { buildFeaturedEmployers } from "../lib/employer-utils";
 import { generateOrganizationJsonLd, generateWebSiteJsonLd } from "../lib/seo";
@@ -112,16 +111,16 @@ export default async function HomePage() {
 				type="application/ld+json"
 				dangerouslySetInnerHTML={{ __html: generateWebSiteJsonLd(SITE_URL) }}
 			/>
-			<GlobalHeader scope="guest" isAuthenticated={false} />
-			<main className={styles.page}>
-				<MarketplaceHome
-					listings={landingListings}
-					employers={landingEmployers}
-					destinations={destinations}
-					announcements={announcements}
-				/>
-			</main>
-			<PublicBottomNav />
+			<PublicShell>
+				<div className={styles.page}>
+					<MarketplaceHome
+						listings={landingListings}
+						employers={landingEmployers}
+						destinations={destinations}
+						announcements={announcements}
+					/>
+				</div>
+			</PublicShell>
 		</>
 	);
 }
