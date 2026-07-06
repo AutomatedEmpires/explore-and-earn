@@ -206,17 +206,18 @@ const BENEFIT_CELL: CSSProperties = {
 	background: PAPER, borderRadius: "10px", textAlign: "center",
 }
 
+/* Hierarchy: the ROLE is the card's primary object; the host is trust
+   context. Title outranks host name (it was inverted before). */
 const hostNameText: CSSProperties = {
-	fontFamily: DISPLAY_FONT, fontSize: "clamp(15px, 4.0vw, 18px)",
-	fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
-	lineHeight: 1.15, color: INK, textAlign: "center",
-	textShadow: "0 1px 0 rgba(255,255,255,0.65)",
+	fontFamily: UI_FONT, fontSize: "clamp(11px, 2.9vw, 13px)",
+	fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em",
+	lineHeight: 1.2, color: INK_SOFT, textAlign: "center",
 }
 
 const jobTitleText: CSSProperties = {
-	fontFamily: DISPLAY_FONT, fontSize: "clamp(13px, 3.4vw, 16px)",
-	fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em",
-	lineHeight: 1.2, color: INK, textAlign: "center",
+	fontFamily: DISPLAY_FONT, fontSize: "clamp(16px, 4.4vw, 19px)",
+	fontWeight: 700, letterSpacing: "0.02em",
+	lineHeight: 1.15, color: INK, textAlign: "center",
 }
 
 const locationText: CSSProperties = {
