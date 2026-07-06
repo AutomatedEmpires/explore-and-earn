@@ -4,6 +4,14 @@
     {
       "path": "/api/cron/expire-listings",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/new-match-alerts",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/saved-search-alerts",
+      "schedule": "30 8 * * *"
     }
   ]
 }

@@ -39,7 +39,9 @@ try {
 
   async function shoot(label, width, height) {
     await page.setViewportSize({ width, height });
-    await page.goto(base + path, { waitUntil: "load", timeout: 90000 });
+    // Dev cold-route compiles on this box run 60-300s — pre-warm routes with
+    // curl before shooting, and keep this budget generous regardless.
+    await page.goto(base + path, { waitUntil: "load", timeout: 300000 });
     await tokensReady().catch(async () => {
       await page.reload({ waitUntil: "load" }); // dev chunk may have lagged; retry once
       await tokensReady().catch(() => {});
