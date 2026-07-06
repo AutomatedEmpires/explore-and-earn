@@ -12,7 +12,10 @@ const webRoot = fileURLToPath(new URL("..", import.meta.url));
 // reuseExistingServer stays false so a stale server (old code) can never
 // masquerade as the app under test; opt back in with PW_REUSE_SERVER=1.
 const PORT = 3100;
-if (!process.env.PW_REUSE_SERVER) {
+// TEST_WORKER_INDEX guard: workers re-import this config AFTER the webServer
+// is up — an unguarded kill here would shoot down the very server the main
+// process just started (every test then fails ERR_CONNECTION_REFUSED).
+if (!process.env.PW_REUSE_SERVER && !process.env.TEST_WORKER_INDEX) {
   try {
     execFileSync("fuser", ["-k", `${PORT}/tcp`], { stdio: "ignore" });
   } catch {
@@ -34,21 +37,31 @@ export default defineConfig({
     trace: "on-first-retry"
   },
   webServer: {
-    // WEBPACK dev on purpose — NOT --turbopack. The webpack dev build aliases
+    // WEBPACK dev on purpose — NOT --turbopack: the webpack build aliases
     // @clerk/nextjs/server to the dev-bench shim (next.config.ts webpack()),
-    // which is what lets the smoke specs traverse seeker/host shells without
-    // real Clerk sessions AND is why requests don't hang here: under
-    // --turbopack the alias can't be expressed, real clerkMiddleware runs,
-    // and its first-request fetch hangs ~30s per request on WSL2 (the
-    // audit's historic "socket hang up" / ECONNRESET failure).
+    // which the impersonated smoke specs need for synthetic auth() sessions.
+    //
+    // KEYLESS on purpose: with real Clerk keys, clerkMiddleware's
+    // first-request fetch hangs ~30s per request on this WSL2 box under BOTH
+    // bundlers (the audit's historic "socket hang up" / ECONNRESET). Keyless,
+    // the middleware uses its fail-closed fallback — public routes pass,
+    // protected routes 401 (asserted as a security property in smoke.spec) —
+    // and authed shells are traversed via the dev-bench ee_dev_role cookie,
+    // exactly like local QA.
     command: `corepack pnpm exec next dev --hostname 127.0.0.1 --port ${PORT}`,
     cwd: webRoot,
     reuseExistingServer: Boolean(process.env.PW_REUSE_SERVER),
-    // next dev cold-compiles the first request; in WSL2 this can exceed the old
-    // 120s default and time out the whole run before any test executes.
-    timeout: 240000,
+    // next dev cold-compiles the first request; on this WSL2 box a COLD
+    // webpack compile of the homepage tree alone measured 205s, so the budget
+    // must comfortably exceed it (warm .next cache runs are far faster).
+    timeout: 480000,
     url: `http://127.0.0.1:${PORT}`,
     stdout: "pipe",
-    stderr: "pipe"
+    stderr: "pipe",
+    env: {
+      ...process.env,
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
+      CLERK_SECRET_KEY: ""
+    }
   }
 });

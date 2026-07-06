@@ -69,7 +69,9 @@ test.describe("public SEO + LLM surfaces", () => {
 	});
 
 	test("listing detail emits JobPosting + BreadcrumbList JSON-LD", async ({ page }) => {
-		const response = await page.goto("/listing/sunrise-orchard");
+		// A real DISCOVERY_FIXTURES id — resolved through the dev/preview
+		// fixture-detail seam (production 404s non-UUID ids honestly).
+		const response = await page.goto("/listing/lst_orchard_wenatchee");
 		expect(response?.ok()).toBeTruthy();
 		const blocks = (await ldJsonText(page)).join("\n");
 		expect(blocks).toContain("JobPosting");

@@ -76,6 +76,19 @@ export default hasClerkMiddlewareConfig
       }
     })
   : function authFallbackMiddleware(request: Request) {
+      // DEV MOCK BENCH: same impersonation bypass the Clerk branch has, so
+      // keyless local QA (and the keyless Playwright harness) can traverse
+      // role shells with the ee_dev_role cookie. isDevBenchEnabled() is
+      // compile-time false in production builds — this can never open a
+      // deployed environment.
+      if (
+        isDevBenchEnabled() &&
+        (request as { cookies?: { get(name: string): unknown } }).cookies?.get(
+          DEV_ROLE_COOKIE,
+        )
+      ) {
+        return NextResponse.next();
+      }
       // Fail closed: when Clerk is not configured (local/dev only, since
       // production and preview throw above), protected routes are denied
       // rather than silently opened.
