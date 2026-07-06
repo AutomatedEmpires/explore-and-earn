@@ -50,7 +50,7 @@ export default async function SwipePage() {
 	return (
 		<BucketPage
 			title="Swipe"
-			description="Drag through opportunities \u2014 pass, save, or apply. Use the buttons or arrow keys."
+			description="Drag through opportunities — pass, save, or apply. Use the buttons or arrow keys."
 		>
 			<SwipeDeck listings={listings} initialCursor={initialCursor} isAuthenticated={!!userId} />
 		</BucketPage>

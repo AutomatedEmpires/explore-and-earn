@@ -46,6 +46,23 @@ try {
       await page.reload({ waitUntil: "load" }); // dev chunk may have lagged; retry once
       await tokensReady().catch(() => {});
     });
+    // Full-page shots don't fire IntersectionObserver, so lazy covers render
+    // as blank frames unless we scroll them into load first — then wait for
+    // every image to decode (first-hit Cloudinary transforms can take ~2s).
+    await page.evaluate(async () => {
+      const step = window.innerHeight;
+      for (let y = 0; y <= document.body.scrollHeight; y += step) {
+        window.scrollTo(0, y);
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      window.scrollTo(0, 0);
+    });
+    await page
+      .waitForFunction(
+        () => Array.from(document.images).every((i) => i.complete),
+        { timeout: 30000 },
+      )
+      .catch(() => {});
     await page.waitForTimeout(700); // reveal/animation settle
     const file = `${outDir}/${slug}_${label}.png`;
     await page.screenshot({ path: file, fullPage: true });

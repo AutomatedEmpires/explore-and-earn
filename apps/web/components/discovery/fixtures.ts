@@ -41,7 +41,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
         alt: "Sunlit apple orchard rows at harvest time",
       },
     },
-    coverImageUrl: cloudinaryPhoto("farm", "annie-spratt-jmjnnq2xfoy", "hero"),
+    coverImageUrl: cloudinaryPhoto("farm", "sokmean-nou-mjeqdrpwefc", "hero"),
     matchScore: 88,
     founding: true,
     payInsight: {
@@ -82,7 +82,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     conditionalBadges: ["boosted"],
-    coverImageUrl: cloudinaryPhoto("maritime", "adam-gonzales-7rc7hb1acog", "hero"),
+    coverImageUrl: cloudinaryPhoto("maritime", "rasmus-andersen-nmzzl8lzkuu", "hero"),
     founding: false,
     visaSupport: true,
     payInsight: {
@@ -121,7 +121,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     matchScore: 72,
-    coverImageUrl: cloudinaryPhoto("remote", "altumcode-iymqiblxk-8", "hero"),
+    coverImageUrl: cloudinaryPhoto("remote", "kevin-schmid-mta8r0bxhbo", "hero"),
     visaSupport: true,
     payInsight: {
       meterValue: 73,
@@ -161,7 +161,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     conditionalBadges: ["boosted"],
-    coverImageUrl: cloudinaryPhoto("seasonal", "aleksandra-sapozhnikova-nbcribslxkq", "hero"),
+    coverImageUrl: cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"),
     founding: false,
     payInsight: {
       meterValue: 71,
@@ -232,6 +232,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       currency: "USD",
       note: "Strong hourly pay, but food and full housing are not included.",
     },
-    coverImageUrl: cloudinaryPhoto("farm", "annika-treial-e4wuwbcur7y", "hero"),
+    coverImageUrl: cloudinaryPhoto("farm", "tim-hufner-6-ktk6b8mq8", "hero"),
   },
 ];

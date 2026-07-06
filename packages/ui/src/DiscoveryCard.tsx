@@ -83,6 +83,12 @@ export interface DiscoveryCardProps {
 	readonly onWarn?: (id: string) => void
 	readonly onRemove?: (id: string) => void
 	readonly actions?: ReactNode
+	/**
+	 * Above-the-fold cards should pass "eager": the cover then loads with
+	 * fetchpriority=high (LCP + deterministic screenshots). Default "lazy" —
+	 * feeds keep below-fold covers off the critical path.
+	 */
+	readonly imageLoading?: "eager" | "lazy"
 	readonly cardState?:
 		| "saved" | "applied" | "offered" | "scheduled"
 		| "accepted" | "matched" | "not_selected" | "withdrawn"
@@ -252,6 +258,7 @@ export function DiscoveryCard({
 	onWarn,
 	onRemove,
 	actions,
+	imageLoading = "lazy",
 }: DiscoveryCardProps) {
 	const cat      = data.category
 	const roleText = data.positionTitle ?? data.title
@@ -478,7 +485,8 @@ export function DiscoveryCard({
 					<img
 						src={data.coverImageUrl}
 						alt={`${data.hostName} cover`}
-						loading="lazy"
+						loading={imageLoading}
+						fetchPriority={imageLoading === "eager" ? "high" : undefined}
 						decoding="async"
 						style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
 					/>

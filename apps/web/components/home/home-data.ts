@@ -65,12 +65,12 @@ interface DestinationSeed {
 }
 
 const DESTINATION_SEEDS: readonly DestinationSeed[] = [
-  { slug: "alaska", name: "Alaska", imageCategory: "maritime", imageSlug: "adam-gonzales-7rc7hb1acog", season: "Summer salmon season", categories: ["Lodges", "Fishing", "Parks", "Remote"], demoJobs: 148, demoHosts: 32 },
-  { slug: "colorado", name: "Colorado", imageCategory: "seasonal", imageSlug: "aleksandra-sapozhnikova-nbcribslxkq", season: "Winter & summer", categories: ["Resorts", "Ranches", "Guiding"], demoJobs: 96, demoHosts: 24 },
+  { slug: "alaska", name: "Alaska", imageCategory: "maritime", imageSlug: "venti-views-asmavys4azm", season: "Summer salmon season", categories: ["Lodges", "Fishing", "Parks", "Remote"], demoJobs: 148, demoHosts: 32 },
+  { slug: "colorado", name: "Colorado", imageCategory: "seasonal", imageSlug: "yuhan-du-zi9z-e8cxge", season: "Winter & summer", categories: ["Resorts", "Ranches", "Guiding"], demoJobs: 96, demoHosts: 24 },
   { slug: "montana", name: "Montana", imageCategory: "farm", imageSlug: "annie-spratt-jmjnnq2xfoy", season: "Spring–Fall", categories: ["Ranch", "Lodges", "Trail crews"], demoJobs: 74, demoHosts: 19 },
   { slug: "wyoming", name: "Wyoming", imageCategory: "seasonal", imageSlug: "vincent-guth-62v7ntlkgl8", season: "Park season", categories: ["Parks", "Ranch", "Hospitality"], demoJobs: 61, demoHosts: 15 },
   { slug: "maine", name: "Maine", imageCategory: "maritime", imageSlug: "werner-hilversum-vfljehs-y5w", season: "Summer coast", categories: ["Camps", "Coastal", "Hospitality"], demoJobs: 53, demoHosts: 14 },
-  { slug: "california", name: "California", imageCategory: "farm", imageSlug: "annika-treial-e4wuwbcur7y", season: "Harvest season", categories: ["Vineyards", "Farms", "Parks"], demoJobs: 88, demoHosts: 21 },
+  { slug: "california", name: "California", imageCategory: "farm", imageSlug: "meric-tuna-ce1ovmrzumq", season: "Harvest season", categories: ["Vineyards", "Farms", "Parks"], demoJobs: 88, demoHosts: 21 },
 ];
 
 /** US-state token → slug, for parsing freeform `location_display` ("Sitka, Alaska"). */
@@ -139,11 +139,11 @@ export interface HomeCategory {
 export const HOME_CATEGORIES: readonly HomeCategory[] = [
   { key: "farm", label: "Farm & Ranch", imageCategory: "farm", imageUrl: lanePhoto("farm", "young-sung-jang-7-6pulwb1d0"), href: "/seek?category=farm", blurb: "Orchards, ranches, harvests" },
   { key: "maritime", label: "Maritime", imageCategory: "maritime", imageUrl: lanePhoto("maritime", "vidar-nordli-mathisen-pjiv1ekevzk"), href: "/seek?category=maritime", blurb: "Boats, docks, fisheries" },
-  { key: "remote", label: "Remote & Wilderness", imageCategory: "remote", imageUrl: lanePhoto("remote", "altumcode-iymqiblxk-8"), href: "/seek?category=remote", blurb: "Cabins, ops, off-grid" },
-  { key: "hospitality", label: "Hospitality", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "aleksandra-sapozhnikova-nbcribslxkq"), href: "/seek?category=seasonal&role=hospitality", blurb: "Lodges, front desk, service" },
+  { key: "remote", label: "Remote & Wilderness", imageCategory: "remote", imageUrl: lanePhoto("remote", "justin-kauffman-fpohihximhg"), href: "/seek?category=remote", blurb: "Cabins, ops, off-grid" },
+  { key: "hospitality", label: "Hospitality", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vojtech-bruzek-yrxr3bspds0"), href: "/seek?category=seasonal&role=hospitality", blurb: "Lodges, front desk, service" },
   { key: "parks", label: "Parks & Tourism", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vincent-guth-62v7ntlkgl8"), href: "/seek?category=seasonal&role=parks", blurb: "Trails, tours, gateways" },
-  { key: "resorts", label: "Resorts", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "yuhan-du-zi9z-e8cxge"), href: "/seek?category=seasonal&role=resort", blurb: "Ski & summer resorts" },
-  { key: "guide", label: "Adventure & Guiding", imageCategory: "remote", imageUrl: lanePhoto("remote", "tobias-tullius-cqrhyg4l2pu"), href: "/seek?category=seasonal&role=guide", blurb: "Guides, outfitters, crews" },
+  { key: "resorts", label: "Resorts", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "valeriia-bugaiova-pphgehz1uk"), href: "/seek?category=seasonal&role=resort", blurb: "Ski & summer resorts" },
+  { key: "guide", label: "Adventure & Guiding", imageCategory: "remote", imageUrl: lanePhoto("seasonal", "rasmus-gundorff-saederup-v1wgkhdi6du"), href: "/seek?category=seasonal&role=guide", blurb: "Guides, outfitters, crews" },
   { key: "trades", label: "Maintenance & Trades", imageCategory: "farm", imageUrl: lanePhoto("farm", "venti-views-n-ndvlwtfde"), href: "/seek?category=seasonal&role=trades", blurb: "Facilities, repair, build" },
 ];
 

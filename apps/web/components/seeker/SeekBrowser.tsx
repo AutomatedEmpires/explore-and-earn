@@ -70,11 +70,12 @@ function ListingSection({
 				</p>
 			</header>
 			<div className={s.grid}>
-				{listings.map((listing) => (
+				{listings.map((listing, index) => (
 					<DiscoveryCard
 						key={listing.id}
 						data={toDiscoveryCardData(listing)}
 						surface="discovery_feed"
+						imageLoading={index < 2 ? "eager" : "lazy"}
 						onOpen={onOpen}
 						onHostClick={onHostClick}
 						onHousingClick={(lid) => onBenefit({ id: lid, bucket: "housing" })}
@@ -463,11 +464,12 @@ export function SeekBrowser({
 						</div>
 					) : (
 						<div className={styles.grid}>
-							{results.map((listing) => (
+							{results.map((listing, index) => (
 								<DiscoveryCard
 									key={listing.id}
 									data={toDiscoveryCardData(listing)}
 									surface="discovery_feed"
+									imageLoading={index < 2 ? "eager" : "lazy"}
 									onOpen={(id) => setActiveId(id)}
 									onHostClick={(id) => setActiveHostId(id)}
 									onHousingClick={(id) => setActiveBenefit({ id, bucket: "housing" })}

@@ -287,11 +287,12 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
         </div>
       ) : (
         <div className={styles.jobsGrid}>
-          {shown.map((listing) => (
+          {shown.map((listing, index) => (
             <DiscoveryCard
               key={listing.id}
               data={toDiscoveryCardData(listing)}
               surface="discovery_feed"
+              imageLoading={index < 2 ? "eager" : "lazy"}
               onOpen={(id) => router.push(`/listing/${id}`)}
               onApply={(id) => router.push(`/listing/${id}`)}
               onHostClick={() => router.push("/seek")}
