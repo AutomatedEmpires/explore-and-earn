@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export interface CommandSearchProps {
   /** Route the query submits to (GET-style navigation with ?<param>=). */
@@ -30,8 +30,17 @@ export function CommandSearch({
   className,
 }: CommandSearchProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState("");
+
+  // Reflect the URL's query param into the field — on first load of a results
+  // page (e.g. a direct link or refresh of /applications?q=foo), on browser
+  // back/forward, and any other external change to the URL. Without this the
+  // box shows blank even though the page below it is actively filtered.
+  useEffect(() => {
+    setValue(searchParams.get(paramName) ?? "");
+  }, [searchParams, paramName]);
 
   // "/" focuses the command bar from anywhere in the scope (unless the user is
   // already typing in a field). Escape blurs it.
