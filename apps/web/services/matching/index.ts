@@ -40,12 +40,38 @@ const asNumber = (value: unknown): number | null =>
 const asBool = (value: unknown): boolean | null =>
   typeof value === "boolean" ? value : null;
 
-function toSeekerInput(row: Row): MatchSeekerInput {
+/**
+ * Certification names per seeker, batched in ONE query. Certifications live
+ * in seeker_certifications (not on the profile row) — leaving them empty
+ * unfairly capped every applicant to a cert-requiring listing.
+ */
+async function loadCertificationNames(
+  client: ReturnType<typeof db>,
+  seekerProfileIds: string[],
+): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (seekerProfileIds.length === 0) return map;
+  const { data } = await client
+    .from("seeker_certifications")
+    .select("seeker_profile_id, name")
+    .in("seeker_profile_id", seekerProfileIds);
+  for (const raw of (data ?? []) as Array<Record<string, unknown>>) {
+    const id = String(raw.seeker_profile_id);
+    const name = typeof raw.name === "string" ? raw.name : null;
+    if (!name) continue;
+    const list = map.get(id) ?? [];
+    list.push(name);
+    map.set(id, list);
+  }
+  return map;
+}
+
+function toSeekerInput(row: Row, certifications: string[] = []): MatchSeekerInput {
   return {
     desiredCategories: asStringArray(row.desired_categories),
     desiredRoles: asStringArray(row.desired_roles),
     skillTags: asStringArray(row.general_skill_tags),
-    certifications: [], // sourced from seeker_certifications in a later pass
+    certifications,
     interestTags: asStringArray(row.interest_tags),
     experienceLevel: asString(row.experience_level),
     housingPreference: asString(row.housing_preference),
@@ -115,7 +141,8 @@ export async function computeAndStoreMatchesForSeeker(
     .limit(CANDIDATE_CAP);
   if (listingsError) throw new Error(`matching: load listings — ${listingsError.message}`);
 
-  const seekerInput = toSeekerInput(profile as Row);
+  const certs = await loadCertificationNames(client, [seekerProfileId]);
+  const seekerInput = toSeekerInput(profile as Row, certs.get(seekerProfileId) ?? []);
   const computedAt = new Date(nowMs).toISOString();
 
   const rows = ((listings ?? []) as Row[])
@@ -174,8 +201,9 @@ export async function computeAndStoreMatchForApplication(
   if (!profile || !listing) return { stored: 0 };
 
   const seekerProfileId = String((profile as Row).id);
+  const appCerts = await loadCertificationNames(client, [seekerProfileId]);
   const result = computeMatch(
-    toSeekerInput(profile as Row),
+    toSeekerInput(profile as Row, appCerts.get(seekerProfileId) ?? []),
     toListingInput(listing as Row),
     { nowMs },
   );
@@ -256,11 +284,21 @@ export async function computeAndStoreMatchesForListing(
   const listingInput = toListingInput(listingRow);
   const computedAt = new Date(nowMs).toISOString();
 
+  const seekerRows = (seekers ?? []) as Row[];
+  const certsBySeeker = await loadCertificationNames(
+    client,
+    seekerRows.map((s) => String(s.id)),
+  );
+
   const rows: Record<string, unknown>[] = [];
   const strong: StrongMatchRecipient[] = [];
 
-  for (const seeker of (seekers ?? []) as Row[]) {
-    const result = computeMatch(toSeekerInput(seeker), listingInput, { nowMs });
+  for (const seeker of seekerRows) {
+    const result = computeMatch(
+      toSeekerInput(seeker, certsBySeeker.get(String(seeker.id)) ?? []),
+      listingInput,
+      { nowMs },
+    );
     if (result.excluded !== null) continue;
     const seekerProfileId = String(seeker.id);
     rows.push({
