@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import Link from "next/link";
-import { useAuth } from "@clerk/nextjs";
+
 import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
 import { uploadProfilePhoto } from "@explore-and-earn/db/client";
 import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
@@ -10,6 +10,7 @@ import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 import { ImageUpload } from "../ImageUpload";
 import { updateHostProfileAction } from "../../app/actions/hostProfile";
 import type { HostProfileSummary } from "./models";
+import { useOptionalGetToken } from "../../lib/useOptionalGetToken";
 import styles from "./HostProfileForm.module.css";
 
 export interface HostProfileFormProps {
@@ -32,7 +33,7 @@ export function HostProfileForm({
   hostProfileId,
   photoUrl: initialPhotoUrl,
 }: HostProfileFormProps) {
-  const { getToken } = useAuth();
+  const getToken = useOptionalGetToken();
   const [isPending, startTransition] = useTransition();
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl ?? "");
   const [housingOffered, setHousingOffered] = useState(

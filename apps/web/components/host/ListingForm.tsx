@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
-import { useAuth } from "@clerk/nextjs";
+
 
 import { Button, Icon } from "@explore-and-earn/ui";
 import {
@@ -22,6 +22,7 @@ import { ImageUpload } from "../ImageUpload";
 import { BenefitTrustModal, type BenefitKind } from "../discovery";
 import { MediaGalleryUpload, type GalleryItem } from "./MediaGalleryUpload";
 import { createListingAction, updateListingAction } from "../../app/actions/listings";
+import { useOptionalGetToken } from "../../lib/useOptionalGetToken";
 import styles from "./ListingForm.module.css";
 
 /**
@@ -84,7 +85,7 @@ function categoryLabel(category: MarketplaceCategory): string {
  */
 export function ListingForm({ mode, listingId, initial, hostProfileId }: ListingFormProps) {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const getToken = useOptionalGetToken();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
