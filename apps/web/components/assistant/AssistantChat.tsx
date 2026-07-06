@@ -8,21 +8,41 @@ import { Icon } from "@explore-and-earn/ui";
 
 import styles from "./assistant.module.css";
 
-const SUGGESTIONS = [
+/** Which persona the /api/assistant route should answer as. */
+export type AssistantContext = "seeker" | "host";
+
+export interface AssistantChatProps {
+  /** Persona sent to the route; defaults to the seeker guide. */
+  readonly context?: AssistantContext;
+  readonly emptyTitle?: string;
+  readonly emptySub?: string;
+  readonly suggestions?: readonly string[];
+  readonly placeholder?: string;
+}
+
+const SEEKER_SUGGESTIONS = [
   "Find farm work with housing included",
   "Which opportunities fit me best?",
-  "How can I improve my profile?",
+  "Help me sharpen my resume",
   "Where do my applications stand?",
 ] as const;
 
 /**
- * Seeker assistant chat panel. Streams from /api/assistant (auth-scoped tools).
- * Renders text parts of each message; tool activity streams into the assistant
- * turn transparently. Premium, borders-first, token-driven.
+ * Assistant chat panel — one component, context-aware. Streams from
+ * /api/assistant with auth-scoped tools; the `context` prop selects the persona
+ * (seeker discovery/resume coach vs host listing coach). Renders text parts;
+ * tool activity streams into the assistant turn transparently. Premium,
+ * borders-first, token-driven.
  */
-export function AssistantChat() {
+export function AssistantChat({
+  context = "seeker",
+  emptyTitle = "Ask your guide",
+  emptySub = "Find opportunities, understand why they match you, and sharpen your profile.",
+  suggestions = SEEKER_SUGGESTIONS,
+  placeholder = "Ask about opportunities, matches, your profile…",
+}: AssistantChatProps) {
   const { messages, sendMessage, status, error } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/assistant" }),
+    transport: new DefaultChatTransport({ api: "/api/assistant", body: { context } }),
   });
   const [input, setInput] = useState("");
   const busy = status === "submitted" || status === "streaming";
@@ -39,12 +59,10 @@ export function AssistantChat() {
       <div className={styles.transcript} aria-live="polite">
         {messages.length === 0 && (
           <div className={styles.empty}>
-            <p className={styles.emptyTitle}>Ask your guide</p>
-            <p className={styles.emptySub}>
-              Find opportunities, understand why they match you, and sharpen your profile.
-            </p>
+            <p className={styles.emptyTitle}>{emptyTitle}</p>
+            <p className={styles.emptySub}>{emptySub}</p>
             <div className={styles.suggestions}>
-              {SUGGESTIONS.map((suggestion) => (
+              {suggestions.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"
@@ -92,7 +110,7 @@ export function AssistantChat() {
           className={styles.input}
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder="Ask about opportunities, matches, your profile…"
+          placeholder={placeholder}
           disabled={busy}
           aria-label="Message the assistant"
         />

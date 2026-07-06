@@ -7,6 +7,7 @@ import {
   getPublicListingById,
   getSeekerApplications,
   getSeekerProfile,
+  getSeekerResume,
   searchListings,
   type MatchListingInput,
   type MatchSeekerInput,
@@ -157,6 +158,37 @@ export function buildSeekerTools(ctx: SeekerToolContext): ToolSet {
         if (profile.payExpectationMinCents == null) missing.push("pay expectation");
         if (!profile.shortBio) missing.push("a short bio");
         return { missing, complete: missing.length === 0 };
+      },
+    }),
+
+    resume_summary: tool({
+      description:
+        "Summarize THIS seeker's resume/profile and surface the gaps (missing bio, no experience, no education, no skills). Use for 'help with my resume / make my profile stronger' — then coach concrete additions or draft an experience bullet.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const resume = await getSeekerResume(ctx.token, ctx.userId);
+        const profile = resume.profile;
+        const gaps: string[] = [];
+        if (!profile?.bio?.trim()) gaps.push("a short bio that says who you are and what you're after");
+        if (resume.experiences.length === 0) gaps.push("at least one work experience with a concrete summary");
+        if (resume.educations.length === 0) gaps.push("education or training");
+        if ((profile?.generalSkills.length ?? 0) === 0) gaps.push("a few skills");
+        if ((profile?.desiredCategories.length ?? 0) === 0) gaps.push("the categories of work you want");
+        return {
+          headline: profile?.headline ?? null,
+          hasBio: Boolean(profile?.bio?.trim()),
+          skills: profile?.generalSkills ?? [],
+          desiredCategories: profile?.desiredCategories ?? [],
+          experienceCount: resume.experiences.length,
+          educationCount: resume.educations.length,
+          certificationCount: resume.certifications.length,
+          experiences: resume.experiences.map((experience) => ({
+            role: experience.roleTitle,
+            company: experience.companyName,
+            hasSummary: Boolean(experience.summary?.trim()),
+          })),
+          gaps,
+        };
       },
     }),
   };

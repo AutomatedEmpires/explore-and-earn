@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { AssistantChat } from "./AssistantChat";
-import styles from "./assistant.module.css";
+import { AssistantChat } from "../../../components/assistant/AssistantChat";
+import styles from "../../../components/assistant/assistant.module.css";
 
 export const metadata: Metadata = {
   title: "Assistant",

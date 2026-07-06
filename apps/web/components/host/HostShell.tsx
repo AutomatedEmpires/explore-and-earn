@@ -34,6 +34,7 @@ const NAV: readonly NavGroup[] = [
   {
     group: "Insights",
     items: [
+      { href: "/host/assistant", label: "Assistant", sub: "Listing coach", icon: "action.message" },
       { href: "/host/profile", label: "Profile", sub: "Public page", icon: "nav.profile" },
       { href: "/host/analytics", label: "Analytics", sub: "Performance", icon: "analytics.meter" },
       { href: "/host/settings", label: "Settings", sub: "Plan + team", icon: "system.info" },
