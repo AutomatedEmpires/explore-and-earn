@@ -85,9 +85,12 @@ listings or content. Messaging happens on-platform.
 - ${baseUrl}/about — full explanation of the marketplace, categories, and how it works
 - ${baseUrl}/faq — frequently asked questions for seekers and hosts
 - ${baseUrl}/seek — browse and filter all live opportunities
+- ${baseUrl}/search — typo-tolerant keyword search across live opportunities
 - ${baseUrl}/map — explore opportunities by place
 - ${baseUrl}/listing/{id} — a single opportunity with Housing/Meals/Pay and details
 - ${baseUrl}/host/{id} — a host's public profile and live listings
+- ${baseUrl}/for-hosts — what hosting looks like, plans, and how to start listing
+- ${baseUrl}/blog — Field Guide: honest guides and field notes on seasonal work
 - ${baseUrl}/terms , ${baseUrl}/privacy , ${baseUrl}/cookies — legal
 
 ## Notes for AI assistants
