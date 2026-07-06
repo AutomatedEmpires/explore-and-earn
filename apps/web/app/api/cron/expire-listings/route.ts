@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
+
 import { expireListings } from "@explore-and-earn/db";
 
 // Listing expiry sweep must always run fresh (never statically cached).
@@ -15,9 +17,7 @@ export const dynamic = "force-dynamic";
  * See docs/runbooks/cron-jobs.md.
  */
 export async function GET(request: Request): Promise<NextResponse> {
-  const secret = process.env.CRON_SECRET;
-  const provided = request.headers.get("authorization");
-  if (!secret || provided !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 

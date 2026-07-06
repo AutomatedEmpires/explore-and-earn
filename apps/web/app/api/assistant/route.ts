@@ -13,12 +13,13 @@ import {
   logAssistantTurn,
   logHostAssistantTurn,
 } from "../../../services/assistant/persistence";
+import { checkRateLimit } from "../../../lib/rateLimit";
 import { buildHostTools } from "../../../services/assistant/hostTools";
 import { hostSystemPrompt, seekerSystemPrompt } from "../../../services/assistant/systemPrompt";
 import { buildSeekerTools } from "../../../services/assistant/tools";
 
-// Allow streaming responses up to 30s.
-export const maxDuration = 30;
+// Allow streaming responses up to 60s — a 5-step tool loop can exceed 30.
+export const maxDuration = 60;
 
 /**
  * Context-aware AI assistant endpoint — one route, two personas.
@@ -31,6 +32,12 @@ export const maxDuration = 30;
  * "provider/model" string, overridable with ASSISTANT_MODEL.
  */
 const MODEL = process.env.ASSISTANT_MODEL ?? "anthropic/claude-sonnet-4.5";
+
+// The one endpoint that spends real AI-gateway money per call gets the same
+// abuse guards as every write action: a per-user request budget plus a hard
+// cap on conversation size (the model only needs the recent window anyway).
+const MAX_MESSAGES = 40;
+const MAX_BODY_BYTES = 64 * 1024;
 
 type AssistantContext = "seeker" | "host";
 
@@ -49,8 +56,23 @@ export async function POST(req: Request): Promise<Response> {
     return new Response("Assistant is not configured.", { status: 503 });
   }
 
-  const body = (await req.json()) as { messages: UIMessage[]; context?: unknown };
-  const messages = body.messages;
+  const limited = checkRateLimit(`assistant:${userId}`, 20, 5 * 60 * 1000);
+  if (!limited.allowed) {
+    return new Response("Too many requests — give it a few minutes.", { status: 429 });
+  }
+
+  const contentLength = Number(req.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_BODY_BYTES) {
+    return new Response("Conversation too large.", { status: 413 });
+  }
+
+  const body = (await req.json().catch(() => null)) as
+    | { messages?: unknown; context?: unknown }
+    | null;
+  if (!body || !Array.isArray(body.messages) || body.messages.length === 0) {
+    return new Response("Invalid request body.", { status: 400 });
+  }
+  const messages = body.messages.slice(-MAX_MESSAGES) as UIMessage[];
   const context = normalizeContext(body.context);
   const token = await getToken({ template: "supabase" });
   const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
