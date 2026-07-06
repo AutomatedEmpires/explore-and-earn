@@ -35,7 +35,10 @@ import styles from "./page.module.css";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-	title: "Seek",
+	title: "Browse seasonal jobs — housing, meals & pay upfront",
+	description:
+		"Browse live seasonal opportunities across farm, maritime, remote, and resort work. Every listing answers housing, meals, and pay before you apply.",
+	alternates: { canonical: "/seek" },
 };
 
 const PAGE_SIZE = 48;
@@ -222,7 +225,12 @@ export default async function SeekPage({
 		warnIfDiscoveryDataMissingInProduction("seek/page");
 	}
 
-	const featuredEmployers = buildFeaturedEmployers(DISCOVERY_FIXTURES);
+	// The employer rail derives from the same inventory as the results: real
+	// rows when the DB is configured, fixtures only where fixtures are allowed.
+	// Never fixture employers in production — their lst_* links cannot resolve.
+	const featuredEmployers = buildFeaturedEmployers(
+		hasPublicDataConfig ? listings : canUseFixtures ? DISCOVERY_FIXTURES : [],
+	);
 
 	const buildPageHref = (targetPage: number): string => {
 		const sp = new URLSearchParams();

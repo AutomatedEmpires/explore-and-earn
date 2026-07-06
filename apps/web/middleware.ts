@@ -19,6 +19,11 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up/(.*)",
   "/api/webhooks/(.*)",
   "/api/health",
+  // Browser CSP violation reports are fired by the UA with no Clerk session —
+  // most of them from signed-out visitors on public pages. Without this entry,
+  // clerkMiddleware rejects every report before the handler runs and the
+  // report-only rollout collects nothing.
+  "/api/csp-report",
   // Vercel Cron invokes this with `Authorization: Bearer ${CRON_SECRET}`, not a
   // Clerk session — so it must bypass Clerk's auth.protect() to reach the route
   // handler, which validates the cron secret itself. Without this, the daily

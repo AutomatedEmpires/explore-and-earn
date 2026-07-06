@@ -38,8 +38,6 @@ export default async function ProfilePage() {
 	let seekerProfileId: string | null = null;
 	let matchedListings: Awaited<ReturnType<typeof getMatchedListings>> = [];
 
-	const featuredEmployers = buildFeaturedEmployers(DISCOVERY_FIXTURES);
-
 	if (userId) {
 		let seekerName = status.seekerName;
 		try {
@@ -88,6 +86,12 @@ export default async function ProfilePage() {
 
 		status = { ...status, seekerName, appliedCount, resumeCompletion };
 	}
+
+	// Employer strip: real matched inventory in production (fixture employers'
+	// lst_* links cannot resolve there); fixtures for preview fullness only.
+	const featuredEmployers = buildFeaturedEmployers(
+		process.env.NODE_ENV !== "production" ? DISCOVERY_FIXTURES : matchedListings,
+	);
 
 	return (
 		<ProfileHub

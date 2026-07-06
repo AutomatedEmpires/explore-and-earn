@@ -20,9 +20,11 @@ import { cachedSeekerProfile, getSupabaseToken } from "../../lib/serverCache";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-	title: "Search | Explore & Earn",
+	// The root template appends "| Explore & Earn" — don't bake it in twice.
+	title: "Search seasonal jobs",
 	description:
 		"Search farm, maritime, remote, and seasonal work opportunities. Filter by category, housing, meals, pay, location, and dates.",
+	alternates: { canonical: "/search" },
 	robots: { index: true, follow: true },
 };
 

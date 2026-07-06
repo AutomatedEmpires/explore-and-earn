@@ -24,6 +24,8 @@ import { TrueValue } from "../../../components/listing/TrueValue";
 import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../lib/seo";
+import { isUuid } from "../../../lib/ids";
+import { getFixtureListingDetail } from "../../../components/discovery/fixtureDetail";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -35,15 +37,29 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * listings.id is a Postgres uuid — a non-UUID param can never exist in the DB
+ * and would throw 22P02 into the error boundary (behind HTTP 200). Guarding
+ * here turns unknown ids into honest 404s, and lets dev/preview fixture ids
+ * (lst_*) resolve so the fixture discover → inspect journey stays connected.
+ */
+async function resolveListingDetail(id: string) {
+  if (isUuid(id)) return getListingDetailPublicCached(id);
+  return getFixtureListingDetail(id);
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const listing = await getListingDetailPublicCached(id);
+  const listing = await resolveListingDetail(id);
 
   if (!listing) {
     return { title: "Listing not found" };
   }
 
-  const title = `${listing.title} — ${listing.host?.companyName ?? "Explore & Earn"} · Explore & Earn`;
+  // The root template appends "| Explore & Earn" — don't bake the brand in twice.
+  const title = listing.host?.companyName
+    ? `${listing.title} — ${listing.host.companyName}`
+    : listing.title;
   const description = listing.description
     ? listing.description.slice(0, 155)
     : `${listing.title} opportunity at ${listing.host?.companyName ?? "a host organization"}. Housing ${listing.housingIncluded ? "included" : "not included"}, meals ${listing.mealsIncluded ? "included" : "not included"}.`;
@@ -73,9 +89,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ListingDetailPage({ params }: Props) {
   const { id } = await params;
-  const listing = await getListingDetailPublicCached(id);
+  const listing = await resolveListingDetail(id);
 
   if (!listing) notFound();
+
+  // Fixture-backed listings (dev/preview only) have non-UUID ids that must
+  // never reach the uuid-typed seeker-state queries below.
+  const isFixtureListing = !isUuid(listing.id);
 
   const { userId } = await auth();
   const token = userId ? await getSupabaseToken() : null;
@@ -106,7 +126,7 @@ export default async function ListingDetailPage({ params }: Props) {
   let onboardingComplete = false;
   let seekerProfile: Awaited<ReturnType<typeof cachedSeekerProfile>> = null;
 
-  if (userId && token && viewerRole === "seeker") {
+  if (userId && token && viewerRole === "seeker" && !isFixtureListing) {
     const [applied, saved, profile] = await Promise.all([
       hasApplied(token, userId, listing.id),
       hasSaved(token, userId, listing.id),
@@ -151,7 +171,7 @@ export default async function ListingDetailPage({ params }: Props) {
   const jsonLd = generateJobPostingJsonLd(listing, listing.host, baseUrl);
   const breadcrumbJsonLd = generateBreadcrumbJsonLd([
     { name: "Explore & Earn", url: baseUrl },
-    ...(listing.host
+    ...(listing.host && listing.host.id
       ? [{ name: listing.host.companyName, url: `${baseUrl}/host/${listing.host.id}` }]
       : []),
     { name: listing.title, url: `${baseUrl}/listing/${listing.id}` },
@@ -232,12 +252,18 @@ export default async function ListingDetailPage({ params }: Props) {
               )}
               <div className={styles.hostInfo}>
                 <div className={styles.hostNameRow}>
-                  <Link
-                    href={`/host/${listing.host.id}`}
-                    className={styles.hostName}
-                  >
-                    {listing.host.companyName}
-                  </Link>
+                  {listing.host.id ? (
+                    <Link
+                      href={`/host/${listing.host.id}`}
+                      className={styles.hostName}
+                    >
+                      {listing.host.companyName}
+                    </Link>
+                  ) : (
+                    <span className={styles.hostName}>
+                      {listing.host.companyName}
+                    </span>
+                  )}
                   {listing.host.verified && <VerifiedHostBadge />}
                 </div>
                 <div className={styles.hostDate}>{dateLabel}</div>
