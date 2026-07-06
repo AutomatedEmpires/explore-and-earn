@@ -66,10 +66,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	const post = getEditorialPost(slug);
 
 	if (!post) {
-		return { title: "Article not found · Explore & Earn" };
+		return { title: "Article not found" };
 	}
 
-	const title = `${post.title} · Explore & Earn`;
+	const title = post.title;
 	const canonical = `${baseUrl}/blog/${post.slug}`;
 
 	return {

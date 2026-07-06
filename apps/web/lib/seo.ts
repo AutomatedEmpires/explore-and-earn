@@ -68,6 +68,11 @@ export function generateJobPostingJsonLd(
   const validThrough = listing.endsAt ?? undefined;
   const datePosted = listing.publishedAt ?? undefined;
 
+  // Google Jobs requires either a physical jobLocation or an explicit
+  // TELECOMMUTE declaration — remote/location-less listings are otherwise
+  // ineligible for the one search vertical that matters most here.
+  const isRemote = listing.category === "remote" || !listing.locationDisplay;
+
   const jobPosting = {
     "@context": "https://schema.org",
     "@type": "JobPosting",
@@ -86,6 +91,14 @@ export function generateJobPostingJsonLd(
     employmentType,
     hiringOrganization,
     jobLocation,
+    ...(isRemote
+      ? {
+          jobLocationType: "TELECOMMUTE",
+          applicantLocationRequirements: { "@type": "Country", name: "USA" },
+        }
+      : {}),
+    // Applications happen on-platform, not via an external redirect chain.
+    directApply: true,
     baseSalary,
   };
 

@@ -35,7 +35,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // host_profiles.id is a Postgres uuid — non-UUID params can't exist and
   // would throw 22P02 into the error boundary instead of 404ing.
   const host = isUuid(id) ? await getPublicHostProfileCached(id) : null;
-  if (!host) return { title: "Host not found" };
+  // notFound() (pre-stream) so dead host URLs carry a real 404 instead of a
+  // soft-404 with fallback metadata — mirrors listing/[id].
+  if (!host) notFound();
 
   const tagline = host.tagline ?? host.about?.slice(0, 100);
   const title = host.companyName;
