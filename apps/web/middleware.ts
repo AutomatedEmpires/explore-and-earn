@@ -15,10 +15,14 @@ const isPublicRoute = createRouteMatcher([
   "/map",
   "/listing/(.*)",
   "/host/(.*)", // Public host profiles (/host/{id}) + layout-gated authed routes
-  // (.*) after the base path (no slash) so the BARE /sign-in and /sign-up
-  // are public too — "/sign-in/(.*)" left the entry URL itself auth-guarded.
-  "/sign-in(.*)",
-  "/sign-up(.*)",
+  // Bare path + "/(.*)" pair (like /blog below) so the entry URLs themselves
+  // are public — "/sign-in/(.*)" alone left /sign-in auth-guarded — without
+  // the prefix-wildcard "/sign-in(.*)" form, which would also make sibling
+  // routes like /sign-in-help public.
+  "/sign-in",
+  "/sign-in/(.*)",
+  "/sign-up",
+  "/sign-up/(.*)",
   "/api/webhooks/(.*)",
   "/api/health",
   // Browser CSP violation reports are fired by the UA with no Clerk session —

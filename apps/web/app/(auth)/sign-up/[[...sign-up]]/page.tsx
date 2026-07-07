@@ -4,6 +4,7 @@ import { SignUp } from "@clerk/nextjs";
 
 import styles from "../../auth.module.css";
 import { clerkAppearance } from "../../clerk-appearance";
+import { KeylessAuthNotice, isClerkKeyless } from "../../keyless-notice";
 
 export const metadata: Metadata = { title: "Join" };
 
@@ -15,7 +16,7 @@ export default function SignUpPage() {
 					Explore<span className={styles.brandAmp}>&amp;</span>Earn
 				</Link>
 				<p className={styles.tagline}>Start exploring — housing, meals, and pay upfront.</p>
-				<SignUp appearance={clerkAppearance} />
+				{isClerkKeyless() ? <KeylessAuthNotice /> : <SignUp appearance={clerkAppearance} />}
 			</div>
 		</main>
 	);

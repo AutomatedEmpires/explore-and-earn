@@ -4,6 +4,7 @@ import { SignIn } from "@clerk/nextjs";
 
 import styles from "../../auth.module.css";
 import { clerkAppearance } from "../../clerk-appearance";
+import { KeylessAuthNotice, isClerkKeyless } from "../../keyless-notice";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -21,7 +22,11 @@ export default async function SignInPage({ searchParams }: Props) {
           Explore<span className={styles.brandAmp}>&amp;</span>Earn
         </Link>
         <p className={styles.tagline}>Welcome back, seeker.</p>
-        <SignIn appearance={clerkAppearance} forceRedirectUrl={redirect_url} />
+        {isClerkKeyless() ? (
+          <KeylessAuthNotice />
+        ) : (
+          <SignIn appearance={clerkAppearance} forceRedirectUrl={redirect_url} />
+        )}
       </div>
     </main>
   );

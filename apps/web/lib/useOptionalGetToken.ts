@@ -4,6 +4,10 @@ import { useAuth } from "@clerk/nextjs";
 
 type GetToken = (options?: { template?: string }) => Promise<string | null>;
 
+// Module-level so the fallback keeps a stable identity across renders —
+// consumers hold getToken in useCallback deps.
+const NULL_TOKEN_GETTER: GetToken = async () => null;
+
 /**
  * useAuth().getToken for client components that must render in environments
  * WITHOUT <ClerkProvider> (the keyless local/QA world — the root layout
@@ -15,12 +19,15 @@ type GetToken = (options?: { template?: string }) => Promise<string | null>;
  *
  * The useAuth call happens unconditionally on every render (the throw is
  * synchronous and consistent per environment), so hook order is stable.
+ * useAuth's only synchronous throw is the missing-<ClerkProvider> guard,
+ * so the catch cannot mask a keyed-environment failure — with keys set,
+ * the provider exists and useAuth never throws.
  */
 export function useOptionalGetToken(): GetToken {
 	try {
 		const { getToken } = useAuth();
 		return getToken as GetToken;
 	} catch {
-		return async () => null;
+		return NULL_TOKEN_GETTER;
 	}
 }
