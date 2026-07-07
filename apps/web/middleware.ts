@@ -15,7 +15,13 @@ const isPublicRoute = createRouteMatcher([
   "/map",
   "/listing/(.*)",
   "/host/(.*)", // Public host profiles (/host/{id}) + layout-gated authed routes
+  // Bare path + "/(.*)" pair (like /blog below) so the entry URLs themselves
+  // are public — "/sign-in/(.*)" alone left /sign-in auth-guarded — without
+  // the prefix-wildcard "/sign-in(.*)" form, which would also make sibling
+  // routes like /sign-in-help public.
+  "/sign-in",
   "/sign-in/(.*)",
+  "/sign-up",
   "/sign-up/(.*)",
   "/api/webhooks/(.*)",
   "/api/health",

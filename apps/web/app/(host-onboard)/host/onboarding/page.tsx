@@ -35,6 +35,7 @@ export default function HostOnboardingPage() {
 	return (
 		<main className={styles.page}>
 			<section className={styles.card}>
+				<p className={styles.eyebrow}>Explore &amp; Earn · For hosts</p>
 				<h1 className={styles.title}>Set up your host account</h1>
 				<p className={styles.subtitle}>
 					Tell us who you are so seekers know who they are applying to.
@@ -62,6 +63,14 @@ export default function HostOnboardingPage() {
 						</p>
 					) : null}
 				</form>
+				<ol className={styles.next} aria-label="What happens next">
+					<li>Your command center opens with a guided checklist</li>
+					<li>Post your first role with Housing, Meals &amp; Pay upfront</li>
+					<li>Publish and start reaching seekers ready to move</li>
+				</ol>
+				<p className={styles.reassure}>
+					You can rename this and add photos, locations, and your story anytime.
+				</p>
 			</section>
 		</main>
 	)

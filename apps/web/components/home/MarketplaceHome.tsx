@@ -132,7 +132,7 @@ function HomeHero({
                 type="text"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                placeholder="Deckhand, harvest, lodge…"
+                placeholder="Deckhand, harvest…"
               />
             </label>
             <span className={styles.searchDivider} aria-hidden="true" />
@@ -143,7 +143,7 @@ function HomeHero({
                 type="text"
                 value={loc}
                 onChange={(e) => setLoc(e.target.value)}
-                placeholder="Alaska, Colorado, remote…"
+                placeholder="Alaska, remote…"
               />
             </label>
             <span className={styles.searchDivider} aria-hidden="true" />

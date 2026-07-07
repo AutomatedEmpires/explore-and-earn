@@ -248,9 +248,9 @@
 	transform: scale(0.94);
 }
 
-/* Hide crowded labels on the very narrowest screens — the active step's full
-   title already shows above the rail, so the track stays scannable. */
-@media (max-width: 360px) {
+/* Hide crowded labels on phones — five labels can't share ~380px without
+   colliding, and the active step's full title already shows above the rail. */
+@media (max-width: 479px) {
 	.nodeLabel {
 		display: none;
 	}

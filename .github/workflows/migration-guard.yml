@@ -12,11 +12,12 @@
 name: Migration Guard
 
 on:
+  # No path filter on pull_request: this check is REQUIRED by main's branch
+  # protection, and a path-filtered required check never runs — so it never
+  # passes — on PRs that don't touch migrations, blocking them forever. The
+  # script validates the whole migrations tree in milliseconds with zero
+  # dependencies, so running it on every PR is free.
   pull_request:
-    paths:
-      - "supabase/migrations/**"
-      - "tools/scripts/migration-allocations.json"
-      - "tools/scripts/check-migration-prefixes.mjs"
   merge_group:
   push:
     branches:

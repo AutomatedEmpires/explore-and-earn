@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+
 
 import { Icon } from "@explore-and-earn/ui";
 import { uploadProfilePhoto } from "@explore-and-earn/db/client";
 import { saveHeroCoverAction } from "../../app/actions/seekerProfile";
+import { useOptionalGetToken } from "../../lib/useOptionalGetToken";
 import styles from "./HeroPhotoPickerModal.module.css";
 
 export interface HeroPhotoPickerModalProps {
@@ -45,7 +46,7 @@ export function HeroPhotoPickerModal({
   currentUrl,
   seekerProfileId,
 }: HeroPhotoPickerModalProps) {
-  const { getToken } = useAuth();
+  const getToken = useOptionalGetToken();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);

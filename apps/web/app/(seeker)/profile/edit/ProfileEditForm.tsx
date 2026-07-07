@@ -2,7 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+
+import { useOptionalGetToken } from "../../../../lib/useOptionalGetToken";
+
 
 import {
   MARKETPLACE_CATEGORIES,
@@ -89,7 +91,7 @@ function isCategory(value: string): value is MarketplaceCategory {
 
 export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const getToken = useOptionalGetToken();
   const [photoUrl, setPhotoUrl] = useState(initial.profilePhotoUrl);
   const [displayName, setDisplayName] = useState(initial.displayName);
   const [bio, setBio] = useState(initial.bio);
