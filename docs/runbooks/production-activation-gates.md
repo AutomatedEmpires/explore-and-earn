@@ -7,7 +7,9 @@
 > execution time.
 >
 > Infrastructure already verified operating: database, PostHog, Sentry, Resend
-> API key + delivery, cron. See `PORTFOLIO_ACTIVATION_STATE.md` (Explore & Earn).
+> API key + delivery, cron. The workspace-level `PORTFOLIO_ACTIVATION_STATE.md`
+> (Automated Empires portfolio control surface, maintained outside this repo)
+> holds the cross-product Explore & Earn entry.
 
 ---
 
@@ -114,13 +116,13 @@ Until this is set, the handler throws and **new signups never get a `seeker_prof
 `db push` fails because the prod ledger diverges from the numbered convention.
 The fix is `supabase migration repair`, which **only writes the
 `supabase_migrations.schema_migrations` table — it never executes migration
-SQL.** The schema is byte-identical before and after. See the dry-run table in
-the accompanying report / below.
+SQL.** The schema is byte-identical before and after. The dry-run reconciliation
+is enumerated below.
 
 **Mark APPLIED (9)** — numbered files whose schema is already present under a
 timestamp version (1:1 name match):
 
-```
+```text
 049 announcement_checkout_idempotency   050 message_conversation_rls_hardening
 051 matching_fields                     052 match_scores
 053 assistant_threads                   054 host_spam_report_flagging
@@ -132,7 +134,7 @@ timestamp version (1:1 name match):
 reconcile migrations, whose schema is subsumed by applied 001–048; and the 9
 July-06 rows that are 049–057's content under timestamp names):
 
-```
+```text
 20260606002452 20260606005108 20260606011452 20260606011530 20260606032746
 20260606035409 20260606040420 20260606040823 20260606060012 20260607010310
 20260607014403 20260607030038 20260607030129 20260607030139 20260607030206
@@ -200,9 +202,11 @@ prices unset.
 
 **Exact evidence required to prove ownership (any ONE is sufficient):**
 
-1. The account id embedded in prod's `STRIPE_SECRET_KEY` or
-   `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (the `…_(live|test)_51<ACCOUNT>` segment).
-   Founder reads it from Vercel → decode → confirms account + mode. *Most direct.*
+1. The account behind prod's `STRIPE_SECRET_KEY`. Authoritative check: run
+   `stripe get /v1/account --api-key <prod STRIPE_SECRET_KEY>` (or
+   `stripe accounts retrieve`) — the returned `id` + `livemode` prove the
+   account and mode directly (better than eyeballing the `…_(live|test)_51…`
+   key segment, which only encodes the account, not the mode). *Most direct.*
 2. In the Stripe dashboard for the candidate account, a webhook endpoint or
    customer/product referencing `exploreandearn.com`.
 3. A restricted key on the intended account granted to the CLI, so the agent can
