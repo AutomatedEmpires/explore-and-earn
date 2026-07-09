@@ -103,8 +103,8 @@ const INK       = "var(--palette-ink)"
 const INK_SOFT  = "var(--palette-ink-muted)"
 const PAPER     = "var(--palette-surface)"
 
-const H_INK = "color-mix(in srgb, var(--palette-teal) 78%, var(--palette-ink))"   /* teal — housing/meals available */
-const P_INK = "color-mix(in srgb, var(--palette-amber) 52%, var(--palette-ink))"  /* deep gold — pay (money) */
+// Pay accent (deep gold) — still used by the applicant-review Schedule action.
+const P_INK = "color-mix(in srgb, var(--palette-amber) 52%, var(--palette-ink))"
 
 
 const CAT_LABEL: Record<MarketplaceCategory, string> = {
@@ -121,34 +121,9 @@ const MAPPIN: Record<MarketplaceCategory, IconKey> = {
 	seasonal: "mappin.seasonal", mix: "mappin.mix",
 }
 
-// ─── Benefit helpers ──────────────────────────────────────────────────────────
-//
-// Housing & Meals share a green/red signal: provided = green, not_provided = light red.
-// Pay is always blue — it always has a dollar value so it never reads as "unavailable".
-
-// "Not provided" is information, not an error — muted neutral, never alarming red.
-const RED_INK = "var(--palette-ink-muted)"
-
-// Housing / Meals — provided = warm teal, not-provided = muted neutral
-const HM_GREEN_BG     = "color-mix(in srgb, var(--palette-teal) 13%, var(--palette-surface))"
-const HM_GREEN_BORDER = `1.5px solid color-mix(in srgb, var(--palette-teal) 42%, var(--palette-line))`
-const HM_GREEN_SHADOW = "var(--elevation-card)"
-const HM_RED_BG       = "color-mix(in srgb, var(--palette-ink) 4%, var(--palette-surface))"
-const HM_RED_BORDER   = "1px solid var(--palette-line)"
-const HM_RED_SHADOW   = "none"
-
-// partial is treated identically to provided — "available" is the single signal
-function hmBg(p: BenefitProvision | undefined):     string { return (p === "provided" || p === "partial") ? HM_GREEN_BG     : HM_RED_BG     }
-function hmBorder(p: BenefitProvision | undefined): string { return (p === "provided" || p === "partial") ? HM_GREEN_BORDER : HM_RED_BORDER }
-function hmColor(p: BenefitProvision | undefined):  string { return (p === "provided" || p === "partial") ? H_INK           : RED_INK       }
-function hmShadow(p: BenefitProvision | undefined): string { return (p === "provided" || p === "partial") ? HM_GREEN_SHADOW : HM_RED_SHADOW }
-
-// Pay — always blue regardless of provision
-// Pay — always present (money), warm gold accent
-const PAY_BG     = "color-mix(in srgb, var(--palette-amber) 15%, var(--palette-surface))"
-const PAY_BORDER = `1.5px solid color-mix(in srgb, var(--palette-amber) 52%, var(--palette-line))`
-const PAY_COLOR  = P_INK
-const PAY_SHADOW = "var(--elevation-card)"
+// Housing/Meals/Pay cell styling now lives in DiscoveryCard.module.css
+// (.triad / .benefit* classes) — glance-readable green ✓ / red ✕ / gold, so
+// the triad reads as the card's dominant module. See BenefitTriadCell below.
 
 // ─── Fill bar helpers ─────────────────────────────────────────────────────────
 
@@ -198,14 +173,6 @@ const STRIP_CELL: CSSProperties = {
 	boxShadow: "var(--elevation-card)",
 }
 
-/** Benefit cell — inline icon + label (housing / meals / pay) */
-const BENEFIT_CELL: CSSProperties = {
-	display: "flex", flexDirection: "row",
-	alignItems: "center", justifyContent: "center",
-	gap: "5px", padding: "9px 6px",
-	background: PAPER, borderRadius: "10px", textAlign: "center",
-}
-
 /* Hierarchy: the ROLE is the card's primary object; the host is trust
    context. Title outranks host name (it was inverted before). */
 const hostNameText: CSSProperties = {
@@ -235,6 +202,62 @@ const stripLabel: CSSProperties = {
 const stripValue: CSSProperties = {
 	fontFamily: UI_FONT, fontSize: "clamp(10px, 2.2vw, 12px)",
 	fontWeight: 600, color: INK, textAlign: "center", lineHeight: 1.2,
+}
+
+// ─── Benefit triad cell (housing / meals / pay) ────────────────────────────
+//
+// The card's dominant module. Housing & Meals read OFFERED (green ✓) / NOT
+// OFFERED (red ✕) via icon AND colour; Pay is always gold and carries the rate.
+// A clickable cell (photo bucket / pay scale) renders as a <button>.
+function BenefitTriadCell({
+	kind,
+	provided,
+	value,
+	onClick,
+}: {
+	readonly kind: "housing" | "meals" | "pay"
+	readonly provided?: boolean
+	readonly value: string
+	readonly onClick?: () => void
+}) {
+	const isPay = kind === "pay"
+	const stateClass = isPay
+		? styles.benefitPay
+		: provided
+			? styles.benefitProvided
+			: styles.benefitNot
+	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
+	const icon: IconKey =
+		kind === "housing" ? "benefit.housing" : kind === "meals" ? "benefit.meals" : "benefit.pay"
+	const stateText = isPay ? "" : provided ? "offered" : "not offered"
+	const aria = `${label}${stateText ? `: ${stateText}` : ""}${value ? ` — ${value}` : ""}`
+
+	const inner = (
+		<>
+			<span className={styles.benefitHead}>
+				<Icon name={icon} size={14} aria-hidden />
+				<span>{label}</span>
+				{!isPay ? (
+					<span className={styles.benefitState}>
+						<Icon name={provided ? "system.success" : "system.error"} size={13} aria-hidden />
+					</span>
+				) : null}
+			</span>
+			<span className={`${styles.benefitValue}${isPay ? ` ${styles.benefitPayValue}` : ""}`}>
+				{value}
+			</span>
+		</>
+	)
+
+	return onClick ? (
+		<button type="button" className={`${styles.benefit} ${stateClass}`} onClick={onClick} aria-label={aria}>
+			{inner}
+		</button>
+	) : (
+		<div className={`${styles.benefit} ${stateClass}`} aria-label={aria}>
+			{inner}
+		</div>
+	)
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -442,36 +465,7 @@ export function DiscoveryCard({
 	const ctaShadow    = isPassiveCta ? "none"
 		: `4px 5px 0 rgba(26,43,60,0.36), inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -2px 0 rgba(0,0,0,0.12)`
 
-	const housingCell: CSSProperties = {
-		...BENEFIT_CELL,
-		border: hmBorder(hp), background: hmBg(hp), color: hmColor(hp),
-		boxShadow: hmShadow(hp),
-		...(canOpenHousing ? { cursor: "pointer", width: "100%" } : {}),
-	}
-	const mealsCell: CSSProperties = {
-		...BENEFIT_CELL,
-		border: hmBorder(mp), background: hmBg(mp), color: hmColor(mp),
-		boxShadow: hmShadow(mp),
-		...(canOpenMeals ? { cursor: "pointer", width: "100%" } : {}),
-	}
-	const payCell: CSSProperties = {
-		...BENEFIT_CELL,
-		border: PAY_BORDER, background: PAY_BG, color: PAY_COLOR,
-		boxShadow: PAY_SHADOW,
-		...(onPayClick ? { cursor: "pointer", width: "100%" } : {}),
-	}
-
 	return (
-		<>
-		{/* Hover expand for interactive benefit cells — scoped by component class */}
-		<style>{`
-			.ui-card--discovery .dc-benefit-btn {
-				transition: transform 120ms ease, box-shadow 120ms ease;
-			}
-			.ui-card--discovery .dc-benefit-btn:hover {
-				transform: scale(1.05) translateY(-1px);
-			}
-		`}</style>
 		<article
 			className={`ui-card--discovery ${styles.card}`}
 			style={cardStyle}
@@ -806,43 +800,27 @@ export function DiscoveryCard({
 						))}
 					</div>
 				) : (
-					/* Standard H/M/P row — icon+label for housing/meals, icon+rate for pay */
-					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
-						{canOpenHousing ? (
-							<button type="button" className="dc-benefit-btn" style={housingCell} onClick={() => onHousingClick!(data.id)} aria-label={`Housing: ${data.triad.housing}`}>
-								<Icon name="benefit.housing" size={16} aria-hidden />
-								<span style={stripLabel}>{data.housingOccupancy === "solo" ? "Private" : data.housingOccupancy === "shared" ? "Shared" : "Housing"}</span>
-							</button>
-						) : (
-							<div style={housingCell} aria-label={`Housing: ${data.triad.housing}`}>
-								<Icon name="benefit.housing" size={16} aria-hidden />
-								<span style={stripLabel}>{data.housingOccupancy === "solo" ? "Private" : data.housingOccupancy === "shared" ? "Shared" : "Housing"}</span>
-							</div>
-						)}
-
-						{canOpenMeals ? (
-							<button type="button" className="dc-benefit-btn" style={mealsCell} onClick={() => onMealsClick!(data.id)} aria-label={`Meals: ${data.triad.meals}`}>
-								<Icon name="benefit.meals" size={16} aria-hidden />
-								<span style={stripLabel}>Meals</span>
-							</button>
-						) : (
-							<div style={mealsCell} aria-label={`Meals: ${data.triad.meals}`}>
-								<Icon name="benefit.meals" size={16} aria-hidden />
-								<span style={stripLabel}>Meals</span>
-							</div>
-						)}
-
-						{onPayClick ? (
-							<button type="button" className="dc-benefit-btn" style={payCell} onClick={() => onPayClick(data.id)} aria-label={`Pay: ${data.triad.pay}`}>
-								<Icon name="benefit.pay" size={16} aria-hidden />
-								<span style={stripValue}>{data.triad.pay}</span>
-							</button>
-						) : (
-							<div style={payCell} aria-label={`Pay: ${data.triad.pay}`}>
-								<Icon name="benefit.pay" size={16} aria-hidden />
-								<span style={stripValue}>{data.triad.pay}</span>
-							</div>
-						)}
+					/* HOUSING · MEALS · PAY — the card's dominant module. Green ✓ =
+					   offered, red ✕ = not offered (icon + colour, a11y-safe); Pay
+					   is always gold and carries the rate. */
+					<div className={styles.triad}>
+						<BenefitTriadCell
+							kind="housing"
+							provided={hp !== "not_provided"}
+							value={data.triad.housing}
+							onClick={canOpenHousing ? () => onHousingClick!(data.id) : undefined}
+						/>
+						<BenefitTriadCell
+							kind="meals"
+							provided={mp !== "not_provided"}
+							value={data.triad.meals}
+							onClick={canOpenMeals ? () => onMealsClick!(data.id) : undefined}
+						/>
+						<BenefitTriadCell
+							kind="pay"
+							value={data.triad.pay}
+							onClick={onPayClick ? () => onPayClick(data.id) : undefined}
+						/>
 					</div>
 				)}
 
@@ -995,6 +973,5 @@ export function DiscoveryCard({
 				)}
 			</div>
 		</article>
-		</>
 	)
 }
