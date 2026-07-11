@@ -11,8 +11,9 @@
  * cross-process or cross-restart replays (acceptable for MVP single-instance).
  *
  * Env:
- *   RESEND_API_KEY    — required to send; omit for local dev (logs to console)
- *   RESEND_FROM_EMAIL — optional From header override
+ *   RESEND_API_KEY        — required to send; omit for local dev (logs to console)
+ *   RESEND_FROM_EMAIL     — optional From header override
+ *   RESEND_REPLY_TO_EMAIL — optional Reply-To address
  */
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -112,13 +113,20 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
   }
 
   try {
+    const replyTo = process.env.RESEND_REPLY_TO_EMAIL?.trim();
     const response = await fetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: {
         Authorization: "Bearer " + apiKey,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from, to: [to], subject, html }),
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject,
+        html,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
     });
 
     if (!response.ok) {

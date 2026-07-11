@@ -14,8 +14,9 @@
  * mailer logs to the console instead of sending.
  *
  * Env:
- *   - RESEND_API_KEY    (required to actually send) server-only; never exposed
- *   - RESEND_FROM_EMAIL (optional) From header override
+ *   - RESEND_API_KEY        (required to actually send) server-only; never exposed
+ *   - RESEND_FROM_EMAIL     (optional) From header override
+ *   - RESEND_REPLY_TO_EMAIL (optional) Reply-To address
  *   - NEXT_PUBLIC_APP_URL (optional) base URL used by absoluteUrl()
  */
 

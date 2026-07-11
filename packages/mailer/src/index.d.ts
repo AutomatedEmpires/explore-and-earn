@@ -11,8 +11,9 @@
  * cross-process or cross-restart replays (acceptable for MVP single-instance).
  *
  * Env:
- *   RESEND_API_KEY    — required to send; omit for local dev (logs to console)
- *   RESEND_FROM_EMAIL — optional From header override
+ *   RESEND_API_KEY        — required to send; omit for local dev (logs to console)
+ *   RESEND_FROM_EMAIL     — optional From header override
+ *   RESEND_REPLY_TO_EMAIL — optional Reply-To address
  */
 /** Exposed for testing only — resets the in-memory dedup store between tests. */
 export declare function _resetDedup(): void;
