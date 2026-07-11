@@ -132,19 +132,18 @@ export interface HomeCategory {
 }
 
 /**
- * Eight browse cards mapped onto the locked five-lane taxonomy: the four real
- * lanes plus seasonal facets (hospitality / parks / resorts / guide) that filter
- * the `seasonal` lane — never inventing a sixth category.
+ * The FOUR canonical marketplace lanes — mirrors MARKETPLACE_CATEGORIES and the
+ * Discovery Card's category stamp exactly. Seekers browse by lane; the dozen
+ * sub-roles each lane contains (hospitality, parks, resorts, guiding, trades…)
+ * live inside /seek as filters, not as top-level categories. The homepage
+ * previously fanned Seasonal into five role-tiles, fracturing the taxonomy into
+ * a false "eight categories" — the blurb now carries that breadth instead.
  */
 export const HOME_CATEGORIES: readonly HomeCategory[] = [
-  { key: "farm", label: "Farm & Ranch", imageCategory: "farm", imageUrl: lanePhoto("farm", "young-sung-jang-7-6pulwb1d0"), href: "/seek?category=farm", blurb: "Orchards, ranches, harvests" },
-  { key: "maritime", label: "Maritime", imageCategory: "maritime", imageUrl: lanePhoto("maritime", "vidar-nordli-mathisen-pjiv1ekevzk"), href: "/seek?category=maritime", blurb: "Boats, docks, fisheries" },
-  { key: "remote", label: "Remote & Wilderness", imageCategory: "remote", imageUrl: lanePhoto("remote", "justin-kauffman-fpohihximhg"), href: "/seek?category=remote", blurb: "Cabins, ops, off-grid" },
-  { key: "hospitality", label: "Hospitality", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vojtech-bruzek-yrxr3bspds0"), href: "/seek?category=seasonal&role=hospitality", blurb: "Lodges, front desk, service" },
-  { key: "parks", label: "Parks & Tourism", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vincent-guth-62v7ntlkgl8"), href: "/seek?category=seasonal&role=parks", blurb: "Trails, tours, gateways" },
-  { key: "resorts", label: "Resorts", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "valeriia-bugaiova-pphgehz1uk"), href: "/seek?category=seasonal&role=resort", blurb: "Ski & summer resorts" },
-  { key: "guide", label: "Adventure & Guiding", imageCategory: "remote", imageUrl: lanePhoto("seasonal", "rasmus-gundorff-saederup-v1wgkhdi6du"), href: "/seek?category=seasonal&role=guide", blurb: "Guides, outfitters, crews" },
-  { key: "trades", label: "Maintenance & Trades", imageCategory: "farm", imageUrl: lanePhoto("farm", "venti-views-n-ndvlwtfde"), href: "/seek?category=seasonal&role=trades", blurb: "Facilities, repair, build" },
+  { key: "farm", label: "Farm", imageCategory: "farm", imageUrl: lanePhoto("farm", "young-sung-jang-7-6pulwb1d0"), href: "/seek?category=farm", blurb: "Orchards, ranches, harvests & greenhouses" },
+  { key: "maritime", label: "Maritime", imageCategory: "maritime", imageUrl: lanePhoto("maritime", "vidar-nordli-mathisen-pjiv1ekevzk"), href: "/seek?category=maritime", blurb: "Boats, docks, fisheries & processing" },
+  { key: "remote", label: "Remote", imageCategory: "remote", imageUrl: lanePhoto("remote", "justin-kauffman-fpohihximhg"), href: "/seek?category=remote", blurb: "Cabins, backcountry ops, guiding & off-grid" },
+  { key: "seasonal", label: "Seasonal", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vojtech-bruzek-yrxr3bspds0"), href: "/seek?category=seasonal", blurb: "Lodges, resorts, parks & hospitality" },
 ];
 
 // ─── Rolling announcements (monetized rail) ────────────────────────────────
