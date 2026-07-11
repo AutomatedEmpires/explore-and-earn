@@ -31,6 +31,11 @@ export function Providers({ children }: { children: ReactNode }) {
 					api_host: posthogHost,
 					capture_pageview: "history_change",
 					opt_out_capturing_by_default: !accepted,
+					// Product analytics is consent-gated above. Replay and console capture
+					// remain disabled so form content and application logs never leave the
+					// browser through the analytics transport.
+					disable_session_recording: true,
+					enable_recording_console_log: false,
 				});
 				setClient(posthog);
 			});
