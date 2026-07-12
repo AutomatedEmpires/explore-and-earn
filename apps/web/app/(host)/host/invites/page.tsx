@@ -83,7 +83,7 @@ function pct(part: number, whole: number): number {
 
 export default async function HostInvitesPage() {
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const token = userId ? await getToken() : null;
 
   if (!userId || !token) {
     return (

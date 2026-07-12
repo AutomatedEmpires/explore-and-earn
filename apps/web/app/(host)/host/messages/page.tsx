@@ -54,7 +54,7 @@ export default async function HostMessagesPage({
     );
   }
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return (
       <section className={styles.block}>

@@ -48,7 +48,7 @@ async function myRefundablePurchasesImpl(): Promise<RefundablePurchasesResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "expired_session" };
 
   // Resolve the host's own profile from the verified clerk identity, THEN read
@@ -95,7 +95,7 @@ async function requestRefundImpl(
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "expired_session" };
 
   if (!VALID_PURCHASE_TYPES.has(input.purchaseType)) {

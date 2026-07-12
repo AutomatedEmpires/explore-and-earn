@@ -405,3 +405,34 @@ No credential or token can be retired yet. In particular: retain the old shared 
 4. **Whether Explore&Earn is ready for Production users:** **No.**
 5. **Whether Explore&Earn is ready for money:** **No.**
 6. **Whether any credential/token can be retired yet:** **No.**
+
+## Phase 2 — NO-GO blocker closure
+
+**Phase opened:** 2026-07-12
+
+**Scope:** Dark Preview auth, Stripe test webhooks, Production environment contract, non-destructive data isolation, Preview rollback rehearsal, remote Mapbox fixture proof, and internal email delivery/reply evidence. No Production launch or credential retirement is authorized.
+
+### Phase 2 pre-change freeze
+
+This snapshot was taken before Phase 2 provider or repository changes.
+
+| Surface | Frozen state |
+|---|---|
+| PR | Draft PR `#244`, head `04c67fd7b383d7e0e0023a178a604f5f6cbb3adc`, mergeable, all recorded checks green |
+| PR scope | One documentation-only commit adding this report |
+| PR Preview | `dpl_2Wo7p4tcWSEXWJPe35zsKvSitpa6`, `READY`; build status only, no runtime proof |
+| Proven exact-main Preview | `dpl_LW9LvGWrjRT1fzpMQXwGaAxoTm2B`, `READY`, accepted main `b616b9e…` |
+| Current Production | `dpl_5HCPaCNCQuyip2iZTHpoMvSxjQFY`, `READY`, accepted main `b616b9e…`; last-good rollback target |
+| Prior Production fallback | `dpl_6m17ghudS8NvDTCPX7PVp7CadJdv`, `READY`, source `98dd3591…` |
+| PR branch environment | No branch-specific Vercel overrides at freeze |
+| Critical regression risk | General Preview Supabase records are the previously diagnosed localhost lane; the PR Preview is not assumed healthy merely because it built |
+| Doppler `dev` | Clerk, hosted Supabase, Stripe test/catalog, Resend, Sentry, PostHog, Mapbox, and Cloudinary names present |
+| Doppler `stg` | Hosted Supabase public pair, Stripe test/catalog, Resend, Sentry runtime pair, PostHog, and Mapbox names present; Clerk/webhook/service-role names absent |
+| Doppler `prd` | Resend, PostHog, and Mapbox names only; Clerk, Supabase, Stripe, Sentry, app URL, cron, and admin contract absent |
+| Webhook secrets | No `STRIPE_WEBHOOK_SECRET` or `CLERK_WEBHOOK_SECRET` in Vercel at freeze |
+
+The isolated Windows checkout on `codex/explore-and-earn-production-readiness` is the only Phase 2 write location. The founder's dirty WSL design checkout remains untouched.
+
+### Phase 2 execution record
+
+Pending controlled execution.

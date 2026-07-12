@@ -14,9 +14,7 @@ import { auth } from "@clerk/nextjs/server";
  */
 export async function optionalAuth(): Promise<{
 	userId: string | null;
-	getToken:
-		| ((opts?: { template?: string }) => Promise<string | null>)
-		| null;
+	getToken: (() => Promise<string | null>) | null;
 }> {
 	try {
 		const { userId, getToken } = await auth();

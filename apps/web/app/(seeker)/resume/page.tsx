@@ -36,7 +36,7 @@ export default async function ResumePage() {
 		return <SignedOutResume />;
 	}
 
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) {
 		return <SignedOutResume />;
 	}

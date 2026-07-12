@@ -14,7 +14,7 @@ export async function markAllNotificationsReadAction(): Promise<void> {
   if (!userId) {
     return;
   }
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return;
   }

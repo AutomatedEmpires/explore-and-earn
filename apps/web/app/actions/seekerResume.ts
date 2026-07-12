@@ -21,7 +21,7 @@ async function currentUserId(): Promise<string | undefined> {
 
 /**
  * Save the signed-in seeker's bio (and, once a column exists, headline).
- * Resolves the Clerk session, exchanges it for a Supabase-templated token, and
+ * Resolves the Clerk session, mints its native Supabase-integrated token, and
  * delegates the scoped write to the db package. Returns a small result object so
  * the client can surface success/failure without throwing.
  */
@@ -33,7 +33,7 @@ async function updateBioActionImpl(
 		return { ok: false, error: "You must be signed in to save your resume." };
 	}
 
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) {
 		return { ok: false, error: "You must be signed in to save your resume." };
 	}

@@ -37,10 +37,10 @@ interface HostAuth {
 }
 
 /**
- * Resolve the Clerk user id + Supabase-templated JWT for the current host.
+ * Resolve the Clerk user id + native Supabase-integrated JWT for the current host.
  *
  * Per repo auth law: `userId` comes from `auth().userId` (never decoded from the
- * token), and the Supabase RLS token uses the "supabase" JWT template. Both are
+ * token), and the Supabase RLS token comes from Clerk's native integration. Both are
  * required so the db layer can scope every write to the caller's host profile.
  */
 async function resolveHostAuth(): Promise<
@@ -50,7 +50,7 @@ async function resolveHostAuth(): Promise<
   if (!userId) {
     return { ok: false, error: "You must be signed in as a host to manage listings." };
   }
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return { ok: false, error: "Your session has expired — sign in again to continue." };
   }

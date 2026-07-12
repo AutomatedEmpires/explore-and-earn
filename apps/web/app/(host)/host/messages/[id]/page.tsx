@@ -39,7 +39,7 @@ export default async function HostMessageThreadPage({
     );
   }
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return (
       <section className={styles.block}>

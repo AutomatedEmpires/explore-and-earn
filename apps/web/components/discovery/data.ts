@@ -28,6 +28,10 @@ const hasPublicDataConfig =
   Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
   Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 const allowFixtureFallback = process.env.NODE_ENV !== "production";
+const allowPreviewMapFixtures =
+  process.env.NODE_ENV === "production" &&
+  process.env.VERCEL_ENV === "preview" &&
+  process.env.PREVIEW_MAP_FIXTURES === "1";
 
 function reportDiscoveryFallback(context: string, error: unknown) {
   const detail = error instanceof Error ? error.message : String(error);
@@ -103,8 +107,10 @@ export async function getDiscoveryListingById(
 export async function getDiscoveryListingsWithCoords(): Promise<
   DiscoveryListing[]
 > {
-  // DEV MOCK BENCH: deterministic fixtures over live data while impersonating.
-  if (isDevBenchEnabled()) {
+  // The Preview-only flag exists solely for remote Mapbox proof while the
+  // isolated readiness database has no listings. It cannot activate in a
+  // Vercel Production runtime and does not affect any non-map discovery seam.
+  if (isDevBenchEnabled() || allowPreviewMapFixtures) {
     return DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
   }
   if (!hasPublicDataConfig) {

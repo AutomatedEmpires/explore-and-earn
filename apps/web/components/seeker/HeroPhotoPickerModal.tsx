@@ -91,7 +91,7 @@ export function HeroPhotoPickerModal({
       setUploading(true);
       setError(null);
       try {
-        const token = await getToken({ template: "supabase" });
+        const token = await getToken();
         if (!token) throw new Error("no_token");
         const url = await uploadProfilePhoto(token, seekerProfileId, file, "seeker");
         const result = await saveHeroCoverAction(url);

@@ -12,7 +12,7 @@ import { reportError } from "../../lib/sentry";
  * Swipe-deck server actions (/swipe surface).
  *
  * AUTH LAW: userId always comes from `auth().userId` (never decoded from the
- * JWT); the Supabase-authed token comes from `getToken({ template: "supabase" })`
+ * JWT); the Supabase-authed token comes from `getToken()`
  * and is passed to the db helpers. Both actions are best-effort and validate
  * their inputs before touching the database.
  */
@@ -65,7 +65,7 @@ async function saveListingActionImpl(
 	if (!allowed) {
 		return { ok: false, alreadySaved: false };
 	}
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) {
 		return { ok: false, alreadySaved: false };
 	}
@@ -100,7 +100,7 @@ async function passListingActionImpl(listingId: string): Promise<{ ok: boolean }
 	if (!userId) return { ok: false };
 	const { allowed } = checkRateLimit(`pass:${userId}`, 200, 5 * 60 * 1000);
 	if (!allowed) return { ok: false };
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) return { ok: false };
 	return passListing(token, userId, listingId);
 }
@@ -122,7 +122,7 @@ export async function unpassListingAction(listingId: string): Promise<{ ok: bool
 		}
 		const { userId, getToken } = await auth();
 		if (!userId) return { ok: false };
-		const token = await getToken({ template: "supabase" });
+		const token = await getToken();
 		if (!token) return { ok: false };
 		return unpassListing(token, userId, listingId);
 	} catch (error) {
@@ -146,7 +146,7 @@ async function getSwipeBatchActionImpl(
 	if (!userId) {
 		return { listings: [], nextCursor: null };
 	}
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) {
 		return { listings: [], nextCursor: null };
 	}

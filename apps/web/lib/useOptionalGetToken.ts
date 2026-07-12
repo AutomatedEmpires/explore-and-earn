@@ -2,7 +2,7 @@
 
 import { useAuth } from "@clerk/nextjs";
 
-type GetToken = (options?: { template?: string }) => Promise<string | null>;
+type GetToken = () => Promise<string | null>;
 
 // Module-level so the fallback keeps a stable identity across renders —
 // consumers hold getToken in useCallback deps.

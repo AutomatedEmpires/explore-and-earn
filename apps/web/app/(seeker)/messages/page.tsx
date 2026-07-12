@@ -54,7 +54,7 @@ export default async function MessagesPage() {
 		);
 	}
 
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) {
 		return (
 			<BucketPage title="Messages" description={PAGE_DESCRIPTION}>

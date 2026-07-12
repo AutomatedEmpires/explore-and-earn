@@ -35,7 +35,7 @@ export default async function SeekerMessageThreadPage({
 		);
 	}
 
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) {
 		return (
 			<BucketPage title="Conversation" description={PAGE_DESCRIPTION}>

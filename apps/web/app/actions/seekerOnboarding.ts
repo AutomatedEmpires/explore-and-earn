@@ -16,7 +16,7 @@ import { reportError } from "../../lib/sentry";
  * Seeker onboarding write path (Wave 9 / Agent B).
  *
  * IDENTITY: clerkUserId ALWAYS comes from auth().userId — never decoded from the
- * Supabase template token. Every step is optional/skippable; the final step sets
+ * native Supabase-integrated token. Every step is optional/skippable; the final step sets
  * onboarding_complete = true (passed via complete: true from the skills step,
  * not from a client-side useEffect on the done page).
  */
@@ -53,7 +53,7 @@ async function saveOnboardingStepImpl(
   if (!userId) {
     return { ok: false, error: "not_authenticated" };
   }
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return { ok: false, error: "no_token" };
   }

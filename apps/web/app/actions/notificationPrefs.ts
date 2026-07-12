@@ -33,7 +33,7 @@ async function currentUserId(): Promise<string | undefined> {
 async function getNotificationPrefsActionImpl(): Promise<NotificationPrefs> {
   const { userId, getToken } = await auth();
   if (!userId) return DEFAULT_NOTIFICATION_PREFS;
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return DEFAULT_NOTIFICATION_PREFS;
   return getNotificationPrefs(token, userId);
 }
@@ -59,7 +59,7 @@ async function saveNotificationPrefsActionImpl(
 ): Promise<NotificationPrefsActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "unauthenticated" };
 
   const result = await saveNotificationPrefs(token, userId, prefs);
@@ -89,7 +89,7 @@ async function updateNotificationPrefsActionImpl(
 ): Promise<NotificationPrefsActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "unauthenticated" };
 
   const result = await updateNotificationPrefsQuery(token, userId, prefs);

@@ -41,7 +41,7 @@ async function applyToListingActionImpl(
 		return { ok: false, error: "rate_limit_exceeded" }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
 	}
@@ -116,7 +116,7 @@ async function getSeekerApplicationIdsActionImpl(): Promise<string[]> {
 		return []
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return []
 	}
@@ -144,7 +144,7 @@ async function withdrawApplicationActionImpl(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
 	}

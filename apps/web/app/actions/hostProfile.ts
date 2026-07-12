@@ -34,7 +34,7 @@ function isAllowedStorageUrl(url: string | undefined | null): boolean {
  * Server action: create a host profile for the authenticated user.
  *
  * Auth is enforced here (Clerk) before any DB work; the Supabase-compatible JWT
- * is minted via the "supabase" Clerk JWT template and handed to the db layer,
+ * is minted via Clerk's native Supabase integration and handed to the db layer,
  * along with the verified `userId` used as the app-level ownership scope.
  */
 async function createHostProfileActionImpl(
@@ -50,7 +50,7 @@ async function createHostProfileActionImpl(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
 	}
@@ -99,7 +99,7 @@ export interface UpdateHostProfileInput {
  * Writes company_name, about, primary_location_name, website_url, and photo_url
  * to the caller's own `host_profiles` row (scoped by the verified `auth().userId`
  * in the db layer). Follows the same auth pattern as the other server actions:
- * `auth()` -> `getToken({ template: "supabase" })` -> db call -> revalidate.
+ * `auth()` -> `getToken()` -> db call -> revalidate.
  */
 async function updateHostProfileActionImpl(
 	fields: UpdateHostProfileInput,
@@ -109,7 +109,7 @@ async function updateHostProfileActionImpl(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
 	}

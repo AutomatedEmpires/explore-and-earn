@@ -60,7 +60,7 @@ export function HostProfileForm({
     if (!hostProfileId) {
       throw new Error("Missing host profile — reload the page and try again.");
     }
-    const token = await getToken({ template: "supabase" });
+    const token = await getToken();
     if (!token) {
       throw new Error("Your session has expired — sign in again.");
     }

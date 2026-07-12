@@ -23,7 +23,7 @@ export const metadata: Metadata = {
  * listings, excluding anything they have already saved or applied to (the
  * applied filter is enforced server-side inside getSwipeBatch). The deck then
  * paginates client-side via getSwipeBatchAction. AUTH LAW: userId comes from
- * auth().userId and the Supabase token from getToken({ template: "supabase" }).
+ * auth().userId and the Supabase token from getToken().
  * An unauthenticated/edge render falls back to the public feed so the deck is
  * never empty.
  */
@@ -34,7 +34,7 @@ export default async function SwipePage() {
 	let initialCursor: string | null = null;
 
 	if (userId) {
-		const token = await getToken({ template: "supabase" });
+		const token = await getToken();
 		if (token) {
 			const savedIds = await getSavedListingIds(token, userId);
 			const batch = await getSwipeListings(token, userId, savedIds);

@@ -128,7 +128,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
     if (!hostProfileId) {
       throw new Error("Missing host profile — reload the page and try again.");
     }
-    const token = await getToken({ template: "supabase" });
+    const token = await getToken();
     if (!token) {
       throw new Error("Your session has expired — sign in again.");
     }
@@ -139,7 +139,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
     if (!hostProfileId) {
       throw new Error("Missing host profile — reload the page and try again.");
     }
-    const token = await getToken({ template: "supabase" });
+    const token = await getToken();
     if (!token) {
       throw new Error("Your session has expired — sign in again.");
     }
@@ -148,7 +148,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
 
   async function removeGalleryImage(url: string): Promise<void> {
     if (!hostProfileId) return;
-    const token = await getToken({ template: "supabase" });
+    const token = await getToken();
     if (!token) return;
     try {
       const { pathname } = new URL(url);

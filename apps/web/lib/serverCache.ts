@@ -34,7 +34,7 @@ import {
  */
 
 /**
- * Request-scoped Supabase JWT. Clerk mints a fresh token per `getToken()` call
+ * Request-scoped Clerk session JWT from the native Supabase integration.
  * (a network round-trip, and each token differs by `iat`), so calling it once
  * per request and reusing the result is both faster AND makes the token string
  * stable — which is what lets {@link cachedSeekerProfile} / {@link cachedHostProfile}
@@ -42,7 +42,7 @@ import {
  */
 export const getSupabaseToken = cache(async (): Promise<string | null> => {
   const { getToken } = await auth();
-  return (await getToken({ template: "supabase" })) ?? null;
+  return (await getToken()) ?? null;
 });
 
 /**

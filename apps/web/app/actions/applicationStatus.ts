@@ -55,7 +55,7 @@ async function updateApplicationStatusActionImpl(
     return { ok: false, error: "You must be signed in as a host." };
   }
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return { ok: false, error: "Your session has expired. Sign in again to continue." };
   }

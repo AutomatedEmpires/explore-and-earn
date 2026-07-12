@@ -22,7 +22,7 @@ export default async function HostSettingsPage() {
     );
   }
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return (
       <section className={styles.block}>

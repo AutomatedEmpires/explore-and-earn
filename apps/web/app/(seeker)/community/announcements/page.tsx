@@ -36,7 +36,7 @@ export default async function CommunityAnnouncementsPage({
 }) {
 	const { purchased } = await searchParams;
 	const { userId, getToken } = await auth();
-	const token = userId ? await getToken({ template: "supabase" }) : null;
+	const token = userId ? await getToken() : null;
 	const user = userId ? await currentUser() : null;
 	const fallbackName = user?.firstName ?? null;
 

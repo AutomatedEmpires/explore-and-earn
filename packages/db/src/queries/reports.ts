@@ -70,7 +70,7 @@ const ALLOWED_REASONS = new Set<string>([
 /**
  * Insert a new listing report on behalf of the authenticated user.
  *
- * @param clerkToken  Supabase-template Clerk JWT for the authed client.
+ * @param clerkToken  Clerk session JWT from the native Supabase integration.
  * @param input       Validated insert input (reporterId from server-side auth).
  * @returns `{ ok: true, report }` on success, `{ ok: false, error }` on failure.
  */

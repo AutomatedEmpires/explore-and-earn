@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const { userId, getToken } = await auth();
   if (!userId) return { title: "Application" };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { title: "Application" };
   const application = await getSeekerApplicationRichById(token, userId, id).catch(() => null);
   const title = application?.listing?.title
@@ -120,7 +120,7 @@ function buildTimeline(application: RichSeekerApplication): TimelineStep[] {
 export default async function AppliedDetailPage({ params }: Props) {
   const { id } = await params;
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const token = userId ? await getToken() : null;
 
   if (!userId || !token) {
     notFound();

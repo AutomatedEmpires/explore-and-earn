@@ -25,7 +25,7 @@ async function setOfferStatus(
 ): Promise<OfferActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "unauthenticated" };
 
   const result = await updateApplicationStatusBySeeker(

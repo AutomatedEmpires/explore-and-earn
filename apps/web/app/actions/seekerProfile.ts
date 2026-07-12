@@ -9,7 +9,7 @@ const VALID_TIMELINES = new Set(["now", "1_month", "3_months", "6_months"]);
 async function getSession(): Promise<{ userId: string; token: string } | null> {
   const { userId, getToken } = await auth();
   if (!userId) return null;
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return null;
   return { userId, token };
 }
