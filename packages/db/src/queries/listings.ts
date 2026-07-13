@@ -142,6 +142,16 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
       id: row.host_profile_id ?? undefined,
       name: hostName,
       verified,
+      // Monetization ranking ("pay more, show more"): expose the host's real
+      // active subscription tier so Enterprise > Professional > Starter is
+      // honored. Never fabricated — anything other than a known paid tier
+      // (incl. null/free/unknown) maps to "none" (ranks last, never hidden).
+      tier:
+        row.host_profiles?.subscription_tier === "starter" ||
+        row.host_profiles?.subscription_tier === "professional" ||
+        row.host_profiles?.subscription_tier === "enterprise"
+          ? row.host_profiles.subscription_tier
+          : "none",
     },
     benefits: {
       housing: {

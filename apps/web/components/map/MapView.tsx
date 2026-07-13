@@ -83,10 +83,11 @@ function hasCoordinates(listing: DiscoveryListing): listing is MappedListing {
   return listing.coordinates != null;
 }
 
-/** Monetization inputs a listing can supply on the map surface (no host tier here). */
+/** Monetization inputs a listing supplies on the map surface (boosted + tier + match). */
 function toRankInputs(listing: DiscoveryListing): MonetizationInputs {
   return {
     boosted: listing.conditionalBadges?.includes("boosted"),
+    hostTier: listing.host?.tier,
     matchScore: listing.matchScore,
   };
 }

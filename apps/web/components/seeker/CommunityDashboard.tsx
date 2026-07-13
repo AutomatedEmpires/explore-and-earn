@@ -278,6 +278,7 @@ function buildListingFeedCards(listings: readonly DiscoveryListing[]): BoostedLi
     .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
     .sort(byMonetization<DiscoveryListing>(l => ({
       boosted: l.conditionalBadges?.includes("boosted"),
+      hostTier: l.host?.tier,
       matchScore: l.matchScore,
     })))
     .slice(0, 4)

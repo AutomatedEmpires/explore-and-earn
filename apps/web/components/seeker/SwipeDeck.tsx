@@ -63,6 +63,7 @@ const PREFETCH_REMAINING = 5;
  */
 const orderByMonetization = byMonetization<DiscoveryListing>((listing) => ({
 	boosted: listing.conditionalBadges?.includes("boosted") ?? false,
+	hostTier: listing.host?.tier,
 	matchScore: listing.matchScore,
 }));
 
