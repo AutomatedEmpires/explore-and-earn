@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
@@ -6,18 +5,20 @@ import {
   getConversations,
   getHostApplications,
   getHostListings,
+  getHostSubscriptionTier,
   getMatchScoresForHost,
   getSeekerDisplayNames,
   rowToDiscoveryFields,
 } from "@explore-and-earn/db";
-import { Icon, Meter, MetricCard, MetricGrid } from "@explore-and-earn/ui";
+import { PLAN_ENTITLEMENTS } from "@explore-and-earn/contracts";
+import { Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
 import {
   APPLICANT_STAGE_LABEL,
+  HostApplicantCard,
   HostPipelineBoard,
   HostSectionHeading,
   countByStage,
-  type HostApplicantItem,
 } from "../../../../components/host";
 import { EmptyState, type DiscoveryListing } from "../../../../components/discovery";
 import { toApplicantItem, threadsByApplicationId } from "./applicants-data";
@@ -27,39 +28,6 @@ export const metadata: Metadata = { title: "Applicants" };
 
 // Applicants are per-host (app-level scoped) and must never be statically cached.
 export const dynamic = "force-dynamic";
-
-/** Two-letter initials for the rail avatar (no avatar URL in the view-model). */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.charAt(0).toUpperCase();
-  return (parts[0]!.charAt(0) + parts[parts.length - 1]!.charAt(0)).toUpperCase();
-}
-
-/**
- * Presentation-only "profile signal" for the recommended-seekers rail. This is
- * deliberately NOT a matching/scoring algorithm (match isolation is founder-
- * gated and guardrail-enforced): it reads how complete the HOUSING/MEALS/PAY
- * triad is on the listing the seeker applied to — i.e. how warm/actionable the
- * lead is for the host — and nothing about the seeker's fit. Pure + stable.
- */
-function leadSignal(item: HostApplicantItem): number {
-  const b = item.listing.benefits;
-  const provided = [b.housing, b.meals, b.pay].filter(
-    (slot) => slot.provision === "provided",
-  ).length;
-  const hasNote = item.note ? 1 : 0;
-  // 3 triad slots + a cover-note bump, mapped onto a confident 70..96 band so
-  // the meter always reads as a strong, invite-worthy lead.
-  return 70 + provided * 8 + hasNote * 2;
-}
-
-/** Presentation labels for the ADR-040 match bands (render-time only). */
-const BAND_LABEL: Record<string, string> = {
-  strong: "Strong match",
-  developing: "Developing match",
-  needs_attention: "Needs attention",
-};
 
 export default async function HostApplicantsPage({
   searchParams,
@@ -91,14 +59,17 @@ export default async function HostApplicantsPage({
 
   // Applications carry only listingId/listingTitle; load the host's listings to
   // resolve each application's full DiscoveryListing for the canonical card.
-  const [applications, listingRows, conversations, matchScores] = await Promise.all([
-    getHostApplications(token, userId),
-    getHostListings(token, userId).catch(() => []),
-    getConversations(token, userId, "host").catch(() => []),
-    // Real ADR-040 fit for the host's applicants (populated on apply). Resilient:
-    // an empty map when no scores exist yet, so the rail degrades to lead signal.
-    getMatchScoresForHost(token).catch(() => new Map()),
-  ]);
+  const [applications, listingRows, conversations, matchScores, subscriptionTier] =
+    await Promise.all([
+      getHostApplications(token, userId),
+      getHostListings(token, userId).catch(() => []),
+      getConversations(token, userId, "host").catch(() => []),
+      // Real ADR-040 fit for the host's applicants (populated on apply). Resilient:
+      // an empty map when no scores exist yet, so the bucket shows its empty state.
+      getMatchScoresForHost(token).catch(() => new Map()),
+      // Real subscription tier — gates the Matched-seekers bucket (never fabricated).
+      getHostSubscriptionTier(token, userId).catch(() => "none" as const),
+    ]);
   const threadsMap = threadsByApplicationId(conversations);
 
   // Resolve seeker display names in a single batch query.
@@ -142,14 +113,24 @@ export default async function HostApplicantsPage({
   const counts = countByStage(applicants);
   const total = applicants.length;
 
-  // Best-fit early applicants for the "Recommended seekers" rail — ranked by the
-  // real ADR-040 match score when it has been computed (populated on apply), and
-  // gracefully falling back to the triad lead-signal for applicants not yet scored.
-  const rankSignal = (a: HostApplicantItem): number => a.matchScore ?? leadSignal(a);
-  const recommended = applicants
-    .filter((a) => a.stage === "new" || a.stage === "reviewing")
-    .sort((a, b) => rankSignal(b) - rankSignal(a))
-    .slice(0, 3);
+  // "Matched seekers" bucket — REAL ADR-040 fit only. Applicants that carry a
+  // genuine match score (populated on apply; see getMatchScoresForHost), ranked
+  // highest-first. A discovery aid, never a gate: unscored or already-declined
+  // seekers are simply not prioritised here — never locked out of applying. No
+  // fabricated seekers, scores, or counts.
+  const matchedSeekers = applicants
+    .filter((a) => a.matchScore != null && a.stage !== "declined")
+    .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
+    .slice(0, 6);
+
+  // Tier gate (ADR-039): the matched-seeker bucket is a paid capability. The
+  // 'full' analytics entitlement (Professional / Enterprise) unlocks it; Starter
+  // and un-subscribed hosts get the 'basic' tier and a compact upsell instead.
+  // Derived from the host's REAL subscription via the same PLAN_ENTITLEMENTS the
+  // analytics surface gates on — never fabricated.
+  const matchedSeekersUnlocked =
+    subscriptionTier !== "none" &&
+    PLAN_ENTITLEMENTS[subscriptionTier].analytics === "full";
 
   return (
     <section className={styles.block}>
@@ -194,67 +175,71 @@ export default async function HostApplicantsPage({
             />
           </MetricGrid>
 
-          <HostPipelineBoard applicants={applicants} />
-
-          {recommended.length > 0 ? (
-            <div className={styles.rail}>
-              <header className={styles.railHead}>
-                <div>
-                  <span className={styles.railKicker}>Recommended seekers</span>
-                  <h2 className={styles.railTitle}>Keep the role warm</h2>
-                  <p className={styles.railSub}>
-                    Strong early applicants worth a personal invite before the
-                    pool goes cold.
-                  </p>
-                </div>
-                <Link className={styles.railAction} href="/host/invites">
+          <section
+            className={styles.bucket}
+            aria-labelledby="matched-seekers-heading"
+          >
+            <header className={styles.bucketHead}>
+              <div>
+                <span className={styles.bucketKicker}>Matched seekers</span>
+                <h2 id="matched-seekers-heading" className={styles.bucketTitle}>
+                  Seekers who fit your listings
+                </h2>
+                <p className={styles.bucketSub}>
+                  Ranked by real match on résumé, availability, and experience —
+                  a discovery aid, never a gate. Anyone can still apply.
+                </p>
+              </div>
+              {matchedSeekersUnlocked && matchedSeekers.length > 0 ? (
+                <Link className={styles.bucketAction} href="/host/invites">
                   Invite seekers
                   <Icon name="action.forward" size={16} aria-hidden />
                 </Link>
-              </header>
-              <ul className={styles.railGrid}>
-                {recommended.map((item) => {
-                  // Real match when scored (populated on apply); else the triad lead signal.
-                  const signal = item.matchScore ?? leadSignal(item);
-                  const meterLabel = item.matchBand ? BAND_LABEL[item.matchBand] : "Lead signal";
-                  const href = item.threadId
-                    ? `/host/messages/${item.threadId}`
-                    : `/host/applicants/${item.id}`;
-                  return (
-                    <li key={item.id} className={styles.matchCard}>
-                      <div className={styles.matchWho}>
-                        <span className={styles.matchAvatar} aria-hidden>
-                          {initials(item.applicantName)}
-                        </span>
-                        <div className={styles.matchText}>
-                          <span className={styles.matchName}>
-                            {item.applicantName}
-                          </span>
-                          <span className={styles.matchRole}>
-                            {item.listing.title}
-                          </span>
-                        </div>
-                      </div>
-                      <div className={styles.matchMeter}>
-                        <Meter value={signal} label={meterLabel} />
-                      </div>
-                      <div
-                        className={styles.matchTrack}
-                        aria-hidden
-                        style={{ "--w": `${signal}%` } as CSSProperties}
-                      >
-                        <span />
-                      </div>
-                      <Link className={styles.matchInvite} href={href}>
-                        <Icon name="action.message" size={16} aria-hidden />
-                        Invite to chat
-                      </Link>
-                    </li>
-                  );
-                })}
+              ) : null}
+            </header>
+
+            {!matchedSeekersUnlocked ? (
+              <div className={styles.locked}>
+                <span className={styles.lockedIcon} aria-hidden>
+                  <Icon name="system.lock" size={20} />
+                </span>
+                <div className={styles.lockedText}>
+                  <p className={styles.lockedTitle}>
+                    Matched seekers is a Professional feature
+                  </p>
+                  <p className={styles.lockedSub}>
+                    Upgrade to Professional to see the seekers who best fit your
+                    open listings, ranked by their real match score.
+                  </p>
+                </div>
+                <Link className={styles.lockedCta} href="/host/billing">
+                  View plans
+                  <Icon name="action.forward" size={16} aria-hidden />
+                </Link>
+              </div>
+            ) : matchedSeekers.length > 0 ? (
+              <ul className={styles.bucketGrid}>
+                {matchedSeekers.map((item) => (
+                  <li key={item.id} className={styles.bucketItem}>
+                    <HostApplicantCard applicant={item} showMatch />
+                  </li>
+                ))}
               </ul>
-            </div>
-          ) : null}
+            ) : (
+              <div className={styles.bucketEmpty}>
+                <span className={styles.bucketEmptyIcon} aria-hidden>
+                  <Icon name="status.match" size={20} />
+                </span>
+                <p className={styles.bucketEmptyTitle}>No matched seekers yet</p>
+                <p className={styles.bucketEmptySub}>
+                  As seekers apply to your listings, the strongest fits surface
+                  here, ranked by their real match score.
+                </p>
+              </div>
+            )}
+          </section>
+
+          <HostPipelineBoard applicants={applicants} />
         </>
       ) : (
         <EmptyState

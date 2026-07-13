@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Badge, DiscoveryCard, type DiscoveryCardProps } from "@explore-and-earn/ui";
+import { Badge, DiscoveryCard, Icon, type DiscoveryCardProps } from "@explore-and-earn/ui";
+import { MATCH_BANDS, matchBandFor, type MatchBand } from "@explore-and-earn/contracts";
 
 import { toDiscoveryCardData } from "../discovery";
 import { HostApplicantCardActions } from "./HostApplicantCardActions";
@@ -13,12 +14,25 @@ import styles from "./HostApplicantCard.module.css";
 
 export interface HostApplicantCardProps {
   readonly applicant: HostApplicantItem;
+  /**
+   * Surface the applicant's REAL ADR-040 match score (never a fabricated
+   * signal): used by the host "Matched seekers" bucket. Off by default so the
+   * applicant pipeline board renders unchanged. The chip is shown ONLY when a
+   * real score has actually been computed for this seeker × listing pair.
+   */
+  readonly showMatch?: boolean;
 }
 
 function stageToCardState(stage: ApplicantStage): DiscoveryCardProps["cardState"] {
   if (stage === "offered") return "offered";
   if (stage === "declined") return "not_selected";
   return undefined;
+}
+
+/** Canonical band label (issue #46) for a real match score. */
+function bandLabel(band: MatchBand | undefined, score: number): string {
+  const id = band ?? matchBandFor(score);
+  return MATCH_BANDS.find((entry) => entry.id === id)?.label ?? "Match";
 }
 
 /** Initials fallback avatar (no avatar URL in the host applicant view-model). */
@@ -35,7 +49,11 @@ function initials(name: string): string {
  * identity, stage, and the host-side Skip / Save / Offer control row in the
  * card action slot.
  */
-export function HostApplicantCard({ applicant }: HostApplicantCardProps) {
+export function HostApplicantCard({ applicant, showMatch = false }: HostApplicantCardProps) {
+  const { matchScore } = applicant;
+  const showMatchChip = showMatch && matchScore != null;
+  const roundedScore = matchScore != null ? Math.round(matchScore) : null;
+
   return (
     <article className={styles.card}>
       <div className={styles.meta}>
@@ -55,6 +73,21 @@ export function HostApplicantCard({ applicant }: HostApplicantCardProps) {
           icon={APPLICANT_STAGE_ICON[applicant.stage]}
         />
       </div>
+      {showMatchChip && roundedScore != null ? (
+        <div
+          className={styles.match}
+          aria-label={`Match ${roundedScore} out of 100 — ${bandLabel(applicant.matchBand, roundedScore)}`}
+        >
+          <Icon name="status.match" size={16} aria-hidden />
+          <span className={styles.matchLabel}>
+            {bandLabel(applicant.matchBand, roundedScore)}
+          </span>
+          <span className={styles.matchScore}>
+            {roundedScore}
+            <span className={styles.matchScoreUnit}>/100</span>
+          </span>
+        </div>
+      ) : null}
       {applicant.note ? <p className={styles.note}>{applicant.note}</p> : null}
       <DiscoveryCard
         data={toDiscoveryCardData(applicant.listing)}
