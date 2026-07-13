@@ -46,10 +46,46 @@ export function PopupShell({
 	const panelRef = useRef<HTMLDivElement>(null);
 	const restoreFocusRef = useRef<HTMLElement | null>(null);
 	const [mounted, setMounted] = useState(false);
+	// `present` keeps the portal in the DOM through the exit animation after
+	// `open` flips to false, so the mirrored close transition can play. The
+	// focus trap / scroll lock (below) still release the instant `open` is
+	// false, so a11y is unaffected — only the visual teardown is deferred.
+	const [present, setPresent] = useState(open);
 
 	useEffect(() => {
 		setMounted(true);
 	}, []);
+
+	useEffect(() => {
+		if (open) {
+			setPresent(true);
+		}
+	}, [open]);
+
+	useEffect(() => {
+		if (open || !present) {
+			return;
+		}
+		// Closing: hold the portal for one exit cycle, then unmount. Duration is
+		// read from the --motion-drawer token (0 under reduced motion) so the
+		// timing stays token-driven rather than a hard-coded magic number.
+		let exitMs = 320;
+		if (typeof window !== "undefined") {
+			if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+				exitMs = 0;
+			} else {
+				const raw = getComputedStyle(document.documentElement)
+					.getPropertyValue("--motion-drawer")
+					.trim();
+				const parsed = Number.parseFloat(raw);
+				if (!Number.isNaN(parsed)) {
+					exitMs = raw.endsWith("ms") ? parsed : parsed * 1000;
+				}
+			}
+		}
+		const timer = window.setTimeout(() => setPresent(false), exitMs);
+		return () => window.clearTimeout(timer);
+	}, [open, present]);
 
 	useEffect(() => {
 		if (!open || !panelRef.current) {
@@ -112,28 +148,32 @@ export function PopupShell({
 		};
 	}, [open, onClose, mounted]);
 
-	if (!mounted || !open) {
+	if (!mounted || !present) {
 		return null;
 	}
 
+	// Rendered but no longer open → play the mirrored exit and stay inert.
+	const closing = !open;
+	const sizeClass =
+		size === "compact"
+			? styles.compact
+			: size === "wide"
+				? styles.wide
+				: "";
+
 	return createPortal(
 		<div
-			className={styles.scrim}
+			className={`${styles.scrim}${closing ? ` ${styles.closing}` : ""}`}
+			aria-hidden={closing || undefined}
 			onClick={(event) => {
-				if (event.target === event.currentTarget) {
+				if (!closing && event.target === event.currentTarget) {
 					onClose();
 				}
 			}}
 		>
 			<div
 				ref={panelRef}
-				className={
-					size === "compact"
-						? `${styles.panel} ${styles.compact}`
-						: size === "wide"
-							? `${styles.panel} ${styles.wide}`
-							: styles.panel
-				}
+				className={`${styles.panel}${sizeClass ? ` ${sizeClass}` : ""}${closing ? ` ${styles.closing}` : ""}`}
 				role="dialog"
 				aria-modal={true}
 				aria-labelledby={titleId}
