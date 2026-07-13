@@ -23,6 +23,13 @@ create index if not exists community_photo_reports_status_created_idx
 
 alter table public.community_photo_reports enable row level security;
 
+-- Data API access is opt-in and deliberately narrow: signed-in users may
+-- submit and view only their own reports through RLS; anonymous callers see
+-- neither rows nor schema metadata. Moderator workflows use the service role.
+revoke all on table public.community_photo_reports from anon, public;
+grant select, insert on table public.community_photo_reports to authenticated;
+grant select, update on table public.community_photo_reports to service_role;
+
 drop policy if exists community_photo_reports_insert_own on public.community_photo_reports;
 create policy community_photo_reports_insert_own
   on public.community_photo_reports for insert to authenticated
