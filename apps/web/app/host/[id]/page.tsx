@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { optionalAuth } from "../../../lib/optionalAuth";
 import {
   getPublicListingsByHost,
@@ -8,7 +9,7 @@ import {
   getHostReviews,
   getReviewableEngagementForHost,
 } from "@explore-and-earn/db";
-import type { PublicHostListing } from "@explore-and-earn/db";
+import type { PublicHostListing, HostTeamMember } from "@explore-and-earn/db";
 import { getPublicHostProfileCached } from "../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
 
@@ -165,6 +166,93 @@ function AboutSection({ about }: { about: string }) {
       <div className={styles.aboutCard}>
         <p className={styles.aboutText}>{about}</p>
       </div>
+    </section>
+  );
+}
+
+function WhyWorkSection({ why }: { why: string }) {
+  return (
+    <section className={styles.section} aria-labelledby="why-heading">
+      <h2 id="why-heading" className={styles.sectionHeading}>
+        Why work for us
+      </h2>
+      <div className={styles.whyCard}>
+        <div className={styles.whyAccent} aria-hidden>
+          <Icon name="status.match" size={20} aria-hidden />
+        </div>
+        <p className={styles.whyText}>{why}</p>
+      </div>
+    </section>
+  );
+}
+
+function TeamSection({ team }: { team: HostTeamMember[] }) {
+  return (
+    <section className={styles.section} aria-labelledby="team-heading">
+      <h2 id="team-heading" className={styles.sectionHeading}>
+        Meet the team
+      </h2>
+      <div className={styles.teamGrid}>
+        {team.map((member, i) => (
+          <div key={`${member.name}-${i}`} className={styles.teamCard}>
+            <div className={styles.teamPhotoFrame}>
+              {member.photoUrl ? (
+                <Image
+                  src={member.photoUrl}
+                  alt={member.name}
+                  fill
+                  sizes="96px"
+                  className={styles.teamPhoto}
+                />
+              ) : (
+                <div className={styles.teamPhotoPlaceholder}>
+                  <Icon name="nav.profile" size={24} aria-hidden />
+                </div>
+              )}
+            </div>
+            {member.name ? <p className={styles.teamName}>{member.name}</p> : null}
+            {member.role ? <p className={styles.teamRole}>{member.role}</p> : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ActivitiesSection({ activities }: { activities: string[] }) {
+  return (
+    <section className={styles.section} aria-labelledby="activities-heading">
+      <h2 id="activities-heading" className={styles.sectionHeading}>
+        Life &amp; activities
+      </h2>
+      <ul className={styles.chipList}>
+        {activities.map((activity, i) => (
+          <li key={`${activity}-${i}`} className={styles.chip}>
+            <Icon name="status.match" size={16} aria-hidden />
+            {activity}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function PerksSection({ perks }: { perks: string[] }) {
+  return (
+    <section className={styles.section} aria-labelledby="perks-heading">
+      <h2 id="perks-heading" className={styles.sectionHeading}>
+        Perks &amp; benefits
+      </h2>
+      <ul className={styles.perkList}>
+        {perks.map((perk, i) => (
+          <li key={`${perk}-${i}`} className={styles.perkRow}>
+            <span className={styles.perkIcon} aria-hidden>
+              <Icon name="status.accepted" size={16} aria-hidden />
+            </span>
+            <span className={styles.perkText}>{perk}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -381,9 +469,21 @@ export default async function PublicHostProfilePage({ params }: Props) {
 
       {/* ── Content grid: main col + sidebar ─────────────────── */}
       <div className={hasSidebar ? styles.contentGrid : styles.contentSingle}>
-        {/* Main column: showcase — about → forecast → opportunities → reviews */}
+        {/* Main column: showcase — about → why → team → activities → perks →
+            forecast → opportunities → reviews. Each narrative section self-omits
+            when the host has no data for it. */}
         <div className={styles.mainCol}>
           {host.about ? <AboutSection about={host.about} /> : null}
+          {host.whyWorkForUs ? <WhyWorkSection why={host.whyWorkForUs} /> : null}
+          {host.team && host.team.length > 0 ? (
+            <TeamSection team={host.team} />
+          ) : null}
+          {host.activities && host.activities.length > 0 ? (
+            <ActivitiesSection activities={host.activities} />
+          ) : null}
+          {host.perks && host.perks.length > 0 ? (
+            <PerksSection perks={host.perks} />
+          ) : null}
           {host.primaryLocationName ? (
             <WeatherWidget location={host.primaryLocationName} />
           ) : null}

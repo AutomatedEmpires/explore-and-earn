@@ -78,6 +78,9 @@ export default async function HostListingEditPage({
         listingId={id}
         initial={initial}
         hostProfileId={hostProfile?.id}
+        hostName={hostProfile?.companyName}
+        hostAvatarUrl={hostProfile?.photoUrl ?? undefined}
+        hostSubscriptionTier={hostProfile?.subscriptionTier}
       />
     </section>
   );

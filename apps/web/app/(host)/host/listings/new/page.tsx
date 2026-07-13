@@ -38,7 +38,13 @@ export default async function HostNewListingPage() {
           to create a listing.
         </p>
       )}
-      <ListingForm mode="create" hostProfileId={hostProfile?.id} />
+      <ListingForm
+        mode="create"
+        hostProfileId={hostProfile?.id}
+        hostName={hostProfile?.companyName}
+        hostAvatarUrl={hostProfile?.photoUrl ?? undefined}
+        hostSubscriptionTier={hostProfile?.subscriptionTier}
+      />
     </section>
   );
 }
