@@ -36,7 +36,7 @@ Before work, record `git status -sb`, the current branch and HEAD, open PRs, the
 - Documentation: `docs/<lane>/<slug>`
 - Chores: `chore/<lane>/<slug>`
 
-Use kebab case. Never direct-push `main`, merge, delete branches, rewrite history, force-push, or overwrite another agent’s lane or artifact. Keep each PR small, scoped to its issue and acceptance criteria, and cite the governing canon or repo document.
+Use kebab case. Implementing agents/builders never direct-push `main`, merge their own PRs, delete unmerged branches, rewrite history, force-push, or overwrite another agent’s lane or artifact. A designated maintainer or approved automation may merge after independent review and green required checks, then delete the merged branch. Keep each PR small, scoped to its issue and acceptance criteria, and cite the governing canon or repo document.
 
 ## 5. Required checks before PR
 
