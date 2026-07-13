@@ -20,6 +20,8 @@ export interface HostDashboardProps {
   readonly primaryLane: string | null;
   /** Full host analytics for the performance cards. */
   readonly analytics: HostAnalytics;
+  /** Unread message count — surfaced as a "needs attention" row when > 0. */
+  readonly unread?: number;
 }
 
 /** Map activity type to an icon key from the registry. */
@@ -63,6 +65,7 @@ export function HostDashboard({
   companyName,
   primaryLane,
   analytics,
+  unread = 0,
 }: HostDashboardProps) {
   // Primary counts come from analytics — getHostAnalytics is the reliable host
   // resolver (live listings + applications by status); the month-scoped stats
@@ -79,11 +82,6 @@ export function HostDashboard({
   ).reduce((sum, n) => sum + n, 0);
   const pendingReview = analytics.totalApplicationsByStatus["applied"] ?? 0;
 
-  const monthApps = Object.values(stats.applicationsThisMonth).reduce(
-    (sum, n) => sum + n,
-    0,
-  );
-  const totalAppsMonth = monthApps > 0 ? monthApps : totalApplicationsAllTime;
   const newApps = stats.applicationsThisMonth["applied"] ?? pendingReview;
 
   // "Pipeline fill" — share of applications moved past "applied".
@@ -149,10 +147,6 @@ export function HostDashboard({
 
   const pending = stats.pendingActions > 0 ? stats.pendingActions : pendingReview;
   const isNewHost = totalListings === 0;
-  // Exactly one KPI leads as the dominant tile — the host's most urgent job
-  // (pending review > new applicants). Avoids two competing "primary" tiles.
-  const leadKpi: "pending" | "new" | null =
-    pending > 0 ? "pending" : newApps > 0 ? "new" : null;
   // The single strongest next action drives the hero CTA.
   const heroPrimary =
     pending > 0
@@ -204,45 +198,10 @@ export function HostDashboard({
         />
       ) : null}
 
-      {/* ── KPI row ─────────────────────────────────────────────────── */}
-      <div className="host-kpiGrid">
-        <Link className="host-kpi" href="/host/listings">
-          <span className="host-kpi__top">
-            <Icon name="status.open" size={16} aria-hidden />
-          </span>
-          <span className="host-kpi__value">{liveCount}</span>
-          <span className="host-kpi__label">Live listings</span>
-        </Link>
-        <Link
-          className={`host-kpi${leadKpi === "new" ? " host-kpi--primary" : ""}`}
-          href="/host/applicants"
-        >
-          <span className="host-kpi__top">
-            <Icon name="action.apply" size={16} aria-hidden />
-          </span>
-          <span className="host-kpi__value">{newApps}</span>
-          <span className="host-kpi__label">New applicants</span>
-        </Link>
-        <Link
-          className={`host-kpi${leadKpi === "pending" ? " host-kpi--primary" : ""}`}
-          href="/host/applicants"
-        >
-          <span className="host-kpi__top">
-            <Icon name="status.match" size={16} aria-hidden />
-          </span>
-          <span className="host-kpi__value">{pending}</span>
-          <span className="host-kpi__label">Pending review</span>
-        </Link>
-        <Link className="host-kpi" href="/host/applicants">
-          <span className="host-kpi__top">
-            <Icon name="analytics.meter" size={16} aria-hidden />
-          </span>
-          <span className="host-kpi__value">{totalAppsMonth}</span>
-          <span className="host-kpi__label">Apps this month</span>
-        </Link>
-      </div>
-
-      {/* ── Needs attention ─────────────────────────────────────────── */}
+      {/* ── Needs attention — the primary, content-first at-a-glance ──
+          What this host must act on RIGHT NOW: applicants to review, fresh
+          interest, drafts to publish, unread threads. Counts are real (no
+          fabrication); each row deep-links to the surface that resolves it. */}
       <section className="host-panel host-panel--raised">
         <div className="host-panel__head">
           <div className="host-panel__titles">
@@ -271,6 +230,16 @@ export function HostDashboard({
               <Icon name="action.forward" size={20} aria-hidden />
             </Link>
           ) : null}
+          {unread > 0 ? (
+            <Link className="host-attention" href="/host/messages">
+              <span className="host-attention__count">{unread}</span>
+              <span className="host-attention__text">
+                <span className="host-attention__title">Unread messages</span>
+                <span className="host-attention__sub">Seekers waiting to hear back from you</span>
+              </span>
+              <Icon name="action.forward" size={20} aria-hidden />
+            </Link>
+          ) : null}
           {draftCount > 0 ? (
             <Link className="host-attention" href="/host/listings">
               <span className="host-attention__count">{draftCount}</span>
@@ -281,7 +250,7 @@ export function HostDashboard({
               <Icon name="action.forward" size={20} aria-hidden />
             </Link>
           ) : null}
-          {pending === 0 && newApps === 0 && draftCount === 0 ? (
+          {pending === 0 && newApps === 0 && unread === 0 && draftCount === 0 ? (
             isNewHost ? (
               // A brand-new host is NOT "caught up" — the next action is the
               // setup path (saying otherwise contradicted the 0/3 checklist
@@ -301,47 +270,6 @@ export function HostDashboard({
               </p>
             )
           ) : null}
-        </div>
-      </section>
-
-      {/* ── Quick actions ───────────────────────────────────────────── */}
-      <section>
-        <div className="host-actionGrid">
-          <Link className="host-action-tile host-action-tile--primary" href="/host/listings/new">
-            <span className="host-action-tile__icon"><Icon name="action.apply" size={20} aria-hidden /></span>
-            <span className="host-action-tile__label">Create listing</span>
-            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
-          </Link>
-          <Link className="host-action-tile" href="/host/applicants">
-            <span className="host-action-tile__icon"><Icon name="status.match" size={20} aria-hidden /></span>
-            <span className="host-action-tile__label">Review applicants</span>
-            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
-          </Link>
-          <Link className="host-action-tile" href="/host/listings">
-            <span className="host-action-tile__icon"><Icon name="status.boosted" size={20} aria-hidden /></span>
-            <span className="host-action-tile__label">Boost a listing</span>
-            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
-          </Link>
-          <Link className="host-action-tile" href="/host/messages">
-            <span className="host-action-tile__icon"><Icon name="nav.messages" size={20} aria-hidden /></span>
-            <span className="host-action-tile__label">Messages</span>
-            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
-          </Link>
-          <Link className="host-action-tile" href="/host/announcements">
-            <span className="host-action-tile__icon"><Icon name="nav.announcements" size={20} aria-hidden /></span>
-            <span className="host-action-tile__label">Announcements</span>
-            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
-          </Link>
-          <Link className="host-action-tile" href="/host/profile/edit">
-            <span className="host-action-tile__icon"><Icon name="nav.profile" size={20} aria-hidden /></span>
-            <span className="host-action-tile__label">Edit profile</span>
-            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
-          </Link>
-          <Link className="host-action-tile" href="/host/billing">
-            <span className="host-action-tile__icon"><Icon name="system.info" size={20} aria-hidden /></span>
-            <span className="host-action-tile__label">Plan &amp; billing</span>
-            <span className="host-action-tile__chev"><Icon name="action.forward" size={20} aria-hidden /></span>
-          </Link>
         </div>
       </section>
 

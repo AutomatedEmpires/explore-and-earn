@@ -1,0 +1,320 @@
+/*
+ * HostShell layout — pairs the shared <ScopeShellNav> (desktop LEFT rail +
+ * mobile HAMBURGER drawer) with a minimal top bar. Founder canon (2026-07-13):
+ * secondary nav is TUCKED into the rail/hamburger — NO bottom dock of selectors.
+ *
+ * Tokens only (Glacier semantic + inherited host-os gold accent from .host-os).
+ * Borders-first, ≥44px tap targets, safe-area aware, reduced-motion safe.
+ */
+
+.shell {
+	min-height: 100vh;
+}
+
+/* Content column — offset past the fixed rail at ≥1024px (SCOPE_RAIL_WIDTH,
+   passed in as --host-rail-w so the offset always tracks the constant). */
+.main {
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+}
+
+@media (min-width: 1024px) {
+	.main {
+		margin-inline-start: var(--host-rail-w, 240px);
+	}
+}
+
+/* ─── Minimal top bar (brand + scope + user) ─────────────────────────────── */
+.topbar {
+	position: sticky;
+	inset-block-start: 0;
+	z-index: var(--z-dock);
+	display: flex;
+	align-items: center;
+	gap: var(--space-10);
+	min-height: 60px;
+	padding: var(--space-10) var(--space-14);
+	/* Reserve room for the fixed hamburger (44px at ~space-12 inset) on mobile. */
+	padding-inline-start: calc(44px + var(--space-12) + var(--space-12));
+	background: var(--color-surface);
+	border-block-end: 1px solid var(--border-soft);
+}
+
+@media (min-width: 1024px) {
+	.topbar {
+		/* Rail carries the brand at desktop; the bar resets its left inset. */
+		padding-inline-start: var(--space-20);
+	}
+}
+
+/* Brand + scope — shown on mobile (rail hidden); tucked away once the rail
+   carries the brand at ≥1024px. */
+.topLead {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	min-width: 0;
+	text-decoration: none;
+	color: var(--text-primary);
+}
+
+@media (min-width: 1024px) {
+	.topLead {
+		display: none;
+	}
+}
+
+.topMark {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--radius-input);
+	font-family: var(--font-display);
+	font-weight: 700;
+	font-size: 16px;
+	color: var(--hostos-on-amber, var(--color-cta-text));
+	background: var(--hostos-grad, var(--gradient-action));
+}
+
+.topScope {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	line-height: 1;
+}
+
+.topScope b {
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: var(--type-body-size);
+	color: var(--text-primary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.topScope s {
+	margin-block-start: 3px;
+	font-size: var(--type-label-size);
+	font-weight: 700;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+	text-decoration: none;
+}
+
+.spacer {
+	flex: 1 1 auto;
+}
+
+.topActions {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	flex: none;
+}
+
+/* Primary "New listing" — host gold identity (inherited from .host-os), with a
+   Glacier action fallback if the scope tokens are ever absent. */
+.newBtn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: 44px;
+	padding: 0 var(--space-16);
+	border: 1px solid transparent;
+	border-radius: var(--radius-pill);
+	background: var(--hostos-grad, var(--gradient-action));
+	color: var(--hostos-on-amber, var(--color-cta-text));
+	font-family: var(--font-ui);
+	font-weight: var(--font-weight-semibold);
+	font-size: var(--type-meta-size);
+	text-decoration: none;
+	white-space: nowrap;
+	transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.newBtn > span[aria-hidden] {
+	font-size: 18px;
+	line-height: 1;
+}
+
+@media (max-width: 639px) {
+	.newLabel {
+		/* Collapse to the "+" glyph on small phones. */
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	.newBtn {
+		padding: 0;
+		width: 44px;
+		justify-content: center;
+	}
+}
+
+.bell {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 44px;
+	height: 44px;
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	text-decoration: none;
+	transition: background var(--motion-base) var(--ease-standard);
+}
+
+.bell:hover {
+	background: color-mix(in srgb, var(--color-cta) 8%, var(--color-surface-raised));
+}
+
+.bellBadge {
+	position: absolute;
+	inset-block-start: -2px;
+	inset-inline-end: -2px;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 var(--space-4);
+	display: grid;
+	place-items: center;
+	border-radius: var(--radius-pill);
+	background: var(--gradient-action);
+	color: var(--color-cta-text);
+	font-family: var(--font-ui);
+	font-size: 10px;
+	font-weight: var(--font-weight-semibold);
+	line-height: 1;
+	font-variant-numeric: tabular-nums;
+}
+
+.account {
+	display: inline-grid;
+	place-items: center;
+	flex: none;
+	text-decoration: none;
+}
+
+.accountAvatar {
+	display: grid;
+	place-items: center;
+	width: 40px;
+	height: 40px;
+	border-radius: var(--radius-pill);
+	overflow: hidden;
+	background-size: cover;
+	background-position: center;
+	background-color: var(--color-action-soft);
+	color: var(--hostos-on-amber, var(--color-cta-text));
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: 16px;
+}
+
+/* Give the letter-only avatar the gold fill; the photo variant sets its own
+   background-image inline and the letter is omitted. */
+.accountAvatar:not([style]) {
+	background: var(--hostos-grad, var(--gradient-action));
+}
+
+/* Focus rings — gold on paper, matching the host scope. */
+.newBtn:focus-visible,
+.bell:focus-visible,
+.account:focus-visible,
+.topLead:focus-visible {
+	outline: none;
+	box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--hostos-accent, var(--color-cta));
+}
+
+.newBtn:active,
+.bell:active,
+.account:active {
+	transform: translateY(1px);
+}
+
+/* ─── Content surface ────────────────────────────────────────────────────── */
+.content {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: var(--space-16);
+}
+
+@media (min-width: 1024px) {
+	.content {
+		padding: var(--space-24);
+	}
+}
+
+/* ─── Rail brand (passed into ScopeShellNav's brand slot) ─────────────────── */
+.brand {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	text-decoration: none;
+	color: var(--text-primary);
+}
+
+.brandMark {
+	display: grid;
+	place-items: center;
+	flex: none;
+	width: 32px;
+	height: 32px;
+	border-radius: var(--radius-input);
+	font-family: var(--font-display);
+	font-weight: 700;
+	font-size: 16px;
+	color: var(--hostos-on-amber, var(--color-cta-text));
+	background: var(--hostos-grad, var(--gradient-action));
+}
+
+.brandWord {
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: var(--type-body-size);
+	color: var(--text-primary);
+}
+
+/* Avatar node handed to ScopeShellNav's user row (fills its 36px slot). */
+.navAvatar {
+	display: grid;
+	place-items: center;
+	width: 100%;
+	height: 100%;
+	background-size: cover;
+	background-position: center;
+	color: var(--hostos-on-amber, var(--color-cta-text));
+	font-family: var(--font-display);
+	font-weight: 600;
+	font-size: 15px;
+}
+
+.navAvatar:not([style]) {
+	background: var(--hostos-grad, var(--gradient-action));
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.newBtn,
+	.bell,
+	.newBtn:active,
+	.bell:active,
+	.account:active {
+		transition: none;
+		transform: none;
+	}
+}

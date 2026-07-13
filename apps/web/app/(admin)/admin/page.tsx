@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getMarketplaceStats } from "@explore-and-earn/db";
+import {
+  getMarketplaceStats,
+  getModerationStats,
+  getRefundStats,
+} from "@explore-and-earn/db";
 import { Chip, Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
 import { AdminMarketHealth } from "../../../components/admin";
@@ -29,6 +33,17 @@ export default async function AdminDashboardPage() {
   // never serialized to the client (this is a server component).
   const serviceRoleToken = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const stats = await getMarketplaceStats(serviceRoleToken);
+
+  // Secondary operational queues that also need a moderator decision: community
+  // reports and refund/payment requests. Read resiliently — a transient failure
+  // yields zeros so the overview always renders. Counts are honest when present,
+  // never fabricated.
+  const [moderation, refunds] = await Promise.all([
+    getModerationStats(serviceRoleToken).catch(() => null),
+    getRefundStats(serviceRoleToken).catch(() => null),
+  ]);
+  const openReports = (moderation?.open ?? 0) + (moderation?.reviewing ?? 0);
+  const openRefunds = refunds?.requested ?? 0;
 
   // Presentation-only derivations from the already-fetched stats. No new reads.
   const livePct = pct(stats.liveListings, stats.totalListings);
@@ -69,13 +84,21 @@ export default async function AdminDashboardPage() {
             <span className={styles.opsValue}>{reviewQueue}</span>
             <span className={styles.opsLabel}>Review queue</span>
           </div>
-          <div className={styles.opsNode}>
-            <span className={styles.opsValue}>{compact(stats.liveListings)}</span>
-            <span className={styles.opsLabel}>Listings live</span>
+          <div className={styles.opsNode} data-tone={openReports > 0 ? "hot" : "good"}>
+            <span className={styles.opsValue}>{openReports}</span>
+            <span className={styles.opsLabel}>Community reports</span>
+          </div>
+          <div className={styles.opsNode} data-tone={openRefunds > 0 ? "hot" : "good"}>
+            <span className={styles.opsValue}>{openRefunds}</span>
+            <span className={styles.opsLabel}>Refund requests</span>
           </div>
           <div className={styles.opsNode} data-tone={hostsToVerify > 0 ? "hot" : "good"}>
             <span className={styles.opsValue}>{hostsToVerify}</span>
             <span className={styles.opsLabel}>Hosts to verify</span>
+          </div>
+          <div className={styles.opsNode}>
+            <span className={styles.opsValue}>{compact(stats.liveListings)}</span>
+            <span className={styles.opsLabel}>Listings live</span>
           </div>
           <div className={styles.opsNode} data-tone="good">
             <span className={styles.opsValue}>{healthValue}%</span>
@@ -130,8 +153,8 @@ export default async function AdminDashboardPage() {
             <div>
               <h3 className={styles.panelTitle}>Live review queue</h3>
               <p className={styles.panelNote}>
-                Sorted by impact — applications awaiting first review and
-                listings held for moderation.
+                Sorted by impact — applications, listings, community reports, and
+                refund requests that need a moderator decision now.
               </p>
             </div>
           </div>
@@ -168,6 +191,42 @@ export default async function AdminDashboardPage() {
                 <span className={styles.queueMeta}>Held for moderation</span>
               </span>
               <span className={styles.queueCount}>{stats.underReviewListings}</span>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/reports"
+              className={styles.queueRow}
+              data-tone={openReports > 0 ? "hot" : undefined}
+            >
+              <span className={styles.queueIcon}>
+                <Icon name="action.report" size={20} aria-hidden />
+              </span>
+              <span className={styles.queueBody}>
+                <span className={styles.queueLabel}>Community reports open</span>
+                <span className={styles.queueMeta}>Awaiting moderation</span>
+              </span>
+              <span className={styles.queueCount}>{openReports}</span>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/refunds"
+              className={styles.queueRow}
+              data-tone={openRefunds > 0 ? "hot" : undefined}
+            >
+              <span className={styles.queueIcon}>
+                <Icon name="benefit.pay" size={20} aria-hidden />
+              </span>
+              <span className={styles.queueBody}>
+                <span className={styles.queueLabel}>Refund requests open</span>
+                <span className={styles.queueMeta}>Payment / subscription</span>
+              </span>
+              <span className={styles.queueCount}>{openRefunds}</span>
               <span className={styles.queueGo} aria-hidden="true">
                 <Icon name="action.view" size={20} aria-hidden />
               </span>

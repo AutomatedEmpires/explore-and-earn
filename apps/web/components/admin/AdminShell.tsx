@@ -1,51 +1,53 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
+import {
+  ScopeShellNav,
+  SCOPE_RAIL_WIDTH,
+  type ScopeNavItem,
+} from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
 
-interface NavItem {
+/**
+ * Admin OS shell — the moderation command center chrome.
+ *
+ * Founder canon (2026-07-13): every scope shares ONE navigation model — a
+ * persistent LEFT rail at ≥1024px, a top-left HAMBURGER → left drawer below it.
+ * "NO row of selectors dumped at the bottom. Never." So Admin drops its old
+ * bespoke sidebar + bottom dock and drives its sections through the shared
+ * {@link ScopeShellNav}. The content area is the immersive surface: a light
+ * command topbar (search + review-queue + at-a-glance health) over the routed
+ * moderation surfaces, offset by {@link SCOPE_RAIL_WIDTH} at desktop.
+ */
+
+interface AdminNavDef {
   readonly href: string;
   readonly label: string;
-  readonly sub: string;
   readonly icon: IconKey;
+  /** Overview matches its href EXACTLY (so /admin/* children don't light it up). */
   readonly exact?: boolean;
-  readonly badgeKey?: "unread" | "community";
-}
-interface NavGroup {
-  readonly group: string;
-  readonly items: readonly NavItem[];
+  /** Carries the live review-queue count as a badge (Applications only). */
+  readonly queueBadge?: boolean;
 }
 
-const NAV: readonly NavGroup[] = [
-  {
-    group: "Moderation",
-    items: [
-      { href: "/admin", label: "Overview", sub: "Marketplace health", icon: "analytics.meter", exact: true },
-      { href: "/applications", label: "Applications", sub: "Review queue", icon: "action.apply", badgeKey: "unread" },
-      { href: "/listings", label: "Listings", sub: "Moderate posts", icon: "category.mix" },
-      { href: "/hosts", label: "Hosts", sub: "Verify + trust", icon: "nav.profile" },
-      { href: "/admin/reports", label: "Reports", sub: "Moderation queue", icon: "action.report" },
-      { href: "/admin/refunds", label: "Refunds", sub: "Host requests", icon: "benefit.pay" },
-    ],
-  },
-  {
-    group: "Tools",
-    items: [
-      { href: "/admin/guidelines", label: "Guidelines", sub: "Moderation policy", icon: "nav.help" },
-      { href: "/admin/email-preview", label: "Email templates", sub: "Transactional", icon: "nav.messages" },
-    ],
-  },
+// Primary operational sections — the moderator's working set, ordered by how
+// often a queue needs action. Only REAL admin routes (no fabricated sections).
+const SECTIONS: readonly AdminNavDef[] = [
+  { href: "/admin", label: "Overview", icon: "analytics.meter", exact: true },
+  { href: "/applications", label: "Applications", icon: "action.apply", queueBadge: true },
+  { href: "/listings", label: "Listings", icon: "category.mix" },
+  { href: "/hosts", label: "Hosts", icon: "nav.profile" },
+  { href: "/admin/reports", label: "Reports", icon: "action.report" },
+  { href: "/admin/refunds", label: "Refunds", icon: "benefit.pay" },
 ];
 
-// Admin mobile tabs: Overview · Applications · Listings · Hosts.
-const MOBILE_PRIMARY: readonly NavItem[] = [
-  { href: "/admin", label: "Overview", sub: "", icon: "analytics.meter", exact: true },
-  { href: "/applications", label: "Queue", sub: "", icon: "action.apply" },
-  { href: "/listings", label: "Listings", sub: "", icon: "category.mix" },
-  { href: "/hosts", label: "Hosts", sub: "", icon: "nav.profile" },
+// Reference-y tools, TUCKED into the pinned rail footer (settings-shaped).
+const FOOTER: readonly AdminNavDef[] = [
+  { href: "/admin/guidelines", label: "Guidelines", icon: "nav.help" },
+  { href: "/admin/email-preview", label: "Email templates", icon: "nav.messages" },
 ];
 
 export interface AdminShellProps {
@@ -53,12 +55,12 @@ export interface AdminShellProps {
   readonly adminName: string | null;
   /** Pending review-queue count (badge on Applications + topbar). */
   readonly queueCount?: number;
-  /** Marketplace-health % for the sidebar meter. */
+  /** Marketplace-health % for the topbar at-a-glance meter. */
   readonly healthScore?: number;
   readonly children: ReactNode;
 }
 
-function isActive(pathname: string, item: NavItem): boolean {
+function isActive(pathname: string, item: AdminNavDef): boolean {
   return item.exact
     ? pathname === item.href
     : pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -73,108 +75,88 @@ export function AdminShell({
   const pathname = usePathname();
   const name = adminName?.trim() || "Moderator";
   const initial = name.charAt(0).toUpperCase();
+  const health = Math.max(0, Math.min(100, Math.round(healthScore)));
 
-  const badge = (item: NavItem) => {
-    if (item.badgeKey === "unread") return queueCount > 0 ? queueCount : null;
-    return null;
-  };
+  const items: ScopeNavItem[] = SECTIONS.map((item) => ({
+    href: item.href,
+    label: item.label,
+    icon: item.icon,
+    active: isActive(pathname, item),
+    badge: item.queueBadge && queueCount > 0 ? queueCount : undefined,
+  }));
 
-  const navItem = (item: NavItem) => {
-    const active = isActive(pathname, item);
-    const b = badge(item);
-    return (
-      <Link
-        key={item.href}
-        href={item.href}
-        className="adminos-navitem"
-        aria-current={active ? "page" : undefined}
-      >
-        <span className="i"><Icon name={item.icon} size={20} aria-hidden /></span>
-        <span><b>{item.label}</b><s>{item.sub}</s></span>
-        {b ? <span className="adminos-bdg">{b}</span> : <span />}
-      </Link>
-    );
-  };
+  const footerItems: ScopeNavItem[] = FOOTER.map((item) => ({
+    href: item.href,
+    label: item.label,
+    icon: item.icon,
+    active: isActive(pathname, item),
+  }));
+
+  const brand = (
+    <span className="adminos-railbrand">
+      <span className="adminos-railmark" aria-hidden="true">E</span>
+      <span className="adminos-railword">
+        <b>Explore&amp;Earn</b>
+        <i><span className="adminos-livedot" /> Admin OS</i>
+      </span>
+    </span>
+  );
+
+  // Keep the desktop content offset synced to the exported rail width instead of
+  // a hard-coded magic number (the rail is position:fixed at ≥1024px).
+  const mainStyle = {
+    "--adminos-rail-w": `${SCOPE_RAIL_WIDTH}px`,
+  } as CSSProperties;
 
   return (
-    <div className="adminos-shell">
-      <aside className="adminos-side">
-        <div className="adminos-brand">
-          <div className="adminos-mark">E</div>
-          <div>
-            <b>Explore&amp;Earn</b>
-            <i><span className="adminos-livedot" /> Admin OS</i>
-          </div>
-        </div>
+    <>
+      <ScopeShellNav
+        scopeLabel="Admin"
+        brand={brand}
+        items={items}
+        footerItems={footerItems}
+        userName={name}
+        userHref="/admin"
+        avatar={initial}
+        menuLabel="Open admin menu"
+      />
 
-        <div className="adminos-card">
-          <div className="adminos-avatarimg">
-            <span className="adminos-avatar">{initial}</span>
-            <div>
-              <b>{name}</b>
-              <span><span className="adminos-livedot" /> Moderation online</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="adminos-score">
-          <div className="adminos-score-row">
-            <span>Marketplace health</span>
-            <span>{healthScore}%</span>
-          </div>
-          <div className="adminos-meter">
-            <span style={{ width: `${Math.max(0, Math.min(100, healthScore))}%` }} />
-          </div>
-        </div>
-
-        {NAV.map((g) => (
-          <nav key={g.group} className="adminos-nav" aria-label={g.group}>
-            <div className="adminos-navlabel">{g.group}</div>
-            {g.items.map(navItem)}
-          </nav>
-        ))}
-      </aside>
-
-      <div className="adminos-main">
+      <div className="adminos-main" style={mainStyle}>
         <header className="adminos-top">
           <CommandSearch
             className="adminos-search"
             action="/applications"
             placeholder="Search listings, hosts, applications…"
           />
-          <Link className="adminos-tact adminos-tact--p" href="/applications" aria-label="Review queue">
-            <Icon name="action.apply" size={20} aria-hidden />
-            <span className="adminos-tlabel">Review queue</span>
-            {queueCount > 0 ? <span className="adminos-bdg--top">{queueCount}</span> : null}
-          </Link>
-          <Link className="adminos-account" href="/admin" aria-label="Admin overview">
-            <span className="adminos-avatarmini">{initial}</span>
-          </Link>
+          <div className="adminos-topmeta">
+            <span
+              className="adminos-health"
+              role="meter"
+              aria-valuenow={health}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Marketplace health"
+            >
+              <Icon name="analytics.meter" size={16} aria-hidden />
+              <span className="adminos-health__v">{health}%</span>
+            </span>
+            <Link
+              className="adminos-tact adminos-tact--p"
+              href="/applications"
+              aria-label="Review queue"
+            >
+              <Icon name="action.apply" size={20} aria-hidden />
+              <span className="adminos-tlabel">Review queue</span>
+              {queueCount > 0 ? (
+                <span className="adminos-bdg--top">
+                  {queueCount > 99 ? "99+" : queueCount}
+                </span>
+              ) : null}
+            </Link>
+          </div>
         </header>
         <div className="adminos-contentwrap">{children}</div>
       </div>
-
-      <nav className="adminos-mnav" aria-label="Admin">
-        {MOBILE_PRIMARY.map((item) => {
-          const active = isActive(pathname, item);
-          // The Queue tab carries the live review-queue count on mobile (the
-          // triage-on-the-go device), mirroring the desktop sidebar badge.
-          const showBadge = item.href === "/applications" && queueCount > 0;
-          return (
-            <Link key={item.href} href={item.href} className="adminos-mtab" aria-current={active ? "page" : undefined}>
-              <span className="adminos-mtab__icon">
-                <Icon name={item.icon} size={20} aria-hidden />
-                {showBadge ? (
-                  <span className="adminos-mtab__bdg" aria-hidden="true">
-                    {queueCount > 99 ? "99+" : queueCount}
-                  </span>
-                ) : null}
-              </span>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+    </>
   );
 }

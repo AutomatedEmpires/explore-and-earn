@@ -12,36 +12,30 @@
  * by a separate palette. Host = gold ownership; Seeker = sky exploration;
  * Admin = sky command + warm-red danger.
  *
- * The one intentionally photographic element is the identity card: a framed
- * photo with an ink scrim and bone text (brand's #1 lever). Everything else is
- * paper, ink hairlines, whisper lifts.
+ * Navigation model (founder canon 2026-07-13): Admin shares the ONE scope-nav
+ * model — a persistent LEFT rail (ScopeShellNav) at ≥1024px, a top-left
+ * hamburger → drawer below it. There is NO bottom dock. This file owns only the
+ * MAIN column chrome (topbar + content) plus the scope token cascade; the rail
+ * itself is styled by ScopeShellNav.module.css (Glacier tokens).
  */
 .admin-os {
   /* ---- locked Admin OS chrome set (warm) ---- */
   --adminos-panel:    var(--color-surface);        /* #FFFCF5 warm card surface */
-  --adminos-panel-2:  var(--color-parchment);      /* #F0EAE0 warm panel */
+  --adminos-panel-2:  var(--color-parchment);      /* warm panel */
   --adminos-panel-3:  var(--color-paper);          /* page paper */
-  --adminos-line:     var(--border-soft);          /* #DDE2E3 chrome hairline */
-  --adminos-line-2:   var(--border-soft);
+  --adminos-line:     var(--border-soft);          /* chrome hairline */
   --adminos-ink-line: var(--border-ink);           /* ink hairline for emphasis */
-  --adminos-accent:   var(--color-cta);            /* sky #2F667A — the brand action */
+  --adminos-accent:   var(--color-cta);            /* sky — the brand action */
   --adminos-accent-deep: var(--palette-sky-dark);  /* deep sky for text-on-soft */
   --adminos-accent-soft: var(--color-action-soft); /* sky 12% on white */
-  --adminos-emerald:  var(--color-cta);            /* legacy alias → sky */
   --adminos-mint:     var(--state-ready-fg);       /* pine for success/ready */
-  --adminos-aqua:     var(--palette-sky-light);
   --adminos-gold:     var(--color-gold);
-  --adminos-bone:     #FBF7EE;                      /* text on framed photo */
   --adminos-on-emerald: var(--color-cta-text);     /* white on sky */
-  --adminos-on-accent: var(--color-cta-text);      /* white on sky */
   --adminos-grad:     var(--gradient-sky);          /* sky→teal for meter + active fills */
   /* moderation danger register (reports / removals) — warm red, never neon */
-  --adminos-danger-fg: var(--status-error-fg);     /* #9A3B26 warm red */
+  --adminos-danger-fg: var(--status-error-fg);     /* warm red */
   --adminos-danger-bg: var(--status-error-bg);
-  --adminos-red:      var(--status-error-fg);       /* legacy alias → warm red */
   --adminos-control:  46px;
-  --adminos-avatar:   42px;
-  --adminos-side:     292px;
 
   color: var(--text-primary);
   background:
@@ -52,71 +46,50 @@
   min-height: 100svh;
 }
 
-/* ── Shell grid ─────────────────────────────────────────────── */
-.adminos-shell {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: var(--adminos-side) 1fr;
-  min-height: 100svh;
-}
-
-/* ── Paper sidebar ──────────────────────────────────────────── */
-.adminos-side {
-  position: sticky;
-  top: 0;
-  height: 100svh;
-  padding: 18px 14px;
-  border-right: 1px solid var(--adminos-line);
-  background: var(--color-parchment);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow: hidden;
-}
-
-.adminos-brand {
-  min-height: 60px;
+/* ── Rail brand (composed into ScopeShellNav's brand slot) ─────────── */
+.adminos-railbrand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 24px;
-  background: var(--adminos-panel);
-  border: 1px solid var(--adminos-line);
+  gap: 10px;
+  min-width: 0;
 }
 
-.adminos-mark {
-  width: var(--adminos-avatar);
-  height: var(--adminos-avatar);
+.adminos-railmark {
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
-  border-radius: 14px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   color: var(--adminos-on-emerald);
   font-weight: 700;
+  font-size: 0.9rem;
   background:
     radial-gradient(circle at 33% 24%, rgba(255, 255, 255, 0.85) 0 8%, transparent 9%),
     var(--gradient-sky);
   box-shadow: var(--elevation-card);
 }
 
-.adminos-brand b {
+.adminos-railword {
+  min-width: 0;
+}
+
+.adminos-railword b {
   display: block;
-  letter-spacing: -0.05em;
-  font-size: 1.08rem;
-  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-size: 0.98rem;
+  line-height: 1;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.adminos-brand i {
+.adminos-railword i {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--text-muted);
-  font-size: 0.72rem;
-  margin-top: 4px;
+  font-size: 0.66rem;
+  margin-top: 3px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 700;
@@ -137,206 +110,26 @@
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--adminos-mint) 0%, transparent); }
 }
 
-/* Admin identity card — framed photo + ink scrim + bone text (brand #1 lever).
-   The one intentionally photographic surface; everything else is paper. */
-.adminos-card {
-  position: relative;
-  padding: 14px;
-  border-radius: 26px;
-  overflow: hidden;
-  border: 1px solid var(--adminos-ink-line);
-  background:
-    var(--gradient-hero-scrim),
-    var(--gradient-cover-mountain);
-  min-height: 132px;
-  display: flex;
-  align-items: flex-end;
-  box-shadow: var(--elevation-card);
-}
-
-.adminos-card .adminos-avatarimg {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.adminos-avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  color: var(--adminos-on-emerald);
-  background: var(--gradient-sky);
-  flex: 0 0 auto;
-  box-shadow: var(--elevation-pin);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  overflow: hidden;
-}
-
-/* Text sits over the photo scrim → bone, not ink. */
-.adminos-card b {
-  display: block;
-  letter-spacing: -0.04em;
-  line-height: 0.95;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #FBF7EE;
-}
-
-.adminos-card span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: rgba(251, 247, 238, 0.85);
-  font-size: 0.74rem;
-  font-weight: 700;
-  margin-top: 4px;
-}
-
-/* Profile readiness meter */
-.adminos-score {
-  padding: 12px;
-  border-radius: 22px;
-  background: var(--adminos-panel);
-  border: 1px solid var(--adminos-line);
-}
-
-.adminos-score-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 700;
-  color: var(--text-muted);
-  margin-bottom: 9px;
-}
-
-.adminos-meter {
-  height: 9px;
-  border-radius: 999px;
-  background: var(--palette-steel);
-  overflow: hidden;
-}
-
-.adminos-meter > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--adminos-grad);
-}
-
-/* Nav */
-.adminos-navlabel {
-  margin: 4px 10px 6px;
-  color: var(--text-muted);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-weight: 700;
-}
-
-.adminos-nav {
-  display: grid;
-  gap: 6px;
-}
-
-.adminos-nav:last-of-type {
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-.adminos-nav::-webkit-scrollbar { display: none; }
-
-.adminos-navitem {
-  width: 100%;
-  border: 1px solid transparent;
-  color: var(--text-secondary);
-  background: transparent;
-  min-height: 46px;
-  display: grid;
-  grid-template-columns: 34px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: 17px;
-  text-align: left;
-  text-decoration: none;
-  transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease;
-}
-
-.adminos-navitem .i {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  color: var(--text-secondary);
-  background: var(--adminos-panel);
-  border: 1px solid var(--adminos-line);
-}
-
-.adminos-navitem b {
-  display: block;
-  color: inherit;
-  font-size: 0.92rem;
-  letter-spacing: -0.02em;
-  font-weight: 700;
-}
-
-.adminos-navitem s {
-  display: block;
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  text-decoration: none;
-}
-
-.adminos-bdg {
-  min-width: 24px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  color: var(--text-secondary);
-  background: var(--adminos-panel);
-  border: 1px solid var(--adminos-line);
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.adminos-navitem:hover {
-  background: var(--adminos-accent-soft);
-  color: var(--adminos-accent-deep);
-  transform: translateX(2px);
-}
-
-.adminos-navitem[aria-current="page"] {
-  background: var(--adminos-accent-soft);
-  border-color: color-mix(in srgb, var(--adminos-accent) 38%, transparent);
-  color: var(--adminos-accent-deep);
-  box-shadow: var(--elevation-card);
-}
-
-.adminos-navitem[aria-current="page"] .i {
-  background: var(--adminos-grad);
-  color: var(--adminos-on-emerald);
-  border-color: transparent;
-}
-
-/* ── Main + topbar ──────────────────────────────────────────── */
+/* ── Main column ────────────────────────────────────────────────────
+   The immersive surface. At ≥1024px it is offset by the fixed ScopeShellNav
+   rail (width synced from SCOPE_RAIL_WIDTH via the --adminos-rail-w var). */
 .adminos-main {
   min-width: 0;
   position: relative;
+  z-index: 2;
+}
+
+@media (min-width: 1024px) {
+  .adminos-main {
+    margin-inline-start: var(--adminos-rail-w, 240px);
+  }
 }
 
 .adminos-top {
   position: sticky;
   top: 0;
   z-index: 40;
-  height: 72px;
+  min-height: 72px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -344,6 +137,33 @@
   padding: 14px 24px;
   border-bottom: 1px solid var(--adminos-line);
   background: var(--color-surface);
+}
+
+.adminos-topmeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+/* At-a-glance marketplace health — desktop chrome only. */
+.adminos-health {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: var(--adminos-control);
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--adminos-line);
+  background: var(--adminos-panel);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.adminos-health__v {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .adminos-search {
@@ -364,6 +184,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  cursor: text;
 }
 
 .adminos-tact {
@@ -381,14 +202,6 @@
   text-decoration: none;
   transition: transform 0.2s ease, border-color 0.2s ease;
   position: relative;
-}
-
-.adminos-tact--icon { width: var(--adminos-control); padding: 0; }
-
-.adminos-tact--danger {
-  background: var(--adminos-danger-bg);
-  color: var(--adminos-danger-fg);
-  border-color: color-mix(in srgb, var(--adminos-danger-fg) 38%, transparent);
 }
 
 .adminos-tact--p {
@@ -416,101 +229,24 @@
   place-items: center;
 }
 
-.adminos-account {
-  display: inline-grid;
-  place-items: center;
-  width: var(--adminos-control);
-  height: var(--adminos-control);
-  border-radius: 999px;
-  border: 1px solid var(--adminos-line);
-  background: var(--adminos-panel);
-  text-decoration: none;
-}
-
-.adminos-avatarmini {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 0.82rem;
-  color: var(--adminos-on-emerald);
-  background: var(--adminos-grad);
-}
-
 .adminos-contentwrap {
   padding: 24px;
   max-width: 1480px;
   margin: 0 auto;
 }
 
-/* ── Mobile (≤1023px): hide sidebar, floating bottom nav ───────── */
-.adminos-mnav, .adminos-mtop { display: none; }
-
+/* ── Mobile (≤1023px): rail collapses to the ScopeShellNav hamburger ──
+   No sidebar, no bottom dock. The topbar makes room on its leading edge for
+   the fixed top-left hamburger (44px affordance). */
 @media (max-width: 1023px) {
-  .adminos-shell { grid-template-columns: 1fr; }
-  .adminos-side { display: none; }
-  .adminos-contentwrap { padding: 16px 14px calc(var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom, 0px)); }
-  .adminos-top { padding: 12px 14px; }
+  .adminos-contentwrap { padding: 16px 14px calc(var(--space-24) + env(safe-area-inset-bottom, 0px)); }
+  .adminos-top {
+    padding: 12px 14px;
+    padding-inline-start: calc(44px + var(--space-12) + max(var(--space-12), env(safe-area-inset-left)));
+  }
   .adminos-tlabel { display: none; }
-
-  /* Pinned full-bleed dock — same structural pattern as the seeker/host/public
-     docks (founder rule: never a detached floating pill). */
-  .adminos-mnav {
-    display: grid;
-    position: fixed;
-    z-index: var(--z-dock);
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
-    background: var(--color-surface);
-    border-top: 1px solid var(--adminos-line);
-    box-shadow: 0 -2px 12px color-mix(in srgb, var(--palette-ink) 7%, transparent);
-  }
-
-  .adminos-mtab {
-    border: 0;
-    background: transparent;
-    color: var(--text-muted);
-    border-radius: 16px;
-    padding: 7px 4px;
-    min-height: 44px;
-    display: grid;
-    place-items: center;
-    gap: 3px;
-    font-size: 10px;
-    font-weight: 700;
-    text-decoration: none;
-  }
-
-  .adminos-mtab[aria-current="page"] {
-    color: var(--adminos-on-emerald);
-    background: var(--adminos-grad);
-  }
-
-  .adminos-mtab__icon { position: relative; display: inline-grid; place-items: center; }
-  .adminos-mtab__bdg {
-    position: absolute;
-    top: -6px;
-    right: -9px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--adminos-on-emerald);
-    background: var(--adminos-accent);
-    box-shadow: 0 0 0 2px var(--color-paper);
-  }
+  .adminos-health { display: none; }
+  .adminos-search .cmdsearch-kbd { display: none; }
 }
 
 /* faint ink grid atmosphere on the scope (paper register) */
@@ -555,7 +291,6 @@
   border: 1px solid var(--adminos-line); color: var(--text-muted); font-size: 0.72rem;
   font-family: var(--font-ui, ui-monospace, monospace);
 }
-@media (max-width: 1023px) { .adminos-search .cmdsearch-kbd { display: none; } }
 
 /* ── View-enter: content settles into place on each navigation ─────
    template.tsx re-mounts this wrapper on every route change, so the rise +
@@ -568,17 +303,11 @@
 }
 
 /* ── Keyboard focus rings (sky, legible on paper) + tactile press ── */
-.adminos-navitem:focus-visible,
-.adminos-tact:focus-visible,
-.adminos-account:focus-visible,
-.adminos-mtab:focus-visible {
+.adminos-tact:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--adminos-accent);
 }
-.adminos-navitem:active { transform: translateX(2px) scale(0.985); }
-.adminos-tact:active,
-.adminos-account:active,
-.adminos-mtab:active { transform: translateY(1px) scale(0.98); }
+.adminos-tact:active { transform: translateY(1px) scale(0.98); }
 
 @media (prefers-reduced-motion: reduce) {
   .admin-os *, .admin-os *::before, .admin-os *::after {
