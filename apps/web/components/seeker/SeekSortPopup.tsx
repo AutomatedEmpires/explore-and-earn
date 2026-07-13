@@ -15,13 +15,15 @@ export interface SeekSortPopupProps {
 	readonly onApply: (category: OpportunityCategory | null) => void;
 }
 
+// The four canonical lanes only — founder order (Maritime · Remote · Seasonal ·
+// Farm). `null` is the "All lanes" reset, not a lane. `mix` is deliberately not
+// offered here: sort segments the browse view by a single real category.
 const CATEGORY_OPTIONS: readonly (OpportunityCategory | null)[] = [
 	null,
 	"maritime",
 	"remote",
-	"farm",
 	"seasonal",
-	"mix",
+	"farm",
 ];
 
 export function SeekSortPopup({
@@ -51,7 +53,7 @@ export function SeekSortPopup({
 					<span>Lane sort</span>
 				</>
 			}
-			headerMeta={<span>Maritime, remote, farm, seasonal, mix</span>}
+			headerMeta={<span>Maritime, remote, seasonal, farm</span>}
 			footer={
 				<div className={styles.footer}>
 					<Button variant="ghost" onClick={() => setDraft(null)}>

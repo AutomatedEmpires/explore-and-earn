@@ -299,10 +299,17 @@ export function SeekBrowser({
 		else next.delete("visa");
 		if (value.startRangeMonths) next.set("start_range", String(value.startRangeMonths));
 		else next.delete("start_range");
-		if (value.payMin && value.payMin > 0) next.set("pay_min", String(value.payMin));
-		else next.delete("pay_min");
-		if (value.payUnit) next.set("pay_unit", value.payUnit);
-		else next.delete("pay_unit");
+		// pay_unit only rides along with an active pay floor — a unit on its own
+		// would filter listings by rate unit with no minimum, which seek/page reads
+		// (parsePayUnit) and applies. Keep the two params coupled.
+		if (value.payMin && value.payMin > 0) {
+			next.set("pay_min", String(value.payMin));
+			if (value.payUnit) next.set("pay_unit", value.payUnit);
+			else next.delete("pay_unit");
+		} else {
+			next.delete("pay_min");
+			next.delete("pay_unit");
+		}
 		const queryString = next.toString();
 		router.push(queryString ? `${pathname}?${queryString}` : pathname);
 		setFilterOpen(false);
