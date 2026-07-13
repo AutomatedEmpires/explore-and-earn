@@ -11,7 +11,7 @@ No credential values, customer identities, database URLs, cookies, private provi
 
 ## Executive status
 
-**Final verdict:** **NO-GO for Production users and NO-GO for money.** The exact-main Preview runtime error is fixed and the public read path is healthy, but dark Production auth, signed Stripe webhooks, the Production Doppler contract, functional rollback, Supabase tenant/storage/ledger hardening, and remote Mapbox-canvas proof are not green. No Production promotion was performed.
+**Final verdict after Phase 2:** **NO-GO for Production users and NO-GO for money.** Phase 2 closed the controlled Preview runtime, one-user dark-auth, remote Mapbox, application-layer Stripe-signature, and Preview rollback-rehearsal gates. Production remains blocked by two-user tenant/role proof, admin/recovery, provider-delivered Stripe webhook and durable money-event idempotency, the Production Doppler contract, mail receipt/reply routing, Supabase hardening, and transfer-grade provider decisions. No Production promotion was performed.
 
 The pass treats these as separate states:
 
@@ -435,4 +435,163 @@ The isolated Windows checkout on `codex/explore-and-earn-production-readiness` i
 
 ### Phase 2 execution record
 
-Pending controlled execution.
+Phase 2 safely corrected the repository's Clerk/Supabase architecture, added dark-Preview-only environment bindings, established the hosted Supabase trust boundary, and completed the local validation and read-only Supabase audit. It did not launch Production, enable money, create any external/customer identity, alter database data/schema/policies, or retire any credential. One internal synthetic Clerk identity was created solely for the controlled auth proof described below.
+
+All earlier provider/state tables in this document are historical Pass 1 evidence unless Phase 2 explicitly repeats or supersedes them. In particular, the current dark Clerk user count is one internal synthetic identity, and the current Resend message state is `delivery_delayed`.
+
+#### Change from Pass 1
+
+| Gate | Pass 1 | Phase 2 change |
+|---|---|---|
+| Clerk/Supabase contract | Development binding; named-template assumption; no dark runtime | Native session-token source contract and additive issuer/JWKS trust installed; protected owned Preview origin proves one-user dark auth |
+| Stripe webhook | Test Checkout/account/catalog only | Remote application signature/replay/rejection behavior proven with controlled synthetic signing; provider delivery and handled-event ledger remain open |
+| Mapbox | Hosted route could not construct a map because no mapped rows existed | Preview-only fixture seam renders canvas, five markers, and attribution with origin restriction proof |
+| Rollback | Deployment target/command documented, no functional rehearsal | Protected temporary alias rehearsed candidate → last-good Preview → candidate and was removed |
+| Supabase | RLS inventory known; no Clerk-token tenant proof | Read-only audit deepened and native auth trust added; live fixtures remain prohibited, so two-user tenant/storage proof is still blocked |
+| Resend/support | Provider accepted send; delivery/reply pending | Provider now reports `delivery_delayed`; DNS proves the domain exists but has no receiving MX/mailbox route |
+| Production | Hard NO-GO | Production deployment, aliases, environment bundle, money state, and credentials remain unchanged and NO-GO |
+
+#### Clerk/Supabase architecture correction
+
+The earlier Pass 1 statement that Explore&Earn requires a named Clerk `supabase` JWT template is **superseded by this Phase 2 evidence**. Clerk's current native Supabase integration uses the Clerk issuer/JWKS as a Supabase third-party authentication provider and ordinary `getToken()` calls. A named template is not part of the accepted target architecture.
+
+The controlled source change:
+
+- replaced all 99 `getToken({ template: "supabase" })` call sites with `getToken()` across 72 files;
+- tightened the two optional-token wrapper types to their actual zero-argument contract;
+- removed stale comments that described the deprecated template dependency;
+- added `tools/scripts/check-preview-readiness.mjs`, which rejects any reintroduction of the named template and unsafe Preview-fixture activation;
+- added the guard to the repository's normal `guardrails` chain.
+
+The dedicated Supabase project now has one additive third-party auth integration for the verified Clerk Production issuer and JWKS on `clerk.exploreandearn.com`. The Supabase Management API returned HTTP 201; the post-write inventory returned provider count `1`, type `custom`, with the expected issuer/JWKS host. The `custom` label reflects the Supabase API object type, not a hand-rolled token format. No Supabase Auth provider was disabled and no database object or row changed.
+
+This establishes cryptographic trust and Phase 2 also proved the dark instance can run without touching the current Production deployment. The first Vercel candidate exposed a malformed publishable-key copy: the Clerk dashboard's visually truncated field had been transferred instead of the full quick-copy value. Edge middleware correctly failed closed with `Publishable key not valid.` The full pair was re-read from Clerk's environment-pair control without displaying it, both exact-branch records were replaced, key material was cleared from memory, and the corrected candidate passed.
+
+Clerk rejected the `vercel.app` browser origin even with the correct pair. The owned, isolated `phase2-readiness.exploreandearn.com` origin was therefore created as a new GoDaddy A record, attached only to the corrected Preview deployment, issued a Vercel certificate, and verified as Vercel-authentication protected. No existing DNS record or Production domain moved. On that origin:
+
+- the dark sign-in and sign-up components rendered with no Clerk origin error;
+- one internal synthetic user was created and the verification message reached the founder-controlled Gmail inbox;
+- `/profile` loaded as a protected signed-in route;
+- sign-out redirected the same protected route to `/sign-in`;
+- password login returned to `/profile`;
+- the custom Clerk account portal loaded and exposed account/logout controls.
+
+This is a **partial dark-auth pass**, not complete authorization proof. It proves a Clerk session can protect an application route, but it does not prove the JWT/session claims expected by Supabase or any seeker/host/admin role claim. Only one identity exists, no host/seeker cross-tenant fixture exists, the application exposes no password-recovery entrypoint, social/OAuth/MFA/SSO are not configured, `ADMIN_CLERK_USER_ID` remains unset, and no Clerk webhook/signing secret is installed. The rollback boundary remains Preview-only: the owned evidence alias can return to the exact-main Preview without moving Production, while any future Production auth migration must retain the prior Clerk binding and a recoverable founder identity until full session/RLS/webhook proof passes. A non-fatal Cloudflare Turnstile `600010` warning appeared during the automated profile run and must be rechecked in a founder-operated browser before launch.
+
+#### Exact-branch Preview environment bundle
+
+The exact PR branch `codex/explore-and-earn-production-readiness` now has Preview-only overrides for:
+
+- the dark Clerk publishable/secret pair and sign-in/sign-up routes;
+- `PREVIEW_MAP_FIXTURES=1`;
+- the validated hosted Supabase public pair for project fingerprint `mamo…hmmr`;
+- the dedicated Sentry server/client pair;
+- the E&E PostHog client pair;
+- application URL/version metadata;
+- controlled Stripe test signing material.
+
+The Stripe signing value was locally generated and installed in Doppler `stg` plus the exact Preview branch. It is not a Stripe-provider endpoint secret. It was used only for the controlled remote signature test described below. Production target changes were explicitly false. No service-role key was copied into this bundle.
+
+The fixture gate is constrained in source to `NODE_ENV=production`, `VERCEL_ENV=preview`, and `PREVIEW_MAP_FIXTURES=1`, and it is consumed only by the `/map` discovery-coordinate path. It cannot be activated by the Production environment. General Preview and Production records were not replaced.
+
+#### Local source validation
+
+Validation ran from the isolated Windows checkout at commit `a6f438c143037680d2518d48fdb90817c19269b9`:
+
+| Check | Result |
+|---|---|
+| Frozen install | **PASS** with pnpm `10.12.4`; host Node `24.18` emitted the expected warning against repository pin `24.16.0` |
+| Phase 2/static guardrails | **PASS** |
+| TypeScript typecheck | **PASS** |
+| ESLint | **PASS** after removal of one unused import introduced by the mechanical auth edit |
+| Unit tests | **PASS** — 161 passed, 2 skipped (`mailer` 11, `stripe-seed` 4, `db` 146) |
+| Production build | **PASS** — 4 tasks; 30 static pages |
+| `git diff --check` | **PASS**; CRLF conversion warnings only |
+
+The source commit was pushed to draft PR `#244` at head `a6f438c…`; the PR remained open, draft, and mergeable when the runtime evidence was collected. The final documentation-only commit records that evidence and does not change the application source exercised by the candidate deployment. Final PR state/checks are reported in the handoff because those external statuses can change after this report is committed.
+
+#### Supabase read-only audit and remaining tenant gate
+
+The Phase 2 read-only audit reconfirmed the dedicated project is `ACTIVE_HEALTHY`, all 45 public tables have RLS enabled, and 85 policies cover 39 tables. The six no-policy tables remain intentional deny-all resources. It also reconfirmed:
+
+- 55 repository migration files versus 79 remote ledger records, including eight duplicate migration names; do not push, replay, or repair the live ledger blindly;
+- broad `anon`/`authenticated` grants remain wider than the policy boundary;
+- `community-photos` still permits bucket-wide authenticated object listing;
+- three owner-update policies lack an explicit ownership `WITH CHECK`;
+- the trigger-only `set_host_attestation()` function retains unnecessary direct authenticated execute;
+- the admin client lacks a build-time `server-only` boundary, and dev-bench service-token handling needs the same hardening;
+- the existing RLS isolation test mints a legacy symmetric token and does not prove Clerk third-party-auth behavior.
+
+The live project still contains zero hosts, seekers, listings, or Storage objects. That makes a meaningful two-identity ownership/visibility/Storage test impossible without introducing fixtures into the live project. Phase 2 did not do that. The safe next proof belongs on a disposable Supabase branch/database or an explicitly approved isolated fixture lane.
+
+#### Stripe test webhook status
+
+The corrected Preview candidate received a synthetic `livemode=false` event over its public webhook route using the controlled, non-provider signing value installed for this exercise. The first valid request returned HTTP 200 with the expected ignored-event action. Replaying the same signed event returned the same HTTP 200/action, and an invalid signature returned HTTP 400. The ignored event has no database mutation path, no Stripe object was created, and provider transport was not exercised.
+
+This is a **PASS for the application's remote signature-verification and stable ignored-event behavior**, but only a **partial Stripe gate**. The locally generated signing value is not an endpoint secret issued by Stripe, the test did not prove Stripe-to-Preview delivery, and the application has no general event-ID ledger proving durable idempotency for handled money events. No live Stripe mode was accessed and no customer, charge, subscription, invoice, PaymentIntent, payout, refund, dispute, tax object, endpoint, or live webhook was changed. Money remains NO-GO.
+
+#### Resend delivery/reply blocker
+
+The controlled internal message preserved the intended From and Reply-To identities, but the latest provider state is `delivery_delayed`. Independent DNS verification found no root-domain MX record for `exploreandearn.com`, so `support@exploreandearn.com` is not presently a proven receivable/reply-capable mailbox. Inbox receipt, reply behavior, bounce outcome, and suppression state therefore remain unproven. No second message was sent because repeated delivery attempts cannot remediate absent mail routing.
+
+This is not a missing-domain blocker: the sending domain exists and is verified. It is a founder decision about the receiving-mail provider/MX route and mailbox ownership. The broad rollback key remains in place and cannot be retired.
+
+#### Sentry, PostHog, privacy, Cloudinary, and admin state
+
+- **Sentry:** the dedicated client/server bindings are present on the exact Preview branch. Prior Preview ingestion evidence remains valid, but no Phase 2-candidate-tagged event was emitted. Source-map/release upload remains absent because no Sentry auth token was copied.
+- **PostHog:** the dedicated key/host pair is present on the exact Preview branch. Exact-main still defaults capture off, requires consent, disables session recording, disables console capture, and suppresses person-profile creation in the controlled event path. Provider flags remain broader than the source posture and require review before launch.
+- **Cloudinary:** no Phase 2 mutation occurred. Current E&E delivery remains operational, while shared Free-plan administration, export/URL mapping, and weak preset constraints remain a transfer-grade blocker. Media migration or deletion was not attempted.
+- **Admin/recovery:** the code's admin model depends on a single configured Clerk user ID rather than a tested role/claim boundary. Phase 2 deliberately left that variable unset, so admin remains locked; no independent founder/admin recovery identity or end-to-end recovery proof exists.
+
+#### Candidate runtime, Mapbox, and rollback evidence
+
+The first post-change candidate, `dpl_35dhnY3uwbESyNKV3wYaTgi91bu9`, reached `READY` but failed every middleware route because the copied Clerk publishable key was malformed. It is retained only as diagnostic evidence and was not promoted. After replacing the exact-branch Clerk pair from Clerk's complete environment-pair control, candidate `dpl_AmWDHqD1oqEFN7nFMZsXPmyGDaFJ` reached `READY`. Authenticated Vercel requests returned HTTP 200 for `/api/health`, `/`, `/seek`, and `/map`; the later 30-minute log check found zero HTTP 500s.
+
+The existing allowed non-production alias `explore-and-earn-git-cod-d0bc70-jackson-coles-projects-dd76106c.vercel.app` was pointed to the corrected candidate. Real Chrome rendered one Mapbox canvas, five fixture markers, one attribution control, and no `Map unavailable` fallback. A final clean-console check on the owned protected origin reproduced the same canvas/marker/attribution counts with zero browser warnings or errors; later server-log inspection found zero route 500s. The browser-used public token matched the venture-specific E&E Doppler staging token without printing either value, proving the old/shared token is not needed by this Preview build. Origin probes against the venture token returned HTTP 200 for the allowed Preview alias and localhost, and HTTP 403 for an unrelated origin. Read-only token metadata confirmed only `styles:read` and `fonts:read`. No Mapbox token/restriction was changed, and the old/shared token remains in rollback state because a Production observation/zero-use window has not occurred.
+
+A temporary Preview-only rollback alias was rehearsed from the corrected candidate to exact-main last-good Preview `dpl_LW9LvGWrjRT1fzpMQXwGaAxoTm2B` and back to the candidate. At each stage the alias resolved to the expected immutable deployment, Vercel protection remained enforced for unauthenticated requests, and authenticated `/api/health` returned HTTP 200. The temporary alias was then removed and returned HTTP 404. This is a **PASS for Preview deployment/alias rollback mechanics**; it is not a Production bundle rollback rehearsal.
+
+The rehearsal moves only the alias between immutable builds. It does not rewrite Doppler or branch environment records, rotate credentials, remove webhook endpoints, or change provider projects. Success is detected by the alias resolving to the intended immutable deployment, protected unauthenticated behavior, authenticated health HTTP 200, and no route-level 500s. If auth, payment, email, or map changes are later promoted, rollback must remain replacement-first: retain the last-good deployment and prior Clerk binding, Stripe endpoint/credentials, Resend key/identity, Mapbox token/origins, and matching environment bundle until the replacement is deployed, provider-tested, observed, and independently reversible.
+
+No Production alias or environment record was moved. Current Production remains `dpl_5HCPaCNCQuyip2iZTHpoMvSxjQFY`, and the prior Production fallback remains unchanged.
+
+### Phase 2 final gate table
+
+| Gate | Status | Evidence | Remaining blocker | Safe next action |
+|---|---|---|---|---|
+| Exact-main Preview health | **PASS — completed** | Exact-main `dpl_LW9…` and corrected Phase 2 `dpl_AmW…` are `READY`; corrected candidate returns 200 for health, home, seek, and map with no later 500s | Documentation commit is not the application artifact tested at `a6f438c…` | Keep immutable candidate and exact-main IDs in rollback inventory; retest only if application source/env changes |
+| Dark Clerk proof | **PARTIAL — safely fixed now** | Protected owned Preview origin proves sign-up email verification, password login, protected profile, logout, and account portal; Supabase issuer/JWKS trust is installed | No two-user tenant/RLS proof, role claims, webhook/signature, recovery UI, social/OAuth/MFA/SSO, or recoverable Production admin | Create a disposable two-tenant fixture lane, configure signed Clerk webhook, and founder-test recovery/Turnstile before Production binding |
+| Signed Stripe webhook proof | **PARTIAL — safely fixed now** | Synthetic `livemode=false` valid and replay requests return 200; invalid signature returns 400; ignored action has no DB mutation | Signing value is not Stripe-issued; no provider transport, handled-event ledger/idempotency, or approved live plan | Create a Stripe test endpoint for an approved isolated Preview, prove provider delivery and durable handled-event replay, then draft the live migration plan for founder review |
+| Production Doppler contract | **FAIL — blocked by production risk** | `ENV_CONTRACT.md` inventories provider source, consumer, dev/stg/prd presence, placement, and approval gates | `prd` lacks Clerk, Supabase, Stripe, Sentry, app/admin, cron, and support-receipt completeness | Fill only provider-verified replacement values under a founder-attended Production migration plan; do not infer/copy unknowns |
+| Supabase ledger/storage/tenant testing | **PARTIAL — completed audit; blocked by production risk** | Project healthy; 45/45 public tables use RLS; 85 policies on 39 tables; six no-policy tables remain deny-all; no live mutation | Migration ledger divergence, broad grants, Storage listing exposure, update/check gaps, and no real two-Clerk-token isolation proof | Use a disposable branch/database for canonical diff, pgTAP two-user JWT tests, least-privilege grants, and owner-folder Storage policy |
+| Functional rollback rehearsal | **PASS for Preview — completed** | Temporary protected alias moved candidate → `dpl_LW9…` → candidate; identity/protection/health passed at each step; alias removed and returned 404 | Full Production deployment-plus-provider/env bundle rollback is not rehearsed | Preserve both immutable deployments and every prior provider binding; rehearse a complete non-Production bundle before any live alias movement |
+| Remote Mapbox fixture proof | **PASS — completed** | Owned protected Preview shows one canvas, five markers, attribution, no unavailable fallback, and zero browser warnings/errors; browser token matches the venture Doppler token; allowed origins 200, unrelated origin 403 | Production replacement-token use and zero-use observation for old/shared token are absent | Deploy only after promotion approval, observe token telemetry/logs, then separately approve retirement after rollback window |
+| Resend delivery/reply | **FAIL — requires founder decision** | Sender and Reply-To headers are correct; provider state is `delivery_delayed`; no root MX exists | No receiving mailbox/MX, inbox receipt, reply, bounce, or suppression proof | Founder selects mailbox/provider and authorizes MX; then send one internal test and verify receipt/reply/provider outcome |
+| Sentry | **PARTIAL — safely fixed now** | Dedicated client/server pair is bound to exact branch; earlier Preview ingestion remains proven | No Phase 2-candidate ingestion attribution or source-map/release upload | Emit one non-sensitive tagged Preview event after approved auth/data test; issue scoped build token only if source maps are required |
+| PostHog | **PARTIAL — safely fixed now** | Dedicated pair is bound; earlier consented Preview ingestion passed; source defaults capture off and disables replay/console/person profiles | Provider flags remain broader than source posture; no Phase 2-candidate attribution | Reconcile provider privacy flags, repeat one consented non-sensitive event, and retain default-off posture |
+| Cloudinary risk | **FAIL — blocked by payment/plan and requires founder decision** | Delivery remains operational; no media/provider mutation occurred | Shared Free administration, transfer/export/URL mapping, and preset restrictions are not transfer-grade | Founder chooses paid isolated environment vs accepted shared-risk plan; inventory/migrate only under an approved reversible media plan |
+| Support channel | **FAIL — requires founder decision** | Sending domain exists and is verified; `support@exploreandearn.com` has no proven receiving route | Mailbox owner/provider, MX, monitoring, and recovery ownership are undefined | Provision the founder-owned support mailbox, publish MX, document owner/recovery, and prove an internal reply loop |
+| Privacy posture | **PARTIAL — blocked by production risk** | Analytics source is consented/default-off; no customer data was used; no Cloudinary/Supabase content was changed | Storage bucket listing, provider analytics flags, retention/access policy, and community-photo privacy decision remain | Founder decides photo visibility; test owner-folder policy and document analytics retention/access before users |
+| Admin/recovery | **FAIL — requires founder decision** | Admin variable is unset and admin remains locked; code model is a single Clerk user ID | No recoverable founder/admin identity, role/claim boundary, backup admin, or end-to-end recovery proof | Founder designates recoverable Production admin(s); implement claim-based least privilege and test recovery/lockout in Preview |
+
+### Phase 2 final go/no-go
+
+The remote evidence markers are closed. The remaining NO-GO decisions are substantive provider, tenancy, recovery, mail, and Production-contract gates; documentation alone cannot close them.
+
+| Decision | Verdict | Reason |
+|---|---|---|
+| Production users | **NO-GO** | One-user dark auth passes, but two-user tenant/RLS/role proof, Clerk webhook, admin/recovery, support-mail receipt/reply, and Production configuration are not green |
+| Real money | **NO-GO** | Application signature rejection/replay stability passes, but Stripe-provider delivery, handled-event durable idempotency, live catalog/migration approval, and Production configuration are absent |
+| Production promotion | **NO-GO** | Candidate runtime, remote Mapbox, and Preview alias rollback pass; the Production env contract, full auth/tenant/recovery gate, mail route, and Production bundle rollback remain incomplete |
+| Credential/token retirement | **NO-GO** | No Production observation/zero-use window exists; retain the current Clerk/Stripe fallback state, broad Resend key, old/shared Mapbox token, and immutable Vercel rollback deployments |
+
+Founder decisions still required:
+
+1. select and fund a disposable Supabase branch/database for two-user Clerk JWT, tenant, RLS, Storage, and handled-event ledger testing;
+2. designate a recoverable Production admin model and backup/recovery owner;
+3. select the `support@exploreandearn.com` receiving-mail provider/owner and authorize MX publication;
+4. decide whether community photos are owner-only, tenant-visible, or deliberately public;
+5. review and approve a Stripe live-account/catalog/webhook migration plan after it is drafted; no approved live plan exists and no live endpoint, customer, subscription, or charge work may precede approval;
+6. choose a paid isolated Cloudinary environment or explicitly accept/document the shared Free-plan transfer risk.
+
+No Production launch, live-money migration, customer communication, database mutation, provider deletion, credential revocation, or media migration was performed in Phase 2.
