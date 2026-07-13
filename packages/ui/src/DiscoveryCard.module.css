@@ -17,6 +17,9 @@
   display: flex;
   flex-direction: column;
   width: min(100%, 360px);
+  /* An inline-size container so the title + photo badges shrink to fit narrow
+     card widths (prevents the center badge colliding with the top-right one). */
+  container-type: inline-size;
   overflow: hidden;
   background: var(--gradient-chrome);
   border: 1px solid var(--border-soft);
@@ -272,6 +275,36 @@
 .matchGood   { --dc-match-fg: #22C3B8; }
 .matchFair   { --dc-match-fg: #58B6E8; }
 .matchLow    { --dc-match-fg: #9FB6C4; }
+
+/* Narrow cards (phones, compact grids) — shrink + cap the photo badges so the
+   centered match/boost pill never collides with the top-right category badge. */
+@container (max-width: 370px) {
+  .stamp {
+    font-size: 9px;
+    padding: var(--space-3) var(--space-6);
+    gap: var(--space-2);
+  }
+  .stamp :global(svg) { width: 12px; height: 12px; }
+  .rightSlot { max-width: 34cqw; }
+  .stampCategory > :last-child,
+  .stampOutline {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .centerSlot,
+  .matchPill { max-width: 28cqw; }
+  .matchPill { padding: var(--space-2) var(--space-6); gap: var(--space-3); }
+  .matchPillLabel { display: none; }
+  .matchPillTrack { width: 22px; }
+  .centerSlot .stamp { max-width: 100%; }
+  .centerSlot .stamp > :last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
 
 /* Center-slot solid tones */
 .stampSuccess {
@@ -602,9 +635,9 @@ button.metaRow:focus-visible {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 66px;
-  padding: 10px 6px;
+  gap: 1px;
+  min-height: 44px;
+  padding: var(--space-6) var(--space-4);
   border-radius: var(--radius-input);
   border: 1.5px solid var(--palette-line);
   background: var(--palette-surface);
@@ -614,16 +647,15 @@ button.metaRow:focus-visible {
     box-shadow var(--motion-fast) var(--ease-standard);
 }
 
-/* Housing/Meals state — a big color-coded ✓ / ✕ (no descriptor text; the
-   detail lives in the popup). Colour follows the cell state class below. */
-.benefitCheck {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
+/* Housing/Meals — label only, on a COLOR-CODED cell (no icon, no check). */
+.benefitLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
 }
-.benefitProvided .benefitCheck { color: var(--status-success-fg); }
-.benefitNot .benefitCheck { color: var(--status-error-fg); }
+.benefitProvided .benefitLabel { color: var(--status-success-fg); }
+.benefitNot .benefitLabel { color: var(--status-error-fg); }
 
 button.benefit {
   width: 100%;

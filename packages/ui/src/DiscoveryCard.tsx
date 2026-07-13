@@ -184,27 +184,19 @@ function BenefitTriadCell({
 			? styles.benefitProvided
 			: styles.benefitNot
 	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
-	const icon: IconKey =
-		kind === "housing" ? "benefit.housing" : kind === "meals" ? "benefit.meals" : "benefit.pay"
-	// Housing/Meals carry NO descriptor text on the card — only the field name +
-	// a color-coded ✓/✕ (the detail lives in the popup). Pay shows the rate.
+	// Housing/Meals carry NO icon and NO checkmark on the card — just the label on
+	// a COLOR-CODED cell (green = included, red = not); the detail lives in the
+	// popup. Pay shows the rate. Compact, single tier. aria still states the state.
 	const stateText = isPay ? "" : provided ? "included" : "not included"
 	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
 
-	const inner = (
+	const inner = isPay ? (
 		<>
-			<span className={styles.benefitHead}>
-				<Icon name={icon} size={16} aria-hidden />
-				<span>{label}</span>
-			</span>
-			{isPay ? (
-				<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{value}</span>
-			) : (
-				<span className={styles.benefitCheck} aria-hidden>
-					<Icon name={provided ? "system.success" : "system.error"} size={22} />
-				</span>
-			)}
+			<span className={styles.benefitHead}>{label}</span>
+			<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{value}</span>
 		</>
+	) : (
+		<span className={styles.benefitLabel}>{label}</span>
 	)
 
 	return onClick ? (
