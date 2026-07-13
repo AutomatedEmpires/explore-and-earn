@@ -9,12 +9,16 @@ import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { saveReadinessAction } from "../../app/actions/seekerProfile";
 import type { DiscoveryListing } from "../discovery";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
-import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
-import { MatchCardRail } from "./MatchCardRail";
 import { ReadinessSlider } from "./ReadinessSlider";
-import { SeekerDirectory } from "./SeekerDirectory";
 import { RESUME_APPLY_THRESHOLD, type SeekerStatusSummary } from "./models";
 import styles from "./ProfileHub.module.css";
+
+/** Tone → tile accent class. Named distinctly from the callout tones so the
+    CSS-module class scope never bleeds the callout fill onto a bucket tile. */
+const BUCKET_TONE_CLASS: Record<"primary" | "soon", string> = {
+  primary: styles.bucketPrimary,
+  soon: styles.bucketSoon,
+};
 
 // Category atmospheres are tokenized in styles/tokens.css (shared with SeekerHero).
 /* Photo-less hero fallback: the SCENIC cover treatment (hero scrim over a
@@ -42,16 +46,22 @@ function formatBadgeDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-/** A single tappable status cell composed on the shared `ui-stat` primitive. */
-interface StatCell {
+/**
+ * A single navigable BUCKET tile. The landing is a glanceable index of these —
+ * summary + entry point only; the detail lives on the sub-route it links to
+ * (separation of surfaces). `meta` is a live count/percent shown as a chip;
+ * `tone` promotes a time-sensitive bucket (offers) without a loud full fill.
+ */
+interface Bucket {
   readonly href: string;
   readonly label: string;
-  readonly value: string;
+  readonly summary: string;
   readonly icon: IconKey;
-  readonly mod?: "primary" | "soon";
+  readonly meta?: string;
+  readonly tone?: "primary" | "soon";
 }
 
-/** The one next-best-action surfaced above the fold. Always resolves to one. */
+/** The one next-best-action surfaced above the buckets. Always resolves to one. */
 interface NextAction {
   readonly tone: "primary" | "soon" | "calm";
   readonly eyebrow: string;
@@ -98,6 +108,81 @@ function resolveNextAction(status: SeekerStatusSummary, resumeReady: boolean): N
   };
 }
 
+/**
+ * Build the bucket index from real seeker data. Counts render only when > 0 so
+ * empty states stay honest (the summary line carries the empty message instead
+ * of a sad "0" chip). Every href resolves to an existing seeker route.
+ */
+function buildBuckets(status: SeekerStatusSummary, resumeReady: boolean, matchedCount: number): readonly Bucket[] {
+  const buckets: Bucket[] = [
+    {
+      href: "/resume",
+      label: "Resume & readiness",
+      summary: resumeReady ? "Ready to apply" : "Finish it to unlock applying",
+      icon: "profile.resume",
+      meta: `${status.resumeCompletion}%`,
+      tone: resumeReady ? undefined : "soon",
+    },
+    {
+      href: "/applied",
+      label: "Applications",
+      summary: status.appliedCount > 0 ? "Track where you stand" : "You haven't applied yet",
+      icon: "status.applied",
+      meta: status.appliedCount > 0 ? String(status.appliedCount) : undefined,
+    },
+    {
+      href: "/offered",
+      label: "Offers",
+      summary: status.offersCount > 0 ? "Respond before they expire" : "No offers yet",
+      icon: "status.offered",
+      meta: status.offersCount > 0 ? String(status.offersCount) : undefined,
+      tone: status.offersCount > 0 ? "primary" : undefined,
+    },
+    {
+      href: "/saved",
+      label: "Saved",
+      summary: status.savedCount > 0 ? "Opportunities you bookmarked" : "Nothing saved yet",
+      icon: "nav.saved",
+      meta: status.savedCount > 0 ? String(status.savedCount) : undefined,
+    },
+  ];
+
+  if (matchedCount > 0) {
+    buckets.push({
+      href: "/seek",
+      label: "Matched for you",
+      summary: "Roles picked to fit your profile",
+      icon: "status.match",
+      meta: String(matchedCount),
+    });
+  }
+
+  buckets.push(
+    {
+      href: "/journey",
+      label: "Journey",
+      summary: status.acceptedUpcoming
+        ? `Upcoming: ${status.acceptedUpcoming}`
+        : "Travel plans & your timeline",
+      icon: "mappin.cluster",
+    },
+    {
+      href: "/community",
+      label: "Community",
+      summary: "Photos, feed & announcements",
+      icon: "nav.feed",
+    },
+    {
+      href: "/settings",
+      label: "Settings",
+      summary: "Account, notifications & privacy",
+      icon: "nav.settings",
+    },
+  );
+
+  return buckets;
+}
+
 export interface ProfileHubProps {
   readonly status: SeekerStatusSummary;
   readonly badges?: readonly SeekerBadge[];
@@ -108,6 +193,11 @@ export interface ProfileHubProps {
   readonly bio?: string | null;
   readonly seekerProfileId?: string | null;
   readonly matchedListings?: readonly DiscoveryListing[];
+  /**
+   * Kept on the composition contract for page.tsx, but the featured-employer
+   * rail no longer lives on the decluttered profile landing (it belongs to the
+   * discovery/home surfaces). Not rendered here.
+   */
   readonly featuredEmployers?: readonly FeaturedEmployer[];
 }
 
@@ -121,7 +211,6 @@ export function ProfileHub({
   bio,
   seekerProfileId,
   matchedListings = [],
-  featuredEmployers = [],
 }: ProfileHubProps) {
   const [isPending, startTransition] = useTransition();
   const [optimisticTimeline, setOptimisticTimeline] = useOptimistic(seekingTimeline ?? null);
@@ -141,32 +230,8 @@ export function ProfileHub({
     ? undefined
     : (CATEGORY_GRADIENTS[preferredCategories[0] ?? ""] ?? DEFAULT_GRADIENT);
 
-  const stats: readonly StatCell[] = [
-    {
-      href: "/resume",
-      label: "Resume",
-      value: `${status.resumeCompletion}%`,
-      icon: "profile.resume",
-      mod: !resumeReady && status.offersCount === 0 ? "soon" : undefined,
-    },
-    { href: "/saved", label: "Saved", value: String(status.savedCount), icon: "nav.saved" },
-    { href: "/applied", label: "Applied", value: String(status.appliedCount), icon: "action.apply" },
-    {
-      href: "/offered",
-      label: "Offers",
-      value: String(status.offersCount),
-      icon: "status.match",
-      mod: status.offersCount > 0 ? "primary" : undefined,
-    },
-    {
-      href: "/accepted",
-      label: "Upcoming",
-      value: status.acceptedUpcoming ? "1" : "—",
-      icon: "status.accepted",
-    },
-  ];
-
   const nextAction = resolveNextAction(status, resumeReady);
+  const buckets = buildBuckets(status, resumeReady, matchedListings.length);
 
   function handleReadinessChange(value: string) {
     if (!seekerProfileId) return;
@@ -244,24 +309,6 @@ export function ProfileHub({
         <ReadinessSlider value={optimisticTimeline} onChange={handleReadinessChange} saving={isPending} />
       </div>
 
-      {/* ── Status — tappable cells on the shared ui-stat primitive ── */}
-      <ul className={styles.statusRow} aria-label="Your activity">
-        {stats.map((stat) => {
-          const mod =
-            stat.mod === "primary" ? "ui-stat--primary" : stat.mod === "soon" ? "ui-stat--soon" : "";
-          return (
-            <li key={stat.href}>
-              <Link href={stat.href} className={`${styles.statCell} ui-stat ${mod}`}>
-                <span className="ui-stat__label">
-                  <Icon name={stat.icon} size={16} aria-hidden /> {stat.label}
-                </span>
-                <span className="ui-stat__value">{stat.value}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-
       {/* ── One next-best-action — the module's dominant element ── */}
       <Link href={nextAction.href} className={`${styles.callout} ${styles[nextAction.tone]}`}>
         <span className={styles.calloutIcon} aria-hidden="true">
@@ -283,43 +330,61 @@ export function ProfileHub({
         </span>
       </Link>
 
-      {/* ── Lower stack: matched · featured · directory · badges ── */}
-      <div className={styles.stack}>
-        {matchedListings.length > 0 && (
-          <MatchCardRail listings={matchedListings} title="Matched for you" />
-        )}
+      {/* ── Buckets — the decluttered index: summaries + entry points only ── */}
+      <nav className={styles.buckets} aria-label="Profile sections">
+        <h2 className={styles.bucketsTitle}>Your space</h2>
+        <ul className={styles.bucketGrid}>
+          {buckets.map((bucket) => (
+            <li key={bucket.href}>
+              <Link
+                href={bucket.href}
+                className={`${styles.bucket} ${bucket.tone ? BUCKET_TONE_CLASS[bucket.tone] : ""}`}
+              >
+                <span className={styles.bucketIcon} aria-hidden="true">
+                  <Icon name={bucket.icon} size={22} />
+                </span>
+                <span className={styles.bucketText}>
+                  <span className={styles.bucketLabel}>{bucket.label}</span>
+                  <span className={styles.bucketSummary}>{bucket.summary}</span>
+                </span>
+                {bucket.meta && (
+                  <span
+                    className={bucket.tone === "primary" ? styles.bucketMetaEmphasis : styles.bucketMeta}
+                  >
+                    {bucket.meta}
+                  </span>
+                )}
+                <span className={styles.bucketChevron} aria-hidden="true">
+                  <Icon name="action.forward" size={16} />
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-        {featuredEmployers.length > 0 && <FeaturedEmployerStrip employers={featuredEmployers} />}
-
-        <div className={styles.directoryWrap}>
-          <SeekerDirectory status={status} />
-        </div>
-
-        {badges.length > 0 && (
-          <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Badges</h2>
-            <ul className={styles.badgeList}>
-              {badges.map((b) => {
-                const meta = BADGE_META[b.badgeKey];
-                return (
-                  <li key={b.id} className={styles.badgeItem}>
-                    <span className={styles.badgeIcon} aria-hidden="true">
-                      <Icon name={meta.icon as IconKey} size={20} />
-                    </span>
-                    <div className={styles.badgeInfo}>
-                      <span className={styles.badgeName}>{meta.label}</span>
-                      <span className={styles.badgeDesc}>{meta.description}</span>
-                    </div>
-                    <time className={styles.badgeDate} dateTime={b.awardedAt}>
-                      {formatBadgeDate(b.awardedAt)}
-                    </time>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-      </div>
+      {/* ── Badges — a compact medallion strip, only when earned ── */}
+      {badges.length > 0 && (
+        <section className={styles.badges} aria-label="Badges">
+          <h2 className={styles.bucketsTitle}>Badges</h2>
+          <ul className={styles.badgeStrip}>
+            {badges.map((b) => {
+              const meta = BADGE_META[b.badgeKey];
+              return (
+                <li key={b.id} className={styles.badgeChip}>
+                  <span className={styles.badgeChipIcon} aria-hidden="true">
+                    <Icon name={meta.icon as IconKey} size={18} />
+                  </span>
+                  <span className={styles.badgeChipName}>{meta.label}</span>
+                  <time className={styles.badgeChipDate} dateTime={b.awardedAt}>
+                    {formatBadgeDate(b.awardedAt)}
+                  </time>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

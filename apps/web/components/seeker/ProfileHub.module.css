@@ -276,56 +276,6 @@
   margin-top: var(--space-4);
 }
 
-/* ── Status row — tappable cells over the ui-stat primitive ── */
-.statusRow {
-  list-style: none;
-  margin: var(--space-16) var(--space-16) 0;
-  padding: 0;
-  display: grid;
-  /* Five cells distribute evenly with no orphan: 3-up on phones,
-     auto-fitting to 5-up as width allows. */
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-8);
-}
-
-.statusRow > li { min-width: 0; }
-.statusRow > li > .statCell { height: 100%; }
-
-@media (min-width: 480px) {
-  .statusRow { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); }
-}
-
-@media (min-width: 640px) {
-  .statusRow { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-}
-
-.statusRow :global(.ui-stat__label) {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.statCell {
-  text-decoration: none;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard),
-    box-shadow var(--motion-fast) var(--ease-standard);
-}
-
-.statCell:hover {
-  border-color: var(--border-ink);
-  box-shadow: var(--elevation-hover);
-  transform: translateY(-1px);
-}
-
-.statCell:active { transform: translateY(0); }
-
-.statCell:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
 /* ── Next-best-action callout — the dominant element of the hub ── */
 .callout {
   position: relative;
@@ -517,99 +467,226 @@
   transition: width var(--motion-base) var(--ease-standard);
 }
 
-/* ── Lower stack ── */
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  margin-top: var(--space-12);
-  padding-bottom: var(--space-16);
-}
-
-.directoryWrap {
-  /* MatchCardRail / FeaturedEmployerStrip self-pad; the directory does not. */
-  padding: var(--space-8) var(--space-16) 0;
-}
-
-/* ── Section (badges) ── */
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
+/* ── Buckets — the decluttered index of navigable surfaces ── */
+.buckets {
+  margin: var(--space-section) 0 0;
   padding: 0 var(--space-16);
 }
 
-.sectionTitle {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--type-section-size);
-  line-height: var(--type-section-lh);
-  font-weight: var(--font-weight-regular);
-  color: var(--text-primary);
+.bucketsTitle {
+  margin: 0 0 var(--space-10);
+  padding-inline: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-.badgeList {
+.bucketGrid {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
-  overflow: hidden;
-  background: var(--color-surface-raised);
+  display: grid;
+  /* Mobile-first: a clean single column of tiles at 375px. */
+  grid-template-columns: 1fr;
+  gap: var(--space-10);
 }
 
-.badgeItem {
+.bucketGrid > li { min-width: 0; }
+
+/* 2-up on tablet, 3-up on desktop (references real device widths). */
+@media (min-width: 768px) {
+  .bucketGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1280px) {
+  .bucketGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.bucket {
+  height: 100%;
   display: flex;
   align-items: center;
   gap: var(--space-12);
-  padding: var(--space-12) var(--space-14);
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.badgeItem:last-child { border-bottom: none; }
-
-.badgeIcon {
-  flex-shrink: 0;
-  display: flex;
+  min-height: 76px;
+  padding: var(--space-14);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
   color: var(--text-secondary);
+  text-decoration: none;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
 }
 
-.badgeInfo {
+.bucket:hover {
+  border-color: var(--border-ink);
+  box-shadow: var(--elevation-hover);
+  transform: translateY(-1px);
+}
+
+.bucket:active { transform: translateY(0); }
+
+.bucket:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.bucketIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-chip);
+  height: var(--icon-chip);
+  border-radius: var(--radius-cell);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 22%, transparent);
+  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+  color: var(--color-cta);
+}
+
+.bucketText {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 2px;
 }
 
-.badgeName {
+.bucketLabel {
   font-family: var(--font-ui);
   font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
   font-weight: var(--font-weight-semibold);
   color: var(--text-primary);
 }
 
-.badgeDesc {
+.bucketSummary {
   font-family: var(--font-ui);
   font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
   color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.badgeDate {
+.bucketMeta {
   flex-shrink: 0;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.bucketMetaEmphasis {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  background: var(--status-match-bg);
+  color: var(--status-match-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.bucketChevron {
+  flex-shrink: 0;
+  display: flex;
+  color: var(--text-muted);
+}
+
+/* Time-sensitive bucket (offers): a quiet accent, not a loud full fill.
+   Distinct names from the callout's .primary/.soon so the module's shared
+   class scope doesn't bleed the callout fill onto a tile. */
+.bucketPrimary {
+  border-color: color-mix(in srgb, var(--color-cta) 40%, transparent);
+}
+
+.bucketPrimary .bucketIcon {
+  border-color: transparent;
+  background: var(--gradient-action);
+  color: var(--color-cta-text);
+}
+
+/* Unfinished bucket (resume below threshold): a warm nudge accent. */
+.bucketSoon {
+  border-color: color-mix(in srgb, var(--state-soon-fg) 40%, transparent);
+}
+
+.bucketSoon .bucketIcon {
+  border-color: color-mix(in srgb, var(--state-soon-fg) 30%, transparent);
+  background: color-mix(in srgb, var(--state-soon-fg) 12%, transparent);
+  color: var(--state-soon-fg);
+}
+
+.bucketSoon .bucketMeta {
+  color: var(--state-soon-fg);
+}
+
+/* ── Badges — a compact medallion strip ── */
+.badges {
+  margin: var(--space-section) 0 0;
+  padding: 0 var(--space-16) var(--space-16);
+}
+
+.badgeStrip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.badgeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+}
+
+.badgeChipIcon {
+  flex-shrink: 0;
+  display: flex;
+  color: var(--color-cta);
+}
+
+.badgeChipName {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.badgeChipDate {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  color: var(--text-muted);
   white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .seekerDot { animation: none; }
   .progressFill { transition: none; }
-  .statCell,
+  .bucket,
   .callout,
   .calloutCta { transition: none; }
-  .statCell:hover,
+  .bucket:hover,
+  .bucket:active,
   .callout:hover,
   .callout:active,
   .callout:hover .calloutCta { transform: none; }
