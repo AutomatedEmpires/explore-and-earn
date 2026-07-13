@@ -32,10 +32,12 @@ function lanePhoto(category: PhotoCategory, slug: string, size: "card" | "hero" 
 
 // ─── Hero ───────────────────────────────────────────────────────────────────
 
-/** A deliberately scenic, warm "working landscape" hero — not a data cover. */
+/** A scenic cool "working landscape" hero — coastal/maritime to sit with the
+ * Glacier palette (a warm cover fights the ice-and-chrome UI). Not a data cover.
+ * If the hero-size variant is missing, the maritime cover gradient shows. */
 export const HOME_HERO = {
-  imageUrl: cloudinaryPhoto("farm", "venti-views-n-ndvlwtfde", "hero"),
-  category: "farm" as OpportunityCategory,
+  imageUrl: cloudinaryPhoto("maritime", "venti-views-asmavys4azm", "hero"),
+  category: "maritime" as OpportunityCategory,
 };
 
 // ─── Destinations ("Where will you go next?") ──────────────────────────────

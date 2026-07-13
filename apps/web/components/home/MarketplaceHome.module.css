@@ -107,23 +107,23 @@
 /* ─── Hero ───────────────────────────────────────────────────────────────── */
 
 .hero {
+	/* Full-bleed: the hero encompasses the whole viewport width, not a boxed
+	   card. Breaks out of the .home flex column and any page gutter. */
 	width: 100%;
-	max-width: 1200px;
-	margin-inline: auto;
-	padding-inline: var(--space-gutter);
-	padding-top: var(--space-16);
+	margin: 0;
+	padding: 0;
 }
 
 .heroFrame {
 	position: relative;
 	isolation: isolate;
 	overflow: hidden;
-	border-radius: var(--radius-card);
-	border: 1.5px solid var(--border-ink-warm);
-	background-color: var(--color-parchment);
+	border: none;
+	border-radius: 0;
+	background-color: var(--color-panel-dark);
 	background-size: cover;
 	background-position: center;
-	min-height: 34rem;
+	min-height: clamp(34rem, 92vh, 52rem);
 	display: flex;
 	align-items: flex-end;
 }

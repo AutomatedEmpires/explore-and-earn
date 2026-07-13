@@ -175,16 +175,8 @@ export function GlobalHeader({
             >
               Community
             </Link>
-            {/* Host conversion entry — surfaced in the signed-out/public state. */}
-            {!isAuthenticated ? (
-              <Link
-                className={`${styles.navLink}${sectionActive === "hosts" ? ` ${styles.navLinkActive}` : ""}`}
-                href="/for-hosts"
-                aria-current={sectionActive === "hosts" ? "page" : undefined}
-              >
-                For Hosts
-              </Link>
-            ) : null}
+            {/* Host flow is separate (reached via sign-in → "I'm a host"), not a
+                primary nav destination — so "For Hosts" is intentionally not here. */}
           </nav>
         )}
 
