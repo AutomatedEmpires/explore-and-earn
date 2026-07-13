@@ -7,7 +7,7 @@ import {
   vi,
 } from "vitest";
 
-import { _resetDedup, sendMail } from "../index.js";
+import { _resetDedup, sendMail } from "../index.ts";
 
 const mockFetch = vi.fn();
 
@@ -15,8 +15,11 @@ beforeEach(() => {
   mockFetch.mockReset();
   vi.stubGlobal("fetch", mockFetch);
   vi.stubEnv("RESEND_API_KEY", "");
+  vi.stubEnv("RESEND_FROM", "");
   vi.stubEnv("RESEND_FROM_EMAIL", "");
+  vi.stubEnv("RESEND_REPLY_TO", "");
   vi.stubEnv("RESEND_REPLY_TO_EMAIL", "");
+  vi.stubEnv("SUPPORT_EMAIL", "");
   _resetDedup();
 });
 
@@ -75,7 +78,7 @@ describe("sendMail", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("sends successfully and returns ok:true", async () => {
+  it("sends successfully with the default Reply-To and returns ok:true", async () => {
     vi.stubEnv("RESEND_API_KEY", "test-key");
     mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
 
@@ -93,7 +96,20 @@ describe("sendMail", () => {
     const body = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(body.to).toEqual(["user@example.com"]);
     expect(body.subject).toBe("Test subject");
-    expect(body).not.toHaveProperty("reply_to");
+    expect(body.reply_to).toBe("support@exploreandearn.com");
+  });
+
+  it("prefers RESEND_FROM over RESEND_FROM_EMAIL", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("RESEND_FROM", " canonical@exploreandearn.com ");
+    vi.stubEnv("RESEND_FROM_EMAIL", "legacy@exploreandearn.com");
+    mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
+
+    await sendMail({ to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.from).toBe("canonical@exploreandearn.com");
   });
 
   it("uses RESEND_FROM_EMAIL override when set", async () => {
@@ -122,6 +138,23 @@ describe("sendMail", () => {
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(body.reply_to).toBe("support@exploreandearn.com");
+  });
+
+  it("prefers RESEND_REPLY_TO over RESEND_REPLY_TO_EMAIL", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    vi.stubEnv("RESEND_REPLY_TO", " canonical-reply@exploreandearn.com ");
+    vi.stubEnv("RESEND_REPLY_TO_EMAIL", "legacy-reply@exploreandearn.com");
+    mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
+
+    await sendMail({
+      to: "user@example.com",
+      subject: "Hi",
+      html: "<p>Hi</p>",
+    });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.reply_to).toBe("canonical-reply@exploreandearn.com");
   });
 
   it("catches provider HTTP errors and returns ok:false without throwing", async () => {
