@@ -18,6 +18,18 @@ import {
 } from "../../app/actions/community";
 import styles from "./PostEngagement.module.css";
 
+// ─── Defined reactions ─────────────────────────────────────────────────────────
+
+/** Human names for the five community reactions (glyphs come from the contract's
+ *  REACTION_EMOJIS). A tasteful, defined set so every reaction reads clearly. */
+const REACTION_LABELS: Record<ReactionKey, string> = {
+  smile:   "Like",
+  heart:   "Love",
+  sparkle: "Inspiring",
+  clap:    "Congrats",
+  hundred: "Been there",
+};
+
 // ─── Time formatter ────────────────────────────────────────────────────────────
 
 function relTime(iso: string): string {
@@ -296,16 +308,19 @@ export function PostEngagement({
         {REACTION_KEYS.map(key => {
           const isActive = active.has(key);
           const count    = displayCounts[key];
+          const label    = REACTION_LABELS[key];
           return (
             <button
               key={key}
               type="button"
               className={`${styles.reaction}${isActive ? ` ${styles.reactionActive}` : ""}`}
-              aria-label={`React with ${REACTION_EMOJIS[key]}${isActive ? " — you reacted" : ""}`}
+              aria-label={`${label}${isActive ? " — you reacted" : ""}`}
               aria-pressed={isActive}
+              title={label}
               onClick={() => toggle(key)}
             >
               <span className={styles.reactionEmoji} aria-hidden>{REACTION_EMOJIS[key]}</span>
+              <span className={styles.reactionLabel}>{label}</span>
               <span className={styles.reactionCount}>{count}</span>
             </button>
           );

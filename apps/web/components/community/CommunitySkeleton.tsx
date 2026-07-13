@@ -2,8 +2,9 @@ import styles from "../seeker/CommunityDashboard.module.css";
 
 /**
  * Route-level loading skeleton for the community area.
- * Server component — renders a paper-textured masthead placeholder plus a
- * shimmer feed/photo grid while `force-dynamic` data resolves.
+ * Server component — renders the immersive tab-bar header placeholder plus a
+ * shimmer feed/photo grid while `force-dynamic` data resolves. Mirrors the
+ * land-directly-in-the-feed layout (no explanatory masthead).
  * Presentational only; reuses the community design-system classes.
  */
 
@@ -27,12 +28,12 @@ function PostSkeleton() {
 export function CommunitySkeleton({ variant = "feed" }: { readonly variant?: "feed" | "photos" }) {
   return (
     <div className={styles.dashboard} aria-busy="true" aria-label="Loading community">
-      <div className={styles.welcomeBar}>
-        <div className={styles.mastheadTop}>
-          <div className={`${styles.skeletonLine} ${styles.skeletonLineShort}`} style={{ background: "rgba(255,255,255,0.18)" }} />
-          <div className={styles.skeletonText} style={{ maxWidth: "16rem", height: 28, background: "rgba(255,255,255,0.22)" }} />
-          <div className={styles.skeletonText} style={{ maxWidth: "30rem", background: "rgba(255,255,255,0.14)" }} />
-        </div>
+      <div className={styles.tabNav} aria-hidden>
+        {["Photos", "Feed", "Announcements"].map(label => (
+          <span key={label} className={styles.tabLink} style={{ color: "transparent", minWidth: "6.5rem" }}>
+            {label}
+          </span>
+        ))}
       </div>
       <div className={styles.layout}>
         <div className={styles.mainCol}>

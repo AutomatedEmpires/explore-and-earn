@@ -1,137 +1,24 @@
-/* Seeker Map — dark-glass atlas inside the emerald Seeker OS.
-   Tokens resolve to dark glass + emerald CTA under the (seeker) scope, so the
-   surface joins the OS instead of fighting it. Zero raw hex. */
+/* Seeker Map — fully immersive Zillow-style atlas inside the Seeker OS.
+   The map IS the surface: it fills the content column edge-to-edge and top-to-
+   bottom (minus the OS top bar and the mobile dock). Floating glass controls sit
+   over the map; a swipe-up tray carries the in-view listings. Tokens resolve to
+   dark glass + emerald CTA under the (seeker) scope. Zero raw hex. */
 
 .shell {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-16);
+	position: relative;
+	/* Break out of the padded, max-width content column to a near-full-bleed
+	   surface (inset by one gutter each side to stay clear of the scrollbar). */
 	width: calc(100vw - (var(--space-gutter) * 2));
 	margin-inline: calc(50% - 50vw + var(--space-gutter));
-}
-
-/* ---- editorial header ---- */
-
-.head {
-	display: flex;
-	align-items: flex-end;
-	justify-content: space-between;
-	gap: var(--space-20);
-	flex-wrap: wrap;
-}
-
-.headLede {
-	max-width: 44rem;
-	min-width: 0;
-}
-
-.eyebrow {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-8);
-	padding: var(--space-6) var(--space-12);
-	border-radius: var(--radius-pill);
-	border: 1px solid color-mix(in srgb, var(--color-cta) 28%, transparent);
-	background: color-mix(in srgb, var(--color-cta) 12%, transparent);
-	color: var(--status-success-fg);
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	line-height: var(--type-label-lh);
-	letter-spacing: var(--type-label-tracking);
-	font-weight: var(--font-weight-semibold);
-	text-transform: uppercase;
-}
-
-.live {
-	width: 0.5rem;
-	height: 0.5rem;
-	border-radius: var(--radius-pill);
-	background: var(--color-cta);
-	box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-cta) 70%, transparent);
-	animation: livePulse 1.9s ease-out infinite;
-}
-
-@keyframes livePulse {
-	70% {
-		box-shadow: 0 0 0 0.6rem color-mix(in srgb, var(--color-cta) 0%, transparent);
-	}
-	100% {
-		box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-cta) 0%, transparent);
-	}
-}
-
-.title {
-	margin: var(--space-12) 0 var(--space-8);
-	font-family: var(--font-display);
-	font-size: clamp(1.7rem, 4vw, 2.6rem);
-	line-height: 1;
-	letter-spacing: -0.02em;
-	color: var(--text-primary);
-}
-
-.subtitle {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
-	line-height: 1.5;
-	color: var(--text-secondary);
-}
-
-.legend {
-	display: grid;
-	grid-template-columns: auto auto;
-	align-items: center;
-	gap: var(--space-6) var(--space-8);
-	padding: var(--space-12) var(--space-16);
-	border-radius: var(--radius-card);
-	border: 1px solid var(--border-soft);
-	background: var(--color-surface);
-	backdrop-filter: blur(12px);
-}
-
-.legendDot {
-	width: 0.85rem;
-	height: 0.85rem;
-	border-radius: var(--radius-pill) var(--radius-pill) var(--radius-pill) 2px;
-	transform: rotate(-45deg);
-	justify-self: center;
-}
-
-.legendSingle {
-	background: linear-gradient(135deg, var(--color-cta), var(--status-warning-fg));
-	box-shadow: 0 0 0.75rem color-mix(in srgb, var(--color-cta) 40%, transparent);
-}
-
-.legendGroup {
-	background: linear-gradient(135deg, var(--color-cta), var(--color-cta));
-	box-shadow: 0 0 0.75rem color-mix(in srgb, var(--color-cta) 30%, transparent);
-}
-
-.legendLabel {
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	line-height: var(--type-label-lh);
-	letter-spacing: var(--type-label-tracking);
-	font-weight: var(--font-weight-semibold);
-	text-transform: uppercase;
-	color: var(--text-secondary);
-}
-
-/* ---- at-a-glance rail ---- */
-
-.rail {
-	width: 100%;
-}
-
-/* ---- map frame ---- */
-
-.wrap {
-	position: relative;
-	width: 100%;
-	height: max(34rem, calc(100dvh - var(--size-bottom-nav) - 18rem));
-	border: 1px solid var(--border-ink);
-	border-radius: var(--radius-card);
+	/* Pull up under the sticky OS top bar and down past the content padding so
+	   the map fills the viewport height. Top bar is 72px (see seeker-os.css). */
+	margin-top: calc(var(--space-24) * -1);
+	margin-bottom: calc(var(--space-24) * -1);
+	height: calc(100dvh - 72px);
+	min-height: 30rem;
 	overflow: hidden;
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-ink);
 	background:
 		radial-gradient(circle at 28% 22%, color-mix(in srgb, var(--color-cta) 14%, transparent), transparent 38%),
 		radial-gradient(circle at 76% 64%, color-mix(in srgb, var(--color-cta) 10%, transparent), transparent 40%),
@@ -166,7 +53,80 @@
 	height: 100%;
 }
 
-/* ---- pins: emerald-gold teardrops ---- */
+/* ---- floating sort (left) + filter (right) controls ---- */
+
+.controlBar {
+	position: absolute;
+	top: var(--space-16);
+	left: var(--space-16);
+	right: var(--space-16);
+	z-index: 5;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-12);
+	pointer-events: none;
+}
+
+.control {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	min-height: 2.75rem;
+	padding: 0 var(--space-16);
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--border-ink);
+	background: color-mix(in srgb, var(--color-paper) 82%, transparent);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	letter-spacing: var(--type-label-tracking);
+	font-weight: var(--font-weight-semibold);
+	box-shadow: 0 10px 28px color-mix(in srgb, var(--color-ink) 34%, transparent);
+	backdrop-filter: blur(18px);
+	cursor: pointer;
+	pointer-events: auto;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard);
+}
+
+.control:hover {
+	transform: translateY(-1px);
+	border-color: color-mix(in srgb, var(--color-cta) 50%, var(--border-ink));
+}
+
+.control:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+.controlActive {
+	border-color: color-mix(in srgb, var(--color-cta) 55%, transparent);
+	background: color-mix(in srgb, var(--color-cta) 16%, var(--color-paper) 84%);
+	color: var(--status-success-fg);
+}
+
+.controlLabel {
+	white-space: nowrap;
+}
+
+.controlCount {
+	display: inline-grid;
+	place-items: center;
+	min-width: 1.25rem;
+	height: 1.25rem;
+	padding: 0 var(--space-4);
+	border-radius: var(--radius-pill);
+	background: var(--color-cta);
+	color: var(--color-cta-text);
+	font-size: var(--type-meta-size);
+	line-height: 1;
+	font-weight: var(--font-weight-semibold);
+}
+
+/* ---- pins: category teardrops ---- */
 
 .pin {
 	display: inline-flex;
@@ -249,7 +209,7 @@
 	border-radius: var(--radius-pill);
 }
 
-/* ---- popup card: dark glass ---- */
+/* ---- pin popup card: dark glass, the compact DiscoveryCard ---- */
 
 .popupCard {
 	width: min(21rem, 82vw);
@@ -270,33 +230,6 @@
 	backdrop-filter: blur(18px);
 }
 
-.popupHeader {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-8);
-	padding: 0 var(--space-4);
-}
-
-.popupEyebrow,
-.popupMeta {
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	line-height: var(--type-label-lh);
-	font-weight: var(--font-weight-semibold);
-	letter-spacing: var(--type-label-tracking);
-	text-transform: uppercase;
-}
-
-.popupEyebrow {
-	color: var(--status-success-fg);
-}
-
-.popupMeta {
-	color: var(--text-secondary);
-	text-align: right;
-}
-
 .popup :global(.mapboxgl-popup-content) {
 	padding: 0;
 	background: transparent;
@@ -308,15 +241,15 @@
 	display: none;
 }
 
-/* ---- listing tray: dark glass ---- */
+/* ---- listing tray: swipe-up, dark glass ---- */
 
 .tray {
 	position: absolute;
 	left: 0;
 	right: 0;
 	bottom: 0;
-	z-index: 2;
-	height: min(40%, 24rem);
+	z-index: 4;
+	height: min(56%, 30rem);
 	display: flex;
 	flex-direction: column;
 	border-top: 1px solid var(--border-ink);
@@ -390,6 +323,15 @@
 	pointer-events: auto;
 }
 
+.trayEmpty {
+	margin: 0;
+	padding: var(--space-16) var(--space-8);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
 .trayList {
 	display: flex;
 	flex-direction: column;
@@ -408,52 +350,36 @@
 	outline-offset: 2px;
 }
 
-@media (max-width: 767px) {
-	.wrap {
-		height: max(32rem, calc(100dvh - var(--size-bottom-nav) - 22rem));
+/* ── Mobile (≤1023px): dock is pinned; keep the tray + controls clear of it ── */
+@media (max-width: 1023px) {
+	.shell {
+		width: 100vw;
+		margin-inline: calc(50% - 50vw);
+		margin-top: calc(var(--space-16) * -1);
+		/* Cancel the content column's dock-reserving bottom padding so the map
+		   fills to the viewport bottom; the fixed dock overlays the map edge. */
+		margin-bottom: calc((var(--size-bottom-nav) + var(--space-24)) * -1);
+		border-radius: 0;
+		border-inline: 0;
 	}
 
 	.tray {
-		height: min(46%, 26rem);
+		bottom: calc(var(--size-bottom-nav) + env(safe-area-inset-bottom, 0px));
+		height: min(60%, 28rem);
 	}
 }
 
 @media (max-width: 640px) {
-	.shell {
-		width: calc(100vw - var(--space-16));
-		margin-inline: calc(50% - 50vw + var(--space-8));
-	}
-
-	.legend {
-		display: none;
-	}
-
-	.wrap {
-		height: max(30rem, calc(100dvh - var(--size-bottom-nav) - 24rem));
-	}
-
-	.tray {
-		transform: translateY(calc(100% - 4rem));
-		height: min(48%, 24rem);
-	}
-
-	.trayHandle {
-		grid-template-columns: 1fr;
-		justify-items: center;
-		text-align: center;
-	}
-
-	.trayMeta {
-		display: none;
+	.control {
+		padding: 0 var(--space-12);
 	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.live,
 	.pin,
+	.control,
 	.tray,
 	.trayBody {
-		animation: none;
 		transition: none;
 	}
 }

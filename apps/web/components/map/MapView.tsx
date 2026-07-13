@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -11,16 +12,12 @@ import MapboxMap, { Marker, Popup, type MapRef } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
-import {
-  DiscoveryCard,
-  Icon,
-  MetricCard,
-  MetricGrid,
-  Skeleton,
-} from "@explore-and-earn/ui";
+import { DiscoveryCard, Icon, Skeleton } from "@explore-and-earn/ui";
 
 import {
   BenefitTrustModal,
+  CATEGORY_ICON,
+  CATEGORY_LABEL,
   EmptyState,
   HostProfilePopup,
   PayDetailsDrawer,
@@ -29,11 +26,21 @@ import {
   type DiscoveryListing,
 } from "../discovery";
 import { MAPPIN_ICON } from "../seeker/mappin";
+import { SeekFilterPopup, type SeekFilterPopupValue } from "../seeker/SeekFilterPopup";
+import { SeekSortPopup } from "../seeker/SeekSortPopup";
+import { byMonetization, type MonetizationInputs } from "../../lib/ranking";
 import styles from "./MapView.module.css";
 
 export interface MapViewProps {
   readonly listings: readonly DiscoveryListing[];
   readonly initialFocusId?: string;
+  /**
+   * Mapbox access token, read in the server component (map/page.tsx) and passed
+   * down. Falls back to the client-inlined env var, but the prop is the reliable
+   * path: this component is dynamically imported with `ssr: false`, so reading
+   * `process.env.NEXT_PUBLIC_MAPBOX_TOKEN` here alone can resolve empty.
+   */
+  readonly mapboxToken?: string;
 }
 
 type MappedListing = DiscoveryListing & {
@@ -47,8 +54,22 @@ interface MarkerGroup {
   readonly category: OpportunityCategory;
 }
 
+/** Current map viewport, in geographic degrees. Null until the map first loads. */
+interface ViewBounds {
+  readonly north: number;
+  readonly south: number;
+  readonly east: number;
+  readonly west: number;
+}
+
 const USA_VIEW = { longitude: -98.5795, latitude: 39.8283, zoom: 4 } as const;
 const MAP_STYLE = { width: "100%", height: "100%" };
+
+const EMPTY_FILTERS: SeekFilterPopupValue = {
+  housing: false,
+  meals: false,
+  visaSupport: false,
+};
 
 const MARKER_CLASS = {
   farm: styles.pinFarm,
@@ -60,6 +81,68 @@ const MARKER_CLASS = {
 
 function hasCoordinates(listing: DiscoveryListing): listing is MappedListing {
   return listing.coordinates != null;
+}
+
+/** Monetization inputs a listing can supply on the map surface (no host tier here). */
+function toRankInputs(listing: DiscoveryListing): MonetizationInputs {
+  return {
+    boosted: listing.conditionalBadges?.includes("boosted"),
+    matchScore: listing.matchScore,
+  };
+}
+
+/**
+ * Best-effort "starts within N months" test. `begins` is a human string
+ * ("Aug 12, 2026", "Rolling", "Flexible"); only concrete, parseable dates are
+ * filtered. Unknown / unparseable timing is never hidden — an active filter
+ * orders and screens, but a listing with no readable start date still shows.
+ */
+function beginsWithin(begins: string | undefined, months: number): boolean {
+  if (!begins) return true;
+  const when = new Date(begins);
+  if (Number.isNaN(when.getTime())) return true;
+  const limit = new Date();
+  limit.setMonth(limit.getMonth() + months);
+  return when <= limit;
+}
+
+/** Client-side filter predicate mirroring the Seek sort + filter controls. */
+function matchesFilters(
+  listing: MappedListing,
+  lane: OpportunityCategory | null,
+  filters: SeekFilterPopupValue,
+): boolean {
+  if (lane && listing.category !== lane) return false;
+  // Housing / Meals "included" mirrors the card's green state: anything but
+  // an explicit not_provided counts as offered.
+  if (filters.housing && listing.benefits.housing.provision === "not_provided") {
+    return false;
+  }
+  if (filters.meals && listing.benefits.meals.provision === "not_provided") {
+    return false;
+  }
+  if (filters.visaSupport && !listing.visaSupport) return false;
+  if (filters.payMin && filters.payMin > 0) {
+    const cents = listing.payInsight?.minCents;
+    if (cents == null) return false;
+    const unit = listing.payInsight?.unit;
+    if (filters.payUnit && unit && unit !== filters.payUnit) return false;
+    if (cents / 100 < filters.payMin) return false;
+  }
+  if (filters.startRangeMonths && !beginsWithin(listing.begins, filters.startRangeMonths)) {
+    return false;
+  }
+  return true;
+}
+
+function inViewport(listing: MappedListing, bounds: ViewBounds): boolean {
+  const { lat, lon } = listing.coordinates;
+  return (
+    lat <= bounds.north &&
+    lat >= bounds.south &&
+    lon <= bounds.east &&
+    lon >= bounds.west
+  );
 }
 
 function groupMarkers(listings: readonly MappedListing[]): MarkerGroup[] {
@@ -85,56 +168,50 @@ function groupMarkers(listings: readonly MappedListing[]): MarkerGroup[] {
   });
 }
 
-export function MapView({ listings, initialFocusId }: MapViewProps) {
+export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps) {
   const router = useRouter();
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const token = mapboxToken ?? process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const mapRef = useRef<MapRef | null>(null);
   const trayStartY = useRef<number | null>(null);
 
   const mapped = useMemo(() => listings.filter(hasCoordinates), [listings]);
-  const markerGroups = useMemo(() => groupMarkers(mapped), [mapped]);
 
-  const atlas = useMemo(() => {
-    const regions = new Set(
-      mapped.map(
-        (listing) =>
-          `${listing.coordinates.lat.toFixed(1)}:${listing.coordinates.lon.toFixed(1)}`,
-      ),
-    );
-    // Housing on site = roof fully provided (not partial, not absent). The
-    // label only claims a roof when the provision actually backs it.
-    const housingOnSite = mapped.filter(
-      (listing) => listing.benefits.housing.provision === "provided",
-    ).length;
-    const verified = mapped.filter((listing) => listing.host.verified).length;
-    const topMatch = mapped.reduce(
-      (best, listing) => Math.max(best, listing.matchScore ?? 0),
-      0,
-    );
-    // Real east–west span from actual pins (no fabricated geography). Only call
-    // it "coast to coast" when the longitude spread genuinely crosses the
-    // continent (~> 35° of longitude); otherwise describe the true footprint.
-    const lons = mapped.map((listing) => listing.coordinates.lon);
-    const lonSpan =
-      lons.length > 1 ? Math.max(...lons) - Math.min(...lons) : 0;
-    const spanLabel =
-      regions.size <= 1
-        ? "One region"
-        : lonSpan >= 35
-          ? "Coast to coast"
-          : lonSpan >= 12
-            ? "Spanning regions"
-            : "Clustered nearby";
-    return {
-      mapped: mapped.length,
-      regions: regions.size,
-      clusters: markerGroups.length,
-      housingOnSite,
-      verified,
-      topMatch,
-      spanLabel,
-    };
-  }, [mapped, markerGroups]);
+  // ── Immersive sort + filter (reuse the Seek controls) ──────────────────────
+  const [lane, setLane] = useState<OpportunityCategory | null>(null);
+  const [filters, setFilters] = useState<SeekFilterPopupValue>(EMPTY_FILTERS);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const filterCount = useMemo(() => {
+    let n = 0;
+    if (filters.housing) n += 1;
+    if (filters.meals) n += 1;
+    if (filters.visaSupport) n += 1;
+    if (filters.startRangeMonths) n += 1;
+    if (filters.payMin && filters.payMin > 0) n += 1;
+    return n;
+  }, [filters]);
+
+  const filtered = useMemo(
+    () => mapped.filter((listing) => matchesFilters(listing, lane, filters)),
+    [mapped, lane, filters],
+  );
+
+  // ── Viewport-scoped markers + tray (Zillow "search this area") ─────────────
+  const [bounds, setBounds] = useState<ViewBounds | null>(null);
+
+  const visible = useMemo(() => {
+    if (!bounds) return filtered;
+    return filtered.filter((listing) => inViewport(listing, bounds));
+  }, [filtered, bounds]);
+
+  const markerGroups = useMemo(() => groupMarkers(visible), [visible]);
+
+  // In-view listings, ordered by the shared monetization rule (never hides).
+  const trayListings = useMemo(
+    () => [...visible].sort(byMonetization(toRankInputs)),
+    [visible],
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(
     initialFocusId ?? null,
@@ -150,9 +227,11 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
 
+  // Popup resolves against the filtered set: a listing screened out by the sort
+  // or filters closes its popup instead of floating over an empty map.
   const selected = useMemo(
-    () => mapped.find((listing) => listing.id === selectedId) ?? null,
-    [mapped, selectedId],
+    () => filtered.find((listing) => listing.id === selectedId) ?? null,
+    [filtered, selectedId],
   );
 
   const activeHost = useMemo(
@@ -175,17 +254,6 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
     [mapped, reportId],
   );
 
-  const trayListings = useMemo(() => {
-    if (!selectedId) {
-      return mapped;
-    }
-    const selectedListing = mapped.find((listing) => listing.id === selectedId);
-    if (!selectedListing) {
-      return mapped;
-    }
-    return [selectedListing, ...mapped.filter((listing) => listing.id !== selectedId)];
-  }, [mapped, selectedId]);
-
   const initialViewState = useMemo(() => {
     const focus = initialFocusId
       ? mapped.find((listing) => listing.id === initialFocusId)
@@ -198,6 +266,21 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
         }
       : USA_VIEW;
   }, [initialFocusId, mapped]);
+
+  // Sync the tracked viewport from the live map (on load + after every pan/zoom)
+  // so markers and the tray re-query to what's currently on screen.
+  const syncBounds = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const next = map.getBounds();
+    if (!next) return;
+    setBounds({
+      north: next.getNorth(),
+      south: next.getSouth(),
+      east: next.getEast(),
+      west: next.getWest(),
+    });
+  }, []);
 
   const focusListing = (listing: MappedListing) => {
     setSelectedId(listing.id);
@@ -258,64 +341,23 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
     );
   }
 
+  const sortLabel = lane ? CATEGORY_LABEL[lane] : "Sort";
+  const sortIcon = lane ? CATEGORY_ICON[lane] : "action.sort";
+
   return (
     <div className={styles.shell}>
-      <header className={styles.head}>
-        <div className={styles.headLede}>
-          <span className={styles.eyebrow}>
-            <span className={styles.live} aria-hidden />
-            Seeker map
-          </span>
-          <h2 className={styles.title}>Where the work becomes a place.</h2>
-          <p className={styles.subtitle}>
-            Every pin carries its housing, meals, and pay. Open one to see the
-            full triad before you ever pack a bag.
-          </p>
-        </div>
-        <div className={styles.legend} aria-hidden="true">
-          <span className={`${styles.legendDot} ${styles.legendSingle}`} />
-          <span className={styles.legendLabel}>Opportunity</span>
-          <span className={`${styles.legendDot} ${styles.legendGroup}`} />
-          <span className={styles.legendLabel}>Cluster</span>
-        </div>
-      </header>
-
-      <MetricGrid className={styles.rail}>
-        <MetricCard
-          label="On the map"
-          value={atlas.mapped}
-          trend={`${atlas.clusters} ${atlas.clusters === 1 ? "site" : "sites"}`}
-          trendTone="neutral"
-        />
-        <MetricCard
-          label="Regions in reach"
-          value={atlas.regions}
-          trend={atlas.spanLabel}
-          trendTone={atlas.regions > 1 ? "up" : "neutral"}
-        />
-        <MetricCard
-          label="Housing on site"
-          value={atlas.housingOnSite}
-          trend={atlas.housingOnSite > 0 ? "Roof included" : "None yet"}
-          trendTone={atlas.housingOnSite > 0 ? "up" : "down"}
-        />
-        <MetricCard
-          label={atlas.topMatch > 0 ? "Top match" : "Verified hosts"}
-          value={atlas.topMatch > 0 ? `${atlas.topMatch}%` : atlas.verified}
-          trend={atlas.topMatch > 0 ? "Best fit pinned" : "Trusted on map"}
-          trendTone="up"
-        />
-      </MetricGrid>
-
-      <div className={styles.wrap}>
-        <div className={styles.canvas}>
+      <div className={styles.canvas}>
         <MapboxMap
           ref={mapRef}
           mapboxAccessToken={token}
           initialViewState={initialViewState}
           mapStyle="mapbox://styles/mapbox/dark-v11"
           style={MAP_STYLE}
-          onLoad={() => setLoaded(true)}
+          onLoad={() => {
+            setLoaded(true);
+            syncBounds();
+          }}
+          onMoveEnd={syncBounds}
           onError={() => setErrored(true)}
           onClick={() => setSelectedId(null)}
           reuseMaps
@@ -366,10 +408,6 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
             >
               <div className={styles.popupCard}>
                 <div className={styles.popupFrame}>
-                  <div className={styles.popupHeader}>
-                    <span className={styles.popupEyebrow}>Pinned opportunity</span>
-                    <span className={styles.popupMeta}>{selected.opportunityWindow}</span>
-                  </div>
                   <DiscoveryCard
                     data={toDiscoveryCardData(selected)}
                     surface="map"
@@ -391,12 +429,36 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
         </MapboxMap>
       </div>
 
+      {/* ── Floating sort (left) + filter (right) over the map ── */}
+      <div className={styles.controlBar}>
+        <button
+          type="button"
+          className={lane ? `${styles.control} ${styles.controlActive}` : styles.control}
+          onClick={() => setSortOpen(true)}
+        >
+          <Icon name={sortIcon} size={16} aria-hidden />
+          <span className={styles.controlLabel}>{sortLabel}</span>
+        </button>
+        <button
+          type="button"
+          className={filterCount > 0 ? `${styles.control} ${styles.controlActive}` : styles.control}
+          onClick={() => setFilterOpen(true)}
+        >
+          <Icon name="action.filter" size={16} aria-hidden />
+          <span className={styles.controlLabel}>Filter</span>
+          {filterCount > 0 ? (
+            <span className={styles.controlCount}>{filterCount}</span>
+          ) : null}
+        </button>
+      </div>
+
       {!loaded ? (
         <div className={styles.loading} aria-hidden="true">
           <Skeleton variant="rect" />
         </div>
       ) : null}
 
+      {/* ── Swipe-up listing view: what's currently in the map viewport ── */}
       <section
         className={trayOpen ? `${styles.tray} ${styles.trayOpen}` : styles.tray}
         aria-label="Map listings tray"
@@ -406,55 +468,65 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
           className={styles.trayHandle}
           onPointerDown={onTrayPointerDown}
           onPointerUp={onTrayPointerUp}
+          aria-expanded={trayOpen}
         >
           <span className={styles.trayGrip} aria-hidden />
           <span className={styles.trayTitle}>
-            {trayOpen ? "Hide listing view" : "Swipe up for listing view"}
+            {trayOpen ? "Hide listings" : "Swipe up for listings in view"}
           </span>
-          <span className={styles.trayMeta}>{mapped.length} mapped opportunities</span>
+          <span className={styles.trayMeta}>
+            {trayListings.length}{" "}
+            {trayListings.length === 1 ? "in view" : "in view"}
+          </span>
         </button>
         <div className={styles.trayBody}>
-          <div className={styles.trayList}>
-            {trayListings.map((listing) => (
-              <div
-                key={listing.id}
-                className={
-                  listing.id === selectedId
-                    ? `${styles.trayCard} ${styles.trayCardActive}`
-                    : styles.trayCard
-                }
-              >
-                <DiscoveryCard
-                  data={toDiscoveryCardData(listing)}
-                  surface="map"
-                  onOpen={(id) => {
-                    const next = mapped.find((item) => item.id === id);
-                    if (next) {
-                      focusListing(next);
-                      setTrayOpen(true);
-                    }
-                  }}
-                  onApply={(id) => router.push(`/listing/${id}`)}
-                  onHostClick={(id) => setActiveHostId(id)}
-                  onLocationClick={(id) => {
-                    const next = mapped.find((item) => item.id === id);
-                    if (next) {
-                      focusListing(next);
-                    }
-                  }}
-                  onHousingClick={(id) =>
-                    setActiveBenefit({ id, bucket: "housing" })
+          {trayListings.length === 0 ? (
+            <p className={styles.trayEmpty}>
+              No opportunities in this view. Pan or zoom out, or loosen your
+              filters.
+            </p>
+          ) : (
+            <div className={styles.trayList}>
+              {trayListings.map((listing) => (
+                <div
+                  key={listing.id}
+                  className={
+                    listing.id === selectedId
+                      ? `${styles.trayCard} ${styles.trayCardActive}`
+                      : styles.trayCard
                   }
-                  onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
-                  onPayClick={(id) => setActivePayId(id)}
-                  onReport={(id) => setReportId(id)}
-                />
-              </div>
-            ))}
-          </div>
+                >
+                  <DiscoveryCard
+                    data={toDiscoveryCardData(listing)}
+                    surface="map"
+                    onOpen={(id) => {
+                      const next = mapped.find((item) => item.id === id);
+                      if (next) {
+                        focusListing(next);
+                        setTrayOpen(true);
+                      }
+                    }}
+                    onApply={(id) => router.push(`/listing/${id}`)}
+                    onHostClick={(id) => setActiveHostId(id)}
+                    onLocationClick={(id) => {
+                      const next = mapped.find((item) => item.id === id);
+                      if (next) {
+                        focusListing(next);
+                      }
+                    }}
+                    onHousingClick={(id) =>
+                      setActiveBenefit({ id, bucket: "housing" })
+                    }
+                    onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
+                    onPayClick={(id) => setActivePayId(id)}
+                    onReport={(id) => setReportId(id)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
-      </div>
 
       <HostProfilePopup
         host={activeHost}
@@ -480,6 +552,26 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
       <ReportListingDrawer
         listing={activeReportListing}
         onClose={() => setReportId(null)}
+      />
+
+      <SeekSortPopup
+        open={sortOpen}
+        onClose={() => setSortOpen(false)}
+        category={lane ?? undefined}
+        onApply={(next) => {
+          setLane(next);
+          setSortOpen(false);
+        }}
+      />
+
+      <SeekFilterPopup
+        open={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        value={filters}
+        onApply={(next) => {
+          setFilters(next);
+          setFilterOpen(false);
+        }}
       />
     </div>
   );

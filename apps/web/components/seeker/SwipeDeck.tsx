@@ -4,6 +4,7 @@ import {
 	startTransition,
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 	type CSSProperties,
@@ -13,20 +14,26 @@ import {
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, DiscoveryCard, Icon, Meter } from "@explore-and-earn/ui";
+import type { OpportunityCategory } from "@explore-and-earn/contracts";
+import { Button, DiscoveryCard, Icon } from "@explore-and-earn/ui";
 
 import {
+	CATEGORY_ICON,
+	CATEGORY_LABEL,
 	DiscoveryCardSkeleton,
 	EmptyState,
 	toDiscoveryCardData,
 	type DiscoveryListing,
 } from "../discovery";
+import { SeekFilterPopup, type SeekFilterPopupValue } from "./SeekFilterPopup";
+import { SeekSortPopup } from "./SeekSortPopup";
 import {
 	getSwipeBatchAction,
 	passListingAction,
 	saveListingAction,
 	unpassListingAction,
 } from "../../app/actions/swipe";
+import { byMonetization } from "../../lib/ranking";
 import styles from "./SwipeDeck.module.css";
 
 type SwipeAction = "pass" | "save" | "apply";
@@ -41,10 +48,71 @@ const COMMIT_DISTANCE = 120;
 /** Throw-off / snap-back durations (ms); kept in sync with the inline CSS transition. */
 const THROW_MS = 240;
 const SNAP_MS = 160;
+/** How long the "Skipped" / "Saved" confirm toast lingers (long enough to hit Undo). */
+const FEEDBACK_MS = 2200;
 /** Top card + cards peeking behind it. */
 const MAX_VISIBLE = 3;
 /** Prefetch the next page once the deck has this many (or fewer) cards left. */
 const PREFETCH_REMAINING = 5;
+
+/**
+ * Monetization order (shared "pay more, show more" util). The only signals a
+ * listing view-model carries are the boosted badge and the match score, so we
+ * map those; missing signals degrade to rank 0 (shown, but last). Never hides —
+ * only orders — as a tiebreaker WITHIN each fetched batch.
+ */
+const orderByMonetization = byMonetization<DiscoveryListing>((listing) => ({
+	boosted: listing.conditionalBadges?.includes("boosted") ?? false,
+	matchScore: listing.matchScore,
+}));
+
+const EMPTY_FILTERS: SeekFilterPopupValue = {
+	housing: false,
+	meals: false,
+	visaSupport: false,
+};
+
+/**
+ * Does a listing survive the active sort lane + filter set? Filters HIDE only on
+ * a positive mismatch — a listing whose data can't be judged on a given axis is
+ * kept, so a filter never silently empties the deck on missing fields.
+ */
+function listingMatches(
+	listing: DiscoveryListing,
+	lane: OpportunityCategory | null,
+	filters: SeekFilterPopupValue,
+): boolean {
+	if (lane && listing.category !== lane) {
+		return false;
+	}
+	if (filters.housing && listing.benefits.housing.provision !== "provided") {
+		return false;
+	}
+	if (filters.meals && listing.benefits.meals.provision !== "provided") {
+		return false;
+	}
+	if (filters.visaSupport && listing.visaSupport !== true) {
+		return false;
+	}
+	if (filters.payMin && filters.payMin > 0) {
+		const cents = listing.payInsight?.minCents;
+		const unit = listing.payInsight?.unit ?? undefined;
+		const comparable = !filters.payUnit || unit === filters.payUnit;
+		if (cents != null && comparable && cents < filters.payMin * 100) {
+			return false;
+		}
+	}
+	if (filters.startRangeMonths && listing.begins) {
+		const startsAt = Date.parse(listing.begins);
+		if (!Number.isNaN(startsAt)) {
+			const horizon = Date.now() + filters.startRangeMonths * 31 * 86_400_000;
+			if (startsAt > horizon) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
 
 export interface SwipeDeckProps {
 	readonly listings: readonly DiscoveryListing[];
@@ -55,34 +123,41 @@ export interface SwipeDeckProps {
 }
 
 /**
- * SwipeDeck — the /swipe surface. A true swipe experience built on the SINGLE
- * canonical DiscoveryCard ("swipe" surface, product-principles #2/#6): drag to
- * throw, a peeking card stack, text-labeled Pass/Save/Apply overlays, full
- * keyboard control, undo/rewind, and a NEUTRAL match Meter (the card hides its
- * Meter off the "matched" surface, so the deck surfaces it here).
+ * SwipeDeck — the immersive /swipe surface. A true Tinder-style deck built on the
+ * SINGLE canonical DiscoveryCard ("swipe" surface, which renders no CTA — the
+ * card is entirely gesture-driven). The page around it is stripped to just the
+ * card: drag to throw, a peeking stack, edge-glow / labeled overlays that scale
+ * with the drag, flanking arrow controls on ≥768, full keyboard control, a
+ * confirm toast with one-tap Undo, and in-place Sort / Filter (the same popups
+ * /seek uses). Motion honors prefers-reduced-motion.
  *
- * "Better than Tinder" for this product means values-first (Housing/Meals/Pay
- * always on the card), match shown neutrally (never red/green good-bad), and a
- * no-cost Undo — zero dark patterns. Motion uses design-system tokens and fully
- * honors prefers-reduced-motion.
+ * "Better than Tinder" here means values-first (Housing/Meals/Pay always on the
+ * card), match shown neutrally by the card itself, and a no-cost Undo — zero
+ * dark patterns.
  *
- * Infinite load: the deck seeds from the server-fetched first batch, then
- * pre-fetches the next page (getSwipeBatchAction) once PREFETCH_REMAINING cards
- * remain, appending de-duplicated rows and advancing the cursor until the feed
- * is exhausted (nextCursor === null).
+ * Order: each fetched batch is monetization-ranked (byMonetization) as a
+ * tiebreaker after the server's batch order; batches stay in fetch order and
+ * nothing is ever hidden.
  *
- * Persistence: decisions update local state, and a swipe-right / Save is
- * additionally persisted best-effort via the saveListingAction server action
- * (failures are swallowed so the deck never blocks). Pass/apply persistence and
- * the match algorithm still arrive with the gated data layer.
+ * Infinite load: seeds from the server-fetched first batch, then pre-fetches the
+ * next page once PREFETCH_REMAINING cards remain, appending de-duplicated,
+ * monetization-ordered rows until the feed is exhausted (nextCursor === null).
+ *
+ * Sort / Filter run client-side over the loaded deck (the swipe stream isn't a
+ * URL-driven server query), reusing SeekSortPopup (lane) and SeekFilterPopup
+ * (housing/meals/visa/pay/begins). Applying either starts the filtered deck
+ * fresh.
+ *
+ * Persistence: a Save is persisted best-effort via saveListingAction and a Pass
+ * via passListingAction (failures are swallowed so the gesture never blocks);
+ * Undo of a pass rolls back the persisted pass.
  */
 export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = true }: SwipeDeckProps) {
 	const router = useRouter();
-	const [deck, setDeck] = useState<DiscoveryListing[]>(() => [...listings]);
+	const [deck, setDeck] = useState<DiscoveryListing[]>(() => [...listings].sort(orderByMonetization));
 	const [cursor, setCursor] = useState<string | null>(initialCursor);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [loadError, setLoadError] = useState(false);
-	const total = deck.length;
 	const [index, setIndex] = useState(0);
 	const [decisions, setDecisions] = useState<readonly Decision[]>([]);
 	const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -90,6 +165,13 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 	const [leaving, setLeaving] = useState<SwipeAction | null>(null);
 	const [reducedMotion, setReducedMotion] = useState(false);
 	const [feedback, setFeedback] = useState<"pass" | "save" | null>(null);
+
+	// Sort / filter — client-side over the loaded deck. `lane` is the SeekSortPopup
+	// category; `filters` is the SeekFilterPopup value.
+	const [lane, setLane] = useState<OpportunityCategory | null>(null);
+	const [filters, setFilters] = useState<SeekFilterPopupValue>(EMPTY_FILTERS);
+	const [sortOpen, setSortOpen] = useState(false);
+	const [filterOpen, setFilterOpen] = useState(false);
 
 	const [showAuthGate, setShowAuthGate] = useState(false);
 
@@ -138,6 +220,15 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		}
 	}, [showAuthGate]);
 
+	// The visible deck: the loaded rows that survive the active lane + filters.
+	// Already monetization-ordered (the raw deck is ordered per batch), so the
+	// filtered view inherits that order.
+	const view = useMemo(
+		() => deck.filter((listing) => listingMatches(listing, lane, filters)),
+		[deck, lane, filters],
+	);
+	const total = view.length;
+
 	const loadMore = useCallback(async () => {
 		if (loadingRef.current || cursor === null) {
 			return;
@@ -149,13 +240,10 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 			const batch = await getSwipeBatchAction(excludeIds, cursor);
 			setDeck((prev) => {
 				const seen = new Set(prev.map((listing) => listing.id));
-				const merged = [...prev];
-				for (const listing of batch.listings) {
-					if (!seen.has(listing.id)) {
-						merged.push(listing);
-					}
-				}
-				return merged;
+				const additions = batch.listings
+					.filter((listing) => !seen.has(listing.id))
+					.sort(orderByMonetization);
+				return additions.length > 0 ? [...prev, ...additions] : prev;
 			});
 			setCursor(batch.nextCursor);
 		} catch {
@@ -167,11 +255,11 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 	}, [cursor]);
 
 	useEffect(() => {
-		const remaining = deck.length - index;
+		const remaining = view.length - index;
 		if (remaining <= PREFETCH_REMAINING && cursor !== null && !loadingRef.current) {
 			void loadMore();
 		}
-	}, [index, deck.length, cursor, loadMore]);
+	}, [index, view.length, cursor, loadMore]);
 
 	const triggerLeave = useCallback(
 		(action: SwipeAction) => {
@@ -182,7 +270,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 			if (leaving) {
 				return;
 			}
-			const card = deck[index];
+			const card = view[index];
 			if (!card) {
 				return;
 			}
@@ -214,7 +302,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				if (feedbackTimer.current) {
 					clearTimeout(feedbackTimer.current);
 				}
-				feedbackTimer.current = setTimeout(() => setFeedback(null), reducedMotion ? 0 : 900);
+				feedbackTimer.current = setTimeout(() => setFeedback(null), FEEDBACK_MS);
 			}
 			setOffset(
 				action === "apply"
@@ -236,13 +324,17 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				reducedMotion ? 0 : THROW_MS,
 			);
 		},
-		[leaving, deck, index, reducedMotion, router],
+		[isAuthenticated, leaving, view, index, reducedMotion, router],
 	);
 
 	const undo = useCallback(() => {
 		if (!isAuthenticated || leaving) {
 			return;
 		}
+		if (feedbackTimer.current) {
+			clearTimeout(feedbackTimer.current);
+		}
+		setFeedback(null);
 		setDecisions((prev) => {
 			const last = prev[prev.length - 1];
 			// Undoing a pass removes the persisted pass so the card can
@@ -265,10 +357,61 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		setLeaving(null);
 	}, []);
 
-	const current = deck[index];
+	// Applying a lane / filter re-forms the deck, so start the filtered run fresh
+	// at the first card. Any in-flight throw/feedback timers are cleared so the
+	// reset can't be clobbered by a late setIndex.
+	const resetPosition = useCallback(() => {
+		if (leaveTimer.current) {
+			clearTimeout(leaveTimer.current);
+		}
+		if (feedbackTimer.current) {
+			clearTimeout(feedbackTimer.current);
+		}
+		setIndex(0);
+		setDecisions([]);
+		setOffset({ x: 0, y: 0 });
+		setLeaving(null);
+		setFeedback(null);
+	}, []);
+
+	const applySort = useCallback(
+		(nextLane: OpportunityCategory | null) => {
+			setLane(nextLane);
+			resetPosition();
+			setSortOpen(false);
+		},
+		[resetPosition],
+	);
+
+	const applyFilters = useCallback(
+		(next: SeekFilterPopupValue) => {
+			setFilters(next);
+			resetPosition();
+			setFilterOpen(false);
+		},
+		[resetPosition],
+	);
+
+	const clearControls = useCallback(() => {
+		setLane(null);
+		setFilters(EMPTY_FILTERS);
+		resetPosition();
+	}, [resetPosition]);
+
+	const current = view[index];
 	const savedCount = decisions.filter((decision) => decision.action === "save").length;
+	const filterCount =
+		(filters.housing ? 1 : 0) +
+		(filters.meals ? 1 : 0) +
+		(filters.visaSupport ? 1 : 0) +
+		(filters.payMin && filters.payMin > 0 ? 1 : 0) +
+		(filters.startRangeMonths ? 1 : 0);
+	const controlsActive = filterCount > 0 || lane !== null;
 
 	const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+		if (sortOpen || filterOpen || showAuthGate) {
+			return;
+		}
 		if (!current) {
 			return;
 		}
@@ -352,6 +495,49 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		setOffset({ x: 0, y: 0 });
 	};
 
+	// The Sort / Filter controls stay reachable in every deck state, so extract
+	// them once and render them in the immersive top bar for each branch.
+	const controlBar = (
+		<div className={styles.controlBar}>
+			<button
+				type="button"
+				className={lane ? `${styles.tool} ${styles.toolActive}` : styles.tool}
+				onClick={() => setSortOpen(true)}
+				aria-haspopup="dialog"
+			>
+				<Icon name={lane ? CATEGORY_ICON[lane] : "action.sort"} size={16} aria-hidden />
+				<span className={styles.toolLabel}>{lane ? CATEGORY_LABEL[lane] : "Sort"}</span>
+			</button>
+			<button
+				type="button"
+				className={filterCount > 0 ? `${styles.tool} ${styles.toolActive}` : styles.tool}
+				onClick={() => setFilterOpen(true)}
+				aria-haspopup="dialog"
+			>
+				<Icon name="action.filter" size={16} aria-hidden />
+				<span className={styles.toolLabel}>Filter</span>
+				{filterCount > 0 ? <span className={styles.toolCount}>{filterCount}</span> : null}
+			</button>
+		</div>
+	);
+
+	const popups = (
+		<>
+			<SeekSortPopup
+				open={sortOpen}
+				onClose={() => setSortOpen(false)}
+				category={lane ?? undefined}
+				onApply={applySort}
+			/>
+			<SeekFilterPopup
+				open={filterOpen}
+				onClose={() => setFilterOpen(false)}
+				value={filters}
+				onApply={applyFilters}
+			/>
+		</>
+	);
+
 	if (!current) {
 		// More pages are still in flight (or queued): show skeleton slots rather
 		// than the terminal empty state, so a mid-deck refill doesn't flash
@@ -359,22 +545,30 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		if (loadingMore || cursor !== null) {
 			return (
 				<div className={styles.deck} aria-busy="true">
-					<p className={styles.progress}>Finding more opportunities…</p>
-					<div className={styles.stack}>
-						<DiscoveryCardSkeleton />
-						<DiscoveryCardSkeleton />
-						<DiscoveryCardSkeleton />
+					<div className={styles.topBar}>
+						<p className={styles.progress}>Finding more opportunities…</p>
+						{controlBar}
 					</div>
+					<div className={styles.arena}>
+						<div className={styles.stack}>
+							<DiscoveryCardSkeleton />
+							<DiscoveryCardSkeleton />
+							<DiscoveryCardSkeleton />
+						</div>
+					</div>
+					{popups}
 				</div>
 			);
 		}
 		if (loadError) {
 			return (
 				<div className={styles.deck}>
-					<EmptyState
-						title="Couldn't load more"
-						message="There was a problem fetching the next batch of opportunities. Try again or browse the full feed under Seek."
-					/>
+					<div className={styles.arena}>
+						<EmptyState
+							title="Couldn't load more"
+							message="There was a problem fetching the next batch of opportunities. Try again or browse the full feed under Seek."
+						/>
+					</div>
 					<div className={styles.controls}>
 						<Button
 							variant="secondary"
@@ -390,13 +584,38 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				</div>
 			);
 		}
+		// Everything loaded is filtered out → offer a way back to the full deck.
+		if (controlsActive) {
+			return (
+				<div className={styles.deck}>
+					<div className={styles.topBar}>
+						<p className={styles.progress}>No matches</p>
+						{controlBar}
+					</div>
+					<div className={styles.arena}>
+						<EmptyState
+							title="No opportunities match"
+							message="Your sort lane or filters screened out every loaded opportunity. Clear them to see the full deck again."
+						/>
+					</div>
+					<div className={styles.controls}>
+						<Button variant="secondary" icon="action.close" onClick={clearControls}>
+							Clear sort &amp; filters
+						</Button>
+					</div>
+					{popups}
+				</div>
+			);
+		}
 		const summary =
 			savedCount > 0
 				? `You saved ${savedCount} ${savedCount === 1 ? "opportunity" : "opportunities"}. Find them under Saved, or run the deck again.`
 				: "You've reviewed every opportunity in the deck. Start over, or browse the full feed under Seek.";
 		return (
 			<div className={styles.deck}>
-				<EmptyState title="You're all caught up" message={summary} />
+				<div className={styles.arena}>
+					<EmptyState title="You're all caught up" message={summary} />
+				</div>
 				<div className={styles.controls}>
 					<Button variant="secondary" icon="action.back" onClick={restart}>
 						Start over
@@ -413,7 +632,8 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 	const passOverlayStyle: CSSProperties = { opacity: passStrength };
 	const saveOverlayStyle: CSSProperties = { opacity: saveStrength };
 	const applyOverlayStyle: CSSProperties = { opacity: applyStrength };
-	const visible = deck.slice(index, index + MAX_VISIBLE);
+	const visible = view.slice(index, index + MAX_VISIBLE);
+	const arrowsDisabled = Boolean(leaving);
 
 	return (
 		<div
@@ -424,121 +644,145 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 			tabIndex={0}
 			onKeyDown={onKeyDown}
 		>
-			<p className={styles.progress}>
-				Opportunity {index + 1} of {total}
-			</p>
+			<div className={styles.topBar}>
+				<p className={styles.progress}>
+					Opportunity {index + 1} of {total}
+				</p>
+				{controlBar}
+			</div>
 
-			{typeof current.matchScore === "number" ? (
-				<Meter value={current.matchScore} label="Match" />
-			) : null}
+			<div className={styles.arena}>
+				{/* Pointer users (≥768) get explicit arrow controls flanking the card;
+				    they are hidden under coarse pointers, where the gesture rules. */}
+				<button
+					type="button"
+					className={`${styles.arrow} ${styles.arrowPass}`}
+					onClick={() => triggerLeave("pass")}
+					disabled={arrowsDisabled}
+					aria-label="Skip this opportunity"
+				>
+					<Icon name="action.close" size={24} aria-hidden />
+				</button>
 
-			<div className={styles.stack}>
-				{visible.map((listing, depth) => {
-					const isTop = depth === 0;
-					const layerStyle: CSSProperties = isTop
-						? {
-								position: "relative",
-								zIndex: MAX_VISIBLE,
-								transform: `translate3d(${offset.x}px, ${offset.y}px, 0) rotate(${offset.x * 0.04}deg)`,
-								transition: dragging
-									? "none"
-									: `transform ${reducedMotion ? 0 : leaving ? THROW_MS : SNAP_MS}ms var(--ease-standard)`,
-								cursor: dragging ? "grabbing" : "grab",
-								touchAction: "none",
-								userSelect: "none",
-							}
-						: {
-								position: "absolute",
-								inset: 0,
-								zIndex: MAX_VISIBLE - depth,
-								transform: `translateY(${depth * 12}px) scale(${1 - depth * 0.05})`,
-								transformOrigin: "top center",
-								transition: reducedMotion ? "none" : `transform ${SNAP_MS}ms var(--ease-standard)`,
-								pointerEvents: "none",
-							};
-					return (
+				<div className={styles.stack}>
+					{visible.map((listing, depth) => {
+						const isTop = depth === 0;
+						const layerStyle: CSSProperties = isTop
+							? {
+									position: "relative",
+									zIndex: MAX_VISIBLE,
+									transform: `translate3d(${offset.x}px, ${offset.y}px, 0) rotate(${offset.x * 0.04}deg)`,
+									transition: dragging
+										? "none"
+										: `transform ${reducedMotion ? 0 : leaving ? THROW_MS : SNAP_MS}ms var(--ease-standard)`,
+									cursor: dragging ? "grabbing" : "grab",
+									touchAction: "none",
+									userSelect: "none",
+								}
+							: {
+									position: "absolute",
+									inset: 0,
+									zIndex: MAX_VISIBLE - depth,
+									transform: `translateY(${depth * 12}px) scale(${1 - depth * 0.05})`,
+									transformOrigin: "top center",
+									transition: reducedMotion ? "none" : `transform ${SNAP_MS}ms var(--ease-standard)`,
+									pointerEvents: "none",
+								};
+						return (
+							<div
+								key={listing.id}
+								className={styles.cardLayer}
+								style={layerStyle}
+								aria-hidden={!isTop}
+								onPointerDown={isTop ? onPointerDown : undefined}
+								onPointerMove={isTop ? onPointerMove : undefined}
+								onPointerUp={isTop ? onPointerEnd : undefined}
+								onPointerCancel={isTop ? onPointerEnd : undefined}
+							>
+								{isTop ? (
+									<>
+										<span className={`${styles.overlay} ${styles.overlayPass}`} style={passOverlayStyle} aria-hidden>
+											<Icon name="action.close" size={20} aria-hidden /> Skip
+										</span>
+										<span className={`${styles.overlay} ${styles.overlaySave}`} style={saveOverlayStyle} aria-hidden>
+											<Icon name="action.save" size={20} aria-hidden /> Save
+										</span>
+										<span className={`${styles.overlay} ${styles.overlayApply}`} style={applyOverlayStyle} aria-hidden>
+											<Icon name="action.apply" size={20} aria-hidden /> Apply
+										</span>
+										{/* Drag feedback — a tinted edge glow whose opacity tracks the
+										    drag distance (same tokens as the confirm toast). On coarse
+										    pointers the labeled overlays above are hidden and this glow
+										    answers the gesture. */}
+										<span className={`${styles.edgeGlow} ${styles.edgeGlowPass}`} style={passOverlayStyle} aria-hidden />
+										<span className={`${styles.edgeGlow} ${styles.edgeGlowSave}`} style={saveOverlayStyle} aria-hidden />
+										<span className={`${styles.edgeGlow} ${styles.edgeGlowApply}`} style={applyOverlayStyle} aria-hidden />
+									</>
+								) : null}
+								{/* Deck covers are the whole viewport — the visible stack loads eagerly. */}
+								<DiscoveryCard data={toDiscoveryCardData(listing)} surface="swipe" actions={<></>} imageLoading="eager" />
+							</div>
+						);
+					})}
+
+					{showAuthGate && (
 						<div
-							key={listing.id}
-							className={styles.cardLayer}
-							style={layerStyle}
-							aria-hidden={!isTop}
-							onPointerDown={isTop ? onPointerDown : undefined}
-							onPointerMove={isTop ? onPointerMove : undefined}
-							onPointerUp={isTop ? onPointerEnd : undefined}
-							onPointerCancel={isTop ? onPointerEnd : undefined}
+							className={styles.authGate}
+							role="dialog"
+							aria-modal="true"
+							aria-label="Sign in to swipe"
+							onKeyDown={(e) => {
+								if (e.key !== "Tab") return;
+								const modal = e.currentTarget;
+								const focusable = Array.from(
+									modal.querySelectorAll<HTMLElement>(
+										'button, a[href], [tabindex]:not([tabindex="-1"])',
+									),
+								).filter((el) => !el.hasAttribute("disabled"));
+								if (focusable.length === 0) return;
+								const first = focusable[0];
+								const last = focusable[focusable.length - 1];
+								if (e.shiftKey && document.activeElement === first) {
+									e.preventDefault();
+									last?.focus();
+								} else if (!e.shiftKey && document.activeElement === last) {
+									e.preventDefault();
+									first?.focus();
+								}
+							}}
 						>
-							{isTop ? (
-								<>
-									<span className={`${styles.overlay} ${styles.overlayPass}`} style={passOverlayStyle} aria-hidden>
-										<Icon name="action.close" size={20} aria-hidden /> Skip
-									</span>
-									<span className={`${styles.overlay} ${styles.overlaySave}`} style={saveOverlayStyle} aria-hidden>
-										<Icon name="action.save" size={20} aria-hidden /> Save
-									</span>
-									<span className={`${styles.overlay} ${styles.overlayApply}`} style={applyOverlayStyle} aria-hidden>
-										<Icon name="action.apply" size={20} aria-hidden /> Apply
-									</span>
-									{/* Mobile drag feedback — the labeled overlays above are hidden
-									    ≤640px, so a tinted edge glow (opacity tracks drag distance,
-									    same tokens as the feedback toast) answers the gesture. */}
-									<span className={`${styles.edgeGlow} ${styles.edgeGlowPass}`} style={passOverlayStyle} aria-hidden />
-									<span className={`${styles.edgeGlow} ${styles.edgeGlowSave}`} style={saveOverlayStyle} aria-hidden />
-									<span className={`${styles.edgeGlow} ${styles.edgeGlowApply}`} style={applyOverlayStyle} aria-hidden />
-								</>
-							) : null}
-							{/* Deck covers are the whole viewport — the visible stack loads eagerly. */}
-							<DiscoveryCard data={toDiscoveryCardData(listing)} surface="swipe" actions={<></>} imageLoading="eager" />
-						</div>
-					);
-				})}
-
-				{showAuthGate && (
-					<div
-						className={styles.authGate}
-						role="dialog"
-						aria-modal="true"
-						aria-label="Sign in to swipe"
-						onKeyDown={(e) => {
-							if (e.key !== "Tab") return;
-							const modal = e.currentTarget;
-							const focusable = Array.from(
-								modal.querySelectorAll<HTMLElement>(
-									'button, a[href], [tabindex]:not([tabindex="-1"])',
-								),
-							).filter((el) => !el.hasAttribute("disabled"));
-							if (focusable.length === 0) return;
-							const first = focusable[0];
-							const last = focusable[focusable.length - 1];
-							if (e.shiftKey && document.activeElement === first) {
-								e.preventDefault();
-								last?.focus();
-							} else if (!e.shiftKey && document.activeElement === last) {
-								e.preventDefault();
-								first?.focus();
-							}
-						}}
-					>
-						<button
-							ref={authGateDismissRef}
-							className={styles.authGateDismiss}
-							onClick={() => setShowAuthGate(false)}
-							aria-label="Dismiss"
-						>
-							<Icon name="action.close" size={16} aria-hidden />
-						</button>
-						<div className={styles.authGateContent}>
-							<Icon name="nav.seek" size={24} aria-hidden />
-							<p className={styles.authGateHeading}>Sign in to start swiping</p>
-							<p className={styles.authGateBody}>
-								Save opportunities, track applications, and get matched with roles that fit your life.
-							</p>
-							<div className={styles.authGateActions}>
-								<Link href="/sign-in" className={styles.authGatePrimary}>Sign in</Link>
-								<Link href="/sign-up" className={styles.authGateSecondary}>Create account</Link>
+							<button
+								ref={authGateDismissRef}
+								className={styles.authGateDismiss}
+								onClick={() => setShowAuthGate(false)}
+								aria-label="Dismiss"
+							>
+								<Icon name="action.close" size={16} aria-hidden />
+							</button>
+							<div className={styles.authGateContent}>
+								<Icon name="nav.seek" size={24} aria-hidden />
+								<p className={styles.authGateHeading}>Sign in to start swiping</p>
+								<p className={styles.authGateBody}>
+									Save opportunities, track applications, and get matched with roles that fit your life.
+								</p>
+								<div className={styles.authGateActions}>
+									<Link href="/sign-in" className={styles.authGatePrimary}>Sign in</Link>
+									<Link href="/sign-up" className={styles.authGateSecondary}>Create account</Link>
+								</div>
 							</div>
 						</div>
-					</div>
-				)}
+					)}
+				</div>
+
+				<button
+					type="button"
+					className={`${styles.arrow} ${styles.arrowSave}`}
+					onClick={() => triggerLeave("save")}
+					disabled={arrowsDisabled}
+					aria-label="Save this opportunity"
+				>
+					<Icon name="action.save" size={24} aria-hidden />
+				</button>
 			</div>
 
 			{feedback ? (
@@ -552,7 +796,11 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 						size={16}
 						aria-hidden
 					/>
-					{feedback === "save" ? "Saved" : "Skipped"}
+					<span>{feedback === "save" ? "Saved" : "Skipped"}</span>
+					<button type="button" className={styles.feedbackUndo} onClick={undo}>
+						<Icon name="action.back" size={14} aria-hidden />
+						Undo
+					</button>
 				</div>
 			) : null}
 
@@ -571,20 +819,11 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				</Button>
 			</div>
 
-			{/* Keyboard copy for fine pointers; touch copy swaps in via CSS under
-			    (pointer: coarse) — arrow keys mean nothing to a thumb. */}
-			<p className={styles.hint}>
-				<span className={styles.hintPointer}>
-					Drag a card, tap a button, or use ← Skip · → Save · ↑ Apply · Backspace to undo.
-				</span>
-				<span className={styles.hintTouch}>
-					Swipe left to skip, right to save, up to apply — or tap a button below.
-				</span>
-			</p>
-
 			<span className={styles.srOnly} role="status" aria-live="polite">
 				{`Opportunity ${index + 1} of ${total}: ${current.title}`}
 			</span>
+
+			{popups}
 		</div>
 	);
 }

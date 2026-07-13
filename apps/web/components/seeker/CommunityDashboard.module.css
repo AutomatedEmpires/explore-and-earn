@@ -740,6 +740,21 @@
   color: var(--text-primary);
 }
 
+.captionMore {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--community-green);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.captionMore:hover { text-decoration: underline; }
+.captionMore:focus-visible { outline: 2px solid var(--community-green); outline-offset: 2px; border-radius: 2px; }
+
 /* ─── Hashtag chips ──────────────────────────────────────────────────────────── */
 
 .hashRow {
@@ -955,7 +970,19 @@
   font-size: var(--type-body-size);
   line-height: var(--type-body-lh);
   color: var(--text-primary);
+  word-break: break-word;
 }
+
+/* Host-authored links inside an announcement body. */
+.announcementLink {
+  color: var(--community-green);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.announcementLink:hover { color: var(--community-green-deep); }
+.announcementLink:focus-visible { outline: 2px solid var(--community-green); outline-offset: 2px; border-radius: 2px; }
 
 .viewHostBtn {
   display: inline-flex;

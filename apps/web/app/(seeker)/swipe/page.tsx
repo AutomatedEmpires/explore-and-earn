@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 
 import { auth } from "@clerk/nextjs/server";
 import { getSavedListingIds } from "@explore-and-earn/db";
@@ -8,9 +9,22 @@ import {
 	getDiscoveryListings,
 	getSwipeListings,
 } from "../../../components/discovery/data";
-import { BucketPage, SwipeDeck } from "../../../components/seeker";
+import { SwipeDeck } from "../../../components/seeker";
 
 export const dynamic = "force-dynamic";
+
+/** Visually-hidden heading — keeps the immersive deck reachable/announced. */
+const SR_ONLY: CSSProperties = {
+	position: "absolute",
+	width: 1,
+	height: 1,
+	padding: 0,
+	margin: -1,
+	overflow: "hidden",
+	clip: "rect(0, 0, 0, 0)",
+	whiteSpace: "nowrap",
+	border: 0,
+};
 
 export const metadata: Metadata = {
 	title: "Swipe",
@@ -59,12 +73,14 @@ export default async function SwipePage() {
 		listings = await getDiscoveryListings();
 	}
 
+	// Immersive route: no page header / marketing chrome — the deck IS the page.
+	// The global header hides on /swipe; only the founder-locked dock remains.
 	return (
-		<BucketPage
-			title="Swipe"
-			description="Drag through opportunities — pass, save, or apply. Use the buttons or arrow keys."
-		>
+		<section aria-labelledby="swipe-heading">
+			<h1 id="swipe-heading" style={SR_ONLY}>
+				Swipe opportunities
+			</h1>
 			<SwipeDeck listings={listings} initialCursor={initialCursor} isAuthenticated={!!userId} />
-		</BucketPage>
+		</section>
 	);
 }

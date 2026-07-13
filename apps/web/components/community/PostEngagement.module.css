@@ -53,6 +53,18 @@
   line-height: 1;
 }
 
+/* Defined reaction name. Hidden on the tightest widths to keep the bar compact
+   (the emoji + accessible name carry it there); shown from 400px up. */
+.reactionLabel {
+  display: none;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+@media (min-width: 400px) {
+  .reactionLabel { display: inline; }
+}
+
 .reactionCount {
   font-variant-numeric: tabular-nums;
   min-width: 1ch;

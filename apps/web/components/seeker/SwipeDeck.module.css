@@ -1,16 +1,29 @@
+/* Immersive swipe stage — just the card, filling the content area minus the
+   founder-locked bottom dock. Flex column: top bar, a growing arena that
+   centers the card, then the control row. */
 .deck {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-12);
 	width: 100%;
-	max-width: var(--bp-sm);
+	max-width: var(--bp-md);
 	margin: 0 auto;
+	min-height: calc(100dvh - var(--size-bottom-nav) - 132px);
 	outline: none;
 }
 
 .deck:focus-visible {
 	border-radius: var(--radius-card);
 	box-shadow: var(--ui-focus-ring);
+}
+
+/* ── Top bar: progress (left) + Sort/Filter tools (right) ──────────────────── */
+.topBar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-8);
+	flex-wrap: wrap;
 }
 
 .progress {
@@ -22,16 +35,173 @@
 	letter-spacing: var(--type-label-tracking);
 	text-transform: uppercase;
 	color: var(--text-secondary);
-	text-align: center;
+}
+
+.controlBar {
+	display: flex;
+	align-items: center;
+	gap: var(--space-6);
+}
+
+.tool {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-4);
+	min-height: var(--tap-min);
+	padding: var(--space-6) var(--space-10);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	cursor: pointer;
+	transition:
+		color var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard);
+}
+
+.tool:hover {
+	color: var(--text-primary);
+	border-color: var(--border-ink);
+}
+
+.toolActive {
+	color: var(--text-primary);
+	border-color: var(--color-cta);
+}
+
+.toolLabel {
+	white-space: nowrap;
+}
+
+.toolCount {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.15rem;
+	height: 1.15rem;
+	padding: 0 var(--space-4);
+	border-radius: var(--radius-pill);
+	background: var(--color-cta);
+	color: var(--color-cta-text);
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-semibold);
+	line-height: 1;
+}
+
+/* ── Arena: grows to fill, centers the card, flanks it with arrows (≥768) ──── */
+.arena {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-16);
 }
 
 .stack {
 	position: relative;
 	width: 100%;
-	padding-bottom: var(--space-24);
+	max-width: 27rem;
 }
 
-/* Auth gate — overlays the card stack for unauthenticated visitors */
+/* Flanking arrow controls — pointer users only (hidden under coarse pointers,
+   where the swipe gesture rules). */
+.arrow {
+	display: none;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 3.25rem;
+	height: 3.25rem;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-secondary);
+	cursor: pointer;
+	box-shadow: 0 6px 16px color-mix(in srgb, var(--color-ink) 10%, transparent);
+	transition:
+		color var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard),
+		transform var(--motion-fast) var(--ease-standard);
+}
+
+.arrow:hover:not(:disabled) {
+	transform: translateY(-1px);
+}
+
+.arrowPass:hover:not(:disabled) {
+	color: var(--state-soon-fg);
+	border-color: var(--state-soon-fg);
+}
+
+.arrowSave:hover:not(:disabled) {
+	color: var(--state-ready-fg);
+	border-color: var(--state-ready-fg);
+}
+
+.arrow:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+@media (min-width: 768px) and (pointer: fine) {
+	.arrow {
+		display: inline-flex;
+	}
+}
+
+.cardLayer {
+	width: 100%;
+	will-change: transform;
+}
+
+.overlay {
+	position: absolute;
+	top: var(--space-12);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-4);
+	padding: var(--space-4) var(--space-8);
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	z-index: 2;
+	pointer-events: none;
+}
+
+.overlayPass {
+	left: var(--space-12);
+}
+
+.overlaySave {
+	right: var(--space-12);
+}
+
+.overlayApply {
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+/* Drag feedback — tinted edge glow whose opacity is driven inline from drag
+   distance (opacity-only, no animation; reduced-motion safe). Pass = warm
+   (soon), save = pine (ready), apply = sky (the neutral action register).
+   Hidden above 640px where the labeled overlays take over. */
+.edgeGlow {
+	display: none;
+}
+
+/* ── Auth gate — overlays the card stack for unauthenticated visitors ──────── */
 .authGate {
 	position: absolute;
 	inset: 0;
@@ -153,54 +323,7 @@
 	background: color-mix(in srgb, var(--color-ink) 5%, transparent);
 }
 
-.cardLayer {
-	width: 100%;
-	will-change: transform;
-}
-
-.overlay {
-	position: absolute;
-	top: var(--space-12);
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-4);
-	padding: var(--space-4) var(--space-8);
-	border: 1px solid var(--border-ink);
-	border-radius: var(--radius-pill);
-	background: var(--color-surface-raised);
-	color: var(--text-primary);
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	line-height: var(--type-label-lh);
-	font-weight: var(--font-weight-semibold);
-	letter-spacing: var(--type-label-tracking);
-	text-transform: uppercase;
-	z-index: 2;
-	pointer-events: none;
-}
-
-.overlayPass {
-	left: var(--space-12);
-}
-
-.overlaySave {
-	right: var(--space-12);
-}
-
-.overlayApply {
-	left: 50%;
-	transform: translateX(-50%);
-}
-
-/* Mobile drag feedback — tinted edge glow whose opacity is driven inline
-   from drag distance (opacity-only, no animation; reduced-motion safe).
-   Pass = warm (soon), save = pine (ready) — same tokens as the feedback
-   toast; apply = sky (the neutral action register). Hidden above 640px
-   where the labeled overlays take over. */
-.edgeGlow {
-	display: none;
-}
-
+/* ── Control row + confirm toast ──────────────────────────────────────────── */
 .controls {
 	display: flex;
 	flex-wrap: wrap;
@@ -209,10 +332,11 @@
 }
 
 .feedbackToast {
-	display: none;
+	display: inline-flex;
+	align-self: center;
 	align-items: center;
-	gap: var(--space-6);
-	padding: var(--space-10) var(--space-12);
+	gap: var(--space-8);
+	padding: var(--space-8) var(--space-8) var(--space-8) var(--space-12);
 	border: 1px solid var(--border-ink);
 	border-radius: var(--radius-pill);
 	background: color-mix(in srgb, var(--color-surface-raised) 92%, white 8%);
@@ -224,7 +348,6 @@
 	letter-spacing: var(--type-label-tracking);
 	text-transform: uppercase;
 	color: var(--text-primary);
-	pointer-events: none;
 	z-index: 20;
 }
 
@@ -237,28 +360,28 @@
 	background: color-mix(in srgb, var(--state-ready-bg) 70%, var(--color-surface-raised));
 }
 
-.hint {
-	margin: 0;
-	text-align: center;
+.feedbackUndo {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-4);
+	min-height: var(--tap-min);
+	padding: var(--space-4) var(--space-10);
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
 	font-family: var(--font-ui);
-	font-size: var(--type-caption-size);
-	line-height: var(--type-caption-lh);
-	color: var(--text-muted);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	cursor: pointer;
+	transition: background-color var(--motion-fast) var(--ease-standard);
 }
 
-/* Keyboard copy for fine pointers; touch copy under coarse pointers. */
-.hintTouch {
-	display: none;
-}
-
-@media (pointer: coarse) {
-	.hintPointer {
-		display: none;
-	}
-
-	.hintTouch {
-		display: inline;
-	}
+.feedbackUndo:hover {
+	background: color-mix(in srgb, var(--color-ink) 6%, var(--color-surface-raised));
 }
 
 .srOnly {
@@ -277,11 +400,15 @@
 	.cardLayer {
 		transition: none !important;
 	}
+
+	.arrow {
+		transition: none;
+	}
 }
 
 @media (max-width: 640px) {
-	.stack {
-		padding-bottom: var(--space-16);
+	.deck {
+		min-height: calc(100dvh - var(--size-bottom-nav) - 112px);
 	}
 
 	.cardLayer[aria-hidden="true"] {
@@ -316,14 +443,6 @@
 	.edgeGlowApply {
 		border-color: var(--color-cta);
 		background: linear-gradient(180deg, color-mix(in srgb, var(--color-action-soft) 72%, transparent) 0%, transparent 45%);
-	}
-
-	.feedbackToast {
-		display: inline-flex;
-		position: fixed;
-		right: var(--space-12);
-		top: 50%;
-		transform: translateY(-50%);
 	}
 
 	.controls {
