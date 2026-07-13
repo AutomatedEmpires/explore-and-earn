@@ -285,27 +285,35 @@ export function DiscoveryCard({
 	const isInvited     = cardState === "invited"
 	const isReported    = cardState === "reported"
 
-	// Center-top slot: action states > boosted > fill bar
-	// Priority: applied > scheduled > draft > filled > boosted (with ⚡ icon, gold)
+	// Founder badge rule (2026-07-13): a match score always claims the top-CENTER
+	// slot on seeker browse/decision surfaces; a boosted listing then drops to
+	// the right slot UNDER the category badge. Boosted only takes center when
+	// there is no match score to show.
 	type CenterBadge = { label: string; tone: CenterTone; icon?: IconKey; decoration: boolean }
+	const hasMatch = typeof data.matchScore === "number"
+	const matchCenterEligible =
+		hasMatch && (isDiscoveryFeed || isMatched || isApplicantReview || surface === "swipe" || surface === "map")
+
 	const centerBadge: CenterBadge | null =
 		isApplied    ? { label: "Applied",  tone: "paper",   decoration: false }
 		: isScheduled ? { label: "Schedule", tone: "paper",   decoration: true  }
 		: isDraft     ? { label: "Draft",    tone: "paper",   decoration: false }
 		: isFilled    ? { label: "Filled",   tone: "success", decoration: false }
 		: isReported  ? { label: data.reportCount ? `${data.reportCount} Reports` : "Reported", tone: "error", decoration: false }
-		: isBoosted   ? { label: "Boosted",  tone: "boosted", icon: "status.boosted" as IconKey, decoration: false }
+		: (isBoosted && !matchCenterEligible) ? { label: "Boosted", tone: "boosted", icon: "status.boosted" as IconKey, decoration: false }
 		: null
 
-	// R1 right secondary: passive state badges only (boosted moved to center)
-	// When boosted+matched conflict: boosted takes center, match score surfaces here as "92% Match"
+	const showMatchCenter = !centerBadge && matchCenterEligible
+	// Boosted drops to the right slot (gold, under the category badge) when a
+	// match score has claimed the center.
+	const boostedSecondary = isBoosted && showMatchCenter
+
+	// R1 right secondary: passive state badges (match now shows centered).
 	type SecondaryBadge = { label: string; tone: SecondaryTone }
-	const matchBadgeLabel = typeof data.matchScore === "number" ? `${data.matchScore}% Match` : "Matched"
 	const secondaryBadge: SecondaryBadge | null =
 		isSaved       ? { label: "Saved",          tone: "success" }
 		: isOffered   ? { label: "Offered",         tone: "success" }
 		: isAccepted  ? { label: "Accepted",        tone: "success" }
-		: isMatched   ? { label: matchBadgeLabel,   tone: "match"   }
 		: isInvited   ? { label: "Invited",         tone: "warning" }
 		: isNotSelected ? { label: "Passed",        tone: "muted"   }
 		: isWithdrawn ? { label: "Withdrawn",       tone: "muted"   }
@@ -314,14 +322,15 @@ export function DiscoveryCard({
 		: isReported && data.reportCategory ? { label: data.reportCategory, tone: "error" }
 		: null
 
-	// Match bar: always-on for host_applicant_review (boosted doesn't apply to seeker cards);
-	// on the discovery feed, whenever a seeker fit score is present (the ADR-040
-	// signal at browse time); on other surfaces, only when matched + no center
-	// badge (boosted wins center, score falls to R1)
-	const showMatchBar = isApplicantReview
-		? typeof data.matchScore === "number"
-		: (isDiscoveryFeed || isMatched) && !centerBadge && typeof data.matchScore === "number"
-	const showHeroBar  = !centerBadge && !showMatchBar && typeof data.fillPercent === "number"
+	const showHeroBar  = !centerBadge && !showMatchCenter && typeof data.fillPercent === "number"
+
+	// Seeker decision bar (Skip · Apply · Save) is the default CTA on browse
+	// surfaces; resolved lifecycle states keep their single state CTA. Skip only
+	// appears when a handler exists (e.g. a deck); the grid shows Apply · Save.
+	const showDecisionBar =
+		(isDiscoveryFeed || surface === "map" || isMatched)
+		&& !isApplied && !isReported && !isDisabled
+		&& Boolean(onApply || onOpen)
 
 	// ── CTA resolution ────────────────────────────────────────────────────────
 	const ctaLabel =
@@ -445,17 +454,12 @@ export function DiscoveryCard({
 							{centerBadge.decoration && <span aria-hidden className={styles.stampRule} />}
 						</span>
 					</div>
-				) : showMatchBar && data.matchScore !== undefined ? (
-					/* Match score — neutral information (sky/teal), never good-vs-bad */
-					<div
-						className={styles.heroBar}
-						style={{ "--dc-bar-pct": `${clampPct(data.matchScore)}%` } as CSSProperties}
-					>
-						<div className={styles.heroBarTrack}>
-							<div className={`${styles.heroBarFill} ${styles.heroBarFillMatch}`} />
-						</div>
-						<span className={styles.heroBarLabel}>{data.matchScore}% Match</span>
-					</div>
+				) : showMatchCenter && data.matchScore !== undefined ? (
+					/* Match score — centered pill, neutral glacier (information, not good-vs-bad) */
+					<span className={styles.matchPill}>
+						<Icon name="status.match" size={14} aria-hidden />
+						{data.matchScore}% Match
+					</span>
 				) : showHeroBar && data.fillPercent !== undefined ? (
 					/* Fill-quality bar — listing scarcity signal */
 					<div
@@ -481,8 +485,14 @@ export function DiscoveryCard({
 						{CAT_LABEL[cat]}
 					</span>
 
-					{/* Secondary badge — state indicator (max 1); toned outline stamp */}
-					{secondaryBadge ? (
+					{/* Secondary badge — boosted (gold, when match took center) wins;
+					    otherwise one toned state stamp. */}
+					{boostedSecondary ? (
+						<span className={`${styles.stamp} ${styles.stampBoostedSecondary}`}>
+							<Icon name="status.boosted" size={14} aria-hidden />
+							Boosted
+						</span>
+					) : secondaryBadge ? (
 						<span className={`${styles.stamp} ${styles.stampOutline} ${SECONDARY_TONE_CLASS[secondaryBadge.tone]}`}>
 							{secondaryBadge.label}
 						</span>
@@ -669,6 +679,40 @@ export function DiscoveryCard({
 								onClick={onSchedule ? () => onSchedule!(data.id) : onOpen ? () => onOpen(data.id) : undefined}
 							>
 								Schedule
+							</button>
+						</div>
+					) : showDecisionBar ? (
+						/* Seeker decision bar — Skip · Apply · Save (25/50/25, or
+						   Apply · Save 66/34 when no skip handler). */
+						<div
+							className={styles.ctaRow}
+							style={{ "--dc-cta-cols": onSkip ? "1fr 2fr 1fr" : "2fr 1fr" } as CSSProperties}
+						>
+							{onSkip ? (
+								<button
+									type="button"
+									className={`${styles.ctaBtn} ${styles.ctaSkip} ui-pressable`}
+									onClick={() => onSkip(data.id)}
+									aria-label="Skip this opportunity"
+								>
+									<Icon name="action.close" size={18} aria-hidden />
+								</button>
+							) : null}
+							<button
+								type="button"
+								className={`${styles.ctaBtn} ${styles.ctaApply} ui-pressable`}
+								onClick={onApply ? () => onApply(data.id) : onOpen ? () => onOpen(data.id) : undefined}
+							>
+								Apply
+								<Icon name="action.forward" size={16} aria-hidden />
+							</button>
+							<button
+								type="button"
+								className={`${styles.ctaBtn} ${styles.ctaSave} ui-pressable`}
+								onClick={onSave ? () => onSave(data.id) : onOpen ? () => onOpen(data.id) : undefined}
+								aria-label="Save this opportunity"
+							>
+								<Icon name="nav.saved" size={18} aria-hidden />
 							</button>
 						</div>
 					) : (
