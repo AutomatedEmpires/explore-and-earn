@@ -8,15 +8,84 @@
 .inner {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-16);
+  gap: var(--space-24);
   max-width: 1100px;
   margin: 0 auto;
   padding: var(--space-32) var(--space-24) var(--space-20);
-  text-align: center;
 }
 
-/* ── Row 1: social icons ─────────────────────────────────────────────────────── */
+/* ── Row 1: link columns ─────────────────────────────────────────────────── */
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-24) var(--space-16);
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  min-width: 0;
+}
+
+.columnTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.columnList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.columnLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-input);
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.columnLink:hover {
+  color: var(--text-primary);
+  text-decoration: underline;
+}
+
+.columnLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-parchment), 0 0 0 4px var(--color-cta);
+}
+
+@media (min-width: 768px) {
+  .columns {
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-24);
+  }
+}
+
+/* ── Row 2: social + wordmark/copyright ──────────────────────────────────── */
+
+.baseRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-16);
+  padding-top: var(--space-20);
+  border-top: 1px solid var(--border-soft);
+}
 
 .social {
   display: flex;
@@ -28,7 +97,11 @@
 .socialLink {
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
   color: var(--text-muted);
+  border-radius: var(--radius-pill);
   transition: color var(--motion-base) var(--ease-standard);
 }
 
@@ -36,53 +109,28 @@
   color: var(--text-primary);
 }
 
-/* ── Row 2: legal nav ────────────────────────────────────────────────────────── */
-
-.legalNav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-8);
+.socialLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-parchment), 0 0 0 4px var(--color-cta);
 }
-
-.legalItem {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-8);
-}
-
-.legalLink {
-  font-family: var(--font-display);
-  font-size: var(--type-body-size);
-  color: var(--text-secondary);
-  text-decoration: none;
-}
-
-.legalLink:hover {
-  color: var(--text-primary);
-  text-decoration: underline;
-}
-
-.dot {
-  font-family: var(--font-display);
-  font-size: var(--type-body-size);
-  color: var(--text-muted);
-  user-select: none;
-}
-
-/* ── Row 3: wordmark + copyright ─────────────────────────────────────────────── */
 
 .copy {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: var(--type-card-size);
+  font-weight: var(--font-weight-bold);
   letter-spacing: -0.01em;
-  /* gradient text */
-  background: linear-gradient(135deg, #c4954a 0%, #2f667a 100%);
+  /* gradient wordmark — gold into sky, palette-locked */
+  background: linear-gradient(135deg, var(--color-gold) 0%, var(--palette-sky) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   color: transparent;
+}
+
+@media (min-width: 768px) {
+  .baseRow {
+    flex-direction: row;
+    justify-content: space-between;
+  }
 }

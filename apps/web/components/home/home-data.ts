@@ -15,6 +15,7 @@
 import { cloudinaryPhoto, type PhotoCategory } from "@explore-and-earn/ui";
 import {
   FOUNDER_LOCKED_PRICING,
+  FOUNDING_LOCKED_PRICING,
   PLAN_ENTITLEMENTS,
   type OpportunityCategory,
 } from "@explore-and-earn/contracts";
@@ -210,7 +211,10 @@ export function buildAnnouncements(
 export interface HomePlan {
   readonly key: "starter" | "professional" | "enterprise";
   readonly name: string;
+  /** Standard monthly rate (shown struck-through beside the founding rate). */
   readonly priceMonthlyCents: number;
+  /** Founding Host Program rate — the hero price while founding seats remain. */
+  readonly foundingMonthlyCents: number;
   readonly blurb: string;
   readonly features: readonly string[];
   readonly featured?: boolean;
@@ -222,6 +226,7 @@ export const HOME_PLANS: readonly HomePlan[] = [
     key: "starter",
     name: "Starter",
     priceMonthlyCents: FOUNDER_LOCKED_PRICING.starter.monthly,
+    foundingMonthlyCents: FOUNDING_LOCKED_PRICING.starter.monthly,
     blurb: "A single location getting its first season staffed.",
     features: [
       `${PLAN_ENTITLEMENTS.starter.listings} active listing`,
@@ -235,6 +240,7 @@ export const HOME_PLANS: readonly HomePlan[] = [
     key: "professional",
     name: "Professional",
     priceMonthlyCents: FOUNDER_LOCKED_PRICING.professional.monthly,
+    foundingMonthlyCents: FOUNDING_LOCKED_PRICING.professional.monthly,
     blurb: "Hosts hiring across a full season.",
     features: [
       `Up to ${PLAN_ENTITLEMENTS.professional.listings} active listings`,
@@ -250,6 +256,7 @@ export const HOME_PLANS: readonly HomePlan[] = [
     key: "enterprise",
     name: "Enterprise",
     priceMonthlyCents: FOUNDER_LOCKED_PRICING.enterprise.monthly,
+    foundingMonthlyCents: FOUNDING_LOCKED_PRICING.enterprise.monthly,
     blurb: "Multi-location operators hiring at scale.",
     features: [
       `${PLAN_ENTITLEMENTS.enterprise.listings}+ active listings`,

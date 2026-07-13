@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 import {
@@ -6,7 +7,7 @@ import {
   FOUNDING_LOCKED_PRICING,
   FOUNDING_SEAT_CAP,
 } from "@explore-and-earn/contracts";
-import { Icon, type IconKey } from "@explore-and-earn/ui";
+import { cloudinaryPhoto, Icon, type IconKey } from "@explore-and-earn/ui";
 
 import styles from "./page.module.css";
 
@@ -21,6 +22,9 @@ export const metadata: Metadata = {
     type: "website",
   },
 };
+
+/** The same scenic Cloudinary hero pattern the homepage uses — a real place, framed. */
+const HERO_IMAGE = cloudinaryPhoto("seasonal", "vojtech-bruzek-yrxr3bspds0", "hero");
 
 /** Representative figures for the labelled dashboard PREVIEW (clearly not live data). */
 const PREVIEW_KPIS: ReadonlyArray<{ value: string; label: string }> = [
@@ -103,23 +107,37 @@ export default function ForHostsPage() {
   return (
     <div className={styles.page}>
 
-      {/* ── Hero ────────────────────────────────────────────────── */}
-      <section className={styles.hero}>
-        <p className={styles.eyebrow}>For hosts</p>
-        <h1 className={styles.heroTitle}>Your hosting command center</h1>
-        <p className={styles.heroSub}>
-          Post seasonal work with Housing, Meals &amp; Pay up front, and reach
-          seekers who are ready to go. Here&rsquo;s exactly what your dashboard
-          looks like — before you sign up.
-        </p>
-        <div className={styles.heroActions}>
-          <Link className={styles.startBtnLg} href="/host/onboarding">
-            <Icon name="status.open" size={20} aria-hidden />
-            Start hosting
-          </Link>
-          <a className={styles.ghostBtnLg} href="#preview">
-            See the dashboard
-          </a>
+      {/* ── Hero — framed working landscape, homepage register ──── */}
+      <section className={styles.hero} aria-labelledby="hosts-hero-title">
+        <div className={styles.heroFrame}>
+          <Image
+            className={styles.heroImage}
+            src={HERO_IMAGE}
+            alt=""
+            aria-hidden="true"
+            fill
+            priority
+            sizes="100vw"
+          />
+          <div className={styles.heroScrim} aria-hidden="true" />
+          <div className={styles.heroInner}>
+            <p className={styles.eyebrow}>For hosts</p>
+            <h1 id="hosts-hero-title" className={styles.heroTitle}>Your hosting command center</h1>
+            <p className={styles.heroSub}>
+              Post seasonal work with Housing, Meals &amp; Pay up front, and reach
+              seekers who are ready to go. Here&rsquo;s exactly what your dashboard
+              looks like — before you sign up.
+            </p>
+            <div className={styles.heroActions}>
+              <Link className={styles.startBtnLg} href="/host/onboarding">
+                <Icon name="status.open" size={20} aria-hidden />
+                Start hosting
+              </Link>
+              <a className={styles.ghostBtnLg} href="#preview">
+                See the dashboard
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -179,18 +197,23 @@ export default function ForHostsPage() {
       </section>
 
       {/* ── Pricing ─────────────────────────────────────────────── */}
-      <section className={styles.pricing}>
+      <section id="pricing" className={styles.pricing}>
         <h2 className={styles.sectionTitle}>Simple host plans</h2>
         <p className={styles.pricingSub}>Annual billing is two months free. Cancel anytime.</p>
 
-        <div className={styles.foundingBanner}>
-          <span className={styles.foundingBannerLabel}>Founding Host Program</span>
-          <p className={styles.foundingBannerBody}>
-            The first {FOUNDING_SEAT_CAP} paying hosts lock in a lower rate for
-            as long as they keep hosting — see the founding price on each plan
-            below. The rate is tied to your seat: it survives a tier change,
-            but it&rsquo;s given up for good if you ever cancel.
-          </p>
+        <div id="founding" className={styles.foundingBanner}>
+          <span className={styles.foundingMedal} aria-hidden>
+            <Icon name="trust.founding_host" size={24} />
+          </span>
+          <div>
+            <span className={styles.foundingBannerLabel}>Founding Host Program</span>
+            <p className={styles.foundingBannerBody}>
+              The first {FOUNDING_SEAT_CAP} paying hosts lock in the founding rate
+              for as long as they keep hosting — it&rsquo;s the hero price on each
+              plan below. The rate is tied to your seat: it survives a tier change,
+              but it&rsquo;s given up for good if you ever cancel.
+            </p>
+          </div>
         </div>
 
         <div className={styles.tierGrid}>
@@ -198,15 +221,21 @@ export default function ForHostsPage() {
             <article key={tier.name} className={styles.tier}>
               <h3 className={styles.tierName}>{tier.name}</h3>
               <p className={styles.tierPrice}>
-                {priceLabel(tier.monthly)}
+                <strong>{priceLabel(tier.foundingMonthly)}</strong>
                 <span className={styles.tierPer}>/mo</span>
+                <s className={styles.tierStd}>
+                  <span className={styles.srOnly}>Standard price </span>
+                  {priceLabel(tier.monthly)}/mo
+                </s>
               </p>
-              <p className={styles.tierFounding}>
-                <span className={styles.tierFoundingLabel}>Founding Host</span>
-                {" "}{priceLabel(tier.foundingMonthly)}
-                <span className={styles.tierPer}>/mo</span>
+              <p className={styles.tierFoundingNote}>
+                <Icon name="trust.founding_host" size={16} aria-hidden />
+                First {FOUNDING_SEAT_CAP} hosts lock this rate for life
               </p>
               <p className={styles.tierBlurb}>{tier.blurb}</p>
+              <Link className={styles.tierCta} href="/host/onboarding">
+                Start hosting
+              </Link>
             </article>
           ))}
         </div>

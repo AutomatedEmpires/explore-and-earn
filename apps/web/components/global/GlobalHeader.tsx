@@ -96,10 +96,12 @@ export function GlobalHeader({
   const homeHref = scope === "host" ? "/host/listings" : "/";
   // Seekers' "Explore" should open the discovery feed, not the marketing root.
   const exploreHref = scope === "seeker" ? "/seek" : homeHref;
-  // Active section for the explore/community nav: Community anywhere under
-  // /community, Explore on the scope's own home/seek route.
-  const sectionActive: "explore" | "community" | null =
+  // Active section for the explore/community/hosts nav: Community anywhere
+  // under /community, For Hosts on /for-hosts, Explore on the scope's own
+  // home/seek route.
+  const sectionActive: "explore" | "community" | "hosts" | null =
     pathname.startsWith("/community") ? "community" :
+    pathname === "/for-hosts" || pathname.startsWith("/for-hosts/") ? "hosts" :
     pathname === exploreHref ? "explore" :
     null;
   const profileHref = scope === "host" ? "/host/profile" : "/profile";
@@ -173,6 +175,16 @@ export function GlobalHeader({
             >
               Community
             </Link>
+            {/* Host conversion entry — surfaced in the signed-out/public state. */}
+            {!isAuthenticated ? (
+              <Link
+                className={`${styles.navLink}${sectionActive === "hosts" ? ` ${styles.navLinkActive}` : ""}`}
+                href="/for-hosts"
+                aria-current={sectionActive === "hosts" ? "page" : undefined}
+              >
+                For Hosts
+              </Link>
+            ) : null}
           </nav>
         )}
 
