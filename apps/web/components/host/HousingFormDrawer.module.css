@@ -150,6 +150,80 @@
 	color: var(--text-secondary);
 }
 
+/* ── Photo upload plumbing ───────────────────────────── */
+
+/* Hidden native file input — the .cameraButton label is the visible target */
+.fileInput {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Framed photo — object-fit only, NEVER filtered */
+.photoImg {
+	object-fit: cover;
+}
+
+.removePhoto {
+	position: absolute;
+	top: var(--space-8);
+	right: var(--space-8);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: var(--radius-pill);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 40%, transparent);
+	background: color-mix(in srgb, var(--color-surface-raised) 88%, transparent);
+	color: var(--text-primary);
+	cursor: pointer;
+	box-shadow: 0 2px 8px rgba(26, 43, 60, 0.18);
+	z-index: 1;
+	transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.removePhoto:hover {
+	transform: scale(1.08);
+}
+
+.removePhoto:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+.spinner {
+	width: 1.1rem;
+	height: 1.1rem;
+	border-radius: var(--radius-pill);
+	border: 2px solid color-mix(in srgb, var(--border-ink) 30%, transparent);
+	border-top-color: var(--color-cta);
+	animation: photoBucketSpin 0.7s linear infinite;
+}
+
+@keyframes photoBucketSpin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.formError {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	color: var(--color-error, #c04040);
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-cell);
+	background: color-mix(in srgb, var(--color-error, #c04040) 8%, transparent);
+}
+
 /* ── Form fields ─────────────────────────────────────── */
 
 .fieldRow {
@@ -392,7 +466,12 @@
 	.photoSlot,
 	.photoArea,
 	.cameraButton,
+	.removePhoto,
 	.chip {
 		transition: none;
+	}
+
+	.spinner {
+		animation: none;
 	}
 }

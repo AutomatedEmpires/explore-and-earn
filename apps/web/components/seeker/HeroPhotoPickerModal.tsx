@@ -1,13 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 
 import { Icon } from "@explore-and-earn/ui";
 import { uploadProfilePhoto } from "@explore-and-earn/db/client";
 import { saveHeroCoverAction } from "../../app/actions/seekerProfile";
 import { useOptionalGetToken } from "../../lib/useOptionalGetToken";
+import { curatedCovers } from "../../lib/curatedPhotos";
 import styles from "./HeroPhotoPickerModal.module.css";
+
+// Predefined COVER options for the seeker scope (cover is always separate from
+// the profile logo/avatar). Distinct from host & admin sets — see curatedPhotos.
+const SEEKER_COVERS = curatedCovers("seeker");
 
 export interface HeroPhotoPickerModalProps {
   readonly open: boolean;
@@ -72,11 +78,13 @@ export function HeroPhotoPickerModal({
     };
   }, [open, handleKeyDown]);
 
-  const handleGradient = useCallback(
-    async (gradient: string) => {
-      const result = await saveHeroCoverAction(gradient);
+  // One handler for any predefined cover value — a Cloudinary photo URL or a
+  // gradient token. SeekerHero renders either (isPhotoUrl decides).
+  const handleSelectCover = useCallback(
+    async (value: string) => {
+      const result = await saveHeroCoverAction(value);
       if (result.ok) {
-        onSelect(gradient);
+        onSelect(value);
         onClose();
       } else {
         setError("Could not save. Please try again.");
@@ -154,13 +162,44 @@ export function HeroPhotoPickerModal({
                 <Icon name="action.more" size={20} />
                 {uploading ? "Uploading…" : "Upload your own photo"}
               </button>
+              <p className={styles.uploadHint}>Your own photo looks best.</p>
             </div>
           )}
 
           {error && <p className={styles.error} role="alert">{error}</p>}
 
-          {/* Gradient presets */}
-          <p className={styles.sectionLabel}>Choose a landscape</p>
+          {/* Predefined cover photos (seeker set) */}
+          <p className={styles.sectionLabel}>Or pick a cover</p>
+          <div className={styles.gradientGrid}>
+            {SEEKER_COVERS.map((opt) => {
+              const selected = currentUrl === opt.value;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  className={`${styles.gradientSwatch} ${selected ? styles.swatchSelected : ""}`}
+                  style={opt.kind === "gradient" ? { background: opt.value } : undefined}
+                  onClick={() => void handleSelectCover(opt.value)}
+                  aria-label={opt.label}
+                  aria-pressed={selected}
+                >
+                  {opt.kind === "photo" ? (
+                    <Image
+                      src={opt.value}
+                      alt=""
+                      fill
+                      sizes="(max-width: 520px) 33vw, 160px"
+                      className={styles.coverPhoto}
+                    />
+                  ) : null}
+                  <span className={styles.swatchLabel}>{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Landscape gradients */}
+          <p className={styles.sectionLabel}>Landscapes</p>
           <div className={styles.gradientGrid}>
             {GRADIENT_OPTIONS.map((opt) => (
               <button
@@ -168,7 +207,7 @@ export function HeroPhotoPickerModal({
                 type="button"
                 className={`${styles.gradientSwatch} ${currentUrl === opt.gradient ? styles.swatchSelected : ""}`}
                 style={{ background: opt.gradient }}
-                onClick={() => void handleGradient(opt.gradient)}
+                onClick={() => void handleSelectCover(opt.gradient)}
                 aria-label={opt.label}
                 aria-pressed={currentUrl === opt.gradient}
               >

@@ -1,0 +1,264 @@
+/* ══════════════════════════════════════════════════════════════════
+   HostCoverLogoPicker — cover + logo photo affordances (owner-only).
+   The toolbar sits over the cover band; the chooser reuses PopupShell.
+   ══════════════════════════════════════════════════════════════════ */
+
+.toolbar {
+	position: absolute;
+	top: var(--space-12);
+	right: var(--space-12);
+	z-index: 2;
+	display: flex;
+	gap: var(--space-8);
+}
+
+.affordance {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: 2.25rem;
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--color-surface-raised) 60%, transparent);
+	background: color-mix(in srgb, var(--palette-ink) 46%, transparent);
+	color: #fff;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+	backdrop-filter: blur(4px);
+	transition: background var(--motion-fast) var(--ease-standard);
+}
+
+.affordance:hover {
+	background: color-mix(in srgb, var(--palette-ink) 64%, transparent);
+}
+
+.affordance:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 2px;
+}
+
+/* ── Preview strips ─────────────────────────────────────────────── */
+
+.previewCover {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 16 / 6;
+	overflow: hidden;
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-paper);
+}
+
+.previewCoverImg {
+	object-fit: cover;
+}
+
+.previewCoverFill {
+	position: absolute;
+	inset: 0;
+	background: var(--gradient-chrome);
+}
+
+.previewLogoRow {
+	display: flex;
+	justify-content: center;
+	padding: var(--space-8) 0 var(--space-4);
+}
+
+.previewLogo {
+	position: relative;
+	width: 96px;
+	height: 96px;
+	border-radius: 20px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--gradient-chrome);
+	box-shadow: 0 0 0 1px var(--border-soft), 0 4px 16px rgba(26, 43, 60, 0.16);
+}
+
+.previewLogoImg {
+	object-fit: cover;
+}
+
+.previewLogoGlyph {
+	font-family: var(--font-display);
+	font-size: 2.5rem;
+	font-weight: 700;
+	color: #fff;
+}
+
+/* ── Upload ─────────────────────────────────────────────────────── */
+
+.uploadRow {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+}
+
+.fileInput {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.uploadBtn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-8);
+	padding: var(--space-12) var(--space-16);
+	border-radius: var(--radius-medium);
+	border: 1.5px dashed var(--border-soft);
+	background: transparent;
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	font-weight: var(--font-weight-medium);
+	cursor: pointer;
+	transition: border-color var(--motion-fast) var(--ease-standard),
+		color var(--motion-fast) var(--ease-standard);
+}
+
+.uploadBtn:hover {
+	border-color: var(--border-ink);
+	color: var(--text-primary);
+}
+
+.uploadBtn:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+.uploadHint {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	color: var(--text-secondary);
+	text-align: center;
+}
+
+/* ── Predefined grids ───────────────────────────────────────────── */
+
+.sectionLabel {
+	font-family: var(--font-ui);
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--text-secondary);
+	margin: 0;
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: var(--space-8);
+}
+
+.swatch {
+	position: relative;
+	aspect-ratio: 16 / 9;
+	overflow: hidden;
+	border-radius: var(--radius-medium);
+	border: 2.5px solid transparent;
+	cursor: pointer;
+	transition: transform var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard);
+}
+
+.swatch:hover {
+	transform: scale(1.03);
+}
+
+.swatch:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+/* Framed cover thumbnail — never filtered */
+.swatchImg {
+	object-fit: cover;
+}
+
+.swatchLabel {
+	position: absolute;
+	inset-block-end: 0;
+	inset-inline: 0;
+	padding: var(--space-6) var(--space-8);
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.65), transparent);
+	font-family: var(--font-ui);
+	font-size: 10px;
+	font-weight: 700;
+	color: #fff;
+	text-align: center;
+}
+
+.logoSwatch {
+	position: relative;
+	aspect-ratio: 1 / 1;
+	overflow: hidden;
+	border-radius: var(--radius-medium);
+	border: 2.5px solid transparent;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard);
+}
+
+.logoSwatch:hover {
+	transform: scale(1.03);
+}
+
+.logoSwatch:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.logoSwatchGlyph {
+	font-family: var(--font-display);
+	font-size: 1.75rem;
+	font-weight: 700;
+	color: #fff;
+}
+
+.swatchSelected {
+	border-color: #fff;
+	box-shadow: 0 0 0 2px var(--color-cta);
+}
+
+/* ── Notes ──────────────────────────────────────────────────────── */
+
+.previewNote {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	color: var(--text-secondary);
+}
+
+.doneBtn {
+	width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.affordance,
+	.swatch,
+	.logoSwatch,
+	.uploadBtn {
+		transition: none;
+	}
+}
