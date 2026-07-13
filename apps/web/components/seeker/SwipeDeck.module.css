@@ -67,6 +67,13 @@
 	color: var(--text-primary);
 }
 
+/* Extend the 2rem visual button to a ≥44px hit area without inflating it. */
+.authGateDismiss::after {
+	content: "";
+	position: absolute;
+	inset: calc((2rem - var(--tap-min)) / 2);
+}
+
 .authGateContent {
 	display: flex;
 	flex-direction: column;
@@ -106,6 +113,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	min-height: var(--tap-min);
 	padding: var(--space-10) var(--space-16);
 	border-radius: var(--radius-pill);
 	background: var(--color-ink);
@@ -127,6 +135,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	min-height: var(--tap-min);
 	padding: var(--space-10) var(--space-16);
 	border-radius: var(--radius-pill);
 	border: 1px solid var(--border-ink);
@@ -183,6 +192,15 @@
 	transform: translateX(-50%);
 }
 
+/* Mobile drag feedback — tinted edge glow whose opacity is driven inline
+   from drag distance (opacity-only, no animation; reduced-motion safe).
+   Pass = warm (soon), save = pine (ready) — same tokens as the feedback
+   toast; apply = sky (the neutral action register). Hidden above 640px
+   where the labeled overlays take over. */
+.edgeGlow {
+	display: none;
+}
+
 .controls {
 	display: flex;
 	flex-wrap: wrap;
@@ -228,6 +246,21 @@
 	color: var(--text-muted);
 }
 
+/* Keyboard copy for fine pointers; touch copy under coarse pointers. */
+.hintTouch {
+	display: none;
+}
+
+@media (pointer: coarse) {
+	.hintPointer {
+		display: none;
+	}
+
+	.hintTouch {
+		display: inline;
+	}
+}
+
 .srOnly {
 	position: absolute;
 	width: 1px;
@@ -257,6 +290,32 @@
 
 	.overlay {
 		display: none;
+	}
+
+	.edgeGlow {
+		display: block;
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		border: 2px solid transparent;
+		border-radius: var(--radius-card);
+		pointer-events: none;
+		opacity: 0;
+	}
+
+	.edgeGlowPass {
+		border-color: var(--state-soon-fg);
+		background: linear-gradient(90deg, color-mix(in srgb, var(--state-soon-bg) 62%, transparent) 0%, transparent 45%);
+	}
+
+	.edgeGlowSave {
+		border-color: var(--state-ready-fg);
+		background: linear-gradient(270deg, color-mix(in srgb, var(--state-ready-bg) 62%, transparent) 0%, transparent 45%);
+	}
+
+	.edgeGlowApply {
+		border-color: var(--color-cta);
+		background: linear-gradient(180deg, color-mix(in srgb, var(--color-action-soft) 72%, transparent) 0%, transparent 45%);
 	}
 
 	.feedbackToast {

@@ -1,0 +1,135 @@
+/**
+ * PublicBottomNav — the pinned dock for the logged-out / public user scope.
+ *
+ * Forked from navigation/BottomNav.module.css to mirror the seeker dock's
+ * mobile-chrome fixes without touching the shared sheet: legible ≥12px
+ * (--type-caption-size) labels, a calm soft-sky active lane (no heavy
+ * gradient pill), and press feedback via the shared .ui-pressable utility
+ * (applied in the TSX). Pinned flat to the bottom, full-bleed, warm surface,
+ * ink-warm hairline on top, whisper top-lift, safe-area padding for the iOS
+ * home indicator. Tokens only.
+ */
+
+.nav {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: var(--z-dock);
+	width: 100%;
+	background: var(--color-surface);
+	border-top: 1px solid var(--border-ink-warm);
+	/* Fixed chrome over scrolling content — a whisper lift, not a card shadow. */
+	box-shadow: 0 -2px 12px color-mix(in srgb, var(--palette-ink) 7%, transparent);
+	padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.list {
+	display: flex;
+	align-items: stretch;
+	gap: var(--space-4);
+	width: 100%;
+	margin: 0;
+	padding: var(--space-8);
+	list-style: none;
+}
+
+.item {
+	flex: 1;
+	min-width: 0;
+}
+
+.tab {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-3);
+	width: 100%;
+	min-height: var(--tap-min);
+	padding: var(--space-6) var(--space-2);
+	border: 1px solid transparent;
+	border-radius: var(--radius-cell);
+	background: transparent;
+	color: var(--text-muted);
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: 0.01em;
+	text-decoration: none;
+	cursor: pointer;
+	transition:
+		color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard),
+		transform var(--motion-fast) var(--ease-standard),
+		opacity var(--motion-fast) var(--ease-standard);
+}
+
+.tab :global(svg) {
+	transition: transform var(--motion-base) var(--ease-standard);
+}
+
+.label {
+	font: inherit;
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+
+/* Hover is a pointer-device affordance only — the cell warms, the icon lifts. */
+@media (hover: hover) {
+	.tab:hover {
+		color: var(--text-primary);
+		background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+	}
+
+	.tab:hover :global(svg) {
+		transform: translateY(-1px);
+	}
+}
+
+/* Tactile press — scale + slight dim (matches .ui-pressable; declared here
+   too so the press transform wins over the hover rule above). */
+.tab:active {
+	transform: scale(0.97);
+	opacity: 0.85;
+}
+
+.tab:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+/* ── Active lane — quiet soft-sky fill + deep-sky glyph and label
+   (mirrors the seeker dock; still obviously active, no gradient pill). ── */
+.active,
+.active:hover {
+	color: var(--palette-sky-dark);
+	background: var(--color-action-soft);
+	border-color: color-mix(in srgb, var(--color-cta) 38%, transparent);
+	font-weight: var(--font-weight-semibold);
+}
+
+.active :global(svg) {
+	color: var(--color-cta);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.tab,
+	.tab :global(svg) {
+		transition: none;
+	}
+
+	.tab:hover :global(svg),
+	.tab:active {
+		transform: none;
+	}
+
+	.tab:active {
+		opacity: 1;
+	}
+}

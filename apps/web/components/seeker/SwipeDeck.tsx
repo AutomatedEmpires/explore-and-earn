@@ -478,6 +478,12 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 									<span className={`${styles.overlay} ${styles.overlayApply}`} style={applyOverlayStyle} aria-hidden>
 										<Icon name="action.apply" size={20} aria-hidden /> Apply
 									</span>
+									{/* Mobile drag feedback — the labeled overlays above are hidden
+									    ≤640px, so a tinted edge glow (opacity tracks drag distance,
+									    same tokens as the feedback toast) answers the gesture. */}
+									<span className={`${styles.edgeGlow} ${styles.edgeGlowPass}`} style={passOverlayStyle} aria-hidden />
+									<span className={`${styles.edgeGlow} ${styles.edgeGlowSave}`} style={saveOverlayStyle} aria-hidden />
+									<span className={`${styles.edgeGlow} ${styles.edgeGlowApply}`} style={applyOverlayStyle} aria-hidden />
 								</>
 							) : null}
 							{/* Deck covers are the whole viewport — the visible stack loads eagerly. */}
@@ -565,8 +571,15 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				</Button>
 			</div>
 
+			{/* Keyboard copy for fine pointers; touch copy swaps in via CSS under
+			    (pointer: coarse) — arrow keys mean nothing to a thumb. */}
 			<p className={styles.hint}>
-				Drag a card, tap a button, or use ← Skip · → Save · ↑ Apply · Backspace to undo.
+				<span className={styles.hintPointer}>
+					Drag a card, tap a button, or use ← Skip · → Save · ↑ Apply · Backspace to undo.
+				</span>
+				<span className={styles.hintTouch}>
+					Swipe left to skip, right to save, up to apply — or tap a button below.
+				</span>
 			</p>
 
 			<span className={styles.srOnly} role="status" aria-live="polite">

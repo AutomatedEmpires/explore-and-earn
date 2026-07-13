@@ -368,7 +368,10 @@
   color: var(--text-primary);
   font-weight: 700;
   text-decoration: none;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
   position: relative;
 }
 
@@ -456,23 +459,27 @@
   }
 
   .seekeros-mtab {
-    border: 0;
+    border: 1px solid transparent;
     background: transparent;
     color: var(--text-muted);
-    border-radius: 16px;
-    padding: 7px 4px;
-    min-height: 44px;
+    border-radius: var(--radius-cell);
+    padding: var(--space-6) var(--space-4);
+    min-height: var(--tap-min);
     display: grid;
     place-items: center;
-    gap: 3px;
-    font-size: 10px;
+    gap: var(--space-3);
+    font-size: var(--type-caption-size);
+    line-height: var(--type-label-lh);
     font-weight: 700;
     text-decoration: none;
   }
 
+  /* Active tab — quiet soft-sky fill + deep-sky glyph (no heavy gradient
+     pill), same register as the sidebar's active nav item. */
   .seekeros-mtab[aria-current="page"] {
-    color: var(--seekeros-on-accent);
-    background: var(--seekeros-grad);
+    color: var(--seekeros-accent-deep);
+    background: var(--seekeros-accent-soft);
+    border-color: color-mix(in srgb, var(--seekeros-accent) 38%, transparent);
   }
 }
 
@@ -539,14 +546,26 @@
   box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--seekeros-accent);
 }
 .seekeros-navitem:active { transform: translateX(2px) scale(0.985); }
+/* Press state for the dock tabs + header quick buttons (they also carry
+   .ui-pressable for the shared transition). Declared here too so the press
+   transform wins over the :hover lift in this later-loaded sheet. */
 .seekeros-tact:active,
 .seekeros-account:active,
-.seekeros-mtab:active { transform: translateY(1px) scale(0.98); }
+.seekeros-mtab:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .seeker-os *, .seeker-os *::before, .seeker-os *::after {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+  .seekeros-tact:active,
+  .seekeros-account:active,
+  .seekeros-mtab:active {
+    transform: none;
+    opacity: 1;
   }
 }

@@ -777,6 +777,22 @@ body {
 }
 
 /* =================================================================== */
+/* Pressable — shared tactile press feedback for chrome controls        */
+/* (dock tabs, header quick buttons). Confirms the tap registered.      */
+/* Transform/opacity only; hard-gated by prefers-reduced-motion.        */
+/* =================================================================== */
+.ui-pressable {
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
+}
+
+.ui-pressable:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+/* =================================================================== */
 /* Global keyboard-focus fallback (WCAG 2.4.7)                          */
 /* :where() has ZERO specificity, so this guarantees a visible focus    */
 /* ring on every link/button/control that does NOT define its own       */
@@ -798,6 +814,13 @@ body {
   .ui-skeleton {
     transition: none;
     animation: none;
+  }
+  .ui-pressable {
+    transition: none;
+  }
+  .ui-pressable:active {
+    transform: none;
+    opacity: 1;
   }
   .ui-skeleton--shimmer::after {
     animation: none;

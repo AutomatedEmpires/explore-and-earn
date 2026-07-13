@@ -23,10 +23,10 @@ const NAV: readonly NavGroup[] = [
   {
     group: "Discover",
     items: [
-      { href: "/seek", label: "Discover", sub: "Today's matches", icon: "nav.feed" },
-      { href: "/swipe", label: "Swipe", sub: "Quick-decide", icon: "category.mix" },
-      { href: "/map", label: "Map", sub: "By place", icon: "status.open" },
-      { href: "/saved", label: "Saved", sub: "Your shortlist", icon: "action.forward" },
+      { href: "/seek", label: "Discover", sub: "Today's matches", icon: "nav.seek" },
+      { href: "/swipe", label: "Swipe", sub: "Quick-decide", icon: "nav.swipe" },
+      { href: "/map", label: "Map", sub: "By place", icon: "nav.map" },
+      { href: "/saved", label: "Saved", sub: "Your shortlist", icon: "nav.saved" },
       { href: "/assistant", label: "Assistant", sub: "Your guide", icon: "action.message" },
     ],
   },
@@ -44,16 +44,18 @@ const NAV: readonly NavGroup[] = [
       { href: "/journey", label: "Journey", sub: "Your season", icon: "analytics.meter" },
       { href: "/community", label: "Community", sub: "Field notes", icon: "nav.feed", badgeKey: "community" },
       { href: "/profile", label: "Profile", sub: "Your story", icon: "nav.profile" },
-      { href: "/settings", label: "Settings", sub: "Preferences", icon: "system.info" },
+      { href: "/settings", label: "Settings", sub: "Preferences", icon: "nav.settings" },
     ],
   },
 ];
 
 // Founder-locked seeker mobile tabs: Swipe · Map · Seek · Profile.
+// Honest glyphs from the nav.* registry lane — a card stack for Swipe, a
+// trifold map for Map, a compass for Seek, a person for Profile.
 const MOBILE_PRIMARY: readonly NavItem[] = [
-  { href: "/swipe", label: "Swipe", sub: "", icon: "category.mix" },
-  { href: "/map", label: "Map", sub: "", icon: "status.open" },
-  { href: "/seek", label: "Seek", sub: "", icon: "nav.feed" },
+  { href: "/swipe", label: "Swipe", sub: "", icon: "nav.swipe" },
+  { href: "/map", label: "Map", sub: "", icon: "nav.map" },
+  { href: "/seek", label: "Seek", sub: "", icon: "nav.seek" },
   { href: "/profile", label: "Profile", sub: "", icon: "nav.profile" },
 ];
 
@@ -159,18 +161,18 @@ export function SeekerShell({
           {/* Topbar entry keeps the assistant reachable on mobile — the
               sidebar link disappears ≤1023px and the four dock tabs are
               founder-locked. */}
-          <Link className="seekeros-tact seekeros-tact--icon" href="/assistant" aria-label="Your guide (AI assistant)">
+          <Link className="seekeros-tact seekeros-tact--icon ui-pressable" href="/assistant" aria-label="Your guide (AI assistant)">
             <Icon name="action.message" size={20} aria-hidden />
           </Link>
-          <Link className="seekeros-tact seekeros-tact--icon" href="/notifications" aria-label="Notifications">
-            <Icon name="system.info" size={20} aria-hidden />
+          <Link className="seekeros-tact seekeros-tact--icon ui-pressable" href="/notifications" aria-label="Notifications">
+            <Icon name="nav.notifications" size={20} aria-hidden />
             {unread > 0 ? <span className="seekeros-bdg--top">{unread}</span> : null}
           </Link>
-          <Link className="seekeros-tact seekeros-tact--p" href="/swipe" aria-label="Find work">
+          <Link className="seekeros-tact seekeros-tact--p ui-pressable" href="/swipe" aria-label="Find work">
             <Icon name="action.forward" size={20} aria-hidden />
             <span className="seekeros-tlabel">Find work</span>
           </Link>
-          <Link className="seekeros-account" href="/profile" aria-label="Your profile">
+          <Link className="seekeros-account ui-pressable" href="/profile" aria-label="Your profile">
             <span className="seekeros-avatarmini">{initial}</span>
           </Link>
         </header>
@@ -181,7 +183,7 @@ export function SeekerShell({
         {MOBILE_PRIMARY.map((item) => {
           const active = isActive(pathname, item);
           return (
-            <Link key={item.href} href={item.href} className="seekeros-mtab" aria-current={active ? "page" : undefined}>
+            <Link key={item.href} href={item.href} className="seekeros-mtab ui-pressable" aria-current={active ? "page" : undefined}>
               <Icon name={item.icon} size={20} aria-hidden />
               {item.label}
             </Link>
