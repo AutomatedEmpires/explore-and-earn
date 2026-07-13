@@ -214,6 +214,37 @@ export async function deleteCommunityPhoto(photoId: string): Promise<void> {
   if (error) throw new Error(`deleteCommunityPhoto: ${error.message}`);
 }
 
+export type CommunityPhotoReportReason =
+  | "privacy"
+  | "harassment"
+  | "inappropriate"
+  | "other";
+
+/** Persist an authenticated user's report for moderator review. */
+export async function insertCommunityPhotoReport(
+  token: string,
+  input: {
+    readonly photoId: string;
+    readonly reporterClerkUserId: string;
+    readonly reason: CommunityPhotoReportReason;
+    readonly detail?: string;
+  },
+): Promise<void> {
+  const db = authedClient(token) as unknown as SupabaseClient;
+  const { error } = await db.from("community_photo_reports").insert({
+    photo_id: input.photoId,
+    reporter_clerk_user_id: input.reporterClerkUserId,
+    reason: input.reason,
+    detail: input.detail?.trim().slice(0, 500) || null,
+    status: "submitted",
+  });
+
+  // Duplicate reports are already persisted; treat a retry as success.
+  if (error && error.code !== "23505") {
+    throw new Error(`insertCommunityPhotoReport: ${error.message}`);
+  }
+}
+
 export interface InsertHostAnnouncementParams {
   readonly hostProfileId: string;
   readonly title: string;

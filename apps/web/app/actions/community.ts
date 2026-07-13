@@ -22,6 +22,7 @@ import {
   getOwnedPhotoPath,
   insertComment,
   insertCommunityPhoto,
+  insertCommunityPhotoReport,
   insertHostAnnouncement,
   softDeleteComment,
   toggleAnnouncementReaction,
@@ -54,7 +55,7 @@ async function resolveAuth() {
 
 export type UploadPhotoResult =
   | { ok: true; photoId: string }
-  | { ok: false; reason: "unauthenticated" | "not_seeker" | "incomplete_profile" | "invalid_file" | "upload_failed"; score?: number };
+  | { ok: false; reason: "unauthenticated" | "not_seeker" | "incomplete_profile" | "consent_required" | "invalid_file" | "upload_failed"; score?: number };
 
 export async function uploadCommunityPhotoAction(fd: FormData): Promise<UploadPhotoResult> {
   const session = await resolveAuth();
@@ -70,23 +71,37 @@ export async function uploadCommunityPhotoAction(fd: FormData): Promise<UploadPh
     return { ok: false, reason: "incomplete_profile", score: identity.completionScore };
   }
 
+  if (fd.get("privacy_consent") !== "accepted") {
+    return { ok: false, reason: "consent_required" };
+  }
+
   const file = fd.get("photo");
   if (!(file instanceof File)) return { ok: false, reason: "invalid_file" };
   if (!ALLOWED_MIME_TYPES.has(file.type)) return { ok: false, reason: "invalid_file" };
   if (file.size > MAX_FILE_BYTES) return { ok: false, reason: "invalid_file" };
 
-  const ext = file.type === "image/webp" ? "webp" : file.type === "image/png" ? "png" : "jpg";
-  const filename = `${crypto.randomUUID()}.${ext}`;
+  const filename = `${crypto.randomUUID()}.webp`;
   const caption = (fd.get("caption") as string | null)?.trim().slice(0, 280) || null;
   const locationTag = (fd.get("location_tag") as string | null)?.trim().slice(0, 100) || null;
 
   let storagePath: string;
   try {
+    // Re-encode every upload. Sharp strips EXIF/GPS and other source metadata by
+    // default; rotate() applies orientation before that metadata is discarded.
+    const { default: sharp } = await import("sharp");
+    const sanitized = await sharp(Buffer.from(await file.arrayBuffer()))
+      .rotate()
+      .resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 86 })
+      .toBuffer();
+    const safeFile = new File([new Uint8Array(sanitized)], filename, {
+      type: "image/webp",
+    });
     storagePath = await uploadCommunityPhotoStorage(
       session.token,
       identity.seekerProfileId,
       filename,
-      file,
+      safeFile,
     );
   } catch {
     return { ok: false, reason: "upload_failed" };
@@ -101,6 +116,31 @@ export async function uploadCommunityPhotoAction(fd: FormData): Promise<UploadPh
 
   revalidatePath(COMMUNITY_PATH);
   return { ok: true, photoId };
+}
+
+// ─── Photo report ─────────────────────────────────────────────────────────────
+
+export type ReportPhotoResult =
+  | { ok: true }
+  | { ok: false; reason: "unauthenticated" | "invalid_input" | "report_failed" };
+
+export async function reportCommunityPhotoAction(photoId: string): Promise<ReportPhotoResult> {
+  const session = await resolveAuth();
+  if (!session) return { ok: false, reason: "unauthenticated" };
+  if (!photoId || !checkRateLimit(`community-photo-report:${session.userId}`, 10, 60 * 60 * 1000).allowed) {
+    return { ok: false, reason: "invalid_input" };
+  }
+
+  try {
+    await insertCommunityPhotoReport(session.token, {
+      photoId,
+      reporterClerkUserId: session.userId,
+      reason: "privacy",
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: "report_failed" };
+  }
 }
 
 // ─── Photo delete ─────────────────────────────────────────────────────────────
