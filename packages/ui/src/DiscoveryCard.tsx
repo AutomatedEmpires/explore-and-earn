@@ -132,6 +132,14 @@ function clampPct(pct: number): number {
 	return Math.min(100, Math.max(0, pct))
 }
 
+/** Match-quality band → class. Colour-codes "how well" (founder direction). */
+function matchBandClass(pct: number): string {
+	return pct >= 85 ? styles.matchStrong
+		: pct >= 70 ? styles.matchGood
+			: pct >= 55 ? styles.matchFair
+				: styles.matchLow
+}
+
 // ─── Badge tone → class maps (badge LOGIC below is locked; only styling maps) ─
 
 type CenterTone = "paper" | "success" | "error" | "boosted"
@@ -178,23 +186,24 @@ function BenefitTriadCell({
 	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
 	const icon: IconKey =
 		kind === "housing" ? "benefit.housing" : kind === "meals" ? "benefit.meals" : "benefit.pay"
-	const stateText = isPay ? "" : provided ? "offered" : "not offered"
-	const aria = `${label}${stateText ? `: ${stateText}` : ""}${value ? ` — ${value}` : ""}`
+	// Housing/Meals carry NO descriptor text on the card — only the field name +
+	// a color-coded ✓/✕ (the detail lives in the popup). Pay shows the rate.
+	const stateText = isPay ? "" : provided ? "included" : "not included"
+	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
 
 	const inner = (
 		<>
 			<span className={styles.benefitHead}>
-				<Icon name={icon} size={14} aria-hidden />
+				<Icon name={icon} size={16} aria-hidden />
 				<span>{label}</span>
-				{!isPay ? (
-					<span className={styles.benefitState}>
-						<Icon name={provided ? "system.success" : "system.error"} size={13} aria-hidden />
-					</span>
-				) : null}
 			</span>
-			<span className={`${styles.benefitValue}${isPay ? ` ${styles.benefitPayValue}` : ""}`}>
-				{value}
-			</span>
+			{isPay ? (
+				<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{value}</span>
+			) : (
+				<span className={styles.benefitCheck} aria-hidden>
+					<Icon name={provided ? "system.success" : "system.error"} size={22} />
+				</span>
+			)}
 		</>
 	)
 
@@ -434,8 +443,9 @@ export function DiscoveryCard({
 						)}
 					</button>
 
-					{/* Verified check — listing surfaces only; not shown on applicant review */}
-					{verified && !isApplicantReview ? (
+					{/* Verified check — EVERY host gets it on listing surfaces (founder:
+					    "host always verified"); never shown on seeker applicant cards. */}
+					{!isApplicantReview ? (
 						<span className={styles.verifiedDot} aria-label="Verified Host">
 							<Icon name="trust.verified_host" size={16} aria-hidden />
 						</span>
@@ -455,10 +465,18 @@ export function DiscoveryCard({
 						</span>
 					</div>
 				) : showMatchCenter && data.matchScore !== undefined ? (
-					/* Match score — centered pill, neutral glacier (information, not good-vs-bad) */
-					<span className={styles.matchPill}>
-						<Icon name="status.match" size={14} aria-hidden />
-						{data.matchScore}% Match
+					/* Match score — centered pill, colour-coded by band with a mini
+					   fill bar (how well it fits), keeping the % text. */
+					<span
+						className={`${styles.matchPill} ${matchBandClass(data.matchScore)}`}
+						style={{ "--dc-bar-pct": `${clampPct(data.matchScore)}%` } as CSSProperties}
+						aria-label={`Match ${data.matchScore} percent`}
+					>
+						<span className={styles.matchPillNum}>{data.matchScore}%</span>
+						<span className={styles.matchPillLabel}>Match</span>
+						<span className={styles.matchPillTrack} aria-hidden>
+							<span className={styles.matchPillFill} />
+						</span>
 					</span>
 				) : showHeroBar && data.fillPercent !== undefined ? (
 					/* Fill-quality bar — listing scarcity signal */
@@ -515,13 +533,15 @@ export function DiscoveryCard({
 			{/* ── INFO ROWS ── */}
 			<div className={styles.body}>
 
-				{/* 2. HOST NAME — quiet trust context above the title */}
+				{/* 2. HOST NAME — icon + name (icon in every field) */}
 				{titleHandler ? (
 					<button type="button" className={`${styles.metaRow} ${styles.hostRow}`} onClick={titleHandler}>
+						<Icon name={isApplicantReview ? "nav.profile" : "trust.verified_host"} size={18} aria-hidden />
 						<span className={styles.hostName}>{data.hostName}</span>
 					</button>
 				) : (
 					<div className={`${styles.metaRow} ${styles.hostRow}`}>
+						<Icon name={isApplicantReview ? "nav.profile" : "trust.verified_host"} size={18} aria-hidden />
 						<span className={styles.hostName}>{data.hostName}</span>
 					</div>
 				)}
@@ -682,22 +702,16 @@ export function DiscoveryCard({
 							</button>
 						</div>
 					) : showDecisionBar ? (
-						/* Seeker decision bar — Skip · Apply · Save (25/50/25, or
-						   Apply · Save 66/34 when no skip handler). */
-						<div
-							className={styles.ctaRow}
-							style={{ "--dc-cta-cols": onSkip ? "1fr 2fr 1fr" : "2fr 1fr" } as CSSProperties}
-						>
-							{onSkip ? (
-								<button
-									type="button"
-									className={`${styles.ctaBtn} ${styles.ctaSkip} ui-pressable`}
-									onClick={() => onSkip(data.id)}
-									aria-label="Skip this opportunity"
-								>
-									<Icon name="action.close" size={18} aria-hidden />
-								</button>
-							) : null}
+						/* Seeker decision bar — ALWAYS Skip · Apply · Save at 20/60/20. */
+						<div className={styles.ctaRow}>
+							<button
+								type="button"
+								className={`${styles.ctaBtn} ${styles.ctaSkip} ui-pressable`}
+								onClick={onSkip ? () => onSkip(data.id) : undefined}
+								aria-label="Skip this opportunity"
+							>
+								<Icon name="action.close" size={18} aria-hidden />
+							</button>
 							<button
 								type="button"
 								className={`${styles.ctaBtn} ${styles.ctaApply} ui-pressable`}
@@ -709,7 +723,7 @@ export function DiscoveryCard({
 							<button
 								type="button"
 								className={`${styles.ctaBtn} ${styles.ctaSave} ui-pressable`}
-								onClick={onSave ? () => onSave(data.id) : onOpen ? () => onOpen(data.id) : undefined}
+								onClick={onSave ? () => onSave(data.id) : undefined}
 								aria-label="Save this opportunity"
 							>
 								<Icon name="nav.saved" size={18} aria-hidden />
