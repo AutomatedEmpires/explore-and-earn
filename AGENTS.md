@@ -30,7 +30,7 @@ Current production blockers include two-user tenant/RLS/role proof; production-r
 
 ## 3. Execution doctrine and default authority
 
-The default is to **ship meaningful, tested improvements**, not produce another audit that restates known gaps. Read enough to choose the smallest high-leverage change, implement it, prove it, document material decisions, and leave the branch easier to continue.
+Agents are expected to **ship meaningful, tested improvements, not produce endless audits** that restate known gaps. Read enough to choose the smallest high-leverage change, implement it, prove it, document material decisions, and leave the reversible branch easier to continue.
 
 Without founder approval, agents may perform reversible, non-destructive work within the assigned scope, including:
 
