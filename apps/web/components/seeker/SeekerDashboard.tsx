@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useOptimistic, useState, useTransition } from "react";
 
-import { Icon } from "@explore-and-earn/ui";
 import type { SeekerProfileRecord } from "@explore-and-earn/db";
 import { saveReadinessAction } from "../../app/actions/seekerProfile";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
@@ -11,7 +10,6 @@ import type { DiscoveryListing } from "../discovery";
 import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
 import { JourneyPipeline } from "./JourneyPipeline";
 import { MatchCardRail } from "./MatchCardRail";
-import { QuickStats } from "./QuickStats";
 import { SeekerHero } from "./SeekerHero";
 import styles from "./SeekerDashboard.module.css";
 import type { SeekerStatusSummary } from "./models";
@@ -58,57 +56,6 @@ function ResumeCallout({ pct }: { pct: number }) {
       </div>
       <span className={styles.calloutCta} aria-hidden="true">Go →</span>
     </Link>
-  );
-}
-
-/* ─── Lifecycle destination cards (3-up grid) ─── */
-function LifecycleTeasers({ status }: { status: SeekerStatusSummary }) {
-  const items = [
-    {
-      href: "/invites",
-      label: "Invites",
-      icon: "action.message" as const,
-      count: status.invitesCount,
-      highlight: status.invitesCount > 0,
-    },
-    {
-      href: "/offered",
-      label: "Offers",
-      icon: "action.forward" as const,
-      count: status.offersCount,
-      highlight: status.offersCount > 0,
-    },
-    {
-      href: "/accepted",
-      label: "Accepted",
-      icon: "action.apply" as const,
-      count: undefined,
-      highlight: Boolean(status.acceptedUpcoming),
-    },
-  ];
-
-  return (
-    <div className={styles.teaserRow} role="list" aria-label="Application lifecycle">
-      {items.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={`${styles.teaserCard} ${item.highlight ? styles.teaserHighlight : ""}`}
-          role="listitem"
-          aria-label={item.count != null && item.count > 0 ? `${item.label}: ${item.count}` : item.label}
-        >
-          <div className={styles.teaserIcon}>
-            <Icon name={item.icon as Parameters<typeof Icon>[0]["name"]} size={20} />
-          </div>
-          <div className={styles.teaserInfo}>
-            {item.count != null && item.count > 0 && (
-              <span className={styles.teaserCount}>{item.count}</span>
-            )}
-            <span className={styles.teaserLabel}>{item.label}</span>
-          </div>
-        </Link>
-      ))}
-    </div>
   );
 }
 
@@ -170,19 +117,25 @@ export function SeekerDashboard({
           readinessSaving={isPending}
         />
 
-        {/* Journey pipeline — visual 5-step progress flow */}
-        <JourneyPipeline
-          matchedCount={matchedListings.length}
-          savedCount={status.savedCount}
-          appliedCount={status.appliedCount}
-          offersCount={status.offersCount}
-          acceptedUpcoming={status.acceptedUpcoming}
-        />
+        {/* Journey pipeline — the primary at-a-glance element. Each stage is a
+            link to its own view; the header links to the fuller applications list. */}
+        <section className={styles.pipelineSection} aria-labelledby="pipeline-heading">
+          <div className={styles.pipelineHeader}>
+            <h2 id="pipeline-heading" className={styles.pipelineHeading}>Your pipeline</h2>
+            <Link href="/applied" className={styles.pipelineLink}>
+              All applications <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+          <JourneyPipeline
+            matchedCount={matchedListings.length}
+            savedCount={status.savedCount}
+            appliedCount={status.appliedCount}
+            offersCount={status.offersCount}
+            acceptedUpcoming={status.acceptedUpcoming}
+          />
+        </section>
 
-        {/* Quick stats chips */}
-        <QuickStats status={status} />
-
-        {/* Resume nudge */}
+        {/* Resume nudge — the single primary next-action when the resume blocks applying */}
         {status.resumeCompletion < 80 && (
           <ResumeCallout pct={status.resumeCompletion} />
         )}
@@ -192,12 +145,6 @@ export function SeekerDashboard({
 
         {/* Featured employers */}
         <FeaturedEmployerStrip employers={featuredEmployers} />
-
-        {/* Lifecycle status cards */}
-        <section className={styles.lifecycleSection} aria-label="Your applications">
-          <h2 className={styles.sectionHeading}>Your Applications</h2>
-          <LifecycleTeasers status={status} />
-        </section>
     </div>
   );
 }

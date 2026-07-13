@@ -1,4 +1,6 @@
-/* ProfileHub — the seeker home base (Profile + hub). */
+/* ProfileHub — the seeker home base (Profile + hub).
+   Landing priority (founder v2.2): identity → résumé → offers → matched rail →
+   boosted rail → tucked nav. Showcase the essentials; tuck the routing. */
 
 /* ── Page shell ── */
 .page {
@@ -271,373 +273,10 @@
 
 .bioAdd:hover { border-color: var(--color-cta); }
 
-/* ── Readiness ── */
-.readinessWrap {
-  margin-top: var(--space-4);
-}
-
-/* ── Next-best-action callout — the dominant element of the hub ── */
-.callout {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-14);
-  margin: var(--space-16) var(--space-16) 0;
-  padding: var(--space-16);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
-  color: var(--text-secondary);
-  text-decoration: none;
-  isolation: isolate;
-  overflow: hidden;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard),
-    box-shadow var(--motion-fast) var(--ease-standard);
-}
-
-.callout:hover { transform: translateY(-1px); }
-.callout:active { transform: translateY(0); }
-
-.callout:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-/* ── Leading icon medallion ── */
-.calloutIcon {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-}
-
-.calloutText {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.calloutEyebrow {
-  font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.calloutTitle {
-  font-family: var(--font-display);
-  font-size: var(--type-section-size);
-  line-height: 1.15;
-  font-weight: var(--font-weight-regular);
-  color: var(--text-primary);
-}
-
-.calloutSub {
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-lh);
-  color: var(--text-secondary);
-}
-
-/* ── Trailing CTA chip ── */
-.calloutCta {
-  flex-shrink: 0;
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-height: var(--tap-min);
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
-  transition: transform var(--motion-fast) var(--ease-standard);
-}
-
-.calloutCtaLabel { letter-spacing: 0.01em; }
-
-.callout:hover .calloutCta { transform: translateX(2px); }
-
-/* ── FILLED tones: primary + soon read as the dominant module ── */
-.primary {
-  border-color: transparent;
-  color: var(--color-cta-text);
-  background: var(--gradient-progress);
-  box-shadow: var(--elevation-overlay), 0 10px 30px -8px color-mix(in srgb, var(--color-cta) 55%, transparent);
-}
-.soon {
-  border-color: transparent;
-  color: var(--color-cta-text);
-  background: var(--gradient-state-soon);
-  box-shadow: var(--elevation-overlay), 0 10px 30px -8px color-mix(in srgb, var(--state-soon-fg) 55%, transparent);
-}
-
-/* Inner glow lifts the filled surface off the page */
-.primary::before,
-.soon::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: radial-gradient(
-    120% 140% at 88% -20%,
-    color-mix(in srgb, var(--color-cta-text) 26%, transparent) 0%,
-    transparent 60%
-  );
-}
-
-/* Crisp ring against the colored fill (the standard ink ring would vanish). */
-.primary:focus-visible,
-.soon:focus-visible {
-  box-shadow:
-    0 0 0 2px var(--color-paper),
-    0 0 0 4px var(--color-cta-text);
-}
-
-.primary:hover,
-.soon:hover {
-  box-shadow: var(--elevation-overlay), 0 14px 38px -8px color-mix(in srgb, var(--color-cta) 60%, transparent);
-}
-.soon:hover {
-  box-shadow: var(--elevation-overlay), 0 14px 38px -8px color-mix(in srgb, var(--state-soon-fg) 60%, transparent);
-}
-
-.primary .calloutIcon,
-.soon .calloutIcon {
-  color: var(--color-cta-text);
-  background: color-mix(in srgb, var(--color-cta-text) 20%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-cta-text) 30%, transparent);
-}
-
-.primary .calloutEyebrow,
-.soon .calloutEyebrow { color: color-mix(in srgb, var(--color-cta-text) 82%, transparent); }
-
-.primary .calloutTitle,
-.soon .calloutTitle { color: var(--color-cta-text); }
-
-.primary .calloutSub,
-.soon .calloutSub { color: color-mix(in srgb, var(--color-cta-text) 86%, transparent); }
-
-.primary .calloutCta,
-.soon .calloutCta {
-  color: var(--color-cta-text);
-  background: color-mix(in srgb, var(--color-cta-text) 18%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-cta-text) 28%, transparent);
-}
-
-/* ── Calm tone: quiet, bordered (it is not an action that demands attention) ── */
-.calm {
-  background: var(--color-surface-raised);
-  box-shadow: var(--elevation-card);
-}
-.calm:hover { box-shadow: var(--elevation-hover); }
-.calm .calloutIcon {
-  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
-  color: var(--color-cta);
-}
-.calm .calloutCta {
-  color: var(--color-cta);
-  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
-}
-
-/* ── Progress meter (soon tone) ── */
-.progressTrack {
-  height: 7px;
-  margin-top: var(--space-6);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-cta-text) 28%, transparent);
-  overflow: hidden;
-}
-
-.progressFill {
-  height: 100%;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-cta-text) 92%, transparent);
-  transition: width var(--motion-base) var(--ease-standard);
-}
-
-/* ── Buckets — the decluttered index of navigable surfaces ── */
-.buckets {
-  margin: var(--space-section) 0 0;
-  padding: 0 var(--space-16);
-}
-
-.bucketsTitle {
-  margin: 0 0 var(--space-10);
-  padding-inline: var(--space-2);
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-lh);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--type-label-tracking);
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.bucketGrid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  /* Mobile-first: a clean single column of tiles at 375px. */
-  grid-template-columns: 1fr;
-  gap: var(--space-10);
-}
-
-.bucketGrid > li { min-width: 0; }
-
-/* 2-up on tablet, 3-up on desktop (references real device widths). */
-@media (min-width: 768px) {
-  .bucketGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (min-width: 1280px) {
-  .bucketGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-.bucket {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--space-12);
-  min-height: 76px;
-  padding: var(--space-14);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard),
-    box-shadow var(--motion-fast) var(--ease-standard);
-}
-
-.bucket:hover {
-  border-color: var(--border-ink);
-  box-shadow: var(--elevation-hover);
-  transform: translateY(-1px);
-}
-
-.bucket:active { transform: translateY(0); }
-
-.bucket:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-.bucketIcon {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--icon-chip);
-  height: var(--icon-chip);
-  border-radius: var(--radius-cell);
-  border: 1px solid color-mix(in srgb, var(--color-cta) 22%, transparent);
-  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
-  color: var(--color-cta);
-}
-
-.bucketText {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.bucketLabel {
-  font-family: var(--font-ui);
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-lh);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-}
-
-.bucketSummary {
-  font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
-  line-height: var(--type-caption-lh);
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bucketMeta {
-  flex-shrink: 0;
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-muted);
-}
-
-.bucketMetaEmphasis {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 var(--space-6);
-  border-radius: var(--radius-pill);
-  background: var(--status-match-bg);
-  color: var(--status-match-fg);
-  font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-weight-semibold);
-}
-
-.bucketChevron {
-  flex-shrink: 0;
-  display: flex;
-  color: var(--text-muted);
-}
-
-/* Time-sensitive bucket (offers): a quiet accent, not a loud full fill.
-   Distinct names from the callout's .primary/.soon so the module's shared
-   class scope doesn't bleed the callout fill onto a tile. */
-.bucketPrimary {
-  border-color: color-mix(in srgb, var(--color-cta) 40%, transparent);
-}
-
-.bucketPrimary .bucketIcon {
-  border-color: transparent;
-  background: var(--gradient-action);
-  color: var(--color-cta-text);
-}
-
-/* Unfinished bucket (resume below threshold): a warm nudge accent. */
-.bucketSoon {
-  border-color: color-mix(in srgb, var(--state-soon-fg) 40%, transparent);
-}
-
-.bucketSoon .bucketIcon {
-  border-color: color-mix(in srgb, var(--state-soon-fg) 30%, transparent);
-  background: color-mix(in srgb, var(--state-soon-fg) 12%, transparent);
-  color: var(--state-soon-fg);
-}
-
-.bucketSoon .bucketMeta {
-  color: var(--state-soon-fg);
-}
-
-/* ── Badges — a compact medallion strip ── */
+/* ── Badges — a compact medallion strip in the identity block ── */
 .badges {
-  margin: var(--space-section) 0 0;
-  padding: 0 var(--space-16) var(--space-16);
+  margin: var(--space-4) 0 0;
+  padding: 0 var(--space-16);
 }
 
 .badgeStrip {
@@ -679,15 +318,472 @@
   white-space: nowrap;
 }
 
+/* ── Availability / readiness ── */
+.readinessWrap {
+  margin-top: var(--space-12);
+}
+
+/* ══ Shared prominent-callout shell (résumé + offers) ══ */
+.resumeCard,
+.offersCallout {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-14);
+  margin: var(--space-16) var(--space-16) 0;
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  text-decoration: none;
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.resumeCard:hover,
+.offersCallout:hover { transform: translateY(-1px); }
+.resumeCard:active,
+.offersCallout:active { transform: translateY(0); }
+
+.resumeCard:focus-visible,
+.offersCallout:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* Leading icon medallion (shared) */
+.resumeIcon,
+.offersIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+}
+
+/* Trailing CTA chip (shared) */
+.resumeCta,
+.offersCta {
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.resumeCard:hover .resumeCta,
+.offersCallout:hover .offersCta { transform: translateX(2px); }
+
+/* ── Résumé card — always upfront, quiet raised surface ── */
+.resumeCard {
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+  box-shadow: var(--elevation-card);
+}
+
+.resumeCard:hover { box-shadow: var(--elevation-hover); }
+
+/* Ready: calm confident accent. Unfinished: a warm nudge on the left edge. */
+.resumeReady {
+  border-color: color-mix(in srgb, var(--color-cta) 30%, transparent);
+}
+.resumeUnfinished {
+  border-color: color-mix(in srgb, var(--state-soon-fg) 40%, transparent);
+}
+
+.resumeReady .resumeIcon {
+  background: color-mix(in srgb, var(--color-cta) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 26%, transparent);
+  color: var(--color-cta);
+}
+.resumeUnfinished .resumeIcon {
+  background: color-mix(in srgb, var(--state-soon-fg) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--state-soon-fg) 30%, transparent);
+  color: var(--state-soon-fg);
+}
+
+.resumeText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.resumeEyebrow {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.resumeTitle {
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: 1.15;
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.resumeSub {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.resumeMeter {
+  height: 7px;
+  margin-top: var(--space-6);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  overflow: hidden;
+}
+
+.resumeMeterFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width var(--motion-base) var(--ease-standard);
+}
+
+.resumeReady .resumeMeterFill { background: var(--gradient-action); }
+.resumeUnfinished .resumeMeterFill { background: var(--gradient-state-soon); }
+
+.resumeCta {
+  color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+}
+.resumeUnfinished .resumeCta {
+  color: var(--state-soon-fg);
+  background: color-mix(in srgb, var(--state-soon-fg) 10%, transparent);
+}
+
+/* ── Offers callout — critical, dominant filled surface ── */
+.offersCallout {
+  border-color: transparent;
+  color: var(--color-cta-text);
+  background: var(--gradient-action);
+  box-shadow: var(--elevation-overlay), 0 10px 30px -8px color-mix(in srgb, var(--color-cta) 55%, transparent);
+}
+
+.offersCallout::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    120% 140% at 88% -20%,
+    color-mix(in srgb, var(--color-cta-text) 26%, transparent) 0%,
+    transparent 60%
+  );
+}
+
+.offersCallout:hover {
+  box-shadow: var(--elevation-overlay), 0 14px 38px -8px color-mix(in srgb, var(--color-cta) 60%, transparent);
+}
+
+.offersCallout:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--color-paper),
+    0 0 0 4px var(--color-cta-text);
+}
+
+.offersIcon {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta-text) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta-text) 30%, transparent);
+}
+
+.offersText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.offersEyebrow {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-cta-text) 82%, transparent);
+}
+
+.offersTitle {
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: 1.15;
+  font-weight: var(--font-weight-regular);
+  color: var(--color-cta-text);
+}
+
+.offersSub {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: color-mix(in srgb, var(--color-cta-text) 86%, transparent);
+}
+
+.offersCta {
+  color: var(--color-cta-text);
+  background: color-mix(in srgb, var(--color-cta-text) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta-text) 28%, transparent);
+}
+
+/* ── Job rails (matched · boosted) — compact horizontal DiscoveryCard rails ── */
+.railSection {
+  margin: var(--space-section) 0 0;
+  min-width: 0;
+}
+
+.railHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: 0 var(--space-16);
+  margin-bottom: var(--space-10);
+}
+
+.railTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: 1.15;
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.railTitle svg { color: var(--color-cta); }
+
+.railSeeAll {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+  min-height: var(--tap-min);
+  padding: var(--space-6) var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  text-decoration: none;
+  border-radius: var(--radius-pill);
+}
+
+.railSeeAll:hover { text-decoration: underline; }
+.railSeeAll:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* Horizontal scroll-snap rail; the wide content scrolls inside its own track so
+   the page body never scrolls horizontally. */
+.rail {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-4) var(--space-16) var(--space-8);
+  display: flex;
+  gap: var(--space-14);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.railItem {
+  flex: 0 0 auto;
+  width: min(84vw, 300px);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+/* On tablet/desktop the rail can breathe wider without changing card scale. */
+@media (min-width: 768px) {
+  .railItem { width: 320px; }
+}
+
+/* ── Rail empty state — honest, nudges the next best step ── */
+.railEmpty {
+  margin: 0 var(--space-16);
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-8);
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.railEmptyBody {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.railEmptyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  padding: var(--space-6) var(--space-12);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  text-decoration: none;
+  transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.railEmptyLink:hover { border-color: var(--color-cta); }
+.railEmptyLink:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* ── Tucked nav — the rest of the seeker's space, a compact glanceable index ── */
+.tuckedNav {
+  margin: var(--space-section) 0 0;
+  padding: 0 var(--space-16) var(--space-section);
+}
+
+.tuckedTitle {
+  margin: 0 0 var(--space-10);
+  padding-inline: var(--space-2);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.tuckedGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.tuckedGrid > li { min-width: 0; }
+
+@media (min-width: 768px) {
+  .tuckedGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1280px) {
+  .tuckedGrid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
+
+.tuckedTile {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--tap-min);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.tuckedTile:hover {
+  border-color: var(--border-ink);
+  box-shadow: var(--elevation-hover);
+  transform: translateY(-1px);
+}
+
+.tuckedTile:active { transform: translateY(0); }
+
+.tuckedTile:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.tuckedIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-cta);
+}
+
+.tuckedLabel {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tuckedMeta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+  color: var(--color-cta);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .seekerDot { animation: none; }
-  .progressFill { transition: none; }
-  .bucket,
-  .callout,
-  .calloutCta { transition: none; }
-  .bucket:hover,
-  .bucket:active,
-  .callout:hover,
-  .callout:active,
-  .callout:hover .calloutCta { transform: none; }
+  .resumeMeterFill { transition: none; }
+  .resumeCard,
+  .offersCallout,
+  .resumeCta,
+  .offersCta,
+  .tuckedTile { transition: none; }
+  .resumeCard:hover,
+  .resumeCard:active,
+  .offersCallout:hover,
+  .offersCallout:active,
+  .resumeCard:hover .resumeCta,
+  .offersCallout:hover .offersCta,
+  .tuckedTile:hover,
+  .tuckedTile:active { transform: none; }
 }

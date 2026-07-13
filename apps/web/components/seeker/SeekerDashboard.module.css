@@ -92,223 +92,53 @@
 }
 
 /* ─────────────────────────────────────────────
-   QUICK STATS BAR
+   PIPELINE SECTION — the primary at-a-glance element
+   Header (title + link to the fuller applications view) sits above the
+   clickable JourneyPipeline stage row (that component owns its own styling).
    ───────────────────────────────────────────── */
 
-.statsBar {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-8);
-  padding: var(--space-14) var(--space-16);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  background: var(--color-paper);
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.statsBar::-webkit-scrollbar { display: none; }
-
-/* Resume ring chip */
-.resumeChip {
+.pipelineSection {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-8) var(--space-10);
-  border-radius: var(--radius-cell);
-  border: 1.5px solid var(--border-soft);
-  background: var(--color-surface-raised);
-  text-decoration: none;
-  flex-shrink: 0;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    transform    var(--motion-fast) var(--ease-standard);
 }
 
-.resumeChip:hover {
-  border-color: var(--border-ink);
-  transform: translateY(-1px);
-}
-
-.resumeChip:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-/* Stat chip */
-.statChip {
+.pipelineHeader {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-8) var(--space-14);
-  border-radius: var(--radius-cell);
-  border: 1.5px solid var(--border-soft);
-  background: var(--color-surface-raised);
-  text-decoration: none;
-  flex-shrink: 0;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background   var(--motion-fast) var(--ease-standard),
-    box-shadow   var(--motion-fast) var(--ease-standard),
-    transform    var(--motion-fast) var(--ease-standard);
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16) var(--space-4);
 }
 
-.statChip:hover {
-  border-color: var(--border-ink);
-  transform: translateY(-1px);
-}
-
-.statChip:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-.statHighlight {
-  border-color: var(--status-match-fg);
-  background: color-mix(in srgb, var(--status-match-bg) 55%, var(--color-surface-raised));
-  box-shadow: 0 0 0 1px var(--status-match-fg), var(--elevation-card);
-}
-
-.statHighlight .statValue { color: var(--palette-sky-dark); }
-
-.statValue {
+.pipelineHeading {
   font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.statLabel {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-/* ─────────────────────────────────────────────
-   LIFECYCLE SECTION
-   ───────────────────────────────────────────── */
-
-.lifecycleSection {
-  padding: 20px 0 var(--space-32);
-}
-
-.sectionHeading {
-  font-family: var(--font-display);
-  font-size: clamp(18px, 5vw, 22px);
+  font-size: clamp(16px, 4.5vw, 20px);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
-  padding: 0 var(--space-16) var(--space-12);
 }
 
-/* 3-up grid */
-.teaserRow {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-8);
-  padding: 0 var(--space-16);
-}
-
-.teaserCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-14) var(--space-8);
-  border-radius: var(--radius-card);
-  border: 1.5px solid var(--border-soft);
-  background: var(--color-surface-raised);
-  text-decoration: none;
-  text-align: center;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background   var(--motion-fast) var(--ease-standard),
-    transform    var(--motion-fast) var(--ease-standard),
-    box-shadow   var(--motion-fast) var(--ease-standard);
-}
-
-.teaserCard:hover {
-  border-color: var(--border-ink);
-  transform: translateY(-2px);
-  box-shadow: var(--elevation-hover);
-}
-
-.teaserCard:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-.teaserHighlight {
-  border-color: var(--status-match-fg);
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--status-match-bg) 55%, var(--color-surface-raised)),
-    color-mix(in srgb, var(--status-match-bg) 25%, var(--color-surface-raised))
-  );
-  box-shadow: 0 0 0 1px var(--status-match-fg), var(--elevation-card);
-}
-
-.teaserHighlight .teaserIcon {
-  background: var(--status-match-fg);
-  color: var(--color-cta-text);
-}
-
-.teaserIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-button);
-  background: var(--color-steel, #EAEFEF);
-  color: var(--text-secondary);
-  flex-shrink: 0;
-  transition:
-    background var(--motion-fast) var(--ease-standard),
-    color      var(--motion-fast) var(--ease-standard);
-}
-
-.teaserInfo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.teaserLabel {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
-.teaserCount {
+.pipelineLink {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 var(--space-6);
-  border-radius: var(--radius-pill);
-  background: var(--status-match-fg);
-  color: var(--color-cta-text);
+  gap: var(--space-4);
+  min-height: 44px;
+  padding: 0 var(--space-4);
   font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-label-size);
   font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: var(--radius-button);
+  transition: color var(--motion-fast) var(--ease-standard);
 }
 
-/* Mobile: collapse the 3-up lifecycle grid so cards stay tappable */
-@media (max-width: 380px) {
-  .teaserRow {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.pipelineLink:hover {
+  color: var(--text-primary);
+}
+
+.pipelineLink:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
 }
