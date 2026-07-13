@@ -8,7 +8,6 @@ import { checkRateLimit } from "../../lib/rateLimit";
 import {
   ANNOUNCEMENT_FREE_DURATION_DAYS,
   ANNOUNCEMENT_MONTHLY_QUOTA,
-  ANNOUNCEMENT_PRICE_CENTS,
   type AnnouncementKind,
 } from "@explore-and-earn/contracts";
 import {
