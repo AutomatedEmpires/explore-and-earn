@@ -32,6 +32,13 @@ export interface ListingHost {
   readonly verified: boolean;
   /** Short employer tagline for the featured-employer rail (1–2 punchy sentences). */
   readonly tagline?: string;
+  /**
+   * Host subscription tier — powers monetization ranking ("pay more, show more":
+   * Enterprise > Professional > Starter, below Boosted and strong Match). Derived
+   * from the host's active subscription; never self-declared. Omitted/"none" for
+   * free or unknown hosts (ranks last, never hidden). See apps/web/lib/ranking.ts.
+   */
+  readonly tier?: "enterprise" | "professional" | "starter" | "none";
 }
 
 /**
