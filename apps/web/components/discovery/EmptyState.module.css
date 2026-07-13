@@ -7,7 +7,7 @@
   padding: var(--space-48) var(--space-24);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
+  background: var(--gradient-paper-warm);
   color: var(--text-primary);
 }
 
@@ -19,7 +19,8 @@
   height: var(--icon-chip);
   border-radius: var(--radius-pill);
   background: var(--color-surface);
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border-ink);
+  color: var(--text-primary);
 }
 
 .title {
@@ -40,6 +41,71 @@
   color: var(--text-secondary);
 }
 
+/* ── Recovery chips — link-based filter removal / lane suggestions ───────── */
+
+.chipGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: var(--space-4);
+}
+
+.chipGroupLabel {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-8);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-14);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-ink);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .chip:hover { transform: translateY(-1px); }
+}
+
+.chip:active { transform: scale(0.97); }
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.chipRemoveMark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
 .action {
   display: inline-flex;
   align-items: center;
@@ -48,6 +114,7 @@
   margin-top: var(--space-4);
   padding: var(--space-12) var(--space-20);
   border-radius: var(--radius-button);
+  border: 2px solid var(--border-ink);
   background: var(--color-cta);
   color: var(--color-cta-text);
   font-family: var(--font-ui);
@@ -55,20 +122,24 @@
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
   transition:
-    filter var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard);
+    transform var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
 }
 
 @media (hover: hover) {
-  .action:hover { filter: brightness(1.06) saturate(1.04); }
+  .action:hover { transform: translateY(-1px); }
 }
 
 /* Press feedback — works on touch as well as pointer */
 .action:active { transform: scale(0.98); }
 
 @media (prefers-reduced-motion: reduce) {
-  .action { transition: none; }
-  .action:active { transform: none; }
+  .action,
+  .chip { transition: none; }
+  .action:active,
+  .action:hover,
+  .chip:active,
+  .chip:hover { transform: none; }
 }
 
 .action:focus-visible {
