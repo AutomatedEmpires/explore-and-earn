@@ -1,17 +1,18 @@
 /**
- * Design tokens — V2 "Adventure Paper & Sky" (founder-locked 2026-06-10).
+ * Design tokens — V3 "Glacier: Ice & Chrome" (founder-locked 2026-07-13).
  *
- * Palette: warm paper + ink base (field-journal / adventure soul) lifted by
- * cool sky-blue brand actions, chrome/graphite neutrals, and earthy clay/gold
- * accents. Supersedes both the muddy V1 warm-only palette and the interim
- * cool "Trail & Sky" tokens.
+ * Palette: a cool ice-white base + chrome/graphite neutrals, lifted by a
+ * glacier-blue → teal action gradient. Strong, premium, gradient-forward — the
+ * opposite of the retired warm-pastel "Adventure Paper & Sky" system. Included
+ * benefits read strong emerald; not-offered reads rose. Gold is reserved ONLY
+ * for the paid/premium register (boosted · featured · founding).
  *
- * Governance: TIER 1 primitives feed TIER 2 semantics. Feature code
- * references SEMANTIC tokens only. Custom property names are stable —
- * only values changed, so every existing component updates automatically
- * without touching its own CSS.
+ * Governance: TIER 1 primitives feed TIER 2 semantics. Feature code references
+ * SEMANTIC tokens only. Custom-property names are STABLE — only values changed,
+ * so re-valuing the primitives here re-colors every surface at once.
  *
- * Canon: Notion "Color Palette — Locked (Adventure Paper & Sky)".
+ * Canon: founder direction 2026-07-13 (Glacier). One premium design across all
+ * four lanes — category is a single glassy badge, never a per-card color tint.
  */
 
 :root {
@@ -19,47 +20,49 @@
   /* TIER 1 — PRIMITIVES                                             */
   /* =============================================================== */
 
-  /* Foundation — warm paper surfaces */
-  --palette-paper:        #F6F1E7;   /* page bg — warm paper                 */
-  --palette-surface:      #FFFCF5;   /* card surface — warm white            */
+  /* Foundation — cool ice surfaces */
+  --palette-paper:        #EDF2F6;   /* page bg — cool ice-white              */
+  --palette-surface:      #FFFFFF;   /* card surface — clean white            */
   --palette-white:        #FFFFFF;
-  --palette-line:         #DDE2E3;   /* border hairlines — cool chrome       */
-  --palette-ink-stroke:   #24221E;   /* flat card border — ink               */
-  --palette-ink:          #24221E;   /* primary text — ink                   */
-  --palette-ink-soft:     #4A5153;   /* secondary text — graphite            */
-  --palette-ink-muted:    #6E7679;   /* muted text — graphite tint           */
+  --palette-line:         #DCE6EC;   /* border hairlines — chrome             */
+  --palette-ink-stroke:   #16252F;   /* flat card border — cool ink           */
+  --palette-ink:          #0F1B24;   /* primary text — cool near-black        */
+  --palette-ink-soft:     #3E5460;   /* secondary text — cool graphite        */
+  --palette-ink-muted:    #6A7E8B;   /* muted text — chrome graphite          */
 
-  /* Category accents (chip bg / ink fg) */
-  --palette-farm-bg:      #E2EAD5;   --palette-farm-fg:      #466A2E;
-  --palette-maritime-bg:  #D6E7EE;   --palette-maritime-fg:  #2F667A;
-  --palette-remote-bg:    #DEE3E4;   --palette-remote-fg:    #3C4446;
-  --palette-seasonal-bg:  #F0DEC9;   --palette-seasonal-fg:  #8A532E;
-  --palette-mix-bg:       #EFE4CE;   --palette-mix-fg:       #6B5836;
+  /* Category accents (chip bg / ink fg) — one cool family; the card badge is a
+     single glassy chip, these are only for incidental lane chips + map pins. */
+  --palette-farm-bg:      #DDEFE7;   --palette-farm-fg:      #0A7D54;
+  --palette-maritime-bg:  #D8E9F3;   --palette-maritime-fg:  #1C6F86;
+  --palette-remote-bg:    #E2EBF0;   --palette-remote-fg:    #3B5566;
+  --palette-seasonal-bg:  #D6EEF1;   --palette-seasonal-fg:  #0E7A8C;
+  --palette-mix-bg:       #E4ECF0;   --palette-mix-fg:       #43586A;
 
-  /* Benefit triad (chip bg / ink fg) — HOUSING / MEALS / PAY */
-  --palette-housing-bg:   #D6E7EE;   --palette-housing-fg:   #235260;
-  --palette-meals-bg:     #D9E8DC;   --palette-meals-fg:     #2E5E44;
-  --palette-pay-bg:       #F3E4C2;   --palette-pay-fg:       #7A5A12;
+  /* Benefit triad (chip bg / ink fg) — HOUSING / MEALS included = emerald;
+     PAY = cool steel (neutral, never red). */
+  --palette-housing-bg:   #E2F5EE;   --palette-housing-fg:   #0A7D54;
+  --palette-meals-bg:     #E2F5EE;   --palette-meals-fg:     #0A7D54;
+  --palette-pay-bg:       #E7EFF4;   --palette-pay-fg:       #1C5A78;
 
   /* Status / system (chip bg / ink fg) */
-  --palette-boosted-bg:   #F3E4C2;   --palette-boosted-fg:   #7A5A12;
-  --palette-match-bg:     #D6E7EE;   --palette-match-fg:     #2F667A;
-  --palette-featured-bg:  #F0E2C0;   --palette-featured-fg:  #6E5520;
-  --palette-verified-bg:  #D9E8DC;   --palette-verified-fg:  #2E5E44;
-  --palette-founding-bg:  #F0DEC9;   --palette-founding-fg:  #8A532E;
-  --palette-success-bg:   #D9E8DC;   --palette-success-fg:   #2E5E44;
-  --palette-warning-bg:   #F3E4C2;   --palette-warning-fg:   #7A5A12;
-  --palette-error-bg:     #F3D9D2;   --palette-error-fg:     #9A3B26;
+  --palette-boosted-bg:   #F8EACB;   --palette-boosted-fg:   #7A5814;   /* gold — paid */
+  --palette-match-bg:     #DBEAF3;   --palette-match-fg:     #1C6F86;   /* glacier */
+  --palette-featured-bg:  #F6E7C6;   --palette-featured-fg:  #6E5520;   /* gold — paid */
+  --palette-verified-bg:  #E2F5EE;   --palette-verified-fg:  #0A7D54;   /* green */
+  --palette-founding-bg:  #F8EACB;   --palette-founding-fg:  #7A5814;   /* gold — paid */
+  --palette-success-bg:   #E2F5EE;   --palette-success-fg:   #0A7D54;
+  --palette-warning-bg:   #FAECD0;   --palette-warning-fg:   #8A5A12;
+  --palette-error-bg:     #FCE7EA;   --palette-error-fg:     #C2334A;   /* rose */
 
   /* =============================================================== */
   /* TIER 2 — SEMANTIC TOKENS (reference these in feature code)      */
   /* =============================================================== */
 
-  /* Warm paper — field-journal surfaces (employer cards, framed photos) */
-  --palette-parchment:   #F0EAE0;   /* warm panel background */
-  --palette-card-warm:   #FFFCF5;   /* warm card surface */
-  --palette-ink-warm:    #24221E;   /* warm ink for paper borders */
-  --palette-gold:        #D8A84E;   /* warm gold for star/sparkle marks */
+  /* Cool panels — chrome/ice surfaces (employer cards, framed photos) */
+  --palette-parchment:   #E7EFF3;   /* cool panel background */
+  --palette-card-warm:   #FFFFFF;   /* card surface (name kept for compat) */
+  --palette-ink-warm:    #16252F;   /* cool ink for card borders */
+  --palette-gold:        #D8A84E;   /* warm gold for star/sparkle + premium marks */
 
   /* surfaces / text / borders */
   --color-paper:          var(--palette-paper);
@@ -68,8 +71,6 @@
   --color-ink:            var(--palette-ink);    /* backward compat alias */
   --color-parchment:      var(--palette-parchment);
   --color-card-warm:      var(--palette-card-warm);
-  /* (--color-gold is defined once, in the semantic block below, off
-     --palette-amber; --palette-gold remains for star/sparkle marks.) */
   --border-soft:          var(--palette-line);
   --border-ink:           var(--palette-ink-stroke);
   --border-ink-warm:      var(--palette-ink-warm);
@@ -126,9 +127,7 @@
      reservation and floating bar offsets from this. */
   --size-bottom-nav: 70px;
 
-  /* z-scale — one explicit stacking order for fixed chrome. Ad-hoc z-index
-     ties (dock vs overlay vs lightbox at 70) previously resolved only by DOM
-     order; always take the layer's token instead of inventing a number.
+  /* z-scale — one explicit stacking order for fixed chrome.
        content bars < docks < banners < overlays < lightbox            */
   --z-content-bar: 50;   /* in-page fixed bars (listing apply bar)     */
   --z-dock:        70;   /* bottom navigation docks (public + role OS) */
@@ -136,20 +135,21 @@
   --z-overlay:     100;  /* modal/popup scrims (portal to body)        */
   --z-lightbox:    300;  /* full-screen media viewers                  */
 
-  /* radius */
+  /* radius — rounder in the Glacier system so things pop */
   --radius-pill:   999px;
   --radius-input:  12px;
   --radius-button: 16px;
   --radius-cell:   16px;
-  --radius-image:  16px;
+  --radius-image:  18px;
   --radius-card:   24px;
   --radius-modal:  28px;
 
-  /* elevation — borders-first stays the rule; these are *whisper* lifts only */
-  --elevation-card:    0 1px 2px rgba(36, 34, 30, 0.05), 0 2px 8px rgba(36, 34, 30, 0.05);
-  --elevation-hover:   0 6px 18px rgba(36, 34, 30, 0.10);
-  --elevation-overlay: 0 8px 24px rgba(36, 34, 30, 0.12);
-  --elevation-pin:     0 2px 6px  rgba(36, 34, 30, 0.18);
+  /* elevation — Glacier lifts are cooler + a touch deeper than borders-only,
+     so gradient cards visibly float. Still restrained, never heavy. */
+  --elevation-card:    0 1px 2px rgba(18, 40, 58, 0.06), 0 8px 22px rgba(18, 40, 58, 0.08);
+  --elevation-hover:   0 12px 30px rgba(18, 40, 58, 0.16);
+  --elevation-overlay: 0 16px 40px rgba(12, 26, 38, 0.20);
+  --elevation-pin:     0 3px 10px rgba(12, 26, 38, 0.28);
 
   /* motion */
   --motion-fast:   120ms;
@@ -191,147 +191,152 @@
   --type-label-size:   12px;  --type-label-lh:   1;
   --type-label-tracking: 0.06em;
 
+  /* Marketing display clamps — one scale for all hero/section display type so
+     the homepage + for-hosts stop rolling their own ad-hoc clamp() values. */
+  --type-display-hero:    clamp(30px, 7vw, 56px);
+  --type-display-section: clamp(24px, 4.2vw, 38px);
+
   --font-weight-regular:  400;
   --font-weight-medium:   500;
   --font-weight-semibold: 600;
   --font-weight-bold:     700;
 
   /* =============================================================== */
-  /* V2 — INTERACTIVE / CHROME TOKENS                                */
-  /* Sky blue, deep sky, pine, chrome/graphite. Header, CTAs, badges. */
+  /* V3 — INTERACTIVE / CHROME TOKENS                                */
+  /* Glacier blue, teal, ice, chrome/graphite. Header, CTAs, badges. */
   /* =============================================================== */
 
-  /* Header — deep sky */
-  --palette-header:     var(--palette-sky); /* header IS the sky — one source */
-  --palette-header-mid: #3A7287;
+  /* Header — glacier blue */
+  --palette-header:     var(--palette-sky); /* header IS the glacier blue — one source */
+  --palette-header-mid: #2A7EA0;
 
-  /* Sky blue — primary CTA, active links, interactive */
-  --palette-sky:        #2F667A;
-  --palette-sky-light:  #CFE6EF;
-  --palette-sky-dark:   #1F4858;
+  /* Glacier blue — primary CTA, active links, interactive */
+  --palette-sky:        #1E6A9E;
+  --palette-sky-light:  #D3E8F3;
+  --palette-sky-dark:   #124E6B;
 
-  /* Teal / pine — secondary CTA, housing/success tones */
-  --palette-teal:       #3F7D5A;
-  --palette-teal-light: #D9E8DC;
+  /* Teal — the warm end of the action gradient, housing/success tones */
+  --palette-teal:       #0E9488;
+  --palette-teal-light: #D7F2EC;
+
+  /* Ice — bright cool highlight */
+  --palette-ice:        #7FD4E8;
+  --palette-ice-light:  #DBF2F8;
 
   /* Silver / chrome — borders, badges, metallic accents */
-  --palette-silver:     #B9C4C6;
-  --palette-chrome:     #DDE2E3;
-  --palette-steel:      #EAEFEF;
+  --palette-silver:     #B7C6CE;
+  --palette-chrome:     #DCE6EC;
+  --palette-steel:      #EAF1F5;
 
-  /* Warm gold — highlight, premium, pay */
+  /* Warm gold — RESERVED for premium / paid (boosted · featured · founding) */
   --palette-amber:      #D8A84E;
-  --palette-amber-light:#F3E4C2;
+  --palette-amber-light:#F6E7C6;
 
   /* Semantic aliases */
   --color-header-bg:  var(--palette-header);
   --color-cta:        var(--palette-sky);
   --color-cta-text:   #FFFFFF;
   --color-action-soft: color-mix(in srgb, var(--palette-sky) 12%, var(--palette-white));
-  --color-panel-dark: #38322A;   /* warm dark charcoal panel (employer/CTA blocks) */
+  --color-panel-dark: #10222E;   /* deep cool charcoal panel (employer/CTA blocks) */
   --color-teal:       var(--palette-teal);
+  --color-ice:        var(--palette-ice);
   --color-gold:       var(--palette-amber);
-  --color-gold-text:  #24221E;
+  --color-gold-text:  #3A2600;
   --color-silver:     var(--palette-silver);
   --color-chrome:     var(--palette-chrome);
   --color-steel:      var(--palette-steel);
 
   /* =============================================================== */
-  /* GRADIENTS — intentional, palette-locked. Use these, never roll  */
-  /* one-off linear-gradients with raw hex in feature CSS.           */
+  /* GRADIENTS — the Glacier system is gradient-forward. Use these,  */
+  /* never roll a one-off linear-gradient with raw hex in feature CSS.*/
   /* =============================================================== */
   --gradient-sky:        linear-gradient(135deg, var(--palette-sky) 0%, var(--palette-teal) 100%);
+  --gradient-action:     linear-gradient(135deg, #1E6A9E 0%, #0E9488 100%);   /* primary button/CTA */
+  --gradient-action-hover: linear-gradient(135deg, #2A7EB4 0%, #12A99A 100%);
+  --gradient-ice:        linear-gradient(135deg, var(--palette-ice) 0%, var(--palette-sky) 100%);
   --gradient-sky-soft:   linear-gradient(160deg, var(--palette-sky-light) 0%, var(--palette-steel) 100%);
   --gradient-paper-warm: linear-gradient(160deg, var(--palette-parchment) 0%, var(--palette-surface) 100%);
+  --gradient-chrome:     linear-gradient(160deg, #F4F8FA 0%, #E2EBF0 100%);
   --gradient-gold:       linear-gradient(135deg, var(--palette-amber) 0%, var(--palette-amber-light) 100%);
-  /* hero photo legibility scrim — bottom-weighted ink fade */
-  --gradient-hero-scrim: linear-gradient(180deg, rgba(26, 30, 34, 0) 0%, rgba(26, 30, 34, 0.18) 45%, rgba(26, 30, 34, 0.62) 100%);
+  /* hero photo legibility scrim — bottom-weighted cool-ink fade */
+  --gradient-hero-scrim: linear-gradient(180deg, rgba(10, 22, 32, 0) 0%, rgba(10, 22, 32, 0.20) 45%, rgba(10, 22, 32, 0.66) 100%);
 
   /* =============================================================== */
-  /* CATEGORY ATMOSPHERES — one gradient per marketplace lane.        */
-  /* Apply via var(--gradient-category-<lane>) on hero / cover / rail */
-  /* surfaces so every "maritime" surface renders the SAME blue.      */
-  /* Never re-roll per-component category hex again (drift rule §6).  */
+  /* CATEGORY ATMOSPHERES — one cool glacier family per lane. Applied */
+  /* on hero / cover / photo-fallback surfaces. The CARD itself is one */
+  /* design and never tints by lane; these are photo fallbacks only.  */
   /* =============================================================== */
-  --gradient-category-maritime: linear-gradient(155deg, #072944 0%, #0E4F80 38%, #1874AC 70%, #3A96C6 100%);
-  --gradient-category-farm:     linear-gradient(155deg, #2A1608 0%, #5C3610 35%, #96601C 68%, #CC9440 100%);
-  --gradient-category-remote:   linear-gradient(155deg, #0A1422 0%, #182A40 35%, #2A4668 68%, #4268A0 100%);
-  --gradient-category-seasonal: linear-gradient(155deg, #0C1E08 0%, #204015 35%, #38701E 68%, #76B03A 100%);
-  --gradient-category-mix:      linear-gradient(155deg, #18082A 0%, #341256 38%, #64228C 70%, #A44060 100%);
-  --gradient-category-default:  linear-gradient(155deg, #1A2030 0%, #2C3E58 38%, #406080 70%, #6090B0 100%);
+  --gradient-category-maritime: linear-gradient(155deg, #062A44 0%, #0E5480 38%, #1C82B4 70%, #4FA6CE 100%);
+  --gradient-category-farm:     linear-gradient(155deg, #06251C 0%, #0E5E45 38%, #17957A 70%, #4FC4A0 100%);
+  --gradient-category-remote:   linear-gradient(155deg, #0A1622 0%, #22384F 38%, #3B6084 70%, #6A96B8 100%);
+  --gradient-category-seasonal: linear-gradient(155deg, #06232A 0%, #0E5261 38%, #1786A0 70%, #4FB8CE 100%);
+  --gradient-category-mix:      linear-gradient(155deg, #0C1E2A 0%, #1E3B52 38%, #366084 70%, #6A96B8 100%);
+  --gradient-category-default:  linear-gradient(155deg, #0C1E2A 0%, #1E4A66 38%, #2A7EA0 70%, #5AA6C6 100%);
 
-  /* LIGHT category atmospheres — the warm "field-journal" register for cards/rails
-     (DiscoveryCard, FeaturedEmployersRail). ONE source so a "farm" card and a
-     "farm" rail render the same gold. Layers: body (card fill), cover (cover/frame
-     fallback), cell (info-cell tint), accent (top border), glow (inset ambient). */
+  /* LIGHT category atmospheres — cool glacier tints for any rail/cover fallback
+     that still keys by lane. Layers: body (fill), cover (cover/frame fallback),
+     cell (info-cell tint), accent (top border), glow (inset ambient). */
   --cat-farm-body:
-    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(255, 240, 180, 0.62) 0%, transparent 52%),
-    radial-gradient(ellipse 90% 70% at 20% 95%, rgba(201, 139, 27, 0.22) 0%, transparent 65%),
-    linear-gradient(158deg, #FAF0CC 0%, #EED990 55%, #D4B84A 100%);
-  --cat-farm-cover: linear-gradient(145deg, #C4A854 0%, #E8CC80 50%, #F4DFA0 100%);
-  --cat-farm-cell: linear-gradient(180deg, rgba(250, 240, 200, 0.64) 0%, rgba(238, 215, 130, 0.48) 100%);
-  --cat-farm-accent: #C98B1B;
-  --cat-farm-glow: rgba(201, 139, 27, 0.18);
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(190, 245, 224, 0.55) 0%, transparent 52%),
+    linear-gradient(158deg, #E6F6EF 0%, #C4E9DA 55%, #9AD4BE 100%);
+  --cat-farm-cover: linear-gradient(145deg, #3FA588 0%, #7FC9B2 50%, #B0E0D0 100%);
+  --cat-farm-cell: linear-gradient(180deg, rgba(226, 245, 238, 0.7) 0%, rgba(196, 233, 218, 0.5) 100%);
+  --cat-farm-accent: #0E9488;
+  --cat-farm-glow: rgba(14, 148, 136, 0.16);
 
   --cat-maritime-body:
-    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(200, 235, 255, 0.58) 0%, transparent 52%),
-    radial-gradient(ellipse 90% 70% at 80% 95%, rgba(26, 78, 114, 0.20) 0%, transparent 65%),
-    linear-gradient(158deg, #EAF4FF 0%, #B8D8F4 55%, #88B8E0 100%);
-  --cat-maritime-cover: linear-gradient(145deg, #5C9CC8 0%, #8EC4E4 50%, #B4D8F0 100%);
-  --cat-maritime-cell: linear-gradient(180deg, rgba(234, 244, 255, 0.68) 0%, rgba(180, 210, 244, 0.52) 100%);
-  --cat-maritime-accent: #1A4E72;
-  --cat-maritime-glow: rgba(26, 78, 114, 0.16);
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(200, 232, 250, 0.58) 0%, transparent 52%),
+    linear-gradient(158deg, #E4F1FA 0%, #BCDBF0 55%, #8EBFE0 100%);
+  --cat-maritime-cover: linear-gradient(145deg, #2A7EB0 0%, #6BAAD6 50%, #A6D0EC 100%);
+  --cat-maritime-cell: linear-gradient(180deg, rgba(228, 241, 250, 0.7) 0%, rgba(188, 219, 240, 0.5) 100%);
+  --cat-maritime-accent: #1C6F86;
+  --cat-maritime-glow: rgba(28, 111, 134, 0.16);
 
   --cat-remote-body:
-    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(210, 200, 255, 0.52) 0%, transparent 52%),
-    radial-gradient(ellipse 90% 70% at 20% 95%, rgba(48, 56, 152, 0.18) 0%, transparent 65%),
-    linear-gradient(158deg, #F0EAFF 0%, #C8B8F4 55%, #A090D8 100%);
-  --cat-remote-cover: linear-gradient(145deg, #7870B8 0%, #A898D8 50%, #C8C0EC 100%);
-  --cat-remote-cell: linear-gradient(180deg, rgba(240, 234, 255, 0.66) 0%, rgba(196, 180, 244, 0.50) 100%);
-  --cat-remote-accent: #303898;
-  --cat-remote-glow: rgba(48, 56, 152, 0.15);
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(210, 224, 236, 0.55) 0%, transparent 52%),
+    linear-gradient(158deg, #EAF0F5 0%, #CBDAE6 55%, #A6BCCE 100%);
+  --cat-remote-cover: linear-gradient(145deg, #46617A 0%, #7C97AE 50%, #B0C4D4 100%);
+  --cat-remote-cell: linear-gradient(180deg, rgba(234, 240, 245, 0.7) 0%, rgba(203, 218, 230, 0.5) 100%);
+  --cat-remote-accent: #3B5566;
+  --cat-remote-glow: rgba(59, 85, 102, 0.14);
 
   --cat-seasonal-body:
-    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(190, 248, 210, 0.55) 0%, transparent 52%),
-    radial-gradient(ellipse 90% 70% at 20% 95%, rgba(26, 94, 56, 0.18) 0%, transparent 65%),
-    linear-gradient(158deg, #EAFAE0 0%, #B8DCA0 55%, #84BC68 100%);
-  --cat-seasonal-cover: linear-gradient(145deg, #5A9C60 0%, #8CC480 50%, #B0D898 100%);
-  --cat-seasonal-cell: linear-gradient(180deg, rgba(234, 250, 224, 0.66) 0%, rgba(180, 220, 152, 0.50) 100%);
-  --cat-seasonal-accent: #1A5E38;
-  --cat-seasonal-glow: rgba(26, 94, 56, 0.16);
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(190, 240, 246, 0.55) 0%, transparent 52%),
+    linear-gradient(158deg, #E2F5F8 0%, #BCE6EC 55%, #8ED2DC 100%);
+  --cat-seasonal-cover: linear-gradient(145deg, #1786A0 0%, #5FB6C6 50%, #A4DCE4 100%);
+  --cat-seasonal-cell: linear-gradient(180deg, rgba(226, 245, 248, 0.7) 0%, rgba(188, 230, 236, 0.5) 100%);
+  --cat-seasonal-accent: #0E7A8C;
+  --cat-seasonal-glow: rgba(14, 122, 140, 0.16);
 
   --cat-mix-body:
-    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(248, 244, 238, 0.58) 0%, transparent 52%),
-    radial-gradient(ellipse 90% 70% at 20% 95%, rgba(42, 62, 106, 0.14) 0%, transparent 65%),
-    linear-gradient(158deg, #F5ECD8 0%, #D8C4A4 55%, #BCA880 100%);
-  --cat-mix-cover: linear-gradient(145deg, #A890A0 0%, #C8B0B8 50%, #DED0C8 100%);
-  --cat-mix-cell: linear-gradient(180deg, rgba(245, 236, 215, 0.64) 0%, rgba(214, 193, 155, 0.48) 100%);
-  --cat-mix-accent: #2A3E6A;
-  --cat-mix-glow: rgba(42, 62, 106, 0.13);
+    radial-gradient(ellipse 180% 60% at 50% -5%, rgba(210, 226, 238, 0.55) 0%, transparent 52%),
+    linear-gradient(158deg, #E8EEF4 0%, #C8D8E4 55%, #A2BACE 100%);
+  --cat-mix-cover: linear-gradient(145deg, #3E607E 0%, #7C99B2 50%, #B0C6D6 100%);
+  --cat-mix-cell: linear-gradient(180deg, rgba(232, 238, 244, 0.7) 0%, rgba(200, 216, 228, 0.5) 100%);
+  --cat-mix-accent: #43586A;
+  --cat-mix-glow: rgba(67, 88, 106, 0.13);
 
   /* Cover-theme presets — user-selectable hero backgrounds beyond the lanes */
-  --gradient-cover-wilderness:  linear-gradient(160deg, #1A1E0E 0%, #2D3A1A 50%, #5A6B3D 100%);
-  --gradient-cover-coastal:     linear-gradient(160deg, #1A3850 0%, #2A7090 50%, #60B8C8 100%);
-  --gradient-cover-mountain:    linear-gradient(160deg, #2A3040 0%, #4A5870 50%, #A0B8D0 100%);
-  --gradient-cover-adventure:   linear-gradient(160deg, #2A1A08 0%, #7A3A1A 50%, #E06030 100%);
-  --gradient-cover-sunset:      linear-gradient(160deg, #3A1A2A 0%, #8A3A5A 50%, #E88060 100%);
+  --gradient-cover-wilderness:  linear-gradient(160deg, #06231C 0%, #0E5E45 50%, #3FA588 100%);
+  --gradient-cover-coastal:     linear-gradient(160deg, #062A44 0%, #1C82B4 50%, #6BC4D6 100%);
+  --gradient-cover-mountain:    linear-gradient(160deg, #0A1622 0%, #3B6084 50%, #A6C4DC 100%);
+  --gradient-cover-adventure:   linear-gradient(160deg, #062A44 0%, #0E7A8C 50%, #4FC4A0 100%);
+  --gradient-cover-sunset:      linear-gradient(160deg, #0C1E2A 0%, #1E6A9E 50%, #7FD4E8 100%);
 
   /* =============================================================== */
-  /* LIFECYCLE / READINESS STATE — ready (available/can-apply/        */
-  /* accepted · pine) · soon (pending/1–3mo · amber) · later (6mo ·   */
-  /* clay) · urgent (expiring · warm red). Single source for the      */
-  /* status colors duplicated across hero/profile/pipeline/readiness. */
+  /* LIFECYCLE / READINESS STATE — ready (available/accepted · green) */
+  /* · soon (pending · gold) · later (6mo · slate) · urgent (rose).   */
   /* =============================================================== */
-  --state-ready-fg:   #2D7A3A;  --state-ready-bg:  var(--palette-teal-light);
-  --state-soon-fg:    #B07C0A;  --state-soon-bg:   var(--palette-amber-light);
-  --state-later-fg:   #6A5035;  --state-later-bg:  var(--palette-seasonal-bg);
+  --state-ready-fg:   #0A7D54;  --state-ready-bg:  var(--palette-teal-light);
+  --state-soon-fg:    #8A5A12;  --state-soon-bg:   var(--palette-amber-light);
+  --state-later-fg:   #3B5566;  --state-later-bg:  var(--palette-remote-bg);
   --state-urgent-fg:  var(--status-error-fg);  --state-urgent-bg: var(--status-error-bg);
-  --state-live-dot:   #4ADE80;  /* pulsing "live / now" indicator */
+  --state-live-dot:   #22D3AA;  /* pulsing "live / now" indicator */
 
-  --gradient-state-ready: linear-gradient(135deg, #1E8A50 0%, #2CAE6A 100%);
+  --gradient-state-ready: linear-gradient(135deg, #0A7D54 0%, #12A98A 100%);
   --gradient-state-soon:  linear-gradient(135deg, #9A6A08 0%, #C48A14 100%);
-  --gradient-state-later: linear-gradient(135deg, #5A4028 0%, #806248 100%);
-  --gradient-progress:    linear-gradient(135deg, var(--palette-sky) 0%, #5AA0BF 100%);
+  --gradient-state-later: linear-gradient(135deg, #2A4050 0%, #48627A 100%);
+  --gradient-progress:    linear-gradient(135deg, var(--palette-sky) 0%, var(--palette-teal) 100%);
 
   /* =============================================================== */
   /* FORM FIELDS — single source of truth for inputs/textareas/etc.  */
