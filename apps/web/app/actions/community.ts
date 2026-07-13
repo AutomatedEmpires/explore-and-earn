@@ -40,6 +40,7 @@ const COMMUNITY_PHOTOS_BUCKET = "community-photos";
 
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/webp", "image/png"]);
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_INPUT_PIXELS = 40_000_000;
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
@@ -89,7 +90,9 @@ export async function uploadCommunityPhotoAction(fd: FormData): Promise<UploadPh
     // Re-encode every upload. Sharp strips EXIF/GPS and other source metadata by
     // default; rotate() applies orientation before that metadata is discarded.
     const { default: sharp } = await import("sharp");
-    const sanitized = await sharp(Buffer.from(await file.arrayBuffer()))
+    const sanitized = await sharp(Buffer.from(await file.arrayBuffer()), {
+      limitInputPixels: MAX_INPUT_PIXELS,
+    })
       .rotate()
       .resize({ width: 2400, height: 2400, fit: "inside", withoutEnlargement: true })
       .webp({ quality: 86 })
@@ -159,8 +162,8 @@ export async function deleteCommunityPhotoAction(photoId: string): Promise<Delet
   const storagePath = await getOwnedPhotoPath(identity.seekerProfileId, photoId);
   if (!storagePath) return { ok: false, reason: "not_found" };
 
-  await deleteCommunityPhoto(photoId);
   await deleteStorageObject(session.token, COMMUNITY_PHOTOS_BUCKET, storagePath);
+  await deleteCommunityPhoto(photoId);
 
   revalidatePath(COMMUNITY_PATH);
   return { ok: true };
