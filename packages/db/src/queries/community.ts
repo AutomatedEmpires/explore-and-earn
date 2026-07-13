@@ -236,7 +236,6 @@ export async function insertCommunityPhotoReport(
     reporter_clerk_user_id: input.reporterClerkUserId,
     reason: input.reason,
     detail: input.detail?.trim().slice(0, 500) || null,
-    status: "submitted",
   });
 
   // Duplicate reports are already persisted; treat a retry as success.
