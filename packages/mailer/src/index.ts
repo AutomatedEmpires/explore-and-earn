@@ -11,13 +11,17 @@
  * cross-process or cross-restart replays (acceptable for MVP single-instance).
  *
  * Env:
- *   RESEND_API_KEY        — required to send; omit for local dev (logs to console)
- *   RESEND_FROM_EMAIL     — optional From header override
- *   RESEND_REPLY_TO_EMAIL — optional Reply-To address
+ *   RESEND_API_KEY          — required to send; omit for local dev (logs to console)
+ *   RESEND_FROM             — canonical From header override
+ *   RESEND_FROM_EMAIL       — legacy From header fallback
+ *   RESEND_REPLY_TO         — canonical Reply-To address
+ *   RESEND_REPLY_TO_EMAIL   — legacy Reply-To fallback
+ *   SUPPORT_EMAIL           — support-address Reply-To fallback
  */
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
-const DEFAULT_FROM = "Explore & Earn <notifications@exploreandearn.com>";
+const DEFAULT_FROM = "Explore&Earn <notifications@exploreandearn.com>";
+const DEFAULT_REPLY_TO = "support@exploreandearn.com";
 const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /** In-process dedup store: idempotencyKey → timestamp of last successful send. */
@@ -30,7 +34,7 @@ export function _resetDedup(): void {
 
 export interface SendMailOptions {
   readonly to: string;
-  /** Defaults to DEFAULT_FROM / RESEND_FROM_EMAIL env var. */
+  /** Precedence: explicit value, RESEND_FROM, RESEND_FROM_EMAIL, brand default. */
   readonly from?: string;
   readonly subject: string;
   readonly html: string;
@@ -49,12 +53,24 @@ export interface SendMailResult {
   readonly isDuplicate?: boolean;
 }
 
+function firstNonBlank(...values: Array<string | undefined>): string | undefined {
+  return values.map((value) => value?.trim()).find(Boolean);
+}
+
 function resolveFrom(override?: string): string {
-  const fromEnv = process.env.RESEND_FROM_EMAIL;
-  return (
-    override ??
-    (fromEnv && fromEnv.trim().length > 0 ? fromEnv : DEFAULT_FROM)
-  );
+  return firstNonBlank(
+    override,
+    process.env.RESEND_FROM,
+    process.env.RESEND_FROM_EMAIL,
+  ) ?? DEFAULT_FROM;
+}
+
+function resolveReplyTo(): string {
+  return firstNonBlank(
+    process.env.RESEND_REPLY_TO,
+    process.env.RESEND_REPLY_TO_EMAIL,
+    process.env.SUPPORT_EMAIL,
+  ) ?? DEFAULT_REPLY_TO;
 }
 
 /**
@@ -113,7 +129,6 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
   }
 
   try {
-    const replyTo = process.env.RESEND_REPLY_TO_EMAIL?.trim();
     const response = await fetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: {
@@ -125,7 +140,7 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
         to: [to],
         subject,
         html,
-        ...(replyTo ? { reply_to: replyTo } : {}),
+        reply_to: resolveReplyTo(),
       }),
     });
 
