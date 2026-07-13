@@ -399,7 +399,3 @@ export async function removeCommentAction(commentId: string): Promise<RemoveComm
     return { ok: false, reason: "remove_failed" };
   }
 }
-
-// Re-export types for use in components
-export type { AnnouncementKind };
-export { ANNOUNCEMENT_PRICE_CENTS };

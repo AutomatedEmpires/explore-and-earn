@@ -252,22 +252,30 @@ export default async function SeekPage({
 
 	const showPagination = page > 1 || hasNextPage;
 
-	// Dashboard data — only fetched when signed in
+	// Dashboard data — only fetched when signed in. If the seeker-status fetch
+	// fails (transient DB fault, or the dev bench's sentinel token locally),
+	// degrade to the public discovery view instead of 500ing the whole page —
+	// discovery must never dead-end on a personalization fault.
 	let dashboardProps = null;
 	let savedSearchViews: { id: string; label: string; href: string }[] = [];
-	if (userId && token) {
+	seekerDashboard: if (userId && token) {
 		const clerkUser = await currentUser();
 		const fallbackName =
 			clerkUser?.firstName
 				? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
 				: "Seeker";
 
-		const [status, matchedListings, profile, savedSearches] = await Promise.all([
-			getSeekerStatus(token, userId, fallbackName),
-			getMatchedListings(token, userId),
-			cachedSeekerProfile(token, userId),
-			getSavedSearches(token, userId).catch(() => []),
-		]);
+		let status, matchedListings, profile, savedSearches;
+		try {
+			[status, matchedListings, profile, savedSearches] = await Promise.all([
+				getSeekerStatus(token, userId, fallbackName),
+				getMatchedListings(token, userId),
+				cachedSeekerProfile(token, userId),
+				getSavedSearches(token, userId).catch(() => []),
+			]);
+		} catch {
+			break seekerDashboard;
+		}
 
 		// Per saved search, count live listings published AFTER it was saved that
 		// still match its filters — the "N new" alert the seeker sees on return.
