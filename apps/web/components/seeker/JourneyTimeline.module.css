@@ -1,93 +1,202 @@
 .timeline {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-16);
-	margin: 0;
-	padding: 0;
-	list-style: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
+/* Each stop owns its category accent; nodes + trail segment read that colour. */
 .stop {
-	position: relative;
-	display: flex;
-	gap: var(--space-12);
-	padding-bottom: var(--space-16);
+  --node-accent: var(--color-cta);
+  position: relative;
+  display: flex;
+  gap: var(--space-14);
+  padding-bottom: var(--space-24);
 }
 
+.stop[data-category="farm"]     { --node-accent: var(--cat-farm-accent); }
+.stop[data-category="maritime"] { --node-accent: var(--cat-maritime-accent); }
+.stop[data-category="remote"]   { --node-accent: var(--cat-remote-accent); }
+.stop[data-category="seasonal"] { --node-accent: var(--cat-seasonal-accent); }
+.stop[data-category="mix"]      { --node-accent: var(--cat-mix-accent); }
+
+/* ─── The connecting spine — a warm hairline down the node column ─── */
 .stop::before {
-	content: "";
-	position: absolute;
-	top: var(--icon-md);
-	bottom: 0;
-	left: calc(var(--icon-chip-compact) / 2);
-	width: 1px;
-	background: var(--border-soft);
+  content: "";
+  position: absolute;
+  top: calc(var(--icon-chip) / 2);
+  bottom: 0;
+  left: calc(var(--icon-chip) / 2 - 1px);
+  width: 2px;
+  background: var(--border-soft);
 }
 
 .stop:last-child {
-	padding-bottom: 0;
+  padding-bottom: 0;
 }
 
 .stop:last-child::before {
-	display: none;
+  display: none;
+}
+
+/* A completed leg reads like walked trail — tinted with its own lane accent. */
+.completed::before {
+  background: color-mix(in srgb, var(--node-accent) 50%, var(--border-soft));
+}
+
+/* ─── Node column ─── */
+.rail {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  width: var(--icon-chip);
 }
 
 .marker {
-	position: relative;
-	z-index: 1;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-	width: var(--icon-chip-compact);
-	height: var(--icon-chip-compact);
-	border: 1px solid var(--border-soft);
-	border-radius: var(--radius-pill);
-	background: var(--color-surface-raised);
-	color: var(--text-secondary);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-chip);
+  height: var(--icon-chip);
+  border: 2px solid var(--node-accent);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--node-accent);
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 
+/* Completed — a solid, "stamped" node filled with a wash of its lane accent. */
+.completed .marker {
+  background: color-mix(in srgb, var(--node-accent) 16%, var(--color-surface-raised));
+}
+
+/* Upcoming — a hollow, dashed node in a quieter accent: clearly "not yet". */
+.upcoming .marker {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--node-accent) 45%, var(--border-soft));
+  background: var(--color-surface);
+  color: color-mix(in srgb, var(--node-accent) 72%, var(--text-muted));
+}
+
+/* In progress — the one dominant "you are here" node: larger, thicker border,
+   a deeper accent wash, and a bordered accent ring around it. Borders-first. */
+.inProgress .marker {
+  width: 46px;
+  height: 46px;
+  border-width: 3px;
+  background: color-mix(in srgb, var(--node-accent) 22%, var(--color-surface-raised));
+}
+
+.inProgress .marker::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: var(--radius-pill);
+  border: 2px solid color-mix(in srgb, var(--node-accent) 55%, transparent);
+}
+
+/* Live "now" pip on the current node (opacity pulse only). */
+.live {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-pill);
+  background: var(--state-live-dot);
+  border: 2px solid var(--color-surface-raised);
+}
+
+/* ─── Text column ─── */
 .content {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-8);
-	flex: 1;
-	min-width: 0;
-	padding-bottom: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  flex: 1;
+  min-width: 0;
+  padding-top: var(--space-2);
 }
 
 .head {
-	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: var(--space-12);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
 }
 
 .text {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-2);
-	min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.hereTag {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-bold);
+  color: var(--node-accent);
 }
 
 .title {
-	font-family: var(--font-display);
-	font-size: var(--type-card-size);
-	line-height: var(--type-card-lh);
-	color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
 }
 
 .meta {
-	font-family: var(--font-ui);
-	font-size: var(--type-meta-size);
-	line-height: var(--type-meta-lh);
-	color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
 }
 
 .summary {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-meta-size);
-	line-height: var(--type-meta-lh);
-	color: var(--text-secondary);
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ─── Motion — transform/opacity only, hard reduced-motion gate ─── */
+@keyframes trail-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stop {
+    animation: trail-rise var(--motion-base) var(--ease-standard) both;
+    animation-delay: calc(min(var(--i, 0), 6) * 45ms);
+  }
+
+  .live {
+    animation: live-pulse 2s var(--ease-standard) infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker {
+    transition: none;
+  }
 }
