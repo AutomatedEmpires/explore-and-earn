@@ -137,15 +137,27 @@ const FEED_TYPE_RHYTHM: readonly FeedSlotType[] = [
   "seeker",
 ];
 
+/** Feed regulation: the two promotional streams that would otherwise dominate —
+ *  host announcements and job-share (listing) cards — are density-capped so the
+ *  feed reads as a communal wall, never an ad board. In the main ranking pass a
+ *  card of one of these types is only eligible once enough ORGANIC posts (seeker
+ *  photos + E&E field guides) precede it: at most one of each per N organic posts.
+ *  A fallback still emits everything if promotional content is all that remains,
+ *  so real content is never dropped — the cap shapes ordering, not inclusion. */
+const ORGANIC_PER_ANNOUNCEMENT = 3;
+const ORGANIC_PER_LISTING = 3;
+
 // ─── Tab navigation ───────────────────────────────────────────────────────────
 
+// Order is founder-locked: Photos | Feed | Announcements (L→R). COMMUNITY_TABS
+// (render order) and TAB_ORDER (arrow-key index math) must stay in lockstep.
 const COMMUNITY_TABS = [
-  { id: "feed" as const, label: "Feed", icon: "nav.feed" as const },
   { id: "photos" as const, label: "Photos", icon: "nav.photos" as const },
+  { id: "feed" as const, label: "Feed", icon: "nav.feed" as const },
   { id: "announcements" as const, label: "Announcements", icon: "nav.announcements" as const },
 ] as const;
 
-const TAB_ORDER: readonly CommunityTab[] = ["feed", "photos", "announcements"];
+const TAB_ORDER: readonly CommunityTab[] = ["photos", "feed", "announcements"];
 
 /**
  * True ARIA tablist: role=tablist/tab with roving tabindex, arrow-key + Home/End
@@ -281,10 +293,15 @@ function buildEditorialFeedCards(): EditorialCard[] {
 /**
  * Ranked, communal interleaver. Inputs are REAL content buckets (seeker photos,
  * host announcements, boosted listings, featured employers). It favours the
- * preferred rhythm + recency, but enforces the anti-spam invariant: never more
- * than two of the same content type in a row. Buckets are consumed front-to-back
- * (callers pre-sort seeker/announcement buckets newest-first), so recency is
- * preserved within a type while variety is preserved across types.
+ * preferred rhythm + recency, but enforces two anti-saturation invariants:
+ *   1. never more than two of the same content type in a row, and
+ *   2. the promotional streams (announcements + job-share listings) are
+ *      density-capped to at most one per N organic posts (see the constants
+ *      above), so the feed can't be flooded by hosts or job cards.
+ * Buckets are consumed front-to-back (callers pre-sort seeker/announcement
+ * buckets newest-first), so recency is preserved within a type while variety is
+ * preserved across types. A final fallback still emits any remaining promotional
+ * content so nothing real is ever dropped — the cap only shapes ordering.
  */
 function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[] {
   const queues: Record<FeedSlotType, FeedItem[]> = {
@@ -309,13 +326,34 @@ function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[
     return run;
   };
 
+  // Density regulation — count what's been emitted so far. "Organic" = genuine
+  // communal content (seeker photos + field guides); the promotional streams are
+  // metered against it so they never outpace the community.
+  const emitted: Record<FeedSlotType, number> = {
+    seeker: 0, announcement: 0, listing: 0, employer: 0, editorial: 0,
+  };
+  const organicEmitted = () => emitted.seeker + emitted.editorial;
+  const densityCap: Record<string, number> = {
+    announcement: ORGANIC_PER_ANNOUNCEMENT,
+    listing: ORGANIC_PER_LISTING,
+  };
+  // A regulated type is within budget when the count already placed is below the
+  // per-organic allowance. Non-regulated types (seeker/editorial/employer) always
+  // pass. Leads with organic content: with 0 organic emitted, the allowance is 0.
+  const withinDensity = (type: FeedSlotType): boolean => {
+    const per = densityCap[type];
+    if (per === undefined) return true;
+    return emitted[type] < Math.ceil(organicEmitted() / per);
+  };
+
   // Try the preferred rhythm first; on each step pick the best eligible type.
   let rhythmIdx = 0;
   while (remaining() > 0) {
     const preferred = FEED_TYPE_RHYTHM[rhythmIdx % FEED_TYPE_RHYTHM.length]!;
     rhythmIdx++;
 
-    // Eligible = has supply AND wouldn't create a 3-in-a-row of its type.
+    // Eligible = has supply, wouldn't create a 3-in-a-row, AND is within its
+    // promotional-density budget.
     const order: FeedSlotType[] = [
       preferred,
       "seeker", "announcement", "listing", "employer", "editorial",
@@ -324,18 +362,23 @@ function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[
     for (const type of order) {
       if (queues[type].length === 0) continue;
       if (runOf(type) >= 2) continue;
+      if (!withinDensity(type)) continue;
       chosen = type;
       break;
     }
-    // Fallback: nothing satisfies the anti-spam rule (e.g. only one type left) —
-    // take whatever remains so we never drop real content.
+    // Fallback: nothing satisfies the density/anti-spam rules (e.g. only
+    // promotional content is left, or it's all one type) — relax the density cap
+    // but keep the run rule where possible, then take whatever remains, so we
+    // never drop real content.
     if (!chosen) {
       chosen =
+        order.find(t => queues[t].length > 0 && runOf(t) < 2) ??
         (["seeker", "announcement", "listing", "employer", "editorial"] as FeedSlotType[])
           .find(t => queues[t].length > 0) ?? null;
     }
     if (!chosen) break;
     result.push(queues[chosen].shift()!);
+    emitted[chosen]++;
   }
 
   return result;
@@ -837,6 +880,28 @@ function SeekerAnnouncementsIntro() {
         <p className={styles.annIntroSub}>
           Seasonal openings, housing updates, and hiring calls — posted by hosts, read free by every
           seeker. Built by seekers, for seekers.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Hosts on the Photos surface (read-only) ──────────────────────────────────
+
+/** Photos are a seekers-only space. Hosts can browse the wall but never get the
+ *  upload affordance here — their broadcast channel is Announcements. This is a
+ *  presentation gate; the real upload authorization lives in the server action. */
+function HostPhotosNotice() {
+  return (
+    <div className={styles.annIntro}>
+      <span className={styles.annIntroIcon} aria-hidden>
+        <Icon name="nav.photos" size={24} aria-hidden />
+      </span>
+      <div className={styles.annIntroText}>
+        <p className={styles.annIntroTitle}>The photo wall is a seekers-only space</p>
+        <p className={styles.annIntroSub}>
+          Seekers share moments from the field here. As a host, you can browse every photo —
+          to reach the community, post an update from the Announcements tab.
         </p>
       </div>
     </div>
@@ -1508,7 +1573,9 @@ export function CommunityDashboard({
           <div {...panelProps("feed")} className={styles.tabPanel}>
             {activeTab === "feed" ? (
               <>
-                <ShareComposer seekerInitial={seekerInitial} />
+                {/* Photo-sharing is seekers-only, so the "share a photo" composer
+                    CTA is hidden from hosts (their channel is Announcements). */}
+                {!isHost ? <ShareComposer seekerInitial={seekerInitial} /> : null}
                 {visibleFeed.length === 0 ? (
                   <CommunityEmptyState
                     icon="nav.feed"
@@ -1554,11 +1621,18 @@ export function CommunityDashboard({
           <div {...panelProps("photos")} className={styles.tabPanel}>
             {activeTab === "photos" ? (
               <>
-                <PhotoUploadForm
-                  completionScore={completionScore}
-                  onSuccess={() => { router.refresh(); }}
-                  onToast={addToast}
-                />
+                {/* GATE: photos are seekers-only. Hosts get a read-only notice
+                    (never the uploader); the uploader's own completion gate and
+                    the server action guard the seeker path. */}
+                {isHost ? (
+                  <HostPhotosNotice />
+                ) : (
+                  <PhotoUploadForm
+                    completionScore={completionScore}
+                    onSuccess={() => { router.refresh(); }}
+                    onToast={addToast}
+                  />
+                )}
                 <PhotoMasonryGrid photos={photoItems} />
               </>
             ) : null}
@@ -1568,6 +1642,10 @@ export function CommunityDashboard({
           <div {...panelProps("announcements")} className={styles.tabPanel}>
             {activeTab === "announcements" ? (
               <>
+                {/* GATE: posting is host-only (hosts + admin/E&E). Seekers can read
+                    every announcement but never see a compose affordance — they get
+                    the read-only intro. The composer + server action enforce the
+                    real authorization; this only decides which affordance shows. */}
                 {isHost ? (
                   <HostAnnouncementComposer
                     subscriptionTier={hostTier}

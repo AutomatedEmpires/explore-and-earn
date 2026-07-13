@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getFeedPhotos, getPhotoReactionsBatch, getSeekerCompletionScore } from "@explore-and-earn/db";
+import { getFeedPhotos, getHostTierAndProfile, getPhotoReactionsBatch, getSeekerCompletionScore } from "@explore-and-earn/db";
 
 import {
 	CommunityDashboard,
@@ -29,10 +29,14 @@ export default async function CommunityPhotosPage() {
 	const user = userId ? await currentUser() : null;
 	const fallbackName = user?.firstName ?? null;
 
-	const [status, matchedListings, seekerIdentity] = await Promise.all([
+	// hostIdentity is fetched only to gate the presentation: photos are a
+	// seekers-only surface, so a host who lands here directly sees a read-only
+	// notice instead of the uploader. Uses the existing host-lookup contract.
+	const [status, matchedListings, seekerIdentity, hostIdentity] = await Promise.all([
 		getSeekerStatus(token, userId, fallbackName),
 		getMatchedListings(token, userId),
 		token && userId ? getSeekerCompletionScore(token, userId).catch(() => null) : Promise.resolve(null),
+		token && userId ? getHostTierAndProfile(token, userId).catch(() => null) : Promise.resolve(null),
 	]);
 
 	const featuredEmployers = buildFeaturedEmployers(matchedListings);
@@ -56,6 +60,7 @@ export default async function CommunityPhotosPage() {
 			featuredEmployers={featuredEmployers}
 			serverPhotos={serverPhotos}
 			completionScore={status.resumeCompletion}
+			isHost={Boolean(hostIdentity)}
 			currentSeekerProfileId={seekerIdentity?.seekerProfileId ?? null}
 		/>
 	);

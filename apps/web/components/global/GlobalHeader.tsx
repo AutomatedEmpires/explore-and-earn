@@ -128,6 +128,15 @@ export function GlobalHeader({
         {/* ── Col 2: nav — community tabs or explore/community links ───── */}
         {onCommunity ? (
           <nav className={styles.communityTabs} aria-label="Community sections">
+            {/* Order is founder-locked: Photos | Feed | Announcements (L→R). */}
+            <Link
+              className={`${styles.communityTab}${communityTab === "photos" ? ` ${styles.communityTabActive}` : ""}`}
+              href="/community/photos"
+              aria-current={communityTab === "photos" ? "page" : undefined}
+            >
+              <Icon name="nav.photos" size={16} aria-hidden />
+              Photos
+            </Link>
             <Link
               className={`${styles.communityTab}${communityTab === "feed" ? ` ${styles.communityTabActive}` : ""}`}
               href="/community"
@@ -141,14 +150,6 @@ export function GlobalHeader({
                   aria-label={`${unreadCommunity} unread`}
                 />
               ) : null}
-            </Link>
-            <Link
-              className={`${styles.communityTab}${communityTab === "photos" ? ` ${styles.communityTabActive}` : ""}`}
-              href="/community/photos"
-              aria-current={communityTab === "photos" ? "page" : undefined}
-            >
-              <Icon name="nav.photos" size={16} aria-hidden />
-              Photos
             </Link>
             <Link
               className={`${styles.communityTab}${communityTab === "announcements" ? ` ${styles.communityTabActive}` : ""}`}
