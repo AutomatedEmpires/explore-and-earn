@@ -37,21 +37,6 @@ function initials(name: string): string {
 }
 
 /**
- * Deterministic, presentation-only sparkline shape for a stage tile. This is
- * NOT analytics or a trend computation — it derives a stable bar profile from
- * the real per-stage count so the data viz reflects the actual pipeline shape
- * (a fuller stage reads taller) without ever fabricating history. Pure.
- */
-function stageSpark(count: number, total: number): readonly number[] {
-  const peak = total === 0 ? 18 : Math.max(18, Math.round((count / total) * 100));
-  const base = Math.max(10, Math.round(peak * 0.34));
-  // A gentle rising ramp toward the stage's share of the pipeline.
-  return [0.32, 0.5, 0.42, 0.64, 0.58, 0.82, 1].map((f) =>
-    Math.max(8, Math.round(base + (peak - base) * f)),
-  );
-}
-
-/**
  * Presentation-only "profile signal" for the recommended-seekers rail. This is
  * deliberately NOT a matching/scoring algorithm (match isolation is founder-
  * gated and guardrail-enforced): it reads how complete the HOUSING/MEALS/PAY
@@ -188,28 +173,24 @@ export default async function HostApplicantsPage({
               value={counts.new}
               trend="Review"
               trendTone="neutral"
-              spark={stageSpark(counts.new, total)}
             />
             <MetricCard
               label={APPLICANT_STAGE_LABEL.reviewing}
               value={counts.reviewing}
               trend="In flight"
               trendTone="neutral"
-              spark={stageSpark(counts.reviewing, total)}
             />
             <MetricCard
               label={APPLICANT_STAGE_LABEL.offered}
               value={counts.offered}
               trend={counts.offered > 0 ? "Open" : "—"}
               trendTone={counts.offered > 0 ? "up" : "down"}
-              spark={stageSpark(counts.offered, total)}
             />
             <MetricCard
               label="In pipeline"
               value={total}
               trend="Active"
               trendTone="up"
-              spark={stageSpark(total, total)}
             />
           </MetricGrid>
 

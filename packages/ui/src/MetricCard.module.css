@@ -51,8 +51,8 @@
 }
 
 .trendUp {
-  background: color-mix(in srgb, var(--status-success-fg, #36f49c) 18%, transparent);
-  color: var(--status-success-fg, #36f49c);
+  background: color-mix(in srgb, var(--status-success-fg) 18%, transparent);
+  color: var(--status-success-fg);
 }
 
 .trendDown {
