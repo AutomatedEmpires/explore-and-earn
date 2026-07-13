@@ -57,6 +57,9 @@ export function GlobalHeader({
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
   const prevY = useRef(0);
+  // Logged-out sign-in chooser (I'm a seeker · I'm a host · New here).
+  const [authMenuOpen, setAuthMenuOpen] = useState(false);
+  const authMenuRef = useRef<HTMLDivElement>(null);
 
   // Smart hide-on-scroll: disappears when scrolling down past header height,
   // reappears the moment the user scrolls back up.
@@ -80,6 +83,30 @@ export function GlobalHeader({
       cancelAnimationFrame(rafId);
     };
   }, []);
+
+  // Close the auth chooser on navigation.
+  useEffect(() => {
+    setAuthMenuOpen(false);
+  }, [pathname]);
+
+  // Dismiss the auth chooser on outside click or Escape while it's open.
+  useEffect(() => {
+    if (!authMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (authMenuRef.current && !authMenuRef.current.contains(event.target as Node)) {
+        setAuthMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAuthMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [authMenuOpen]);
 
   const isImmersive = IMMERSIVE_ROUTES.some(
     (r) => pathname === r || pathname.startsWith(`${r}/`),
@@ -205,7 +232,50 @@ export function GlobalHeader({
               </Link>
             </>
           ) : (
-            <Link className={styles.signInBtn} href="/sign-in">Sign in</Link>
+            <div className={styles.authMenuWrap} ref={authMenuRef}>
+              <button
+                type="button"
+                className={styles.signInBtn}
+                aria-haspopup="menu"
+                aria-expanded={authMenuOpen}
+                onClick={() => setAuthMenuOpen((open) => !open)}
+              >
+                Sign in
+                <Icon name="action.more" size={16} aria-hidden />
+              </button>
+              {authMenuOpen ? (
+                <div className={styles.authMenu} role="menu" aria-label="Sign in options">
+                  <p className={styles.authMenuLabel}>Choose your path</p>
+                  <Link className={styles.authMenuItem} role="menuitem" href="/sign-in?role=seeker">
+                    <span className={styles.authMenuIcon}>
+                      <Icon name="nav.seek" size={18} aria-hidden />
+                    </span>
+                    <span className={styles.authMenuText}>
+                      <span className={styles.authMenuItemTitle}>I&rsquo;m a seeker</span>
+                      <span className={styles.authMenuItemSub}>Find work — free forever</span>
+                    </span>
+                    <Icon name="action.forward" size={14} aria-hidden />
+                  </Link>
+                  <Link className={styles.authMenuItem} role="menuitem" href="/sign-in?role=host">
+                    <span className={styles.authMenuIcon}>
+                      <Icon name="nav.host" size={18} aria-hidden />
+                    </span>
+                    <span className={styles.authMenuText}>
+                      <span className={styles.authMenuItemTitle}>I&rsquo;m a host</span>
+                      <span className={styles.authMenuItemSub}>List your place &amp; hire</span>
+                    </span>
+                    <Icon name="action.forward" size={14} aria-hidden />
+                  </Link>
+                  <span className={styles.authMenuDivider} aria-hidden />
+                  <Link className={styles.authMenuGhost} role="menuitem" href="/sign-up">
+                    New here? Create an account
+                  </Link>
+                  <Link className={styles.authMenuAdmin} role="menuitem" href="/sign-in?role=admin">
+                    Become an admin
+                  </Link>
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
       </div>
