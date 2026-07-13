@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { getFeedPhotos, getPhotoReactionsBatch } from "@explore-and-earn/db";
+import { getFeedPhotos, getPhotoReactionsBatch, getSeekerCompletionScore } from "@explore-and-earn/db";
 
 import {
 	CommunityDashboard,
@@ -29,9 +29,10 @@ export default async function CommunityPhotosPage() {
 	const user = userId ? await currentUser() : null;
 	const fallbackName = user?.firstName ?? null;
 
-	const [status, matchedListings] = await Promise.all([
+	const [status, matchedListings, seekerIdentity] = await Promise.all([
 		getSeekerStatus(token, userId, fallbackName),
 		getMatchedListings(token, userId),
+		token && userId ? getSeekerCompletionScore(token, userId).catch(() => null) : Promise.resolve(null),
 	]);
 
 	const featuredEmployers = buildFeaturedEmployers(matchedListings);
@@ -55,6 +56,7 @@ export default async function CommunityPhotosPage() {
 			featuredEmployers={featuredEmployers}
 			serverPhotos={serverPhotos}
 			completionScore={status.resumeCompletion}
+			currentSeekerProfileId={seekerIdentity?.seekerProfileId ?? null}
 		/>
 	);
 }

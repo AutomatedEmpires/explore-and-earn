@@ -8,6 +8,7 @@ import {
 	getFeedPhotos,
 	getHostTierAndProfile,
 	getPhotoReactionsBatch,
+	getSeekerCompletionScore,
 	markCommunitySeen,
 } from "@explore-and-earn/db";
 
@@ -50,17 +51,20 @@ export default async function SeekerCommunityPage() {
 	let serverPhotos: Awaited<ReturnType<typeof getFeedPhotos>> | undefined;
 	let serverAnnouncements: Awaited<ReturnType<typeof getFeedAnnouncements>> | undefined;
 	let hostIdentity: Awaited<ReturnType<typeof getHostTierAndProfile>> = null;
+	let seekerIdentity: Awaited<ReturnType<typeof getSeekerCompletionScore>> = null;
 	let hostUsedThisMonth = 0;
 
 	if (token && userId) {
-		const [photosResult, announcementsResult, hostResult] = await Promise.allSettled([
+		const [photosResult, announcementsResult, hostResult, seekerResult] = await Promise.allSettled([
 			getFeedPhotos(token),
 			getFeedAnnouncements(token),
 			getHostTierAndProfile(token, userId),
+			getSeekerCompletionScore(token, userId),
 		]);
 		if (photosResult.status === "fulfilled") serverPhotos = photosResult.value;
 		if (announcementsResult.status === "fulfilled") serverAnnouncements = announcementsResult.value;
 		if (hostResult.status === "fulfilled") hostIdentity = hostResult.value;
+		if (seekerResult.status === "fulfilled") seekerIdentity = seekerResult.value;
 
 		// Enrich with real reaction counts
 		if (serverPhotos?.length || serverAnnouncements?.length) {
@@ -100,6 +104,7 @@ export default async function SeekerCommunityPage() {
 			hostTier={hostIdentity?.subscriptionTier}
 			hostUsedThisMonth={hostUsedThisMonth}
 			hostDraftAnnouncementId={null}
+			currentSeekerProfileId={seekerIdentity?.seekerProfileId ?? null}
 		/>
 	);
 }

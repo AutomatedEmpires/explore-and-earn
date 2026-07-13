@@ -19,7 +19,11 @@ import { CATEGORY_LABEL } from "../discovery";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import type { SeekerStatusSummary } from "./models";
 import { HostAnnouncementComposer } from "../host/HostAnnouncementComposer";
-import { uploadCommunityPhotoAction } from "../../app/actions/community";
+import {
+  deleteCommunityPhotoAction,
+  reportCommunityPhotoAction,
+  uploadCommunityPhotoAction,
+} from "../../app/actions/community";
 import { getEditorialPosts, type EditorialPost } from "../../lib/editorial";
 import styles from "./CommunityDashboard.module.css";
 
@@ -37,6 +41,7 @@ type SeekerPost = {
   readonly dbId?: string;
   readonly userReactions?: readonly ReactionKey[];
   readonly commentCount?: number;
+  readonly isOwner: boolean;
 };
 
 type HostAnnouncement = {
@@ -98,6 +103,7 @@ interface CommunityDashboardProps {
   readonly hostTier?: string;
   readonly hostUsedThisMonth?: number;
   readonly hostDraftAnnouncementId?: string | null;
+  readonly currentSeekerProfileId?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -349,7 +355,10 @@ function reactionCountsToArray(counts?: ReactionCounts): readonly [number, numbe
   return [counts.smile, counts.heart, counts.hundred, counts.clap, counts.sparkle];
 }
 
-function photosToSeekerPosts(photos: readonly CommunityPhoto[]): SeekerPost[] {
+function photosToSeekerPosts(
+  photos: readonly CommunityPhoto[],
+  currentSeekerProfileId: string | null,
+): SeekerPost[] {
   return photos.map((p): SeekerPost => ({
     kind: "seeker",
     id: `photo-${p.id}`,
@@ -362,6 +371,7 @@ function photosToSeekerPosts(photos: readonly CommunityPhoto[]): SeekerPost[] {
     dbId: p.id,
     userReactions: p.reactionCounts?.userReactions,
     commentCount: p.commentCount,
+    isOwner: Boolean(currentSeekerProfileId && p.seekerProfileId === currentSeekerProfileId),
   }));
 }
 
@@ -396,6 +406,7 @@ function PhotoUploadForm({
   const [caption, setCaption]       = useState("");
   const [locationTag, setLocationTag] = useState("");
   const [fileError, setFileError]   = useState<string | null>(null);
+  const [consent, setConsent]       = useState(false);
   const [isPending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -441,9 +452,12 @@ function PhotoUploadForm({
         onToast("Photo posted!");
         setCaption("");
         setLocationTag("");
+        setConsent(false);
         if (fileRef.current) fileRef.current.value = "";
       } else if (result.reason === "incomplete_profile") {
         onToast(`Profile at ${result.score ?? completionScore}% — need 80% to post.`);
+      } else if (result.reason === "consent_required") {
+        onToast("Confirm the community photo consent before posting.");
       } else {
         onToast("Upload failed — please try again.");
       }
@@ -502,8 +516,23 @@ function PhotoUploadForm({
           disabled={isPending}
         />
       </label>
+      <label className={styles.photoConsent}>
+        <input
+          name="privacy_consent"
+          type="checkbox"
+          value="accepted"
+          checked={consent}
+          onChange={event => setConsent(event.target.checked)}
+          disabled={isPending}
+          required
+        />
+        <span>
+          I chose to post this publicly, have permission from anyone shown, and understand I can
+          delete it or report a concern. Location and camera metadata will be removed before upload.
+        </span>
+      </label>
       {fileError && <p className={styles.photoError}>{fileError}</p>}
-      <button className={styles.photoSubmitBtn} type="submit" disabled={isPending}>
+      <button className={styles.photoSubmitBtn} type="submit" disabled={isPending || !consent}>
         {isPending ? "Posting…" : "Post Photo"}
       </button>
     </form>
@@ -554,14 +583,24 @@ function HashtagChips({ tags }: { readonly tags: readonly string[] }) {
 
 interface PostMenuProps {
   readonly postId: string;
+  readonly photoId?: string;
+  readonly canDelete?: boolean;
   readonly onClose: () => void;
   readonly onHide: () => void;
   readonly onToast: (msg: string) => void;
 }
 
-function PostMenu({ postId, onClose, onHide, onToast }: PostMenuProps) {
+function PostMenu({
+  postId,
+  photoId,
+  canDelete = false,
+  onClose,
+  onHide,
+  onToast,
+}: PostMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [reported, setReported] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -595,8 +634,30 @@ function PostMenu({ postId, onClose, onHide, onToast }: PostMenuProps) {
   }
 
   function handleReport() {
-    setReported(true);
-    onToast("Thanks for reporting — we'll review this post");
+    if (!photoId) return;
+    startTransition(async () => {
+      const result = await reportCommunityPhotoAction(photoId);
+      if (result.ok) {
+        setReported(true);
+        onToast("Thanks for reporting — we'll review this post");
+      } else {
+        onToast("We couldn't submit that report. Please try again.");
+      }
+    });
+  }
+
+  function handleDelete() {
+    if (!photoId || !window.confirm("Delete this photo from the community?")) return;
+    startTransition(async () => {
+      const result = await deleteCommunityPhotoAction(photoId);
+      if (result.ok) {
+        onHide();
+        onToast("Photo deleted from the community");
+        onClose();
+      } else {
+        onToast("We couldn't delete that photo. Please try again.");
+      }
+    });
   }
 
   function handleHide() {
@@ -616,9 +677,14 @@ function PostMenu({ postId, onClose, onHide, onToast }: PostMenuProps) {
         </div>
       ) : (
         <>
-          <button type="button" className={styles.postMenuItem} role="menuitem" onClick={handleReport}>
+          <button type="button" className={styles.postMenuItem} role="menuitem" onClick={handleReport} disabled={isPending || !photoId}>
             Report post
           </button>
+          {canDelete ? (
+            <button type="button" className={styles.postMenuItem} role="menuitem" onClick={handleDelete} disabled={isPending}>
+              Delete my photo
+            </button>
+          ) : null}
           <button type="button" className={styles.postMenuItem} role="menuitem" onClick={handleHide}>
             Hide from feed
           </button>
@@ -669,6 +735,8 @@ function SeekerCard({ post, onHide, onToast }: SeekerCardProps) {
           {menuOpen ? (
             <PostMenu
               postId={post.id}
+              photoId={post.dbId}
+              canDelete={post.isOwner}
               onClose={() => setMenuOpen(false)}
               onHide={onHide}
               onToast={onToast}
@@ -1335,6 +1403,7 @@ export function CommunityDashboard({
   hostTier = "none",
   hostUsedThisMonth = 0,
   hostDraftAnnouncementId = null,
+  currentSeekerProfileId = null,
 }: CommunityDashboardProps) {
   const { toasts, add: addToast } = useToasts();
   const router = useRouter();
@@ -1389,7 +1458,9 @@ export function CommunityDashboard({
   }, []);
 
   // ─── Real content only — no fabricated authors, captions, or counts ───────────
-  const realSeekerPosts = serverPhotos?.length ? photosToSeekerPosts(serverPhotos) : [];
+  const realSeekerPosts = serverPhotos?.length
+    ? photosToSeekerPosts(serverPhotos, currentSeekerProfileId)
+    : [];
   const realAnnouncementItems = serverAnnouncements?.length
     ? announcementsToFeedItems(serverAnnouncements)
     : [];
