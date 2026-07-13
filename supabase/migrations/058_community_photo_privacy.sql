@@ -10,7 +10,7 @@ create table if not exists public.community_photo_reports (
   reason                 text not null default 'privacy' check (reason in (
                            'privacy', 'harassment', 'inappropriate', 'other'
                          )),
-  detail                 text,
+  detail                 text check (detail is null or char_length(detail) <= 500),
   status                 text not null default 'submitted' check (status in (
                            'submitted', 'triaged', 'action_taken', 'dismissed', 'closed'
                          )),
@@ -26,14 +26,20 @@ alter table public.community_photo_reports enable row level security;
 -- Data API access is opt-in and deliberately narrow: signed-in users may
 -- submit and view only their own reports through RLS; anonymous callers see
 -- neither rows nor schema metadata. Moderator workflows use the service role.
-revoke all on table public.community_photo_reports from anon, public;
-grant select, insert on table public.community_photo_reports to authenticated;
+revoke all on table public.community_photo_reports
+  from anon, authenticated, service_role, public;
+grant select on table public.community_photo_reports to authenticated;
+grant insert (photo_id, reporter_clerk_user_id, reason, detail)
+  on table public.community_photo_reports to authenticated;
 grant select, update on table public.community_photo_reports to service_role;
 
 drop policy if exists community_photo_reports_insert_own on public.community_photo_reports;
 create policy community_photo_reports_insert_own
   on public.community_photo_reports for insert to authenticated
-  with check (reporter_clerk_user_id = public.get_clerk_user_id());
+  with check (
+    reporter_clerk_user_id = public.get_clerk_user_id()
+    and status = 'submitted'
+  );
 
 drop policy if exists community_photo_reports_select_own on public.community_photo_reports;
 create policy community_photo_reports_select_own
