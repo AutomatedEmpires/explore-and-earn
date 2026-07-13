@@ -32,18 +32,30 @@ export default async function SwipePage() {
 
 	let listings: DiscoveryListing[] = [];
 	let initialCursor: string | null = null;
+	// True once a personalized batch was fetched successfully — even if empty,
+	// so a signed-in seeker who has swiped through everything keeps their honest
+	// "all caught up" state instead of being shown the public feed.
+	let personalizedOk = false;
 
 	if (userId) {
 		const token = await getToken();
 		if (token) {
-			const savedIds = await getSavedListingIds(token, userId);
-			const batch = await getSwipeListings(token, userId, savedIds);
-			listings = batch.listings;
-			initialCursor = batch.nextCursor;
+			// A fault in the personalized swipe batch (transient DB error, or the
+			// dev bench's sentinel token locally) must not dead-end a locked
+			// discovery mode — fall through to the public feed instead.
+			try {
+				const savedIds = await getSavedListingIds(token, userId);
+				const batch = await getSwipeListings(token, userId, savedIds);
+				listings = batch.listings;
+				initialCursor = batch.nextCursor;
+				personalizedOk = true;
+			} catch {
+				personalizedOk = false;
+			}
 		}
 	}
 
-	if (listings.length === 0 && !userId) {
+	if (listings.length === 0 && !personalizedOk) {
 		listings = await getDiscoveryListings();
 	}
 
