@@ -1,56 +1,97 @@
+"use client";
+
 import Link from "next/link";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
 import type { PublicHostListing } from "@explore-and-earn/db";
-import { Icon } from "@explore-and-earn/ui";
+import {
+  DiscoveryCard,
+  Icon,
+  type DiscoveryCardData,
+} from "@explore-and-earn/ui";
 import type { MarketplaceCategory } from "@explore-and-earn/contracts";
-import { CategoryBadge } from "../listing/CategoryBadge";
 
 import styles from "./PublicListingCard.module.css";
 
 interface Props {
-  listing: PublicHostListing;
+  readonly listing: PublicHostListing;
+  /** Host business name — the card's host row (PublicHostListing omits it). */
+  readonly hostName: string;
+  readonly hostVerified?: boolean;
+  readonly hostAvatarUrl?: string | null;
+  /** Above-the-fold cards load the cover eagerly for a clean LCP. */
+  readonly priority?: boolean;
 }
 
-export function PublicListingCard({ listing }: Props) {
-  const paySummary =
-    listing.compensationSummary ??
-    (listing.compensationMinCents != null
-      ? `${new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: listing.compensationCurrency,
-          maximumFractionDigits: 0,
-        }).format(listing.compensationMinCents / 100)}${listing.compensationUnit && listing.compensationUnit !== "other" ? `/${listing.compensationUnit}` : ""}`
-      : "See listing");
+function paySummary(listing: PublicHostListing): string {
+  if (listing.compensationSummary) return listing.compensationSummary;
+  if (listing.compensationMinCents != null) {
+    const amount = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: listing.compensationCurrency,
+      maximumFractionDigits: 0,
+    }).format(listing.compensationMinCents / 100);
+    const unit =
+      listing.compensationUnit && listing.compensationUnit !== "other"
+        ? `/${listing.compensationUnit}`
+        : "";
+    return `${amount}${unit}`;
+  }
+  return "See listing";
+}
+
+/**
+ * PublicListingCard — composes the LOCKED DiscoveryCard for the host public
+ * profile's Opportunities section. It never edits the card: it maps a
+ * `PublicHostListing` onto `DiscoveryCardData` and overrides only the CTA with a
+ * crawlable "View opportunity" link (a public SEO surface wants a real <a href>,
+ * and an anonymous visitor gets a single clear destination rather than the
+ * seeker Skip/Apply/Save decision bar).
+ */
+export function PublicListingCard({
+  listing,
+  hostName,
+  hostVerified,
+  hostAvatarUrl,
+  priority = false,
+}: Props) {
+  const router = useRouter();
+  const href = `/listing/${listing.id}`;
+
+  const data: DiscoveryCardData = {
+    id: listing.id,
+    hostName,
+    title: listing.title,
+    category: listing.category as MarketplaceCategory,
+    location: listing.locationDisplay ?? "",
+    opportunityWindow: "",
+    coverImageUrl: listing.coverPhotoUrl ?? undefined,
+    hostAvatarUrl: hostAvatarUrl ?? undefined,
+    verifiedHost: hostVerified,
+    triad: {
+      housing: listing.housingIncluded ? "Included" : "Not included",
+      meals: listing.mealsIncluded ? "Included" : "Not included",
+      pay: paySummary(listing),
+    },
+    benefitProvision: {
+      housing: listing.housingIncluded ? "provided" : "not_provided",
+      meals: listing.mealsIncluded ? "provided" : "not_provided",
+      pay: "provided",
+    },
+  };
 
   return (
-    <Link href={`/listing/${listing.id}`} className={styles.card}>
-      {listing.coverPhotoUrl && (
-        <div className={styles.cover}>
-          <Image
-            src={listing.coverPhotoUrl}
-            alt={listing.title}
-            fill
-            style={{ objectFit: "cover" }}
-          />
-        </div>
-      )}
-
-      <div className={styles.body}>
-        <div className={styles.categoryRow}>
-          <CategoryBadge category={listing.category as MarketplaceCategory} />
-        </div>
-
-        <h3 className={styles.title}>{listing.title}</h3>
-
-        {listing.locationDisplay && (
-          <div className={styles.location}>
-            <Icon name="nav.map" size={16} aria-hidden />
-            <span>{listing.locationDisplay}</span>
-          </div>
-        )}
-
-        <div className={styles.pay}>{paySummary}</div>
-      </div>
-    </Link>
+    <DiscoveryCard
+      data={data}
+      surface="discovery_feed"
+      imageLoading={priority ? "eager" : "lazy"}
+      onOpen={() => router.push(href)}
+      actions={
+        <Link href={href} className={styles.cta}>
+          <Icon name="action.view" size={16} aria-hidden />
+          View opportunity
+          <Icon name="action.forward" size={16} aria-hidden />
+        </Link>
+      }
+    />
   );
 }

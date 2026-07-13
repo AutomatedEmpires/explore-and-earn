@@ -161,7 +161,7 @@ export function HostProfileHero({
         <div className={styles.ctaCol}>
           {hasListings ? (
             <a href="#listings" className={styles.ctaPrimary}>
-              View listings
+              See opportunities
               <Icon name="action.forward" size={16} aria-hidden />
             </a>
           ) : null}

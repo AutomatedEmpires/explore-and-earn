@@ -233,131 +233,6 @@
 @media (min-width: 860px) { .listingsGrid { grid-template-columns: 1fr; } }
 @media (min-width: 960px) { .listingsGrid { grid-template-columns: repeat(2, 1fr); } }
 
-/* Listing article — warm paper card with ink border on hover */
-.listingArticle {
-  background: var(--color-surface-raised);
-  border-radius: var(--radius-card);
-  border: 1px solid var(--border-soft);
-  overflow: hidden;
-  transition: border-color var(--motion-fast) var(--ease-standard),
-              box-shadow var(--motion-fast) var(--ease-standard);
-}
-
-.listingArticle:hover {
-  border-color: var(--border-ink);
-  box-shadow: var(--elevation-pin);
-}
-
-.listingLink {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-}
-
-/* Cover photo */
-.listingCover {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  background: var(--color-steel);
-}
-
-.listingCoverImg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 300ms var(--ease-standard);
-}
-
-.listingArticle:hover .listingCoverImg {
-  transform: scale(1.025);
-}
-
-.listingCoverEmpty {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: linear-gradient(135deg, var(--color-steel) 0%, var(--color-chrome) 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-}
-
-/* Listing card body */
-.listingBody {
-  padding: var(--space-16);
-}
-
-.listingCategory {
-  margin-bottom: var(--space-8);
-}
-
-.listingTitle {
-  font-family: var(--font-display);
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
-  color: var(--text-primary);
-  margin: 0 0 var(--space-8);
-}
-
-.listingLocation {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  color: var(--text-secondary);
-  margin-bottom: var(--space-10);
-}
-
-.listingBenefits {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-6);
-}
-
-.listingBenefitHousing {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-8);
-  border-radius: var(--radius-pill);
-  background: var(--benefit-housing-bg);
-  color: var(--benefit-housing-fg);
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-weight-medium);
-}
-
-.listingBenefitMeals {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-8);
-  border-radius: var(--radius-pill);
-  background: var(--benefit-meals-bg);
-  color: var(--benefit-meals-fg);
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-weight-medium);
-}
-
-.listingPay {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-8);
-  border-radius: var(--radius-pill);
-  background: var(--benefit-pay-bg);
-  color: var(--benefit-pay-fg);
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-weight-medium);
-}
-
 /* ── Empty state ─────────────────────────────────────────────────── */
 
 .emptyListings {
@@ -578,11 +453,7 @@
 /* ── Motion — respect reduced-motion ─────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
-  .listingArticle,
-  .listingCoverImg,
-  .ctaPrimary,
   .mapLink,
   .browseCta,
   .benefitCardLink { transition: none; }
-  .listingArticle:hover .listingCoverImg { transform: none; }
 }

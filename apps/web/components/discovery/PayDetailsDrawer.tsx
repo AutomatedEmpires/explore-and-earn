@@ -67,6 +67,9 @@ export function PayDetailsDrawer({ listing, onClose }: PayDetailsDrawerProps) {
 		() => (listing ? formatHeadlineAmount(listing) : "See listing"),
 		[listing],
 	);
+	// The card's Pay cell now shows label + value only; the host's fuller pay
+	// descriptor (e.g. "Weekly, paid on Fridays") reads clearly here.
+	const paySummary = listing?.benefits.pay.summary;
 	const benchmarkText = useMemo(
 		() =>
 			listing
@@ -115,6 +118,9 @@ export function PayDetailsDrawer({ listing, onClose }: PayDetailsDrawerProps) {
 					<div className={styles.payHeadlineBlock}>
 						<p className={styles.amountValue}>{headlineAmount}</p>
 						<p className={styles.amountLabel}>Listing pay</p>
+						{paySummary && paySummary !== headlineAmount ? (
+							<p className={styles.payDescriptor}>{paySummary}</p>
+						) : null}
 					</div>
 					<div className={styles.inlineArtwork} aria-hidden>
 						{listing.coverImageUrl ? (

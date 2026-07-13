@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { optionalAuth } from "../../../lib/optionalAuth";
 import {
@@ -9,15 +8,17 @@ import {
   getHostReviews,
   getReviewableEngagementForHost,
 } from "@explore-and-earn/db";
+import type { PublicHostListing } from "@explore-and-earn/db";
 import { getPublicHostProfileCached } from "../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
-import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 
 import { HostProfileHero } from "../../../components/host/HostProfileHero";
 import { HostTrustBand } from "../../../components/host/HostTrustBand";
 import { HostReviews } from "../../../components/host/HostReviews";
 import { LeaveReview } from "../../../components/host/LeaveReview";
-import { CategoryBadge } from "../../../components/listing/CategoryBadge";
+import { PublicListingCard } from "../../../components/host/PublicListingCard";
+import { WeatherWidget } from "../../../components/host/WeatherWidget";
+import { byMonetization } from "../../../lib/ranking";
 import { generateBreadcrumbJsonLd } from "../../../lib/seo";
 import { isUuid } from "../../../lib/ids";
 import styles from "./page.module.css";
@@ -159,7 +160,7 @@ function AboutSection({ about }: { about: string }) {
   return (
     <section className={styles.section} aria-labelledby="about-heading">
       <h2 id="about-heading" className={styles.sectionHeading}>
-        About
+        About us
       </h2>
       <div className={styles.aboutCard}>
         <p className={styles.aboutText}>{about}</p>
@@ -170,24 +171,21 @@ function AboutSection({ about }: { about: string }) {
 
 function ListingsSection({
   listings,
+  hostName,
+  hostVerified,
+  hostAvatarUrl,
 }: {
-  listings: Array<{
-    id: string;
-    title: string;
-    category: string;
-    coverPhotoUrl: string | null;
-    locationDisplay: string | null;
-    housingIncluded: boolean;
-    mealsIncluded: boolean;
-    compensationSummary: string | null;
-    compensationMinCents: number | null;
-    compensationMaxCents: number | null;
-    compensationUnit: string | null;
-    compensationCurrency: string;
-    publishedAt: string | null;
-  }>;
+  listings: PublicHostListing[];
+  hostName: string;
+  hostVerified: boolean;
+  hostAvatarUrl: string | null;
 }) {
-  const hasListings = listings.length > 0;
+  // Order opportunities through the shared monetization ranking — the single
+  // "pay more, show more" authority. PublicHostListing carries no per-listing
+  // boost/tier/match signal yet, so each degrades to rank 0 and the query's
+  // published_at DESC order is preserved (byMonetization never hides, only orders).
+  const ordered = [...listings].sort(byMonetization(() => ({})));
+  const hasListings = ordered.length > 0;
   return (
     <section id="listings" className={styles.section} aria-labelledby="listings-heading">
       <div className={styles.sectionHead}>
@@ -202,71 +200,15 @@ function ListingsSection({
 
       {hasListings ? (
         <div className={styles.listingsGrid}>
-          {listings.map((listing) => (
-            <article key={listing.id} className={styles.listingArticle}>
-              {/* Category band */}
-              <Link href={`/listing/${listing.id}`} className={styles.listingLink}>
-                {listing.coverPhotoUrl ? (
-                  <div className={styles.listingCover}>
-                    <Image
-                      src={listing.coverPhotoUrl}
-                      alt={listing.title}
-                      fill
-                      sizes="(min-width: 960px) 50vw, (min-width: 480px) 50vw, 100vw"
-                      className={styles.listingCoverImg}
-                    />
-                  </div>
-                ) : (
-                  <div className={styles.listingCoverEmpty}>
-                    <Icon name={catIcons[listing.category] ?? "category.mix"} size={24} aria-hidden />
-                  </div>
-                )}
-
-                <div className={styles.listingBody}>
-                  <div className={styles.listingCategory}>
-                    <CategoryBadge category={listing.category as MarketplaceCategory} />
-                  </div>
-                  <h3 className={styles.listingTitle}>{listing.title}</h3>
-
-                  {listing.locationDisplay ? (
-                    <div className={styles.listingLocation}>
-                      <Icon name="nav.map" size={16} aria-hidden />
-                      <span>{listing.locationDisplay}</span>
-                    </div>
-                  ) : null}
-
-                  <div className={styles.listingBenefits}>
-                    {listing.housingIncluded ? (
-                      <span className={styles.listingBenefitHousing}>
-                        <Icon name="benefit.housing" size={16} aria-hidden />
-                        Housing
-                      </span>
-                    ) : null}
-                    {listing.mealsIncluded ? (
-                      <span className={styles.listingBenefitMeals}>
-                        <Icon name="benefit.meals" size={16} aria-hidden />
-                        Meals
-                      </span>
-                    ) : null}
-                    {listing.compensationSummary ?? (listing.compensationMinCents != null
-                      ? (
-                        <span className={styles.listingPay}>
-                          <Icon name="analytics.meter" size={16} aria-hidden />
-                          {new Intl.NumberFormat("en-US", {
-                            style: "currency",
-                            currency: listing.compensationCurrency,
-                            maximumFractionDigits: 0,
-                          }).format(listing.compensationMinCents / 100)}
-                          {listing.compensationUnit && listing.compensationUnit !== "other"
-                            ? `/${listing.compensationUnit}`
-                            : ""}
-                        </span>
-                      )
-                      : null)}
-                  </div>
-                </div>
-              </Link>
-            </article>
+          {ordered.map((listing, i) => (
+            <PublicListingCard
+              key={listing.id}
+              listing={listing}
+              hostName={hostName}
+              hostVerified={hostVerified}
+              hostAvatarUrl={hostAvatarUrl}
+              priority={i < 2}
+            />
           ))}
         </div>
       ) : (
@@ -439,9 +381,18 @@ export default async function PublicHostProfilePage({ params }: Props) {
 
       {/* ── Content grid: main col + sidebar ─────────────────── */}
       <div className={hasSidebar ? styles.contentGrid : styles.contentSingle}>
-        {/* Main column: about + listings */}
+        {/* Main column: showcase — about → forecast → opportunities → reviews */}
         <div className={styles.mainCol}>
           {host.about ? <AboutSection about={host.about} /> : null}
+          {host.primaryLocationName ? (
+            <WeatherWidget location={host.primaryLocationName} />
+          ) : null}
+          <ListingsSection
+            listings={listings}
+            hostName={host.companyName}
+            hostVerified={host.verified}
+            hostAvatarUrl={host.photoUrl}
+          />
           {reviewable ? (
             <LeaveReview
               hostName={host.companyName}
@@ -454,7 +405,6 @@ export default async function PublicHostProfilePage({ params }: Props) {
             summary={ratingSummary}
             reviews={reviews}
           />
-          <ListingsSection listings={listings} />
         </div>
 
         {/* Sidebar: location, housing/meals — only renders if data exists */}

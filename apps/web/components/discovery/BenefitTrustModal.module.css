@@ -197,6 +197,43 @@
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, white 36%, transparent);
 }
 
+.viewSummaryHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-8);
+	width: 100%;
+}
+
+.summaryLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+/* Descriptor — the card no longer shows the Housing/Meals text, so this is
+   the prominent home for the host's summary (e.g. "Shared bunkhouse"). */
+.descriptor {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: clamp(1.1rem, 3.4vw, 1.32rem);
+	line-height: 1.28;
+	letter-spacing: -0.005em;
+	color: var(--text-primary);
+}
+
+.descriptorMuted {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-muted);
+}
+
 .provisionBadge {
 	display: inline-flex;
 	align-items: center;
@@ -228,14 +265,6 @@
 	border-color: color-mix(in srgb, var(--border-ink) 32%, transparent);
 	background: color-mix(in srgb, var(--color-surface-raised) 88%, white 12%);
 	color: var(--text-secondary);
-}
-
-.summaryText {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
-	line-height: var(--type-body-lh);
-	color: var(--text-primary);
 }
 
 /* ── View mode: published facts + read-only chips ───────── */
@@ -493,6 +522,19 @@
 	font-size: var(--type-body-size);
 	line-height: var(--type-body-lh);
 	color: var(--text-primary);
+}
+
+/* ── Verify caption (view mode) — quiet, muted, icon + text ─── */
+
+.verifyNote {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-muted);
 }
 
 /* ── Footer ──────────────────────────────────────────────── */

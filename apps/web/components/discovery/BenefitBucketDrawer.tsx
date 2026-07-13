@@ -20,23 +20,18 @@ const BUCKET_META: Record<
 	{
 		readonly label: string;
 		readonly icon: IconKey;
-		readonly emptyTitle: string;
-		readonly emptyBody: string;
+		readonly slots: readonly string[];
 	}
 > = {
 	housing: {
 		label: "Housing",
 		icon: "benefit.housing",
-		emptyTitle: "No housing photos yet",
-		emptyBody:
-			"This host hasn't added photos of the housing yet. When they do, they'll appear here.",
+		slots: ["Bedroom", "Common", "Bath", "Misc"],
 	},
 	meals: {
 		label: "Meals",
 		icon: "benefit.meals",
-		emptyTitle: "No meal photos yet",
-		emptyBody:
-			"This host hasn't added photos of the meals yet. When they do, they'll appear here.",
+		slots: ["Kitchen", "Prepared", "Dining", "Misc"],
 	},
 };
 
@@ -118,21 +113,26 @@ export function BenefitBucketDrawer({
 			closeLabel={`Close ${meta.label.toLowerCase()} details`}
 		>
 			<section className={styles.summaryCard} aria-label={`${meta.label} summary`}>
-				<span className={styles.summaryLabel}>What's provided</span>
-				<div className={styles.benefit}>
-					<div className={styles.benefitHead}>
-						<span className={styles.benefitLabel}>
-							<Icon name={meta.icon} size={16} aria-hidden />
-							<span>{meta.label}</span>
-						</span>
-						<span className={styles.benefitProvision}>
-							{PROVISION_LABEL[info.provision]}
-						</span>
-					</div>
-					<p className={styles.benefitValue}>
-						{info.summary ?? PROVISION_LABEL[info.provision]}
-					</p>
+				{/* The card's Housing/Meals cell now shows COLOR ONLY, so the
+				    descriptor it used to carry lives here, as the lead. */}
+				<div className={styles.summaryHead}>
+					<span className={styles.summaryLabel}>
+						<Icon name={meta.icon} size={16} aria-hidden />
+						<span>What's provided</span>
+					</span>
+					<span className={styles.benefitProvision}>
+						{PROVISION_LABEL[info.provision]}
+					</span>
 				</div>
+				<p
+					className={info.summary ? styles.descriptorLead : styles.descriptorMuted}
+				>
+					{info.summary ?? PROVISION_LABEL[info.provision]}
+				</p>
+				<p className={styles.verifyNote} role="note">
+					<Icon name="system.info" size={16} aria-hidden />
+					<span>Always verify accuracy with the host.</span>
+				</p>
 				<div className={styles.factGrid}>
 					<div className={styles.factCard}>
 						<span className={styles.factLabel}>Listing</span>
@@ -147,22 +147,24 @@ export function BenefitBucketDrawer({
 
 			<section
 				className={styles.section}
-				aria-label={`${meta.label} evidence`}
+				aria-label={`${meta.label} photos`}
 			>
-				<h3 className={styles.sectionLabel}>Evidence bucket</h3>
-				<div className={styles.empty}>
-					<span className={styles.emptyIcon} aria-hidden>
-						<Icon name={meta.icon} size={24} />
-					</span>
-					<span className={styles.emptyKicker}>No uploaded media yet</span>
-					<p className={styles.emptyTitle}>{meta.emptyTitle}</p>
-					<p className={styles.emptyBody}>{meta.emptyBody}</p>
+				<h3 className={styles.sectionLabel}>Photos</h3>
+				{/* Four honest slots. No photos are fabricated — each slot stays an
+				    empty placeholder until the host uploads real media for it. */}
+				<div className={styles.slotGrid}>
+					{meta.slots.map((slotLabel) => (
+						<div key={slotLabel} className={styles.slot}>
+							<div className={styles.slotArea} aria-hidden>
+								<Icon name={meta.icon} size={20} />
+							</div>
+							<span className={styles.slotLabel}>{slotLabel}</span>
+						</div>
+					))}
 				</div>
-				<div className={styles.noteCard}>
-					<p className={styles.noteText}>
-						Only listing-specific {meta.label.toLowerCase()} uploads belong here. This drawer stays empty until that exact evidence exists.
-					</p>
-				</div>
+				<p className={styles.noteText}>
+					The host hasn&apos;t added {meta.label.toLowerCase()} photos yet. When they do, each slot fills in here.
+				</p>
 			</section>
 
 			<div className={styles.disclaimer} role="note">
