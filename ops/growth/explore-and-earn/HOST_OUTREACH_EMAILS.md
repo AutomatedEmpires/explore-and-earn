@@ -24,7 +24,7 @@ Hi [First name / Company team],
 
 I found [Company] through [official source or directory] and noticed [one neutral, sourced detail about the operation]. I’m building Explore&Earn, a marketplace where place-based employers publish their own opportunities with Housing, Meals, and Pay answered before someone applies.
 
-We’re inviting a small first wave of farms, ranches, maritime operators, lodges, camps, resorts, and outdoor businesses to shape the host workflow. We do not copy listings from other sites—you control the profile, opportunity, and original media.
+We’re inviting a small first wave of Farm, Maritime, Remote, and Seasonal hosts to shape a visual Discovery Card across Seek, Swipe, and Map. This can complement channels you already use; we do not copy listings from them. You control the profile, opportunity, and original evidence.
 
 Would a 15-minute fit conversation for [likely season, explicitly framed as a question] be useful?
 
@@ -57,7 +57,7 @@ Subject: Re: A transparent seasonal-hiring channel for [Company]
 
 Hi [First name / Company team],
 
-Following up once in case the Housing / Meals / Pay approach is relevant for [Company]. The goal is not to replace the channels you already use. It is to give qualified, travel-ready seekers the information they need before applying and give hosts control of the source material.
+Following up once in case the Housing / Meals / Pay approach is relevant for [Company]. The goal is not to replace the channels you already use. It is to give seekers considering place-based work the information they need before applying and give hosts control of the source material.
 
 If [upcoming season] is too early an assumption, what month would be better—or should I close the loop?
 
@@ -97,7 +97,7 @@ Any `STOP`, `unsubscribe`, `cancel`, `end`, `quit`, or equivalent request is app
 
 ## Founding-host pitch for email or a call recap
 
-> Explore&Earn is inviting a paid founding cohort capped at 100 host seats to shape a seeker-first marketplace for place-based work. Every host-created opportunity answers Housing, Meals, and Pay. Founding Hosts receive a lifetime-locked cohort price while the qualifying subscription remains active, guided first-listing setup, and a direct product-feedback channel. The company controls its profile, opportunity, and original media; Explore&Earn does not copy inventory from another site. Founding pricing begins at $149/month or $1,490/year for Starter. Would you like the official plan comparison and onboarding checklist?
+> Explore&Earn is inviting a paid founding cohort capped at 100 host seats to shape a seeker-first marketplace for Farm, Maritime, Remote, and Seasonal work. Every host-created Discovery Card answers Housing, Meals, and Pay and can be found through Seek, Swipe, and Map. Founding Hosts receive a lifetime-locked cohort price while the qualifying subscription remains active, guided first-listing setup, and a direct product-feedback channel. The company controls its profile, opportunity, and rights-cleared evidence; Explore&Earn does not copy inventory from another site. Founding pricing begins at $149/month or $1,490/year for Starter. Would you like the official plan comparison and onboarding checklist?
 
 Do not state how many seats remain unless the number comes from live subscription data.
 
@@ -105,7 +105,15 @@ Do not state how many seats remain unless the number comes from live subscriptio
 
 ### “We already hire elsewhere.”
 
-> That makes sense, and Explore&Earn does not need to replace a channel that works. The question is whether a separate, host-controlled profile with Housing, Meals, and Pay upfront could reduce repetitive questions or reach seekers who choose opportunities by place and living setup. If not, I’ll close the loop.
+> That makes sense, and Explore&Earn does not need to replace a channel that works. The question is whether a host-controlled Discovery Card with Housing, Meals, Pay, place, and evidence upfront could reduce repetitive questions or expectation gaps for seekers who choose by location and living setup. Where does your current channel already do this well, and where do candidates still need clarification? If there is no gap, I’ll close the loop.
+
+### “Why should we maintain another listing?”
+
+> The first test has to earn the work it creates. We would guide one original host profile and one opportunity, reuse company-level details, and keep variable or unknown fields explicit. We will not import or mirror a listing from another platform. What would need to be reusable or connected to your current process for a pilot to be reasonable?
+
+### “Are you better than [platform]?”
+
+> That platform may be stronger at its own job—volume, category depth, professional credentials, remote screening, or exchange community. Explore&Earn should earn a place by making the practical arrangement and adventure context clearer. I’d rather understand what already works for you and whether this fills a real gap.
 
 ### “Housing varies.”
 

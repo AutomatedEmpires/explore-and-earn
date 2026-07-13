@@ -32,6 +32,26 @@ The strongest early hosts have:
 - enough operational maturity to answer applicant questions promptly; and
 - interest in shaping a new seeker-first channel without replacing their existing hiring channels.
 
+## Competitor-aware acquisition position
+
+Explore&Earn does not need to beat general aggregators on inventory volume or replace category specialists. The first-wave pitch is a complementary, host-controlled decision layer for seekers choosing a place and practical arrangement:
+
+- Farm, Maritime, Remote, and Seasonal only;
+- Seek, Swipe, and Map discovery around the reusable Discovery Card;
+- Housing, Meals, and Pay visible as structured answers rather than buried in generic perks; and
+- host-created profiles, opportunity details, and rights-cleared evidence rather than copied marketplace inventory.
+
+Competitor boards may be used for market vocabulary and employer-name discovery only. A lead enters this pipeline only after the operator independently resolves the official host domain and verifies the public business contact route. See `COMPETITOR_INTELLIGENCE.md`, `CATEGORY_SEARCH_PLAYBOOK.md`, and `SEARCH_QUERY_BANK.md`.
+
+Normalized to the four marketplace lanes, the current 30 high-priority records are 21 Seasonal, 6 Farm, 3 Maritime, and 0 Remote. Preserve all 30 high-priority statuses, but sequence them for learning:
+
+1. call the existing top 10 in their ranked order;
+2. contact the five remaining Farm and two remaining Maritime records, plus one camp/outdoor operator;
+3. use those results before scaling the remaining twelve Seasonal records; and
+4. run a separate 15-record Remote discovery sprint for official-site-verified travel/outdoor/farm/maritime/seasonal-life employers.
+
+This is a within-band contact order, not a rescore or an assertion that a prospect uses any particular competitor. The detailed record order and hypotheses are in `HOST_ACQUISITION_COMPETITOR_GAP_STRATEGY.md`.
+
 ## Data and legal operating rules
 
 1. Research only public, no-login business websites and public government, chamber, tourism, agriculture, marina, resort, camp, or association directories.
@@ -111,6 +131,13 @@ Before calling any of the top 10, prepare a one-page CRM view containing:
 - current Founding Host pricing and seat terms from the repository canon;
 - response choices: pilot now, revisit month, not a fit, wrong contact, or suppress.
 
+Add two competitor-aware fields to the call card:
+
+- `current_channels_to_ask_about` — an unanswered discovery prompt, never a claim that the company uses a platform; and
+- `clarity_hypothesis` — one Housing / Meals / Pay, place, evidence, credential, or application expectation that may still require applicant follow-up.
+
+Do not lead by naming a competitor. Ask where the host's current channels work well and what candidates still need clarified.
+
 ## Pilot selection
 
 Choose three pilots from the top 10 only after a live conversation. Aim for complementary learning:
@@ -128,6 +155,8 @@ Do not call a company a pilot target externally until it agrees. The source log 
 - Wednesday: make top-10 manual calls and log feedback within the same day.
 - Thursday: send due follow-ups and hold onboarding sessions.
 - Friday: review funnel metrics and update the product feedback digest.
+
+Until the Remote lane has a qualified cohort, use one Monday research block for the 15-record Remote discovery sprint. Do not add generic remote employers merely to balance the table.
 
 Metrics: verified-source rate, direct-contact rate, positive-reply rate, conversation rate, pilot acceptance rate, listing-start rate, listing-completion rate, time to first live listing, opt-out rate, complaint rate, and the share of listings with complete Housing / Meals / Pay evidence. Complaint rate above zero pauses the sequence for operator review; missing suppression evidence also pauses sends.
 

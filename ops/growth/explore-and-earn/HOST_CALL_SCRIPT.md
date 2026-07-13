@@ -24,7 +24,7 @@ Operator must have:
 
 ## Gatekeeper opener
 
-> Hi, this is [Name] with Explore&Earn by Automated Empires. This is a brief business-development call. We’re speaking with place-based employers about a host-controlled seasonal-work marketplace. Who is the right person to ask about seasonal recruiting or operations?
+> Hi, this is [Name] with Explore&Earn by Automated Empires. This is a brief business-development call. We’re speaking with Farm, Maritime, Remote, and Seasonal hosts about a host-controlled marketplace for place-based work. Who is the right person to ask about recruiting or operations?
 
 If asked for details:
 
@@ -56,6 +56,8 @@ Use four or five, not the whole list.
 8. What screening does your team perform, and what should a platform never imply it performs?
 9. Would an applicant profile and on-platform message thread be useful, or do you need candidates routed into an existing ATS?
 10. What would make a first listing too burdensome to complete?
+11. Do candidates choose opportunities through search, map/location, quick mobile browsing, referrals, or another path?
+12. Which parts of a company profile could be reused safely across roles and seasons?
 
 Never ask for confidential applicant data, current employee personal data, unpublished wages, or details the recipient is not authorized to share.
 
@@ -79,7 +81,15 @@ After verbal or written permission:
 
 ### “We already hire elsewhere.”
 
-> That is not a problem. We’re testing whether a separate, transparent profile can reduce repeated Housing / Meals / Pay questions or reach people who choose by place. We are not asking for exclusivity. What would a new channel need to prove to earn a small test?
+> That is not a problem. We’re testing whether a host-controlled Discovery Card can reduce repeated Housing / Meals / Pay questions or expectation gaps for people who choose by place. We are not asking for exclusivity. Where does your current channel work well, and what would a complementary channel need to prove to earn a small test?
+
+### “Why should we maintain another listing?”
+
+> It should not be another copy. We would guide one original host profile and one opportunity, reuse company-level details, and preserve variable or unknown fields. What would need to carry forward or connect to your current process for the test to be manageable?
+
+### “Are you better than [platform]?”
+
+> I would not make that blanket claim. A broad board may be stronger on volume; a category board may be stronger on specialized inventory or credentials. Explore&Earn is testing whether place, Housing, Meals, Pay, evidence, and a focused discovery flow can be clearer for this kind of seeker. Is that a gap you see today?
 
 ### “Housing varies.”
 
@@ -115,3 +125,12 @@ Log exactly one primary outcome:
 > Hi [Name], this is [Name] with Explore&Earn by Automated Empires at [callback number]. I’m reaching out about a host-controlled marketplace for place-based seasonal opportunities. I found [Company] through [source]. This is not a claim of partnership and I have not copied a job listing. I’ll send one short email if a public address is available. If you would rather not hear from us, tell me at [callback/email] and I’ll suppress future outreach. Again, [Name] at [number].
 
 Do not leave more than one voicemail in the first-wave sequence.
+
+## Category-specific follow-up
+
+- **Farm:** “Is this paid employment, education/internship, volunteer service, exchange, or something else—and which terms vary by season?”
+- **Maritime:** “Is the opportunity licensed vessel work, unlicensed crew, fisheries, shore-side marina/trade work, or waterfront hospitality?”
+- **Remote:** “What geography, timezone, travel, schedule, equipment, and work-authorization limits make `remote` accurate?”
+- **Seasonal:** “Which season dates, access/transport, Housing, Meals, and Pay details must be understood before an application is useful?”
+
+These are qualification questions. Do not infer the answer from a competitor listing or search result.

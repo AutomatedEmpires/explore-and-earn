@@ -5,7 +5,7 @@ Status: outreach-ready copy based on repository pricing canon; acceptance and bi
 
 ## External-facing offer
 
-### Help build the seasonal-work marketplace you wish already existed
+### Help build the place-based work marketplace you wish already existed
 
 Explore&Earn is a seeker-first discovery marketplace for farms, ranches, maritime operators, lodges, resorts, camps, outdoor businesses, and other place-based employers. Every opportunity answers three questions before a seeker applies:
 
@@ -23,6 +23,19 @@ The Founding Host Program is limited to 100 paid host seats that help shape how 
 - a direct channel for product feedback during the founding cohort;
 - cohort recognition as a Founding Host, separate from any identity or claim-verification representation; and
 - access to the plan entitlements included with the selected tier.
+
+### Why Explore&Earn is different
+
+Explore&Earn is not positioned as another general job board. It focuses on Farm, Maritime, Remote, and Seasonal work and organizes seeker discovery around one practical decision card:
+
+- **Seek** for intentional category and fit search;
+- **Swipe** for quick, mobile exploration;
+- **Map** for place-based discovery; and
+- **Housing / Meals / Pay** visible before application.
+
+Established platforms may be stronger on inventory volume, category depth, professional credentials, remote breadth, or work-exchange community. Explore&Earn's founding-host test is whether a host-controlled, more visual and structured opportunity can make the actual arrangement clearer and reduce avoidable expectation mismatches. This is a hypothesis to measure, not a promise of applicant volume, quality, placement, or reduced workload.
+
+The host creates and approves the information. Evidence photos must be uploaded by the host with the right to use them and should support the current employee arrangement—not reuse guest marketing images or third-party screenshots. `Host-provided`, `variable`, `unknown`, and `last confirmed` qualifiers must stay visible; evidence is not an independent inspection or legal certification.
 
 “Lifetime-locked” is host-seat scoped, follows the host through plan changes, and is permanently forfeited if the subscription is cancelled. The program has a hard cap of 100 paid seats. Any remaining-seat count must come from live subscription data and must never be guessed.
 
@@ -51,6 +64,8 @@ The host agrees to:
 7. follow applicable employment, wage, housing, safety, nondiscrimination, and privacy obligations; and
 8. accept platform review, correction requests, reporting, and removal processes.
 
+The host should also identify whether each opportunity is paid employment, exchange, volunteer service, internship/education, licensed or credentialed maritime work, shore-side work, or another legally distinct arrangement. Explore&Earn must not blur those categories for a simpler pitch.
+
 ## Honest trust language
 
 Use:
@@ -67,7 +82,7 @@ Operator hold: repository code/legal copy and older design canon currently disag
 
 ## 30-second founding-host pitch
 
-> Explore&Earn helps place-based employers show the details seasonal applicants care about before they apply: Housing, Meals, and Pay. We are inviting a paid founding cohort capped at 100 host seats to shape the workflow and lock in Founding Host pricing while the qualifying subscription stays active. We do not copy your jobs from another site—you create and control the profile, opportunity, and media. Would a 15-minute fit conversation be useful for your next hiring season?
+> Explore&Earn helps Farm, Maritime, Remote, and Seasonal hosts show the details place-motivated seekers care about before they apply: Housing, Meals, and Pay. We are inviting a paid founding cohort capped at 100 host seats to shape the workflow and lock in Founding Host pricing while the qualifying subscription stays active. We do not copy your jobs from another site—you create and control the profile, opportunity, and media. Would a 15-minute fit conversation be useful for your next hiring cycle?
 
 ## Operator qualification checklist
 

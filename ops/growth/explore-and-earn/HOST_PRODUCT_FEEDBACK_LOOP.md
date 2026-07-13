@@ -178,6 +178,27 @@ Feed into:
 
 Immediate escalation: credible imminent harm, exploitation, trafficking indicators, unlawful fees, identity fraud, retaliation, or a material Housing / Meals / Pay mismatch. The growth operator pauses the affected listing/outreach path and routes it to the approved trust/safety owner. Do not investigate beyond role or promise confidentiality that the system cannot provide.
 
+### 9. Discovery mode and competitive context
+
+Capture:
+
+- channels the host currently uses, what each does well, and where applicants still need clarification;
+- whether candidates discover the host by intentional search, destination/map, quick mobile browsing, referral, social content, or direct brand awareness;
+- host reaction to Seek, Swipe, Map, and the Discovery Card as separate concepts;
+- concern about maintaining another profile, duplicated ATS/email entry, and which company details could be reused;
+- category-specific needs that a general board may not represent, including arrangement type, credentials, remote geography, and season-level variability; and
+- any named competitor reference as that host's experience, not as a universal market fact.
+
+Feed into:
+
+- evidence-based prioritization of Seek, Swipe, and Map rather than assuming equal demand;
+- company-profile reuse, update reminders, and host-controlled integrations/handoffs;
+- positioning copy that acknowledges current-channel strengths and states a narrow complementary value;
+- lane-specific Discovery Card fields without fragmenting the shared Housing / Meals / Pay primitive; and
+- the acquisition message test for the next cohort.
+
+Pilot measure: host comprehension of the value proposition, reported repeated-question rate, first-profile completion time, duplicate-entry burden, discovery-mode preference, and willingness to test alongside an existing channel. Do not collect or reproduce a competitor's listing in the CRM as evidence.
+
 ## Weekly synthesis
 
 Every Friday, the growth operator produces a one-page digest:
