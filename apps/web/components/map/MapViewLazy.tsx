@@ -23,8 +23,8 @@ const MapView = dynamic(() => import("./MapView").then((m) => m.MapView), {
         width: "100%",
         height: "100%",
         minHeight: "60vh",
-        background: "var(--surface-sunken, #ece7dd)",
-        borderRadius: "var(--radius-lg, 16px)",
+        background: "var(--gradient-sky-soft)",
+        borderRadius: "var(--radius-image)",
       }}
     />
   ),

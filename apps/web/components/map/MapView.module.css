@@ -98,12 +98,12 @@
 }
 
 .legendSingle {
-	background: linear-gradient(135deg, var(--color-cta), var(--seekeros-gold, var(--status-warning-fg)));
+	background: linear-gradient(135deg, var(--color-cta), var(--status-warning-fg));
 	box-shadow: 0 0 0.75rem color-mix(in srgb, var(--color-cta) 40%, transparent);
 }
 
 .legendGroup {
-	background: linear-gradient(135deg, var(--seekeros-aqua, var(--color-cta)), var(--color-cta));
+	background: linear-gradient(135deg, var(--color-cta), var(--color-cta));
 	box-shadow: 0 0 0.75rem color-mix(in srgb, var(--color-cta) 30%, transparent);
 }
 
@@ -134,7 +134,7 @@
 	overflow: hidden;
 	background:
 		radial-gradient(circle at 28% 22%, color-mix(in srgb, var(--color-cta) 14%, transparent), transparent 38%),
-		radial-gradient(circle at 76% 64%, color-mix(in srgb, var(--seekeros-aqua, var(--color-cta)) 10%, transparent), transparent 40%),
+		radial-gradient(circle at 76% 64%, color-mix(in srgb, var(--color-cta) 10%, transparent), transparent 40%),
 		var(--color-paper);
 	box-shadow: 0 24px 60px color-mix(in srgb, var(--color-ink) 30%, transparent);
 }
@@ -198,7 +198,7 @@
 	background: linear-gradient(
 		135deg,
 		var(--color-cta),
-		var(--seekeros-gold, var(--status-warning-fg))
+		var(--status-warning-fg)
 	);
 	color: var(--color-cta-text);
 	border-color: transparent;
@@ -208,7 +208,7 @@
 .pinRemote {
 	background: linear-gradient(
 		135deg,
-		var(--seekeros-aqua, var(--color-cta)),
+		var(--color-cta),
 		var(--color-cta)
 	);
 	color: var(--color-cta-text);
@@ -219,7 +219,7 @@
 	background: linear-gradient(
 		135deg,
 		var(--color-cta),
-		var(--seekeros-aqua, var(--color-cta))
+		var(--color-cta)
 	);
 	color: var(--color-cta-text);
 	border-color: transparent;
