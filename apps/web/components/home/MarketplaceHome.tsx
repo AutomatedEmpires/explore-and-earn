@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
-import { FOUNDING_SEAT_CAP, type OpportunityCategory } from "@explore-and-earn/contracts";
+import { FOUNDING_SEAT_CAP } from "@explore-and-earn/contracts";
 
 import type { DiscoveryListing } from "../discovery";
 import { toDiscoveryCardData } from "../discovery/listing";
@@ -13,7 +13,7 @@ import { FeaturedEmployersRail, type FeaturedEmployer } from "../public/Featured
 import {
   HOME_CATEGORIES,
   HOME_PLANS,
-  HOME_HERO,
+  HOME_HERO_ROTATION,
   formatUsd,
   type HomeAnnouncement,
   type HomeDestination,
@@ -37,6 +37,7 @@ function SectionHead({
   sub,
   seeAllHref,
   seeAllLabel,
+  emphasis,
 }: {
   /** Heading id — sections reference it via aria-labelledby. */
   id: string;
@@ -45,12 +46,19 @@ function SectionHead({
   sub?: string;
   seeAllHref?: string;
   seeAllLabel?: string;
+  /** Bumps the title to the display-section scale (a louder section headline). */
+  emphasis?: boolean;
 }) {
   return (
     <div className={styles.sectionHead}>
       <div className={styles.sectionHeadText}>
         <p className={styles.eyebrow}>{eyebrow}</p>
-        <h2 id={id} className={styles.sectionTitle}>{title}</h2>
+        <h2
+          id={id}
+          className={`${styles.sectionTitle}${emphasis ? ` ${styles.sectionTitleEmphasis}` : ""}`}
+        >
+          {title}
+        </h2>
         {sub ? <p className={styles.sectionSub}>{sub}</p> : null}
       </div>
       {seeAllHref ? (
@@ -73,18 +81,27 @@ const TRIAD_BADGES: ReadonlyArray<{ key: string; label: string; icon: IconKey }>
 // ─── Hero ──────────────────────────────────────────────────────────────────
 
 function HomeHero({
-  heroImage,
-  heroCategory,
   peek,
 }: {
-  heroImage?: string;
-  heroCategory: OpportunityCategory;
   peek?: DiscoveryListing;
 }) {
   const router = useRouter();
   const [role, setRole] = useState("");
   const [loc, setLoc] = useState("");
   const [category, setCategory] = useState("");
+
+  // Dynamic hero — rotate through the controllable HOME_HERO_ROTATION bucket.
+  // Start on index 0 (matches the server render and first client paint), then
+  // advance to a rotated pick after mount. Because the pick happens in an effect
+  // it never runs during SSR/hydration, so there's no hydration mismatch.
+  const [heroIndex, setHeroIndex] = useState(0);
+  useEffect(() => {
+    if (HOME_HERO_ROTATION.length <= 1) return;
+    setHeroIndex(Math.floor(Math.random() * HOME_HERO_ROTATION.length));
+  }, []);
+  const hero = HOME_HERO_ROTATION[heroIndex] ?? HOME_HERO_ROTATION[0];
+  const heroImage = hero.imageUrl;
+  const heroCategory = hero.category;
 
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -116,11 +133,17 @@ function HomeHero({
         <div className={styles.heroInner}>
           <p className={styles.heroEyebrow}>
             <span className={styles.liveDot} aria-hidden="true" />
-            Built for seekers, by seekers
+            The seeker-first work marketplace
           </p>
-          <h1 id="home-hero-title" className={styles.heroTitle}>
-            Find seasonal work with housing, meals, pay &amp; a place — upfront.
+          {/* The anthem — the loudest thing after the photo. */}
+          <h1 id="home-hero-title" className={styles.heroAnthem}>
+            Built for seekers,
+            <br />
+            by seekers.
           </h1>
+          <p className={styles.heroPromise}>
+            Find seasonal work with housing, meals, pay &amp; a place — upfront.
+          </p>
           <p className={styles.heroSub}>
             Free forever for seekers. Hosts pay for visibility — you never pay to find work.
           </p>
@@ -493,6 +516,7 @@ function DestinationGrid({ destinations }: { destinations: readonly HomeDestinat
         sub="Discover where to work next — before you commit."
         seeAllHref="/map"
         seeAllLabel="Open the map"
+        emphasis
       />
       <div className={styles.destinationGrid}>
         {destinations.map((d, i) => (
@@ -734,15 +758,16 @@ export function MarketplaceHome({
   destinations,
   announcements,
 }: MarketplaceHomeProps) {
-  // The hero photo is a fixed scenic "working landscape" (not a data cover) so
-  // first impression always sells the place; the floating peek is a real listing.
+  // The hero photo rotates through the controllable HOME_HERO_ROTATION bucket
+  // (picked client-side per landing) so first impression always sells the place;
+  // the floating peek is a real listing.
   const heroListing = listings.find((l) => l.conditionalBadges?.includes("boosted")) ?? listings[0];
 
   // Organic-first sequence: promise → inventory → discovery story → browse
   // lanes → paid rails → free-forever → host conversion arc.
   return (
     <div className={styles.home}>
-      <HomeHero heroImage={HOME_HERO.imageUrl} heroCategory={HOME_HERO.category} peek={heroListing} />
+      <HomeHero peek={heroListing} />
       <ThreeQuestions />
       <FeaturedJobs listings={listings} />
       <DiscoverModes listings={listings} />

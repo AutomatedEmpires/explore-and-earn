@@ -104,6 +104,14 @@
 	.sectionTitle { font-size: var(--type-page-size); line-height: var(--type-page-lh); }
 }
 
+/* Emphasis — a louder section headline (e.g. "Where will you go next?") so a
+   destination title still holds its own against the anthem-scale hero. Placed
+   after the desktop .sectionTitle rule so it wins at every breakpoint. */
+.sectionTitleEmphasis {
+	font-size: var(--type-display-section);
+	line-height: 1.1;
+}
+
 /* ─── Hero ───────────────────────────────────────────────────────────────── */
 
 .hero {
@@ -172,13 +180,28 @@
 	box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-live-dot) 30%, transparent);
 }
 
-.heroTitle {
+/* The anthem — "Built for seekers, by seekers." The loudest text on the page,
+   Patrick Hand display at the sanctioned hero scale. */
+.heroAnthem {
 	font-family: var(--font-display);
-	font-size: clamp(1.9rem, 5.4vw, 3.1rem);
-	line-height: 1.08;
+	font-size: var(--type-display-hero);
+	line-height: 1;
 	font-weight: var(--font-weight-regular);
 	color: var(--palette-white);
 	margin: 0 0 var(--space-12);
+	text-wrap: balance;
+	letter-spacing: -0.01em;
+}
+
+/* The promise line — kept intact, now a strong subhead beneath the anthem. */
+.heroPromise {
+	font-family: var(--font-ui);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--palette-white);
+	margin: 0 0 var(--space-8);
+	max-width: 34rem;
 	text-wrap: balance;
 }
 

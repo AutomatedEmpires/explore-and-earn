@@ -32,13 +32,39 @@ function lanePhoto(category: PhotoCategory, slug: string, size: "card" | "hero" 
 
 // ─── Hero ───────────────────────────────────────────────────────────────────
 
-/** A scenic cool "working landscape" hero — coastal/maritime to sit with the
- * Glacier palette (a warm cover fights the ice-and-chrome UI). Not a data cover.
- * If the hero-size variant is missing, the maritime cover gradient shows. */
-export const HOME_HERO = {
-  imageUrl: cloudinaryPhoto("maritime", "venti-views-asmavys4azm", "hero"),
-  category: "maritime" as OpportunityCategory,
-};
+export interface HomeHeroImage {
+  readonly imageUrl: string;
+  /** Drives the cover-gradient fallback class if the hero photo is missing. */
+  readonly category: OpportunityCategory;
+}
+
+/**
+ * HOME_HERO_ROTATION — the controllable hero "bucket". The homepage picks ONE of
+ * these per landing (client-side, after mount) so the first impression feels
+ * alive without a hydration mismatch. This is the single place the founder edits
+ * to control which images can appear: add, remove, or reorder entries here.
+ *
+ * All entries are cool/scenic, mixed lanes (coastal · mountain · farm-at-dusk) so
+ * the hero sits with the Glacier palette — a warm cover fights the ice-and-chrome
+ * UI. Slugs are the same curated lane photos referenced by DESTINATION_SEEDS; if a
+ * hero-size variant is missing, the category cover gradient shows underneath.
+ */
+export const HOME_HERO_ROTATION: readonly HomeHeroImage[] = [
+  // Alaska — coastal maritime
+  { imageUrl: cloudinaryPhoto("maritime", "venti-views-asmavys4azm", "hero"), category: "maritime" },
+  // Colorado — alpine, winter & summer
+  { imageUrl: cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"), category: "seasonal" },
+  // Wyoming — parks & high country
+  { imageUrl: cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"), category: "seasonal" },
+  // Maine — summer coast
+  { imageUrl: cloudinaryPhoto("maritime", "werner-hilversum-vfljehs-y5w", "hero"), category: "maritime" },
+  // Montana — ranch land at dusk
+  { imageUrl: cloudinaryPhoto("farm", "annie-spratt-jmjnnq2xfoy", "hero"), category: "farm" },
+];
+
+/** Stable SSR default — the first entry of the rotation renders on the server and
+ * on the first client paint, then the client advances to a rotated pick on mount. */
+export const HOME_HERO: HomeHeroImage = HOME_HERO_ROTATION[0];
 
 // ─── Destinations ("Where will you go next?") ──────────────────────────────
 
