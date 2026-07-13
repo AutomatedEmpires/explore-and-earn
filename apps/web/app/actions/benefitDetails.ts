@@ -32,7 +32,7 @@ async function resolveHostAuth(): Promise<
   if (!userId) {
     return { ok: false, error: "You must be signed in as a host to edit benefits." };
   }
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return { ok: false, error: "Your session has expired — sign in again to continue." };
   }

@@ -29,7 +29,7 @@ async function saveListingActionImpl(
 	if (!userId) return { ok: false };
 	const { allowed } = checkRateLimit(`save:${userId}`, 60, 5 * 60 * 1000);
 	if (!allowed) return { ok: false };
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) return { ok: false };
 	return saveListing(token, userId, listingId);
 }
@@ -58,7 +58,7 @@ async function unsaveListingActionImpl(
 ): Promise<{ ok: boolean }> {
 	const { userId, getToken } = await auth();
 	if (!userId) return { ok: false };
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) return { ok: false };
 	const result = await unsaveListing(token, userId, listingId);
 	if (result.ok) revalidatePath("/saved");

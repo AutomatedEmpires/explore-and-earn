@@ -119,7 +119,7 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
     if (!initial.seekerProfileId) {
       throw new Error("Profile not found — reload the page and try again.");
     }
-    const token = await getToken({ template: "supabase" });
+    const token = await getToken();
     if (!token) {
       throw new Error("Your session has expired — sign in again.");
     }

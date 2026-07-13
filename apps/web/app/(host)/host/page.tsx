@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function HostDashboardPage() {
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const token = userId ? await getToken() : null;
 
   if (!userId || !token) {
     return (

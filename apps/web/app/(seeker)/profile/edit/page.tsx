@@ -47,7 +47,7 @@ async function resolveInitial(): Promise<ProfileEditInitial> {
     if (!userId) {
       return EMPTY_INITIAL;
     }
-    const token = await getToken({ template: "supabase" });
+    const token = await getToken();
     if (!token) {
       return EMPTY_INITIAL;
     }

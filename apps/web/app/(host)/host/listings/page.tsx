@@ -155,7 +155,7 @@ export default async function HostListingsPage() {
   if (!userId) {
     return <SignInToManage />;
   }
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return <SignInToManage />;
   }

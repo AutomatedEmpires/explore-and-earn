@@ -48,7 +48,7 @@ async function sendMessageActionImpl(
 	const { allowed } = checkRateLimit(`msg:${userId}`, 30, 60 * 1000);
 	if (!allowed) return { ok: false, error: "rate_limit_exceeded" };
 
-	const token = await getToken({ template: "supabase" });
+	const token = await getToken();
 	if (!token) return { ok: false, error: "unauthenticated" };
 
 	const result = await sendMessage(token, userId, conversationId, body);
@@ -161,7 +161,7 @@ export async function fetchConversationMessagesAction(
 	try {
 		const { userId, getToken } = await auth();
 		if (!userId) return { ok: false, messages: [] };
-		const token = await getToken({ template: "supabase" });
+		const token = await getToken();
 		if (!token) return { ok: false, messages: [] };
 		const messages = await getMessages(token, userId, conversationId);
 		return { ok: true, messages };
@@ -186,7 +186,7 @@ export async function markMessagesReadAction(
 	try {
 		const { userId, getToken } = await auth();
 		if (!userId) return;
-		const token = await getToken({ template: "supabase" });
+		const token = await getToken();
 		if (!token) return;
 
 		await markMessagesRead(token, userId, conversationId);

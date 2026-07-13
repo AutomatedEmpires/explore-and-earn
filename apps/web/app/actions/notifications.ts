@@ -19,7 +19,7 @@ async function currentUserId(): Promise<string | undefined> {
  * Server action: mark one of the authenticated seeker's notifications as read.
  *
  * Auth is enforced here (Clerk) before any DB work; the Supabase JWT is minted
- * via the "supabase" Clerk JWT template and handed to the db layer, which also
+ * via Clerk's native Supabase integration and handed to the db layer, which also
  * applies an app-level ownership guard. Returns `{ ok: false }` when signed out
  * or the write does not apply.
  */
@@ -31,7 +31,7 @@ async function markNotificationReadActionImpl(
 		return { ok: false }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false }
 	}
@@ -63,7 +63,7 @@ async function markAllNotificationsReadActionImpl(): Promise<{ ok: boolean }> {
 		return { ok: false }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false }
 	}

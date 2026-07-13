@@ -33,7 +33,7 @@ export default async function HostAnnouncementsPage() {
   const { userId, getToken } = await auth();
   if (!userId) return <SignInState />;
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return <SignInState />;
 
   const hostIdentity = await getHostTierAndProfile(token, userId).catch(() => null);

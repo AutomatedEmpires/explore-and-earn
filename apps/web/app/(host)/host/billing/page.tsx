@@ -114,7 +114,7 @@ export default async function HostBillingPage({
 }) {
   const query = await searchParams;
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const token = userId ? await getToken() : null;
 
   if (!userId || !token) {
     return (

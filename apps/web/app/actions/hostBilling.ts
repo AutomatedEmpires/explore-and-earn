@@ -28,7 +28,7 @@ async function resolveHostAuth(): Promise<
     return { ok: false, error: "unauthenticated" };
   }
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     return { ok: false, error: "expired_session" };
   }

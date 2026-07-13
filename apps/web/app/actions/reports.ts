@@ -40,7 +40,7 @@ async function submitReportActionImpl(
 		return { ok: false, error: "Missing listing ID." }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
 	}

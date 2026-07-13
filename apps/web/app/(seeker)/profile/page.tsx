@@ -56,7 +56,7 @@ export default async function ProfilePage() {
 		let appliedCount = status.appliedCount;
 		let resumeCompletion = status.resumeCompletion;
 		try {
-			const token = await getToken({ template: "supabase" });
+			const token = await getToken();
 			if (token) {
 				const [apps, resume, earnedBadges, profile, matched] = await Promise.all([
 					getSeekerApplications(token, userId),

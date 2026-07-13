@@ -30,7 +30,7 @@ export interface ResumeActionResult {
 async function getAuth(): Promise<{ userId: string; token: string } | null> {
   const { userId, getToken } = await auth();
   if (!userId) return null;
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return null;
   return { userId, token };
 }

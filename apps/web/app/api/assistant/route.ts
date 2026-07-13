@@ -93,7 +93,7 @@ export async function POST(req: Request): Promise<Response> {
         .filter(Boolean)
         .join(" ")
     : "";
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
 
   // ── Host (listing coach) ──────────────────────────────────────────────────

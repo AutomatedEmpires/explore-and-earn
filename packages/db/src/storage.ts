@@ -8,7 +8,8 @@ import { authedClient } from "./client";
  * URL via getPublicUrl(); writes are gated by storage RLS keyed on the caller's
  * Clerk identity (auth.jwt() ->> 'sub').
  *
- * `token` is the Supabase-templated Clerk JWT (getToken({ template: "supabase" }));
+ * `token` is the ordinary Clerk session JWT minted by `getToken()` after the
+ * Clerk instance's native Supabase integration has been enabled;
  * it is handed to authedClient() so every storage write runs as the caller.
  */
 

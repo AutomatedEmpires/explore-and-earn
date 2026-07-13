@@ -18,7 +18,7 @@ export async function submitHostReviewAction(
 ): Promise<{ ok: boolean }> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false };
   const result = await createHostReview(
     token,

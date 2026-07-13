@@ -20,7 +20,7 @@ export async function saveSearchAction(
 ): Promise<{ ok: boolean }> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false };
   const result = await createSavedSearch(token, userId, label, filters);
   if (result.ok) revalidatePath("/seek");
@@ -32,7 +32,7 @@ export async function deleteSavedSearchAction(
 ): Promise<{ ok: boolean }> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false };
   const result = await deleteSavedSearch(token, userId, id);
   if (result.ok) revalidatePath("/seek");

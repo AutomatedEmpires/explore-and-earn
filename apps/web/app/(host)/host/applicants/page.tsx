@@ -83,7 +83,7 @@ export default async function HostApplicantsPage({
 }) {
   const { listingId: filterListingId } = await searchParams;
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const token = userId ? await getToken() : null;
 
   // Unauthenticated (or no session token): graceful fallback. The (host) route
   // group is also middleware-protected, so this is belt-and-braces.

@@ -229,7 +229,7 @@ function ApplicationGroup({
 
 export default async function AppliedPage() {
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const token = userId ? await getToken() : null;
 
   if (!userId || !token) {
     return (

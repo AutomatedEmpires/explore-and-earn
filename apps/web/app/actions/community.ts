@@ -45,7 +45,7 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024;
 async function resolveAuth() {
   const { userId, getToken } = await auth();
   if (!userId) return null;
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return null;
   return { userId, token };
 }

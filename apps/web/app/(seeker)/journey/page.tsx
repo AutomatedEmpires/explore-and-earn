@@ -27,7 +27,7 @@ function computeJourneyStatus(beginsAt: string | null, endsAt: string | null): J
 
 export default async function JourneyPage() {
 	const { userId, getToken } = await auth();
-	const token = userId ? await getToken({ template: "supabase" }) : null;
+	const token = userId ? await getToken() : null;
 
 	let stops: JourneyStop[] = [];
 

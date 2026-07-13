@@ -42,7 +42,7 @@ export default async function SeekerPublicProfilePage({ params }: Props) {
 
   if (!userId) notFound();
 
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) notFound();
 
   const profile = await getSeekerProfileForHost(token, userId, seekerProfileId);

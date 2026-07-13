@@ -11,7 +11,7 @@ import { adminClient } from "../adminClient";
  *
  * IDENTITY MODEL (read this before touching the queries):
  *   Auth is owned by Clerk (issue #105): the JWT `sub` claim minted by the
- *   "supabase" Clerk template is the CLERK id (`user_2abc...`), and every other
+ *   native Clerk/Supabase session token is the CLERK id (`user_2abc...`), and every other
  *   query module scopes by that Clerk id. `notifications.recipient_user_id` was
  *   originally `NOT NULL references auth.users(id)` (migration 008) — the
  *   Supabase-side UUID. Clerk users have NO `auth.users` row, so that column
@@ -105,7 +105,7 @@ function rowToNotification(raw: unknown): Notification {
  * Recent notifications for the authed seeker, newest first (limit 50).
  * Dismissed notifications are excluded. Returns an empty array when signed out.
  *
- * @param clerkToken - Verified Clerk JWT from `getToken({ template: "supabase" })`.
+ * @param clerkToken - Verified Clerk JWT from `getToken()`.
  * @param clerkUserId - Verified Clerk user id from `auth().userId` — never decoded from the token.
  */
 export async function getNotifications(

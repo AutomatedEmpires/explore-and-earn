@@ -26,7 +26,7 @@ export default async function HostProfileEditPage() {
   if (!userId) {
     redirect("/sign-in");
   }
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) {
     redirect("/sign-in");
   }

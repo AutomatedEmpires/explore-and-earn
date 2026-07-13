@@ -34,7 +34,7 @@ export default async function HostApplicantDetailPage({
 }) {
   const { id } = await params;
   const { userId, getToken } = await auth();
-  const token = userId ? await getToken({ template: "supabase" }) : null;
+  const token = userId ? await getToken() : null;
   if (!userId || !token) {
     notFound();
   }

@@ -103,7 +103,7 @@ async function updateDisplayNameActionImpl(
 ): Promise<SettingsActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "unauthenticated" };
 
   const trimmed = displayName.trim();
@@ -138,7 +138,7 @@ async function updateScheduleActionImpl(
 ): Promise<SettingsActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "unauthenticated" };
 
   const status = formValue(formData, "availability_status");
@@ -179,7 +179,7 @@ async function updateTravelActionImpl(
 ): Promise<SettingsActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "unauthenticated" };
 
   const readiness = formValue(formData, "travel_readiness");
@@ -221,7 +221,7 @@ async function updateNotificationPrefsActionImpl(
 ): Promise<SettingsActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken({ template: "supabase" });
+  const token = await getToken();
   if (!token) return { ok: false, error: "unauthenticated" };
 
   const result = await updateNotificationPrefs(token, userId, prefs);

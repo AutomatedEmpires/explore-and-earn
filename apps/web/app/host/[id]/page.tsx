@@ -384,7 +384,7 @@ export default async function PublicHostProfilePage({ params }: Props) {
   const { userId, getToken } = await optionalAuth();
   let reviewable: Awaited<ReturnType<typeof getReviewableEngagementForHost>> = null;
   if (userId && getToken) {
-    const seekerToken = await getToken({ template: "supabase" });
+    const seekerToken = await getToken();
     if (seekerToken) {
       reviewable = await getReviewableEngagementForHost(seekerToken, userId, id);
     }

@@ -44,7 +44,7 @@ async function getInvitesActionImpl(): Promise<InviteWithListing[]> {
 		return []
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return []
 	}
@@ -62,7 +62,7 @@ export async function withdrawInviteAction(
 	try {
 		const { userId, getToken } = await auth()
 		if (!userId) return { ok: false, error: "You must be signed in as a host." }
-		const token = await getToken({ template: "supabase" })
+		const token = await getToken()
 		if (!token) return { ok: false, error: "Your session has expired — sign in again." }
 
 		const result = await withdrawInvite(token, userId, inviteId)
@@ -104,7 +104,7 @@ async function respondToInviteActionImpl(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
 	}
@@ -207,7 +207,7 @@ async function createInviteForCurrentHost(
 		return { ok: false, error: "rate_limit_exceeded" }
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
 	}
@@ -344,7 +344,7 @@ async function searchSeekersActionImpl(
 		return []
 	}
 
-	const token = await getToken({ template: "supabase" })
+	const token = await getToken()
 	if (!token) {
 		return []
 	}
