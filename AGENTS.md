@@ -143,7 +143,7 @@ Work is done when:
 
 - the change delivers a meaningful user, buyer, trust, supply, or production-readiness improvement;
 - acceptance criteria and repository contracts are satisfied without unrelated edits;
-- focused tests exist and pass, and the relevant commands above have fresh recorded results;
+- for executable behavior changes, focused tests exist and pass; for every change, the relevant commands or documentation-specific checks above have fresh recorded results;
 - affected UI is exercised through the real flow with responsive and accessibility evidence;
 - tenant, provider, data, money, email, and legal effects are explicit and use only safe environments;
 - no secrets, private URLs, real-user data, scraped listings, or unsupported launch/customer claims enter the diff;
