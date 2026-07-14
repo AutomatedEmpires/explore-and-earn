@@ -254,10 +254,12 @@ export default async function ListingDetailPage({ params }: Props) {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLd }}
-      />
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLd }}
+        />
+      )}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }}

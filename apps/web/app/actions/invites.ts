@@ -4,18 +4,20 @@ import { auth } from "@clerk/nextjs/server"
 import {
 	getSeekerInvites,
 	respondToInvite,
-	createInvite,
+	createInviteWithEntitlement,
 	getHostListings,
 	getHostProfile,
 	getHostClerkIdByProfileId,
 	getNotificationPrefs,
 	getSeekerClerkIdByProfileId,
+	restoreInviteCreditForInvite,
 	searchSeekersForInvite,
 	withdrawInvite,
 	type InviteResponse,
 	type InviteWithListing,
 	type SeekerSearchResult,
 } from "@explore-and-earn/db"
+import { MONTHLY_INVITE_QUOTA } from "@explore-and-earn/contracts"
 import { revalidatePath } from "next/cache"
 
 import { getClerkContact } from "../../lib/clerkUser"
@@ -65,8 +67,18 @@ export async function withdrawInviteAction(
 		const token = await getToken()
 		if (!token) return { ok: false, error: "Your session has expired — sign in again." }
 
+		// Only a never-delivered invite ('created') hands its credit back.
+		// wasUndelivered comes from the withdraw UPDATE itself (atomic — see
+		// withdrawInvite), so a seeker responding concurrently can never cause
+		// a restore for an invite that was actually delivered.
 		const result = await withdrawInvite(token, userId, inviteId)
-		if (result.ok) revalidatePath("/host/invites")
+		if (result.ok) {
+			if (result.wasUndelivered) {
+				// Idempotent (one restore per invite, enforced in SQL); false pre-061.
+				await restoreInviteCreditForInvite(inviteId)
+			}
+			revalidatePath("/host/invites")
+		}
 		return result
 	} catch (error) {
 		reportError(error, { action: "withdrawInviteAction" })
@@ -225,14 +237,24 @@ async function createInviteForCurrentHost(
 		return { ok: false, error: "forbidden" }
 	}
 
-	// Insert the invite (deduplication enforced by DB UNIQUE constraint).
-	const result = await createInvite(token, {
-		hostProfileId: hostProfile.id,
-		seekerProfileId,
-		listingId,
-		message,
-		invitedByUserId: userId,
-	})
+	// Insert the invite with SERVER-ENFORCED entitlement: the monthly allowance
+	// comes from the host's real subscription tier (never a client value), and
+	// the SQL function consumes the credit atomically with the insert — a
+	// concurrent double-send can never overspend, and a duplicate
+	// (listing, seeker) pair spends nothing. 'invite_credits_required' is the
+	// blocked-upsell state (buy a pack or upgrade the plan).
+	const monthlyAllowance = MONTHLY_INVITE_QUOTA[hostProfile.subscriptionTier]
+	const result = await createInviteWithEntitlement(
+		token,
+		{
+			hostProfileId: hostProfile.id,
+			seekerProfileId,
+			listingId,
+			message,
+			invitedByUserId: userId,
+		},
+		monthlyAllowance,
+	)
 	if (!result.ok) {
 		return { ok: false, error: result.error }
 	}

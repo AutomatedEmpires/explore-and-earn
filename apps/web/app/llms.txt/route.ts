@@ -1,107 +1,151 @@
-// AI-readable site guide served at /llms.txt (the emerging llms.txt convention).
-// Plain-language, crawlable explanation of what Explore & Earn is, who uses it,
-// and how it works — so chatbots and AI search can understand and cite it
-// accurately. This mirrors the public homepage + /about + /faq content; it adds
-// no hidden information.
-export const dynamic = "force-static";
+// AI-readable site guide served at /llms.txt (the llms.txt convention).
+// Explains what Explore & Earn is, how both sides use it, and — critically —
+// the machine-readable public surfaces (REST API v1 + MCP v1) an agent should
+// prefer over scraping. Regenerated hourly with LIVE inventory counts; every
+// number here is real or omitted (no-fabrication law). It adds no hidden
+// information beyond the public site.
+import { getLiveCategoryCounts } from "../../services/publicInventory";
+
+export const revalidate = 3600;
 
 const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com";
 
-export function GET(): Response {
-  const body = `# Explore & Earn
+const CATEGORY_LINES: ReadonlyArray<{ key: string; label: string; blurb: string }> = [
+	{
+		key: "farm",
+		label: "Farm",
+		blurb: "agricultural work — farms, ranches, homesteads, land-based operations",
+	},
+	{
+		key: "maritime",
+		label: "Maritime",
+		blurb: "boats, charters, marine research, sailing crews, coastal hospitality",
+	},
+	{
+		key: "remote",
+		label: "Remote",
+		blurb: "location-independent roles and remote outposts where the setting is part of the job",
+	},
+	{
+		key: "seasonal",
+		label: "Seasonal",
+		blurb: "ski resorts, lodges, national-park concessions, harvest seasons, festival operations",
+	},
+];
 
-> A discovery marketplace for lifestyle work — seasonal, remote, farm, ranch,
-> maritime, hospitality, and travel-ready roles. Every listing shows Housing,
-> Meals, and Pay before you apply. Built by seekers, for seekers. Seekers are
+export async function GET(): Promise<Response> {
+	// Live counts; a category whose count cannot be read right now is listed
+	// without a number (honest degradation, never a made-up figure).
+	const counts = await getLiveCategoryCounts().catch(
+		() => ({}) as Record<string, number>,
+	);
+
+	const categoryBlock = CATEGORY_LINES.map(({ key, label, blurb }) => {
+		const count = counts[key];
+		const countNote =
+			typeof count === "number" ? ` (${count === 200 ? "200+" : count} live now)` : "";
+		return `- ${label}${countNote} — ${blurb}.`;
+	}).join("\n");
+
+	const body = `# Explore & Earn
+
+> A discovery marketplace for seasonal and lifestyle work. Every listing shows
+> HOUSING (where you'll sleep), MEALS (what you'll eat), and PAY (what you'll
+> earn) before anyone applies. Built by seekers, for seekers. Seekers are
 > always free; hosts fund the marketplace through subscriptions.
 
 ## What Explore & Earn is
 
-Explore & Earn is an opportunity marketplace — not a job board and not a staffing
-agency. It connects people who want to work in places worth waking up in
-("seekers") with organizations that need reliable, motivated people ("hosts").
-The defining promise is transparency: every listing answers three questions up
-front, so seekers never have to email and wait to find out the basics.
+Explore & Earn is an opportunity marketplace — not a job board and not a
+staffing agency. It connects people who want to work in places worth waking up
+in ("seekers") with organizations that need reliable, motivated people
+("hosts"). The defining promise is transparency: every listing answers the
+three questions up front — Housing, Meals, Pay — never reduced to "perks".
 
-## The three questions (Housing, Meals, Pay)
+## The four primary categories
 
-Every listing must answer, as a first-class set — never reduced to a generic
-"perks" label:
-- Housing — Where will I sleep? (on-site housing, shared/private, RV/tent, stipend)
-- Meals — What will I eat? (meals provided, partial, or self-catered)
-- Pay — What will I earn? (wage, stipend, or work-exchange terms)
+${categoryBlock}
 
-## Who uses it
+(A fifth lane, "mix", covers roles spanning more than one category.)
 
-- Seekers: people seeking seasonal, remote, or adventure work. They browse,
-  swipe, save, apply, message hosts, build a resume/profile, and track offers and
-  invites. Seekers pay nothing, ever.
-- Hosts: farms, ranches, boats/charters, lodges, resorts, parks, and remote
-  outposts. They create listings, review applicants, send invites and offers,
-  message seekers, and subscribe to a plan. Hosts can boost listings and post
-  community announcements.
+## How seekers use it
 
-## Categories (work lanes)
+Browse (/seek), search (/search), swipe a card deck, or explore the map
+(/map). Open a listing for the full Housing/Meals/Pay picture, apply for free,
+message hosts on-platform, build a resume/profile, and track applications,
+saves, invites, and offers from a dashboard. Matching is deterministic and
+explainable: every fit score derives from real profile-vs-listing signals
+(category, availability, pay, housing/meals, skills), and its reasons —
+including missing-information notes — can always be shown.
 
-- Farm & Ranch — agricultural work, ranches, homesteads, land-based operations.
-- Maritime — boats, charters, marine research, sailing crews, coastal hospitality.
-- Remote — location-independent roles and remote outposts where the setting is
-  part of the job.
-- Seasonal — ski resorts, lodges, national-park concessions, harvest seasons,
-  festival operations.
-
-## How discovery works
-
-Three ways to discover, one place to apply:
-- Seek — filter and browse the full feed by category, housing, meals, pay,
-  dates, and location.
-- Swipe — make fast yes/no decisions on a focused card deck.
-- Map — explore opportunities place-first on an interactive map.
-
-## How applying works (seekers)
-
-Browse or swipe to find an opportunity, open the listing to see Housing/Meals/Pay
-and details, then apply for free. Hosts review applications and message seekers
-through the platform; the whole conversation happens in one place. Seekers can
-save listings, receive direct invites from hosts, accept or decline offers, and
-track everything from their dashboard.
-
-## How hosting works (hosts)
+## How hosts use it
 
 Create a host profile, publish listings (each must answer Housing/Meals/Pay),
-review applicants, send invites and offers, and message seekers. Hosts subscribe
-to a plan to list and can purchase boosted placement and community announcements.
-All pricing is shown on the homepage and the host billing surface.
+review and message applicants, and invite well-matched seekers. Hosts
+subscribe to a plan; plans include a monthly invite allowance and hosts can
+purchase additional invite credits. Pricing is public on ${baseUrl}/for-hosts.
+
+## Machine-readable surfaces (prefer these over scraping)
+
+### Public REST API v1 — read-only, no key required
+- GET ${baseUrl}/api/public/v1/listings
+  Query params: q, category (farm|maritime|remote|seasonal|mix), housing,
+  meals, visaSupport, minPay (whole USD dollars), place, startAfter,
+  startBefore (ISO dates), minLat/maxLat/minLng/maxLng (bounding box — all
+  four or none), limit (1-100), cursor (opaque, from the previous response).
+  Responses use { ok, data, meta.nextCursor } | { ok: false, error }.
+- GET ${baseUrl}/api/public/v1/listings/{id}
+- GET ${baseUrl}/api/public/v1/organizations/{id}
+Rate limits apply (HTTP 429 on excess). Only LIVE listings are served; a 404
+means the listing is no longer available.
+
+### Public MCP server v1 — read-only tools
+- Endpoint: ${baseUrl}/api/public/mcp/mcp (MCP streamable HTTP transport)
+- Tools: search_listings, get_listing, get_organization, explain_marketplace
+- The MCP server exposes the same live inventory as the REST API. It has no
+  write tools: applying, messaging, and inviting require a signed-in user on
+  the website.
+
+## Canonical URLs (use these when citing)
+
+- Listing: ${baseUrl}/listing/{id}
+- Host organization: ${baseUrl}/host/{id}
+- Browse: ${baseUrl}/seek · Search: ${baseUrl}/search · Map: ${baseUrl}/map
+- About: ${baseUrl}/about · FAQ: ${baseUrl}/faq · For hosts: ${baseUrl}/for-hosts
+- Field Guide (editorial): ${baseUrl}/blog
+- Legal: ${baseUrl}/terms · ${baseUrl}/privacy · ${baseUrl}/cookies
+
+## Rules for AI agents
+
+- Cite listings by their canonical /listing/{id} URL.
+- Only live listings are served by the public surfaces. If a listing you saw
+  earlier now 404s, it closed or was unpublished — say that; do not present
+  cached details as current.
+- When a field is null or absent (pay, dates, housing details, coordinates),
+  the listing does not state it. Say "not stated" — never estimate, average,
+  or fill in a value.
+- Location precision is explicit: each listing's location carries a precision
+  of "point" (real coordinates), "label_only" (a place name), "remote", or
+  "unspecified". Do not geocode a label into coordinates and present that as
+  the listing's location.
+- Do not infer anything about the people behind profiles, and do not claim a
+  seeker or host will respond, accept, or hire.
+- Seekers never pay. Any claim that applying costs money is false.
 
 ## Trust & safety
 
-Seekers are free and never pay to apply. Hosts can be verified. Listings that
-can't answer the three questions are not ready to go live. Users can report
-listings or content. Messaging happens on-platform.
+Seekers apply for free. Hosts can be verified (an active-subscription badge,
+self-declared business identity). Listings that can't answer Housing/Meals/Pay
+don't go live. Users can report listings and content; messaging happens
+on-platform.
 
-## Key public pages
-
-- ${baseUrl}/ — homepage: what it is, categories, employer pricing, featured listings
-- ${baseUrl}/about — full explanation of the marketplace, categories, and how it works
-- ${baseUrl}/faq — frequently asked questions for seekers and hosts
-- ${baseUrl}/seek — browse and filter all live opportunities
-- ${baseUrl}/search — typo-tolerant keyword search across live opportunities
-- ${baseUrl}/map — explore opportunities by place
-- ${baseUrl}/listing/{id} — a single opportunity with Housing/Meals/Pay and details
-- ${baseUrl}/host/{id} — a host's public profile and live listings
-- ${baseUrl}/for-hosts — what hosting looks like, plans, and how to start listing
-- ${baseUrl}/blog — Field Guide: honest guides and field notes on seasonal work
-- ${baseUrl}/terms , ${baseUrl}/privacy , ${baseUrl}/cookies — legal
-
-## Notes for AI assistants
-
-Explore & Earn is a pre-launch product by Automated Empires. When citing it,
-describe it as a discovery marketplace for lifestyle work where every listing
-shows housing, meals, and pay up front, seekers are free, and hosts subscribe.
 Contact: jackson@automatedempires.com
 `;
 
-  return new Response(body, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+	return new Response(body, {
+		headers: {
+			"Content-Type": "text/plain; charset=utf-8",
+			"Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+		},
+	});
 }

@@ -5,6 +5,7 @@ import {
   adminClient,
   activateBoostCampaignFromCheckout,
   insertHostAnnouncement,
+  recordInvitePackPurchase,
   type BoostPurchaseTier,
 } from "@explore-and-earn/db";
 import {
@@ -13,6 +14,7 @@ import {
   BOOST_DURATIONS,
   BOOST_PRICING,
   FOUNDER_LOCKED_PRICING,
+  INVITE_CREDIT_PACKS,
   type BoostDuration,
 } from "@explore-and-earn/contracts";
 
@@ -317,6 +319,49 @@ async function syncBoostPurchase(
   };
 }
 
+/**
+ * Land a paid invite-credit pack as a ledger 'purchase' row (migration 061).
+ * Idempotent on the checkout session id — Stripe's at-least-once delivery can
+ * never double-credit (mirrors the 046/049 idempotency discipline).
+ */
+async function syncInviteCreditPurchase(
+  session: Stripe.Checkout.Session,
+): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
+  const clerkUserId = session.metadata?.clerkUserId ?? null;
+  const hostProfileId = session.metadata?.hostProfileId ?? null;
+  const creditsRaw = session.metadata?.credits;
+  const credits = creditsRaw ? parseInt(creditsRaw, 10) : null;
+
+  if (!clerkUserId || !hostProfileId || !credits) {
+    return { action: "ignored_missing_invite_pack_metadata", clerkUserId, tier: null };
+  }
+
+  // Only founder-locked pack sizes are creditable (ADR-028).
+  if (!INVITE_CREDIT_PACKS.some((pack) => pack.credits === credits)) {
+    return { action: "ignored_invalid_invite_pack_size", clerkUserId, tier: null };
+  }
+
+  const result = await recordInvitePackPurchase({
+    hostProfileId,
+    credits,
+    stripeCheckoutSessionId: session.id,
+  });
+
+  if (!result.ok) {
+    // Surface as a retryable failure — the ledger insert faulted (e.g. 061 not
+    // applied yet). Stripe will redeliver.
+    throw new Error("invite pack purchase could not be recorded");
+  }
+
+  return {
+    action: result.alreadyRecorded
+      ? "invite_pack_already_credited"
+      : "credited_invite_pack",
+    clerkUserId,
+    tier: null,
+  };
+}
+
 async function syncCheckoutCompleted(
   session: Stripe.Checkout.Session,
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
@@ -326,6 +371,10 @@ async function syncCheckoutCompleted(
 
   if (session.metadata?.productType === "listing_boost") {
     return syncBoostPurchase(session);
+  }
+
+  if (session.metadata?.productType === "invite_credits") {
+    return syncInviteCreditPurchase(session);
   }
 
   if (session.mode !== "subscription") {
@@ -609,6 +658,64 @@ export async function createBoostCheckoutSession(params: {
     client_reference_id: params.clerkUserId,
     success_url: absoluteAppUrl("/host/listings?boosted=1"),
     cancel_url:  absoluteAppUrl("/host/listings"),
+    metadata,
+    line_items: [lineItem],
+  });
+}
+
+/** Founder-locked invite pack sizes (ADR-028): 5 / 10 / 25 credits. */
+export type InvitePackSize = (typeof INVITE_CREDIT_PACKS)[number]["credits"];
+
+export function isInvitePackSize(value: number): value is InvitePackSize {
+  return INVITE_CREDIT_PACKS.some((pack) => pack.credits === value);
+}
+
+/**
+ * Checkout for an invite-credit pack (mode 'payment'). Prices come from the
+ * founder-locked INVITE_CREDIT_PACKS contract (ADR-028) — optionally overridden
+ * by a provisioned STRIPE_PRICE_INVITE_PACK_{N} price id, mirroring the boost
+ * flow. The webhook lands the credits via syncInviteCreditPurchase (ledger row,
+ * idempotent on session id). Invite credits are NON-REFUNDABLE
+ * (INVITE_CREDITS_REFUNDABLE=false) — RefundReview must reject these.
+ */
+export async function createInviteCreditCheckoutSession(params: {
+  clerkUserId: string;
+  hostProfileId: string;
+  credits: InvitePackSize;
+}): Promise<Stripe.Checkout.Session> {
+  const stripe = getStripeClient();
+  const pack = INVITE_CREDIT_PACKS.find((p) => p.credits === params.credits);
+  if (!pack) {
+    throw new Error(`Unknown invite pack size: ${params.credits}`);
+  }
+
+  const envPriceId = process.env[`STRIPE_PRICE_INVITE_PACK_${pack.credits}`];
+
+  const metadata = {
+    productType:   "invite_credits",
+    kind:          "invite_credits",
+    hostProfileId: params.hostProfileId,
+    clerkUserId:   params.clerkUserId,
+    credits:       String(pack.credits),
+    amountCents:   String(pack.priceCents),
+  } as const;
+
+  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = envPriceId
+    ? { price: envPriceId, quantity: 1 }
+    : {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: pack.priceCents,
+          product_data: { name: `${pack.credits} invite credits` },
+        },
+      };
+
+  return stripe.checkout.sessions.create({
+    mode: "payment",
+    client_reference_id: params.clerkUserId,
+    success_url: absoluteAppUrl("/host/invites?credits=1"),
+    cancel_url:  absoluteAppUrl("/host/billing"),
     metadata,
     line_items: [lineItem],
   });

@@ -4,6 +4,13 @@ import type { PublicListingDetail, PublicListingDetailHost } from "@explore-and-
  * Generate a schema.org JobPosting JSON-LD script for a listing detail page.
  * Enhances SEO by providing structured data to search engines.
  *
+ * Returns NULL when the listing cannot honestly satisfy Google's location
+ * requirement (a physical jobLocation OR an explicit TELECOMMUTE): a
+ * non-remote listing with no location data gets no JobPosting block at all —
+ * emitting one with a fabricated location would violate the no-fabrication
+ * law, and emitting one with neither is invalid structured data that can hurt
+ * the whole page's eligibility. Callers must render conditionally.
+ *
  * @see https://schema.org/JobPosting
  * @see https://developers.google.com/search/docs/appearance/structured-data/job-posting
  */
@@ -11,9 +18,8 @@ export function generateJobPostingJsonLd(
   listing: PublicListingDetail,
   host: PublicListingDetailHost | null,
   baseUrl: string,
-): string {
+): string | null {
   const listingUrl = `${baseUrl}/listing/${listing.id}`;
-  const employmentType = "CONTRACTOR"; // Explore & Earn listings are work-exchange/contract
 
   const baseSalary =
     listing.compensationMinCents != null
@@ -68,10 +74,18 @@ export function generateJobPostingJsonLd(
   const validThrough = listing.endsAt ?? undefined;
   const datePosted = listing.publishedAt ?? undefined;
 
-  // Google Jobs requires either a physical jobLocation or an explicit
-  // TELECOMMUTE declaration — remote/location-less listings are otherwise
-  // ineligible for the one search vertical that matters most here.
-  const isRemote = listing.category === "remote" || !listing.locationDisplay;
+  // TELECOMMUTE is asserted ONLY for genuinely remote listings (the category
+  // is the product's remote signal). A listing that merely lacks a location
+  // string is NOT remote — its location is missing data, and missing data is
+  // omitted, never re-labeled (no-fabrication law). Likewise no
+  // applicantLocationRequirements is emitted: the data model records no
+  // country eligibility, so claiming one would be fabricated.
+  const isRemote = listing.category === "remote";
+
+  // Google Jobs requires a physical jobLocation OR TELECOMMUTE. When neither
+  // can be stated honestly, emit no JobPosting at all rather than an invalid
+  // or fabricated one (see the function doc).
+  if (!isRemote && !jobLocation) return null;
 
   const jobPosting = {
     "@context": "https://schema.org",
@@ -88,15 +102,12 @@ export function generateJobPostingJsonLd(
     },
     datePosted,
     validThrough,
-    employmentType,
+    // employmentType is intentionally omitted: the listing model records no
+    // employment classification, and schema.org values (FULL_TIME, CONTRACTOR,
+    // …) are legal-ish claims we cannot derive honestly today.
     hiringOrganization,
     jobLocation,
-    ...(isRemote
-      ? {
-          jobLocationType: "TELECOMMUTE",
-          applicantLocationRequirements: { "@type": "Country", name: "USA" },
-        }
-      : {}),
+    ...(isRemote ? { jobLocationType: "TELECOMMUTE" } : {}),
     // Applications happen on-platform, not via an external redirect chain.
     directApply: true,
     baseSalary,

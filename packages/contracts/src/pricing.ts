@@ -28,30 +28,48 @@ export const FOUNDING_LOCKED_PRICING = {
 export const FOUNDING_SEAT_CAP = 100
 
 // Per-tier entitlements (ADR-039). Server-computed from Subscription +
-// PlanEntitlement; never frontend-hardcoded (G14). Starter keeps 0 included
-// invite credits (ADR-005).
+// PlanEntitlement; never frontend-hardcoded (G14).
+//
+// includedInviteCredits are MONTHLY invite allowances (starter 3 /
+// professional 10 / enterprise 20) per the founder charter of 2026-07-14
+// (product directives v3), superseding ADR-005's one-time starter-0 figure.
+// The server-enforced gate is MONTHLY_INVITE_QUOTA below; the
+// inviteQuotaConsistency test keeps the two from drifting (a drift would sell
+// one allowance and enforce another — the exact failure ADR-039 forbids).
 export const PLAN_ENTITLEMENTS = {
   starter: {
     listings: 1,
-    includedInviteCredits: 0,
+    includedInviteCredits: 3,
     monthlyAnnouncements: 0,
     teamSeats: 0,
     analytics: "basic",
   },
   professional: {
     listings: 5,
-    includedInviteCredits: 5,
+    includedInviteCredits: 10,
     monthlyAnnouncements: 1,
     teamSeats: 0,
     analytics: "full",
   },
   enterprise: {
     listings: 10,
-    includedInviteCredits: 10,
+    includedInviteCredits: 20,
     monthlyAnnouncements: 3,
     teamSeats: 1,
     analytics: "full",
   },
+} as const
+
+// The server-enforced monthly invite allowance per stored tier (mirrors
+// ANNOUNCEMENT_MONTHLY_QUOTA's shape). Unsubscribed hosts ('none') get zero
+// included invites — sourcing/inviting is a paid capability with an honest
+// upsell, not a floored freebie. Purchased packs (INVITE_CREDIT_PACKS) extend
+// beyond the monthly allowance and never expire monthly.
+export const MONTHLY_INVITE_QUOTA = {
+  none: 0,
+  starter: 3,
+  professional: 10,
+  enterprise: 20,
 } as const
 
 // Invite credit packs (integer cents) — ADR-028: 5=$250, 10=$400, 25=$750.

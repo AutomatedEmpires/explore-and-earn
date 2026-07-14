@@ -344,6 +344,13 @@ export interface SearchFilters {
   location?: string;
   startDateAfter?: string;
   startDateBefore?: string;
+  /**
+   * Geographic bounding box (validated upstream via isValidGeoBounds).
+   * Restricts results to listings WITH coordinates inside the box — listings
+   * without coordinates are excluded by definition of a geographic query.
+   * Shared by /map, the public API, and MCP (one geo path, no duplicates).
+   */
+  bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number };
   limit?: number;
   offset?: number;
 }
@@ -431,6 +438,17 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
     builder = builder.lte("begins_at", filters.startDateBefore);
   }
 
+  if (filters.bounds) {
+    const { minLat, maxLat, minLng, maxLng } = filters.bounds;
+    builder = builder
+      .not("latitude", "is", null)
+      .not("longitude", "is", null)
+      .gte("latitude", minLat)
+      .lte("latitude", maxLat)
+      .gte("longitude", minLng)
+      .lte("longitude", maxLng);
+  }
+
   const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;
   const ordered = builder.order("published_at", { ascending: false });
   const hasOffset =
@@ -443,6 +461,47 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
 
   if (error) throw new Error(`searchListings: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
+}
+
+/** Match-critical requirement fields promoted by migration 051. */
+export interface ListingMatchRequirements {
+  requiredSkillTags: string[];
+  requiredCertifications: string[];
+  experienceLevelRequired: string | null;
+}
+
+/**
+ * Requirement fields for ONE live listing. Defensive by design: these columns
+ * (051) may lack anon column grants in some environments, so any read fault
+ * degrades to null — callers treat that as "requirements unknown" (honest
+ * missing data), never as "no requirements".
+ */
+export async function getListingMatchRequirements(
+  listingId: string,
+): Promise<ListingMatchRequirements | null> {
+  try {
+    const untyped = anonClient() as unknown as SupabaseClient;
+    const { data, error } = await untyped
+      .from("listings")
+      .select("required_skill_tags, required_certifications, experience_level_required")
+      .eq("id", listingId)
+      .eq("status", "live")
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as Record<string, unknown>;
+    const asStrings = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+    return {
+      requiredSkillTags: asStrings(row.required_skill_tags),
+      requiredCertifications: asStrings(row.required_certifications),
+      experienceLevelRequired:
+        typeof row.experience_level_required === "string"
+          ? row.experience_level_required
+          : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function resolveHostProfileId(

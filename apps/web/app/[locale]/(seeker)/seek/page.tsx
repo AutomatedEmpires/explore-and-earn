@@ -3,7 +3,10 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 
 import {
 	type SearchFilters,
+	computeBehaviorProfile,
 	getSavedSearches,
+	getSeekerBehaviorInteractions,
+	personalizedOrderingScore,
 	rowToDiscoveryFields,
 	savedSearchToQueryString,
 	scoreSeekerListingRow,
@@ -265,14 +268,18 @@ export default async function SeekPage({
 				? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
 				: "Seeker";
 
-		let status, matchedListings, profile, savedSearches;
+		let status, matchedListings, profile, savedSearches, behaviorInteractions;
 		try {
-			[status, matchedListings, profile, savedSearches] = await Promise.all([
-				getSeekerStatus(token, userId, fallbackName),
-				getMatchedListings(token, userId),
-				cachedSeekerProfile(token, userId),
-				getSavedSearches(token, userId).catch(() => []),
-			]);
+			[status, matchedListings, profile, savedSearches, behaviorInteractions] =
+				await Promise.all([
+					getSeekerStatus(token, userId, fallbackName),
+					getMatchedListings(token, userId),
+					cachedSeekerProfile(token, userId),
+					getSavedSearches(token, userId).catch(() => []),
+					// Real interactions only (saves/passes/applies); [] on any fault so
+					// personalization can never break discovery.
+					getSeekerBehaviorInteractions(token, userId),
+				]);
 		} catch {
 			break seekerDashboard;
 		}
@@ -331,13 +338,20 @@ export default async function SeekPage({
 					? listing
 					: { ...listing, matchScore: score };
 			});
-			// Browsing (no text query): lead with the best fits. In-page re-rank
-			// only — published_at pagination is unchanged underneath. A typed
-			// query keeps search relevance order.
+			// Browsing (no text query): lead with the best fits, nudged by the
+			// seeker's own recorded behavior (saves/passes/applies — bounded ±8
+			// ordering points, reorder-only, never hides a card; the DISPLAYED
+			// score stays the pure ADR-040 fit). In-page re-rank only —
+			// published_at pagination is unchanged underneath. A typed query
+			// keeps search relevance order.
 			if (!query) {
-				listings = [...listings].sort(
-					(a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1),
+				const behaviorProfile = computeBehaviorProfile(
+					behaviorInteractions ?? [],
+					Date.now(),
 				);
+				const orderKey = (l: DiscoveryListing): number =>
+					personalizedOrderingScore(l.matchScore ?? -1, behaviorProfile, l.category);
+				listings = [...listings].sort((a, b) => orderKey(b) - orderKey(a));
 			}
 		}
 	}
