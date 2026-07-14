@@ -218,6 +218,61 @@ describe("buildMatchTrace — negative evidence and honesty", () => {
     );
     expect(codes(trace.signals)).toContain("onsite_conflicts_remote_only");
   });
+
+  it("pay shortfall is softened (weak) when the seeker marked pay flexible", () => {
+    const below = (payFlexible: boolean) =>
+      buildMatchTrace(
+        seeker({ payExpectationMinCents: 800_000, payFlexible }),
+        listing({ compensationMinCents: 300_000, compensationMaxCents: 400_000 }),
+        { nowMs: NOW },
+      ).signals.find((s) => s.code === "pay_below_expectation");
+    expect(below(false)?.polarity).toBe("negative");
+    expect(below(true)?.polarity).toBe("weak");
+    expect(below(true)?.params?.payPercent).toBe(50); // ratio stays factual
+  });
+});
+
+describe("buildMatchTrace — engine parity on fallback branches", () => {
+  it("hybrid/any remote preference on-site surfaces flexibility, not a false 'missing'", () => {
+    // The engine scores this branch 75 (mild positive) — the trace must not
+    // explain it as unevaluated.
+    const trace = buildMatchTrace(
+      seeker({ travelReadiness: null, remotePreference: "hybrid" }),
+      listing(),
+      { nowMs: NOW },
+    );
+    const c = codes(trace.signals);
+    expect(c).toContain("location_flexible_preference");
+    expect(c).not.toContain("travel_readiness_unknown");
+  });
+
+  it("meals unstated + meals preferred surfaces the honest missing note (engine penalizes this)", () => {
+    const trace = buildMatchTrace(
+      seeker({ mealsPreference: "preferred" }),
+      listing({ mealsIncluded: null }),
+      { nowMs: NOW },
+    );
+    const signal = trace.signals.find((s) => s.code === "meals_unspecified_preferred");
+    expect(signal).toBeDefined();
+    expect(signal?.polarity).toBe("missing");
+    // Never the false claim that meals are excluded.
+    expect(codes(trace.signals)).not.toContain("meals_not_included_preferred");
+  });
+
+  it("near-full availability overlap (>=99.5%) renders as full-season coverage", () => {
+    // 61.8 of 62 days ≈ 99.7% — the engine rounds this to 100.
+    const trace = buildMatchTrace(
+      seeker({
+        availabilityStart: "2026-07-01T04:00:00Z",
+        availabilityEnd: "2026-09-01T00:00:00Z",
+      }),
+      listing(),
+      { nowMs: NOW },
+    );
+    const c = codes(trace.signals);
+    expect(c).toContain("availability_overlaps_season");
+    expect(c).not.toContain("availability_partial_overlap");
+  });
 });
 
 describe("buildMatchTrace — missing data reduces certainty, never fabricates", () => {

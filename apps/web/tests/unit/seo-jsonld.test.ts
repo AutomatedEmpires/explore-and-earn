@@ -55,7 +55,8 @@ function listing(over: Partial<PublicListingDetail> = {}): PublicListingDetail {
   };
 }
 
-function parse(json: string): Record<string, unknown> {
+function parse(json: string | null): Record<string, unknown> {
+  if (json === null) throw new Error("unexpected null JSON-LD");
   // Undo the JSON-LD HTML escaping for assertions.
   return JSON.parse(
     json
@@ -97,16 +98,16 @@ describe("JobPosting — representative listing types", () => {
     expect(jp.applicantLocationRequirements).toBeUndefined();
   });
 
-  it("a listing merely MISSING its location is not relabeled remote", () => {
-    const jp = parse(
-      generateJobPostingJsonLd(
-        listing({ locationDisplay: null, latitude: null, longitude: null }),
-        host,
-        BASE,
-      ),
+  it("a non-remote listing MISSING its location emits NO JobPosting at all", () => {
+    // Google requires jobLocation OR TELECOMMUTE; neither can be stated
+    // honestly here, so no block is emitted (never a fabricated location,
+    // never invalid structured data).
+    const result = generateJobPostingJsonLd(
+      listing({ locationDisplay: null, latitude: null, longitude: null }),
+      host,
+      BASE,
     );
-    expect(jp.jobLocationType).toBeUndefined();
-    expect(jp.jobLocation).toBeUndefined(); // missing data omitted, not invented
+    expect(result).toBeNull();
   });
 
   it("compensation-unspecified listing emits NO baseSalary (no placeholder)", () => {

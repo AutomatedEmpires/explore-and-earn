@@ -219,14 +219,28 @@ function locationSignals(
 				},
 			]
 		default:
-			return [
-				{
-					code: "travel_readiness_unknown",
-					component: "locationTravelFit",
-					polarity: "missing",
-				},
-			]
+			break
 	}
+
+	// Mirrors the engine's post-switch fallback: a hybrid/any remote preference
+	// scores 75 on-site (mild positive) — surfacing only "readiness unknown"
+	// for a positively-scored input would misexplain the score.
+	if (seeker.remotePreference === "hybrid" || seeker.remotePreference === "any") {
+		return [
+			{
+				code: "location_flexible_preference",
+				component: "locationTravelFit",
+				polarity: "weak",
+			},
+		]
+	}
+	return [
+		{
+			code: "travel_readiness_unknown",
+			component: "locationTravelFit",
+			polarity: "missing",
+		},
+	]
 }
 
 function availabilitySignals(
@@ -321,7 +335,9 @@ function availabilitySignals(
 
 	const listingDur = ls != null && le != null ? Math.max((le - ls) / DAY, 1) : null
 	const frac = listingDur ? Math.min(overlapDays / listingDur, 1) : 1
-	if (frac >= 0.999) {
+	// 0.995 matches the engine's rounding (round(frac*100) === 100), so a
+	// near-full overlap never renders as a "100% partial" oddity.
+	if (frac >= 0.995) {
 		return [
 			{
 				code: "availability_overlaps_season",
@@ -370,11 +386,14 @@ function paySignals(
 			},
 		]
 	}
+	// The engine softens a shortfall for pay-flexible seekers (+15 sub-score);
+	// the ratio stays factual, but the framing follows the seeker's own
+	// flexibility rather than reading as a hard negative.
 	return [
 		{
 			code: "pay_below_expectation",
 			component: "payAlignment",
-			polarity: "negative",
+			polarity: seeker.payFlexible === true ? "weak" : "negative",
 			params: { payPercent: Math.round((offer / need) * 100) },
 		},
 	]
@@ -409,20 +428,30 @@ function housingMealsSignals(
 		})
 	}
 
+	// Mirrors the engine: once the seeker states a meals preference, the meals
+	// sub-score is evaluated even when the listing leaves meals unstated (the
+	// engine treats null as not-provided). An unstated listing gets an honest
+	// missing-data note, never a false "not included" claim.
 	const mealsWanted =
 		seeker.mealsPreference === "required" || seeker.mealsPreference === "preferred"
-	if (seeker.mealsPreference != null && listing.mealsIncluded != null) {
-		if (listing.mealsIncluded === true && mealsWanted) {
+	if (mealsWanted) {
+		if (listing.mealsIncluded === true) {
 			signals.push({
 				code: "meals_included_matches_need",
 				component: "housingMealsFit",
 				polarity: "positive",
 			})
-		} else if (listing.mealsIncluded !== true && mealsWanted) {
+		} else if (listing.mealsIncluded === false) {
 			signals.push({
 				code: "meals_not_included_preferred",
 				component: "housingMealsFit",
 				polarity: "negative",
+			})
+		} else {
+			signals.push({
+				code: "meals_unspecified_preferred",
+				component: "housingMealsFit",
+				polarity: "missing",
 			})
 		}
 	}

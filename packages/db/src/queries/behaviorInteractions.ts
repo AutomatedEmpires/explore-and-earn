@@ -81,7 +81,7 @@ export async function getSeekerBehaviorInteractions(
 				.limit(INTERACTION_ROW_CAP),
 			db
 				.from("applications")
-				.select("status, submitted_at, listings!listing_id(category)")
+				.select("status, submitted_at, updated_at, listings!listing_id(category)")
 				.eq("seeker_profile_id", seekerProfileId)
 				.order("submitted_at", { ascending: false })
 				.limit(INTERACTION_ROW_CAP),
@@ -116,7 +116,14 @@ export async function getSeekerBehaviorInteractions(
 			const category = categoryOf(raw);
 			interactions.push({ kind: "apply", category, occurredAt });
 			if (raw.status === "withdrawn") {
-				interactions.push({ kind: "withdraw", category, occurredAt });
+				// The withdrawal happened at the last status transition, not at
+				// submission — updated_at keeps the negative signal appropriately
+				// fresh instead of pre-decayed to the apply date.
+				interactions.push({
+					kind: "withdraw",
+					category,
+					occurredAt: raw.updated_at ?? occurredAt,
+				});
 			}
 		}
 

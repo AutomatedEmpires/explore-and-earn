@@ -48,14 +48,22 @@ export function apiError(error: ApiError): Response {
 }
 
 /**
- * Best-effort client ip for public rate limiting (x-forwarded-for's first hop
- * on Vercel; 'unknown' groups direct/unattributed callers into one bucket).
+ * Best-effort client ip for public rate limiting.
+ *
+ * TRUST MODEL: on Vercel (the deployment target) x-real-ip and x-forwarded-for
+ * are platform-set from the connecting client and cannot be forged by request
+ * headers; x-real-ip is preferred as the single-value form. Outside a trusted
+ * proxy these headers ARE client-controllable — which is acceptable here
+ * because these per-IP limits are abuse damping on public read-only data, not
+ * an authorization boundary (nothing private is reachable regardless of key).
  */
 export function clientIp(request: Request): string {
+	const realIp = request.headers.get("x-real-ip")?.trim();
+	if (realIp) return realIp;
 	const forwarded = request.headers.get("x-forwarded-for");
 	if (forwarded) {
 		const first = forwarded.split(",")[0]?.trim();
 		if (first) return first;
 	}
-	return request.headers.get("x-real-ip") ?? "unknown";
+	return "unknown";
 }

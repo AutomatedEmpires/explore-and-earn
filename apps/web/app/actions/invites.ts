@@ -5,7 +5,6 @@ import {
 	getSeekerInvites,
 	respondToInvite,
 	createInviteWithEntitlement,
-	getHostInvites,
 	getHostListings,
 	getHostProfile,
 	getHostClerkIdByProfileId,
@@ -68,21 +67,13 @@ export async function withdrawInviteAction(
 		const token = await getToken()
 		if (!token) return { ok: false, error: "Your session has expired — sign in again." }
 
-		// Snapshot the invite's status BEFORE withdrawing: only a never-delivered
-		// invite ('created') hands its credit back. Best-effort — a read fault
-		// just means no restore, never a blocked withdrawal.
-		let wasUndelivered = false
-		try {
-			const invites = await getHostInvites(token, userId)
-			wasUndelivered =
-				invites.find((invite) => invite.id === inviteId)?.status === "created"
-		} catch {
-			/* no restore on read fault */
-		}
-
+		// Only a never-delivered invite ('created') hands its credit back.
+		// wasUndelivered comes from the withdraw UPDATE itself (atomic — see
+		// withdrawInvite), so a seeker responding concurrently can never cause
+		// a restore for an invite that was actually delivered.
 		const result = await withdrawInvite(token, userId, inviteId)
 		if (result.ok) {
-			if (wasUndelivered) {
+			if (result.wasUndelivered) {
 				// Idempotent (one restore per invite, enforced in SQL); false pre-061.
 				await restoreInviteCreditForInvite(inviteId)
 			}

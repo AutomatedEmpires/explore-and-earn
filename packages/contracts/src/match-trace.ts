@@ -45,6 +45,7 @@ export const MATCH_SIGNAL_CODES = [
 	"travel_readiness_supports",
 	"travel_readiness_limited",
 	"travel_readiness_unknown",
+	"location_flexible_preference",
 	// availabilityOverlap
 	"availability_overlaps_season",
 	"availability_partial_overlap",
@@ -65,6 +66,7 @@ export const MATCH_SIGNAL_CODES = [
 	"housing_needs_unknown",
 	"meals_included_matches_need",
 	"meals_not_included_preferred",
+	"meals_unspecified_preferred",
 	// caps (blockers) — 1:1 with MATCH_SCORE_CAPS keys
 	"required_certification_missing",
 	"impossible_timeline_conflict",
@@ -203,6 +205,10 @@ const SIGNAL_TEMPLATES: Record<MatchSignalCode, SignalTemplates> = {
 		seeker: "You haven't set travel readiness, so location fit is only partly evaluated.",
 		host: "They haven't stated travel readiness, so location fit is only partly evaluated.",
 	},
+	location_flexible_preference: {
+		seeker: "Your location preference is flexible, which suits an on-site role like this.",
+		host: "Their flexible location preference suits this on-site role.",
+	},
 	availability_overlaps_season: {
 		seeker: "Your availability covers this role's {overlapDays}-day season.",
 		host: "Their availability covers the listing's {overlapDays}-day season.",
@@ -270,6 +276,10 @@ const SIGNAL_TEMPLATES: Record<MatchSignalCode, SignalTemplates> = {
 	meals_not_included_preferred: {
 		seeker: "Meals aren't included, and you said you'd prefer them.",
 		host: "Meals aren't included; they prefer meals provided.",
+	},
+	meals_unspecified_preferred: {
+		seeker: "This listing doesn't say whether meals are included, which you'd want to know.",
+		host: "The listing doesn't state meals; the candidate prefers them provided.",
 	},
 	required_certification_missing: {
 		seeker: "This role requires certifications your profile doesn't list yet.",

@@ -4,6 +4,13 @@ import type { PublicListingDetail, PublicListingDetailHost } from "@explore-and-
  * Generate a schema.org JobPosting JSON-LD script for a listing detail page.
  * Enhances SEO by providing structured data to search engines.
  *
+ * Returns NULL when the listing cannot honestly satisfy Google's location
+ * requirement (a physical jobLocation OR an explicit TELECOMMUTE): a
+ * non-remote listing with no location data gets no JobPosting block at all —
+ * emitting one with a fabricated location would violate the no-fabrication
+ * law, and emitting one with neither is invalid structured data that can hurt
+ * the whole page's eligibility. Callers must render conditionally.
+ *
  * @see https://schema.org/JobPosting
  * @see https://developers.google.com/search/docs/appearance/structured-data/job-posting
  */
@@ -11,7 +18,7 @@ export function generateJobPostingJsonLd(
   listing: PublicListingDetail,
   host: PublicListingDetailHost | null,
   baseUrl: string,
-): string {
+): string | null {
   const listingUrl = `${baseUrl}/listing/${listing.id}`;
 
   const baseSalary =
@@ -74,6 +81,11 @@ export function generateJobPostingJsonLd(
   // applicantLocationRequirements is emitted: the data model records no
   // country eligibility, so claiming one would be fabricated.
   const isRemote = listing.category === "remote";
+
+  // Google Jobs requires a physical jobLocation OR TELECOMMUTE. When neither
+  // can be stated honestly, emit no JobPosting at all rather than an invalid
+  // or fabricated one (see the function doc).
+  if (!isRemote && !jobLocation) return null;
 
   const jobPosting = {
     "@context": "https://schema.org",

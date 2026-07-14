@@ -310,12 +310,26 @@ async function resolveHostProfileId(
   return data ? String((data as Record<string, unknown>).id) : null;
 }
 
-export type WithdrawInviteResult = { ok: boolean; error?: string };
+export type WithdrawInviteResult = {
+  ok: boolean;
+  error?: string;
+  /**
+   * True iff the invite was status 'created' (never delivered) AT THE MOMENT
+   * the withdraw UPDATE matched — derived from the update itself, not a prior
+   * read, so callers can safely key credit restoration off it (no TOCTOU).
+   */
+  wasUndelivered?: boolean;
+};
 
 /**
  * Host retracts a still-pending invite (created/delivered/viewed → withdrawn),
  * scoped to the caller's own host profile. A no-op match — already actioned,
  * expired, or not owned — returns ok:false so the UI can explain why.
+ *
+ * Two-step conditional update: the strictly-'created' UPDATE runs first; only
+ * if it matched nothing do the delivered/viewed states get withdrawn. Each
+ * UPDATE's WHERE is atomic, so `wasUndelivered` is exact even when the seeker
+ * responds concurrently (the invite-credit restore policy depends on this).
  * `clerkUserId` MUST come from auth().userId (never decoded from the token).
  */
 export async function withdrawInvite(
@@ -331,17 +345,29 @@ export async function withdrawInvite(
   }
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+
+  const created = await untyped
+    .from("invites")
+    .update({ status: "withdrawn" })
+    .eq("id", inviteId)
+    .eq("host_profile_id", hostProfileId)
+    .eq("status", "created")
+    .select("id")
+    .maybeSingle();
+  if (created.error) return { ok: false, error: created.error.message };
+  if (created.data) return { ok: true, wasUndelivered: true };
+
   const { data, error } = await untyped
     .from("invites")
     .update({ status: "withdrawn" })
     .eq("id", inviteId)
     .eq("host_profile_id", hostProfileId)
-    .in("status", ["created", "delivered", "viewed"])
+    .in("status", ["delivered", "viewed"])
     .select("id")
     .maybeSingle();
   if (error) return { ok: false, error: error.message };
   if (!data) return { ok: false, error: "That invite can no longer be withdrawn." };
-  return { ok: true };
+  return { ok: true, wasUndelivered: false };
 }
 
 function sanitizeSearchQuery(raw: string): string {
