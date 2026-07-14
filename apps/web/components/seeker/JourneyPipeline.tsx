@@ -15,6 +15,7 @@ export interface JourneyPipelineProps {
   readonly savedCount: number;
   readonly appliedCount: number;
   readonly offersCount: number;
+  readonly acceptedCount: number;
   readonly acceptedUpcoming?: string;
 }
 
@@ -23,6 +24,7 @@ export function JourneyPipeline({
   savedCount,
   appliedCount,
   offersCount,
+  acceptedCount,
   acceptedUpcoming,
 }: JourneyPipelineProps) {
   const steps: PipelineStep[] = [
@@ -30,7 +32,7 @@ export function JourneyPipeline({
     { href: "/saved",    label: "Saved",   count: savedCount,    hasActivity: savedCount > 0    },
     { href: "/applied",  label: "Applied", count: appliedCount,  hasActivity: appliedCount > 0  },
     { href: "/offered",  label: "Offers",  count: offersCount,   hasActivity: offersCount > 0,  isUrgent: offersCount > 0 },
-    { href: "/accepted", label: "Accepted",                      hasActivity: Boolean(acceptedUpcoming) },
+    { href: "/accepted", label: "Accepted", count: acceptedCount, hasActivity: acceptedCount > 0 || Boolean(acceptedUpcoming) },
   ];
 
   const reachedIdx = steps.reduce((max, s, i) => (s.hasActivity ? i : max), -1);

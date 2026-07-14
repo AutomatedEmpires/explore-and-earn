@@ -5,11 +5,10 @@ import type {
   ListingHost,
   ListingPayInsight,
   OpportunityCategory,
-  OpportunityListing,
   ResponsiveImage,
 } from "@explore-and-earn/contracts";
 import type { DiscoveryCardData, IconKey } from "@explore-and-earn/ui";
-import type { SeekerApplicationListing } from "@explore-and-earn/db";
+import type { DiscoveryFields, SeekerApplicationListing } from "@explore-and-earn/db";
 
 /**
  * Discovery & Feed lane — view model.
@@ -34,8 +33,14 @@ export type DiscoveryListingCoordinates = ListingCoordinates;
 /** @deprecated Use `ListingPayInsight` from `@explore-and-earn/contracts` instead. */
 export type DiscoveryListingPayInsight = ListingPayInsight;
 
-/** Canonical opportunity listing. Alias of `OpportunityListing` from contracts. */
-export type DiscoveryListing = OpportunityListing;
+/**
+ * Canonical opportunity listing view-model. Alias of the DB `DiscoveryFields`
+ * (= `OpportunityListing` + the per-seeker `previouslySkipped` flag stamped by
+ * the shared `rowToDiscoveryFields` mapper). Assignable everywhere an
+ * `OpportunityListing` is expected; surfaces read `.previouslySkipped` to pass
+ * the `<DiscoveryCard previouslySkipped>` marker on demote-but-visible surfaces.
+ */
+export type DiscoveryListing = DiscoveryFields;
 
 /** Map a canonical category to its canonical Icon registry key (never "lodge"). */
 export const CATEGORY_ICON: Record<OpportunityCategory, IconKey> = {
@@ -203,5 +208,9 @@ export function seekerApplicationListingToCardData(
     },
     housingOccupancy: inferHousingOccupancy(listing.benefits.housing.summary),
     verifiedHost: listing.host.verified,
+    // Boosted marker must travel even off the discovery feed (founder decision):
+    // lifecycle-bucket pages map through here, so carry the badge the DB stamped
+    // on SeekerApplicationListing instead of dropping it.
+    conditionalBadges: listing.conditionalBadges,
   };
 }

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 
 import { getDiscoveryListingsWithCoords } from "../../../../components/discovery/data";
 import { MapViewLazy } from "../../../../components/map";
+import { getSupabaseToken } from "../../../../lib/serverCache";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +42,15 @@ export default async function MapPage({
 }: {
 	searchParams: Promise<MapSearchParams>;
 }) {
+	// Auth is optional — the map is a public read. When a seeker is signed in we
+	// thread their token+userId so applied pins are HARD-excluded and every pin
+	// carries the boosted/skipped/match enrichment; signed-out visitors get the
+	// unscoped public map (no crash).
+	const { userId } = await auth();
+	const token = userId ? await getSupabaseToken() : null;
 	const [params, listings] = await Promise.all([
 		searchParams,
-		getDiscoveryListingsWithCoords(),
+		getDiscoveryListingsWithCoords(token, userId),
 	]);
 	const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 	return (

@@ -241,6 +241,12 @@ a.userRow:focus-visible {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	/* border-box so the 1px border is INSIDE the declared 44px. Without it the
+	   button rendered 46px (content-box + border) and overhung the exact 44px
+	   gutter every scope shell reserves (padding-inline-start: calc(44px + …)),
+	   reading as off-center against the top bar. The bar glyph is flex-centered
+	   so it stays dead-center in the circle either way. */
+	box-sizing: border-box;
 	width: 44px;
 	height: 44px;
 	padding: 0;

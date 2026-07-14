@@ -25,6 +25,8 @@ export interface SeekerStatusSummary {
   readonly savedCount: number;
   readonly appliedCount: number;
   readonly offersCount: number;
+  /** Number of accepted roles — drives the "Accepted" pipeline count. */
+  readonly acceptedCount: number;
   /** Title of the next confirmed/upcoming role, if any. */
   readonly acceptedUpcoming?: string;
   readonly unreadNotifications: number;

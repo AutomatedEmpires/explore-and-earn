@@ -257,6 +257,7 @@ export function SeekerDashboard({
           savedCount={status.savedCount}
           appliedCount={status.appliedCount}
           offersCount={status.offersCount}
+          acceptedCount={status.acceptedCount}
           acceptedUpcoming={status.acceptedUpcoming}
         />
       </section>

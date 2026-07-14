@@ -1,19 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
+import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { FOUNDING_SEAT_CAP } from "@explore-and-earn/contracts";
 
 import {
-  BenefitTrustModal,
-  HostProfilePopup,
-  PayDetailsDrawer,
-  QuickPeekDrawer,
-  toDiscoveryCardData,
+  ListingCard,
+  ListingCardProvider,
   type DiscoveryListing,
 } from "../discovery";
 import { FeaturedEmployersRail, type FeaturedEmployer } from "../public/FeaturedEmployersRail";
@@ -353,38 +350,6 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
   // Six cards on desktop (3-up grid); the module CSS caps mobile at four.
   const shown = listings.slice(0, 6);
 
-  // Mirror /seek (DiscoveryFeed): the triad, host, and card body open popups in
-  // place instead of navigating away — only Apply and Location still route.
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [activeHostId, setActiveHostId] = useState<string | null>(null);
-  const [activeBenefit, setActiveBenefit] = useState<{
-    readonly id: string;
-    readonly bucket: "housing" | "meals";
-  } | null>(null);
-  const [activePayId, setActivePayId] = useState<string | null>(null);
-
-  // Resolve the active listing/host from the full prop list (a host popup can
-  // point at a sibling listing outside the six shown), matching DiscoveryFeed.
-  const activeListing = useMemo(
-    () => listings.find((listing) => listing.id === activeId) ?? null,
-    [listings, activeId],
-  );
-
-  const activeHost = useMemo(
-    () => listings.find((listing) => listing.id === activeHostId)?.host ?? null,
-    [listings, activeHostId],
-  );
-
-  const activeBenefitListing = useMemo(
-    () => listings.find((listing) => listing.id === activeBenefit?.id) ?? null,
-    [listings, activeBenefit],
-  );
-
-  const activePayListing = useMemo(
-    () => listings.find((listing) => listing.id === activePayId) ?? null,
-    [listings, activePayId],
-  );
-
   return (
     <section className={styles.section} aria-labelledby="featured-jobs-title">
       <SectionHead
@@ -406,51 +371,26 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
           </Link>
         </div>
       ) : (
-        <>
+        // Mirror /seek (DiscoveryFeed): the triad, host, card body, and report
+        // flag open popups in place; only Apply and Location route. The shared
+        // host resolves against the FULL prop list (a host popup can point at a
+        // sibling outside the six shown), and the Report drawer is now wired
+        // too (was missing before this migration).
+        <ListingCardProvider
+          listings={listings}
+          overrides={{ onApply: (id) => router.push(`/listing/${id}`) }}
+        >
           <div className={styles.jobsGrid}>
             {shown.map((listing, index) => (
-              <DiscoveryCard
+              <ListingCard
                 key={listing.id}
-                data={toDiscoveryCardData(listing)}
+                listing={listing}
                 surface="discovery_feed"
                 imageLoading={index < 2 ? "eager" : "lazy"}
-                onOpen={(id) => setActiveId(id)}
-                onApply={(id) => router.push(`/listing/${id}`)}
-                onHostClick={(id) => setActiveHostId(id)}
-                onLocationClick={(id) => router.push(`/map?focus=${id}`)}
-                onHousingClick={(id) => setActiveBenefit({ id, bucket: "housing" })}
-                onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
-                onPayClick={(id) => setActivePayId(id)}
               />
             ))}
           </div>
-
-          <QuickPeekDrawer
-            listing={activeListing}
-            onClose={() => setActiveId(null)}
-          />
-
-          <HostProfilePopup
-            host={activeHost}
-            listings={listings}
-            onClose={() => setActiveHostId(null)}
-            onSelectListing={(id) => {
-              setActiveHostId(null);
-              setActiveId(id);
-            }}
-          />
-
-          <BenefitTrustModal
-            listing={activeBenefitListing}
-            bucket={activeBenefit?.bucket ?? null}
-            onClose={() => setActiveBenefit(null)}
-          />
-
-          <PayDetailsDrawer
-            listing={activePayListing}
-            onClose={() => setActivePayId(null)}
-          />
-        </>
+        </ListingCardProvider>
       )}
     </section>
   );

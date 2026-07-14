@@ -30,6 +30,7 @@ export const SEEKER_STATUS: SeekerStatusSummary = {
   savedCount: 3,
   appliedCount: 2,
   offersCount: 1,
+  acceptedCount: 1,
   acceptedUpcoming: "Ski Resort Front Desk",
   unreadNotifications: 4,
   invitesCount: 2,

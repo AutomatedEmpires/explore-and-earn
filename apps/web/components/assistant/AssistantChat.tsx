@@ -6,9 +6,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { DiscoveryCard, Icon } from "@explore-and-earn/ui";
+import { Icon } from "@explore-and-earn/ui";
 
-import { DISCOVERY_FIXTURES, toDiscoveryCardData, type DiscoveryListing } from "../discovery";
+import {
+  DISCOVERY_FIXTURES,
+  ListingCard,
+  ListingCardProvider,
+  type DiscoveryListing,
+} from "../discovery";
 import { byMonetization, type HostTier } from "../../lib/ranking";
 import styles from "./assistant.module.css";
 
@@ -441,27 +446,34 @@ function SearchResultsBlock({
         ) : null}
       </div>
 
-      <div className={styles.resultsGrid}>
-        {parsed.results.map((listing) => (
-          <DiscoveryCard
-            key={listing.id}
-            data={toDiscoveryCardData(listing)}
-            surface="discovery_feed"
-            onOpen={onOpen}
-            actions={
-              <button
-                type="button"
-                className={styles.resultOpen}
-                onClick={() => onOpen(listing.id)}
-              >
-                <Icon name="action.apply" size={16} aria-hidden />
-                View listing
-                <Icon name="action.forward" size={16} aria-hidden />
-              </button>
-            }
-          />
-        ))}
-      </div>
+      {/* Cards are destinations here (the assistant's design): opening any card
+          routes to /listing/{id}. The Host / Benefit / Pay / Report / location
+          popups still come from the shared host for consistency with the feed. */}
+      <ListingCardProvider
+        listings={parsed.results}
+        overrides={{ onOpen, onApply: onOpen }}
+      >
+        <div className={styles.resultsGrid}>
+          {parsed.results.map((listing) => (
+            <ListingCard
+              key={listing.id}
+              listing={listing}
+              surface="discovery_feed"
+              actions={
+                <button
+                  type="button"
+                  className={styles.resultOpen}
+                  onClick={() => onOpen(listing.id)}
+                >
+                  <Icon name="action.apply" size={16} aria-hidden />
+                  View listing
+                  <Icon name="action.forward" size={16} aria-hidden />
+                </button>
+              }
+            />
+          ))}
+        </div>
+      </ListingCardProvider>
 
       <Link className={styles.resultsMore} href={buildSeekHref(parsed)}>
         See all in Seek

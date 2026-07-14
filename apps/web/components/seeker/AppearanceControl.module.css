@@ -1,0 +1,82 @@
+/* AppearanceControl — segmented Light / Dark / Auto theme picker.
+   Glacier tokens only; reads correctly in both day + night themes. */
+
+.group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-8);
+}
+
+@media (max-width: 520px) {
+  .group {
+    grid-template-columns: 1fr;
+  }
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  text-align: start;
+  min-height: var(--tap-min, 44px);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-base) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.option:hover {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+}
+
+.option:active {
+  transform: scale(0.98);
+}
+
+.option:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* Selected lane — --color-cta tint + ink-legible label, consistent with the
+   nav active treatment. */
+.option[data-selected="true"] {
+  border-color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 14%, var(--color-surface-raised));
+  color: var(--color-cta);
+}
+
+.optionLabel {
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  font-weight: var(--font-weight-semibold);
+}
+
+.optionHint {
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-muted);
+}
+
+.option[data-selected="true"] .optionHint {
+  color: color-mix(in srgb, var(--color-cta) 78%, var(--text-secondary));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .option {
+    transition: none;
+  }
+  .option:active {
+    transform: none;
+  }
+}

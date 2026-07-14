@@ -15,15 +15,17 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
-import { Button, DiscoveryCard, Icon } from "@explore-and-earn/ui";
+import { Button, Icon } from "@explore-and-earn/ui";
 
 import {
 	CATEGORY_ICON,
 	CATEGORY_LABEL,
 	DiscoveryCardSkeleton,
 	EmptyState,
-	toDiscoveryCardData,
+	ListingCard,
+	ListingCardProvider,
 	type DiscoveryListing,
+	type ListingCardPopupOverrides,
 } from "../discovery";
 import { SeekFilterPopup, type SeekFilterPopupValue } from "./SeekFilterPopup";
 import { SeekSortPopup } from "./SeekSortPopup";
@@ -45,6 +47,12 @@ interface Decision {
 
 /** Drag distance (px) past which a release commits the swipe. */
 const COMMIT_DISTANCE = 120;
+/**
+ * Movement (px) past which a pointer gesture is treated as a drag rather than a
+ * tap. Below this, a pointerup is a tap and the trailing click opens the card's
+ * popup; at/above it the click is swallowed so a drag never fires a card action.
+ */
+const TAP_SLOP = 10;
 /** Throw-off / snap-back durations (ms); kept in sync with the inline CSS transition. */
 const THROW_MS = 240;
 const SNAP_MS = 160;
@@ -125,16 +133,26 @@ export interface SwipeDeckProps {
 
 /**
  * SwipeDeck — the immersive /swipe surface. A true Tinder-style deck built on the
- * SINGLE canonical DiscoveryCard ("swipe" surface, which renders no CTA — the
- * card is entirely gesture-driven). The page around it is stripped to just the
- * card: drag to throw, a peeking stack, edge-glow / labeled overlays that scale
- * with the drag, flanking arrow controls on ≥768, full keyboard control, a
- * confirm toast with one-tap Undo, and in-place Sort / Filter (the same popups
- * /seek uses). Motion honors prefers-reduced-motion.
+ * SINGLE canonical DiscoveryCard, rendered through the shared <ListingCard>
+ * wrapper ("swipe" surface) so the card's popups — Quick Peek, Host, Benefit
+ * (Housing/Meals), Pay, Report — open on a tap while a drag still throws the
+ * card. The top card shows the on-card "Quick Apply" stamp (wired to the same
+ * up-swipe throw); a tap-vs-drag guard (suppressTap) swallows the trailing click
+ * when the pointer moved past the tap slop, so a swipe-release over a control
+ * never fires a card action. The page around it is stripped to just the card:
+ * drag to throw, a peeking stack, edge-glow / labeled overlays that scale with
+ * the drag, flanking arrow controls on ≥768 (Skip left / Save right), full
+ * keyboard control, a confirm toast with one-tap Undo, and in-place Sort /
+ * Filter (the same popups /seek uses). Motion honors prefers-reduced-motion.
  *
  * "Better than Tinder" here means values-first (Housing/Meals/Pay always on the
  * card), match shown neutrally by the card itself, and a no-cost Undo — zero
- * dark patterns.
+ * dark patterns. De-duplicated controls: Skip / Save live on the arrows + the
+ * gesture, Quick Apply on the card, so the dock keeps only Undo.
+ *
+ * End-of-deck: skipped listings are demote-but-not-gone — when the deck empties,
+ * "Review skipped (N)" re-queues the ones passed this session (un-persisting each
+ * pass) so they get a second look.
  *
  * Order: each fetched batch is monetization-ranked (byMonetization) as a
  * tiebreaker after the server's batch order; batches stay in fetch order and
@@ -184,6 +202,13 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 	const loadingRef = useRef(false);
 	const authGateDismissRef = useRef<HTMLButtonElement | null>(null);
 	const preGateFocusRef = useRef<HTMLElement | null>(null);
+	// Tap-vs-drag guard for the on-card popups. A pointer gesture on the top card
+	// bubbles from a card control (host / triad / pay / report / Quick Apply) up to
+	// the deck's pointer handlers; if the pointer moved past the tap slop we mark
+	// it a drag so the trailing `click` on that control is swallowed (a drag-
+	// release over a button swipes instead of opening a popup). Reset on each new
+	// pointerdown; read by `suppressTap` at click time.
+	const wasDragRef = useRef(false);
 
 	useEffect(() => {
 		deckRef.current = deck;
@@ -328,6 +353,20 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		[isAuthenticated, leaving, view, index, reducedMotion, router],
 	);
 
+	// Drag guard read by every on-card control at click time: true iff the last
+	// pointer gesture crossed the tap slop (i.e. was a drag, not a tap). Stable
+	// identity — reads a ref — so it never thrashes the wrapper's handler memo.
+	const suppressTap = useCallback(() => wasDragRef.current, []);
+
+	// The card's on-card CTA. surface="swipe" renders a single "Quick Apply" stamp
+	// when onApply is supplied; wiring it to the same throw the ArrowUp / up-swipe
+	// uses keeps one apply path. Popup openers (Quick Peek / Host / Benefit / Pay /
+	// Report / location→map) keep the wrapper defaults, so they open while swiping.
+	const cardOverrides = useMemo<ListingCardPopupOverrides>(
+		() => ({ onApply: () => triggerLeave("apply") }),
+		[triggerLeave],
+	);
+
 	const undo = useCallback(() => {
 		if (!isAuthenticated || leaving) {
 			return;
@@ -357,6 +396,50 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		setOffset({ x: 0, y: 0 });
 		setLeaving(null);
 	}, []);
+
+	// End-of-deck recycle. Skipped listings are demote-but-not-gone (founder
+	// decision): when the deck empties, re-queue the ones passed THIS session as a
+	// fresh review deck and un-persist each pass (best-effort) so they can also
+	// resurface in future sessions. Any active lane/filter is cleared so the whole
+	// skipped set is reviewable. Terminal mode — pagination is retired (cursor
+	// null); "Start over" still replays the full original deck from the parent.
+	const reviewSkipped = useCallback(() => {
+		const skippedIds = decisions
+			.filter((decision) => decision.action === "pass")
+			.map((decision) => decision.id);
+		if (skippedIds.length === 0) {
+			return;
+		}
+		const wanted = new Set(skippedIds);
+		const skippedListings = deckRef.current.filter((listing) => wanted.has(listing.id));
+		if (skippedListings.length === 0) {
+			return;
+		}
+		// Un-persist the passes so these are no longer excluded from future decks.
+		startTransition(() => {
+			for (const id of skippedIds) {
+				void unpassListingAction(id).catch(() => {
+					/* best-effort; the local re-queue below is what the seeker sees */
+				});
+			}
+		});
+		if (leaveTimer.current) {
+			clearTimeout(leaveTimer.current);
+		}
+		if (feedbackTimer.current) {
+			clearTimeout(feedbackTimer.current);
+		}
+		setLane(null);
+		setFilters(EMPTY_FILTERS);
+		setDeck(skippedListings);
+		setCursor(null);
+		setDecisions([]);
+		setIndex(0);
+		setOffset({ x: 0, y: 0 });
+		setLeaving(null);
+		setFeedback(null);
+		setLoadError(false);
+	}, [decisions]);
 
 	// Applying a lane / filter re-forms the deck, so start the filtered run fresh
 	// at the first card. Any in-flight throw/feedback timers are cleared so the
@@ -401,6 +484,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 
 	const current = view[index];
 	const savedCount = decisions.filter((decision) => decision.action === "save").length;
+	const skippedCount = decisions.filter((decision) => decision.action === "pass").length;
 	const filterCount =
 		(filters.housing ? 1 : 0) +
 		(filters.meals ? 1 : 0) +
@@ -443,6 +527,9 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 	};
 
 	const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+		// Fresh gesture — assume a tap until the pointer proves otherwise, so the
+		// card's popups stay tappable.
+		wasDragRef.current = false;
 		if (!isAuthenticated) {
 			setShowAuthGate(true);
 			return;
@@ -460,10 +547,14 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		if (!dragging || !startRef.current) {
 			return;
 		}
-		setOffset({
-			x: event.clientX - startRef.current.x,
-			y: event.clientY - startRef.current.y,
-		});
+		const dx = event.clientX - startRef.current.x;
+		const dy = event.clientY - startRef.current.y;
+		// Once the pointer travels past the tap slop this gesture is a drag; the
+		// trailing click on any card control is then suppressed (see suppressTap).
+		if (!wasDragRef.current && Math.hypot(dx, dy) > TAP_SLOP) {
+			wasDragRef.current = true;
+		}
+		setOffset({ x: dx, y: dy });
 	};
 
 	const onPointerEnd = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -618,6 +709,11 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 					<EmptyState title="You're all caught up" message={summary} />
 				</div>
 				<div className={styles.controls}>
+					{skippedCount > 0 ? (
+						<Button variant="secondary" icon="action.back" onClick={reviewSkipped}>
+							{`Review skipped (${skippedCount})`}
+						</Button>
+					) : null}
 					<Button variant="secondary" icon="action.back" onClick={restart}>
 						Start over
 					</Button>
@@ -665,6 +761,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 					<Icon name="action.close" size={24} aria-hidden />
 				</button>
 
+				<ListingCardProvider listings={deck} overrides={cardOverrides}>
 				<div className={styles.stack}>
 					{visible.map((listing, depth) => {
 						const isTop = depth === 0;
@@ -720,8 +817,20 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 										<span className={`${styles.edgeGlow} ${styles.edgeGlowApply}`} style={applyOverlayStyle} aria-hidden />
 									</>
 								) : null}
-								{/* Deck covers are the whole viewport — the visible stack loads eagerly. */}
-								<DiscoveryCard data={toDiscoveryCardData(listing)} surface="swipe" actions={<></>} imageLoading="eager" />
+								{/* Deck covers are the whole viewport — the visible stack loads
+								    eagerly. The canonical card is rendered through the shared
+								    wrapper so Housing/Meals/Pay/host/Quick-Peek/Pay/Report popups
+								    open while swiping; the top card shows the "Quick Apply" stamp
+								    (onApply via cardOverrides), behind cards keep no CTA. A drag is
+								    swallowed by suppressTap so a swipe-release over a control never
+								    opens a popup. */}
+								<ListingCard
+									listing={listing}
+									surface="swipe"
+									imageLoading="eager"
+									actions={isTop ? undefined : <></>}
+									suppressTap={suppressTap}
+								/>
 							</div>
 						);
 					})}
@@ -774,6 +883,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 						</div>
 					)}
 				</div>
+				</ListingCardProvider>
 
 				<button
 					type="button"
@@ -805,18 +915,13 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				</div>
 			) : null}
 
+			{/* De-duplicated controls: Skip / Save now live ONLY on the flanking
+			    arrows (≥768) + the swipe gesture, and Quick Apply is the on-card
+			    stamp — so the dock keeps just Undo (the one action with no gesture
+			    or arrow equivalent). */}
 			<div className={styles.controls}>
 				<Button variant="ghost" icon="action.back" onClick={undo} disabled={decisions.length === 0}>
 					Undo
-				</Button>
-				<Button variant="secondary" icon="action.close" onClick={() => triggerLeave("pass")}>
-					Skip
-				</Button>
-				<Button variant="secondary" icon="action.save" onClick={() => triggerLeave("save")}>
-					Save
-				</Button>
-				<Button variant="primary" icon="action.apply" onClick={() => triggerLeave("apply")}>
-					Quick Apply
 				</Button>
 			</div>
 

@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -12,17 +13,14 @@ import MapboxMap, { Marker, Popup, type MapRef } from "react-map-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
-import { DiscoveryCard, Icon, Skeleton } from "@explore-and-earn/ui";
+import { Icon, Skeleton } from "@explore-and-earn/ui";
 
 import {
-  BenefitTrustModal,
   CATEGORY_ICON,
   CATEGORY_LABEL,
   EmptyState,
-  HostProfilePopup,
-  PayDetailsDrawer,
-  ReportListingDrawer,
-  toDiscoveryCardData,
+  ListingCard,
+  ListingCardProvider,
   type DiscoveryListing,
 } from "../discovery";
 import { MAPPIN_ICON } from "../seeker/mappin";
@@ -218,41 +216,24 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
     initialFocusId ?? null,
   );
   const [trayOpen, setTrayOpen] = useState(Boolean(initialFocusId));
-  const [activeHostId, setActiveHostId] = useState<string | null>(null);
-  const [activeBenefit, setActiveBenefit] = useState<{
-    readonly id: string;
-    readonly bucket: "housing" | "meals";
-  } | null>(null);
-  const [activePayId, setActivePayId] = useState<string | null>(null);
-  const [reportId, setReportId] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
+
+  // A ?focus=<id> deep link can point at a listing the map can't show — one with
+  // no coordinates, or one filtered out of the map query entirely (e.g. an
+  // applied listing, now hard-hidden). Rather than silently no-op over an empty
+  // map, fall back to that listing's detail page so the link still lands.
+  useEffect(() => {
+    if (initialFocusId && !mapped.some((listing) => listing.id === initialFocusId)) {
+      router.replace(`/listing/${initialFocusId}`);
+    }
+  }, [initialFocusId, mapped, router]);
 
   // Popup resolves against the filtered set: a listing screened out by the sort
   // or filters closes its popup instead of floating over an empty map.
   const selected = useMemo(
     () => filtered.find((listing) => listing.id === selectedId) ?? null,
     [filtered, selectedId],
-  );
-
-  const activeHost = useMemo(
-    () => mapped.find((listing) => listing.id === activeHostId)?.host ?? null,
-    [mapped, activeHostId],
-  );
-
-  const activeBenefitListing = useMemo(
-    () => mapped.find((listing) => listing.id === activeBenefit?.id) ?? null,
-    [mapped, activeBenefit],
-  );
-
-  const activePayListing = useMemo(
-    () => mapped.find((listing) => listing.id === activePayId) ?? null,
-    [mapped, activePayId],
-  );
-
-  const activeReportListing = useMemo(
-    () => mapped.find((listing) => listing.id === reportId) ?? null,
-    [mapped, reportId],
   );
 
   const initialViewState = useMemo(() => {
@@ -346,6 +327,14 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
   const sortIcon = lane ? CATEGORY_ICON[lane] : "action.sort";
 
   return (
+    // ONE shared popup host for every card on the map — the pin Popup card AND
+    // the swipe-up tray cards. Host / Benefit / Pay / Report open from the
+    // provider defaults; the map-specific Open + Location behaviors (focus a
+    // pin, don't navigate/quick-peek) are per-card overrides below.
+    <ListingCardProvider
+      listings={mapped}
+      overrides={{ onApply: (id) => router.push(`/listing/${id}`) }}
+    >
     <div className={styles.shell}>
       <div className={styles.canvas}>
         <MapboxMap
@@ -409,19 +398,13 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
             >
               <div className={styles.popupCard}>
                 <div className={styles.popupFrame}>
-                  <DiscoveryCard
-                    data={toDiscoveryCardData(selected)}
+                  <ListingCard
+                    listing={selected}
                     surface="map"
-                    onOpen={(id) => setSelectedId(id)}
-                    onApply={(id) => router.push(`/listing/${id}`)}
-                    onHostClick={(id) => setActiveHostId(id)}
-                    onLocationClick={(id) => setSelectedId(id)}
-                    onHousingClick={(id) =>
-                      setActiveBenefit({ id, bucket: "housing" })
-                    }
-                    onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
-                    onPayClick={(id) => setActivePayId(id)}
-                    onReport={(id) => setReportId(id)}
+                    overrides={{
+                      onOpen: (id) => setSelectedId(id),
+                      onLocationClick: (id) => setSelectedId(id),
+                    }}
                   />
                 </div>
               </div>
@@ -497,30 +480,24 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
                       : styles.trayCard
                   }
                 >
-                  <DiscoveryCard
-                    data={toDiscoveryCardData(listing)}
+                  <ListingCard
+                    listing={listing}
                     surface="map"
-                    onOpen={(id) => {
-                      const next = mapped.find((item) => item.id === id);
-                      if (next) {
-                        focusListing(next);
-                        setTrayOpen(true);
-                      }
+                    overrides={{
+                      onOpen: (id) => {
+                        const next = mapped.find((item) => item.id === id);
+                        if (next) {
+                          focusListing(next);
+                          setTrayOpen(true);
+                        }
+                      },
+                      onLocationClick: (id) => {
+                        const next = mapped.find((item) => item.id === id);
+                        if (next) {
+                          focusListing(next);
+                        }
+                      },
                     }}
-                    onApply={(id) => router.push(`/listing/${id}`)}
-                    onHostClick={(id) => setActiveHostId(id)}
-                    onLocationClick={(id) => {
-                      const next = mapped.find((item) => item.id === id);
-                      if (next) {
-                        focusListing(next);
-                      }
-                    }}
-                    onHousingClick={(id) =>
-                      setActiveBenefit({ id, bucket: "housing" })
-                    }
-                    onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
-                    onPayClick={(id) => setActivePayId(id)}
-                    onReport={(id) => setReportId(id)}
                   />
                 </div>
               ))}
@@ -528,32 +505,6 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
           )}
         </div>
       </section>
-
-      <HostProfilePopup
-        host={activeHost}
-        listings={mapped}
-        onClose={() => setActiveHostId(null)}
-        onSelectListing={(id) => {
-          setActiveHostId(null);
-          setSelectedId(id);
-        }}
-      />
-
-      <BenefitTrustModal
-        listing={activeBenefitListing}
-        bucket={activeBenefit?.bucket ?? null}
-        onClose={() => setActiveBenefit(null)}
-      />
-
-      <PayDetailsDrawer
-        listing={activePayListing}
-        onClose={() => setActivePayId(null)}
-      />
-
-      <ReportListingDrawer
-        listing={activeReportListing}
-        onClose={() => setReportId(null)}
-      />
 
       <SeekSortPopup
         open={sortOpen}
@@ -575,5 +526,6 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
         }}
       />
     </div>
+    </ListingCardProvider>
   );
 }

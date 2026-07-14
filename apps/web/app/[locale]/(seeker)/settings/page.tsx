@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 
 import {
+	AppearanceControl,
 	NotificationPrefsForm,
 	SectionHeading,
 	SeekerPage,
@@ -50,6 +51,14 @@ export default async function SettingsPage() {
 						description="Choose which emails you get. Changes save the moment you toggle them."
 					/>
 					<NotificationPrefsForm initialPrefs={prefs} />
+				</section>
+
+				<section className={styles.section}>
+					<SectionHeading
+						title="Appearance"
+						description="Choose Light, Dark, or Auto. Auto follows the time of day and your device."
+					/>
+					<AppearanceControl />
 				</section>
 
 				<section className={styles.section}>

@@ -2,22 +2,26 @@ import type { Metadata } from "next";
 import { auth, currentUser } from "@clerk/nextjs/server";
 
 import {
+	type DiscoveryEnrichment,
 	type SearchFilters,
+	type SeekerScope,
+	EMPTY_BEHAVIOR_PROFILE,
+	behavioralAdjustment,
 	computeBehaviorProfile,
+	enrichmentFromScope,
+	getMatchScoresForSeeker,
 	getSavedSearches,
 	getSeekerBehaviorInteractions,
-	personalizedOrderingScore,
+	resolveSeekerDiscoveryScope,
 	rowToDiscoveryFields,
 	savedSearchToQueryString,
-	scoreSeekerListingRow,
 	searchListings,
-	seekerHasMatchInputs,
 } from "@explore-and-earn/db";
 import {
 	type CompensationUnit,
 	MARKETPLACE_CATEGORIES,
-	matchBandFor,
 } from "@explore-and-earn/contracts";
+import { rankForSeeker } from "../../../../lib/ranking";
 
 import {
 	DISCOVERY_FIXTURES,
@@ -205,18 +209,64 @@ export default async function SeekPage({
 	const hasPublicDataConfig = hasDiscoveryPublicDataConfig();
 	const canUseFixtures = canUseDiscoveryFixtureFallback();
 
+	// Signed-in seeker scope — resolved ONCE: the applied/skipped/boosted id sets,
+	// the stored ADR-040 match scores, and the behavior profile. Threading the
+	// scope into searchListings runs the applied HARD-exclusion server-side; the
+	// enrichment stamps boosted/skipped/match onto every card via
+	// rowToDiscoveryFields; the behavior profile feeds the bounded ranking
+	// tiebreak. Best-effort: any fault degrades to the anonymous path (no scope,
+	// no enrichment) so discovery never dead-ends on a personalization fault.
+	let seekerScope: SeekerScope | undefined;
+	let enrichment: DiscoveryEnrichment | undefined;
+	let storedScores: ReadonlyMap<string, number> = new Map();
+	let behaviorProfile = EMPTY_BEHAVIOR_PROFILE;
+	if (userId && token && hasPublicDataConfig) {
+		try {
+			const [scope, scores, behaviorInteractions] = await Promise.all([
+				resolveSeekerDiscoveryScope(token, userId),
+				getMatchScoresForSeeker(token, userId),
+				getSeekerBehaviorInteractions(token, userId).catch(() => []),
+			]);
+			seekerScope = { clerkToken: token, clerkUserId: userId };
+			storedScores = scores;
+			enrichment = enrichmentFromScope(scope, scores);
+			behaviorProfile = computeBehaviorProfile(
+				behaviorInteractions ?? [],
+				Date.now(),
+			);
+		} catch {
+			// Leave the anonymous path: no scope, no enrichment, raw recency order.
+		}
+	}
+
 	let hasNextPage = false;
 	let listings: DiscoveryListing[] = [];
-	// Raw rows kept alongside `listings` (same order) so a signed-in seeker's
-	// fit can be scored per card below. Empty on the fixture path.
-	let scorableRows: Awaited<ReturnType<typeof searchListings>> = [];
 
 	if (hasPublicDataConfig) {
-		const rows = await searchListings(filters);
+		// Pass the seeker scope so searchListings HARD-excludes applied listings
+		// (an applied listing must never resurface as applyable).
+		const rows = await searchListings(filters, seekerScope);
 		hasNextPage = rows.length > PAGE_SIZE;
 		const pageRows = hasNextPage ? rows.slice(0, PAGE_SIZE) : rows;
-		scorableRows = pageRows;
-		listings = pageRows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
+		listings = pageRows.map(
+			(row) => rowToDiscoveryFields(row, enrichment) as DiscoveryListing,
+		);
+		// MATCH-PRIMARY seeker ranking (founder law): stored-score band first,
+		// previously-skipped demoted-but-visible, monetization a bounded secondary
+		// lift, behavior a bounded tiebreak. Stable sort keeps the underlying
+		// published_at order within a band. Anonymous visitors keep raw recency.
+		if (seekerScope) {
+			listings = rankForSeeker(listings, (listing) => ({
+				boosted: listing.conditionalBadges?.includes("boosted") ?? false,
+				hostTier: listing.host.tier,
+				matchScore: storedScores.get(listing.id),
+				previouslySkipped: listing.previouslySkipped,
+				behaviorAdjustment: behavioralAdjustment(
+					behaviorProfile,
+					listing.category,
+				),
+			}));
+		}
 	} else if (canUseFixtures) {
 		const filtered = DISCOVERY_FIXTURES.filter((listing) =>
 			matchesLocalFilters(listing, filters),
@@ -268,17 +318,14 @@ export default async function SeekPage({
 				? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
 				: "Seeker";
 
-		let status, matchedListings, profile, savedSearches, behaviorInteractions;
+		let status, matchedListings, profile, savedSearches;
 		try {
-			[status, matchedListings, profile, savedSearches, behaviorInteractions] =
+			[status, matchedListings, profile, savedSearches] =
 				await Promise.all([
 					getSeekerStatus(token, userId, fallbackName),
 					getMatchedListings(token, userId),
 					cachedSeekerProfile(token, userId),
 					getSavedSearches(token, userId).catch(() => []),
-					// Real interactions only (saves/passes/applies); [] on any fault so
-					// personalization can never break discovery.
-					getSeekerBehaviorInteractions(token, userId),
 				]);
 		} catch {
 			break seekerDashboard;
@@ -328,32 +375,10 @@ export default async function SeekPage({
 			featuredEmployers,
 		};
 
-		// Stamp each grid card with the seeker's ADR-040 fit — the SAME score the
-		// listing it opens will show. Only developing+ bands are surfaced, so the
-		// grid highlights genuine fits instead of labelling every card.
-		if (profile && seekerHasMatchInputs(profile) && scorableRows.length === listings.length) {
-			listings = listings.map((listing, index) => {
-				const score = scoreSeekerListingRow(profile, scorableRows[index]);
-				return matchBandFor(score) === "needs_attention"
-					? listing
-					: { ...listing, matchScore: score };
-			});
-			// Browsing (no text query): lead with the best fits, nudged by the
-			// seeker's own recorded behavior (saves/passes/applies — bounded ±8
-			// ordering points, reorder-only, never hides a card; the DISPLAYED
-			// score stays the pure ADR-040 fit). In-page re-rank only —
-			// published_at pagination is unchanged underneath. A typed query
-			// keeps search relevance order.
-			if (!query) {
-				const behaviorProfile = computeBehaviorProfile(
-					behaviorInteractions ?? [],
-					Date.now(),
-				);
-				const orderKey = (l: DiscoveryListing): number =>
-					personalizedOrderingScore(l.matchScore ?? -1, behaviorProfile, l.category);
-				listings = [...listings].sort((a, b) => orderKey(b) - orderKey(a));
-			}
-		}
+		// The grid's match %, applied HARD-exclusion, previously-skipped marker,
+		// and MATCH-PRIMARY order were already stamped up front from the stored
+		// scope + enrichment (see the `seekerScope` block above) — no per-render
+		// re-scoring here.
 	}
 
 	return (

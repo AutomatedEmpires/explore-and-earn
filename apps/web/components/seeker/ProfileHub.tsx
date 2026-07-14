@@ -6,10 +6,9 @@ import { useRouter } from "next/navigation";
 import { useMemo, useOptimistic, useTransition } from "react";
 
 import { BADGE_META, type SeekerBadge } from "@explore-and-earn/contracts";
-import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
+import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { saveReadinessAction } from "../../app/actions/seekerProfile";
-import type { DiscoveryListing } from "../discovery";
-import { toDiscoveryCardData } from "../discovery";
+import { ListingCard, ListingCardProvider, type DiscoveryListing } from "../discovery";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import { byMonetization } from "../../lib/ranking";
 import { ReadinessSlider } from "./ReadinessSlider";
@@ -176,6 +175,10 @@ export function ProfileHub({
   }
 
   return (
+    <ListingCardProvider
+      listings={matchedListings}
+      overrides={{ onApply: openListing }}
+    >
     <div className={styles.page}>
       {/* ── Full-bleed cover ── */}
       <section
@@ -332,13 +335,7 @@ export function ProfileHub({
           <ul className={styles.rail}>
             {matchedRail.map((listing) => (
               <li key={listing.id} className={styles.railItem}>
-                <DiscoveryCard
-                  data={toDiscoveryCardData(listing)}
-                  surface="matched"
-                  onOpen={openListing}
-                  onHostClick={openListing}
-                  onLocationClick={openListing}
-                />
+                <ListingCard listing={listing} surface="matched" />
               </li>
             ))}
           </ul>
@@ -369,13 +366,7 @@ export function ProfileHub({
           <ul className={styles.rail}>
             {boostedListings.map((listing) => (
               <li key={listing.id} className={styles.railItem}>
-                <DiscoveryCard
-                  data={toDiscoveryCardData(listing)}
-                  surface="matched"
-                  onOpen={openListing}
-                  onHostClick={openListing}
-                  onLocationClick={openListing}
-                />
+                <ListingCard listing={listing} surface="matched" />
               </li>
             ))}
           </ul>
@@ -400,5 +391,6 @@ export function ProfileHub({
         </ul>
       </nav>
     </div>
+    </ListingCardProvider>
   );
 }

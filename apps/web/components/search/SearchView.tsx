@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -9,15 +9,60 @@ import {
 	type CompensationUnit,
 	type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
-import { Chip, DiscoveryCard, type IconKey } from "@explore-and-earn/ui";
+import { Chip, type IconKey } from "@explore-and-earn/ui";
 
 import type { SearchListing } from "./listing";
-import { toDiscoveryCardData } from "./filtering";
+import {
+	ListingCard,
+	ListingCardProvider,
+	type DiscoveryListing,
+} from "../discovery";
 import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
 
 // surface="search" is not part of DISCOVERY_CARD_SURFACES; use the closest real
 // canonical value. Deliberately not "matched" (that triggers the match meter).
 const SEARCH_SURFACE: DiscoveryCardSurface = "discovery_feed";
+
+/**
+ * Adapt the Search lane's own thin `SearchListing` view-model into the canonical
+ * `DiscoveryListing` the shared <ListingCard> renders. Only fields the search
+ * query actually carries are populated — `status: "live"` is honest (searchListings
+ * only returns live rows), and structured data the search projection never fetched
+ * (host id, pay insight, coordinates, begin/end dates) is left ABSENT rather than
+ * fabricated. Because the host id is absent, the host tap routes to the listing
+ * detail (see the provider override) instead of opening a match-all host popup.
+ */
+function searchListingToDiscovery(listing: SearchListing): DiscoveryListing {
+	return {
+		id: listing.id,
+		title: listing.title,
+		category: listing.category,
+		location: listing.location,
+		opportunityWindow: listing.opportunityWindow,
+		status: "live",
+		host: {
+			name: listing.hostName,
+			verified: listing.verifiedHost ?? false,
+			tier: "none",
+		},
+		benefits: {
+			housing: {
+				provision: listing.benefits.housing.provision,
+				summary: listing.benefits.housing.summary,
+			},
+			meals: {
+				provision: listing.benefits.meals.provision,
+				summary: listing.benefits.meals.summary,
+			},
+			pay: {
+				provision: listing.benefits.pay.provision,
+				summary: listing.benefits.pay.summary,
+			},
+		},
+		conditionalBadges: listing.conditionalBadges,
+		matchScore: listing.matchScore,
+	};
+}
 
 const CATEGORY_LABELS: Record<MarketplaceCategory, string> = {
 	farm: "Farm",
@@ -62,6 +107,12 @@ export function SearchView({
 	startBefore = "",
 }: SearchViewProps) {
 	const router = useRouter();
+
+	// Adapt the thin search results to the canonical card view-model ONCE.
+	const cards = useMemo(
+		() => listings.map(searchListingToDiscovery),
+		[listings],
+	);
 
 	// Local state for text/number/date inputs.
 	// Changes navigate on form submit (Enter or the Search button).
@@ -349,19 +400,24 @@ export function SearchView({
 						</p>
 					</div>
 				) : (
-					<ul className="ee-search__list">
-						{listings.map((listing) => (
-							<li key={listing.id} className="ee-search__list-item">
-								<DiscoveryCard
-									data={toDiscoveryCardData(listing)}
-									surface={SEARCH_SURFACE}
-									onOpen={(id) => router.push(`/listing/${id}`)}
-									onApply={(id) => router.push(`/listing/${id}`)}
-									onLocationClick={(id) => router.push(`/map?focus=${id}`)}
-								/>
-							</li>
-						))}
-					</ul>
+					<ListingCardProvider
+						listings={cards}
+						overrides={{
+							onApply: (id) => router.push(`/listing/${id}`),
+							// Search rows carry no host id — route the host tap to
+							// the listing detail rather than open a host popup that
+							// would (mis)match every search result.
+							onHostClick: (id) => router.push(`/listing/${id}`),
+						}}
+					>
+						<ul className="ee-search__list">
+							{cards.map((listing) => (
+								<li key={listing.id} className="ee-search__list-item">
+									<ListingCard listing={listing} surface={SEARCH_SURFACE} />
+								</li>
+							))}
+						</ul>
+					</ListingCardProvider>
 				)}
 			</div>
 		</section>

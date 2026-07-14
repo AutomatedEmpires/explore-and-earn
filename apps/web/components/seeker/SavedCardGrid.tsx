@@ -2,9 +2,12 @@
 
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { DiscoveryCard } from "@explore-and-earn/ui";
 
-import { toDiscoveryCardData, type DiscoveryListing } from "../discovery";
+import {
+	ListingCard,
+	ListingCardProvider,
+	type DiscoveryListing,
+} from "../discovery";
 import styles from "./LifecycleList.module.css";
 
 export interface SavedCardGridProps {
@@ -12,30 +15,37 @@ export interface SavedCardGridProps {
 }
 
 /**
- * Client wrapper for the saved listings grid. Provides navigation handlers so
- * the "Quick Apply" CTA resolves to the listing detail page rather than firing
- * nothing. The server component fetches data; this component owns interactivity.
+ * Client wrapper for the saved listings grid. Adopts the shared <ListingCard>
+ * so a saved card gets the SAME wiring as the discovery feed — Quick Peek /
+ * Host / Benefit / Pay / Report popups, location→map, the match pill (where a
+ * stored score clears the threshold), the boosted marker, and the "previously
+ * skipped" photo flag (Saved is a demote-but-visible surface). One popup host
+ * is shared across the whole grid via the provider. The "Quick Apply" CTA
+ * resolves to the listing detail page.
  */
 export function SavedCardGrid({ listings }: SavedCardGridProps) {
 	const router = useRouter();
 
 	return (
-		<div className={styles.grid}>
-			{listings.map((listing, index) => (
-				<div
-					key={listing.id}
-					className={styles.cell}
-					style={{ "--i": index } as CSSProperties}
-				>
-					<DiscoveryCard
-						data={toDiscoveryCardData(listing)}
-						surface="discovery_feed"
-						cardState="saved"
-						onOpen={(id) => router.push(`/listing/${id}`)}
-						onApply={(id) => router.push(`/listing/${id}`)}
-					/>
-				</div>
-			))}
-		</div>
+		<ListingCardProvider
+			listings={listings}
+			overrides={{ onApply: (id) => router.push(`/listing/${id}`) }}
+		>
+			<div className={styles.grid}>
+				{listings.map((listing, index) => (
+					<div
+						key={listing.id}
+						className={styles.cell}
+						style={{ "--i": index } as CSSProperties}
+					>
+						<ListingCard
+							listing={listing}
+							surface="discovery_feed"
+							cardState="saved"
+						/>
+					</div>
+				))}
+			</div>
+		</ListingCardProvider>
 	);
 }
