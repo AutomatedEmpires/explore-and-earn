@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getModerationStats, getReportsQueue } from "@explore-and-earn/db";
 
-import { ModerationWorkbench } from "../../../../components/admin";
+import { ModerationWorkbench } from "../../../../../components/admin";
 import styles from "../../shared.module.css";
 
 export const metadata: Metadata = { title: "Reports" };

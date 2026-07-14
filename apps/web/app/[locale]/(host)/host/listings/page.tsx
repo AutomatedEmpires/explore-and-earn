@@ -19,8 +19,8 @@ import {
   countListingsByState,
   dbStatusToHostState,
   type HostListingItem,
-} from "../../../../components/host";
-import { EmptyState } from "../../../../components/discovery";
+} from "../../../../../components/host";
+import { EmptyState } from "../../../../../components/discovery";
 import styles from "./page.module.css";
 
 /**

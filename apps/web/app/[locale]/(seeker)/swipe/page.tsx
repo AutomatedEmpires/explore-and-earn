@@ -4,12 +4,12 @@ import type { CSSProperties } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { getSavedListingIds } from "@explore-and-earn/db";
 
-import { type DiscoveryListing } from "../../../components/discovery";
+import { type DiscoveryListing } from "../../../../components/discovery";
 import {
 	getDiscoveryListings,
 	getSwipeListings,
-} from "../../../components/discovery/data";
-import { SwipeDeck } from "../../../components/seeker";
+} from "../../../../components/discovery/data";
+import { SwipeDeck } from "../../../../components/seeker";
 
 export const dynamic = "force-dynamic";
 

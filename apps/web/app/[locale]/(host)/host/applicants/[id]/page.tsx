@@ -15,8 +15,8 @@ import {
 import {
   HostApplicantDetail,
   HostSectionHeading,
-} from "../../../../../components/host";
-import type { DiscoveryListing } from "../../../../../components/discovery";
+} from "../../../../../../components/host";
+import type { DiscoveryListing } from "../../../../../../components/discovery";
 import { toApplicantItem, threadsByApplicationId } from "../applicants-data";
 import { StatusActions } from "./StatusActions";
 import { ApplicantResumePopupButton } from "./ApplicantResumePopupButton";

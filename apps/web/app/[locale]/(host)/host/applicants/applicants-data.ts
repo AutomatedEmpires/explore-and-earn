@@ -1,8 +1,8 @@
 import type { HostApplication, ListingMatchScore } from "@explore-and-earn/db";
 import { matchScoreKey } from "@explore-and-earn/db";
 
-import type { DiscoveryListing } from "../../../../components/discovery";
-import type { ApplicantStage, HostApplicantItem } from "../../../../components/host";
+import type { DiscoveryListing } from "../../../../../components/discovery";
+import type { ApplicantStage, HostApplicantItem } from "../../../../../components/host";
 
 /**
  * Map an application's DB status to the host pipeline ApplicantStage.

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { PublicShell } from "../../components/public/PublicShell";
+import { PublicShell } from "../../../components/public/PublicShell";
 import { LegalPageNav } from "./LegalPageNav";
 import styles from "./legal.module.css";
 

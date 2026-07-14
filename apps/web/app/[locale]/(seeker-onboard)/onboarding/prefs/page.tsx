@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { saveOnboardingStep } from "../../../actions/seekerOnboarding";
+import { saveOnboardingStep } from "../../../../actions/seekerOnboarding";
 import styles from "../onboarding.module.css";
 
 type LocationPref = "remote" | "on_site" | "either";

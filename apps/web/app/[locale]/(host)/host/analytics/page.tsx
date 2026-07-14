@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getHostAnalytics, getHostProfile } from "@explore-and-earn/db";
 
-import { HostSectionHeading } from "../../../../components/host";
-import { HostAnalyticsDashboard } from "../../../../components/host/HostAnalyticsDashboard";
-import { EmptyState } from "../../../../components/discovery";
+import { HostSectionHeading } from "../../../../../components/host";
+import { HostAnalyticsDashboard } from "../../../../../components/host/HostAnalyticsDashboard";
+import { EmptyState } from "../../../../../components/discovery";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Analytics" };

@@ -3,10 +3,10 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getMessages } from "@explore-and-earn/db";
 
-import { markMessagesReadAction } from "../../../actions/messages";
-import { EmptyState } from "../../../../components/discovery";
-import { BucketPage } from "../../../../components/seeker";
-import { MessageTranscript } from "../../../../components/messaging/MessageTranscript";
+import { markMessagesReadAction } from "../../../../actions/messages";
+import { EmptyState } from "../../../../../components/discovery";
+import { BucketPage } from "../../../../../components/seeker";
+import { MessageTranscript } from "../../../../../components/messaging/MessageTranscript";
 
 export const metadata: Metadata = {
 	title: "Conversation",

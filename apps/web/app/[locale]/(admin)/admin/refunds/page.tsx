@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getRefundQueue, getRefundStats } from "@explore-and-earn/db";
 
-import { RefundQueue } from "../../../../components/admin";
+import { RefundQueue } from "../../../../../components/admin";
 import styles from "../../shared.module.css";
 
 export const metadata: Metadata = { title: "Refunds" };

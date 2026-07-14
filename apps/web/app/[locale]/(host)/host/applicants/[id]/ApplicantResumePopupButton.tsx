@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Icon } from "@explore-and-earn/ui";
 import type { SeekerResume } from "@explore-and-earn/db";
 
-import { SeekerResumePopup } from "../../../../../components/host/SeekerResumePopup";
+import { SeekerResumePopup } from "../../../../../../components/host/SeekerResumePopup";
 import styles from "./ApplicantResumePopupButton.module.css";
 
 export interface ApplicantResumePopupButtonProps {

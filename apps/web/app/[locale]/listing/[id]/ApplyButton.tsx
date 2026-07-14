@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { Button, Modal } from "@explore-and-earn/ui";
-import { applyToListingAction } from "../../actions/applications";
-import { saveListingAction, unsaveListingAction } from "../../actions/savedListings";
+import { applyToListingAction } from "../../../actions/applications";
+import { saveListingAction, unsaveListingAction } from "../../../actions/savedListings";
 import styles from "./ApplyButton.module.css";
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
   viewerRole: "guest" | "seeker" | "owner";
   alreadyApplied: boolean;
   alreadySaved: boolean;
-  onboardingComplete: boolean;
+  resumeComplete: boolean;
 }
 
 export function ApplyButton({
@@ -22,12 +23,14 @@ export function ApplyButton({
   viewerRole,
   alreadyApplied,
   alreadySaved,
-  onboardingComplete,
+  resumeComplete,
 }: Props) {
   const router = useRouter();
+  const t = useTranslations("Apply");
+  const tc = useTranslations("Common");
   const [isPending, startTransition] = useTransition();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [saved, setSaved] = useState(alreadySaved);
 
@@ -40,7 +43,7 @@ export function ApplyButton({
         }}
         disabled={isPending}
       >
-        Sign in to apply
+        {t("signInToApply")}
       </Button>
     );
   }
@@ -53,7 +56,7 @@ export function ApplyButton({
           router.push(`/host/listings/${listingId}/edit`);
         }}
       >
-        Edit listing
+        {t("editListing")}
       </Button>
     );
   }
@@ -63,14 +66,14 @@ export function ApplyButton({
     return (
       <div className={styles.appliedState}>
         <span>✓</span>
-        <span>Application sent</span>
+        <span>{t("applicationSent")}</span>
       </div>
     );
   }
 
   const handleApply = () => {
-    if (!onboardingComplete) {
-      setShowOnboardingModal(true);
+    if (!resumeComplete) {
+      setShowResumeModal(true);
       return;
     }
     setShowConfirmModal(true);
@@ -83,16 +86,20 @@ export function ApplyButton({
         const result = await applyToListingAction(listingId);
         if (result.ok) {
           router.refresh();
+        } else if (result.error === "resume_incomplete") {
+          // Server-side gate rejected a stale client — surface the same
+          // "finish your résumé" path rather than a generic error.
+          setShowResumeModal(true);
         } else {
           const msg = result.error === "rate_limit_exceeded"
-            ? "You're applying too quickly. Please wait a moment and try again."
+            ? t("errorRateLimit")
             : result.error === "unauthenticated"
-              ? "Your session expired. Please sign in and try again."
-              : (result.error ?? "Something went wrong. Please try again.");
+              ? t("errorSessionExpired")
+              : (result.error ?? t("errorGeneric"));
           setApplyError(msg);
         }
       } catch {
-        setApplyError("Something went wrong. Please try again.");
+        setApplyError(t("errorGeneric"));
       }
     });
   };
@@ -113,22 +120,24 @@ export function ApplyButton({
     <>
       <div className={styles.buttonRow}>
         <Button variant="primary" onClick={handleApply} disabled={isPending}>
-          Apply
+          {tc("apply")}
         </Button>
         <Button
           variant="secondary"
           onClick={handleToggleSave}
           disabled={isPending}
         >
-          {saved ? "Saved" : "Save"}
+          {saved ? tc("saved") : tc("save")}
         </Button>
       </div>
 
       {showConfirmModal && (
-        <Modal heading="Apply to this listing?">
+        <Modal heading={t("confirmHeading")}>
           <p className={styles.modalText}>
-            Confirm your application to <strong>{title}</strong>. The host will
-            review your profile and contact you if interested.
+            {t.rich("confirmBody", {
+              title,
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </p>
           <div className={styles.buttonRow}>
             <Button
@@ -136,47 +145,44 @@ export function ApplyButton({
               onClick={handleConfirm}
               disabled={isPending}
             >
-              Confirm
+              {tc("confirm")}
             </Button>
             <Button
               variant="ghost"
               onClick={() => setShowConfirmModal(false)}
               disabled={isPending}
             >
-              Cancel
+              {tc("cancel")}
             </Button>
           </div>
         </Modal>
       )}
 
-      {showOnboardingModal && (
-        <Modal heading="Complete your profile first">
-          <p className={styles.modalText}>
-            You need to complete your seeker profile before applying to
-            listings.
-          </p>
+      {showResumeModal && (
+        <Modal heading={t("resumeGateHeading")}>
+          <p className={styles.modalText}>{t("resumeGateBody")}</p>
           <div className={styles.buttonRow}>
             <Button
               variant="primary"
-              onClick={() => router.push("/onboarding")}
+              onClick={() => router.push("/resume")}
             >
-              Go to onboarding
+              {t("finishResume")}
             </Button>
             <Button
               variant="ghost"
-              onClick={() => setShowOnboardingModal(false)}
+              onClick={() => setShowResumeModal(false)}
             >
-              Cancel
+              {tc("cancel")}
             </Button>
           </div>
         </Modal>
       )}
 
       {applyError && (
-        <Modal heading="Could not submit application">
+        <Modal heading={t("errorHeading")}>
           <p className={styles.modalText}>{applyError}</p>
           <Button variant="ghost" onClick={() => setApplyError(null)}>
-            Dismiss
+            {tc("dismiss")}
           </Button>
         </Modal>
       )}

@@ -9,7 +9,7 @@ import {
 } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
-import { saveOnboardingStep } from "../../../actions/seekerOnboarding";
+import { saveOnboardingStep } from "../../../../actions/seekerOnboarding";
 import styles from "../onboarding.module.css";
 
 const MAX_TAGS = 10;

@@ -7,9 +7,9 @@ import {
   getSeekerDisplayName,
   markMessagesRead,
 } from "@explore-and-earn/db";
-import { EmptyState } from "../../../../../components/discovery";
-import { HostSectionHeading } from "../../../../../components/host";
-import { MessageTranscript } from "../../../../../components/messaging/MessageTranscript";
+import { EmptyState } from "../../../../../../components/discovery";
+import { HostSectionHeading } from "../../../../../../components/host";
+import { MessageTranscript } from "../../../../../../components/messaging/MessageTranscript";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Conversation" };

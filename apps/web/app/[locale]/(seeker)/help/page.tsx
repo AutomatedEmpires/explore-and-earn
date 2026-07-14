@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { HelpCenter, HELP_FAQS, HELP_ITEMS, SeekerPage } from "../../../components/seeker";
+import { HelpCenter, HELP_FAQS, HELP_ITEMS, SeekerPage } from "../../../../components/seeker";
 
 export const metadata: Metadata = {
 	title: "Help",

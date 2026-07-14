@@ -7,8 +7,8 @@ import {
 	CommunityDashboard,
 	getMatchedListings,
 	getSeekerStatus,
-} from "../../../../components/seeker";
-import { buildFeaturedEmployers } from "../../../../lib/employer-utils";
+} from "../../../../../components/seeker";
+import { buildFeaturedEmployers } from "../../../../../lib/employer-utils";
 
 export const dynamic = "force-dynamic";
 

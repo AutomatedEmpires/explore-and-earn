@@ -3,8 +3,8 @@
 import * as Sentry from "@sentry/nextjs";
 import { useEffect, useState } from "react";
 
-import { reportError } from "../../lib/sentry";
-import { StatusCard } from "../../components/StatusCard";
+import { reportError } from "../../../lib/sentry";
+import { StatusCard } from "../../../components/StatusCard";
 
 export default function HostError({
 	error,

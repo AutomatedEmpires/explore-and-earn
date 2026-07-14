@@ -7,7 +7,7 @@ import {
   newMessageEmail,
   welcomeHostEmail,
   welcomeSeekerEmail,
-} from "../../../../lib/emails";
+} from "../../../../../lib/emails";
 
 export interface EmailPreview {
   readonly slug: string;

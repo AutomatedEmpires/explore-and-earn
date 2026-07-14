@@ -12,8 +12,8 @@ import {
 import {
   HostProfileForm,
   HostSectionHeading,
-} from "../../../../../components/host";
-import type { HostProfileSummary } from "../../../../../components/host";
+} from "../../../../../../components/host";
+import type { HostProfileSummary } from "../../../../../../components/host";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Edit profile" };

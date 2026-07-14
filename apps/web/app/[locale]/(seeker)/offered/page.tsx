@@ -7,8 +7,8 @@ import {
   BucketPage,
   LifecycleList,
   OfferedActions,
-} from "../../../components/seeker";
-import { EmptyState } from "../../../components/discovery";
+} from "../../../../components/seeker";
+import { EmptyState } from "../../../../components/discovery";
 
 export const metadata: Metadata = {
   title: "Offered",

@@ -1,6 +1,6 @@
 import { Skeleton } from "@explore-and-earn/ui";
 
-import { DiscoveryCardSkeleton } from "../components/discovery/DiscoveryCardSkeleton";
+import { DiscoveryCardSkeleton } from "../../components/discovery/DiscoveryCardSkeleton";
 import styles from "./(seeker)/loading.module.css";
 
 const CARD_KEYS = ["card-1", "card-2", "card-3", "card-4", "card-5", "card-6"];

@@ -5,8 +5,8 @@ import { Button, Icon } from "@explore-and-earn/ui";
 import type { HostInvite } from "@explore-and-earn/db/client";
 import type { ListingRow } from "@explore-and-earn/db/client";
 
-import { SeekerSearchDrawer } from "../../../../components/host/SeekerSearchDrawer";
-import { withdrawInviteAction } from "../../../actions/invites";
+import { SeekerSearchDrawer } from "../../../../../components/host/SeekerSearchDrawer";
+import { withdrawInviteAction } from "../../../../actions/invites";
 import styles from "./InvitesList.module.css";
 
 /** Invite statuses a host can still retract. */

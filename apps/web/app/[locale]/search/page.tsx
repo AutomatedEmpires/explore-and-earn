@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { optionalAuth } from "../../lib/optionalAuth";
+import { optionalAuth } from "../../../lib/optionalAuth";
 
 import type { ListingRow, SearchFilters } from "@explore-and-earn/db";
 import {
@@ -12,10 +12,10 @@ import {
 import type { CompensationUnit, MarketplaceCategory } from "@explore-and-earn/contracts";
 import { MARKETPLACE_CATEGORIES, matchBandFor } from "@explore-and-earn/contracts";
 
-import type { SearchListing } from "../../components/search/listing";
-import { SEARCH_FIXTURES } from "../../components/search/fixtures";
-import { SearchView } from "../../components/search/SearchView";
-import { cachedSeekerProfile, getSupabaseToken } from "../../lib/serverCache";
+import type { SearchListing } from "../../../components/search/listing";
+import { SEARCH_FIXTURES } from "../../../components/search/fixtures";
+import { SearchView } from "../../../components/search/SearchView";
+import { cachedSeekerProfile, getSupabaseToken } from "../../../lib/serverCache";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,13 @@ export const metadata: Metadata = {
 const hasPublicDataConfig =
 	Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
 	Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+// Fixtures are a DEV/PREVIEW convenience only. In production (NODE_ENV==="production",
+// which covers Vercel prod AND preview builds) the fixture fallback is OFF, so an
+// unconfigured prod never renders invented listings — it shows an honest empty
+// state instead. Mirrors `allowFixtureFallback` in components/discovery/data.ts and
+// the sibling seeker/home seams.
+const allowFixtureFallback = process.env.NODE_ENV !== "production";
 
 // ─── URL param parsers ───────────────────────────────────────────────────────
 
@@ -208,8 +215,10 @@ export default async function SearchPage({
 		const rows = await searchListings(filters);
 		scorableRows = rows;
 		listings = rows.map(rowToSearchListing);
-	} else {
-		// Dev / preview: filter the typed fixture set locally.
+	} else if (allowFixtureFallback) {
+		// Dev / preview only: filter the typed fixture set locally. Never in prod
+		// (see `allowFixtureFallback`) — the else branch renders an honest empty
+		// state rather than passing off invented listings as real.
 		listings = applyLocalFilters(SEARCH_FIXTURES, {
 			query,
 			category,
@@ -218,6 +227,9 @@ export default async function SearchPage({
 			payMin,
 			location,
 		});
+	} else {
+		// Production with no public data config → honest empty state, no fixtures.
+		listings = [];
 	}
 
 	// Stamp each result with the signed-in seeker's ADR-040 fit — the SAME score

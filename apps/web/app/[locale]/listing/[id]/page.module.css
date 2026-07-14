@@ -1,279 +1,76 @@
-/* ─── Listing detail page ────────────────────────────────────────────────── */
+/* ─── Immersive listing detail page ──────────────────────────────────────── */
 
 .page {
   background-color: var(--color-paper);
   min-height: 100vh;
-  /* --space-80 originally sized to just the .actionBar's own height (it sat at
-     bottom:0). .actionBar now floats above the bottom-nav dock instead, so the
-     same offset it uses has to be added here too, or the last bit of
-     scrollable content ends up hidden behind the repositioned bar. */
+  /* Reserve room so the last content clears the floating action bar, which sits
+     above the fixed public bottom-nav dock (see .actionBar below). */
   padding-bottom: calc(
     var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px) + var(--space-80)
   );
 }
 
-/* ─── Cover photo — framed photograph on the paper mat (frame, not filter) ──── */
-
-.cover {
-  position: relative;
-  margin: var(--space-16) var(--space-gutter) 0;
-  aspect-ratio: 16 / 9;
-  border-radius: var(--radius-card);
-  overflow: hidden;
-  border: 1px solid var(--border-soft);
-  box-shadow: var(--elevation-card);
-  background-color: var(--color-surface);
-}
-
-/* On wide screens the cover stays a contained, framed hero — not edge-to-edge. */
-@media (min-width: 64rem) {
-  .cover {
-    aspect-ratio: 21 / 9;
-    margin-top: var(--space-20);
-  }
-}
-
-.fillImg {
-  object-fit: cover;
-}
-
-/* ─── Gallery strip ───────────────────────────────────────────────────────── */
-
-.gallery {
-  display: flex;
-  gap: var(--space-8);
-  overflow-x: auto;
-  padding: var(--space-12) var(--space-gutter);
-  scrollbar-width: none;
-}
-
-.gallery::-webkit-scrollbar {
-  display: none;
-}
-
-.galleryThumb {
-  position: relative;
-  flex-shrink: 0;
-  width: 120px;
-  height: 90px;
-  border-radius: var(--radius-cell);
-  overflow: hidden;
-  border: 1px solid var(--border-soft);
-  background-color: var(--color-surface);
-}
-
-/* ─── Content wrapper ─────────────────────────────────────────────────────── */
+/* ─── Content column ─────────────────────────────────────────────────────── */
 
 .content {
-  max-width: 42rem;
+  max-width: 52rem;
   margin: 0 auto;
-  padding: var(--space-gutter);
+  padding: var(--space-24) var(--space-gutter) 0;
 }
-
-.categoryBadge {
-  margin-bottom: var(--space-12);
-}
-
-/* ─── Title ───────────────────────────────────────────────────────────────── */
-
-.title {
-  font-family: var(--font-display);
-  font-size: var(--type-page-size);
-  line-height: var(--type-page-lh);
-  color: var(--text-primary);
-  margin: 0 0 var(--space-12);
-}
-
-/* ─── Location ────────────────────────────────────────────────────────────── */
-
-.location {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  color: var(--text-secondary);
-  font-size: var(--type-body-size);
-  margin-bottom: var(--space-16);
-}
-
-/* ─── Host bar (inline host summary) ─────────────────────────────────────── */
-
-.hostBar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-12);
-  margin-bottom: var(--space-16);
-}
-
-.hostAvatar {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-image);
-  border: 2px solid var(--border-ink);
-  background-color: var(--color-surface);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.hostInfo {
-  flex: 1;
-}
-
-.hostNameRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  margin-bottom: var(--space-4);
-}
-
-.hostName {
-  font-family: var(--font-ui);
-  font-size: var(--type-body-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  text-decoration: none;
-}
-
-.hostName:hover {
-  text-decoration: underline;
-}
-
-.hostDate {
-  font-size: var(--type-meta-size);
-  color: var(--text-secondary);
-}
-
-/* ─── Benefit triad ───────────────────────────────────────────────────────── */
-
-.triad {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-12);
-  margin-bottom: var(--space-section);
-}
-
-@media (max-width: 479px) {
-  .triad { grid-template-columns: 1fr; }
-}
-
-.triadCell {
-  padding: var(--space-16);
-  border-radius: var(--radius-card);
-  border: 1px solid var(--cell-border);
-  background-color: var(--cell-bg);
-}
-
-.triadCellHousing {
-  --cell-bg: var(--benefit-housing-bg);
-  --cell-border: var(--benefit-housing-fg);
-  --cell-fg: var(--benefit-housing-fg);
-}
-
-.triadCellMeals {
-  --cell-bg: var(--benefit-meals-bg);
-  --cell-border: var(--benefit-meals-fg);
-  --cell-fg: var(--benefit-meals-fg);
-}
-
-.triadCellPay {
-  --cell-bg: var(--benefit-pay-bg);
-  --cell-border: var(--benefit-pay-fg);
-  --cell-fg: var(--benefit-pay-fg);
-}
-
-.triadHeader {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-8);
-}
-
-.triadLabel {
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--type-label-tracking);
-  color: var(--cell-fg);
-}
-
-.triadValue {
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  color: var(--cell-fg);
-}
-
-/* ─── Description ─────────────────────────────────────────────────────────── */
-
-.description {
-  margin-bottom: var(--space-section);
-}
-
-.descriptionHeading {
-  font-family: var(--font-display);
-  font-size: var(--type-section-size);
-  line-height: var(--type-section-lh);
-  color: var(--text-primary);
-  margin: 0 0 var(--space-12);
-}
-
-.descriptionBody {
-  font-family: var(--font-ui);
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-lh);
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-}
-
-.descriptionBody p {
-  margin-bottom: var(--space-12);
-}
-
-/* ─── Host summary block wrapper ─────────────────────────────────────────── */
 
 .hostSummaryWrapper {
   margin-bottom: var(--space-section);
 }
 
-/* ─── Sticky action bar ───────────────────────────────────────────────────── */
+/* ─── Sticky action bar ──────────────────────────────────────────────────── */
 
 .actionBar {
   position: fixed;
-  /* Floats above the pinned full-bleed bottom dock (BottomNav.module.css:
-     position:fixed, z-index:70, bottom:0 + safe-area padding) instead of
-     sitting under it at bottom:0 — same --size-bottom-nav token PublicShell
-     already uses to reserve scroll space for the same dock, so the two can't
-     drift apart. Without this, the nav dock renders on top of the Apply/Save
-     buttons on mobile, the one page whose entire purpose is that CTA. */
+  /* Floats above the pinned full-bleed bottom dock (BottomNav: position:fixed,
+     z-index:70, bottom:0 + safe-area) instead of sitting under it — same
+     --size-bottom-nav token PublicShell reserves scroll space with, so the two
+     can't drift apart. Without this the dock covers the Apply CTA on mobile. */
   bottom: calc(var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px));
   left: 0;
   right: 0;
   background-color: var(--color-surface-raised);
   border-top: 1px solid var(--border-soft);
-  padding: var(--space-16);
+  padding: var(--space-12) var(--space-16);
   display: flex;
   justify-content: center;
   z-index: var(--z-content-bar);
 }
 
-/* Gentle nudge shown to seekers whose profile is too thin to compute an honest
-   fit — links to onboarding. Borders-first, token-only, matches the fit panel. */
-.fitPrompt {
+.actionBarInner {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: var(--space-8);
-  margin-bottom: var(--space-section);
-  padding: var(--space-12) var(--space-16);
-  border-radius: var(--radius-card);
-  border: 1px dashed var(--border-ink);
-  background-color: var(--color-surface);
-  color: var(--text-primary);
-  font-size: var(--type-body-size);
-  line-height: var(--type-body-lh);
+  width: 100%;
+  max-width: 52rem;
+}
+
+/* Contextual guide link — sits above the Apply CTA, links to the assistant
+   pre-loaded with this listing. Compact so it never crowds the bar on mobile. */
+.guideLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  align-self: center;
+  padding: var(--space-6) var(--space-12);
+  border-radius: var(--radius-pill);
+  color: var(--color-cta);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
   text-decoration: none;
 }
 
-.fitPrompt span {
-  flex: 1;
+.guideLink:hover {
+  text-decoration: underline;
 }
 
+.guideLink svg {
+  flex-shrink: 0;
+}

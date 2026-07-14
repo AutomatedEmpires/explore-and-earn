@@ -7,8 +7,8 @@ import {
   BucketPage,
   InviteActions,
   LifecycleList,
-} from "../../../components/seeker";
-import { EmptyState } from "../../../components/discovery";
+} from "../../../../components/seeker";
+import { EmptyState } from "../../../../components/discovery";
 
 export const metadata: Metadata = {
   title: "Invites",

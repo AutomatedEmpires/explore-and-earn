@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { useOptionalGetToken } from "../../../../lib/useOptionalGetToken";
+import { useOptionalGetToken } from "../../../../../lib/useOptionalGetToken";
 
 
 import {
@@ -13,9 +13,9 @@ import {
 import { uploadProfilePhoto } from "@explore-and-earn/db/client";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
-import { ImageUpload } from "../../../../components/ImageUpload";
-import { saveOnboardingStep } from "../../../actions/seekerOnboarding";
-import { saveProfilePhotoAction } from "../../../actions/seekerProfile";
+import { ImageUpload } from "../../../../../components/ImageUpload";
+import { saveOnboardingStep } from "../../../../actions/seekerOnboarding";
+import { saveProfilePhotoAction } from "../../../../actions/seekerProfile";
 import styles from "./edit.module.css";
 
 type LocationPref = "remote" | "on_site" | "either";

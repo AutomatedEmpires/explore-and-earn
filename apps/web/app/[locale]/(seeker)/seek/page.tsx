@@ -19,17 +19,17 @@ import {
 import {
 	DISCOVERY_FIXTURES,
 	type DiscoveryListing,
-} from "../../../components/discovery";
+} from "../../../../components/discovery";
 import {
 	canUseDiscoveryFixtureFallback,
 	hasDiscoveryPublicDataConfig,
 	warnIfDiscoveryDataMissingInProduction,
-} from "../../../components/discovery/data";
-import { SeekBrowser } from "../../../components/seeker";
-import { SeekerDashboard } from "../../../components/seeker/SeekerDashboard";
-import { getSeekerStatus, getMatchedListings } from "../../../components/seeker/data";
-import { cachedSeekerProfile, getSupabaseToken } from "../../../lib/serverCache";
-import { buildFeaturedEmployers } from "../../../lib/employer-utils";
+} from "../../../../components/discovery/data";
+import { SeekBrowser } from "../../../../components/seeker";
+import { SeekerDashboard } from "../../../../components/seeker/SeekerDashboard";
+import { getSeekerStatus, getMatchedListings } from "../../../../components/seeker/data";
+import { cachedSeekerProfile, getSupabaseToken } from "../../../../lib/serverCache";
+import { buildFeaturedEmployers } from "../../../../lib/employer-utils";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";

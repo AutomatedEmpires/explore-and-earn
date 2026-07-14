@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getAllHostProfiles } from "@explore-and-earn/db";
 
-import { AdminHostsTable, AdminPager } from "../../../components/admin";
+import { AdminHostsTable, AdminPager } from "../../../../components/admin";
 import styles from "../shared.module.css";
 
 export const metadata: Metadata = { title: "Hosts" };

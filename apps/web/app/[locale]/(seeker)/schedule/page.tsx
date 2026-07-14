@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getSeekerAvailability } from "@explore-and-earn/db";
 
-import { updateScheduleAction } from "../../actions/seekerSettings";
-import { EmptyState } from "../../../components/discovery";
-import { BucketPage } from "../../../components/seeker";
-import styles from "../../../components/seeker/SchedulePanel.module.css";
+import { updateScheduleAction } from "../../../actions/seekerSettings";
+import { EmptyState } from "../../../../components/discovery";
+import { BucketPage } from "../../../../components/seeker";
+import styles from "../../../../components/seeker/SchedulePanel.module.css";
 
 export const metadata: Metadata = {
   title: "Schedule",

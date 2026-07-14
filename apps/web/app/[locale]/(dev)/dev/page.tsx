@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { DEV_SURFACES } from "../../../components/dev/surfaces";
-import { DEV_ROLES, isDevBenchEnabled } from "../../../lib/devBench";
-import { readDevRole } from "../../../lib/devBench/server";
+import { DEV_SURFACES } from "../../../../components/dev/surfaces";
+import { DEV_ROLES, isDevBenchEnabled } from "../../../../lib/devBench";
+import { readDevRole } from "../../../../lib/devBench/server";
 import { setDevRoleAction } from "./actions";
 import styles from "./page.module.css";
 

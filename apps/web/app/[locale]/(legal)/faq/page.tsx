@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
-import { generateFaqJsonLd } from "../../../lib/seo";
+import { generateFaqJsonLd } from "../../../../lib/seo";
 import styles from "../legal.module.css";
 import fa from "./faq.module.css";
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { CSSProperties } from "react";
 
-import { isAdminUserId } from "../../../../../lib/admin";
+import { isAdminUserId } from "../../../../../../lib/admin";
 import { getEmailPreview } from "../previews";
 
 export const dynamic = "force-dynamic";

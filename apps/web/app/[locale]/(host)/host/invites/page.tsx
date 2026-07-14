@@ -4,8 +4,8 @@ import { getHostInvites, getHostListings } from "@explore-and-earn/db";
 import type { HostInvite, ListingRow } from "@explore-and-earn/db/client";
 import { Chip, Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
-import { HostSectionHeading } from "../../../../components/host";
-import { EmptyState } from "../../../../components/discovery";
+import { HostSectionHeading } from "../../../../../components/host";
+import { EmptyState } from "../../../../../components/discovery";
 import { InvitesList } from "./InvitesList";
 import styles from "./page.module.css";
 

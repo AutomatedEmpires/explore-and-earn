@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 
 import {
   computeSeekerListingFit,
+  getSeekerResumeStatus,
   hasApplied,
   hasSaved,
   seekerHasMatchInputs,
@@ -14,18 +14,28 @@ import {
   cachedSeekerProfile,
   getListingDetailPublicCached,
   getSupabaseToken,
-} from "../../../lib/serverCache";
+} from "../../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
-import { CategoryBadge } from "../../../components/listing/CategoryBadge";
-import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
-import { SeekerFitSignal } from "../../../components/listing/SeekerFitSignal";
-import { TrueValue } from "../../../components/listing/TrueValue";
-import { VerifiedHostBadge } from "@explore-and-earn/ui";
+import { HostSummaryBlock } from "../../../../components/listing/HostSummaryBlock";
+import { TrueValue } from "../../../../components/listing/TrueValue";
+import { ListingHero } from "../../../../components/listing/ListingHero";
+import { ListingGallery } from "../../../../components/listing/ListingGallery";
+import { ListingGlance, type GlanceItem } from "../../../../components/listing/ListingGlance";
+import { FitReasons, type FitReasonsPrompt } from "../../../../components/listing/FitReasons";
+import { DealUpfront } from "../../../../components/listing/DealUpfront";
+import { DetailList } from "../../../../components/listing/DetailList";
+import { ProseSection } from "../../../../components/listing/ProseSection";
+import { WeatherWidget } from "../../../../components/listing/WeatherWidget";
+import { LocationContext } from "../../../../components/listing/LocationContext";
+import { TeamGrid } from "../../../../components/listing/TeamGrid";
+import { WhyWorkForUs } from "../../../../components/listing/WhyWorkForUs";
 import { ApplyButton } from "./ApplyButton";
-import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../lib/seo";
-import { isUuid } from "../../../lib/ids";
-import { optionalAuth } from "../../../lib/optionalAuth";
-import { getFixtureListingDetail } from "../../../components/discovery/fixtureDetail";
+import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../../lib/seo";
+import { fetchWeather } from "../../../../lib/weather";
+import { formatMoney, formatMonthYear } from "../../../../lib/format";
+import { isUuid } from "../../../../lib/ids";
+import { optionalAuth } from "../../../../lib/optionalAuth";
+import { getFixtureListingDetail } from "../../../../components/discovery/fixtureDetail";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +46,14 @@ const baseUrl =
 interface Props {
   params: Promise<{ id: string }>;
 }
+
+const CATEGORY_LABEL: Record<string, string> = {
+  farm: "Farm",
+  maritime: "Maritime",
+  remote: "Remote",
+  seasonal: "Seasonal",
+  mix: "Mix",
+};
 
 /**
  * listings.id is a Postgres uuid — a non-UUID param can never exist in the DB
@@ -123,22 +141,26 @@ export default async function ListingDetailPage({ params }: Props) {
   // Visibility rule: non-live listings are only shown to the owning host
   if (listing.status !== "live" && !isOwner) notFound();
 
-  // Fetch seeker-specific state (applied/saved/onboarding) when authed
+  // Fetch seeker-specific state (applied/saved/résumé) when authed. The apply
+  // gate is authoritative on the server (applyToListing re-checks), but we also
+  // compute résumé-completeness here so the button routes an incomplete seeker
+  // to the résumé builder instead of opening the confirm dialog.
   let alreadyApplied = false;
   let alreadySaved = false;
-  let onboardingComplete = false;
+  let resumeComplete = false;
   let seekerProfile: Awaited<ReturnType<typeof cachedSeekerProfile>> = null;
 
   if (userId && token && viewerRole === "seeker" && !isFixtureListing) {
-    const [applied, saved, profile] = await Promise.all([
+    const [applied, saved, profile, resumeStatus] = await Promise.all([
       hasApplied(token, userId, listing.id),
       hasSaved(token, userId, listing.id),
       cachedSeekerProfile(token, userId),
+      getSeekerResumeStatus(token, userId),
     ]);
     alreadyApplied = applied;
     alreadySaved = saved;
     seekerProfile = profile;
-    onboardingComplete = profile?.onboardingComplete === true;
+    resumeComplete = resumeStatus.complete;
   }
 
   // Seeker-facing ADR-040 fit signal: computed on the fly with the same engine
@@ -151,25 +173,75 @@ export default async function ListingDetailPage({ params }: Props) {
   const seekerNeedsProfileForFit =
     viewerRole === "seeker" && (!seekerProfile || !seekerHasMatchInputs(seekerProfile));
 
-  // Build benefit triad data
-  const housingLabel = listing.housingIncluded ? "Included" : "Not included";
-  const mealsLabel = listing.mealsIncluded ? "Included" : "Not included";
+  // Location-aware 10-day outlook — fetched in the RSC only when the listing
+  // carries real coordinates. fetchWeather never throws (null on any failure),
+  // and the widget renders an honest shell for a null outlook.
+  const hasCoords = listing.latitude != null && listing.longitude != null;
+  const weather = hasCoords
+    ? await fetchWeather(listing.latitude as number, listing.longitude as number)
+    : null;
+
+  // Benefit / pay summaries
   const paySummary =
     listing.compensationSummary ??
     (listing.compensationMinCents != null
-      ? `${new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: listing.compensationCurrency,
-          maximumFractionDigits: 0,
-        }).format(listing.compensationMinCents / 100)}${listing.compensationUnit && listing.compensationUnit !== "other" ? `/${listing.compensationUnit}` : ""}`
+      ? `${formatMoney(listing.compensationMinCents, { currency: listing.compensationCurrency })}${listing.compensationUnit && listing.compensationUnit !== "other" ? `/${listing.compensationUnit}` : ""}`
       : "See listing");
 
   const dateLabel =
     listing.beginsAt && listing.endsAt
-      ? `${new Date(listing.beginsAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })} – ${new Date(listing.endsAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}`
+      ? `${formatMonthYear(listing.beginsAt)} – ${formatMonthYear(listing.endsAt)}`
       : listing.beginsAt
-        ? `Starting ${new Date(listing.beginsAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}`
+        ? `Starting ${formatMonthYear(listing.beginsAt)}`
         : "Ongoing";
+
+  // At-a-glance facts — each cell added ONLY when its underlying field is real.
+  const glanceItems: GlanceItem[] = [];
+  if (listing.locationDisplay) {
+    glanceItems.push({ icon: "nav.map", label: "Location", value: listing.locationDisplay });
+  }
+  glanceItems.push({
+    icon: "status.begins",
+    label: "When",
+    value: listing.timelineSummary ?? dateLabel,
+  });
+  glanceItems.push({
+    icon: `category.${listing.category}`,
+    label: "Category",
+    value: CATEGORY_LABEL[listing.category] ?? listing.category,
+  });
+  if (listing.host) {
+    glanceItems.push({
+      icon: listing.host.verified ? "trust.verified_host" : "nav.hosts",
+      label: "Host",
+      value: `${listing.host.companyName}${listing.host.verified ? " · Verified" : ""}`,
+    });
+  }
+  if (fit && !fit.excluded) {
+    glanceItems.push({ icon: "status.match", label: "Your fit", value: `${fit.score} / 100` });
+  }
+
+  // "Why you're a good fit" prompt for viewers who can't get an honest score.
+  let fitPrompt: FitReasonsPrompt | null = null;
+  if (!fit) {
+    if (seekerNeedsProfileForFit) {
+      fitPrompt = {
+        text: "Finish your profile to see how well this opportunity fits you.",
+        href: "/onboarding",
+      };
+    } else if (viewerRole === "guest") {
+      fitPrompt = {
+        text: "Sign in and tell us what you're after to see how well this fits you.",
+        href: `/sign-in?redirect_url=/listing/${listing.id}`,
+      };
+    }
+  }
+
+  // Perks & benefits merges the listing-level and host-level perk lists (deduped,
+  // order-preserving). Both are self-omitting arrays from the data layer.
+  const allPerks = Array.from(
+    new Set([...(listing.perks ?? []), ...(listing.hostPerks ?? [])]),
+  );
 
   const jsonLd = generateJobPostingJsonLd(listing, listing.host, baseUrl);
   const breadcrumbJsonLd = generateBreadcrumbJsonLd([
@@ -191,164 +263,119 @@ export default async function ListingDetailPage({ params }: Props) {
         dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }}
       />
       <div className={styles.page}>
-        {/* Cover photo */}
-        {listing.coverPhotoUrl && (
-          <div className={styles.cover}>
-            <Image
-              src={listing.coverPhotoUrl}
-              alt={listing.title}
-              fill
-              className={styles.fillImg}
-              priority
-              // .cover is gutter-inset on mobile and width-constrained on
-              // desktop — without sizes the srcset assumed 100vw and
-              // over-fetched the LCP image.
-              sizes="(max-width: 1023px) 92vw, 960px"
-            />
-          </div>
-        )}
+        {/* 1–2. Immersive hero (back button overlaid) + gallery */}
+        <ListingHero
+          title={listing.title}
+          category={listing.category}
+          locationDisplay={listing.locationDisplay}
+          coverPhotoUrl={listing.coverPhotoUrl}
+          host={
+            listing.host
+              ? {
+                  id: listing.host.id,
+                  companyName: listing.host.companyName,
+                  photoUrl: listing.host.photoUrl,
+                  verified: listing.host.verified,
+                }
+              : null
+          }
+          dateLabel={dateLabel}
+        />
+        <ListingGallery title={listing.title} photoUrls={listing.galleryPhotoUrls} />
 
-        {/* Gallery photos */}
-        {listing.galleryPhotoUrls.length > 0 && (
-          <div className={styles.gallery}>
-            {listing.galleryPhotoUrls.map((url, idx) => (
-              <div key={url} className={styles.galleryThumb}>
-                <Image
-                  src={url}
-                  alt={`${listing.title} photo ${idx + 1}`}
-                  fill
-                  className={styles.fillImg}
-                  sizes="120px"
-                />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Content */}
         <div className={styles.content}>
-          {/* Category badge */}
-          <div className={styles.categoryBadge}>
-            <CategoryBadge category={listing.category} />
-          </div>
+          {/* 3. At a glance */}
+          <ListingGlance items={glanceItems} />
 
-          {/* Title */}
-          <h1 className={styles.title}>{listing.title}</h1>
+          {/* 4. Why you're a good fit */}
+          <FitReasons fit={fit} prompt={fitPrompt} />
 
-          {/* Location */}
-          {listing.locationDisplay && (
-            <div className={styles.location}>
-              <Icon name="nav.map" size={16} aria-hidden />
-              <span>{listing.locationDisplay}</span>
-            </div>
-          )}
-
-          {/* Host bar */}
-          {listing.host && (
-            <div className={styles.hostBar}>
-              {listing.host.photoUrl && (
-                <div className={styles.hostAvatar}>
-                  <Image
-                    src={listing.host.photoUrl}
-                    alt={listing.host.companyName}
-                    fill
-                    className={styles.fillImg}
-                    sizes="48px"
-                  />
-                </div>
-              )}
-              <div className={styles.hostInfo}>
-                <div className={styles.hostNameRow}>
-                  {listing.host.id ? (
-                    <Link
-                      href={`/host/${listing.host.id}`}
-                      className={styles.hostName}
-                    >
-                      {listing.host.companyName}
-                    </Link>
-                  ) : (
-                    <span className={styles.hostName}>
-                      {listing.host.companyName}
-                    </span>
-                  )}
-                  {listing.host.verified && <VerifiedHostBadge />}
-                </div>
-                <div className={styles.hostDate}>{dateLabel}</div>
-              </div>
-            </div>
-          )}
-
-          {/* Seeker fit signal (ADR-040) — the decision-point payoff */}
-          {fit && <SeekerFitSignal result={fit} />}
-          {seekerNeedsProfileForFit && (
-            <Link href="/onboarding" className={styles.fitPrompt}>
-              <Icon name="status.match" size={20} aria-hidden />
-              <span>Finish your profile to see how well this opportunity fits you.</span>
-              <Icon name="action.forward" size={16} aria-hidden />
-            </Link>
-          )}
-          {/* Contextual guide: opens the assistant pre-loaded with THIS
-              listing (the fixture path has no real id to reason over). */}
-          {viewerRole === "seeker" && !isFixtureListing && (
-            <Link
-              href={`/assistant?listingId=${listing.id}&listingTitle=${encodeURIComponent(listing.title)}`}
-              className={styles.fitPrompt}
-            >
-              <Icon name="action.message" size={20} aria-hidden />
-              <span>Ask your guide about this role — fit, life there, next steps.</span>
-              <Icon name="action.forward" size={16} aria-hidden />
-            </Link>
-          )}
-
-          {/* Benefit triad */}
-          <div className={styles.triad}>
-            <div className={`${styles.triadCell} ${styles.triadCellHousing}`}>
-              <div className={styles.triadHeader}>
-                <Icon name="benefit.housing" size={16} aria-hidden />
-                <span className={styles.triadLabel}>Housing</span>
-              </div>
-              <div className={styles.triadValue}>{housingLabel}</div>
-            </div>
-
-            <div className={`${styles.triadCell} ${styles.triadCellMeals}`}>
-              <div className={styles.triadHeader}>
-                <Icon name="benefit.meals" size={16} aria-hidden />
-                <span className={styles.triadLabel}>Meals</span>
-              </div>
-              <div className={styles.triadValue}>{mealsLabel}</div>
-            </div>
-
-            <div className={`${styles.triadCell} ${styles.triadCellPay}`}>
-              <div className={styles.triadHeader}>
-                <Icon name="benefit.pay" size={16} aria-hidden />
-                <span className={styles.triadLabel}>Pay</span>
-              </div>
-              <div className={styles.triadValue}>{paySummary}</div>
-            </div>
-          </div>
-
-          {/* True value — what the covered housing/meals are really worth */}
-          <TrueValue
+          {/* 5. The deal, upfront (+ TrueValue) */}
+          <DealUpfront
             housingIncluded={listing.housingIncluded}
             mealsIncluded={listing.mealsIncluded}
+            housingDescription={listing.housingDescription ?? null}
+            mealsDescription={listing.mealsDescription ?? null}
             paySummary={paySummary}
+          >
+            <TrueValue
+              housingIncluded={listing.housingIncluded}
+              mealsIncluded={listing.mealsIncluded}
+              paySummary={paySummary}
+            />
+          </DealUpfront>
+
+          {/* 6. About this position */}
+          {listing.description ? (
+            <ProseSection
+              title="About this position"
+              icon="system.info"
+              headingId="listing-about"
+              text={listing.description}
+            />
+          ) : null}
+
+          {/* 7. What you'll do */}
+          <DetailList
+            title="What you'll do"
+            icon="profile.experience"
+            markerIcon="system.success"
+            headingId="listing-responsibilities"
+            items={listing.responsibilities ?? []}
           />
 
-          {/* Description */}
-          {listing.description && (
-            <section className={styles.description} aria-labelledby="listing-description">
-              <h2 id="listing-description" className={styles.descriptionHeading}>
-                About this opportunity
-              </h2>
-              <div className={styles.descriptionBody}>
-                {listing.description.split("\n\n").map((para, idx) => (
-                  <p key={idx}>{para}</p>
-                ))}
-              </div>
-            </section>
-          )}
+          {/* 8. What we're looking for */}
+          <DetailList
+            title="What we're looking for"
+            icon="profile.skills"
+            markerIcon="action.forward"
+            headingId="listing-requirements"
+            items={listing.requirements ?? []}
+          />
 
-          {/* Host summary block */}
+          {/* 9. Perks & benefits */}
+          <DetailList
+            title="Perks & benefits"
+            icon="reaction.clap"
+            markerIcon="system.success"
+            headingId="listing-perks"
+            variant="chips"
+            items={allPerks}
+          />
+
+          {/* 10. Life here */}
+          <DetailList
+            title="Life here"
+            icon="reaction.hundred"
+            markerIcon="nav.map"
+            headingId="listing-life"
+            subtitle="The place, off the clock."
+            variant="chips"
+            items={listing.activities ?? []}
+          />
+
+          {/* 11. Weather (honest shell when the fetch fails) */}
+          {hasCoords ? (
+            <WeatherWidget locationLabel={listing.locationDisplay} outlook={weather} />
+          ) : null}
+
+          {/* 12. Where you'll be */}
+          {hasCoords ? (
+            <LocationContext
+              locationDisplay={listing.locationDisplay}
+              latitude={listing.latitude as number}
+              longitude={listing.longitude as number}
+              category={listing.category}
+            />
+          ) : null}
+
+          {/* 13. Meet the team */}
+          <TeamGrid members={listing.team ?? []} />
+
+          {/* 14. Why work with us */}
+          <WhyWorkForUs text={listing.whyWorkForUs ?? null} />
+
+          {/* 15. About the host */}
           {listing.host && (
             <div className={styles.hostSummaryWrapper}>
               <HostSummaryBlock
@@ -372,16 +399,27 @@ export default async function ListingDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* Sticky action bar */}
+        {/* 16. Sticky action bar — ApplyButton + contextual guide link */}
         <div className={styles.actionBar}>
-          <ApplyButton
-            listingId={listing.id}
-            title={listing.title}
-            viewerRole={viewerRole}
-            alreadyApplied={alreadyApplied}
-            alreadySaved={alreadySaved}
-            onboardingComplete={onboardingComplete}
-          />
+          <div className={styles.actionBarInner}>
+            {viewerRole === "seeker" && !isFixtureListing && (
+              <Link
+                href={`/assistant?listingId=${listing.id}&listingTitle=${encodeURIComponent(listing.title)}`}
+                className={styles.guideLink}
+              >
+                <Icon name="action.message" size={18} aria-hidden />
+                <span>Ask your guide about this role</span>
+              </Link>
+            )}
+            <ApplyButton
+              listingId={listing.id}
+              title={listing.title}
+              viewerRole={viewerRole}
+              alreadyApplied={alreadyApplied}
+              alreadySaved={alreadySaved}
+              resumeComplete={resumeComplete}
+            />
+          </div>
         </div>
       </div>
     </>

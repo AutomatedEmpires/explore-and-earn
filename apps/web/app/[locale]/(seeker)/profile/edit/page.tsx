@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getSeekerProfile } from "@explore-and-earn/db";
 
-import { BucketPage } from "../../../../components/seeker";
+import { BucketPage } from "../../../../../components/seeker";
 import { ProfileEditForm, type ProfileEditInitial } from "./ProfileEditForm";
 
 export const dynamic = "force-dynamic";

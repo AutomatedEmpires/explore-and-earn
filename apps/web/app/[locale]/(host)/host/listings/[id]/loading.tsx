@@ -1,4 +1,4 @@
-import { HostDetailSkeleton } from "../../../../../components/host";
+import { HostDetailSkeleton } from "../../../../../../components/host";
 
 /**
  * Loading placeholder for the listing detail route. Shown during async

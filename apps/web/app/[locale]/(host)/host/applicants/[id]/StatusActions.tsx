@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@explore-and-earn/ui";
 import type { HostSettableStatus } from "@explore-and-earn/db/client";
 
-import { updateApplicationStatusAction } from "../../../../actions/applicationStatus";
+import { updateApplicationStatusAction } from "../../../../../actions/applicationStatus";
 import styles from "./StatusActions.module.css";
 
 interface StatusButton {

@@ -1,5 +1,5 @@
-import { HostDetailSkeleton } from "../../../../components/host";
-import { BucketPage } from "../../../../components/seeker";
+import { HostDetailSkeleton } from "../../../../../components/host";
+import { BucketPage } from "../../../../../components/seeker";
 
 /**
  * Loading placeholder for the seeker message thread. Shown during async

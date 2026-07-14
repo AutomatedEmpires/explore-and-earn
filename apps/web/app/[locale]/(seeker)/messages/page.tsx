@@ -8,12 +8,12 @@ import {
 	rowToDiscoveryFields,
 } from "@explore-and-earn/db";
 
-import { EmptyState } from "../../../components/discovery";
+import { EmptyState } from "../../../../components/discovery";
 import {
 	BucketPage,
 	MessageList,
 	type MessageThread,
-} from "../../../components/seeker";
+} from "../../../../components/seeker";
 
 export const metadata: Metadata = {
 	title: "Messages",

@@ -9,9 +9,9 @@ import {
 	SettingsPanel,
 	SETTINGS_ASSURANCES,
 	buildAccountGroups,
-} from "../../../components/seeker";
-import { getClerkContact } from "../../../lib/clerkUser";
-import { getNotificationPrefsAction } from "../../actions/notificationPrefs";
+} from "../../../../components/seeker";
+import { getClerkContact } from "../../../../lib/clerkUser";
+import { getNotificationPrefsAction } from "../../../actions/notificationPrefs";
 import styles from "./settings.module.css";
 
 export const metadata: Metadata = {

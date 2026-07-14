@@ -15,13 +15,13 @@ import {
   HostSectionHeading,
   dbStatusToHostState,
   deriveHostStats,
-} from "../../../../components/host";
+} from "../../../../../components/host";
 import type {
   HostApplicantItem,
   HostListingItem,
   HostProfileSummary,
-} from "../../../../components/host";
-import type { DiscoveryListing } from "../../../../components/discovery";
+} from "../../../../../components/host";
+import type { DiscoveryListing } from "../../../../../components/discovery";
 import { toApplicantItem } from "../applicants/applicants-data";
 import styles from "./page.module.css";
 

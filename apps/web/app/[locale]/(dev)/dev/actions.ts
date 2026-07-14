@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 
-import { isDevBenchEnabled, isDevRole, type DevRole } from "../../../lib/devBench";
-import { writeDevRole } from "../../../lib/devBench/server";
+import { isDevBenchEnabled, isDevRole, type DevRole } from "../../../../lib/devBench";
+import { writeDevRole } from "../../../../lib/devBench/server";
 
 /** Where each role lands after switching, unless an explicit target is given. */
 const ROLE_HOME: Record<DevRole, string> = {

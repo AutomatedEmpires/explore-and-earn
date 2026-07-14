@@ -9,12 +9,12 @@ import {
   getSeekerDisplayNames,
 } from "@explore-and-earn/db";
 
-import { EmptyState } from "../../../../components/discovery";
+import { EmptyState } from "../../../../../components/discovery";
 import {
   HostSectionHeading,
   HostThreadGroups,
   type HostMessageThread,
-} from "../../../../components/host";
+} from "../../../../../components/host";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";

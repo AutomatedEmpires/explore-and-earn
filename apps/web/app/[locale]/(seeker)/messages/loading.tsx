@@ -1,6 +1,6 @@
 import { Skeleton } from "@explore-and-earn/ui";
 
-import { BucketPage } from "../../../components/seeker";
+import { BucketPage } from "../../../../components/seeker";
 import styles from "./loading.module.css";
 
 /**

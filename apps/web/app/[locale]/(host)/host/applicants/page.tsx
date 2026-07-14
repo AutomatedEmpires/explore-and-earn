@@ -19,8 +19,8 @@ import {
   HostPipelineBoard,
   HostSectionHeading,
   countByStage,
-} from "../../../../components/host";
-import { EmptyState, type DiscoveryListing } from "../../../../components/discovery";
+} from "../../../../../components/host";
+import { EmptyState, type DiscoveryListing } from "../../../../../components/discovery";
 import { toApplicantItem, threadsByApplicationId } from "./applicants-data";
 import styles from "./page.module.css";
 

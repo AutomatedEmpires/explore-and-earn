@@ -7,7 +7,7 @@ import {
   getHostAnalytics,
 } from "@explore-and-earn/db";
 
-import { HostDashboard } from "../../../components/host";
+import { HostDashboard } from "../../../../components/host";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Dashboard" };

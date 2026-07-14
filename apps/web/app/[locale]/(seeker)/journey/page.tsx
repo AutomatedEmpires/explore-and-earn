@@ -7,7 +7,7 @@ import {
 	JourneyTimeline,
 	type JourneyStop,
 	type JourneyStatus,
-} from "../../../components/seeker";
+} from "../../../../components/seeker";
 
 export const metadata: Metadata = {
 	title: "Journey",

@@ -4,14 +4,14 @@ import { auth } from "@clerk/nextjs/server";
 import { getNotifications, type Notification } from "@explore-and-earn/db";
 import type { IconKey } from "@explore-and-earn/ui";
 
-import { markAllNotificationsReadAction } from "../../actions/notifications";
+import { markAllNotificationsReadAction } from "../../../actions/notifications";
 import {
   BucketPage,
   NotificationList,
   type NotificationItem,
   type NotificationKind,
-} from "../../../components/seeker";
-import { EmptyState } from "../../../components/discovery";
+} from "../../../../components/seeker";
+import { EmptyState } from "../../../../components/discovery";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {

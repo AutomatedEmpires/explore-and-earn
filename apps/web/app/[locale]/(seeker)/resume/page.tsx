@@ -3,12 +3,12 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getSeekerResume } from "@explore-and-earn/db";
 
-import { EmptyState } from "../../../components/discovery";
+import { EmptyState } from "../../../../components/discovery";
 import {
 	BucketPage,
 	ResumeBuilder,
 	computeResumeCompletion,
-} from "../../../components/seeker";
+} from "../../../../components/seeker";
 
 export const metadata: Metadata = {
 	title: "Resume",

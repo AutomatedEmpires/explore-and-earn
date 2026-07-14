@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getRecentApplications } from "@explore-and-earn/db";
 
-import { AdminApplicationsTable } from "../../../components/admin";
+import { AdminApplicationsTable } from "../../../../components/admin";
 import styles from "../shared.module.css";
 
 export const metadata: Metadata = { title: "Applications" };

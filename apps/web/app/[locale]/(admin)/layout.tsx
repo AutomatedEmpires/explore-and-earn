@@ -4,9 +4,9 @@ import { auth } from "@clerk/nextjs/server";
 import type { ReactNode } from "react";
 import { getMarketplaceStats } from "@explore-and-earn/db";
 
-import { AdminShell } from "../../components/admin";
-import { isAdminUserId } from "../../lib/admin";
-import "../../styles/admin-os.css";
+import { AdminShell } from "../../../components/admin";
+import { isAdminUserId } from "../../../lib/admin";
+import "../../../styles/admin-os.css";
 
 /**
  * Real moderation badge + marketplace-health for the shell chrome, derived from

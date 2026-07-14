@@ -1,6 +1,6 @@
 import { Skeleton } from "@explore-and-earn/ui";
 
-import { HostSectionHeading } from "../../../../components/host";
+import { HostSectionHeading } from "../../../../../components/host";
 import styles from "./loading.module.css";
 
 /**

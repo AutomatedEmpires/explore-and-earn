@@ -6,12 +6,12 @@ import {
 	type SeekerApplicationListing,
 } from "@explore-and-earn/db";
 
-import { BucketPage, CardStatus } from "../../../components/seeker";
+import { BucketPage, CardStatus } from "../../../../components/seeker";
 import {
 	CATEGORY_ICON,
 	EmptyState,
 	seekerApplicationListingToCardData,
-} from "../../../components/discovery";
+} from "../../../../components/discovery";
 import styles from "./accepted.module.css";
 
 export const metadata: Metadata = {

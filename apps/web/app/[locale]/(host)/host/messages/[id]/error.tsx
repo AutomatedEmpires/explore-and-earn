@@ -4,7 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { reportError } from "../../../../../lib/sentry";
+import { reportError } from "../../../../../../lib/sentry";
 import styles from "../../../../status.module.css";
 
 /**

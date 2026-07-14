@@ -4,12 +4,12 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { cachedHostProfile, getSupabaseToken } from "../../lib/serverCache";
-import { HostShell } from "../../components/host/HostShell";
-import { devHostProfile, isDevBenchEnabled } from "../../lib/devBench";
-import { readDevRole } from "../../lib/devBench/server";
-import "../../styles/host.css";
-import "../../styles/host-os.css";
+import { cachedHostProfile, getSupabaseToken } from "../../../lib/serverCache";
+import { HostShell } from "../../../components/host/HostShell";
+import { devHostProfile, isDevBenchEnabled } from "../../../lib/devBench";
+import { readDevRole } from "../../../lib/devBench/server";
+import "../../../styles/host.css";
+import "../../../styles/host-os.css";
 
 /**
  * Host scope layout.

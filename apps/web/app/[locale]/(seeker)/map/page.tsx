@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { getDiscoveryListingsWithCoords } from "../../../components/discovery/data";
-import { MapViewLazy } from "../../../components/map";
+import { getDiscoveryListingsWithCoords } from "../../../../components/discovery/data";
+import { MapViewLazy } from "../../../../components/map";
 
 export const dynamic = "force-dynamic";
 

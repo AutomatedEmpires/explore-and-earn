@@ -10,7 +10,7 @@ import {
 import type { MarketplaceCategory } from "@explore-and-earn/contracts"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition, type FormEvent } from "react"
-import { createHostProfileAction } from "../../../actions/hostProfile"
+import { createHostProfileAction } from "../../../../actions/hostProfile"
 import styles from "./page.module.css"
 
 type Step = "welcome" | "essentials" | "preview"

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getAllListingsForModeration } from "@explore-and-earn/db";
 
-import { AdminListingsTable, AdminPager } from "../../../components/admin";
+import { AdminListingsTable, AdminPager } from "../../../../components/admin";
 import styles from "../shared.module.css";
 
 export const metadata: Metadata = { title: "Listings" };

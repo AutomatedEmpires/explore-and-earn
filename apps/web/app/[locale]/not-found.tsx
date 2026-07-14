@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { StatusCard } from "../components/StatusCard";
+import { StatusCard } from "../../components/StatusCard";
 
 export const metadata: Metadata = {
 	title: "Page not found",

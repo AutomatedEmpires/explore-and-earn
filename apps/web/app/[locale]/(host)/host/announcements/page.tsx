@@ -5,9 +5,9 @@ import {
   getHostTierAndProfile,
 } from "@explore-and-earn/db";
 
-import { EmptyState } from "../../../../components/discovery";
-import { HostSectionHeading } from "../../../../components/host";
-import { HostAnnouncementComposer } from "../../../../components/host/HostAnnouncementComposer";
+import { EmptyState } from "../../../../../components/discovery";
+import { HostSectionHeading } from "../../../../../components/host";
+import { HostAnnouncementComposer } from "../../../../../components/host/HostAnnouncementComposer";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";

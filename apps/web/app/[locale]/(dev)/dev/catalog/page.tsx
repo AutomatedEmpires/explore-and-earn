@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { CatalogClient } from "../../../../components/dev/catalog/CatalogClient";
-import { isDevBenchEnabled } from "../../../../lib/devBench";
+import { CatalogClient } from "../../../../../components/dev/catalog/CatalogClient";
+import { isDevBenchEnabled } from "../../../../../lib/devBench";
 
 export const metadata: Metadata = {
   title: "Card + Popup Catalog · Dev",

@@ -9,8 +9,8 @@ import {
 	getEditorialPost,
 	getEditorialPosts,
 	type EditorialTone,
-} from "../../../lib/editorial";
-import { escapeJsonLdHtml } from "../../../lib/seo";
+} from "../../../../lib/editorial";
+import { escapeJsonLdHtml } from "../../../../lib/seo";
 import styles from "./page.module.css";
 
 export const dynamic = "force-static";

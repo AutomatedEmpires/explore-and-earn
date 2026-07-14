@@ -14,8 +14,8 @@ import {
   type BadgeProps,
 } from "@explore-and-earn/ui";
 
-import { BucketPage } from "../../../components/seeker";
-import { CATEGORY_ICON, EmptyState } from "../../../components/discovery";
+import { BucketPage } from "../../../../components/seeker";
+import { CATEGORY_ICON, EmptyState } from "../../../../components/discovery";
 import { WithdrawButton } from "./WithdrawButton";
 import styles from "./applied.module.css";
 

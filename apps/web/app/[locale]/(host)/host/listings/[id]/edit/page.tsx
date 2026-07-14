@@ -8,7 +8,7 @@ import {
   HostSectionHeading,
   ListingForm,
   type ListingFormInitialValues,
-} from "../../../../../../components/host";
+} from "../../../../../../../components/host";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Edit listing" };

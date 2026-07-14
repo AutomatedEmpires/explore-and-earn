@@ -3,8 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { DiscoveryCard } from "@explore-and-earn/ui";
 import { getApplicationsForSeekerWithListings } from "@explore-and-earn/db";
 
-import { BucketPage, CardStatus } from "../../../components/seeker";
-import { EmptyState, seekerApplicationListingToCardData } from "../../../components/discovery";
+import { BucketPage, CardStatus } from "../../../../components/seeker";
+import { EmptyState, seekerApplicationListingToCardData } from "../../../../components/discovery";
 import styles from "./withdrawn.module.css";
 
 export const metadata: Metadata = {

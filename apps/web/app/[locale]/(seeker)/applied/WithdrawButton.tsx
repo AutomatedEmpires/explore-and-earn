@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { withdrawApplicationAction } from "../../actions/applications";
+import { withdrawApplicationAction } from "../../../actions/applications";
 import styles from "./WithdrawButton.module.css";
 
 export interface WithdrawButtonProps {

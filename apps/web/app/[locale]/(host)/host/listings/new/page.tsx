@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getHostProfile } from "@explore-and-earn/db";
 
-import { HostSectionHeading, ListingForm } from "../../../../../components/host";
+import { HostSectionHeading, ListingForm } from "../../../../../../components/host";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "New listing" };

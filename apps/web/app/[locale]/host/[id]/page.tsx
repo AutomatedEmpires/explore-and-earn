@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { optionalAuth } from "../../../lib/optionalAuth";
+import { optionalAuth } from "../../../../lib/optionalAuth";
 import {
   getPublicListingsByHost,
   getHostRatingSummary,
@@ -10,18 +10,18 @@ import {
   getReviewableEngagementForHost,
 } from "@explore-and-earn/db";
 import type { PublicHostListing, HostTeamMember } from "@explore-and-earn/db";
-import { getPublicHostProfileCached } from "../../../lib/serverCache";
+import { getPublicHostProfileCached } from "../../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
 
-import { HostProfileHero } from "../../../components/host/HostProfileHero";
-import { HostTrustBand } from "../../../components/host/HostTrustBand";
-import { HostReviews } from "../../../components/host/HostReviews";
-import { LeaveReview } from "../../../components/host/LeaveReview";
-import { PublicListingCard } from "../../../components/host/PublicListingCard";
-import { WeatherWidget } from "../../../components/host/WeatherWidget";
-import { byMonetization } from "../../../lib/ranking";
-import { generateBreadcrumbJsonLd } from "../../../lib/seo";
-import { isUuid } from "../../../lib/ids";
+import { HostProfileHero } from "../../../../components/host/HostProfileHero";
+import { HostTrustBand } from "../../../../components/host/HostTrustBand";
+import { HostReviews } from "../../../../components/host/HostReviews";
+import { LeaveReview } from "../../../../components/host/LeaveReview";
+import { PublicListingCard } from "../../../../components/host/PublicListingCard";
+import { WeatherWidget } from "../../../../components/host/WeatherWidget";
+import { byMonetization } from "../../../../lib/ranking";
+import { generateBreadcrumbJsonLd } from "../../../../lib/seo";
+import { isUuid } from "../../../../lib/ids";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";

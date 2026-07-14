@@ -5,9 +5,9 @@ import { notFound } from "next/navigation";
 import { getAdminListingDetail } from "@explore-and-earn/db";
 import { Badge, Icon, type IconKey } from "@explore-and-earn/ui";
 
-import { AdminListingCard } from "../../../../components/admin";
-import { seekerApplicationListingToCardData } from "../../../../components/discovery";
-import { humanizeToken, listingStatusVariant } from "../../../../components/admin/status";
+import { AdminListingCard } from "../../../../../components/admin";
+import { seekerApplicationListingToCardData } from "../../../../../components/discovery";
+import { humanizeToken, listingStatusVariant } from "../../../../../components/admin/status";
 import styles from "../../shared.module.css";
 import detailStyles from "./page.module.css";
 

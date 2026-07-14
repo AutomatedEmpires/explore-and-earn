@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { Icon } from "@explore-and-earn/ui";
 
-import { isAdminUserId } from "../../../../lib/admin";
+import { isAdminUserId } from "../../../../../lib/admin";
 import { EMAIL_PREVIEWS } from "./previews";
 import styles from "./email-preview.module.css";
 

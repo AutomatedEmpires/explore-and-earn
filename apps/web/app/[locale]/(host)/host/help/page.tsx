@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { HostHelpCenter } from "../../../../components/host/HostHelpCenter";
+import { HostHelpCenter } from "../../../../../components/host/HostHelpCenter";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {

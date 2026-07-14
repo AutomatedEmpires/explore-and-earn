@@ -6,6 +6,7 @@ import {
   PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
 import { Card } from "@explore-and-earn/ui";
+import { formatMoney } from "../../../../../lib/format";
 import {
   getHostProfile,
   getHostRefundRequests,
@@ -15,15 +16,15 @@ import {
 import {
   startHostBillingPortalAction,
   startHostCheckoutAction,
-} from "../../../actions/hostBilling";
+} from "../../../../actions/hostBilling";
 import {
   HostRefundPanel,
   type HostRefundRequestView,
-} from "../../../../components/host/HostRefundPanel";
+} from "../../../../../components/host/HostRefundPanel";
 import {
   hasStripeCheckoutConfig,
   type HostSubscriptionTier,
-} from "../../../../services/stripe";
+} from "../../../../../services/stripe";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Billing" };
@@ -41,11 +42,8 @@ const HOST_PLAN_TIERS: HostSubscriptionTier[] = [
 ];
 
 function formatCurrency(amountCents: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(amountCents / 100);
+  // Locale and currency defaults are applied inside the shared formatter.
+  return formatMoney(amountCents);
 }
 
 function titleCaseTier(value: string): string {

@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 
 import { getHostProfile } from "@explore-and-earn/db";
 
-import { AssistantChat } from "../../../../components/assistant/AssistantChat";
-import styles from "../../../../components/assistant/assistant.module.css";
-import { optionalAuth } from "../../../../lib/optionalAuth";
-import { getSupabaseToken } from "../../../../lib/serverCache";
+import { AssistantChat } from "../../../../../components/assistant/AssistantChat";
+import styles from "../../../../../components/assistant/assistant.module.css";
+import { optionalAuth } from "../../../../../lib/optionalAuth";
+import { getSupabaseToken } from "../../../../../lib/serverCache";
 import {
   readHostThreadMessages,
   type PersistedAssistantMessage,
-} from "../../../../services/assistant/persistence";
+} from "../../../../../services/assistant/persistence";
 
 export const metadata: Metadata = {
   title: "Assistant",

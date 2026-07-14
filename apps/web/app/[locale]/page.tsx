@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
 import {
 	getHomepageBoostedListings,
 	getHomepageFeaturedEmployers,
@@ -9,33 +10,39 @@ import {
 	type HomepageFeaturedEmployer,
 } from "@explore-and-earn/db";
 
-import { MarketplaceHome } from "../components/home/MarketplaceHome";
-import { buildDestinations, buildAnnouncements } from "../components/home/home-data";
-import { DISCOVERY_FIXTURES, type DiscoveryListing } from "../components/discovery";
+import { MarketplaceHome } from "../../components/home/MarketplaceHome";
+import { buildDestinations, buildAnnouncements } from "../../components/home/home-data";
+import { DISCOVERY_FIXTURES, type DiscoveryListing } from "../../components/discovery";
 import {
 	canUseDiscoveryFixtureFallback,
 	hasDiscoveryPublicDataConfig,
-} from "../components/discovery/data";
-import { PublicShell } from "../components/public/PublicShell";
-import type { FeaturedEmployer } from "../components/public/FeaturedEmployersRail";
-import { buildFeaturedEmployers } from "../lib/employer-utils";
-import { generateOrganizationJsonLd, generateWebSiteJsonLd } from "../lib/seo";
+} from "../../components/discovery/data";
+import { PublicShell } from "../../components/public/PublicShell";
+import type { FeaturedEmployer } from "../../components/public/FeaturedEmployersRail";
+import { buildFeaturedEmployers } from "../../lib/employer-utils";
+import { generateOrganizationJsonLd, generateWebSiteJsonLd } from "../../lib/seo";
 import styles from "./page.module.css";
 
-export const metadata: Metadata = {
-	title: {
-		absolute: "Explore & Earn — Seasonal jobs with housing, meals & pay upfront",
-	},
-	description:
-		"Discover seasonal work in places worth living — farms, coasts, resorts, and remote roles. Every opportunity answers the three questions that matter before you apply: where you'll sleep, what you'll eat, and what you'll earn.",
-	alternates: { canonical: "/" },
-	openGraph: {
-		title: "Explore & Earn — Seasonal jobs with housing, meals & pay upfront",
-		description:
-			"A discovery marketplace for seasonal work and real-world exploration. Housing, meals, and pay — answered on every listing.",
-		url: "/",
-	},
-};
+// Server-side i18n proof: the homepage's SEO metadata is now sourced from the
+// message catalog via getTranslations (the getTranslations half of the pipeline,
+// complementing the useTranslations client usages in the header/hero/apply gate).
+// hreflang scaffold (en only) rides on this key page per the i18n plan.
+export async function generateMetadata(): Promise<Metadata> {
+	const t = await getTranslations("Meta");
+	return {
+		title: { absolute: t("homeTitle") },
+		description: t("homeDescription"),
+		alternates: {
+			canonical: "/",
+			languages: { en: "/", "x-default": "/" },
+		},
+		openGraph: {
+			title: t("homeTitle"),
+			description: t("homeOgDescription"),
+			url: "/",
+		},
+	};
+}
 
 export const dynamic = "force-dynamic";
 

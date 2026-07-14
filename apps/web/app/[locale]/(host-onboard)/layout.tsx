@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { isDevBenchEnabled } from "../../lib/devBench";
-import { readDevRole } from "../../lib/devBench/server";
-import { optionalAuth } from "../../lib/optionalAuth";
+import { isDevBenchEnabled } from "../../../lib/devBench";
+import { readDevRole } from "../../../lib/devBench/server";
+import { optionalAuth } from "../../../lib/optionalAuth";
 
 /**
  * Auth gate for the host-onboarding lane.

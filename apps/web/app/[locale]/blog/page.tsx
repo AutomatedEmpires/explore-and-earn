@@ -8,7 +8,7 @@ import {
 	getEditorialPosts,
 	type EditorialPost,
 	type EditorialTone,
-} from "../../lib/editorial";
+} from "../../../lib/editorial";
 import styles from "./page.module.css";
 
 export const dynamic = "force-static";

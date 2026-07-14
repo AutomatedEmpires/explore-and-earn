@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getSeekerTravelPrefs } from "@explore-and-earn/db";
 
-import { updateTravelAction } from "../../actions/seekerSettings";
-import { EmptyState } from "../../../components/discovery";
-import { BucketPage } from "../../../components/seeker";
-import styles from "../../../components/seeker/TravelPanel.module.css";
+import { updateTravelAction } from "../../../actions/seekerSettings";
+import { EmptyState } from "../../../../components/discovery";
+import { BucketPage } from "../../../../components/seeker";
+import styles from "../../../../components/seeker/TravelPanel.module.css";
 
 export const metadata: Metadata = {
   title: "Travel",

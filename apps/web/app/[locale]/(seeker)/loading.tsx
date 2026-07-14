@@ -1,6 +1,6 @@
 import { Skeleton } from "@explore-and-earn/ui";
 
-import { DiscoveryCardSkeleton } from "../../components/discovery/DiscoveryCardSkeleton";
+import { DiscoveryCardSkeleton } from "../../../components/discovery/DiscoveryCardSkeleton";
 import styles from "./loading.module.css";
 
 const CHIP_KEYS = ["chip-1", "chip-2", "chip-3", "chip-4", "chip-5"];

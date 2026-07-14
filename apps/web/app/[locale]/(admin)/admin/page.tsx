@@ -7,7 +7,7 @@ import {
 } from "@explore-and-earn/db";
 import { Chip, Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
-import { AdminMarketHealth } from "../../../components/admin";
+import { AdminMarketHealth } from "../../../../components/admin";
 import styles from "./overview.module.css";
 
 export const metadata: Metadata = { title: "Dashboard" };

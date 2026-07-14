@@ -9,15 +9,15 @@ import {
 	type SeekerBadge,
 } from "@explore-and-earn/db";
 
-import { DISCOVERY_FIXTURES } from "../../../components/discovery";
+import { DISCOVERY_FIXTURES } from "../../../../components/discovery";
 import {
 	ProfileHub,
 	computeResumeCompletion,
 	getSeekerStatusFallback,
 	type SeekerStatusSummary,
-} from "../../../components/seeker";
-import { getMatchedListings } from "../../../components/seeker/data";
-import { buildFeaturedEmployers } from "../../../lib/employer-utils";
+} from "../../../../components/seeker";
+import { getMatchedListings } from "../../../../components/seeker/data";
+import { buildFeaturedEmployers } from "../../../../lib/employer-utils";
 
 export const metadata: Metadata = {
 	title: "Profile",

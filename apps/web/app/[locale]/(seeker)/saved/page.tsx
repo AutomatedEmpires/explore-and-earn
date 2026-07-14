@@ -7,8 +7,8 @@ import {
 	rowToDiscoveryFields,
 } from "@explore-and-earn/db";
 
-import { EmptyState, type DiscoveryListing } from "../../../components/discovery";
-import { BucketPage, SavedCardGrid } from "../../../components/seeker";
+import { EmptyState, type DiscoveryListing } from "../../../../components/discovery";
+import { BucketPage, SavedCardGrid } from "../../../../components/seeker";
 
 export const metadata: Metadata = {
 	title: "Saved",
