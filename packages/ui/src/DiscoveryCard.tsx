@@ -87,6 +87,12 @@ export interface DiscoveryCardProps {
 	readonly onRemove?: (id: string) => void
 	readonly actions?: ReactNode
 	/**
+	 * Seeker previously skipped this listing. Skipped listings are demoted-but-
+	 * visible everywhere except the swipe deck (founder decision) — when true the
+	 * card renders a subtle bottom-left "Previously skipped" photo marker.
+	 */
+	readonly previouslySkipped?: boolean
+	/**
 	 * Above-the-fold cards should pass "eager": the cover then loads with
 	 * fetchpriority=high (LCP + deterministic screenshots). Default "lazy" —
 	 * feeds keep below-fold covers off the critical path.
@@ -131,6 +137,15 @@ function fillCopy(pct: number): string {
 function clampPct(pct: number): number {
 	return Math.min(100, Math.max(0, pct))
 }
+
+/**
+ * Match score is shown as the centered pill on ANY surface whenever the stored
+ * `data.matchScore` reaches this threshold (founder decision 2026-07-14 — a
+ * strong match is a product selling point, not a per-surface allowlist). Stored
+ * scores are read as-is; the card never recomputes. Listings below this simply
+ * show no match pill.
+ */
+export const MATCH_SHOW_THRESHOLD = 75
 
 /** Match-quality band → class. Colour-codes "how well" (founder direction). */
 function matchBandClass(pct: number): string {
@@ -232,6 +247,7 @@ export function DiscoveryCard({
 	onWarn,
 	onRemove,
 	actions,
+	previouslySkipped,
 	imageLoading = "lazy",
 }: DiscoveryCardProps) {
 	const cat      = data.category
@@ -291,9 +307,10 @@ export function DiscoveryCard({
 	// the right slot UNDER the category badge. Boosted only takes center when
 	// there is no match score to show.
 	type CenterBadge = { label: string; tone: CenterTone; icon?: IconKey; decoration: boolean }
-	const hasMatch = typeof data.matchScore === "number"
+	// Data-driven (not a surface allowlist): show the centered match pill wherever
+	// the stored score is meaningful — saved/applied/offered/invites included.
 	const matchCenterEligible =
-		hasMatch && (isDiscoveryFeed || isMatched || isApplicantReview || surface === "swipe" || surface === "map")
+		typeof data.matchScore === "number" && data.matchScore >= MATCH_SHOW_THRESHOLD
 
 	const centerBadge: CenterBadge | null =
 		isApplied    ? { label: "Applied",  tone: "paper",   decoration: false }
@@ -305,9 +322,14 @@ export function DiscoveryCard({
 		: null
 
 	const showMatchCenter = !centerBadge && matchCenterEligible
-	// Boosted drops to the right slot (gold, under the category badge) when a
-	// match score has claimed the center.
-	const boostedSecondary = isBoosted && showMatchCenter
+	// Founder rule: a boosted listing ALWAYS carries its boosted marker somewhere.
+	// It sits in the CENTER only when boosted is the sole signal (no match %, no
+	// lifecycle/action badge) — i.e. when the resolved center badge IS the boosted
+	// stamp. Whenever anything else occupies the center (a match % OR any lifecycle/
+	// action stamp: Applied/Draft/Filled/Reported/Schedule), the boosted marker
+	// drops to the right slot (gold, under the category badge). Never double-rendered.
+	const boostedInCenter  = centerBadge?.tone === "boosted"
+	const boostedSecondary = isBoosted && !boostedInCenter
 
 	// R1 right secondary: passive state badges (match now shows centered).
 	type SecondaryBadge = { label: string; tone: SecondaryTone }
@@ -508,6 +530,15 @@ export function DiscoveryCard({
 						</span>
 					) : null}
 				</div>
+
+				{/* Previously skipped — subtle bottom-left photo marker (demoted-but-
+				    visible; the swipe deck excludes skipped so never renders this). */}
+				{previouslySkipped ? (
+					<span className={styles.skippedMarker}>
+						<Icon name="action.close" size={14} aria-hidden />
+						Previously skipped
+					</span>
+				) : null}
 
 				{/* Report flag — bottom-right */}
 				{onReport ? (

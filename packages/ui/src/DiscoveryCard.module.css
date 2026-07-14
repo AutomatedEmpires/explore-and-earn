@@ -416,6 +416,42 @@
   color: var(--palette-white);
 }
 
+/* ── PREVIOUSLY-SKIPPED MARKER (bottom-left over the photo) ────────────────── */
+/* Subtle, non-intrusive: demoted-but-visible signal. Frosted ice like the other
+   overlay chips but quieter (muted label, no accent), works over any photo and
+   in dark mode since it's a self-contained glass chip on the scrimmed hero. */
+.skippedMarker {
+  position: absolute;
+  left: var(--space-12);
+  bottom: var(--space-12);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: calc(100% - var(--space-80));
+  padding: var(--space-3) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  line-height: var(--type-label-lh);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--palette-white) 82%, transparent);
+  background: color-mix(in srgb, var(--palette-ink) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--palette-white) 26%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.skippedMarker :global(svg) {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
 /* ── REPORT FLAG (bottom-right over the photo) ────────────────────────────── */
 
 .reportBtn {
@@ -453,10 +489,13 @@
   padding: var(--dc-padding, var(--space-12));
 }
 
-/* Every field sits in its own chrome box — clean definition, near-equal. */
+/* Every field sits in its own chrome box — clean definition, near-equal. The
+   icon+text group is CENTERED (founder direction 2026-07-14): the icon stays
+   immediately left of the text, and the whole group is centered in the box. */
 .metaRow {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-8);
   width: 100%;
   min-height: 44px;
@@ -464,7 +503,7 @@
   background: var(--color-surface);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-input);
-  text-align: left;
+  text-align: center;
   color: var(--text-primary);
 }
 
