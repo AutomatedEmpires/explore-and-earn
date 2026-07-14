@@ -1,8 +1,9 @@
-import type { MatchResult } from "@explore-and-earn/contracts";
+import type { MatchResult, MatchTrace } from "@explore-and-earn/contracts";
 
 import type { ListingRow, PublicListingDetail } from "../queries/listings";
 import type { SeekerProfileRecord } from "../queries/seekerProfiles";
 import { computeMatch, type MatchListingInput, type MatchSeekerInput } from "./matchEngine";
+import { buildMatchTrace } from "./matchTrace";
 
 /**
  * Seeker-facing fit computation for one listing.
@@ -115,6 +116,24 @@ export function computeSeekerListingFit(
   nowMs?: number,
 ): MatchResult {
   return computeMatch(
+    toSeekerMatchInput(profile),
+    toPublicListingMatchInput(listing),
+    nowMs !== undefined ? { nowMs } : {},
+  );
+}
+
+/**
+ * Fit + structured explanation trace for one listing (the "Why this fits"
+ * surface). Same inputs and mapping as {@link computeSeekerListingFit}, so the
+ * explanation can never disagree with the score shown anywhere else. Render
+ * copy with renderMatchTrace()/renderMatchSignal() from contracts (G34).
+ */
+export function computeSeekerListingFitTrace(
+  profile: SeekerProfileRecord,
+  listing: PublicListingDetail,
+  nowMs?: number,
+): MatchTrace {
+  return buildMatchTrace(
     toSeekerMatchInput(profile),
     toPublicListingMatchInput(listing),
     nowMs !== undefined ? { nowMs } : {},
