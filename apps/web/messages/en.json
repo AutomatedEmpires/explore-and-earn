@@ -1,0 +1,70 @@
+{
+	"Nav": {
+		"explore": "Explore",
+		"community": "Community",
+		"photos": "Photos",
+		"feed": "Feed",
+		"announcements": "Announcements",
+		"signIn": "Sign in",
+		"chooseYourPath": "Choose your path",
+		"seekerTitle": "I'm a seeker",
+		"seekerSub": "Find work — free forever",
+		"hostTitle": "I'm a host",
+		"hostSub": "List your place & hire",
+		"createAccount": "New here? Create an account",
+		"becomeAdmin": "Become an admin",
+		"yourProfile": "Your profile",
+		"notifications": "Notifications",
+		"homeAriaLabel": "Explore and Earn — home"
+	},
+	"Common": {
+		"apply": "Apply",
+		"save": "Save",
+		"saved": "Saved",
+		"cancel": "Cancel",
+		"confirm": "Confirm",
+		"dismiss": "Dismiss",
+		"seeAll": "See all",
+		"postAJob": "Post a job",
+		"exploreJobs": "Explore jobs"
+	},
+	"Home": {
+		"eyebrow": "The seeker-first work marketplace",
+		"anthemLine1": "Built for seekers,",
+		"anthemLine2": "by seekers.",
+		"promise": "Find seasonal work with housing, meals, pay & a place — upfront.",
+		"sub": "Free forever for seekers. Hosts pay for visibility — you never pay to find work.",
+		"searchRoleLabel": "Role",
+		"searchRolePlaceholder": "Deckhand, harvest…",
+		"searchWhereLabel": "Where",
+		"searchWherePlaceholder": "Alaska, remote…",
+		"searchCategoryLabel": "Category",
+		"categoryAll": "All work",
+		"categoryFarm": "Farm & ranch",
+		"categoryMaritime": "Maritime",
+		"categoryRemote": "Remote",
+		"categorySeasonal": "Seasonal",
+		"triadHousing": "Housing",
+		"triadMeals": "Meals",
+		"triadPay": "Pay"
+	},
+	"Meta": {
+		"homeTitle": "Explore & Earn — Seasonal jobs with housing, meals & pay upfront",
+		"homeDescription": "Discover seasonal work in places worth living — farms, coasts, resorts, and remote roles. Every opportunity answers the three questions that matter before you apply: where you'll sleep, what you'll eat, and what you'll earn.",
+		"homeOgDescription": "A discovery marketplace for seasonal work and real-world exploration. Housing, meals, and pay — answered on every listing."
+	},
+	"Apply": {
+		"signInToApply": "Sign in to apply",
+		"editListing": "Edit listing",
+		"applicationSent": "Application sent",
+		"confirmHeading": "Apply to this listing?",
+		"confirmBody": "Confirm your application to <strong>{title}</strong>. The host will review your profile and contact you if interested.",
+		"resumeGateHeading": "Complete your résumé to apply",
+		"resumeGateBody": "Hosts move people across the world on a handshake — so they need to know who they're inviting. Finish your résumé (your bio, location, timeline, and skills) before applying to listings.",
+		"finishResume": "Finish your résumé",
+		"errorHeading": "Could not submit application",
+		"errorRateLimit": "You're applying too quickly. Please wait a moment and try again.",
+		"errorSessionExpired": "Your session expired. Please sign in and try again.",
+		"errorGeneric": "Something went wrong. Please try again."
+	}
+}
