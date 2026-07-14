@@ -20,6 +20,7 @@
     "app/**/*.tsx",
     "components/**/*.ts",
     "components/**/*.tsx",
+    "i18n/**/*.ts",
     "lib/**/*.ts",
     "lib/**/*.tsx",
     "next-env.d.ts",

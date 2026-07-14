@@ -71,5 +71,16 @@ export default tseslint.config(
         }
       ]
     }
+  },
+  {
+    // G-I18N (warn, lenient): nudge new user-facing copy in the web UI toward
+    // the next-intl pipeline. Warn-level only — never fails CI. Scoped to the
+    // web app's rendered surfaces (route tree + components); extracting every
+    // existing literal is incremental, so this guides new copy without a mass
+    // rewrite this wave.
+    files: ["apps/web/app/**/*.tsx", "apps/web/components/**/*.tsx"],
+    rules: {
+      "explore-and-earn/no-untranslated-jsx-text": "warn"
+    }
   }
 );

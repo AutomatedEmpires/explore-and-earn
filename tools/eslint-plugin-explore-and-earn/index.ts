@@ -27,6 +27,7 @@ import noExternalCalendarSync from "./rules/no-external-calendar-sync.ts";
 import noLifecycleStringLiterals from "./rules/no-lifecycle-string-literals.ts";
 import noMonetizationInMatch from "./rules/no-monetization-in-match.ts";
 import noPricingLiterals from "./rules/no-pricing-literals.ts";
+import noUntranslatedJsxText from "./rules/no-untranslated-jsx-text.ts";
 import verifiedHostViaComponentOnly from "./rules/verified-host-via-component-only.ts";
 
 export default {
@@ -40,6 +41,7 @@ export default {
     "no-lifecycle-string-literals": noLifecycleStringLiterals,
     "no-monetization-in-match": noMonetizationInMatch,
     "no-pricing-literals": noPricingLiterals,
+    "no-untranslated-jsx-text": noUntranslatedJsxText,
     "verified-host-via-component-only": verifiedHostViaComponentOnly,
   },
 };
