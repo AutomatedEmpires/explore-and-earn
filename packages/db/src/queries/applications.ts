@@ -7,9 +7,15 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
-import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  formatCompensation,
+  formatOpportunityWindow,
+  hasVerifiedHostSubscription,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
+import { isSeekerResumeComplete } from "../lib/resumeCompleteness";
+import { getSeekerResume } from "./seekerResume";
 
 export interface ApplyResult {
   readonly ok: boolean;
@@ -52,6 +58,9 @@ async function resolveSeekerProfileId(
  * - `profile_not_found` — no seeker_profiles row yet (Clerk webhook pending)
  * - `already_applied`   — unique (listing_id, seeker_profile_id) violation
  * - `cannot_apply_to_own_listing` — host cannot apply to their own listing
+ * - `resume_incomplete` — résumé does not yet satisfy the server-authoritative
+ *   completeness gate (see isSeekerResumeComplete); enforced here so a
+ *   determined client cannot bypass the UI-side ApplyButton gate.
  */
 export async function applyToListing(
   clerkToken: string,
@@ -62,6 +71,14 @@ export async function applyToListing(
   const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
     return { ok: false, error: "profile_not_found" };
+  }
+
+  // Server-authoritative résumé gate: block the insert BEFORE it happens when
+  // the seeker's résumé is not complete enough to apply. This is the real
+  // enforcement point — the ApplyButton UI check is advisory only.
+  const resume = await getSeekerResume(clerkToken, clerkUserId);
+  if (!isSeekerResumeComplete(resume)) {
+    return { ok: false, error: "resume_incomplete" };
   }
 
   // Prevent self-application: host cannot apply to their own listing
@@ -456,40 +473,26 @@ export type ApplicationWithListing = SeekerApplication & {
   readonly listing: ApplicationListing | null;
 };
 
+// Compensation summary via the shared, locale-ready formatter (default currency
+// applied in the formatter) \u2014 no inline currency/date formatting in the DB
+// layer. See @explore-and-earn/contracts format.ts.
 function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    return row.compensation_summary;
-  }
-  const minCents =
-    typeof row.compensation_min_cents === "number"
-      ? row.compensation_min_cents
-      : null;
-  if (minCents != null) {
-    const unit =
-      typeof row.compensation_unit === "string"
-        ? row.compensation_unit
-        : "other";
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(minCents);
-    const maxCents =
+  return formatCompensation({
+    summary:
+      typeof row.compensation_summary === "string"
+        ? row.compensation_summary
+        : null,
+    minCents:
+      typeof row.compensation_min_cents === "number"
+        ? row.compensation_min_cents
+        : null,
+    maxCents:
       typeof row.compensation_max_cents === "number"
         ? row.compensation_max_cents
-        : null;
-    const max = maxCents != null ? fmt(maxCents) : null;
-    const range = max && max !== min ? `${min}\u2013${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
+        : null,
+    unit:
+      typeof row.compensation_unit === "string" ? row.compensation_unit : null,
+  });
 }
 
 function rowToDiscoveryListing(value: unknown): ApplicationListing | null {
@@ -523,11 +526,10 @@ function rowToDiscoveryListing(value: unknown): ApplicationListing | null {
       row.location_display.length > 0
         ? row.location_display
         : "Location not specified",
-    opportunityWindow:
-      typeof row.timeline_summary === "string" &&
-      row.timeline_summary.length > 0
-        ? row.timeline_summary
-        : "Open",
+    opportunityWindow: formatOpportunityWindow({
+      timelineSummary:
+        typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+    }),
     status: (typeof row.status === "string"
       ? row.status
       : "live") as ListingStatus,
@@ -651,11 +653,10 @@ function rowToSeekerApplicationListing(
       row.location_display.length > 0
         ? row.location_display
         : "Location not specified",
-    opportunityWindow:
-      typeof row.timeline_summary === "string" &&
-      row.timeline_summary.length > 0
-        ? row.timeline_summary
-        : "Open",
+    opportunityWindow: formatOpportunityWindow({
+      timelineSummary:
+        typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+    }),
     status: (typeof row.status === "string"
       ? row.status
       : "live") as ListingStatus,

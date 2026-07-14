@@ -7,7 +7,11 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
-import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  formatCompensation,
+  formatOpportunityWindow,
+  hasVerifiedHostSubscription,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 
@@ -68,54 +72,37 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+// Compensation + window strings via the shared, locale-ready formatters
+// (the formatter supplies the default currency when the row carries none) \u2014 no
+// inline currency/date formatting in the DB layer. See contracts format.ts.
 function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    return row.compensation_summary;
-  }
-  const minCents =
-    typeof row.compensation_min_cents === "number"
-      ? row.compensation_min_cents
-      : null;
-  if (minCents != null) {
-    const unit =
-      typeof row.compensation_unit === "string"
-        ? row.compensation_unit
-        : "other";
-    const currency =
-      typeof row.compensation_currency === "string"
-        ? row.compensation_currency
-        : "USD";
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(minCents);
-    const maxCents =
+  return formatCompensation({
+    summary:
+      typeof row.compensation_summary === "string"
+        ? row.compensation_summary
+        : null,
+    minCents:
+      typeof row.compensation_min_cents === "number"
+        ? row.compensation_min_cents
+        : null,
+    maxCents:
       typeof row.compensation_max_cents === "number"
         ? row.compensation_max_cents
-        : null;
-    const max = maxCents != null ? fmt(maxCents) : null;
-    const range = max && max !== min ? `${min}\u2013${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
+        : null,
+    unit:
+      typeof row.compensation_unit === "string" ? row.compensation_unit : null,
+    currency:
+      typeof row.compensation_currency === "string"
+        ? row.compensation_currency
+        : null,
+  });
 }
 
 function embeddedOpportunityWindow(row: Record<string, unknown>): string {
-  if (
-    typeof row.timeline_summary === "string" &&
-    row.timeline_summary.length > 0
-  ) {
-    return row.timeline_summary;
-  }
-  return "Open";
+  return formatOpportunityWindow({
+    timelineSummary:
+      typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+  });
 }
 
 function rowToInviteListing(

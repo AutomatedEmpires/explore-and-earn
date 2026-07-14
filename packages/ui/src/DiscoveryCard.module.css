@@ -270,11 +270,12 @@
   background: var(--dc-match-fg, var(--palette-ice));
 }
 
-/* Bands — strong (emerald) · good (teal) · fair (glacier) · low (steel) */
-.matchStrong { --dc-match-fg: #34D399; }
-.matchGood   { --dc-match-fg: #22C3B8; }
-.matchFair   { --dc-match-fg: #58B6E8; }
-.matchLow    { --dc-match-fg: #9FB6C4; }
+/* Bands — strong (emerald) · good (teal) · fair (glacier) · low (steel).
+   Values are named tokens (light-identical) so the card is fully token-driven. */
+.matchStrong { --dc-match-fg: var(--match-strong); }
+.matchGood   { --dc-match-fg: var(--match-good); }
+.matchFair   { --dc-match-fg: var(--match-fair); }
+.matchLow    { --dc-match-fg: var(--match-low); }
 
 /* Narrow cards (phones, compact grids) — shrink + cap the photo badges so the
    centered match/boost pill never collides with the top-right category badge. */
@@ -331,11 +332,11 @@
   border: 1px solid color-mix(in srgb, currentColor 42%, transparent);
 }
 
-.toneSuccess { color: #7BE8C0; }
+.toneSuccess { color: var(--tone-success); }
 .toneMatch   { color: var(--palette-ice); }
-.toneWarning { color: #F4CE82; }
+.toneWarning { color: var(--tone-warning); }
 .toneMuted   { color: color-mix(in srgb, var(--palette-white) 82%, transparent); }
-.toneError   { color: #FB9DAB; }
+.toneError   { color: var(--tone-error); }
 
 /* Boosted secondary badge — gold, sits under the category badge when a match
    score has taken the center slot (founder badge rule). */
@@ -641,7 +642,7 @@ button.metaRow:focus-visible {
   border-radius: var(--radius-input);
   border: 1.5px solid var(--palette-line);
   background: var(--palette-surface);
-  color: var(--palette-ink);
+  color: var(--text-primary);
   text-align: center;
   transition: transform var(--motion-fast) var(--ease-standard),
     box-shadow var(--motion-fast) var(--ease-standard);
@@ -717,7 +718,7 @@ button.benefit:focus-visible {
   font-size: clamp(11px, 2.7vw, 13px);
   font-weight: 700;
   line-height: 1.12;
-  color: var(--palette-ink);
+  color: var(--text-primary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

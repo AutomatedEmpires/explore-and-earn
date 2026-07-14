@@ -9,7 +9,12 @@ import type {
   OpportunityCategory,
   OpportunityListing,
 } from "@explore-and-earn/contracts";
-import { MARKETPLACE_CATEGORIES, hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  MARKETPLACE_CATEGORIES,
+  formatCompensation,
+  formatOpportunityWindow,
+  hasVerifiedHostSubscription,
+} from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 import { getSeekerApplicationIds } from "./applications";
 import { getPassedListingIds } from "./passedListings";
@@ -75,16 +80,18 @@ type RawListingRow = {
   host_profiles: { company_name: string; subscription_tier: string | null } | null;
 };
 
-function formatOpportunityWindow(
+// Display strings (opportunity window + compensation summary) are formatted via
+// the shared, locale-ready chokepoint in @explore-and-earn/contracts \u2014 the DB
+// layer no longer builds currency/date strings inline (no locale or currency
+// literals here). These thin adapters feed raw row columns to the formatters.
+function buildOpportunityWindow(
   row: Pick<ListingRow, "begins_at" | "ends_at" | "timeline_summary">,
 ): string {
-  if (row.timeline_summary) return row.timeline_summary;
-  if (row.begins_at && row.ends_at) {
-    const fmt = (d: string) =>
-      new Date(d).toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    return `${fmt(row.begins_at)}\u2013${fmt(row.ends_at)}`;
-  }
-  return "Open";
+  return formatOpportunityWindow({
+    timelineSummary: row.timeline_summary,
+    begins: row.begins_at,
+    ends: row.ends_at,
+  });
 }
 
 function buildCompensationSummary(
@@ -97,24 +104,13 @@ function buildCompensationSummary(
     | "compensation_currency"
   >,
 ): string {
-  if (row.compensation_summary) return row.compensation_summary;
-  const unit = row.compensation_unit ?? "other";
-  const currency = row.compensation_currency;
-  if (row.compensation_min_cents != null) {
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(row.compensation_min_cents);
-    const max = row.compensation_max_cents != null ? fmt(row.compensation_max_cents) : null;
-    const range = max && max !== min ? `${min}\u2013${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
+  return formatCompensation({
+    summary: row.compensation_summary,
+    minCents: row.compensation_min_cents,
+    maxCents: row.compensation_max_cents,
+    unit: row.compensation_unit,
+    currency: row.compensation_currency,
+  });
 }
 
 function toListingRow(raw: RawListingRow): ListingRow {
@@ -134,7 +130,7 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
     title: row.title,
     category: row.category,
     location: row.location_display ?? "Location not specified",
-    opportunityWindow: formatOpportunityWindow(row),
+    opportunityWindow: buildOpportunityWindow(row),
     begins: row.begins_at ?? undefined,
     ends: row.ends_at ?? undefined,
     status: row.status as ListingStatus,
@@ -695,20 +691,94 @@ export interface PublicListingDetail {
   galleryPhotoUrls: string[];
   hostProfileId: string | null;
   host: PublicListingDetailHost | null;
+
+  /* ── Immersive listing-detail fields (migration 060 + host narrative 059) ──
+     Every field below is OPTIONAL and self-omitting: absent/empty data maps to
+     undefined (arrays) or null (descriptions) so the immersive page renders the
+     corresponding section only when there is honest content to show. */
+
+  /** "What you'll do" — role responsibilities (listings.responsibilities jsonb). */
+  responsibilities?: string[];
+  /** "What we're looking for" — role requirements (listings.requirements jsonb). */
+  requirements?: string[];
+  /** "Perks & benefits" at the LISTING level (listings.perks jsonb). */
+  perks?: string[];
+  /** Free-text housing descriptor (listings.housing_description; migration 040). */
+  housingDescription?: string | null;
+  /** Free-text meals descriptor (listings.meals_description; migration 040). */
+  mealsDescription?: string | null;
+
+  /* ── Host-narrative-derived (host_profiles.narrative jsonb; migration 059) ── */
+  /** "Why work with us" recruiting pitch. */
+  whyWorkForUs?: string | null;
+  /** "Meet the team" members; photoUrl may be null (framed placeholder). */
+  team?: { name: string; role: string; photoUrl?: string | null }[];
+  /** "Life here" / off-the-clock activities. */
+  activities?: string[];
+  /** Host-level perks from the narrative (distinct from listing-level `perks`). */
+  hostPerks?: string[];
 }
 
 const LISTING_DETAIL_COLUMNS =
   "id,title,category,description,location_display,latitude,longitude,status," +
-  "housing_included,meals_included,compensation_summary,compensation_min_cents," +
+  "housing_included,meals_included,housing_description,meals_description," +
+  "responsibilities,requirements,perks," +
+  "compensation_summary,compensation_min_cents," +
   "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
   "begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profile_id," +
-  "host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier)";
+  "host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier,narrative)";
 
 function firstEmbed(value: unknown): Record<string, unknown> | null {
   const candidate = Array.isArray(value) ? value[0] : value;
   return candidate && typeof candidate === "object"
     ? (candidate as Record<string, unknown>)
     : null;
+}
+
+/**
+ * Parse a jsonb/text[] column into a clean, order-preserving list of non-empty
+ * strings. Tolerates null/non-array/mixed content (defaults to []). Used for the
+ * immersive listing arrays (responsibilities/requirements/perks) and the host
+ * narrative activities/perks — never fabricates, only keeps real strings.
+ */
+function toDetailStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+/**
+ * Trim a value to a non-empty string, or null. Keeps free-text descriptors
+ * (housing/meals, whyWorkForUs) honest: blank/whitespace/non-string → null.
+ */
+function toDetailText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Parse host_profiles.narrative team[] (migration 059 shape:
+ * { name, role, photoUrl? }) into validated members. Skips entries with neither
+ * a name nor a role; normalizes a missing/blank photoUrl to null so the UI can
+ * render a framed placeholder. Tolerant of missing/partial jsonb.
+ */
+function toDetailTeam(
+  value: unknown,
+): { name: string; role: string; photoUrl?: string | null }[] {
+  if (!Array.isArray(value)) return [];
+  const members: { name: string; role: string; photoUrl?: string | null }[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const rec = entry as Record<string, unknown>;
+    const name = typeof rec.name === "string" ? rec.name.trim() : "";
+    const role = typeof rec.role === "string" ? rec.role.trim() : "";
+    if (name === "" && role === "") continue;
+    members.push({ name, role, photoUrl: toDetailText(rec.photoUrl) });
+  }
+  return members;
 }
 
 /**
@@ -746,6 +816,22 @@ export async function getListingDetailPublic(
         verified: hasVerifiedHostSubscription(hostRow.subscription_tier),
       }
     : null;
+
+  // Immersive listing arrays/descriptors (migration 060 + 040) — parsed
+  // defensively; empty → undefined so each page section self-omits.
+  const responsibilities = toDetailStringArray(row.responsibilities);
+  const requirements = toDetailStringArray(row.requirements);
+  const perks = toDetailStringArray(row.perks);
+
+  // Host showcase narrative (host_profiles.narrative jsonb; migration 059).
+  // Tolerates a missing/partial/empty jsonb block.
+  const narrative =
+    hostRow && hostRow.narrative && typeof hostRow.narrative === "object"
+      ? (hostRow.narrative as Record<string, unknown>)
+      : {};
+  const team = toDetailTeam(narrative.team);
+  const activities = toDetailStringArray(narrative.activities);
+  const hostPerks = toDetailStringArray(narrative.perks);
 
   return {
     id: String(row.id),
@@ -798,6 +884,17 @@ export async function getListingDetailPublic(
     hostProfileId:
       typeof row.host_profile_id === "string" ? row.host_profile_id : null,
     host,
+
+    // Immersive fields — undefined-when-empty so the page omits empty sections.
+    responsibilities: responsibilities.length > 0 ? responsibilities : undefined,
+    requirements: requirements.length > 0 ? requirements : undefined,
+    perks: perks.length > 0 ? perks : undefined,
+    housingDescription: toDetailText(row.housing_description),
+    mealsDescription: toDetailText(row.meals_description),
+    whyWorkForUs: toDetailText(narrative.whyWorkForUs),
+    team: team.length > 0 ? team : undefined,
+    activities: activities.length > 0 ? activities : undefined,
+    hostPerks: hostPerks.length > 0 ? hostPerks : undefined,
   };
 }
 

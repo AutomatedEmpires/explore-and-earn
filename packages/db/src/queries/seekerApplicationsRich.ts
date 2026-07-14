@@ -7,7 +7,11 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
-import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  formatCompensation,
+  formatOpportunityWindow,
+  hasVerifiedHostSubscription,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 import type { SeekerApplicationListing } from "./applications";
@@ -47,40 +51,26 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+// Compensation summary via the shared, locale-ready formatter (default currency
+// applied in the formatter) — no inline currency/date formatting in the DB
+// layer. See @explore-and-earn/contracts format.ts.
 function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    return row.compensation_summary;
-  }
-  const minCents =
-    typeof row.compensation_min_cents === "number"
-      ? row.compensation_min_cents
-      : null;
-  if (minCents != null) {
-    const unit =
-      typeof row.compensation_unit === "string"
-        ? row.compensation_unit
-        : "other";
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(minCents);
-    const maxCents =
+  return formatCompensation({
+    summary:
+      typeof row.compensation_summary === "string"
+        ? row.compensation_summary
+        : null,
+    minCents:
+      typeof row.compensation_min_cents === "number"
+        ? row.compensation_min_cents
+        : null,
+    maxCents:
       typeof row.compensation_max_cents === "number"
         ? row.compensation_max_cents
-        : null;
-    const max = maxCents != null ? fmt(maxCents) : null;
-    const range = max && max !== min ? `${min}–${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
+        : null,
+    unit:
+      typeof row.compensation_unit === "string" ? row.compensation_unit : null,
+  });
 }
 
 function rowToSeekerApplicationListing(
@@ -125,11 +115,10 @@ function rowToSeekerApplicationListing(
       row.location_display.length > 0
         ? row.location_display
         : "Location not specified",
-    opportunityWindow:
-      typeof row.timeline_summary === "string" &&
-      row.timeline_summary.length > 0
-        ? row.timeline_summary
-        : "Open",
+    opportunityWindow: formatOpportunityWindow({
+      timelineSummary:
+        typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+    }),
     status: (typeof row.status === "string"
       ? row.status
       : "live") as ListingStatus,
