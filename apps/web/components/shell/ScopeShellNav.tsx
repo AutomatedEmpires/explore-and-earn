@@ -42,6 +42,13 @@ export interface ScopeNavItem {
 	readonly badge?: number;
 	/** Marks the current section (drives `aria-current` + the active lane). */
 	readonly active?: boolean;
+	/**
+	 * Hide this item from the MOBILE drawer (it still shows in the desktop rail).
+	 * Use for destinations already carried by the mobile bottom dock — the drawer
+	 * must not redundantly repeat Seek / Swipe / Map. The rail keeps them because
+	 * the mobile dock is hidden on desktop.
+	 */
+	readonly hideInDrawer?: boolean;
 }
 
 export interface ScopeShellNavProps {
@@ -375,7 +382,12 @@ export function ScopeShellNav({
 									className={styles.drawerNav}
 									aria-label={`${scopeLabel} sections`}
 								>
-									<NavList items={items} onNavigate={onClose} />
+									{/* Drawer drops dock-duplicated items (Seek/Swipe/Map);
+									    the rail keeps them since the mobile dock is desktop-hidden. */}
+									<NavList
+										items={items.filter((item) => !item.hideInDrawer)}
+										onNavigate={onClose}
+									/>
 								</nav>
 								<div className={styles.foot}>
 									{footerItems && footerItems.length > 0 ? (

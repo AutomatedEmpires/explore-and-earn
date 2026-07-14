@@ -31,15 +31,19 @@ interface SectionDef {
   readonly icon: IconKey;
   readonly exact?: boolean;
   readonly badgeKey?: "unread" | "community";
+  /** Present in the desktop rail but hidden from the mobile drawer (already on
+   *  the founder-locked bottom dock — the drawer must not repeat it). */
+  readonly hideInDrawer?: boolean;
 }
 
 // Scope sections — rail body + hamburger drawer. Order = discovery modes first,
 // then the pipeline, then the community/journey. Every href resolves to a real
-// (seeker) route.
+// (seeker) route. Seek/Swipe/Map are hidden from the mobile drawer because the
+// bottom dock already carries them; the rail keeps them (no dock on desktop).
 const SECTIONS: readonly SectionDef[] = [
-  { href: "/seek", label: "Discover", icon: "nav.seek" },
-  { href: "/swipe", label: "Swipe", icon: "nav.swipe" },
-  { href: "/map", label: "Map", icon: "nav.map" },
+  { href: "/seek", label: "Seek", icon: "nav.seek", hideInDrawer: true },
+  { href: "/swipe", label: "Swipe", icon: "nav.swipe", hideInDrawer: true },
+  { href: "/map", label: "Map", icon: "nav.map", hideInDrawer: true },
   { href: "/assistant", label: "Assistant", icon: "action.message" },
   { href: "/saved", label: "Saved", icon: "nav.saved" },
   { href: "/applied", label: "Applications", icon: "action.apply" },
@@ -102,6 +106,7 @@ export function SeekerShell({
     icon: def.icon,
     badge: badgeFor(def.badgeKey),
     active: isActive(pathname, def.href, def.exact),
+    hideInDrawer: def.hideInDrawer,
   });
 
   const items = SECTIONS.map(toNavItem);
@@ -119,10 +124,10 @@ export function SeekerShell({
         userHref="/profile"
         avatar={<span className="seekeros-railava">{initial}</span>}
         brand={
-          <span className="seekeros-railbrand">
+          <Link className="seekeros-railbrand" href="/" aria-label="Explore & Earn — home">
             <span className="seekeros-railmark" aria-hidden>E</span>
             Explore&amp;Earn
-          </span>
+          </Link>
         }
       />
 

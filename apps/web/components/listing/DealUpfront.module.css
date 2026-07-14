@@ -1,0 +1,74 @@
+.triad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
+}
+
+@media (max-width: 33.4375rem) {
+  .triad {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cell {
+  min-width: 0;
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--cell-border);
+  background-color: var(--cell-bg);
+}
+
+.housing {
+  --cell-bg: var(--benefit-housing-bg);
+  --cell-border: var(--benefit-housing-fg);
+  --cell-fg: var(--benefit-housing-fg);
+}
+
+.meals {
+  --cell-bg: var(--benefit-meals-bg);
+  --cell-border: var(--benefit-meals-fg);
+  --cell-fg: var(--benefit-meals-fg);
+}
+
+.pay {
+  --cell-bg: var(--benefit-pay-bg);
+  --cell-border: var(--benefit-pay-fg);
+  --cell-fg: var(--benefit-pay-fg);
+}
+
+.cellHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+  color: var(--cell-fg);
+}
+
+.cellHead svg {
+  flex-shrink: 0;
+}
+
+.cellLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--type-label-tracking);
+  color: var(--cell-fg);
+}
+
+.cellValue {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--cell-fg);
+}
+
+.cellDesc {
+  margin: var(--space-8) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}

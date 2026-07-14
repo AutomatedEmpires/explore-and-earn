@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
 import { FOUNDING_SEAT_CAP } from "@explore-and-earn/contracts";
 
-import type { DiscoveryListing } from "../discovery";
-import { toDiscoveryCardData } from "../discovery/listing";
+import {
+  BenefitTrustModal,
+  HostProfilePopup,
+  PayDetailsDrawer,
+  QuickPeekDrawer,
+  toDiscoveryCardData,
+  type DiscoveryListing,
+} from "../discovery";
 import { FeaturedEmployersRail, type FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import {
   HOME_CATEGORIES,
@@ -72,10 +79,10 @@ function SectionHead({
 }
 
 // The signature promise — the triad reads instantly, nothing diluting it.
-const TRIAD_BADGES: ReadonlyArray<{ key: string; label: string; icon: IconKey }> = [
-  { key: "housing", label: "Housing", icon: "benefit.housing" },
-  { key: "meals", label: "Meals", icon: "benefit.meals" },
-  { key: "pay", label: "Pay", icon: "benefit.pay" },
+const TRIAD_BADGES: ReadonlyArray<{ key: string; labelKey: "triadHousing" | "triadMeals" | "triadPay"; icon: IconKey }> = [
+  { key: "housing", labelKey: "triadHousing", icon: "benefit.housing" },
+  { key: "meals", labelKey: "triadMeals", icon: "benefit.meals" },
+  { key: "pay", labelKey: "triadPay", icon: "benefit.pay" },
 ];
 
 // ─── Hero ──────────────────────────────────────────────────────────────────
@@ -86,6 +93,8 @@ function HomeHero({
   peek?: DiscoveryListing;
 }) {
   const router = useRouter();
+  const t = useTranslations("Home");
+  const tc = useTranslations("Common");
   const [role, setRole] = useState("");
   const [loc, setLoc] = useState("");
   const [category, setCategory] = useState("");
@@ -133,62 +142,58 @@ function HomeHero({
         <div className={styles.heroInner}>
           <p className={styles.heroEyebrow}>
             <span className={styles.liveDot} aria-hidden="true" />
-            The seeker-first work marketplace
+            {t("eyebrow")}
           </p>
           {/* The anthem — the loudest thing after the photo. */}
           <h1 id="home-hero-title" className={styles.heroAnthem}>
-            Built for seekers,
+            {t("anthemLine1")}
             <br />
-            by seekers.
+            {t("anthemLine2")}
           </h1>
-          <p className={styles.heroPromise}>
-            Find seasonal work with housing, meals, pay &amp; a place — upfront.
-          </p>
-          <p className={styles.heroSub}>
-            Free forever for seekers. Hosts pay for visibility — you never pay to find work.
-          </p>
+          <p className={styles.heroPromise}>{t("promise")}</p>
+          <p className={styles.heroSub}>{t("sub")}</p>
 
           <form className={styles.searchBar} onSubmit={onSearch} role="search" aria-label="Search opportunities">
             <label className={styles.searchField}>
-              <span className={styles.searchLabel}>Role</span>
+              <span className={styles.searchLabel}>{t("searchRoleLabel")}</span>
               <input
                 className={styles.searchInput}
                 type="text"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                placeholder="Deckhand, harvest…"
+                placeholder={t("searchRolePlaceholder")}
               />
             </label>
             <span className={styles.searchDivider} aria-hidden="true" />
             <label className={styles.searchField}>
-              <span className={styles.searchLabel}>Where</span>
+              <span className={styles.searchLabel}>{t("searchWhereLabel")}</span>
               <input
                 className={styles.searchInput}
                 type="text"
                 value={loc}
                 onChange={(e) => setLoc(e.target.value)}
-                placeholder="Alaska, remote…"
+                placeholder={t("searchWherePlaceholder")}
               />
             </label>
             <span className={styles.searchDivider} aria-hidden="true" />
             <label className={styles.searchField}>
-              <span className={styles.searchLabel}>Category</span>
+              <span className={styles.searchLabel}>{t("searchCategoryLabel")}</span>
               <select
                 className={styles.searchSelect}
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                aria-label="Category"
+                aria-label={t("searchCategoryLabel")}
               >
-                <option value="">All work</option>
-                <option value="farm">Farm &amp; ranch</option>
-                <option value="maritime">Maritime</option>
-                <option value="remote">Remote</option>
-                <option value="seasonal">Seasonal</option>
+                <option value="">{t("categoryAll")}</option>
+                <option value="farm">{t("categoryFarm")}</option>
+                <option value="maritime">{t("categoryMaritime")}</option>
+                <option value="remote">{t("categoryRemote")}</option>
+                <option value="seasonal">{t("categorySeasonal")}</option>
               </select>
             </label>
             <button className={styles.searchSubmit} type="submit">
               <Icon name="action.search" size={20} aria-hidden />
-              <span>Explore jobs</span>
+              <span>{tc("exploreJobs")}</span>
             </button>
           </form>
 
@@ -196,14 +201,14 @@ function HomeHero({
             {TRIAD_BADGES.map((b) => (
               <li key={b.key} className={styles.trustBadge}>
                 <Icon name={b.icon} size={16} aria-hidden />
-                {b.label}
+                {t(b.labelKey)}
               </li>
             ))}
           </ul>
 
           <div className={styles.heroCtas}>
             <Link className={styles.heroSecondary} href="/for-hosts">
-              Post a job
+              {tc("postAJob")}
             </Link>
           </div>
         </div>
@@ -348,6 +353,38 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
   // Six cards on desktop (3-up grid); the module CSS caps mobile at four.
   const shown = listings.slice(0, 6);
 
+  // Mirror /seek (DiscoveryFeed): the triad, host, and card body open popups in
+  // place instead of navigating away — only Apply and Location still route.
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeHostId, setActiveHostId] = useState<string | null>(null);
+  const [activeBenefit, setActiveBenefit] = useState<{
+    readonly id: string;
+    readonly bucket: "housing" | "meals";
+  } | null>(null);
+  const [activePayId, setActivePayId] = useState<string | null>(null);
+
+  // Resolve the active listing/host from the full prop list (a host popup can
+  // point at a sibling listing outside the six shown), matching DiscoveryFeed.
+  const activeListing = useMemo(
+    () => listings.find((listing) => listing.id === activeId) ?? null,
+    [listings, activeId],
+  );
+
+  const activeHost = useMemo(
+    () => listings.find((listing) => listing.id === activeHostId)?.host ?? null,
+    [listings, activeHostId],
+  );
+
+  const activeBenefitListing = useMemo(
+    () => listings.find((listing) => listing.id === activeBenefit?.id) ?? null,
+    [listings, activeBenefit],
+  );
+
+  const activePayListing = useMemo(
+    () => listings.find((listing) => listing.id === activePayId) ?? null,
+    [listings, activePayId],
+  );
+
   return (
     <section className={styles.section} aria-labelledby="featured-jobs-title">
       <SectionHead
@@ -369,23 +406,51 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
           </Link>
         </div>
       ) : (
-        <div className={styles.jobsGrid}>
-          {shown.map((listing, index) => (
-            <DiscoveryCard
-              key={listing.id}
-              data={toDiscoveryCardData(listing)}
-              surface="discovery_feed"
-              imageLoading={index < 2 ? "eager" : "lazy"}
-              onOpen={(id) => router.push(`/listing/${id}`)}
-              onApply={(id) => router.push(`/listing/${id}`)}
-              onHostClick={() => router.push("/seek")}
-              onLocationClick={(id) => router.push(`/map?focus=${id}`)}
-              onHousingClick={(id) => router.push(`/listing/${id}`)}
-              onMealsClick={(id) => router.push(`/listing/${id}`)}
-              onPayClick={(id) => router.push(`/listing/${id}`)}
-            />
-          ))}
-        </div>
+        <>
+          <div className={styles.jobsGrid}>
+            {shown.map((listing, index) => (
+              <DiscoveryCard
+                key={listing.id}
+                data={toDiscoveryCardData(listing)}
+                surface="discovery_feed"
+                imageLoading={index < 2 ? "eager" : "lazy"}
+                onOpen={(id) => setActiveId(id)}
+                onApply={(id) => router.push(`/listing/${id}`)}
+                onHostClick={(id) => setActiveHostId(id)}
+                onLocationClick={(id) => router.push(`/map?focus=${id}`)}
+                onHousingClick={(id) => setActiveBenefit({ id, bucket: "housing" })}
+                onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
+                onPayClick={(id) => setActivePayId(id)}
+              />
+            ))}
+          </div>
+
+          <QuickPeekDrawer
+            listing={activeListing}
+            onClose={() => setActiveId(null)}
+          />
+
+          <HostProfilePopup
+            host={activeHost}
+            listings={listings}
+            onClose={() => setActiveHostId(null)}
+            onSelectListing={(id) => {
+              setActiveHostId(null);
+              setActiveId(id);
+            }}
+          />
+
+          <BenefitTrustModal
+            listing={activeBenefitListing}
+            bucket={activeBenefit?.bucket ?? null}
+            onClose={() => setActiveBenefit(null)}
+          />
+
+          <PayDetailsDrawer
+            listing={activePayListing}
+            onClose={() => setActivePayId(null)}
+          />
+        </>
       )}
     </section>
   );

@@ -18,6 +18,10 @@
 
 /* Shared content container per section */
 .section {
+	/* border-box so the gutter padding is drawn INSIDE the 100% width instead of
+	   adding to it — content-box here made every section 32px (host: 48px) wider
+	   than the viewport, the root of the mobile horizontal-overflow bug. */
+	box-sizing: border-box;
 	width: 100%;
 	max-width: 1200px;
 	margin-inline: auto;
@@ -561,10 +565,17 @@
 /* ─── Rolling announcements ───────────────────────────────────────────────── */
 
 .announceSection {
+	/* border-box: keep the gutter padding inside 100% so the full-bleed scroller
+	   below (negative-margin breakout) lands exactly on the viewport edge, never
+	   past it. */
+	box-sizing: border-box;
 	width: 100%;
 	max-width: 1200px;
 	margin-inline: auto;
 	padding-inline: var(--space-gutter);
+	/* Contain the -gutter scroller breakout so it can never leak past the section
+	   box on the page axis. Horizontal SCROLL still lives on .announceScroller. */
+	overflow-x: clip;
 }
 
 .announceHeadRow { margin-bottom: var(--space-10); }
@@ -660,6 +671,9 @@
 	display: grid;
 	grid-template-columns: 1fr;
 	gap: var(--space-16);
+	/* Center a lone card in its column (parity with the /seek grid) so a single
+	   listing sits centered instead of hard-left. */
+	justify-items: center;
 }
 
 /* The Chanel rule: below the 3-up desktop grid, four cards carry the point —
@@ -685,7 +699,8 @@
 .emptySub { font-family: var(--font-ui); font-size: var(--type-body-size); color: var(--text-secondary); margin: 0; max-width: 40ch; }
 
 @media (min-width: 640px) {
-	.jobsGrid { grid-template-columns: repeat(2, 1fr); }
+	/* Multi-column: cards fill their cells again (matches the /seek grid). */
+	.jobsGrid { grid-template-columns: repeat(2, 1fr); justify-items: stretch; }
 }
 
 @media (min-width: 1024px) {
@@ -1176,6 +1191,7 @@
 /* ─── Final CTA ──────────────────────────────────────────────────────────── */
 
 .finalCta {
+	box-sizing: border-box;
 	width: 100%; max-width: 1200px; margin-inline: auto; padding-inline: var(--space-gutter);
 }
 .finalInner {

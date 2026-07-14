@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Button, Icon } from "@explore-and-earn/ui";
+import { formatMoney } from "../../lib/format";
 import { PopupShell } from "../overlay/PopupShell";
 
 import { CATEGORY_ICON, type DiscoveryListing } from "./listing";
@@ -24,26 +25,18 @@ const CATEGORY_RAIL: readonly DiscoveryListing["category"][] = [
 
 function formatHeadlineAmount(listing: DiscoveryListing): string {
 	const insight = listing.payInsight;
-	const currency = insight?.currency ?? "USD";
+	// Currency omitted → formatMoney falls back to its default (USD).
+	const currency = insight?.currency;
 	const min = insight?.minCents;
 	const max = insight?.maxCents;
 	const unit = insight?.unit;
 
 	if (typeof min === "number" && typeof max === "number" && max > min) {
-		const formatter = new Intl.NumberFormat("en-US", {
-			style: "currency",
-			currency,
-			maximumFractionDigits: 0,
-		});
-		return `${formatter.format(min / 100)}–${formatter.format(max / 100)}${unit && unit !== "other" ? `/${unit}` : ""}`;
+		return `${formatMoney(min, { currency })}–${formatMoney(max, { currency })}${unit && unit !== "other" ? `/${unit}` : ""}`;
 	}
 
 	if (typeof min === "number") {
-		return `${new Intl.NumberFormat("en-US", {
-			style: "currency",
-			currency,
-			maximumFractionDigits: 0,
-		}).format(min / 100)}${unit && unit !== "other" ? `/${unit}` : ""}`;
+		return `${formatMoney(min, { currency })}${unit && unit !== "other" ? `/${unit}` : ""}`;
 	}
 
 	return listing.benefits.pay.summary ?? "See listing";

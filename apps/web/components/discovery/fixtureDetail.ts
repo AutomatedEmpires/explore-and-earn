@@ -1,4 +1,6 @@
+import type { OpportunityCategory } from "@explore-and-earn/contracts";
 import type { PublicListingDetail } from "@explore-and-earn/db";
+import { cloudinaryPhoto } from "@explore-and-earn/ui";
 
 import type { DiscoveryListing } from "./listing";
 import { DISCOVERY_FIXTURES } from "./fixtures";
@@ -24,8 +26,251 @@ function toIso(display: string | undefined): string | null {
 	return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
 }
 
+/**
+ * DEV/PREVIEW-ONLY sample gallery. Every URL is built from a curated
+ * (category, photographer-slug) pair that is ALREADY used elsewhere in the repo
+ * (apps/web/lib/curatedPhotos.ts + components/discovery/fixtures.ts) so no new
+ * external image host is introduced. `cloudinaryPhoto` has no "mix" bucket, so
+ * mix listings borrow the neutral seasonal/landscape set.
+ */
+const GALLERY_BY_CATEGORY: Record<OpportunityCategory, readonly string[]> = {
+	farm: [
+		cloudinaryPhoto("farm", "annie-spratt-jmjnnq2xfoy", "hero"),
+		cloudinaryPhoto("farm", "sokmean-nou-mjeqdrpwefc", "hero"),
+		cloudinaryPhoto("farm", "tim-hufner-6-ktk6b8mq8", "hero"),
+	],
+	maritime: [
+		cloudinaryPhoto("maritime", "rasmus-andersen-nmzzl8lzkuu", "hero"),
+		cloudinaryPhoto("maritime", "venti-views-asmavys4azm", "hero"),
+	],
+	remote: [
+		cloudinaryPhoto("remote", "kevin-schmid-mta8r0bxhbo", "hero"),
+		cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"),
+	],
+	seasonal: [
+		cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"),
+		cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"),
+	],
+	mix: [
+		cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"),
+		cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"),
+	],
+};
+
+/** Immersive-detail sample content for the dev fixtures, by category. */
+interface DetailEnrichment {
+	responsibilities: string[];
+	requirements: string[];
+	perks: string[];
+	housingDescription: string;
+	mealsDescription: string;
+	activities: string[];
+	team: { name: string; role: string; photoUrl: null }[];
+	whyWorkForUs: string;
+	hostPerks: string[];
+}
+
+/**
+ * DEV/PREVIEW-ONLY narrative so the immersive listing page renders every
+ * section on fixture inventory. Thematic per category; grounded, never shown in
+ * production (the NODE_ENV gate above refuses fixture ids there). Team members
+ * carry photoUrl: null on purpose (framed placeholder avatars — no remote-image
+ * host allow-listing needed).
+ */
+const DETAIL_ENRICHMENT_BY_CATEGORY: Record<OpportunityCategory, DetailEnrichment> = {
+	farm: {
+		responsibilities: [
+			"Hand-pick and sort fruit at peak ripeness",
+			"Load and stage harvest bins for transport",
+			"Keep tools, ladders, and the packing area clean and safe",
+			"Support irrigation and pruning between picks",
+		],
+		requirements: [
+			"Comfortable on your feet outdoors for full shifts",
+			"Able to lift up to 40 lbs repeatedly",
+			"Reliable, punctual, and team-minded",
+			"No experience needed — we train on arrival",
+		],
+		perks: [
+			"Fresh produce to take home",
+			"Flexible day-off scheduling",
+			"End-of-harvest completion bonus",
+		],
+		housingDescription:
+			"Shared bunkhouse a short walk from the orchard — bed linens and a shared kitchen provided.",
+		mealsDescription:
+			"Hot lunch on every shift; the kitchen is stocked for your own breakfasts and dinners.",
+		activities: [
+			"Valley cycling routes",
+			"Weekend farmers markets",
+			"River swimming spots",
+			"Evening bonfires with the crew",
+		],
+		team: [
+			{ name: "Dana Whitfield", role: "Orchard Manager", photoUrl: null },
+			{ name: "Marco Reyes", role: "Harvest Lead", photoUrl: null },
+			{ name: "Priya Anand", role: "Seeker Coordinator", photoUrl: null },
+		],
+		whyWorkForUs:
+			"We're a family-run operation that treats every seasonal hand like part of the crew — real mentoring, honest pay, and evenings free to explore the valley.",
+		hostPerks: ["Shared staff housing", "Daily crew lunch", "Paid travel stipend", "End-of-season bonus"],
+	},
+	maritime: {
+		responsibilities: [
+			"Handle lines, nets, and deck gear during sets and hauls",
+			"Sort, clean, and ice the catch",
+			"Stand assigned watches and keep the deck clear",
+			"Wash down and maintain equipment between trips",
+		],
+		requirements: [
+			"Able to work long shifts in cold, wet conditions",
+			"Strong swimmer, comfortable at sea",
+			"Follows safety direction without hesitation",
+			"Prior boat experience helpful but not required",
+		],
+		perks: [
+			"Full catch-share bonus on top of the day rate",
+			"All foul-weather gear supplied",
+			"Travel to port reimbursed",
+		],
+		housingDescription:
+			"Private berth aboard the vessel with a bunk and storage; shore housing between trips.",
+		mealsDescription:
+			"All meals are cooked aboard and included, from pre-dawn coffee to dinner after the haul.",
+		activities: [
+			"Shore hikes on rest days",
+			"Wildlife and whale watching",
+			"Harbor-town pubs and markets",
+			"Fishing-gear swaps with the crew",
+		],
+		team: [
+			{ name: "Dana Whitfield", role: "Skipper", photoUrl: null },
+			{ name: "Marco Reyes", role: "First Mate", photoUrl: null },
+			{ name: "Priya Anand", role: "Crew Coordinator", photoUrl: null },
+		],
+		whyWorkForUs:
+			"Hard work, big water, and a tight crew — we run a safe, fair boat and share the season's success with everyone aboard.",
+		hostPerks: ["Berth aboard included", "All meals at sea", "Foul-weather gear provided", "Catch-share upside"],
+	},
+	remote: {
+		responsibilities: [
+			"Welcome and onboard new community members",
+			"Moderate channels and keep conversations healthy",
+			"Plan and run virtual events and AMAs",
+			"Summarize member feedback for the product team",
+		],
+		requirements: [
+			"Reliable high-speed internet and a quiet workspace",
+			"Excellent written communication",
+			"Self-directed across time zones",
+			"1+ year in community, support, or social",
+		],
+		perks: [
+			"Fully remote — work from anywhere",
+			"Home-office stipend",
+			"Annual team offsite",
+		],
+		housingDescription:
+			"Housing is not included — you keep your own base and work from anywhere.",
+		mealsDescription: "Meals are not included with this remote role.",
+		activities: [
+			"Monthly virtual game nights",
+			"Optional regional coworking meetups",
+			"Learning-budget book club",
+			"Async show-and-tell demos",
+		],
+		team: [
+			{ name: "Dana Whitfield", role: "Head of Community", photoUrl: null },
+			{ name: "Marco Reyes", role: "Product Lead", photoUrl: null },
+			{ name: "Priya Anand", role: "People Ops", photoUrl: null },
+		],
+		whyWorkForUs:
+			"We've been remote-first since day one — no commute, no office politics, just clear goals, async trust, and a global team that has each other's backs.",
+		hostPerks: ["Work from anywhere", "Home-office stipend", "Annual paid offsite", "Flexible hours"],
+	},
+	seasonal: {
+		responsibilities: [
+			"Check guests in and out and manage reservations",
+			"Answer questions about lifts, trails, and rentals",
+			"Coordinate with housekeeping and maintenance",
+			"Handle payments and resolve booking issues",
+		],
+		requirements: [
+			"Warm, guest-first attitude",
+			"Comfortable with point-of-sale and booking software",
+			"Available weekends and holidays in season",
+			"Customer-service experience a plus",
+		],
+		perks: [
+			"Free season lift pass",
+			"Discounted rentals and lessons",
+			"Tips pooled across the front desk",
+		],
+		housingDescription:
+			"Staff dorm room five minutes from the lifts, with heat, laundry, and a shared lounge.",
+		mealsDescription:
+			"Staff cafeteria open for breakfast and dinner through the season.",
+		activities: [
+			"Skiing and snowboarding on days off",
+			"Backcountry snowshoe tours",
+			"Town après-ski scene",
+			"Staff movie and game nights",
+		],
+		team: [
+			{ name: "Dana Whitfield", role: "Front Desk Manager", photoUrl: null },
+			{ name: "Marco Reyes", role: "Guest Experience Lead", photoUrl: null },
+			{ name: "Priya Anand", role: "Housing Coordinator", photoUrl: null },
+		],
+		whyWorkForUs:
+			"A season in the Rockies with a crew that plays as hard as it works — ride every day off, grow your hospitality skills, and finish with a bonus.",
+		hostPerks: ["Staff dorm housing", "Season lift pass", "Cafeteria access", "End-of-season bonus"],
+	},
+	mix: {
+		responsibilities: [
+			"Greet guests and run smooth check-ins",
+			"Keep common areas and dorms clean and welcoming",
+			"Host communal dinners and social events",
+			"Share local tips and help plan guests' days out",
+		],
+		requirements: [
+			"Sociable and comfortable with travelers from everywhere",
+			"Flexible across reception, kitchen, and cleaning",
+			"Conversational English; other languages a bonus",
+			"Able to commit to at least three months",
+		],
+		perks: [
+			"Private room included",
+			"Daily communal dinner",
+			"Guest tips shared",
+			"Free walking-tour and event access",
+		],
+		housingDescription:
+			"Your own private room in the hostel, with shared bathrooms and a rooftop terrace.",
+		mealsDescription:
+			"A communal dinner is cooked and shared every evening; the kitchen is open for your own meals.",
+		activities: [
+			"Sunset viewpoints and tram rides",
+			"Surf trips to nearby beaches",
+			"Live-music nights in the old town",
+			"Pastel de nata crawls",
+		],
+		team: [
+			{ name: "Dana Whitfield", role: "Hostel Host", photoUrl: null },
+			{ name: "Marco Reyes", role: "Community Lead", photoUrl: null },
+			{ name: "Priya Anand", role: "Kitchen Coordinator", photoUrl: null },
+		],
+		whyWorkForUs:
+			"Life at the hostel is social, sunny, and never boring — trade a few hours a day for a private room, friends from every continent, and the city at your doorstep.",
+		hostPerks: ["Private room included", "Daily communal dinner", "Shared guest tips", "Local event access"],
+	},
+};
+
 function toDetail(f: DiscoveryListing): PublicListingDetail {
 	const provided = (p: string | undefined) => p === "provided" || p === "partial";
+	const housingIncluded = provided(f.benefits.housing.provision);
+	const mealsIncluded = provided(f.benefits.meals.provision);
+	const enrich = DETAIL_ENRICHMENT_BY_CATEGORY[f.category];
+	const gallery = GALLERY_BY_CATEGORY[f.category];
 	return {
 		id: f.id,
 		title: f.title,
@@ -35,8 +280,8 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 		latitude: f.coordinates?.lat ?? null,
 		longitude: f.coordinates?.lon ?? null,
 		status: "live",
-		housingIncluded: provided(f.benefits.housing.provision),
-		mealsIncluded: provided(f.benefits.meals.provision),
+		housingIncluded,
+		mealsIncluded,
 		compensationSummary: f.benefits.pay.summary ?? null,
 		compensationMinCents: f.payInsight?.minCents ?? null,
 		compensationMaxCents: f.payInsight?.maxCents ?? null,
@@ -47,7 +292,7 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 		endsAt: toIso(f.ends),
 		publishedAt: toIso(f.begins),
 		coverPhotoUrl: f.coverImageUrl ?? null,
-		galleryPhotoUrls: [],
+		galleryPhotoUrls: gallery ? [...gallery] : [],
 		hostProfileId: null,
 		host: {
 			// Fixture hosts have no public profile row — the empty id tells
@@ -59,5 +304,25 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 			primaryLocationName: f.location,
 			verified: f.host.verified === true,
 		},
+
+		// ── Immersive detail sample content (dev/preview only) ──
+		responsibilities: enrich ? [...enrich.responsibilities] : undefined,
+		requirements: enrich ? [...enrich.requirements] : undefined,
+		perks: enrich ? [...enrich.perks] : undefined,
+		// Reuse the listing's real benefit summary first; fall back to the richer
+		// per-category descriptor so the "deal, upfront" section reads fully in
+		// dev. Only present when the benefit is actually provided.
+		housingDescription:
+			housingIncluded && enrich
+				? f.benefits.housing.summary ?? enrich.housingDescription
+				: undefined,
+		mealsDescription:
+			mealsIncluded && enrich
+				? f.benefits.meals.summary ?? enrich.mealsDescription
+				: undefined,
+		whyWorkForUs: enrich ? enrich.whyWorkForUs : undefined,
+		team: enrich ? enrich.team.map((member) => ({ ...member })) : undefined,
+		activities: enrich ? [...enrich.activities] : undefined,
+		hostPerks: enrich ? [...enrich.hostPerks] : undefined,
 	};
 }

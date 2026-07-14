@@ -1,0 +1,28 @@
+/* Frosted back chip — legible overlaid on the hero photo. */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-14) var(--space-8) var(--space-10);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-surface-raised);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--type-button-lh);
+  box-shadow: var(--elevation-card);
+  cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+
+.button:hover {
+  background-color: var(--color-steel);
+}
+
+.button svg {
+  flex-shrink: 0;
+}

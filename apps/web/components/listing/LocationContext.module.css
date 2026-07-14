@@ -1,0 +1,59 @@
+.panel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  padding: var(--space-20) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  /* Category atmosphere as a soft regional backdrop (decoration, not data). */
+  background-image: var(--panel-bg, var(--cat-mix-cell));
+}
+
+.panel[data-category="farm"] { --panel-bg: var(--cat-farm-cell); }
+.panel[data-category="maritime"] { --panel-bg: var(--cat-maritime-cell); }
+.panel[data-category="remote"] { --panel-bg: var(--cat-remote-cell); }
+.panel[data-category="seasonal"] { --panel-bg: var(--cat-seasonal-cell); }
+.panel[data-category="mix"] { --panel-bg: var(--cat-mix-cell); }
+
+.marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--radius-image);
+  background-color: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  color: var(--color-cta);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.place {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+  overflow-wrap: break-word;
+}
+
+.coords {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.note {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Icon } from "@explore-and-earn/ui";
 
 import { UnreadBadge } from "../seeker/UnreadBadge";
@@ -55,6 +56,7 @@ export function GlobalHeader({
   unreadCommunity = 0,
 }: GlobalHeaderProps) {
   const pathname = usePathname();
+  const t = useTranslations("Nav");
   const [hidden, setHidden] = useState(false);
   const prevY = useRef(0);
   // Logged-out sign-in chooser (I'm a seeker · I'm a host · New here).
@@ -121,8 +123,10 @@ export function GlobalHeader({
   const onCommunity = communityTab !== null;
   const scopeLabel = onCommunity ? "Community" : scope === "host" ? "Host" : scope === "seeker" ? "Seeker" : null;
   const homeHref = scope === "host" ? "/host/listings" : "/";
-  // Seekers' "Explore" should open the discovery feed, not the marketing root.
-  const exploreHref = scope === "seeker" ? "/seek" : homeHref;
+  // Founder canon (2026-07-13): "Explore brings to homepage." The Explore tab is
+  // the always-clear way back to the scope's home (the marketing homepage for
+  // seekers/guests) — discovery lives on the Seek dock tab, not here.
+  const exploreHref = homeHref;
   // Active section for the explore/community/hosts nav: Community anywhere
   // under /community, For Hosts on /for-hosts, Explore on the scope's own
   // home/seek route.
@@ -139,7 +143,7 @@ export function GlobalHeader({
       <div className={styles.inner}>
         {/* ── Col 1: brand + scope badge ──────────────────────────────── */}
         <div className={styles.brandGroup}>
-          <Link className={styles.brand} href={homeHref} aria-label="Explore and Earn — home">
+          <Link className={styles.brand} href={homeHref} aria-label={t("homeAriaLabel")}>
             <span className={styles.pinMark}><PinMark /></span>
             <span className={styles.wordmark}>
               Explore<span className={styles.wordmarkAmp}>&amp;</span>Earn
@@ -162,7 +166,7 @@ export function GlobalHeader({
               aria-current={communityTab === "photos" ? "page" : undefined}
             >
               <Icon name="nav.photos" size={16} aria-hidden />
-              Photos
+              {t("photos")}
             </Link>
             <Link
               className={`${styles.communityTab}${communityTab === "feed" ? ` ${styles.communityTabActive}` : ""}`}
@@ -170,7 +174,7 @@ export function GlobalHeader({
               aria-current={communityTab === "feed" ? "page" : undefined}
             >
               <Icon name="nav.feed" size={16} aria-hidden />
-              Feed
+              {t("feed")}
               {unreadCommunity > 0 && communityTab !== "feed" ? (
                 <span
                   className={styles.communityTabDot}
@@ -184,7 +188,7 @@ export function GlobalHeader({
               aria-current={communityTab === "announcements" ? "page" : undefined}
             >
               <Icon name="nav.announcements" size={16} aria-hidden />
-              Announcements
+              {t("announcements")}
             </Link>
           </nav>
         ) : (
@@ -194,14 +198,14 @@ export function GlobalHeader({
               href={exploreHref}
               aria-current={sectionActive === "explore" ? "page" : undefined}
             >
-              Explore
+              {t("explore")}
             </Link>
             <Link
               className={`${styles.navLink}${sectionActive === "community" ? ` ${styles.navLinkActive}` : ""}`}
               href="/community"
               aria-current={sectionActive === "community" ? "page" : undefined}
             >
-              Community
+              {t("community")}
             </Link>
             {/* Host flow is separate (reached via sign-in → "I'm a host"), not a
                 primary nav destination — so "For Hosts" is intentionally not here. */}
@@ -215,7 +219,7 @@ export function GlobalHeader({
               <Link
                 className={styles.iconBtn}
                 href="/notifications"
-                aria-label={unreadCount > 0 ? `Notifications — ${unreadCount} unread` : "Notifications"}
+                aria-label={unreadCount > 0 ? `${t("notifications")} — ${unreadCount} unread` : t("notifications")}
               >
                 <Icon name="action.message" size={20} aria-hidden />
                 {unreadCount > 0 && (
@@ -226,7 +230,7 @@ export function GlobalHeader({
                   />
                 )}
               </Link>
-              <Link className={styles.avatarBtn} href={profileHref} aria-label="Your profile">
+              <Link className={styles.avatarBtn} href={profileHref} aria-label={t("yourProfile")}>
                 <span className={styles.avatarInitial} aria-hidden>{userInitial}</span>
                 <Icon name="action.more" size={16} aria-hidden />
               </Link>
@@ -240,19 +244,19 @@ export function GlobalHeader({
                 aria-expanded={authMenuOpen}
                 onClick={() => setAuthMenuOpen((open) => !open)}
               >
-                Sign in
+                {t("signIn")}
                 <Icon name="action.more" size={16} aria-hidden />
               </button>
               {authMenuOpen ? (
                 <div className={styles.authMenu} role="menu" aria-label="Sign in options">
-                  <p className={styles.authMenuLabel}>Choose your path</p>
+                  <p className={styles.authMenuLabel}>{t("chooseYourPath")}</p>
                   <Link className={styles.authMenuItem} role="menuitem" href="/sign-in?role=seeker">
                     <span className={styles.authMenuIcon}>
                       <Icon name="nav.seek" size={18} aria-hidden />
                     </span>
                     <span className={styles.authMenuText}>
-                      <span className={styles.authMenuItemTitle}>I&rsquo;m a seeker</span>
-                      <span className={styles.authMenuItemSub}>Find work — free forever</span>
+                      <span className={styles.authMenuItemTitle}>{t("seekerTitle")}</span>
+                      <span className={styles.authMenuItemSub}>{t("seekerSub")}</span>
                     </span>
                     <Icon name="action.forward" size={14} aria-hidden />
                   </Link>
@@ -261,17 +265,17 @@ export function GlobalHeader({
                       <Icon name="nav.host" size={18} aria-hidden />
                     </span>
                     <span className={styles.authMenuText}>
-                      <span className={styles.authMenuItemTitle}>I&rsquo;m a host</span>
-                      <span className={styles.authMenuItemSub}>List your place &amp; hire</span>
+                      <span className={styles.authMenuItemTitle}>{t("hostTitle")}</span>
+                      <span className={styles.authMenuItemSub}>{t("hostSub")}</span>
                     </span>
                     <Icon name="action.forward" size={14} aria-hidden />
                   </Link>
                   <span className={styles.authMenuDivider} aria-hidden />
                   <Link className={styles.authMenuGhost} role="menuitem" href="/sign-up">
-                    New here? Create an account
+                    {t("createAccount")}
                   </Link>
                   <Link className={styles.authMenuAdmin} role="menuitem" href="/sign-in?role=admin">
-                    Become an admin
+                    {t("becomeAdmin")}
                   </Link>
                 </div>
               ) : null}

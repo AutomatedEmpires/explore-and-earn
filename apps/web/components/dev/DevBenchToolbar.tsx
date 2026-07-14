@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { DEV_ROLES, isDevBenchEnabled } from "../../lib/devBench";
 import { readDevRole } from "../../lib/devBench/server";
-import { setDevRoleAction } from "../../app/(dev)/dev/actions";
+import { setDevRoleAction } from "../../app/[locale]/(dev)/dev/actions";
 import styles from "./DevBenchToolbar.module.css";
 
 /**

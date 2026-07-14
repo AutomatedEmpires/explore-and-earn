@@ -24,9 +24,9 @@
 		background: var(--color-surface);
 		/* Ink hairline on the right edge only. */
 		border-inline-end: 1px solid var(--border-ink);
-		overflow-y: auto;
-		scrollbar-width: thin;
-		scrollbar-color: color-mix(in srgb, var(--text-secondary) 28%, transparent) transparent;
+		/* Clip; the nav list scrolls inside its own box (see .railNav) so a long
+		   rail never overflows onto the pinned footer. */
+		overflow: hidden;
 	}
 
 	.hamburger {
@@ -64,6 +64,11 @@
 .drawerNav {
 	flex: 1 1 auto;
 	min-height: 0;
+	/* Scroll the list INSIDE its own box so a long nav never overflows onto the
+	   pinned footer (this was the cause of the crushed / overlapping drawer). */
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in srgb, var(--text-secondary) 28%, transparent) transparent;
 }
 
 .navList {
@@ -157,7 +162,7 @@
 
 /* ─── Footer (pinned): footer nav + user row ─────────────────────────────── */
 .foot {
-	margin-top: auto;
+	flex: none;
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-8);
@@ -285,7 +290,11 @@ a.userRow:focus-visible {
 	inset: 0;
 	z-index: var(--z-overlay);
 	display: flex;
-	justify-content: flex-start;
+	/* Centered in the viewport — founder canon: menus + popups center in the
+	   device screen, never hang off the left edge. */
+	align-items: center;
+	justify-content: center;
+	padding: var(--space-20);
 	background:
 		linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 60%, transparent), color-mix(in srgb, var(--color-ink) 50%, transparent));
 	backdrop-filter: blur(8px);
@@ -302,19 +311,16 @@ a.userRow:focus-visible {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-8);
-	width: min(84vw, 320px);
-	height: 100%;
-	padding:
-		max(var(--space-20), env(safe-area-inset-top))
-		var(--space-12)
-		max(var(--space-16), env(safe-area-inset-bottom))
-		max(var(--space-12), env(safe-area-inset-left));
+	width: min(92vw, 380px);
+	max-height: min(86vh, 40rem);
+	padding: var(--space-16) var(--space-12);
 	background: var(--color-surface);
-	border-inline-end: 1px solid var(--border-ink);
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-modal);
 	box-shadow: var(--elevation-overlay);
-	overflow-y: auto;
-	scrollbar-width: thin;
-	scrollbar-color: color-mix(in srgb, var(--text-secondary) 28%, transparent) transparent;
+	/* Clip; the nav list scrolls internally (see .drawerNav) so the head + footer
+	   stay pinned and the items never crush together. */
+	overflow: hidden;
 	animation: drawerIn var(--motion-drawer) var(--ease-standard) both;
 }
 
@@ -323,6 +329,7 @@ a.userRow:focus-visible {
 }
 
 .drawerHead {
+	flex: none;
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
@@ -363,21 +370,25 @@ a.userRow:focus-visible {
 /* ─── Motion ─────────────────────────────────────────────────────────────── */
 @keyframes drawerIn {
 	from {
-		transform: translateX(-100%);
+		opacity: 0;
+		transform: scale(0.96) translateY(8px);
 	}
 
 	to {
-		transform: translateX(0);
+		opacity: 1;
+		transform: none;
 	}
 }
 
 @keyframes drawerOut {
 	from {
-		transform: translateX(0);
+		opacity: 1;
+		transform: none;
 	}
 
 	to {
-		transform: translateX(-100%);
+		opacity: 0;
+		transform: scale(0.96) translateY(8px);
 	}
 }
 

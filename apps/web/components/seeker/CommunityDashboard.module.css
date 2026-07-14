@@ -29,9 +29,9 @@
 .welcomeBar {
   background:
     radial-gradient(ellipse 90% 140% at 5% 70%, color-mix(in srgb, var(--palette-teal) 24%, transparent) 0%, transparent 55%),
-    radial-gradient(ellipse 55% 70% at 95% 15%, rgba(36, 34, 30, 0.34) 0%, transparent 50%),
+    radial-gradient(ellipse 55% 70% at 95% 15%, color-mix(in srgb, var(--palette-ink) 34%, transparent) 0%, transparent 50%),
     var(--community-green);
-  color: #FBF7EE;
+  color: var(--palette-white);
   /* Full-bleed — no side margins, no border-radius */
   border-radius: 0;
   border: none;
@@ -479,9 +479,9 @@
   font-family: var(--font-ui);
   font-size: var(--type-body-size);
   color: var(--text-secondary);
-  border: 1.5px dashed rgba(42, 87, 36, 0.22);
+  border: 1.5px dashed color-mix(in srgb, var(--community-green) 22%, transparent);
   border-radius: var(--radius-card);
-  background: rgba(42, 87, 36, 0.04);
+  background: color-mix(in srgb, var(--community-green) 4%, transparent);
 }
 
 .emptyStateIcon {
@@ -491,7 +491,7 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: 1.5px solid rgba(42, 87, 36, 0.25);
+  border: 1.5px solid color-mix(in srgb, var(--community-green) 25%, transparent);
   background: var(--community-green-bg);
   color: var(--community-green);
   user-select: none;
@@ -549,7 +549,7 @@
   gap: var(--space-12);
   padding: var(--space-16);
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(25, 21, 14, 0.12);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 12%, transparent);
   border-radius: var(--radius-card);
 }
 
@@ -579,9 +579,9 @@
 .skeletonAvatar {
   background: linear-gradient(
     100deg,
-    rgba(25, 21, 14, 0.06) 30%,
-    rgba(25, 21, 14, 0.12) 50%,
-    rgba(25, 21, 14, 0.06) 70%
+    color-mix(in srgb, var(--palette-ink) 6%, transparent) 30%,
+    color-mix(in srgb, var(--palette-ink) 12%, transparent) 50%,
+    color-mix(in srgb, var(--palette-ink) 6%, transparent) 70%
   );
   background-size: 200% 100%;
   animation: communityShimmer 1.4s linear infinite;
@@ -602,8 +602,8 @@
   break-inside: avoid;
   margin-bottom: var(--space-12);
   padding: var(--space-8) var(--space-8) var(--space-16);
-  background: #FDFAF5;
-  border: 1.5px solid rgba(25, 21, 14, 0.14);
+  background: var(--color-surface);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 14%, transparent);
   border-radius: 3px;
 }
 
@@ -629,7 +629,7 @@
   width: 46px;
   height: 46px;
   border-radius: 50%;
-  border: 2px solid rgba(25, 21, 14, 0.55);
+  border: 2px solid color-mix(in srgb, var(--palette-ink) 55%, transparent);
   background: var(--color-parchment);
   display: flex;
   align-items: center;
@@ -684,9 +684,9 @@
   gap: var(--space-4);
   height: 1.25rem;
   padding: 0 var(--space-6);
-  border: 1px solid rgba(42, 87, 36, 0.4);
+  border: 1px solid color-mix(in srgb, var(--community-green) 40%, transparent);
   border-radius: var(--radius-pill);
-  background: rgba(42, 87, 36, 0.08);
+  background: color-mix(in srgb, var(--community-green) 8%, transparent);
   font-family: var(--font-ui);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
@@ -701,9 +701,9 @@
   gap: var(--space-4);
   height: 1.25rem;
   padding: 0 var(--space-6);
-  border: 1px solid rgba(42, 87, 36, 0.5);
+  border: 1px solid color-mix(in srgb, var(--community-green) 50%, transparent);
   border-radius: var(--radius-pill);
-  background: rgba(42, 87, 36, 0.1);
+  background: color-mix(in srgb, var(--community-green) 10%, transparent);
   font-family: var(--font-ui);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
@@ -728,7 +728,7 @@
 }
 
 .moreBtn:hover {
-  background: rgba(25, 21, 14, 0.06);
+  background: color-mix(in srgb, var(--palette-ink) 6%, transparent);
 }
 
 .cardCaption {
@@ -770,9 +770,9 @@
   gap: 2px;
   height: 1.5rem;
   padding: 0 var(--space-8);
-  border: 1px solid rgba(42, 87, 36, 0.3);
+  border: 1px solid color-mix(in srgb, var(--community-green) 30%, transparent);
   border-radius: var(--radius-pill);
-  background: rgba(42, 87, 36, 0.07);
+  background: color-mix(in srgb, var(--community-green) 7%, transparent);
   font-family: var(--font-ui);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
@@ -781,7 +781,7 @@
 }
 
 .hashSign {
-  color: rgba(42, 87, 36, 0.6);
+  color: color-mix(in srgb, var(--community-green) 60%, transparent);
   font-weight: var(--font-weight-regular);
 }
 
@@ -792,7 +792,7 @@
 }
 
 .cardImageMat {
-  border: 1.5px solid rgba(25, 21, 14, 0.25);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 25%, transparent);
   border-radius: 12px;
   overflow: hidden;
   aspect-ratio: 16 / 9;
@@ -811,7 +811,7 @@
 .reactionBar {
   display: flex;
   align-items: stretch;
-  border-top: 1px solid rgba(25, 21, 14, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--palette-ink) 8%, transparent);
 }
 
 .reaction {
@@ -829,11 +829,11 @@
 }
 
 .reaction + .reaction {
-  border-left: 1px solid rgba(25, 21, 14, 0.08);
+  border-left: 1px solid color-mix(in srgb, var(--palette-ink) 8%, transparent);
 }
 
 .reaction:hover {
-  background: rgba(25, 21, 14, 0.04);
+  background: color-mix(in srgb, var(--palette-ink) 4%, transparent);
 }
 
 .reactionEmoji {
@@ -852,12 +852,12 @@
 
 .seekerCard {
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(25, 21, 14, 0.16);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 16%, transparent);
   border-left: 3px solid var(--community-green);
   border-radius: var(--radius-card);
   box-shadow:
-    0 2px 8px rgba(25, 21, 14, 0.06),
-    0 1px 2px rgba(25, 21, 14, 0.04);
+    0 2px 8px color-mix(in srgb, var(--palette-ink) 6%, transparent),
+    0 1px 2px color-mix(in srgb, var(--palette-ink) 4%, transparent);
   overflow: hidden;
 }
 
@@ -866,11 +866,11 @@
 .announcementCard {
   position: relative;
   background: var(--color-parchment);
-  border: 1.5px solid rgba(25, 21, 14, 0.2);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 20%, transparent);
   border-radius: var(--radius-card);
   box-shadow:
-    0 3px 12px rgba(25, 21, 14, 0.08),
-    0 1px 3px rgba(25, 21, 14, 0.05);
+    0 3px 12px color-mix(in srgb, var(--palette-ink) 8%, transparent),
+    0 1px 3px color-mix(in srgb, var(--palette-ink) 5%, transparent);
   /* Extra top margin for tape strips */
   margin-top: var(--space-12);
   overflow: visible;
@@ -883,11 +883,11 @@
   left: 20px;
   width: 56px;
   height: 20px;
-  background: rgba(210, 198, 168, 0.92);
-  border: 1px solid rgba(25, 21, 14, 0.1);
+  background: color-mix(in srgb, var(--palette-silver) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--palette-ink) 10%, transparent);
   border-radius: 3px;
   transform: rotate(-3deg);
-  box-shadow: 0 1px 4px rgba(25, 21, 14, 0.12);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--palette-ink) 12%, transparent);
 }
 
 .tapeRight {
@@ -896,11 +896,11 @@
   right: 20px;
   width: 56px;
   height: 20px;
-  background: rgba(210, 198, 168, 0.92);
-  border: 1px solid rgba(25, 21, 14, 0.1);
+  background: color-mix(in srgb, var(--palette-silver) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--palette-ink) 10%, transparent);
   border-radius: 3px;
   transform: rotate(4deg);
-  box-shadow: 0 1px 4px rgba(25, 21, 14, 0.12);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--palette-ink) 12%, transparent);
 }
 
 /* Push-pin dot */
@@ -912,18 +912,18 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #7A8A6A, #4A5A40);
-  border: 1.5px solid rgba(25, 21, 14, 0.4);
-  box-shadow: 0 2px 5px rgba(25, 21, 14, 0.3);
+  background: radial-gradient(circle at 35% 35%, var(--palette-silver), var(--community-green-deep));
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 40%, transparent);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--palette-ink) 30%, transparent);
   z-index: 1;
 }
 
 /* Promoted (paid-placement) announcement — gold trust treatment */
 .announcementCardPromoted {
   background:
-    radial-gradient(ellipse 130% 90% at 100% 0%, rgba(216, 168, 78, 0.14) 0%, transparent 55%),
+    radial-gradient(ellipse 130% 90% at 100% 0%, color-mix(in srgb, var(--color-gold) 14%, transparent) 0%, transparent 55%),
     var(--color-parchment);
-  border-color: rgba(216, 168, 78, 0.5);
+  border-color: color-mix(in srgb, var(--color-gold) 50%, transparent);
 }
 
 .promotedBadge {
@@ -958,8 +958,8 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(25, 21, 14, 0.06);
-  border: 1px solid rgba(25, 21, 14, 0.12);
+  background: color-mix(in srgb, var(--palette-ink) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--palette-ink) 12%, transparent);
   color: var(--text-secondary);
   margin-top: 2px;
 }
@@ -990,7 +990,7 @@
   gap: var(--space-4);
   height: 1.875rem;
   padding: 0 var(--space-10);
-  border: 1.5px solid rgba(25, 21, 14, 0.25);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 25%, transparent);
   border-radius: var(--radius-input);
   background: rgba(255, 255, 255, 0.7);
   font-family: var(--font-ui);
@@ -1007,7 +1007,7 @@
 
 .viewHostBtn:hover {
   background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(25, 21, 14, 0.4);
+  border-color: color-mix(in srgb, var(--palette-ink) 40%, transparent);
 }
 
 /* Photo grid — 1, 2, or 3 images */
@@ -1018,7 +1018,7 @@
   margin: 0 var(--space-14) var(--space-14);
   border-radius: 10px;
   overflow: hidden;
-  border: 1.5px solid rgba(25, 21, 14, 0.2);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 20%, transparent);
 }
 
 .photoGrid > :only-child {
@@ -1047,9 +1047,9 @@
 
 .blogCard {
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(25, 21, 14, 0.16);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 16%, transparent);
   border-radius: var(--radius-card);
-  box-shadow: 0 2px 8px rgba(25, 21, 14, 0.06);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--palette-ink) 6%, transparent);
   overflow: hidden;
 }
 
@@ -1088,7 +1088,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 1.5px solid rgba(25, 21, 14, 0.3);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 30%, transparent);
   background: var(--color-parchment);
   color: var(--text-secondary);
   flex-shrink: 0;
@@ -1099,9 +1099,9 @@
   align-items: center;
   height: 1.25rem;
   padding: 0 var(--space-6);
-  border: 1px solid rgba(25, 21, 14, 0.35);
+  border: 1px solid color-mix(in srgb, var(--palette-ink) 35%, transparent);
   border-radius: var(--radius-pill);
-  background: rgba(25, 21, 14, 0.06);
+  background: color-mix(in srgb, var(--palette-ink) 6%, transparent);
   font-family: var(--font-ui);
   font-size: 0.5625rem;
   font-weight: var(--font-weight-semibold);
@@ -1123,7 +1123,7 @@
   margin: 0;
   font-size: 0.625rem;
   letter-spacing: 0.15em;
-  color: rgba(25, 21, 14, 0.35);
+  color: color-mix(in srgb, var(--palette-ink) 35%, transparent);
   user-select: none;
   line-height: 1;
 }
@@ -1147,7 +1147,7 @@
   gap: var(--space-4);
   height: 2rem;
   padding: 0 var(--space-12);
-  border: 1.5px solid rgba(25, 21, 14, 0.3);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 30%, transparent);
   border-radius: var(--radius-input);
   background: transparent;
   font-family: var(--font-ui);
@@ -1162,8 +1162,8 @@
 }
 
 .readMoreBtn:hover {
-  border-color: rgba(25, 21, 14, 0.55);
-  background: rgba(25, 21, 14, 0.04);
+  border-color: color-mix(in srgb, var(--palette-ink) 55%, transparent);
+  background: color-mix(in srgb, var(--palette-ink) 4%, transparent);
 }
 
 .blogImageWrap {
@@ -1173,7 +1173,7 @@
 
 .blogImageMat {
   margin: var(--space-14) var(--space-14) var(--space-14) 0;
-  border: 1.5px solid rgba(25, 21, 14, 0.2);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 20%, transparent);
   border-radius: 10px;
   overflow: hidden;
   height: calc(100% - 28px);
@@ -1209,7 +1209,7 @@
 
 .widget {
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(25, 21, 14, 0.15);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 15%, transparent);
   border-radius: var(--radius-card);
   padding: var(--space-16);
   display: flex;
@@ -1252,7 +1252,7 @@
   text-decoration: none;
   text-align: center;
   padding-top: var(--space-4);
-  border-top: 1px solid rgba(25, 21, 14, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--palette-ink) 8%, transparent);
 }
 
 a.widgetFooter:hover { color: var(--text-primary); }
@@ -1263,7 +1263,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   gap: var(--space-4);
   height: 2rem;
   padding: 0 var(--space-12);
-  border: 1.5px solid rgba(25, 21, 14, 0.3);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 30%, transparent);
   border-radius: var(--radius-input);
   background: transparent;
   font-family: var(--font-ui);
@@ -1277,7 +1277,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   transition: border-color var(--motion-fast) var(--ease-standard);
 }
 
-.widgetCta:hover { border-color: rgba(25, 21, 14, 0.55); }
+.widgetCta:hover { border-color: color-mix(in srgb, var(--palette-ink) 55%, transparent); }
 
 /* Welcome widget */
 .welcomeWidget {
@@ -1290,7 +1290,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  border: 2px solid rgba(25, 21, 14, 0.55);
+  border: 2px solid color-mix(in srgb, var(--palette-ink) 55%, transparent);
   background: var(--color-parchment);
   display: flex;
   align-items: center;
@@ -1323,7 +1323,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   flex-direction: column;
   gap: var(--space-6);
   padding: var(--space-10) var(--space-12);
-  border: 1.5px solid rgba(25, 21, 14, 0.14);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 14%, transparent);
   border-radius: var(--radius-input);
   background: var(--color-parchment);
 }
@@ -1369,7 +1369,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   align-items: center;
   height: 1.75rem;
   padding: 0 var(--space-8);
-  border: 1px solid rgba(25, 21, 14, 0.18);
+  border: 1px solid color-mix(in srgb, var(--palette-ink) 18%, transparent);
   border-radius: var(--radius-pill);
   background: var(--color-parchment);
   font-family: var(--font-ui);
@@ -1384,7 +1384,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   transition: border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard);
 }
 
-.widgetTag:hover { border-color: rgba(25, 21, 14, 0.38); color: var(--text-primary); }
+.widgetTag:hover { border-color: color-mix(in srgb, var(--palette-ink) 38%, transparent); color: var(--text-primary); }
 .widgetTag:focus-visible { outline: 2px solid var(--color-cta); outline-offset: 2px; }
 
 /* Upcoming listings widget */
@@ -1403,7 +1403,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   gap: var(--space-10);
   padding: var(--space-10) 0;
   text-decoration: none;
-  border-bottom: 1px solid rgba(25, 21, 14, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--palette-ink) 8%, transparent);
 }
 
 .widgetListItem:last-child { border-bottom: none; }
@@ -1431,9 +1431,9 @@ a.widgetFooter:hover { color: var(--text-primary); }
   align-items: center;
   height: 1rem;
   padding: 0 var(--space-4);
-  border: 1px solid rgba(42, 87, 36, 0.4);
+  border: 1px solid color-mix(in srgb, var(--community-green) 40%, transparent);
   border-radius: var(--radius-pill);
-  background: rgba(42, 87, 36, 0.08);
+  background: color-mix(in srgb, var(--community-green) 8%, transparent);
   font-family: var(--font-ui);
   font-size: 0.5rem;
   font-weight: var(--font-weight-semibold);
@@ -1467,7 +1467,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border: 1.5px solid rgba(25, 21, 14, 0.2);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 20%, transparent);
   border-radius: var(--radius-cell);
   background: var(--color-parchment);
   flex-shrink: 0;
@@ -1495,11 +1495,11 @@ a.widgetFooter:hover { color: var(--text-primary); }
 
 .listingFeedCard {
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(25, 21, 14, 0.16);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 16%, transparent);
   border-radius: var(--radius-card);
   box-shadow:
-    0 2px 8px rgba(25, 21, 14, 0.06),
-    0 1px 2px rgba(25, 21, 14, 0.04);
+    0 2px 8px color-mix(in srgb, var(--palette-ink) 6%, transparent),
+    0 1px 2px color-mix(in srgb, var(--palette-ink) 4%, transparent);
   overflow: hidden;
 }
 
@@ -1508,7 +1508,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   align-items: center;
   gap: var(--space-6);
   padding: var(--space-10) var(--space-14);
-  border-bottom: 1px solid rgba(25, 21, 14, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--palette-ink) 8%, transparent);
   font-family: var(--font-ui);
   font-size: 0.625rem;
   font-weight: var(--font-weight-semibold);
@@ -1550,7 +1550,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .listingSep {
-  color: rgba(25, 21, 14, 0.3);
+  color: color-mix(in srgb, var(--palette-ink) 30%, transparent);
   font-size: 0.75rem;
   user-select: none;
 }
@@ -1592,7 +1592,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   gap: var(--space-4);
   height: 1.625rem;
   padding: 0 var(--space-8);
-  border: 1px solid rgba(25, 21, 14, 0.18);
+  border: 1px solid color-mix(in srgb, var(--palette-ink) 18%, transparent);
   border-radius: var(--radius-pill);
   background: var(--color-parchment);
   font-family: var(--font-ui);
@@ -1608,7 +1608,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   align-items: center;
   gap: var(--space-10);
   padding-top: var(--space-8);
-  border-top: 1px solid rgba(25, 21, 14, 0.08);
+  border-top: 1px solid color-mix(in srgb, var(--palette-ink) 8%, transparent);
 }
 
 .matchGroup {
@@ -1633,7 +1633,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   max-width: 72px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(25, 21, 14, 0.1);
+  background: color-mix(in srgb, var(--palette-ink) 10%, transparent);
   overflow: hidden;
 }
 
@@ -1688,11 +1688,11 @@ a.widgetFooter:hover { color: var(--text-primary); }
 
 .employerFeedCard {
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(25, 21, 14, 0.16);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 16%, transparent);
   border-radius: var(--radius-card);
   box-shadow:
-    0 2px 8px rgba(25, 21, 14, 0.06),
-    0 1px 2px rgba(25, 21, 14, 0.04);
+    0 2px 8px color-mix(in srgb, var(--palette-ink) 6%, transparent),
+    0 1px 2px color-mix(in srgb, var(--palette-ink) 4%, transparent);
   /* No overflow: hidden — the circular badge protrudes below .employerImageSection
      into the .employerBody padding zone. Child images/sections handle their own clipping. */
 }
@@ -1702,7 +1702,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   align-items: center;
   gap: var(--space-6);
   padding: var(--space-10) var(--space-14);
-  border-bottom: 1px solid rgba(25, 21, 14, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--palette-ink) 8%, transparent);
   font-family: var(--font-ui);
   font-size: 0.625rem;
   font-weight: var(--font-weight-semibold);
@@ -1754,7 +1754,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   box-shadow:
     0 0 0 2.5px var(--color-card-warm),
     0 0 0 4px var(--border-ink-warm),
-    0 3px 8px rgba(25, 21, 14, 0.16);
+    0 3px 8px color-mix(in srgb, var(--palette-ink) 16%, transparent);
 
   background: var(--color-card-warm);
   user-select: none;
@@ -1780,7 +1780,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   display: block;
   width: 24px;
   height: 1px;
-  background: rgba(25, 21, 14, 0.25);
+  background: color-mix(in srgb, var(--palette-ink) 25%, transparent);
   flex-shrink: 0;
 }
 
@@ -1846,7 +1846,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   gap: var(--space-4);
   height: 2.125rem;
   padding: 0 var(--space-14);
-  border: 1.5px solid rgba(25, 21, 14, 0.28);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 28%, transparent);
   border-radius: var(--radius-input);
   background: transparent;
   font-family: var(--font-ui);
@@ -1861,14 +1861,14 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .employerCta:hover {
-  border-color: rgba(25, 21, 14, 0.55);
-  background: rgba(25, 21, 14, 0.04);
+  border-color: color-mix(in srgb, var(--palette-ink) 55%, transparent);
+  background: color-mix(in srgb, var(--palette-ink) 4%, transparent);
 }
 
 /* ─── Reaction active state ──────────────────────────────────────────────────── */
 
 .reactionActive {
-  background: rgba(42, 87, 36, 0.06);
+  background: color-mix(in srgb, var(--community-green) 6%, transparent);
 }
 
 .reactionActive .reactionEmoji {
@@ -1894,9 +1894,9 @@ a.widgetFooter:hover { color: var(--text-primary); }
   z-index: 10;
   min-width: 10rem;
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(25, 21, 14, 0.16);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 16%, transparent);
   border-radius: var(--radius-card);
-  box-shadow: 0 4px 16px rgba(25, 21, 14, 0.12), 0 1px 4px rgba(25, 21, 14, 0.08);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--palette-ink) 12%, transparent), 0 1px 4px color-mix(in srgb, var(--palette-ink) 8%, transparent);
   padding: var(--space-4) 0;
   animation: menuIn 120ms var(--ease-standard);
 }
@@ -1923,12 +1923,12 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .postMenuItem:hover {
-  background: rgba(25, 21, 14, 0.05);
+  background: color-mix(in srgb, var(--palette-ink) 5%, transparent);
 }
 
 .postMenuItem:focus-visible {
   outline: none;
-  background: rgba(25, 21, 14, 0.08);
+  background: color-mix(in srgb, var(--palette-ink) 8%, transparent);
 }
 
 /* ─── Feed end marker ────────────────────────────────────────────────────────── */
@@ -1947,7 +1947,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   display: flex;
   align-items: center;
   gap: var(--space-10);
-  color: rgba(25, 21, 14, 0.25);
+  color: color-mix(in srgb, var(--palette-ink) 25%, transparent);
 }
 
 .feedEndRule::before,
@@ -1955,7 +1955,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   content: "";
   flex: 1;
   height: 1px;
-  background: rgba(25, 21, 14, 0.1);
+  background: color-mix(in srgb, var(--palette-ink) 10%, transparent);
 }
 
 .feedEndIcon {
@@ -2034,8 +2034,8 @@ a.widgetFooter:hover { color: var(--text-primary); }
 .blogCard:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 6px 20px rgba(25, 21, 14, 0.1),
-    0 2px 6px rgba(25, 21, 14, 0.06);
+    0 6px 20px color-mix(in srgb, var(--palette-ink) 10%, transparent),
+    0 2px 6px color-mix(in srgb, var(--palette-ink) 6%, transparent);
 }
 
 /* ─── Reaction pop animation ─────────────────────────────────────────────────── */
@@ -2085,16 +2085,16 @@ a.widgetFooter:hover { color: var(--text-primary); }
   gap: var(--space-10);
   padding: var(--space-12) var(--space-14);
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(25, 21, 14, 0.15);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 15%, transparent);
   border-radius: var(--radius-card);
-  box-shadow: 0 1px 4px rgba(25, 21, 14, 0.04);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--palette-ink) 4%, transparent);
 }
 
 .composerAvatar {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  border: 2px solid rgba(25, 21, 14, 0.45);
+  border: 2px solid color-mix(in srgb, var(--palette-ink) 45%, transparent);
   background: var(--color-parchment);
   display: flex;
   align-items: center;
@@ -2112,7 +2112,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   height: 2.375rem;
   padding: 0 var(--space-14);
   background: var(--color-parchment);
-  border: 1.5px solid rgba(25, 21, 14, 0.16);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 16%, transparent);
   border-radius: var(--radius-pill);
   text-align: left;
   cursor: text;
@@ -2120,7 +2120,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .composerInput:hover {
-  border-color: rgba(25, 21, 14, 0.28);
+  border-color: color-mix(in srgb, var(--palette-ink) 28%, transparent);
 }
 
 .composerPlaceholder {
@@ -2141,7 +2141,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   height: 2.375rem;
   border-radius: 50%;
   background: transparent;
-  border: 1.5px solid rgba(25, 21, 14, 0.18);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 18%, transparent);
   color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;
@@ -2149,7 +2149,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .composerPhotoBtn:hover {
-  border-color: rgba(42, 87, 36, 0.45);
+  border-color: color-mix(in srgb, var(--community-green) 45%, transparent);
   color: var(--community-green);
 }
 
@@ -2161,17 +2161,17 @@ a.widgetFooter:hover { color: var(--text-primary); }
   gap: var(--space-12);
   padding: var(--space-14) var(--space-16);
   background: var(--color-card-warm);
-  border: 1.5px solid rgba(42, 87, 36, 0.2);
+  border: 1.5px solid color-mix(in srgb, var(--community-green) 20%, transparent);
   border-left: 3px solid var(--community-green);
   border-radius: var(--radius-card);
-  box-shadow: 0 1px 4px rgba(25, 21, 14, 0.04);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--palette-ink) 4%, transparent);
 }
 
 .composerCtaAvatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 2px solid rgba(42, 87, 36, 0.3);
+  border: 2px solid color-mix(in srgb, var(--community-green) 30%, transparent);
   background: var(--community-green-bg);
   display: flex;
   align-items: center;
@@ -2261,7 +2261,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 }
 
 .toast {
-  background: rgba(25, 21, 14, 0.88);
+  background: color-mix(in srgb, var(--palette-ink) 88%, transparent);
   backdrop-filter: blur(8px);
   color: rgba(255, 255, 255, 0.95);
   font-family: var(--font-ui);
@@ -2269,7 +2269,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   font-weight: var(--font-weight-semibold);
   padding: var(--space-10) var(--space-18, var(--space-16));
   border-radius: var(--radius-pill);
-  box-shadow: 0 4px 16px rgba(25, 21, 14, 0.22), 0 1px 4px rgba(25, 21, 14, 0.12);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--palette-ink) 22%, transparent), 0 1px 4px color-mix(in srgb, var(--palette-ink) 12%, transparent);
   animation: toastIn 260ms var(--ease-standard) both;
   white-space: nowrap;
   max-width: calc(100vw - 2 * var(--space-16));
@@ -2293,13 +2293,13 @@ a.widgetFooter:hover { color: var(--text-primary); }
   break-inside: avoid;
   width: 100%;
   margin-bottom: var(--space-12);
-  background: #FDFAF5;
-  border: 1.5px solid rgba(25, 21, 14, 0.18);
+  background: var(--color-surface);
+  border: 1.5px solid color-mix(in srgb, var(--palette-ink) 18%, transparent);
   border-radius: 3px;
   padding: var(--space-8) var(--space-8) var(--space-28, 28px);
   box-shadow:
-    0 2px 10px rgba(25, 21, 14, 0.1),
-    0 1px 3px rgba(25, 21, 14, 0.06);
+    0 2px 10px color-mix(in srgb, var(--palette-ink) 10%, transparent),
+    0 1px 3px color-mix(in srgb, var(--palette-ink) 6%, transparent);
   cursor: pointer;
   text-align: left;
   /* Rotation cycles: –2°, +1.5°, –1°, +2° */
@@ -2323,8 +2323,8 @@ a.widgetFooter:hover { color: var(--text-primary); }
 .polaroidCard:hover {
   transform: rotate(0deg) translateY(-2px) scale(1.01) !important;
   box-shadow:
-    0 8px 24px rgba(25, 21, 14, 0.16),
-    0 2px 6px rgba(25, 21, 14, 0.08);
+    0 8px 24px color-mix(in srgb, var(--palette-ink) 16%, transparent),
+    0 2px 6px color-mix(in srgb, var(--palette-ink) 8%, transparent);
   z-index: 2;
   position: relative;
 }
@@ -2335,7 +2335,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   border-radius: 2px;
   overflow: hidden;
   background: var(--color-parchment);
-  border: 1px solid rgba(25, 21, 14, 0.1);
+  border: 1px solid color-mix(in srgb, var(--palette-ink) 10%, transparent);
 }
 
 .polaroidImg {
@@ -2392,7 +2392,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   /* Above the z-70 mobile dock — at 70 the later-DOM dock painted over the
      open lightbox and stayed clickable on top of it. */
   z-index: var(--z-lightbox);
-  background: rgba(14, 11, 6, 0.92);
+  background: color-mix(in srgb, var(--palette-ink) 92%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2461,14 +2461,14 @@ a.widgetFooter:hover { color: var(--text-primary); }
   gap: var(--space-14);
   padding: var(--space-16);
   background:
-    radial-gradient(ellipse 120% 80% at 100% 0%, rgba(42, 87, 36, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 120% 80% at 100% 0%, color-mix(in srgb, var(--community-green) 5%, transparent) 0%, transparent 60%),
     var(--color-card-warm);
-  border: 1.5px solid rgba(42, 87, 36, 0.2);
+  border: 1.5px solid color-mix(in srgb, var(--community-green) 20%, transparent);
   border-left: 3px solid var(--community-green);
   border-radius: var(--radius-card);
   box-shadow:
-    0 2px 8px rgba(25, 21, 14, 0.06),
-    0 1px 2px rgba(25, 21, 14, 0.04);
+    0 2px 8px color-mix(in srgb, var(--palette-ink) 6%, transparent),
+    0 1px 2px color-mix(in srgb, var(--palette-ink) 4%, transparent);
   margin-bottom: var(--space-4);
 }
 
@@ -2477,7 +2477,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   align-items: center;
   gap: var(--space-10);
   padding-bottom: var(--space-12);
-  border-bottom: 1px solid rgba(25, 21, 14, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--palette-ink) 8%, transparent);
 }
 
 .photoComposerIcon {
@@ -2487,7 +2487,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  border: 1.5px solid rgba(42, 87, 36, 0.3);
+  border: 1.5px solid color-mix(in srgb, var(--community-green) 30%, transparent);
   background: var(--community-green-bg);
   color: var(--community-green);
   flex-shrink: 0;
@@ -2538,7 +2538,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
   font-size: var(--type-meta-size);
   color: var(--text-primary);
   padding: var(--space-8);
-  border: 1.5px dashed rgba(42, 87, 36, 0.3);
+  border: 1.5px dashed color-mix(in srgb, var(--community-green) 30%, transparent);
   border-radius: var(--radius-input);
   background: var(--color-parchment);
   cursor: pointer;
@@ -2603,7 +2603,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 .photoLocationInput:focus {
   outline: none;
   border-color: var(--field-border-focus);
-  box-shadow: 0 0 0 3px rgba(47, 102, 122, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--palette-teal) 15%, transparent);
 }
 
 .photoCharCount {
@@ -2675,14 +2675,14 @@ a.widgetFooter:hover { color: var(--text-primary); }
   gap: var(--space-14);
   padding: var(--space-16);
   background:
-    radial-gradient(ellipse 100% 80% at 0% 0%, rgba(216, 168, 78, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 80% at 0% 0%, color-mix(in srgb, var(--color-gold) 10%, transparent) 0%, transparent 55%),
     var(--color-card-warm);
-  border: 1.5px solid rgba(216, 168, 78, 0.4);
+  border: 1.5px solid color-mix(in srgb, var(--color-gold) 40%, transparent);
   border-left: 3px solid var(--color-gold);
   border-radius: var(--radius-card);
   box-shadow:
-    0 2px 8px rgba(25, 21, 14, 0.06),
-    0 1px 2px rgba(25, 21, 14, 0.04);
+    0 2px 8px color-mix(in srgb, var(--palette-ink) 6%, transparent),
+    0 1px 2px color-mix(in srgb, var(--palette-ink) 4%, transparent);
   margin-bottom: var(--space-4);
   color: var(--text-secondary);
 }
@@ -2713,7 +2713,7 @@ a.widgetFooter:hover { color: var(--text-primary); }
 
 .photoGateTrack {
   height: 8px;
-  background: rgba(25, 21, 14, 0.1);
+  background: color-mix(in srgb, var(--palette-ink) 10%, transparent);
   border-radius: var(--radius-pill);
   overflow: hidden;
 }

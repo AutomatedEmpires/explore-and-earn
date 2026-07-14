@@ -30,6 +30,8 @@ export { ResumePanel } from "./ResumePanel";
 export type { ResumePanelProps } from "./ResumePanel";
 export { ResumeBuilder } from "./ResumeBuilder";
 export type { ResumeBuilderProps } from "./ResumeBuilder";
+export { ResumeImport } from "./ResumeImport";
+export type { ResumeImportProps } from "./ResumeImport";
 export { SeekerResumeCard } from "./SeekerResumeCard";
 export type { SeekerResumeCardProps } from "./SeekerResumeCard";
 export { SettingsPanel } from "./SettingsPanel";
