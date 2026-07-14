@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   BenefitProvision,
   CompensationUnit,
+  DiscoveryCardConditionalBadge,
   ListingStatus,
   OpportunityCategory,
   OpportunityListing,
@@ -16,7 +17,7 @@ import {
   hasVerifiedHostSubscription,
 } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
-import { getSeekerApplicationIds } from "./applications";
+import { getActiveBoostedListingIds, getSeekerApplicationIds } from "./idReaders";
 import { getPassedListingIds } from "./passedListings";
 
 export interface ListingRow {
@@ -117,13 +118,78 @@ function toListingRow(raw: RawListingRow): ListingRow {
   return { ...raw, category: raw.category as OpportunityCategory };
 }
 
+/**
+ * The stored match score a listing must reach before its numeric % is shown on
+ * a card (founder decision, MATCH SCORE). Below this the card shows no match
+ * pill. Read-only: scores are never recomputed here, only the stored value is
+ * gated. Mirror of MEANINGFUL_MATCH_SCORE_THRESHOLD in apps/web/lib/ranking.ts
+ * (packages can't share a runtime const without a common non-server dep).
+ */
+export const MEANINGFUL_MATCH_SCORE_THRESHOLD = 75;
+
+/**
+ * Per-render enrichment for {@link rowToDiscoveryFields}. Every field is
+ * optional and self-omitting — the shared mapper is used by anon, host, and
+ * seeker surfaces, and only the seeker surfaces resolve these sets. Resolve them
+ * ONCE per request (see {@link resolveSeekerDiscoveryScope} /
+ * {@link getActiveBoostedListingIds}) and thread the same object to every row.
+ */
+export interface DiscoveryEnrichment {
+  /** Listing ids with an active boost campaign — stamped as the "boosted" badge. */
+  readonly boostedListingIds?: ReadonlySet<string>;
+  /**
+   * Listing ids the seeker previously skipped (listing_passes). Off the swipe
+   * deck these stay VISIBLE but are flagged (previouslySkipped) + demoted in
+   * rank (see rankForSeeker); the swipe deck excludes them entirely.
+   */
+  readonly previouslySkippedIds?: ReadonlySet<string>;
+  /**
+   * Stored ADR-040 match scores by listing id (read-only cache). A score is
+   * surfaced as `matchScore` only when it clears
+   * {@link MEANINGFUL_MATCH_SCORE_THRESHOLD}; lower/absent scores show no pill.
+   */
+  readonly matchScores?: ReadonlyMap<string, number>;
+}
+
+/**
+ * The shared discovery view-model — {@link OpportunityListing} plus the
+ * per-seeker `previouslySkipped` flag stamped by {@link rowToDiscoveryFields}.
+ * Assignable anywhere an OpportunityListing is expected (the extra field is
+ * optional); the web `DiscoveryListing` alias re-exposes it to surfaces.
+ */
+export interface DiscoveryFields extends OpportunityListing {
+  /**
+   * Seeker previously skipped this listing (demote-but-visible surfaces). The
+   * card renders a subtle "Previously skipped" photo marker; ranking demotes it.
+   */
+  readonly previouslySkipped?: boolean;
+}
+
 /** Maps a ListingRow to the DiscoveryListing view-model fields. */
-export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
+export function rowToDiscoveryFields(
+  row: ListingRow,
+  enrich?: DiscoveryEnrichment,
+): DiscoveryFields {
   const hostName = row.host_profiles?.company_name ?? "Unknown Host";
   const verified = hasVerifiedHostSubscription(row.host_profiles?.subscription_tier);
 
   const housingProvision: BenefitProvision = row.housing_included ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision = row.meals_included ? "provided" : "not_provided";
+
+  // Boosted marker travels on EVERY card, not just the homepage (founder
+  // decision). Stamped from the shared active-boost set when provided.
+  const conditionalBadges: readonly DiscoveryCardConditionalBadge[] | undefined =
+    enrich?.boostedListingIds?.has(row.id) ? (["boosted"] as const) : undefined;
+
+  // Read-only stored match score, gated to the meaningful threshold. Never
+  // recomputed here — a listing with no stored score simply shows none.
+  const storedScore = enrich?.matchScores?.get(row.id);
+  const matchScore =
+    typeof storedScore === "number" && storedScore >= MEANINGFUL_MATCH_SCORE_THRESHOLD
+      ? storedScore
+      : undefined;
+
+  const previouslySkipped = enrich?.previouslySkippedIds?.has(row.id) ? true : undefined;
 
   return {
     id: row.id,
@@ -134,6 +200,9 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
     begins: row.begins_at ?? undefined,
     ends: row.ends_at ?? undefined,
     status: row.status as ListingStatus,
+    conditionalBadges,
+    matchScore,
+    previouslySkipped,
     host: {
       id: row.host_profile_id ?? undefined,
       name: hostName,
@@ -178,6 +247,58 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
       row.latitude != null && row.longitude != null
         ? { lat: row.latitude, lon: row.longitude }
         : undefined,
+  };
+}
+
+/**
+ * The per-seeker discovery scope, resolved ONCE and threaded through the shared
+ * filter + mapper + ranking on a seeker surface:
+ *   - `appliedIds`  — non-withdrawn applications; HARD-hidden everywhere (never
+ *     reshow an applied listing as applyable).
+ *   - `skippedIds`  — listing_passes; excluded from the swipe deck, elsewhere
+ *     demoted + flagged (previouslySkipped).
+ *   - `boostedIds`  — active boost campaigns; stamped as the boosted badge.
+ *
+ * Every read is best-effort/independent (Promise.allSettled) so one failing
+ * axis (e.g. pre-057 passes, pre-029 boosts) degrades that axis to empty rather
+ * than breaking the whole surface. `clerkUserId` MUST come from auth().userId.
+ */
+export interface SeekerDiscoveryScope {
+  readonly appliedIds: Set<string>;
+  readonly skippedIds: Set<string>;
+  readonly boostedIds: Set<string>;
+}
+
+export async function resolveSeekerDiscoveryScope(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<SeekerDiscoveryScope> {
+  const [applied, skipped, boosted] = await Promise.allSettled([
+    getSeekerApplicationIds(clerkToken, clerkUserId),
+    getPassedListingIds(clerkToken, clerkUserId),
+    getActiveBoostedListingIds(clerkToken),
+  ]);
+  return {
+    appliedIds: new Set(applied.status === "fulfilled" ? applied.value : []),
+    skippedIds: new Set(skipped.status === "fulfilled" ? skipped.value : []),
+    boostedIds:
+      boosted.status === "fulfilled" ? boosted.value : new Set<string>(),
+  };
+}
+
+/**
+ * Build a {@link DiscoveryEnrichment} from a resolved {@link SeekerDiscoveryScope}
+ * (+ optional stored match scores). The one place surfaces turn the scope into
+ * the object threaded to {@link rowToDiscoveryFields} for every row.
+ */
+export function enrichmentFromScope(
+  scope: SeekerDiscoveryScope,
+  matchScores?: ReadonlyMap<string, number>,
+): DiscoveryEnrichment {
+  return {
+    boostedListingIds: scope.boostedIds,
+    previouslySkippedIds: scope.skippedIds,
+    matchScores,
   };
 }
 
@@ -309,15 +430,36 @@ export async function getSwipeBatch(
  */
 export async function getLiveListingsWithCoords(
   clerkToken?: string,
+  clerkUserId?: string,
 ): Promise<ListingRow[]> {
   const db = clerkToken ? authedClient(clerkToken) : anonClient();
-  const { data, error } = await db
+
+  // Applied HARD-exclusion (shared filter): when a seeker is signed in, drop the
+  // listings they've already applied to (non-withdrawn) so an applied listing is
+  // never reshown as applyable — on the map as everywhere. Withdrawn rows are NOT
+  // excluded (getSeekerApplicationIds skips them), keeping re-apply possible.
+  // Best-effort: a failed lookup degrades to no exclusion, never a broken map.
+  let appliedIds: string[] = [];
+  if (clerkToken && clerkUserId) {
+    appliedIds = await getSeekerApplicationIds(clerkToken, clerkUserId).catch(
+      () => [] as string[],
+    );
+  }
+
+  let builder = db
     .from("listings")
     .select(LISTING_COLUMNS)
     .eq("status", "live")
     .not("latitude", "is", null)
-    .not("longitude", "is", null)
-    .order("published_at", { ascending: false });
+    .not("longitude", "is", null);
+
+  if (appliedIds.length > 0) {
+    builder = builder.not("id", "in", `(${appliedIds.join(",")})`);
+  }
+
+  const { data, error } = await builder.order("published_at", {
+    ascending: false,
+  });
 
   if (error) throw new Error(`getLiveListingsWithCoords: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
@@ -384,11 +526,40 @@ export function buildSearchTermFilter(term: string): string {
   ].join(",");
 }
 
-export async function searchListings(filters: SearchFilters): Promise<ListingRow[]> {
+/**
+ * Signed-in seeker scope for surfaces that need per-seeker filtering. When
+ * present, {@link searchListings} HARD-excludes the seeker's applied listings.
+ * `clerkUserId` MUST come from auth().userId — never decoded from the token.
+ */
+export interface SeekerScope {
+  readonly clerkToken: string;
+  readonly clerkUserId: string;
+}
+
+export async function searchListings(
+  filters: SearchFilters,
+  seeker?: SeekerScope,
+): Promise<ListingRow[]> {
+  // Applied HARD-exclusion (shared filter): /search had NONE — an already-applied
+  // listing kept surfacing as applyable. Resolve the seeker's non-withdrawn
+  // applications server-side (never trust a client set) and drop them below.
+  // Best-effort so a lookup fault degrades to an unfiltered search, not a crash.
+  let appliedIds: string[] = [];
+  if (seeker) {
+    appliedIds = await getSeekerApplicationIds(
+      seeker.clerkToken,
+      seeker.clerkUserId,
+    ).catch(() => [] as string[]);
+  }
+
   let builder = anonClient()
     .from("listings")
     .select(LISTING_COLUMNS)
     .eq("status", "live");
+
+  if (appliedIds.length > 0) {
+    builder = builder.not("id", "in", `(${appliedIds.join(",")})`);
+  }
 
   const term = filters.query ? sanitizeSearchTerm(filters.query) : "";
   if (term) {

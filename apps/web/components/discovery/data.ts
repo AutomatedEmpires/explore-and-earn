@@ -1,14 +1,16 @@
 import {
+  type DiscoveryEnrichment,
+  enrichmentFromScope,
   getLiveListingsWithCoords,
+  getMatchScoresForSeeker,
   getPublicListingById,
   getSwipeBatch,
+  resolveSeekerDiscoveryScope,
   rowToDiscoveryFields,
-  scoreSeekerListingRow,
-  seekerHasMatchInputs,
   SWIPE_BATCH_SIZE,
 } from "@explore-and-earn/db";
-import { matchBandFor } from "@explore-and-earn/contracts";
-import { cachedSeekerProfile, getPublicListingsCached } from "../../lib/serverCache";
+import { getPublicListingsCached } from "../../lib/serverCache";
+import { rankForSeeker } from "../../lib/ranking";
 import { isDevBenchEnabled } from "../../lib/devBench";
 import { DISCOVERY_FIXTURES } from "./fixtures";
 import type { DiscoveryListing } from "./listing";
@@ -103,10 +105,19 @@ export async function getDiscoveryListingById(
   }
 }
 
-/** Live opportunities that carry coordinates — backs the /map surface. */
-export async function getDiscoveryListingsWithCoords(): Promise<
-  DiscoveryListing[]
-> {
+/**
+ * Live opportunities that carry coordinates — backs the /map surface.
+ *
+ * When a signed-in seeker's Clerk token + userId are threaded through, the
+ * applied HARD-exclusion runs inside getLiveListingsWithCoords (applied pins are
+ * dropped, never reshown as applyable) and the boosted / previously-skipped /
+ * stored-match enrichment travels onto every pin via rowToDiscoveryFields. The
+ * anonymous/public case (no auth) still works unchanged — no scope, no crash.
+ */
+export async function getDiscoveryListingsWithCoords(
+  clerkToken?: string | null,
+  clerkUserId?: string | null,
+): Promise<DiscoveryListing[]> {
   // The Preview-only flag exists solely for remote Mapbox proof while the
   // isolated readiness database has no listings. It cannot activate in a
   // Vercel Production runtime and does not affect any non-map discovery seam.
@@ -123,8 +134,31 @@ export async function getDiscoveryListingsWithCoords(): Promise<
   }
 
   try {
-    const rows = await getLiveListingsWithCoords();
-    return rows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
+    // Signed-in seeker: resolve the discovery scope + stored match scores ONCE so
+    // the boosted/skipped/match enrichment can be stamped on every pin. The
+    // applied HARD-exclusion is enforced inside getLiveListingsWithCoords from the
+    // same token+userId. Best-effort — a scope fault degrades to the public,
+    // unenriched map rather than breaking it.
+    let enrichment: DiscoveryEnrichment | undefined;
+    if (clerkToken && clerkUserId) {
+      try {
+        const [scope, scores] = await Promise.all([
+          resolveSeekerDiscoveryScope(clerkToken, clerkUserId),
+          getMatchScoresForSeeker(clerkToken, clerkUserId),
+        ]);
+        enrichment = enrichmentFromScope(scope, scores);
+      } catch {
+        enrichment = undefined;
+      }
+    }
+
+    const rows = await getLiveListingsWithCoords(
+      clerkToken ?? undefined,
+      clerkUserId ?? undefined,
+    );
+    return rows.map(
+      (row) => rowToDiscoveryFields(row, enrichment) as DiscoveryListing,
+    );
   } catch (error) {
     if (allowFixtureFallback) {
       reportDiscoveryFallback("getDiscoveryListingsWithCoords", error);
@@ -181,32 +215,37 @@ export async function getSwipeListings(
       ? rows[rows.length - 1]?.published_at ?? null
       : null;
 
-  // ADR-040: the deck leads with the seeker's best fits. Scored with the SAME
-  // engine the /seek grid and listing detail use (scoreSeekerListingRow), and
-  // stamped under the same honest gate (developing+ bands only). Fit is an
-  // enhancement — any failure serves the batch chronologically, unscored.
-  let ordered = rows;
-  const scores = new Map<string, number>();
+  // Enrich with the SAME stored signals every other seeker surface uses: the
+  // boosted marker + the persisted match % (read from the match_scores cache and
+  // gated >= 75 inside rowToDiscoveryFields), so a swipe card shows the identical
+  // number to /seek, the listing detail, and the lifecycle buckets — never a
+  // per-render recompute. Order match-primary with boosted/enterprise as a bounded
+  // lift (rankForSeeker). Best-effort: a scope fault serves the batch unenriched,
+  // in chronological (fetch) order.
+  let enrichment: DiscoveryEnrichment | undefined;
   try {
-    const profile = await cachedSeekerProfile(clerkToken, clerkUserId);
-    if (profile && seekerHasMatchInputs(profile)) {
-      for (const row of rows) {
-        scores.set(row.id, scoreSeekerListingRow(profile, row));
-      }
-      ordered = [...rows].sort(
-        (a, b) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0),
-      );
-    }
+    const [scope, scores] = await Promise.all([
+      resolveSeekerDiscoveryScope(clerkToken, clerkUserId),
+      getMatchScoresForSeeker(clerkToken, clerkUserId),
+    ]);
+    enrichment = enrichmentFromScope(scope, scores);
   } catch {
-    // Profile read failed — the deck still works without fit intelligence.
+    enrichment = undefined;
   }
 
-  const listings = ordered.map((row) => {
-    const listing = rowToDiscoveryFields(row) as DiscoveryListing;
-    const score = scores.get(row.id);
-    return score !== undefined && matchBandFor(score) !== "needs_attention"
-      ? { ...listing, matchScore: score }
-      : listing;
-  });
+  const cards = rows.map(
+    (row) => rowToDiscoveryFields(row, enrichment) as DiscoveryListing,
+  );
+
+  const matchScores = enrichment?.matchScores;
+  const listings = matchScores
+    ? rankForSeeker(cards, (listing) => ({
+        boosted: listing.conditionalBadges?.includes("boosted") ?? false,
+        hostTier: listing.host.tier,
+        matchScore: matchScores.get(listing.id),
+        previouslySkipped: listing.previouslySkipped,
+      }))
+    : cards;
+
   return { listings, nextCursor };
 }

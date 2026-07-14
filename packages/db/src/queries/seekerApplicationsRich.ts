@@ -15,6 +15,9 @@ import {
 
 import { authedClient } from "../client";
 import type { SeekerApplicationListing } from "./applications";
+import { getActiveBoostedListingIds } from "./idReaders";
+import { MEANINGFUL_MATCH_SCORE_THRESHOLD } from "./listings";
+import { getMatchScoresForSeeker } from "./matchScores";
 
 /*
  * Seeker self-service dashboard data (Agent 2 / PR 2).
@@ -75,6 +78,8 @@ function embeddedCompensationSummary(row: Record<string, unknown>): string {
 
 function rowToSeekerApplicationListing(
   value: unknown,
+  boostedListingIds?: ReadonlySet<string>,
+  matchScores?: ReadonlyMap<string, number>,
 ): SeekerApplicationListing | null {
   const row = firstOf(value);
   if (!row) return null;
@@ -128,6 +133,14 @@ function rowToSeekerApplicationListing(
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
     beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
     endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
+    conditionalBadges:
+      boostedListingIds?.has(String(row.id)) ? (["boosted"] as const) : undefined,
+    matchScore: (() => {
+      const stored = matchScores?.get(String(row.id));
+      return typeof stored === "number" && stored >= MEANINGFUL_MATCH_SCORE_THRESHOLD
+        ? stored
+        : undefined;
+    })(),
   };
 }
 
@@ -167,11 +180,15 @@ export async function getSeekerApplicationsRich(
   if (!seekerProfileId) return [];
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data, error } = await untyped
-    .from("applications")
-    .select(RICH_SEEKER_APPLICATION_SELECT)
-    .eq("seeker_profile_id", seekerProfileId)
-    .order("submitted_at", { ascending: false });
+  const [{ data, error }, boostedListingIds, matchScores] = await Promise.all([
+    untyped
+      .from("applications")
+      .select(RICH_SEEKER_APPLICATION_SELECT)
+      .eq("seeker_profile_id", seekerProfileId)
+      .order("submitted_at", { ascending: false }),
+    getActiveBoostedListingIds(clerkToken),
+    getMatchScoresForSeeker(clerkToken, clerkUserId),
+  ]);
 
   if (error) {
     throw new Error(`getSeekerApplicationsRich: ${error.message}`);
@@ -188,7 +205,11 @@ export async function getSeekerApplicationsRich(
       decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
       coverMessage:
         typeof r.cover_message === "string" ? r.cover_message : null,
-      listing: rowToSeekerApplicationListing(r.listings),
+      listing: rowToSeekerApplicationListing(
+        r.listings,
+        boostedListingIds,
+        matchScores,
+      ),
     } satisfies RichSeekerApplication;
   });
 }
@@ -209,12 +230,16 @@ export async function getSeekerApplicationRichById(
   if (!seekerProfileId) return null;
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data, error } = await untyped
-    .from("applications")
-    .select(RICH_SEEKER_APPLICATION_SELECT)
-    .eq("id", applicationId)
-    .eq("seeker_profile_id", seekerProfileId)
-    .maybeSingle();
+  const [{ data, error }, boostedListingIds, matchScores] = await Promise.all([
+    untyped
+      .from("applications")
+      .select(RICH_SEEKER_APPLICATION_SELECT)
+      .eq("id", applicationId)
+      .eq("seeker_profile_id", seekerProfileId)
+      .maybeSingle(),
+    getActiveBoostedListingIds(clerkToken),
+    getMatchScoresForSeeker(clerkToken, clerkUserId),
+  ]);
 
   if (error) {
     throw new Error(`getSeekerApplicationRichById: ${error.message}`);
@@ -231,7 +256,11 @@ export async function getSeekerApplicationRichById(
     decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
     coverMessage:
       typeof r.cover_message === "string" ? r.cover_message : null,
-    listing: rowToSeekerApplicationListing(r.listings),
+    listing: rowToSeekerApplicationListing(
+      r.listings,
+      boostedListingIds,
+      matchScores,
+    ),
   } satisfies RichSeekerApplication;
 }
 
