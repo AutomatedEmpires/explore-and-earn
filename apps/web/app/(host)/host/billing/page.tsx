@@ -217,7 +217,7 @@ export default async function HostBillingPage({
 
               <ul className={styles.entitlements}>
                 <li>{entitlements.listings} live listing slots</li>
-                <li>{entitlements.includedInviteCredits} included invite credits</li>
+                <li>{entitlements.includedInviteCredits} included invite credits / month</li>
                 <li>{entitlements.monthlyAnnouncements} monthly announcements</li>
                 <li>{entitlements.teamSeats} team seats</li>
                 <li>{entitlements.analytics} analytics access</li>

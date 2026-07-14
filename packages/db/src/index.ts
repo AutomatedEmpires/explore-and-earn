@@ -18,6 +18,8 @@ export * from "./queries/hostReviews";
 export * from "./queries/applications";
 export * from "./queries/seekerApplicationsRich";
 export * from "./queries/invites";
+export * from "./queries/inviteEntitlements";
+export * from "./queries/hostSourcing";
 export * from "./queries/hostProfiles";
 export * from "./queries/seekerResume";
 export * from "./queries/seekerProfiles";
