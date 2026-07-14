@@ -449,6 +449,47 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
 }
 
+/** Match-critical requirement fields promoted by migration 051. */
+export interface ListingMatchRequirements {
+  requiredSkillTags: string[];
+  requiredCertifications: string[];
+  experienceLevelRequired: string | null;
+}
+
+/**
+ * Requirement fields for ONE live listing. Defensive by design: these columns
+ * (051) may lack anon column grants in some environments, so any read fault
+ * degrades to null — callers treat that as "requirements unknown" (honest
+ * missing data), never as "no requirements".
+ */
+export async function getListingMatchRequirements(
+  listingId: string,
+): Promise<ListingMatchRequirements | null> {
+  try {
+    const untyped = anonClient() as unknown as SupabaseClient;
+    const { data, error } = await untyped
+      .from("listings")
+      .select("required_skill_tags, required_certifications, experience_level_required")
+      .eq("id", listingId)
+      .eq("status", "live")
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as Record<string, unknown>;
+    const asStrings = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+    return {
+      requiredSkillTags: asStrings(row.required_skill_tags),
+      requiredCertifications: asStrings(row.required_certifications),
+      experienceLevelRequired:
+        typeof row.experience_level_required === "string"
+          ? row.experience_level_required
+          : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function resolveHostProfileId(
   clerkToken: string,
   clerkUserId: string,

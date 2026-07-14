@@ -34,6 +34,7 @@ export * from "./lib/matchScore";
 export * from "./lib/matchEngine";
 export * from "./lib/matchTrace";
 export * from "./lib/behavioralSignals";
+export * from "./lib/resumeInsights";
 export * from "./lib/seekerListingFit";
 export * from "./queries/behaviorInteractions";
 export * from "./queries/matchScores";
