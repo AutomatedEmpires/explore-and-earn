@@ -63,6 +63,11 @@
   font-size: 1.02rem;
   font-weight: 700;
   color: var(--text-primary);
+  text-decoration: none;
+}
+
+.seekeros-railbrand:hover {
+  color: var(--color-cta);
 }
 
 .seekeros-railmark {

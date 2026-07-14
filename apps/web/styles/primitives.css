@@ -22,10 +22,22 @@
   --font-accent: var(--font-cabin-sketch, "Cabin Sketch", "Patrick Hand", cursive);
 }
 
+/* Global page reset. Zero the UA default body margin (8px on every side) so the
+   page frame starts flush at the viewport edge — without this the whole page is
+   shifted 8px and full-bleed sections read as off-center. */
+body {
+  margin: 0;
+}
+
 /* Belt-and-braces horizontal overflow guard: full-bleed breakouts that use
    100vw math (e.g. MapView) can overflow by the classic-scrollbar width on
    desktop. `clip` (not `hidden`) so no new scroll container is created and
-   position: sticky descendants keep working. */
+   position: sticky descendants keep working. Applied at the viewport level
+   (html) as well as body: a bare `body { overflow-x: clip }` is defeated by
+   body→viewport overflow propagation, so the document could still scroll
+   horizontally. `overflow-y` stays visible on both, so vertical scroll and
+   sticky/fixed positioning are unaffected. */
+html,
 body {
   overflow-x: clip;
 }
