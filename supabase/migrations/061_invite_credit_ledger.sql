@@ -181,6 +181,10 @@ end;
 $$;
 
 -- Server-only surface: these functions run under the service role from server
--- actions / webhooks. Deny direct PostgREST invocation.
+-- actions / webhooks. Revoking from PUBLIC drops the default EXECUTE grant for
+-- everyone (including service_role), so re-grant service_role explicitly;
+-- anon/authenticated stay denied → no direct PostgREST invocation.
 revoke execute on function public.create_invite_with_credit(uuid, uuid, uuid, text, uuid, integer) from public, anon, authenticated;
 revoke execute on function public.restore_invite_credit(uuid) from public, anon, authenticated;
+grant execute on function public.create_invite_with_credit(uuid, uuid, uuid, text, uuid, integer) to service_role;
+grant execute on function public.restore_invite_credit(uuid) to service_role;
