@@ -348,6 +348,13 @@ export interface SearchFilters {
   location?: string;
   startDateAfter?: string;
   startDateBefore?: string;
+  /**
+   * Geographic bounding box (validated upstream via isValidGeoBounds).
+   * Restricts results to listings WITH coordinates inside the box — listings
+   * without coordinates are excluded by definition of a geographic query.
+   * Shared by /map, the public API, and MCP (one geo path, no duplicates).
+   */
+  bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number };
   limit?: number;
   offset?: number;
 }
@@ -433,6 +440,17 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
   }
   if (filters.startDateBefore) {
     builder = builder.lte("begins_at", filters.startDateBefore);
+  }
+
+  if (filters.bounds) {
+    const { minLat, maxLat, minLng, maxLng } = filters.bounds;
+    builder = builder
+      .not("latitude", "is", null)
+      .not("longitude", "is", null)
+      .gte("latitude", minLat)
+      .lte("latitude", maxLat)
+      .gte("longitude", minLng)
+      .lte("longitude", maxLng);
   }
 
   const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;

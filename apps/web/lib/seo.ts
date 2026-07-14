@@ -13,7 +13,6 @@ export function generateJobPostingJsonLd(
   baseUrl: string,
 ): string {
   const listingUrl = `${baseUrl}/listing/${listing.id}`;
-  const employmentType = "CONTRACTOR"; // Explore & Earn listings are work-exchange/contract
 
   const baseSalary =
     listing.compensationMinCents != null
@@ -68,10 +67,13 @@ export function generateJobPostingJsonLd(
   const validThrough = listing.endsAt ?? undefined;
   const datePosted = listing.publishedAt ?? undefined;
 
-  // Google Jobs requires either a physical jobLocation or an explicit
-  // TELECOMMUTE declaration — remote/location-less listings are otherwise
-  // ineligible for the one search vertical that matters most here.
-  const isRemote = listing.category === "remote" || !listing.locationDisplay;
+  // TELECOMMUTE is asserted ONLY for genuinely remote listings (the category
+  // is the product's remote signal). A listing that merely lacks a location
+  // string is NOT remote — its location is missing data, and missing data is
+  // omitted, never re-labeled (no-fabrication law). Likewise no
+  // applicantLocationRequirements is emitted: the data model records no
+  // country eligibility, so claiming one would be fabricated.
+  const isRemote = listing.category === "remote";
 
   const jobPosting = {
     "@context": "https://schema.org",
@@ -88,15 +90,12 @@ export function generateJobPostingJsonLd(
     },
     datePosted,
     validThrough,
-    employmentType,
+    // employmentType is intentionally omitted: the listing model records no
+    // employment classification, and schema.org values (FULL_TIME, CONTRACTOR,
+    // …) are legal-ish claims we cannot derive honestly today.
     hiringOrganization,
     jobLocation,
-    ...(isRemote
-      ? {
-          jobLocationType: "TELECOMMUTE",
-          applicantLocationRequirements: { "@type": "Country", name: "USA" },
-        }
-      : {}),
+    ...(isRemote ? { jobLocationType: "TELECOMMUTE" } : {}),
     // Applications happen on-platform, not via an external redirect chain.
     directApply: true,
     baseSalary,

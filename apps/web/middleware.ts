@@ -35,6 +35,11 @@ const isPublicRoute = createRouteMatcher([
   // handler, which validates the cron secret itself. Without this, the daily
   // expire-listings job is rejected before its own auth check ever runs.
   "/api/cron/(.*)",
+  // Public agent surfaces (RFC 2026-07-14 §1): the versioned read-only REST
+  // API and MCP server serve anonymous external agents by design. They carry
+  // their own per-IP rate limits and expose only live public inventory — the
+  // privacy boundary is the DTO layer, not a login.
+  "/api/public/(.*)",
   "/terms",
   "/privacy",
   "/cookies",
