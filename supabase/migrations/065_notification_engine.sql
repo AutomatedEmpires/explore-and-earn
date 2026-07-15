@@ -30,8 +30,10 @@
 -- persisted events row (FK) — a notification can never be fabricated without
 -- a real domain event behind it.
 --
--- Additive-only; no existing table or index is modified (notifications'
--- dedupe_key + unique index already exist from 008 and are reused as-is).
+-- Additive-only: new tables/functions plus one purely-widening change — the
+-- notifications.category CHECK gains 'matches'/'messages' (§7; every existing
+-- row stays valid). notifications' dedupe_key + unique index already exist
+-- from 008 and are reused as-is.
 --
 -- REVIEW-ONLY: this migration is a schema DEFINITION and is NOT applied to
 -- any live database here. Prod apply is founder-operated via the pipeline.
@@ -272,8 +274,8 @@ alter table public.digest_memberships enable row level security;
 -- Service-role only.
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 6. Engine preferences (typed, per-user; supersedes the 018 booleans
---    without removing them)
+-- 6. Engine preferences (typed, per-user; supersedes the 019 seeker email
+--    booleans without removing them)
 -- ═══════════════════════════════════════════════════════════════════════════
 
 create table if not exists public.notification_engine_prefs (

@@ -34,6 +34,13 @@ export interface SendMailOptions {
   readonly from?: string;
   readonly subject: string;
   readonly html: string;
+  /** Optional plain-text alternative part (multipart/alternative). */
+  readonly text?: string;
+  /**
+   * Extra SMTP headers (e.g. List-Unsubscribe / List-Unsubscribe-Post for
+   * one-click unsubscribe). Passed through to the provider verbatim.
+   */
+  readonly headers?: Readonly<Record<string, string>>;
   /**
    * When set, duplicate sends within the 5-minute TTL window are silently
    * dropped. Use a string that uniquely identifies the send event, e.g.
@@ -47,6 +54,10 @@ export interface SendMailResult {
   readonly error?: string;
   /** True when the send was skipped because an identical send was already recorded within the TTL. */
   readonly isDuplicate?: boolean;
+  /** Provider HTTP status when the provider responded (success or failure). */
+  readonly status?: number;
+  /** Provider message id on success (Resend `id`), when available. */
+  readonly providerMessageId?: string;
 }
 
 function resolveFrom(override?: string): string {
@@ -81,7 +92,7 @@ function resolveFrom(override?: string): string {
  * // r.ok === false; r.error contains the reason
  */
 export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
-  const { to, subject, html, idempotencyKey } = opts;
+  const { to, subject, html, text, headers, idempotencyKey } = opts;
   const from = resolveFrom(opts.from);
 
   // Guard: skip if we already sent this within the dedup window.
@@ -125,6 +136,8 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
         to: [to],
         subject,
         html,
+        ...(text ? { text } : {}),
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
         ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });
@@ -133,11 +146,19 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
       const detail = await response.text().catch(() => "");
       const error = `Resend ${response.status}: ${detail.slice(0, 300)}`;
       console.error(`[mailer] send failed: ${error}`);
-      return { ok: false, error };
+      return { ok: false, error, status: response.status };
+    }
+
+    let providerMessageId: string | undefined;
+    try {
+      const payload = (await response.json()) as { id?: unknown };
+      if (typeof payload.id === "string") providerMessageId = payload.id;
+    } catch {
+      // Body is informational only — a success without a parsable id is fine.
     }
 
     if (idempotencyKey) _sentKeys.set(idempotencyKey, Date.now());
-    return { ok: true };
+    return { ok: true, status: response.status, providerMessageId };
   } catch (err) {
     const error = err instanceof Error ? err.message : "unknown";
     console.error("[mailer] send threw:", err);

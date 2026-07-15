@@ -3,8 +3,8 @@
 import { auth } from "@clerk/nextjs/server"
 import {
 	applyToListing,
-	getListingHostContact,
 	getSeekerApplicationIds,
+	recordEvent,
 	withdrawApplication,
 	type ApplyResult,
 } from "@explore-and-earn/db"
@@ -12,10 +12,8 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 
 import { computeAndStoreMatchForApplication } from "../../services/matching"
+import { triggerDispatch } from "../../services/notifications/dispatcher"
 
-import { getClerkContact } from "../../lib/clerkUser"
-import { absoluteUrl, sendEmail } from "../../lib/email"
-import { applicationReceivedEmail } from "../../lib/emails"
 import { checkRateLimit } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
@@ -53,31 +51,21 @@ async function applyToListingActionImpl(
 	}
 
 	if (result.ok) {
-		try {
-			const listingContact = await getListingHostContact(token, listingId)
-			if (listingContact?.hostClerkUserId) {
-				const [hostContact, seekerContact] = await Promise.all([
-					getClerkContact(listingContact.hostClerkUserId),
-					getClerkContact(userId),
-				])
-				if (hostContact.email) {
-					const seekerName = seekerContact.name ?? "A seeker"
-					const listingTitle = listingContact.listingTitle || "your listing"
-					await sendEmail({
-						to: hostContact.email,
-						subject: `${seekerName} applied to ${listingTitle}`,
-						html: applicationReceivedEmail({
-							seekerName,
-							listingTitle,
-							reviewUrl: absoluteUrl("/host/applicants"),
-						}),
-						template: "applicationReceived",
-					})
-				}
-			}
-		} catch (error) {
-			console.error("[email] application notification failed:", error)
-		}
+		// Persist the domain event FIRST (append-only events log) — the
+		// notification engine derives the host's in-app/email/push notification
+		// from this real event with the host's preferences, quiet hours, and
+		// unsubscribe honored (replaces the previous inline one-off email).
+		await recordEvent({
+			eventType: "application_submitted",
+			actorScope: "seeker",
+			subjectType: "application",
+			subjectId: result.applicationId,
+			listingId,
+			seekerProfileId: result.seekerProfileId,
+			sourceSurface: "apply_action",
+			...(result.reactivated ? { properties: { reactivated: true } } : {}),
+		})
+		after(triggerDispatch)
 
 		// Populate the ADR-040 match score for this applicant×listing pair AFTER
 		// the response is sent, so the host's applicant ranking has real fit without
@@ -151,6 +139,16 @@ async function withdrawApplicationActionImpl(
 
 	const result = await withdrawApplication(token, userId, applicationId)
 	if (result.ok) {
+		// Real withdrawal event → host notification via the engine (previously
+		// hosts were never notified of withdrawals at all).
+		await recordEvent({
+			eventType: "application_withdrawn",
+			actorScope: "seeker",
+			subjectType: "application",
+			subjectId: applicationId,
+			sourceSurface: "withdraw_action",
+		})
+		after(triggerDispatch)
 		revalidatePath("/applied")
 	}
 	return result

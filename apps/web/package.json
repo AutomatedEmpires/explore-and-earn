@@ -37,9 +37,11 @@
 		"sharp": "^0.34.5",
 		"stripe": "^22.2.0",
 		"svix": "^1.96.1",
+		"web-push": "^3.6.7",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
+		"@types/web-push": "^3.6.4",
 		"vitest": "4.1.9"
 	}
 }

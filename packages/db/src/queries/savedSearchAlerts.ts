@@ -133,12 +133,28 @@ export interface SavedSearchAlertRunResult {
   readonly listingsMatched: number;
 }
 
+/** One saved search's fresh-results batch, handed to a delivery callback. */
+export interface SavedSearchAlertBatch {
+  readonly job: SavedSearchAlertJob;
+  readonly newCount: number;
+  /** The high-water mark this batch was computed against (stable window id). */
+  readonly floorIso: string;
+  /** Query-string form of the saved filters (for the destination link). */
+  readonly queryString: string;
+}
+
 /**
  * Process every enabled saved search: re-run it, alert on newly-published
  * matches, and advance the high-water mark. Best-effort per search.
+ *
+ * `deliver` (optional) replaces the legacy direct in-app insert — the web
+ * layer passes the notification engine's enqueue so saved-search alerts get
+ * preferences/quiet-hours/dedup across channels. Without it, the legacy
+ * in-app insert keeps working (back-compat).
  */
 export async function runSavedSearchAlerts(
   nowIso: string = new Date().toISOString(),
+  deliver?: (batch: SavedSearchAlertBatch) => Promise<void>,
 ): Promise<SavedSearchAlertRunResult> {
   const jobs = await getEnabledSavedSearchesForAlerts();
   let alerted = 0;
@@ -159,7 +175,16 @@ export async function runSavedSearchAlerts(
         .eq("id", job.savedSearchId);
 
       if (fresh.length > 0) {
-        await insertSavedSearchAlert(job, fresh.length);
+        if (deliver) {
+          await deliver({
+            job,
+            newCount: fresh.length,
+            floorIso: floor,
+            queryString: savedSearchToQueryString(job.filters),
+          });
+        } else {
+          await insertSavedSearchAlert(job, fresh.length);
+        }
         alerted += 1;
         listingsMatched += fresh.length;
       }

@@ -1,0 +1,921 @@
+import "server-only";
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type {
+  EngagementCategory,
+  EngagementChannel,
+  NotificationIntent,
+} from "@explore-and-earn/contracts";
+
+import { adminClient } from "../adminClient";
+
+/**
+ * Persistence layer of the Lifecycle & Engagement Notification Engine
+ * (migration 065): delivery state machine, dispatcher watermark, push
+ * subscriptions, email suppression, digest memberships, and engine prefs.
+ *
+ * Everything here runs on the SERVICE ROLE client — these tables are RLS
+ * deny-by-default on purpose (delivery ledger + push keys + suppression are
+ * server-only concerns). Ownership checks for user-facing mutations happen in
+ * the server actions with the verified `auth().userId` BEFORE calling in.
+ */
+
+function admin(): SupabaseClient {
+  return adminClient() as unknown as SupabaseClient;
+}
+
+/* ------------------------------------------------------------- deliveries */
+
+export type DeliveryStatus =
+  | "pending"
+  | "deferred"
+  | "processing"
+  | "delivered"
+  | "suppressed"
+  | "failed_retryable"
+  | "failed_terminal"
+  | "dead_letter"
+  | "cancelled";
+
+export interface DeliveryRow {
+  readonly id: string;
+  readonly event_id: string | null;
+  readonly recipient_clerk_user_id: string;
+  readonly channel: EngagementChannel;
+  readonly category: string;
+  readonly notification_type: string;
+  readonly variant: string;
+  readonly dedup_key: string;
+  readonly status: DeliveryStatus;
+  readonly attempt_count: number;
+  readonly next_attempt_at: string;
+  readonly intent: NotificationIntent | Record<string, never>;
+  readonly cadence: "immediate" | "daily" | "weekly";
+  readonly created_at: string;
+}
+
+export interface NewDeliveryInput {
+  readonly eventId: string | null;
+  readonly recipientClerkUserId: string;
+  readonly channel: EngagementChannel;
+  readonly category: EngagementCategory;
+  readonly notificationType: string;
+  readonly variant: string;
+  readonly dedupKey: string;
+  readonly intent: NotificationIntent;
+  readonly cadence: "immediate" | "daily" | "weekly";
+  /** Defer first attempt (quiet hours / digest window). Default: now. */
+  readonly nextAttemptAt?: string;
+  readonly status?: Extract<DeliveryStatus, "pending" | "deferred">;
+}
+
+/**
+ * Idempotent delivery materialization: ON CONFLICT (dedup_key) DO NOTHING.
+ * Replays of the same event can never create a second logical delivery.
+ * Returns the number of NEW rows created.
+ */
+export async function insertDeliveries(
+  inputs: readonly NewDeliveryInput[],
+): Promise<number> {
+  if (inputs.length === 0) return 0;
+  const rows = inputs.map((d) => ({
+    event_id: d.eventId,
+    recipient_clerk_user_id: d.recipientClerkUserId,
+    channel: d.channel,
+    category: d.category,
+    notification_type: d.notificationType,
+    variant: d.variant,
+    dedup_key: d.dedupKey,
+    intent: d.intent,
+    cadence: d.cadence,
+    ...(d.nextAttemptAt ? { next_attempt_at: d.nextAttemptAt } : {}),
+    ...(d.status ? { status: d.status } : {}),
+  }));
+  const { data, error } = await admin()
+    .from("notification_deliveries")
+    .upsert(rows, { onConflict: "dedup_key", ignoreDuplicates: true })
+    .select("id");
+  if (error) throw new Error(`insertDeliveries failed: ${error.message}`);
+  return data?.length ?? 0;
+}
+
+/** Delivery ids for a set of dedup keys (existing OR just-created rows). */
+export async function getDeliveryIdsByDedupKeys(
+  dedupKeys: readonly string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (dedupKeys.length === 0) return map;
+  const { data, error } = await admin()
+    .from("notification_deliveries")
+    .select("id, dedup_key")
+    .in("dedup_key", [...dedupKeys]);
+  if (error) throw new Error(`getDeliveryIdsByDedupKeys failed: ${error.message}`);
+  for (const row of (data ?? []) as Array<{ id: string; dedup_key: string }>) {
+    map.set(row.dedup_key, row.id);
+  }
+  return map;
+}
+
+/** One delivery's id+status by its dedup key (digest-run crash recovery). */
+export async function getDeliveryByDedupKey(
+  dedupKey: string,
+): Promise<{ readonly id: string; readonly status: DeliveryStatus } | null> {
+  const { data, error } = await admin()
+    .from("notification_deliveries")
+    .select("id, status")
+    .eq("dedup_key", dedupKey)
+    .maybeSingle();
+  if (error) throw new Error(`getDeliveryByDedupKey failed: ${error.message}`);
+  return (data as { id: string; status: DeliveryStatus } | null) ?? null;
+}
+
+/**
+ * Mark a batch of held digest-member deliveries as logically delivered via
+ * the digest email that represented them.
+ */
+export async function collapseDeliveriesInto(
+  ids: readonly string[],
+  digestDeliveryId: string,
+): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await admin()
+    .from("notification_deliveries")
+    .update({
+      status: "delivered",
+      collapsed_into_delivery_id: digestDeliveryId,
+      delivered_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", [...ids]);
+  if (error) throw new Error(`collapseDeliveriesInto failed: ${error.message}`);
+}
+
+/** Feed of events the taxonomy has not expanded yet (oldest first). */
+export async function getUnprocessedEvents(
+  limit: number,
+): Promise<Array<Record<string, unknown>>> {
+  const { data, error } = await admin().rpc("get_unprocessed_notification_events", {
+    p_limit: limit,
+  });
+  if (error) throw new Error(`getUnprocessedEvents failed: ${error.message}`);
+  return (data ?? []) as Array<Record<string, unknown>>;
+}
+
+/**
+ * Watermark an event as expanded. Idempotent (PK upsert, ignore duplicates):
+ * with the deliveries dedup_key this gives exactly-once LOGICAL expansion
+ * even when two dispatcher runs race the same event.
+ */
+export async function markEventProcessed(
+  eventId: string,
+  deliveryCount: number,
+): Promise<void> {
+  const { error } = await admin()
+    .from("notification_processed_events")
+    .upsert(
+      { event_id: eventId, delivery_count: deliveryCount },
+      { onConflict: "event_id", ignoreDuplicates: true },
+    );
+  if (error) throw new Error(`markEventProcessed failed: ${error.message}`);
+}
+
+/** Atomically lease due deliveries for one worker (SKIP LOCKED RPC). */
+export async function claimDeliveries(args: {
+  readonly workerId: string;
+  readonly limit?: number;
+  readonly leaseSeconds?: number;
+}): Promise<DeliveryRow[]> {
+  const { data, error } = await admin().rpc("claim_notification_deliveries", {
+    p_worker_id: args.workerId,
+    p_limit: args.limit ?? 20,
+    p_lease_seconds: args.leaseSeconds ?? 120,
+  });
+  if (error) throw new Error(`claimDeliveries failed: ${error.message}`);
+  return (data ?? []) as DeliveryRow[];
+}
+
+/** Terminal + retry transitions for a claimed delivery. */
+export async function settleDelivery(args: {
+  readonly id: string;
+  readonly status: Exclude<DeliveryStatus, "pending" | "processing">;
+  readonly providerMessageId?: string;
+  readonly failureClass?: string;
+  readonly failureDetail?: string;
+  readonly suppressionReason?: string;
+  readonly nextAttemptAt?: string;
+  readonly collapsedIntoDeliveryId?: string;
+  readonly deliveredAt?: string;
+}): Promise<void> {
+  const patch: Record<string, unknown> = {
+    status: args.status,
+    worker_id: null,
+    lease_expires_at: null,
+    updated_at: new Date().toISOString(),
+  };
+  if (args.providerMessageId !== undefined) patch.provider_message_id = args.providerMessageId;
+  if (args.failureClass !== undefined) patch.failure_class = args.failureClass;
+  if (args.failureDetail !== undefined) {
+    // Bounded, never raw provider payloads with recipient data.
+    patch.failure_detail = args.failureDetail.slice(0, 500);
+  }
+  if (args.suppressionReason !== undefined) patch.suppression_reason = args.suppressionReason;
+  if (args.nextAttemptAt !== undefined) patch.next_attempt_at = args.nextAttemptAt;
+  if (args.collapsedIntoDeliveryId !== undefined) {
+    patch.collapsed_into_delivery_id = args.collapsedIntoDeliveryId;
+  }
+  if (args.deliveredAt !== undefined) patch.delivered_at = args.deliveredAt;
+  const { error } = await admin()
+    .from("notification_deliveries")
+    .update(patch)
+    .eq("id", args.id);
+  if (error) throw new Error(`settleDelivery failed: ${error.message}`);
+}
+
+/**
+ * Outbound sends (email+push) to one recipient since a timestamp — the
+ * dispatcher's per-recipient throttle window input.
+ */
+export async function countRecentOutboundDeliveries(
+  recipientClerkUserId: string,
+  sinceIso: string,
+): Promise<number> {
+  const { count, error } = await admin()
+    .from("notification_deliveries")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient_clerk_user_id", recipientClerkUserId)
+    .in("channel", ["email", "push"])
+    .eq("status", "delivered")
+    .gte("delivered_at", sinceIso);
+  if (error) throw new Error(`countRecentOutboundDeliveries failed: ${error.message}`);
+  return count ?? 0;
+}
+
+/**
+ * Open (not yet settled) deliveries in a collapse group for a recipient —
+ * used for thread-aware collapse: a new message in a thread supersedes the
+ * still-undelivered notification for the previous one.
+ */
+export async function findOpenCollapsibleDeliveries(args: {
+  readonly recipientClerkUserId: string;
+  readonly channel: EngagementChannel;
+  readonly collapseKey: string;
+  readonly excludeDeliveryId?: string;
+}): Promise<
+  Array<{ readonly id: string; readonly dedup_key: string; readonly created_at: string }>
+> {
+  let query = admin()
+    .from("notification_deliveries")
+    .select("id, dedup_key, created_at")
+    .eq("recipient_clerk_user_id", args.recipientClerkUserId)
+    .eq("channel", args.channel)
+    .in("status", ["pending", "deferred", "failed_retryable"])
+    .eq("intent->>collapseKey", args.collapseKey);
+  if (args.excludeDeliveryId) query = query.neq("id", args.excludeDeliveryId);
+  const { data, error } = await query;
+  if (error) throw new Error(`findOpenCollapsibleDeliveries failed: ${error.message}`);
+  return (data ?? []) as Array<{ id: string; dedup_key: string; created_at: string }>;
+}
+
+/* ----------------------------------------------------- in-app channel write */
+
+/**
+ * Idempotent write into the EXISTING in-app notifications table (008). The
+ * partial unique index on dedupe_key is the guard: a concurrent duplicate
+ * insert fails with 23505 and is reported as `duplicate` (logical delivery
+ * already exists — success for exactly-once purposes).
+ */
+export async function insertEngineNotification(args: {
+  readonly recipientClerkUserId: string;
+  /** LEGACY in-app category (widened 008 CHECK), not the engine category. */
+  readonly inAppCategory: string;
+  readonly priority: "critical" | "important" | "informational";
+  readonly title: string;
+  readonly body: string;
+  readonly subjectType?: string;
+  readonly subjectId?: string;
+  readonly actionUrl?: string;
+  readonly dedupeKey: string;
+}): Promise<{ inserted: boolean; duplicate: boolean }> {
+  const { error } = await admin().from("notifications").insert({
+    recipient_user_id: null,
+    recipient_clerk_user_id: args.recipientClerkUserId,
+    category: args.inAppCategory,
+    priority: args.priority,
+    channel: "in_app",
+    title: args.title,
+    body: args.body,
+    subject_type: args.subjectType ?? null,
+    subject_id: args.subjectId ?? null,
+    action_url: args.actionUrl ?? null,
+    dedupe_key: args.dedupeKey,
+  });
+  if (!error) return { inserted: true, duplicate: false };
+  if (error.code === "23505") return { inserted: false, duplicate: true };
+  throw new Error(`insertEngineNotification failed: ${error.message}`);
+}
+
+/* ------------------------------------------------------------ engine prefs */
+
+export interface EnginePrefsRecord {
+  readonly clerk_user_id: string;
+  readonly email_enabled: boolean;
+  readonly push_enabled: boolean;
+  readonly in_app_enabled: boolean;
+  readonly category_prefs: Record<string, unknown>;
+  readonly quiet_hours_enabled: boolean;
+  readonly quiet_start_minute: number | null;
+  readonly quiet_end_minute: number | null;
+  readonly timezone: string | null;
+  readonly locale: string | null;
+}
+
+const PREFS_COLUMNS =
+  "clerk_user_id, email_enabled, push_enabled, in_app_enabled, category_prefs, " +
+  "quiet_hours_enabled, quiet_start_minute, quiet_end_minute, timezone, locale";
+
+/** Batch prefs read for the dispatcher (absent users simply aren't in the map). */
+export async function getEnginePrefsMap(
+  clerkUserIds: readonly string[],
+): Promise<Map<string, EnginePrefsRecord>> {
+  const map = new Map<string, EnginePrefsRecord>();
+  if (clerkUserIds.length === 0) return map;
+  const unique = [...new Set(clerkUserIds)];
+  const { data, error } = await admin()
+    .from("notification_engine_prefs")
+    .select(PREFS_COLUMNS)
+    .in("clerk_user_id", unique);
+  if (error) throw new Error(`getEnginePrefsMap failed: ${error.message}`);
+  for (const row of (data ?? []) as unknown as EnginePrefsRecord[]) {
+    map.set(row.clerk_user_id, row);
+  }
+  return map;
+}
+
+export async function getEnginePrefs(
+  clerkUserId: string,
+): Promise<EnginePrefsRecord | null> {
+  const { data, error } = await admin()
+    .from("notification_engine_prefs")
+    .select(PREFS_COLUMNS)
+    .eq("clerk_user_id", clerkUserId)
+    .maybeSingle();
+  if (error) throw new Error(`getEnginePrefs failed: ${error.message}`);
+  return (data as unknown as EnginePrefsRecord) ?? null;
+}
+
+export interface EnginePrefsPatch {
+  readonly emailEnabled?: boolean;
+  readonly pushEnabled?: boolean;
+  readonly inAppEnabled?: boolean;
+  readonly categoryPrefs?: Record<string, unknown>;
+  readonly quietHoursEnabled?: boolean;
+  readonly quietStartMinute?: number | null;
+  readonly quietEndMinute?: number | null;
+  readonly timezone?: string | null;
+  readonly locale?: string | null;
+}
+
+/**
+ * Upsert engine prefs for one user. Callers (server actions / unsubscribe
+ * route) are responsible for having authenticated or token-verified the
+ * clerkUserId — this function trusts its argument by contract.
+ */
+export async function upsertEnginePrefs(
+  clerkUserId: string,
+  patch: EnginePrefsPatch,
+): Promise<void> {
+  const row: Record<string, unknown> = {
+    clerk_user_id: clerkUserId,
+    updated_at: new Date().toISOString(),
+  };
+  if (patch.emailEnabled !== undefined) row.email_enabled = patch.emailEnabled;
+  if (patch.pushEnabled !== undefined) row.push_enabled = patch.pushEnabled;
+  if (patch.inAppEnabled !== undefined) row.in_app_enabled = patch.inAppEnabled;
+  if (patch.categoryPrefs !== undefined) row.category_prefs = patch.categoryPrefs;
+  if (patch.quietHoursEnabled !== undefined) row.quiet_hours_enabled = patch.quietHoursEnabled;
+  if (patch.quietStartMinute !== undefined) row.quiet_start_minute = patch.quietStartMinute;
+  if (patch.quietEndMinute !== undefined) row.quiet_end_minute = patch.quietEndMinute;
+  if (patch.timezone !== undefined) row.timezone = patch.timezone;
+  if (patch.locale !== undefined) row.locale = patch.locale;
+  const { error } = await admin()
+    .from("notification_engine_prefs")
+    .upsert(row, { onConflict: "clerk_user_id" });
+  if (error) throw new Error(`upsertEnginePrefs failed: ${error.message}`);
+}
+
+/* ------------------------------------------------------ push subscriptions */
+
+export interface PushSubscriptionRow {
+  readonly id: string;
+  readonly clerk_user_id: string;
+  readonly endpoint: string;
+  readonly p256dh: string;
+  readonly auth: string;
+}
+
+/**
+ * Register/refresh a push subscription. Endpoint is globally unique: a
+ * re-subscribe (same endpoint, e.g. after permission re-grant or on a shared
+ * device signed into a different account) re-binds it to the CURRENT verified
+ * owner and clears any revocation.
+ */
+export async function upsertPushSubscription(args: {
+  readonly clerkUserId: string;
+  readonly endpoint: string;
+  readonly p256dh: string;
+  readonly auth: string;
+  readonly userAgent?: string | null;
+  readonly locale?: string | null;
+  readonly timezone?: string | null;
+}): Promise<void> {
+  const { error } = await admin()
+    .from("push_subscriptions")
+    .upsert(
+      {
+        clerk_user_id: args.clerkUserId,
+        endpoint: args.endpoint,
+        p256dh: args.p256dh,
+        auth: args.auth,
+        user_agent: args.userAgent ?? null,
+        locale: args.locale ?? null,
+        timezone: args.timezone ?? null,
+        revoked_at: null,
+        failure_count: 0,
+      },
+      { onConflict: "endpoint" },
+    );
+  if (error) throw new Error(`upsertPushSubscription failed: ${error.message}`);
+}
+
+/** Owner-scoped removal: deletes only when BOTH endpoint and owner match. */
+export async function deletePushSubscription(
+  clerkUserId: string,
+  endpoint: string,
+): Promise<void> {
+  const { error } = await admin()
+    .from("push_subscriptions")
+    .delete()
+    .eq("clerk_user_id", clerkUserId)
+    .eq("endpoint", endpoint);
+  if (error) throw new Error(`deletePushSubscription failed: ${error.message}`);
+}
+
+export async function getActivePushSubscriptions(
+  clerkUserId: string,
+): Promise<PushSubscriptionRow[]> {
+  const { data, error } = await admin()
+    .from("push_subscriptions")
+    .select("id, clerk_user_id, endpoint, p256dh, auth")
+    .eq("clerk_user_id", clerkUserId)
+    .is("revoked_at", null);
+  if (error) throw new Error(`getActivePushSubscriptions failed: ${error.message}`);
+  return (data ?? []) as PushSubscriptionRow[];
+}
+
+/** Terminal provider response (404/410): the endpoint is dead — revoke it. */
+export async function revokePushSubscription(subscriptionId: string): Promise<void> {
+  const { error } = await admin()
+    .from("push_subscriptions")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", subscriptionId);
+  if (error) throw new Error(`revokePushSubscription failed: ${error.message}`);
+}
+
+export async function recordPushOutcome(
+  subscriptionId: string,
+  ok: boolean,
+): Promise<void> {
+  const patch = ok
+    ? { last_success_at: new Date().toISOString(), failure_count: 0 }
+    : undefined;
+  if (patch) {
+    const { error } = await admin()
+      .from("push_subscriptions")
+      .update(patch)
+      .eq("id", subscriptionId);
+    if (error) throw new Error(`recordPushOutcome failed: ${error.message}`);
+    return;
+  }
+  // Failure: bump the counter without racing concurrent workers to zero.
+  const { data, error } = await admin()
+    .from("push_subscriptions")
+    .select("failure_count")
+    .eq("id", subscriptionId)
+    .maybeSingle();
+  if (error || !data) return;
+  await admin()
+    .from("push_subscriptions")
+    .update({ failure_count: (data.failure_count as number) + 1 })
+    .eq("id", subscriptionId);
+}
+
+/* --------------------------------------------------------- email suppression */
+
+export async function isEmailSuppressed(email: string): Promise<boolean> {
+  const { data, error } = await admin()
+    .from("email_suppressions")
+    .select("id")
+    .eq("email", email.trim().toLowerCase())
+    .maybeSingle();
+  if (error) throw new Error(`isEmailSuppressed failed: ${error.message}`);
+  return data != null;
+}
+
+/** Idempotent (unique email): repeat bounce/complaint webhooks are no-ops. */
+export async function suppressEmail(args: {
+  readonly email: string;
+  readonly reason: "hard_bounce" | "complaint" | "manual" | "invalid";
+  readonly source?: string;
+}): Promise<void> {
+  const { error } = await admin()
+    .from("email_suppressions")
+    .upsert(
+      {
+        email: args.email.trim().toLowerCase(),
+        reason: args.reason,
+        source: args.source ?? null,
+      },
+      { onConflict: "email", ignoreDuplicates: true },
+    );
+  if (error) throw new Error(`suppressEmail failed: ${error.message}`);
+}
+
+/* ------------------------------------- schedule-derived reminder feeds
+   (REAL current state only: an unexpired offered application / a live
+   listing with a real expires_at — re-checked again at send time) */
+
+export interface ExpiringOfferedApplication {
+  readonly id: string;
+  readonly seeker_profile_id: string;
+  readonly listing_id: string;
+  readonly expires_at: string;
+}
+
+/** Applications sitting at status='offered' with a REAL imminent expiry. */
+export async function getExpiringOfferedApplications(
+  withinHours: number,
+  limit = 500,
+): Promise<ExpiringOfferedApplication[]> {
+  const now = new Date();
+  const until = new Date(now.getTime() + withinHours * 3_600_000);
+  const { data, error } = await admin()
+    .from("applications")
+    .select("id, seeker_profile_id, listing_id, expires_at")
+    .eq("status", "offered")
+    .gt("expires_at", now.toISOString())
+    .lte("expires_at", until.toISOString())
+    .limit(limit);
+  if (error) throw new Error(`getExpiringOfferedApplications failed: ${error.message}`);
+  return (data ?? []) as ExpiringOfferedApplication[];
+}
+
+/** Send-time re-check: the offer must STILL be open and unexpired. */
+export async function getApplicationOfferState(
+  applicationId: string,
+): Promise<{ readonly status: string; readonly expires_at: string | null } | null> {
+  const { data, error } = await admin()
+    .from("applications")
+    .select("status, expires_at")
+    .eq("id", applicationId)
+    .maybeSingle();
+  if (error) throw new Error(`getApplicationOfferState failed: ${error.message}`);
+  return (data as { status: string; expires_at: string | null }) ?? null;
+}
+
+export interface ExpiringLiveListing {
+  readonly id: string;
+  readonly title: string;
+  readonly host_profile_id: string;
+  readonly expires_at: string;
+}
+
+/** Live listings whose REAL expires_at falls within the window. */
+export async function getExpiringLiveListings(
+  withinDays: number,
+  limit = 500,
+): Promise<ExpiringLiveListing[]> {
+  const now = new Date();
+  const until = new Date(now.getTime() + withinDays * 86_400_000);
+  const { data, error } = await admin()
+    .from("listings")
+    .select("id, title, host_profile_id, expires_at")
+    .eq("status", "live")
+    .gt("expires_at", now.toISOString())
+    .lte("expires_at", until.toISOString())
+    .limit(limit);
+  if (error) throw new Error(`getExpiringLiveListings failed: ${error.message}`);
+  return (data ?? []) as ExpiringLiveListing[];
+}
+
+/** Send-time re-check: the listing must STILL be live and unexpired. */
+export async function getListingLiveState(
+  listingId: string,
+): Promise<{ readonly status: string; readonly expires_at: string | null } | null> {
+  const { data, error } = await admin()
+    .from("listings")
+    .select("status, expires_at")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (error) throw new Error(`getListingLiveState failed: ${error.message}`);
+  return (data as { status: string; expires_at: string | null }) ?? null;
+}
+
+/* ------------------------------------------------- taxonomy resolvers (admin)
+   Service-role lookups used by the dispatcher's event→intent expansion.
+   Read-only, id-keyed, no user-generated free text beyond listing titles. */
+
+export async function adminSeekerClerkId(seekerProfileId: string): Promise<string | null> {
+  const { data, error } = await admin()
+    .from("seeker_profiles")
+    .select("clerk_user_id")
+    .eq("id", seekerProfileId)
+    .maybeSingle();
+  if (error) throw new Error(`adminSeekerClerkId failed: ${error.message}`);
+  const clerkId = (data as { clerk_user_id: string | null } | null)?.clerk_user_id;
+  return typeof clerkId === "string" && clerkId.length > 0 ? clerkId : null;
+}
+
+export async function adminHostClerkId(hostProfileId: string): Promise<string | null> {
+  const { data, error } = await admin()
+    .from("host_profiles")
+    .select("clerk_user_id")
+    .eq("id", hostProfileId)
+    .maybeSingle();
+  if (error) throw new Error(`adminHostClerkId failed: ${error.message}`);
+  const clerkId = (data as { clerk_user_id: string | null } | null)?.clerk_user_id;
+  return typeof clerkId === "string" && clerkId.length > 0 ? clerkId : null;
+}
+
+export async function adminListingContext(
+  listingId: string,
+): Promise<{ readonly title: string; readonly hostProfileId: string | null } | null> {
+  const { data, error } = await admin()
+    .from("listings")
+    .select("title, host_profile_id")
+    .eq("id", listingId)
+    .maybeSingle();
+  if (error) throw new Error(`adminListingContext failed: ${error.message}`);
+  if (!data) return null;
+  const row = data as { title: string | null; host_profile_id: string | null };
+  return { title: row.title ?? "", hostProfileId: row.host_profile_id };
+}
+
+export async function adminConversationContext(conversationId: string): Promise<{
+  readonly seekerProfileId: string | null;
+  readonly hostProfileId: string | null;
+  readonly listingId: string | null;
+} | null> {
+  const { data, error } = await admin()
+    .from("conversations")
+    .select("seeker_profile_id, host_profile_id, listing_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+  if (error) throw new Error(`adminConversationContext failed: ${error.message}`);
+  if (!data) return null;
+  const row = data as {
+    seeker_profile_id: string | null;
+    host_profile_id: string | null;
+    listing_id: string | null;
+  };
+  return {
+    seekerProfileId: row.seeker_profile_id,
+    hostProfileId: row.host_profile_id,
+    listingId: row.listing_id,
+  };
+}
+
+export async function adminApplicationContext(applicationId: string): Promise<{
+  readonly seekerProfileId: string | null;
+  readonly listingId: string | null;
+} | null> {
+  const { data, error } = await admin()
+    .from("applications")
+    .select("seeker_profile_id, listing_id")
+    .eq("id", applicationId)
+    .maybeSingle();
+  if (error) throw new Error(`adminApplicationContext failed: ${error.message}`);
+  if (!data) return null;
+  const row = data as { seeker_profile_id: string | null; listing_id: string | null };
+  return { seekerProfileId: row.seeker_profile_id, listingId: row.listing_id };
+}
+
+/* -------------------------------------------------- résumé-nudge candidates */
+
+export interface ResumeNudgeCandidate {
+  readonly seekerProfileId: string;
+  readonly clerkUserId: string;
+  readonly completion: number;
+}
+
+/**
+ * Service-role résumé completeness probe using THE authoritative predicate
+ * (lib/resumeCompleteness.seekerResumeCompletion) over the same real rows the
+ * apply-gate reads. Returns null when the profile does not exist.
+ */
+export async function getResumeCompletionByProfileId(
+  seekerProfileId: string,
+): Promise<{ readonly complete: boolean; readonly completion: number } | null> {
+  const db = admin();
+  const { data: profile, error } = await db
+    .from("seeker_profiles")
+    .select(
+      "id, display_name, relative_location, seeking_timeline, short_bio, general_skill_tags",
+    )
+    .eq("id", seekerProfileId)
+    .maybeSingle();
+  if (error) throw new Error(`getResumeCompletionByProfileId failed: ${error.message}`);
+  if (!profile) return null;
+  const p = profile as {
+    id: string;
+    display_name: string | null;
+    relative_location: string | null;
+    seeking_timeline: string | null;
+    short_bio: string | null;
+    general_skill_tags: string[] | null;
+  };
+  const { data: experiences, error: expError } = await db
+    .from("seeker_resume_experiences")
+    .select("id, skill_tags")
+    .eq("seeker_profile_id", seekerProfileId);
+  if (expError) {
+    throw new Error(`getResumeCompletionByProfileId experiences failed: ${expError.message}`);
+  }
+  const { seekerResumeCompletion } = await import("../lib/resumeCompleteness");
+  const status = seekerResumeCompletion({
+    profile: {
+      seekerProfileId: p.id,
+      bio: p.short_bio,
+      headline: null,
+      displayName: p.display_name,
+      location: p.relative_location,
+      seekingTimeline: p.seeking_timeline,
+      desiredCategories: [],
+      generalSkills: p.general_skill_tags ?? [],
+    },
+    experiences: ((experiences ?? []) as Array<{ id: string; skill_tags: string[] | null }>).map(
+      (row) => ({
+        id: row.id,
+        companyName: null,
+        roleTitle: null,
+        location: null,
+        startDate: null,
+        endDate: null,
+        isCurrent: false,
+        summary: null,
+        categoryTags: [],
+        skillTags: row.skill_tags ?? [],
+      }),
+    ),
+    educations: [],
+    certifications: [],
+  });
+  return { complete: status.complete, completion: status.completion };
+}
+
+/**
+ * Bounded feed of seekers to CONSIDER for a résumé nudge (oldest profiles
+ * first for fairness). Completeness is evaluated per candidate by the caller
+ * via getResumeCompletionByProfileId — this feed only narrows to seekers with
+ * a Clerk identity.
+ */
+export async function getResumeNudgeCandidates(
+  limit = 200,
+): Promise<Array<{ readonly seekerProfileId: string; readonly clerkUserId: string }>> {
+  const { data, error } = await admin()
+    .from("seeker_profiles")
+    .select("id, clerk_user_id")
+    .not("clerk_user_id", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(`getResumeNudgeCandidates failed: ${error.message}`);
+  return ((data ?? []) as Array<{ id: string; clerk_user_id: string | null }>)
+    .filter((row) => Boolean(row.clerk_user_id))
+    .map((row) => ({ seekerProfileId: row.id, clerkUserId: row.clerk_user_id as string }));
+}
+
+/* ----------------------------------------------- legacy pref-boolean overlay */
+
+export interface LegacySeekerEmailBooleans {
+  readonly email_on_invite: boolean;
+  readonly email_on_status_change: boolean;
+  readonly email_on_message: boolean;
+}
+
+/**
+ * The 019 seeker email booleans, for users WITHOUT an engine prefs row: an
+ * existing opt-out must keep holding when the engine takes over email — a
+ * migration may never re-subscribe someone.
+ */
+export async function getLegacySeekerEmailBooleans(
+  clerkUserIds: readonly string[],
+): Promise<Map<string, LegacySeekerEmailBooleans>> {
+  const map = new Map<string, LegacySeekerEmailBooleans>();
+  if (clerkUserIds.length === 0) return map;
+  const { data, error } = await admin()
+    .from("seeker_profiles")
+    .select("clerk_user_id, email_on_invite, email_on_status_change, email_on_message")
+    .in("clerk_user_id", [...new Set(clerkUserIds)]);
+  if (error) throw new Error(`getLegacySeekerEmailBooleans failed: ${error.message}`);
+  for (const row of (data ?? []) as Array<
+    { clerk_user_id: string | null } & LegacySeekerEmailBooleans
+  >) {
+    if (row.clerk_user_id) {
+      map.set(row.clerk_user_id, {
+        email_on_invite: row.email_on_invite !== false,
+        email_on_status_change: row.email_on_status_change !== false,
+        email_on_message: row.email_on_message !== false,
+      });
+    }
+  }
+  return map;
+}
+
+/* ------------------------------------------------------- digest membership */
+
+export interface NewDigestMembership {
+  readonly recipientClerkUserId: string;
+  readonly cadence: "daily" | "weekly";
+  readonly category: EngagementCategory;
+  readonly eventId: string;
+  readonly deliveryId: string | null;
+}
+
+/** Idempotent: unique (recipient, cadence, event). Returns rows created. */
+export async function insertDigestMemberships(
+  inputs: readonly NewDigestMembership[],
+): Promise<number> {
+  if (inputs.length === 0) return 0;
+  const rows = inputs.map((m) => ({
+    recipient_clerk_user_id: m.recipientClerkUserId,
+    cadence: m.cadence,
+    category: m.category,
+    event_id: m.eventId,
+    delivery_id: m.deliveryId,
+  }));
+  const { data, error } = await admin()
+    .from("digest_memberships")
+    .upsert(rows, {
+      onConflict: "recipient_clerk_user_id,cadence,event_id",
+      ignoreDuplicates: true,
+    })
+    .select("id");
+  if (error) throw new Error(`insertDigestMemberships failed: ${error.message}`);
+  return data?.length ?? 0;
+}
+
+export interface QueuedDigestMembership {
+  readonly id: string;
+  readonly recipient_clerk_user_id: string;
+  readonly cadence: "daily" | "weekly";
+  readonly category: string;
+  readonly event_id: string;
+  readonly delivery_id: string | null;
+  readonly created_at: string;
+  readonly delivery:
+    | { readonly intent: NotificationIntent | Record<string, never> }
+    | null;
+}
+
+/** All queued memberships for a cadence (bounded), oldest first. */
+export async function getQueuedDigestMemberships(
+  cadence: "daily" | "weekly",
+  limit = 2000,
+): Promise<QueuedDigestMembership[]> {
+  const { data, error } = await admin()
+    .from("digest_memberships")
+    .select(
+      "id, recipient_clerk_user_id, cadence, category, event_id, delivery_id, created_at, " +
+        "delivery:notification_deliveries!digest_memberships_delivery_id_fkey(intent)",
+    )
+    .eq("cadence", cadence)
+    .eq("status", "queued")
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) throw new Error(`getQueuedDigestMemberships failed: ${error.message}`);
+  return (data ?? []) as unknown as QueuedDigestMembership[];
+}
+
+export async function markDigestMembershipsSent(
+  ids: readonly string[],
+  digestDeliveryId: string,
+): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await admin()
+    .from("digest_memberships")
+    .update({
+      status: "sent",
+      digest_delivery_id: digestDeliveryId,
+      sent_at: new Date().toISOString(),
+    })
+    .in("id", [...ids]);
+  if (error) throw new Error(`markDigestMembershipsSent failed: ${error.message}`);
+}
+
+export async function cancelDigestMemberships(ids: readonly string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await admin()
+    .from("digest_memberships")
+    .update({ status: "cancelled" })
+    .in("id", [...ids]);
+  if (error) throw new Error(`cancelDigestMemberships failed: ${error.message}`);
+}

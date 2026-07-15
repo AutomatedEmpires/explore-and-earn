@@ -8,8 +8,7 @@ import {
 	getHostListings,
 	getHostProfile,
 	getHostClerkIdByProfileId,
-	getNotificationPrefs,
-	getSeekerClerkIdByProfileId,
+	recordEvent,
 	restoreInviteCreditForInvite,
 	searchSeekersForInvite,
 	withdrawInvite,
@@ -19,10 +18,12 @@ import {
 } from "@explore-and-earn/db"
 import { MONTHLY_INVITE_QUOTA } from "@explore-and-earn/contracts"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 
+import { triggerDispatch } from "../../services/notifications/dispatcher"
 import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
-import { inviteAcceptedEmail, inviteEmail } from "../../lib/emails"
+import { inviteAcceptedEmail } from "../../lib/emails"
 import { checkRateLimit } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
@@ -261,53 +262,22 @@ async function createInviteForCurrentHost(
 
 	revalidatePath("/host/invites")
 
-	// Best-effort email notification — gated on the seeker's emailOnInvite pref;
-	// errors are caught and never rethrown.
-	try {
-		const seekerClerkUserId = await getSeekerClerkIdByProfileId(
-			token,
-			seekerProfileId,
-		).catch(() => null)
-
-		if (seekerClerkUserId) {
-			// Cross-user prefs read (host token, seeker userId) may fail under RLS;
-			// degrade to sending rather than dropping the invite notification.
-			let prefs = null
-			try {
-				prefs = await getNotificationPrefs(token, seekerClerkUserId)
-			} catch {
-				// Cross-user read failed; skip the notification prefs check.
-			}
-
-			if (prefs === null || prefs.emailOnInvite) {
-				const contact = await getClerkContact(seekerClerkUserId)
-				if (contact.email) {
-					const hostName = hostProfile.companyName || "A host"
-					const listingTitle = ownedListing.title
-					const listingLocation =
-						ownedListing.location_display ?? "Location not specified"
-					const html = inviteEmail({
-						hostName,
-						listingTitle,
-						listingLocation,
-						message: message ?? null,
-						inviteUrl: absoluteUrl("/invites"),
-					})
-					await sendEmail({
-						to: contact.email,
-						subject: `${hostName} invited you to apply to ${listingTitle}`,
-						html,
-						template: "inviteEmail",
-						idempotencyKey: result.inviteId
-							? `inviteEmail:${result.inviteId}`
-							: undefined,
-					})
-				}
-			}
-		}
-	} catch (err) {
-		console.error("[createInviteForCurrentHost] email error (non-fatal):", err)
-	}
+	// Persist the real invite event: the notification engine derives the
+	// seeker's in-app/email/push notification from it (localized, deduped per
+	// invite, preference-/quiet-hours-/unsubscribe-aware — replaces the inline
+	// email; the seeker's legacy email_on_invite opt-out keeps holding via the
+	// engine's legacy-boolean overlay).
+	await recordEvent({
+		eventType: "invite_created",
+		actorScope: "host",
+		subjectType: "invite",
+		subjectId: result.inviteId,
+		listingId,
+		hostProfileId: hostProfile.id,
+		seekerProfileId,
+		sourceSurface: "invite_action",
+	})
+	after(triggerDispatch)
 
 	return { ok: true }
 }

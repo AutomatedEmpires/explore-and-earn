@@ -25,6 +25,7 @@ export * from "./queries/hostProfiles";
 export * from "./queries/seekerResume";
 export * from "./queries/seekerProfiles";
 export * from "./queries/notifications";
+export * from "./queries/notificationEngine";
 export * from "./queries/messages";
 export * from "./queries/emailContext";
 export * from "./queries/notificationPrefs";
