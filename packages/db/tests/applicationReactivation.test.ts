@@ -79,8 +79,14 @@ describe("applyToListing — withdrawn re-apply reactivation (063)", () => {
 
     const result = await applyToListing("token", "user_1", "listing-1", "hi");
 
-    // Reactivated, not a fresh insert.
-    expect(result).toEqual({ ok: true, reactivated: true });
+    // Reactivated, not a fresh insert — and the ids the notification-engine
+    // producer anchors its application_submitted event on are reported.
+    expect(result).toEqual({
+      ok: true,
+      reactivated: true,
+      applicationId: "app-1",
+      seekerProfileId: "seeker-1",
+    });
     // The revive was an UPDATE (not an INSERT) on the existing row.
     expect(update.update).toHaveBeenCalledTimes(1);
     expect(existing.insert).not.toHaveBeenCalled();
@@ -124,7 +130,8 @@ describe("applyToListing — withdrawn re-apply reactivation (063)", () => {
 
   it("first-time apply (no existing row) INSERTs a fresh application, not a reactivation", async () => {
     const existing = makeChain({ data: null });
-    const insert = makeChain({ error: null });
+    // The insert now chains .select("id").maybeSingle() to report the new id.
+    const insert = makeChain({ data: { id: "app-new" }, error: null });
     queueFromResults(
       makeChain(SEEKER_PROFILE),
       makeChain(NOT_OWN_LISTING),
@@ -134,7 +141,11 @@ describe("applyToListing — withdrawn re-apply reactivation (063)", () => {
 
     const result = await applyToListing("token", "user_1", "listing-1");
 
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({
+      ok: true,
+      applicationId: "app-new",
+      seekerProfileId: "seeker-1",
+    });
     expect(insert.insert).toHaveBeenCalledTimes(1);
   });
 
