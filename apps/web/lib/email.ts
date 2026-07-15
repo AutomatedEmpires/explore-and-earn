@@ -44,6 +44,22 @@ export interface SendEmailOptions {
    * `"applicationStatus:<applicationId>:<newStatus>"`.
    */
   readonly idempotencyKey?: string;
+  /** Optional plain-text alternative part (multipart/alternative). */
+  readonly text?: string;
+  /**
+   * Extra SMTP headers (List-Unsubscribe / List-Unsubscribe-Post) forwarded
+   * verbatim to the transport.
+   */
+  readonly headers?: Readonly<Record<string, string>>;
+}
+
+export interface SendEmailResult {
+  readonly ok: boolean;
+  /** Provider HTTP status when the provider responded. */
+  readonly status?: number;
+  /** Provider message id on success, when available. */
+  readonly providerMessageId?: string;
+  readonly error?: string;
 }
 
 /**
@@ -110,7 +126,7 @@ async function insertEmailLog(entry: EmailLogEntry): Promise<void> {
  */
 export async function sendEmail(
   opts: SendEmailOptions,
-): Promise<{ ok: boolean }> {
+): Promise<SendEmailResult> {
   const { to, subject, idempotencyKey } = opts;
   const templateName = opts.template ?? subject;
 
@@ -118,6 +134,8 @@ export async function sendEmail(
     to,
     subject,
     html: opts.html,
+    text: opts.text,
+    headers: opts.headers,
     idempotencyKey,
   });
 
@@ -135,5 +153,10 @@ export async function sendEmail(
     error: result.error,
   });
 
-  return { ok: result.ok };
+  return {
+    ok: result.ok,
+    status: result.status,
+    providerMessageId: result.providerMessageId,
+    error: result.error,
+  };
 }

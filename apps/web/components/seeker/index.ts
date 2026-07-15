@@ -43,6 +43,8 @@ export { SettingsAssurances } from "./SettingsAssurances";
 export type { SettingsAssurancesProps } from "./SettingsAssurances";
 export { NotificationPrefsForm } from "./NotificationPrefsForm";
 export type { NotificationPrefsFormProps } from "./NotificationPrefsForm";
+export { EngagementNotificationSettings } from "./EngagementNotificationSettings";
+export type { EngagementNotificationSettingsProps } from "./EngagementNotificationSettings";
 export { NotificationList } from "./NotificationList";
 export type { NotificationListProps } from "./NotificationList";
 export { HelpPanel } from "./HelpPanel";

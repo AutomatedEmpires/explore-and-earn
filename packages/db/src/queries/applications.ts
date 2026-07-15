@@ -30,6 +30,10 @@ export interface ApplyResult {
    * a "re-applied" confirmation; the host separately sees it via `reappliedAt`.
    */
   readonly reactivated?: boolean;
+  /** The created/reactivated application row id (set on ok=true). */
+  readonly applicationId?: string;
+  /** The applicant's seeker_profiles.id (set on ok=true). */
+  readonly seekerProfileId?: string;
 }
 
 /** Postgres unique_violation SQLSTATE -- surfaced as the already-applied case. */
@@ -147,16 +151,23 @@ export async function applyToListing(
       }
       return { ok: false, error: reactivateError.message };
     }
-    return { ok: true, reactivated: true };
+    return {
+      ok: true,
+      reactivated: true,
+      applicationId: existingRow.id,
+      seekerProfileId,
+    };
   }
 
-  const { error } = await authedClient(clerkToken)
+  const { data: inserted, error } = await authed
     .from("applications")
     .insert({
       listing_id: listingId,
       seeker_profile_id: seekerProfileId,
       cover_message: coverMessage ?? null,
-    });
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     if (error.code === UNIQUE_VIOLATION) {
@@ -169,7 +180,11 @@ export async function applyToListing(
     return { ok: false, error: error.message };
   }
 
-  return { ok: true };
+  return {
+    ok: true,
+    applicationId: (inserted as { id: string } | null)?.id,
+    seekerProfileId,
+  };
 }
 
 // getSeekerApplicationIds moved to ./idReaders (breaks the listings.ts <->

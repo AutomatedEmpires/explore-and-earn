@@ -23,6 +23,13 @@ export interface SendMailOptions {
     readonly from?: string;
     readonly subject: string;
     readonly html: string;
+    /** Optional plain-text alternative part (multipart/alternative). */
+    readonly text?: string;
+    /**
+     * Extra SMTP headers (e.g. List-Unsubscribe / List-Unsubscribe-Post for
+     * one-click unsubscribe). Passed through to the provider verbatim.
+     */
+    readonly headers?: Readonly<Record<string, string>>;
     /**
      * When set, duplicate sends within the 5-minute TTL window are silently
      * dropped. Use a string that uniquely identifies the send event, e.g.
@@ -35,6 +42,10 @@ export interface SendMailResult {
     readonly error?: string;
     /** True when the send was skipped because an identical send was already recorded within the TTL. */
     readonly isDuplicate?: boolean;
+    /** Provider HTTP status when the provider responded (success or failure). */
+    readonly status?: number;
+    /** Provider message id on success (Resend `id`), when available. */
+    readonly providerMessageId?: string;
 }
 /**
  * Send a transactional email via the Resend REST API.

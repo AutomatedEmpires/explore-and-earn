@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
+import { getTranslations } from "next-intl/server";
 import { getHostProfile } from "@explore-and-earn/db";
 
 import { HostSectionHeading } from "../../../../../components/host";
 import { HostSettings } from "../../../../../components/host/HostSettings";
+import { EngagementNotificationSettings } from "../../../../../components/seeker";
 import { EmptyState } from "../../../../../components/discovery";
+import { getEngineNotificationSettingsAction } from "../../../../actions/notificationEngine";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -32,7 +35,11 @@ export default async function HostSettingsPage() {
     );
   }
 
-  const hostProfile = await getHostProfile(token, userId);
+  const [hostProfile, engineSettings, t] = await Promise.all([
+    getHostProfile(token, userId),
+    getEngineNotificationSettingsAction(),
+    getTranslations("Notifications.settings"),
+  ]);
 
   return (
     <section className={styles.block}>
@@ -45,6 +52,8 @@ export default async function HostSettingsPage() {
         companyName={hostProfile?.companyName ?? ""}
         hostProfileId={hostProfile?.id ?? null}
       />
+      <HostSectionHeading title={t("heading")} description={t("description")} />
+      <EngagementNotificationSettings initial={engineSettings} />
     </section>
   );
 }

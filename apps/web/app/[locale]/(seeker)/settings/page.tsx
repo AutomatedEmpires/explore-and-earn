@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
+import { getTranslations } from "next-intl/server";
 
 import {
 	AppearanceControl,
-	NotificationPrefsForm,
+	EngagementNotificationSettings,
 	PaletteControl,
 	SectionHeading,
 	SeekerPage,
@@ -13,7 +14,7 @@ import {
 	buildAccountGroups,
 } from "../../../../components/seeker";
 import { getClerkContact } from "../../../../lib/clerkUser";
-import { getNotificationPrefsAction } from "../../../actions/notificationPrefs";
+import { getEngineNotificationSettingsAction } from "../../../actions/notificationEngine";
 import styles from "./settings.module.css";
 
 export const metadata: Metadata = {
@@ -34,9 +35,10 @@ async function resolveEmail(): Promise<string | null> {
 }
 
 export default async function SettingsPage() {
-	const [prefs, email] = await Promise.all([
-		getNotificationPrefsAction(),
+	const [engineSettings, email, t] = await Promise.all([
+		getEngineNotificationSettingsAction(),
 		resolveEmail(),
+		getTranslations("Notifications.settings"),
 	]);
 	const groups = buildAccountGroups(email);
 
@@ -47,11 +49,8 @@ export default async function SettingsPage() {
 		>
 			<div className={styles.stack}>
 				<section className={styles.section}>
-					<SectionHeading
-						title="Notifications"
-						description="Choose which emails you get. Changes save the moment you toggle them."
-					/>
-					<NotificationPrefsForm initialPrefs={prefs} />
+					<SectionHeading title={t("heading")} description={t("description")} />
+					<EngagementNotificationSettings initial={engineSettings} />
 				</section>
 
 				<section className={styles.section}>

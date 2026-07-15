@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { adminClient, insertStrongMatchNotifications } from "@explore-and-earn/db";
+import { adminClient, recordEvents } from "@explore-and-earn/db";
 
 import { computeAndStoreMatchesForListing } from "./index";
 
@@ -78,17 +78,27 @@ export async function runNewMatchAlerts(
   let notified = 0;
   for (const listing of unscored) {
     try {
-      const { strong, listingTitle } = await computeAndStoreMatchesForListing(listing.id, nowMs);
-      const recipientClerkUserIds = strong
-        .map((recipient) => recipient.recipientClerkUserId)
-        .filter((id): id is string => Boolean(id));
-      if (recipientClerkUserIds.length > 0) {
-        const { inserted } = await insertStrongMatchNotifications({
-          listingId: listing.id,
-          listingTitle: listingTitle || listing.title,
-          recipientClerkUserIds,
-        });
-        notified += inserted;
+      const { strong } = await computeAndStoreMatchesForListing(listing.id, nowMs);
+      const recipients = strong.filter((recipient) =>
+        Boolean(recipient.recipientClerkUserId),
+      );
+      if (recipients.length > 0) {
+        // Persist one REAL match_generated event per strong (listing, seeker)
+        // pair; the notification engine expands them into in-app/email/push
+        // per each seeker's preferences. In-app dedupe stays compatible with
+        // the legacy strong_match:<listingId>:<clerkId> key, so historical
+        // alert recipients are never double-notified.
+        notified += await recordEvents(
+          recipients.map((recipient) => ({
+            eventType: "match_generated" as const,
+            actorScope: "platform" as const,
+            subjectType: "listing",
+            subjectId: listing.id,
+            listingId: listing.id,
+            seekerProfileId: recipient.seekerProfileId,
+            sourceSurface: "new_match_alerts_cron",
+          })),
+        );
       }
     } catch {
       // Resilient: one listing's failure never blocks the rest of the sweep.

@@ -36,6 +36,15 @@ export interface EmailLayoutOptions {
   readonly bodyHtml: string;
   readonly ctaLabel: string;
   readonly ctaUrl: string;
+  /**
+   * Optional replacement for the default footer paragraph, as safe HTML
+   * (callers escape dynamic text). The notification engine passes a localized
+   * footer with a REAL one-click unsubscribe link here; existing callers are
+   * unaffected and keep the default note.
+   */
+  readonly footerHtml?: string;
+  /** BCP-47 document language; defaults to "en" (existing behavior). */
+  readonly lang?: string;
 }
 
 /**
@@ -48,10 +57,15 @@ export function renderEmailLayout({
   bodyHtml,
   ctaLabel,
   ctaUrl,
+  footerHtml,
+  lang,
 }: EmailLayoutOptions): string {
   const company = escapeHtml(COMPANY_NAME);
+  const footer =
+    footerHtml ??
+    `You're receiving this because you have an ${company} account. Manage email preferences in your account settings.`;
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeHtml(lang ?? "en")}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -68,7 +82,7 @@ export function renderEmailLayout({
           <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;background-color:${BRAND.ink};color:${BRAND.white};text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:16px;">${escapeHtml(ctaLabel)}</a>
         </div>
         <div style="padding:20px 28px;border-top:1px solid ${BRAND.line};">
-          <p style="margin:0;font-size:12px;line-height:1.4;color:${BRAND.inkSoft};">You're receiving this because you have an ${company} account. Manage email preferences in your account settings.</p>
+          <p style="margin:0;font-size:12px;line-height:1.4;color:${BRAND.inkSoft};">${footer}</p>
           <p style="margin:8px 0 0;font-size:12px;line-height:1.4;color:${BRAND.inkSoft};">\u00A9 ${company}</p>
         </div>
       </div>

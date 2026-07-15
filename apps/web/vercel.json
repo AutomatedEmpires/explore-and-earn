@@ -12,6 +12,14 @@
     {
       "path": "/api/cron/saved-search-alerts",
       "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/cron/notification-dispatch",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/notification-digests",
+      "schedule": "0 * * * *"
     }
   ]
 }

@@ -57,6 +57,8 @@ export interface Message {
 export interface SendMessageResult {
   readonly ok: boolean;
   readonly error?: string;
+  /** Which side the SENDER is on (server-derived, never client input). */
+  readonly senderRole?: ConversationRole;
 }
 
 const MAX_BODY_LENGTH = 4000;
@@ -277,7 +279,7 @@ export async function sendMessage(
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", conversationId);
 
-    return { ok: true };
+    return { ok: true, senderRole: owned.role };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "unknown" };
   }
