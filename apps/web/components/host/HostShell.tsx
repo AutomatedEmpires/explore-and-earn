@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import { ScopeShellNav, SCOPE_RAIL_WIDTH, type ScopeNavItem } from "../shell";
+import { OnboardingWalkthrough, HOST_TOUR_STEPS } from "../onboarding";
 import styles from "./HostShell.module.css";
 
 /**
@@ -138,6 +139,16 @@ export function HostShell({ companyName, photoUrl, unread = 0, children }: HostS
         </header>
         <div className={styles.content}>{children}</div>
       </div>
+
+      {/* Host onboarding tour — prominent (auto-starts on first visit). */}
+      <OnboardingWalkthrough
+        storageKey="ee.onboarding.host.v1"
+        eyebrow="Host tour"
+        title="Welcome — here’s the lay of the land"
+        steps={HOST_TOUR_STEPS}
+        autoStart
+        launcherLabel="Host tour"
+      />
     </div>
   );
 }

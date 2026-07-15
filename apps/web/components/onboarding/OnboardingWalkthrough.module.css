@@ -1,0 +1,380 @@
+/*
+ * OnboardingWalkthrough — Glacier-tokened tour card + launcher pill.
+ * Theme-aware by construction: every colour references a SEMANTIC token, which
+ * tokens.css re-values under :root[data-theme="dark"] / prefers-color-scheme,
+ * so light + night both render correctly with no per-theme overrides here.
+ */
+
+/* ─── Launcher pill ──────────────────────────────────────────────────────── */
+.launcher {
+	position: fixed;
+	inset-inline-end: var(--space-16);
+	/* Sit clear of the founder-locked seeker mobile dock; hosts have no dock but
+	   the offset is harmless. Desktop tightens once the dock is gone. */
+	inset-block-end: calc(var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px));
+	z-index: var(--z-banner);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	min-height: var(--tap-min);
+	padding: var(--space-10) var(--space-16);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	box-shadow: var(--elevation-card);
+	cursor: pointer;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-base) var(--ease-standard),
+		background var(--motion-base) var(--ease-standard);
+}
+
+.launcher:hover {
+	background: color-mix(in srgb, var(--color-cta) 8%, var(--color-surface-raised));
+	box-shadow: var(--elevation-hover);
+}
+
+.launcher:active {
+	transform: scale(0.97);
+}
+
+.launcher:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+.launcher > :global(svg) {
+	color: var(--color-cta);
+}
+
+@media (min-width: 1024px) {
+	.launcher {
+		inset-block-end: calc(var(--space-24) + env(safe-area-inset-bottom, 0px));
+	}
+}
+
+/* ─── Scrim + card ───────────────────────────────────────────────────────── */
+.scrim {
+	position: fixed;
+	inset: 0;
+	z-index: var(--z-overlay);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: var(--space-20);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--color-ink) 60%, transparent),
+		color-mix(in srgb, var(--color-ink) 50%, transparent)
+	);
+	backdrop-filter: blur(8px);
+	animation: scrimIn var(--motion-base) var(--ease-standard) both;
+}
+
+.card {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+	width: min(94vw, 30rem);
+	max-height: min(88vh, 42rem);
+	overflow-y: auto;
+	padding: var(--space-24);
+	background: var(--color-surface);
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-modal);
+	box-shadow: var(--elevation-overlay);
+	animation: cardIn var(--motion-drawer) var(--ease-standard) both;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+.header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-12);
+}
+
+.headText {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.eyebrow {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--color-cta);
+}
+
+.title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
+	color: var(--text-primary);
+}
+
+.close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 40px;
+	height: 40px;
+	padding: 0;
+	border: 1px solid color-mix(in srgb, var(--border-ink) 72%, transparent);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		background var(--motion-base) var(--ease-standard);
+}
+
+.close:hover {
+	background: color-mix(in srgb, var(--color-cta) 8%, var(--color-surface-raised));
+}
+
+.close:active {
+	transform: scale(0.94);
+}
+
+.close:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* ─── Step body ──────────────────────────────────────────────────────────── */
+.stepBody {
+	display: flex;
+	gap: var(--space-16);
+	align-items: flex-start;
+}
+
+.medallion {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 52px;
+	height: 52px;
+	border-radius: var(--radius-cell);
+	background: var(--gradient-action);
+	color: var(--color-cta-text);
+	box-shadow: var(--elevation-card);
+}
+
+.stepCount {
+	margin: 0 0 var(--space-4);
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.stepTitle {
+	margin: 0 0 var(--space-6);
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	color: var(--text-primary);
+}
+
+.stepText {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.stepLink {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-4);
+	margin-top: var(--space-10);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta);
+	text-decoration: none;
+}
+
+.stepLink:hover {
+	text-decoration: underline;
+}
+
+.stepLink:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+	border-radius: var(--radius-input);
+}
+
+/* ─── Progress dots ──────────────────────────────────────────────────────── */
+.dots {
+	display: flex;
+	gap: var(--space-8);
+	align-items: center;
+}
+
+.dot {
+	width: 9px;
+	height: 9px;
+	padding: 0;
+	border: none;
+	border-radius: var(--radius-pill);
+	background: var(--border-soft);
+	cursor: pointer;
+	transition:
+		background var(--motion-base) var(--ease-standard),
+		width var(--motion-base) var(--ease-standard);
+}
+
+.dot[data-done="true"] {
+	background: color-mix(in srgb, var(--color-cta) 55%, var(--border-soft));
+}
+
+.dot[data-active="true"] {
+	width: 24px;
+	background: var(--color-cta);
+}
+
+.dot:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+.footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-12);
+	flex-wrap: wrap;
+}
+
+.dontShow {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+.dontShow input {
+	width: 16px;
+	height: 16px;
+	accent-color: var(--color-cta);
+	cursor: pointer;
+}
+
+.actions {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	margin-inline-start: auto;
+}
+
+.btn {
+	min-height: var(--tap-min);
+	padding: var(--space-10) var(--space-16);
+	border-radius: var(--radius-button);
+	font-family: var(--font-ui);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+	border: 1px solid transparent;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		background var(--motion-base) var(--ease-standard),
+		box-shadow var(--motion-base) var(--ease-standard);
+}
+
+.btn:active {
+	transform: scale(0.97);
+}
+
+.btn:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+.primary {
+	background: var(--gradient-action);
+	color: var(--color-cta-text);
+	box-shadow: var(--elevation-card);
+}
+
+.primary:hover {
+	background: var(--gradient-action-hover);
+	box-shadow: var(--elevation-hover);
+}
+
+.secondary {
+	background: var(--color-surface-raised);
+	border-color: var(--border-soft);
+	color: var(--text-primary);
+}
+
+.secondary:hover {
+	background: color-mix(in srgb, var(--color-cta) 8%, var(--color-surface-raised));
+}
+
+.ghost {
+	background: transparent;
+	color: var(--text-secondary);
+}
+
+.ghost:hover {
+	background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+	color: var(--text-primary);
+}
+
+/* ─── Motion ─────────────────────────────────────────────────────────────── */
+@keyframes scrimIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes cardIn {
+	from {
+		opacity: 0;
+		transform: scale(0.96) translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.scrim,
+	.card,
+	.launcher {
+		animation: scrimIn var(--motion-fast) var(--ease-standard) both;
+	}
+
+	.launcher,
+	.btn,
+	.close,
+	.dot {
+		transition: none;
+	}
+}

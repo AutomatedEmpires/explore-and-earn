@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { ScopeShellNav, type ScopeNavItem } from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
+import { OnboardingWalkthrough, SEEKER_TOUR_STEPS } from "../onboarding";
 
 /**
  * Seeker OS shell.
@@ -174,6 +175,15 @@ export function SeekerShell({
           );
         })}
       </nav>
+
+      {/* Seeker onboarding tour — subtle (launcher only, no auto-start). */}
+      <OnboardingWalkthrough
+        storageKey="ee.onboarding.seeker.v1"
+        eyebrow="Quick tour"
+        title="Find your way around"
+        steps={SEEKER_TOUR_STEPS}
+        launcherLabel="Take a quick tour"
+      />
     </div>
   );
 }
