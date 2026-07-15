@@ -46,6 +46,7 @@ const SECTIONS: readonly SectionDef[] = [
   { href: "/swipe", label: "Swipe", icon: "nav.swipe", hideInDrawer: true },
   { href: "/map", label: "Map", icon: "nav.map", hideInDrawer: true },
   { href: "/assistant", label: "Assistant", icon: "action.message" },
+  { href: "/resume", label: "Résumé", icon: "profile.resume" },
   { href: "/saved", label: "Saved", icon: "nav.saved" },
   { href: "/applied", label: "Applications", icon: "action.apply" },
   { href: "/invites", label: "Invites", icon: "status.match" },

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getSeekerResume } from "@explore-and-earn/db";
 
+import { devFallback } from "../../../../lib/devBench/fallback";
 import { EmptyState } from "../../../../components/discovery";
 import {
 	BucketPage,
@@ -41,7 +42,12 @@ export default async function ResumePage() {
 		return <SignedOutResume />;
 	}
 
-	const resume = await getSeekerResume(token, userId);
+	const resume = await devFallback(getSeekerResume(token, userId), {
+		profile: null,
+		experiences: [],
+		educations: [],
+		certifications: [],
+	});
 	const completion = computeResumeCompletion(resume);
 
 	return (

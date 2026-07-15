@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 
 import { getSeekerApplicationsWithListings } from "@explore-and-earn/db";
 
+import { devFallback } from "../../../../lib/devBench/fallback";
+
 import {
   BucketPage,
   LifecycleList,
@@ -32,9 +34,10 @@ export default async function OfferedPage() {
     );
   }
 
-  const offers = await getSeekerApplicationsWithListings(token, userId, [
-    "offered",
-  ]);
+  const offers = await devFallback(
+    getSeekerApplicationsWithListings(token, userId, ["offered"]),
+    [],
+  );
   const items = offers.flatMap((offer) =>
     offer.listing
       ? [

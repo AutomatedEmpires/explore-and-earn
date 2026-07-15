@@ -14,6 +14,7 @@ import {
   type BadgeProps,
 } from "@explore-and-earn/ui";
 
+import { devFallback } from "../../../../lib/devBench/fallback";
 import { BucketPage } from "../../../../components/seeker";
 import { CATEGORY_ICON, EmptyState } from "../../../../components/discovery";
 import { WithdrawButton } from "./WithdrawButton";
@@ -245,7 +246,10 @@ export default async function AppliedPage() {
     );
   }
 
-  const applications = await getSeekerApplicationsRich(token, userId);
+  const applications = await devFallback(
+    getSeekerApplicationsRich(token, userId),
+    [] as RichSeekerApplication[],
+  );
   const active = applications.filter((a) => ACTIVE_STATUSES.has(a.status));
   const closed = applications.filter((a) => !ACTIVE_STATUSES.has(a.status));
 

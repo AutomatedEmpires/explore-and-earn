@@ -8,6 +8,7 @@ import {
 	rowToDiscoveryFields,
 } from "@explore-and-earn/db";
 
+import { devFallback } from "../../../../lib/devBench/fallback";
 import { EmptyState } from "../../../../components/discovery";
 import {
 	BucketPage,
@@ -66,7 +67,10 @@ export default async function MessagesPage() {
 		);
 	}
 
-	const conversations = await getConversations(token, userId, "seeker");
+	const conversations = await devFallback(
+		getConversations(token, userId, "seeker"),
+		[],
+	);
 
 	if (conversations.length === 0) {
 		return (

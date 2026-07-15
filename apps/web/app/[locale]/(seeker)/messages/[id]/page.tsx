@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getMessages } from "@explore-and-earn/db";
 
+import { devFallback } from "../../../../../lib/devBench/fallback";
+
 import { markMessagesReadAction } from "../../../../actions/messages";
 import { EmptyState } from "../../../../../components/discovery";
 import { BucketPage } from "../../../../../components/seeker";
@@ -49,8 +51,8 @@ export default async function SeekerMessageThreadPage({
 
 	// Fetch messages + mark-read in parallel; mark-read failure never blocks render.
 	const [messages] = await Promise.all([
-		getMessages(token, userId, id),
-		markMessagesReadAction(id),
+		devFallback(getMessages(token, userId, id), []),
+		markMessagesReadAction(id).catch(() => undefined),
 	]);
 
 	return (

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 import { getSeekerProfile } from "@explore-and-earn/db";
 
+import { devFallback } from "../../../../lib/devBench/fallback";
+
 import { AssistantChat } from "../../../../components/assistant/AssistantChat";
 import styles from "../../../../components/assistant/assistant.module.css";
 import { optionalAuth } from "../../../../lib/optionalAuth";
@@ -35,7 +37,9 @@ export default async function AssistantPage({
   const { userId } = await optionalAuth();
   if (configured && userId) {
     const token = await getSupabaseToken();
-    const profile = token ? await getSeekerProfile(token, userId) : null;
+    const profile = token
+      ? await devFallback(getSeekerProfile(token, userId), null)
+      : null;
     if (profile) {
       initialMessages = await readSeekerThreadMessages(profile.id);
     }

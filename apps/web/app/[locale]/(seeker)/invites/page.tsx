@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getSeekerInvites } from "@explore-and-earn/db";
 
+import { devFallback } from "../../../../lib/devBench/fallback";
+
 import {
   BucketPage,
   InviteActions,
@@ -33,7 +35,7 @@ export default async function InvitesPage() {
     );
   }
 
-  const invites = await getSeekerInvites(token, userId);
+  const invites = await devFallback(getSeekerInvites(token, userId), []);
 
   // Drop invites whose listing could not be resolved (e.g. deleted listing).
   const items = invites.flatMap((entry) =>
