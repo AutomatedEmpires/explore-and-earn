@@ -14,6 +14,7 @@
 // HONESTY: absent facts are null/omitted, never placeholder values.
 
 import type { GeoPoint, GeoPrecision } from "./geo"
+import type { BenefitEvidenceMap, ListingProvenance } from "./provenance"
 
 export const PUBLIC_API_VERSION = "v1"
 
@@ -69,6 +70,28 @@ export interface PublicListingSummaryV1 {
 	readonly organizationName: string | null
 	/** Whether visa support is offered. */
 	readonly visaSupport: boolean
+	/**
+	 * Where this listing's authority comes from (additive, v1-compatible):
+	 * 'verified' = host-confirmed through the platform; 'sourced' = a real,
+	 * attributable public posting Explore & Earn has NOT confirmed. Agents must
+	 * never present a sourced listing as verified by Explore & Earn.
+	 */
+	readonly provenance: ListingProvenance
+	/** Attribution — present iff provenance === 'sourced'. */
+	readonly source: {
+		readonly name: string
+		readonly url: string | null
+		readonly postingId: string | null
+		readonly publishedAt: string | null
+		readonly retrievedAt: string | null
+		readonly employerName: string | null
+	} | null
+	/**
+	 * Per-benefit evidence: 'not_stated' means the source did not state it —
+	 * there is NO value and agents must say "not stated", never infer a yes/no.
+	 * 'stated' = source-stated; 'confirmed' = employer-confirmed.
+	 */
+	readonly benefitEvidence: BenefitEvidenceMap
 }
 
 export interface PublicListingDetailV1 extends PublicListingSummaryV1 {

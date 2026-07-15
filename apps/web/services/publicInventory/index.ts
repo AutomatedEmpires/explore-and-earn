@@ -9,6 +9,7 @@ import {
 	type SearchFilters,
 } from "@explore-and-earn/db";
 import {
+	HOST_CONFIRMED_EVIDENCE,
 	MARKETPLACE_CATEGORIES,
 	PUBLIC_API_DEFAULT_PAGE_SIZE,
 	PUBLIC_API_MAX_PAGE_SIZE,
@@ -214,6 +215,7 @@ function locationOf(args: {
 }
 
 function rowToSummaryV1(row: ListingRow): PublicListingSummaryV1 {
+	const isSourced = row.provenance === "sourced";
 	return {
 		id: row.id,
 		url: `${BASE_URL}/listing/${row.id}`,
@@ -246,9 +248,32 @@ function rowToSummaryV1(row: ListingRow): PublicListingSummaryV1 {
 		endsAt: row.ends_at,
 		publishedAt: row.published_at,
 		coverPhotoUrl: row.cover_photo_url,
-		organizationId: row.host_profile_id,
-		organizationName: row.host_profiles?.company_name ?? null,
+		// Sourced listings have no platform organization: the employer is a
+		// display-only, source-stated name (never an /organizations/{id} target).
+		organizationId: isSourced ? null : row.host_profile_id,
+		organizationName: isSourced
+			? row.source_employer_name ?? null
+			: row.host_profiles?.company_name ?? null,
 		visaSupport: row.visa_support === true,
+		provenance: isSourced ? "sourced" : "verified",
+		source:
+			isSourced && row.source_name
+				? {
+						name: row.source_name,
+						url: row.source_url,
+						postingId: row.source_external_id,
+						publishedAt: row.source_published_at,
+						retrievedAt: row.source_last_seen_at,
+						employerName: row.source_employer_name,
+					}
+				: null,
+		benefitEvidence: isSourced
+			? {
+					housing: row.housing_evidence,
+					meals: row.meals_evidence,
+					pay: row.pay_evidence,
+				}
+			: HOST_CONFIRMED_EVIDENCE,
 	};
 }
 

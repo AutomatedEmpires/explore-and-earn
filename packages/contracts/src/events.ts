@@ -206,6 +206,29 @@ export const DEMO_EVENTS = [
   "demo_signup_started",
 ] as const
 
+// Sourced-inventory lifecycle (provenance lane, founder charter 2026-07-14).
+// Seeded into event_types by migration 064. Import/pipeline events are
+// operational (is_product_event=false in the seed); viewed/matched/clicked/
+// claim events are product events.
+export const SOURCING_EVENTS = [
+  "source_import_started",
+  "source_import_completed",
+  "source_import_failed",
+  "source_record_rejected",
+  "source_record_quarantined",
+  "source_compliance_review_required",
+  "sourced_listing_inserted",
+  "sourced_listing_updated",
+  "sourced_listing_removed",
+  "sourced_listing_viewed",
+  "sourced_listing_matched",
+  "sourced_listing_source_clicked",
+  "listing_claim_initiated",
+  "listing_claim_approved",
+  "listing_claim_rejected",
+  "listing_claim_converted",
+] as const
+
 // Internal/build-governance only — never user-facing product instrumentation.
 export const AGENT_GOVERNANCE_EVENTS = [
   "source_registry_conflict_found",
@@ -233,6 +256,7 @@ export const EVENT_TYPES = [
   ...COMMUNITY_EVENTS,
   ...NOTIFICATION_EVENTS,
   ...DEMO_EVENTS,
+  ...SOURCING_EVENTS,
   ...AGENT_GOVERNANCE_EVENTS,
 ] as const
 export type EventType = (typeof EVENT_TYPES)[number]
