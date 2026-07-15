@@ -84,13 +84,26 @@ describe("renderMessage", () => {
 		expect(result).toBe("Open notifications");
 	});
 
-	it("falls back to the raw key when missing and no fallback is given", async () => {
+	// Note: next-intl's own MISSING_MESSAGE handling resolves a missing key to
+	// the key string itself (logged, not thrown) whenever the target catalog
+	// loads successfully, so translate() never observes a `null` here for a
+	// simple missing key — the `fallback` parameter's own branch only fires
+	// when the catalog itself fails to load, which isn't reproducible against
+	// the real "en" catalog without mocking module loading (out of scope here
+	// per the real-routing requirement). The observable behavior below (raw
+	// key surfaces, never throws) is what's actually pinned.
+	it("falls back to the raw key when missing and no fallback is provided", async () => {
 		const result = await renderMessage("en", "Notifications.does.not.exist", {});
 		expect(result).toBe("Notifications.does.not.exist");
 	});
 
-	it("falls back to the provided fallback string when missing", async () => {
-		const result = await renderMessage("en", "Notifications.does.not.exist", {}, "Default copy");
+	it("uses the provided fallback for a missing key (catalog-presence check, not next-intl's key echo)", async () => {
+		const result = await renderMessage(
+			"en",
+			"Notifications.does.not.exist",
+			{},
+			"Default copy",
+		);
 		expect(result).toBe("Default copy");
 	});
 });

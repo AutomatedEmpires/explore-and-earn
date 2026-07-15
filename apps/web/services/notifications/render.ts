@@ -33,6 +33,16 @@ async function loadMessages(locale: string): Promise<Messages | null> {
 	}
 }
 
+/** Walk a dot-path into the nested catalog; undefined when absent. */
+function catalogEntry(messages: Messages, key: string): unknown {
+	let node: unknown = messages
+	for (const part of key.split(".")) {
+		if (typeof node !== "object" || node === null) return undefined
+		node = (node as Record<string, unknown>)[part]
+	}
+	return node
+}
+
 async function translate(
 	locale: string,
 	key: string,
@@ -40,6 +50,9 @@ async function translate(
 ): Promise<string | null> {
 	const messages = await loadMessages(locale)
 	if (!messages) return null
+	// next-intl returns the KEY for missing entries instead of throwing —
+	// check catalog presence explicitly so the fallback chain actually engages.
+	if (typeof catalogEntry(messages, key) !== "string") return null
 	try {
 		const t = createTranslator({ locale, messages: messages as never })
 		return t(key as never, values as never)
