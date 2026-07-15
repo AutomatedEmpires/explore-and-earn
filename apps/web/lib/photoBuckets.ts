@@ -131,6 +131,17 @@ const todo = (id: string, label: string): BucketEntry => ({
 	publicId: null,
 });
 
+/**
+ * A REAL, uploaded bucket photo whose public ID lives under `ee/buckets/…`
+ * (seeded via scripts/seed-photo-buckets.mjs → Cloudinary). Distinct from
+ * `seed()`, which points back at the older curated library.
+ */
+const real = (id: string, label: string, publicId: string): BucketEntry => ({
+	id,
+	label,
+	publicId,
+});
+
 const flat = (entries: readonly BucketEntry[]): readonly BucketSection[] => [
 	{ key: "default", label: "All", folderKey: null, entries },
 ];
@@ -138,10 +149,13 @@ const flat = (entries: readonly BucketEntry[]): readonly BucketSection[] => [
 // ── The NINE buckets ──────────────────────────────────────────────────────────
 
 /**
- * NOTE ON SEEDING: only real IDs that already exist in curatedPhotos.ts are
- * seeded. farm/maritime/remote/seasonal landscapes exist; housing, meals,
- * seeker icons, and admin imagery do NOT yet — those stay `todo()` slots until
- * the founder uploads into the documented ee/buckets/… folders.
+ * NOTE ON SEEDING: cover buckets reference the older curated library via
+ * `seed()`. Housing + meals now carry a first batch of REAL uploads under
+ * `ee/buckets/…` (via `real()`, from scripts/seed-photo-buckets.mjs — Unsplash,
+ * people-safe: zero detected faces, delivery-verified through t_ee-*). A few
+ * thin sections keep a `todo()` slot for expansion. Seeker icons + admin imagery
+ * stay `todo()` (identity buckets are intentionally NOT photo-seeded — no model
+ * release; they use the abstract monogram/gradient fallback).
  */
 export const PHOTO_BUCKETS: Record<BucketId, PhotoBucket> = {
 	// 1 ── Homepage hero — rotates per landing (see design rules). Landscape mix.
@@ -240,25 +254,36 @@ export const PHOTO_BUCKETS: Record<BucketId, PhotoBucket> = {
 				key: "meals",
 				label: "Prepared meals",
 				folderKey: "meals",
-				entries: [todo("meal-meals-1", "To populate"), todo("meal-meals-2", "To populate")],
+				entries: [
+					real("meal-meals-ella-olsson", "Prepared meal", "ee/buckets/meals/meals/ella-olsson-ZjEeMnDiq00"),
+					todo("meal-meals-2", "To populate"),
+				],
 			},
 			{
 				key: "kitchens",
 				label: "Kitchens",
 				folderKey: "kitchens",
-				entries: [todo("meal-kit-1", "To populate"), todo("meal-kit-2", "To populate")],
+				entries: [
+					real("meal-kit-zhang-ziyu", "Kitchen", "ee/buckets/meals/kitchens/zhang-ziyu-2VX0f47Z5NA"),
+					real("meal-kit-luk-parnican", "Farmhouse kitchen", "ee/buckets/meals/kitchens/luk-parni-an-HZgSvndfakc"),
+				],
 			},
 			{
 				key: "dining",
 				label: "Dining",
 				folderKey: "dining",
-				entries: [todo("meal-din-1", "To populate"), todo("meal-din-2", "To populate")],
+				entries: [
+					real("meal-din-bruno-ngarukiye", "Dining table", "ee/buckets/meals/dining/bruno-ngarukiye-OqFZPMeufYQ"),
+					todo("meal-din-2", "To populate"),
+				],
 			},
 			{
 				key: "misc",
 				label: "Misc",
 				folderKey: "misc",
-				entries: [todo("meal-misc-1", "To populate")],
+				entries: [
+					real("meal-misc-vije", "Fresh produce", "ee/buckets/meals/misc/vije-vijendranath-26LFdL8exMo"),
+				],
 			},
 		],
 	},
@@ -275,19 +300,28 @@ export const PHOTO_BUCKETS: Record<BucketId, PhotoBucket> = {
 				key: "bedrooms",
 				label: "Bedrooms",
 				folderKey: "bedrooms",
-				entries: [todo("house-bed-1", "To populate"), todo("house-bed-2", "To populate")],
+				entries: [
+					real("house-bed-marcus-loke", "Bunk room", "ee/buckets/housing/bedrooms/marcus-loke-WQJvWU_HZFo"),
+					real("house-bed-zoshua-colah", "Simple bedroom", "ee/buckets/housing/bedrooms/zoshua-colah-TzMGehZmocI"),
+				],
 			},
 			{
 				key: "bathrooms",
 				label: "Bathrooms",
 				folderKey: "bathrooms",
-				entries: [todo("house-bath-1", "To populate"), todo("house-bath-2", "To populate")],
+				entries: [
+					real("house-bath-carlos-masias", "Shared bathroom", "ee/buckets/housing/bathrooms/carlos-masias-yg8zkwBS30Q"),
+					real("house-bath-steven-ungermann", "Washroom", "ee/buckets/housing/bathrooms/steven-ungermann-Aac7IlKnYX8"),
+				],
 			},
 			{
 				key: "exteriors",
 				label: "Exteriors",
 				folderKey: "exteriors",
-				entries: [todo("house-ext-1", "To populate"), todo("house-ext-2", "To populate")],
+				entries: [
+					real("house-ext-troy-mortier", "Lodge exterior", "ee/buckets/housing/exteriors/troy-mortier-AmGQi4pF_lE"),
+					real("house-ext-dmytro-koplyk", "Housing exterior", "ee/buckets/housing/exteriors/dmytro-koplyk-8xAu_SSpMPQ"),
+				],
 			},
 			{
 				key: "misc",

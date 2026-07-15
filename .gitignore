@@ -22,3 +22,7 @@ supabase/.temp/
 supabase/.branches/
 test-results/
 playwright-report/
+
+# Photo-bucket seeder run artifacts (regenerated per run)
+scripts/photo-buckets.manifest.json
+scripts/photo-buckets.seed-fragment.ts

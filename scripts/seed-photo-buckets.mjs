@@ -333,9 +333,23 @@ async function seedSection(bucket, orientation, perSection, section) {
         `|photographer_url=${photo.photographerUrl}|unsplash_url=${photo.unsplashUrl}`;
       const tags = ["bucket", bucket, section.key, "unsplash"];
 
+      // Full record — carries everything an out-of-band uploader (the Cloudinary
+      // MCP path) needs, plus attribution. In --dry-run/collect we write these
+      // without uploading; the real (raw-cred) path uploads then keeps the record.
+      const entry = {
+        id: photo.slug,
+        label,
+        publicId,
+        srcUrl: photo.srcUrl,
+        context,
+        tags,
+        downloadLocation: photo.downloadLocation,
+        attribution: attributionOf(photo),
+      };
+
       if (DRY_RUN) {
         process.stdout.write(`   ·  [dry] ${publicId}  ← ${photo.photographer}\n`);
-        entries.push({ id: photo.slug, label, publicId, attribution: attributionOf(photo) });
+        entries.push(entry);
         continue;
       }
 
@@ -344,7 +358,7 @@ async function seedSection(bucket, orientation, perSection, section) {
         await triggerDownload(photo.downloadLocation);
         uploaded++;
         process.stdout.write(`   ✓  ${publicId}  ← ${photo.photographer}\n`);
-        entries.push({ id: photo.slug, label, publicId, attribution: attributionOf(photo) });
+        entries.push(entry);
       } catch (e) {
         failed++;
         manifest.errors.push({ bucket, publicId, error: e.message });
