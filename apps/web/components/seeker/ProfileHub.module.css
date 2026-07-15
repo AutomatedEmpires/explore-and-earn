@@ -426,7 +426,7 @@
   font-family: var(--font-ui);
   font-size: var(--type-caption-size);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -520,7 +520,7 @@
   font-family: var(--font-ui);
   font-size: var(--type-caption-size);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
+  letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
   color: color-mix(in srgb, var(--color-cta-text) 82%, transparent);
 }
@@ -694,12 +694,14 @@
 
 .tuckedGrid > li { min-width: 0; }
 
+/* 6 tiles (Settings lives in the shell nav) — column counts all divide 6 so the
+   grid is always even: 2×3 (mobile) · 3×2 (tablet) · 6×1 (desktop). */
 @media (min-width: 768px) {
-  .tuckedGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .tuckedGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (min-width: 1280px) {
-  .tuckedGrid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .tuckedGrid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
 .tuckedTile {

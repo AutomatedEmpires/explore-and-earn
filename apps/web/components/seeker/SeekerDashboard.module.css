@@ -99,10 +99,10 @@
   padding: var(--space-12) var(--space-16);
   background: linear-gradient(
     to right,
-    var(--palette-amber-light),
-    color-mix(in srgb, var(--palette-amber-light) 45%, var(--color-surface-raised))
+    var(--state-soon-bg),
+    color-mix(in srgb, var(--state-soon-bg) 45%, var(--color-surface-raised))
   );
-  border-bottom: 1px solid color-mix(in srgb, var(--palette-amber) 55%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--state-soon-fg) 40%, transparent);
   text-decoration: none;
   transition: background var(--motion-fast) var(--ease-standard);
 }
@@ -110,8 +110,8 @@
 .resumeCallout:hover {
   background: linear-gradient(
     to right,
-    color-mix(in srgb, var(--palette-amber) 35%, var(--palette-amber-light)),
-    var(--palette-amber-light)
+    color-mix(in srgb, var(--state-soon-fg) 22%, var(--state-soon-bg)),
+    var(--state-soon-bg)
   );
 }
 
@@ -171,8 +171,9 @@
 
 .pipelineHeading {
   font-family: var(--font-display);
-  font-size: clamp(16px, 4.5vw, 20px);
-  font-weight: 700;
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  font-weight: var(--font-weight-regular);
   color: var(--text-primary);
   margin: 0;
 }

@@ -24,6 +24,11 @@
   --seekeros-line:     var(--border-soft);
   --seekeros-panel:    var(--color-surface);
   --seekeros-control:  46px;
+  /* Vertical-center the shared fixed hamburger (<1024px). .seekeros-top renders
+     72px content + 12px x2 padding + 1px border = 97px (content-box), so the
+     shared top:12px button read ~14px high. Center = pad-top + (headerH - button)/2.
+     Inherits to the ScopeShellNav <button> via the .seeker-os wrapper. */
+  --scope-nav-top: calc(var(--space-12) + (72px - 44px) / 2);
 
   color: var(--text-primary);
   background:
@@ -211,7 +216,7 @@
      field never sits beneath it. */
   .seekeros-top {
     padding: 12px 14px;
-    padding-inline-start: calc(44px + var(--space-16) + env(safe-area-inset-left, 0px));
+    padding-inline-start: calc(44px + var(--space-12) + max(var(--space-12), env(safe-area-inset-left)));
   }
 
   /* Pinned full-bleed dock — flat to the bottom edge, edge-to-edge, no float. */

@@ -235,7 +235,7 @@ a.userRow:focus-visible {
 /* ─── Mobile hamburger (<1024px) ─────────────────────────────────────────── */
 .hamburger {
 	position: fixed;
-	inset-block-start: max(var(--space-12), env(safe-area-inset-top));
+	inset-block-start: max(var(--scope-nav-top, var(--space-12)), env(safe-area-inset-top));
 	inset-inline-start: max(var(--space-12), env(safe-area-inset-left));
 	z-index: var(--z-banner);
 	display: inline-flex;

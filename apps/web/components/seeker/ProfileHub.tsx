@@ -94,7 +94,6 @@ function buildTuckedNav(status: SeekerStatusSummary): readonly NavItem[] {
     },
     { href: "/journey", label: "Journey", icon: "mappin.cluster" },
     { href: "/community", label: "Community", icon: "nav.feed" },
-    { href: "/settings", label: "Settings", icon: "nav.settings" },
   ];
 }
 

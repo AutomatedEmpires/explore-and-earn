@@ -42,6 +42,23 @@ body {
   overflow-x: clip;
 }
 
+/* Reserve a stable gutter for the viewport's vertical scrollbar so the classic,
+   space-consuming scrollbar (Windows/Linux, or a narrow desktop window emulating
+   mobile) lives in its OWN reserved column instead of being painted over page
+   content. Without this the full-bleed, position:fixed seeker bottom dock
+   (.seekeros-mnav — left:0/right:0/width:100%) is sized to the viewport's right
+   edge and the vertical scrollbar overlaps its right-most tab (Profile).
+   Reserving the gutter shrinks the fixed dock's containing block to the
+   scrollbar-excluded width, so the dock ends flush against the gutter and the
+   scrollbar can never sit over the Profile tab. `stable` (not `stable
+   both-edges`) reserves only the inline-end edge and is always-on, so dock and
+   content stay aligned and nothing jumps when the scrollbar toggles. Set on the
+   root element so it applies to the viewport scroller (overflow-y stays visible
+   above, so the viewport is the scroll container). */
+html {
+  scrollbar-gutter: stable;
+}
+
 .ui-button:focus-visible,
 .ui-chip:focus-visible {
   outline: none;
