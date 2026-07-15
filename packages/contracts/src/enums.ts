@@ -538,6 +538,9 @@ export const NOTIFICATION_CATEGORY = [
   "applications",
   "offers",
   "invites",
+  // Added by the engagement engine (migration 065 widens the DB CHECK).
+  "matches",
+  "messages",
   "billing",
   "safety",
   "community",
