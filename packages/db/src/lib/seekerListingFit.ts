@@ -94,9 +94,13 @@ export function toListingRowMatchInput(row: ListingRow): MatchListingInput {
     category: row.category,
     housingIncluded: row.housing_included,
     mealsIncluded: row.meals_included,
-    // Sourced rows carry evidence directly on the row (provenance columns).
-    housingEvidence: row.provenance === "sourced" ? row.housing_evidence : undefined,
-    mealsEvidence: row.provenance === "sourced" ? row.meals_evidence : undefined,
+    // Evidence rides the row for EVERY provenance: verified-native rows are
+    // 'confirmed' (a no-op for the engine), sourced rows carry stated/
+    // not_stated, and a CONVERTED listing whose employer never addressed a
+    // benefit legitimately keeps 'not_stated' — gating on provenance here
+    // would silently turn that unknown back into a hard "not included".
+    housingEvidence: row.housing_evidence,
+    mealsEvidence: row.meals_evidence,
     compensationMinCents: row.compensation_min_cents,
     compensationMaxCents: row.compensation_max_cents,
     locationDisplay: row.location_display,

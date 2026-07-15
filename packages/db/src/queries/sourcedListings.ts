@@ -9,6 +9,7 @@ import {
   parseJsonRecords,
   payloadFingerprint,
   planImport,
+  recordNeedsReview,
   validateSourceConfig,
   type ImportPlan,
   type InventoryIndex,
@@ -211,7 +212,7 @@ const refusal = (error: string): ImportReport => ({
 });
 
 /** Map a planned record's stated facts onto listings columns — honestly. */
-function plannedToListingColumns(
+export function plannedToListingColumns(
   entry: PlannedRecord,
   source: ListingSourceRecord,
   nowIso: string,
@@ -224,11 +225,12 @@ function plannedToListingColumns(
     // writing a guessed category.
     throw new Error("plannedToListingColumns: record has no honest category");
   }
+  // FACT + FRESHNESS columns only — safe for both insert and update. Identity
+  // and ownership columns (provenance / host_profile_id / claim_summary) are
+  // added ONLY on insert (see insertColumns): a re-import must never reset an
+  // in-flight claim's state or touch ownership on an existing row.
   return {
-    provenance: "sourced",
-    status: "live",
-    host_profile_id: null,
-    claim_summary: "unclaimed",
+    status: "live", // a matched sourced row that reappears at the source revives
     source_id: source.id,
     source_name: source.name,
     source_external_id: record.externalId,
@@ -265,6 +267,20 @@ function plannedToListingColumns(
     expires_at: record.expiresAt,
     published_at: record.publishedAt ?? nowIso,
     updated_at: nowIso,
+  };
+}
+
+/** Insert-only columns: identity + ownership, never applied on update. */
+export function insertColumns(
+  entry: PlannedRecord,
+  source: ListingSourceRecord,
+  nowIso: string,
+): Record<string, unknown> {
+  return {
+    ...plannedToListingColumns(entry, source, nowIso),
+    provenance: "sourced",
+    host_profile_id: null,
+    claim_summary: "unclaimed",
   };
 }
 
@@ -330,7 +346,7 @@ export async function runSourceImport(args: {
   const index = await loadInventoryIndex(source.id);
   const plan = planImport(rawRecords, configCheck.mapping, source.id, index);
   const needsReview = plan.records.filter(
-    (entry) => entry.outcome === "quarantined" || entry.outcome === "probable_duplicate",
+    (entry) => recordNeedsReview(entry),
   ).length;
 
   if (args.dryRun) {
@@ -351,14 +367,25 @@ export async function runSourceImport(args: {
     for (const entry of plan.records) {
       let listingId: string | null = entry.matchedListingId;
 
+      let effectiveOutcome = entry.outcome;
       if (entry.outcome === "inserted") {
         const { data: inserted, error: insertError } = await client
           .from("listings")
-          .insert(plannedToListingColumns(entry, source, nowIso))
+          .insert(insertColumns(entry, source, nowIso))
           .select("id")
           .single();
-        if (insertError) throw new Error(`listing insert failed: ${insertError.message}`);
-        listingId = String((inserted as { id: string }).id);
+        if (insertError) {
+          // A concurrent import already inserted this posting (the partial
+          // unique indexes on external id / canonical URL) — record it as an
+          // exact duplicate instead of failing the whole run.
+          if (insertError.code === "23505") {
+            effectiveOutcome = "exact_duplicate";
+          } else {
+            throw new Error(`listing insert failed: ${insertError.message}`);
+          }
+        } else {
+          listingId = String((inserted as { id: string }).id);
+        }
       } else if (entry.outcome === "updated" && entry.matchedListingId) {
         const { error: updateError } = await client
           .from("listings")
@@ -385,20 +412,30 @@ export async function runSourceImport(args: {
         content_fingerprint: entry.fingerprint ?? "unparsed",
         raw: source.allowRawSnapshot ? entry.raw : null,
         normalized: entry.record ?? {},
-        outcome: entry.outcome,
+        outcome: effectiveOutcome,
         reject_reason: entry.rejectReason,
         classification: entry.classification ?? {},
-        needs_review:
-          entry.outcome === "quarantined" || entry.outcome === "probable_duplicate",
-        listing_id: entry.outcome === "inserted" ? listingId : null,
+        needs_review: recordNeedsReview(entry),
+        listing_id: effectiveOutcome === "inserted" ? listingId : null,
         matched_listing_id: entry.matchedListingId,
       });
       if (lineageError) throw new Error(`lineage insert failed: ${lineageError.message}`);
     }
 
     // ── Full-snapshot reconciliation: postings gone from the source ──────
+    // SAFETY: reconciliation only runs on a CLEAN snapshot. If any record was
+    // rejected or quarantined, its listing may be present-at-source but
+    // unmatched this run — closing it would remove a live posting. Better a
+    // possibly-stale listing (the freshness sweep bounds that) than a
+    // wrongly-removed one; the skip is recorded in the run stats.
     let removed = 0;
-    if (source.fullSnapshot) {
+    let reconcileSkipped = 0;
+    const unparsedCount =
+      (plan.stats.rejected ?? 0) + (plan.stats.quarantined ?? 0);
+    if (source.fullSnapshot && unparsedCount > 0) {
+      reconcileSkipped = unparsedCount;
+    }
+    if (source.fullSnapshot && unparsedCount === 0) {
       const { data: stale } = await client
         .from("listings")
         .select("id")
@@ -425,7 +462,13 @@ export async function runSourceImport(args: {
       }
     }
 
-    const stats = { ...plan.stats, ...(removed > 0 ? { removed } : {}) };
+    const stats = {
+      ...plan.stats,
+      ...(removed > 0 ? { removed } : {}),
+      ...(reconcileSkipped > 0
+        ? { reconcile_skipped_unclean_snapshot: reconcileSkipped }
+        : {}),
+    };
     await client
       .from("source_import_runs")
       .update({ status: "completed", stats, finished_at: new Date().toISOString() })

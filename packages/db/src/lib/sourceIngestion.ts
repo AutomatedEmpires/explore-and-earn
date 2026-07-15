@@ -566,6 +566,20 @@ export interface ImportPlan {
 }
 
 /**
+ * Whether a planned record lands in the founder review queue: everything
+ * quarantined or probably-duplicated, plus fuzzy verified-matches (a
+ * hypothesis a human must confirm — identity/content verified-matches carry
+ * no rejectReason and are conclusive, so they don't queue).
+ */
+export function recordNeedsReview(entry: PlannedRecord): boolean {
+	return (
+		entry.outcome === "quarantined" ||
+		entry.outcome === "probable_duplicate" ||
+		(entry.outcome === "verified_match" && entry.rejectReason !== null)
+	)
+}
+
+/**
  * Decide the fate of every raw record against existing inventory —
  * deterministic, reviewable, and side-effect free.
  *
@@ -667,7 +681,10 @@ export function planImport(
 			continue
 		}
 
-		// Conservative similarity: same employer+title+location.
+		// Conservative similarity: same employer+title+location. Both branches
+		// are review-flagged — a fuzzy hit is a HYPOTHESIS, and silently dropping
+		// a possibly-distinct new posting against verified inventory would hide
+		// real inventory on a guess (a founder confirms instead).
 		const fuzzyKey = fuzzyIdentityKey(record)
 		const fuzzyRefs = fuzzyKey ? index.byFuzzyKey.get(fuzzyKey) : undefined
 		if (fuzzyRefs && fuzzyRefs.length > 0) {
@@ -675,7 +692,9 @@ export function planImport(
 			planned.push({
 				raw, record, classification, fingerprint,
 				outcome: verifiedHit ? "verified_match" : "probable_duplicate",
-				rejectReason: verifiedHit ? null : "similar existing listing — review before insert",
+				rejectReason: verifiedHit
+					? "similar to an existing VERIFIED listing — review before insert"
+					: "similar existing listing — review before insert",
 				matchedListingId: (verifiedHit ?? fuzzyRefs[0]).listingId,
 			})
 			continue

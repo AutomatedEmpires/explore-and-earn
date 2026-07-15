@@ -14,7 +14,6 @@ import type {
   OpportunityListing,
 } from "@explore-and-earn/contracts";
 import {
-  HOST_CONFIRMED_EVIDENCE,
   MARKETPLACE_CATEGORIES,
   formatCompensation,
   formatOpportunityWindow,
@@ -210,14 +209,15 @@ export function rowProvenanceInfo(
         }
       : {}),
     claimStatus,
-    benefitEvidence:
-      row.provenance === "sourced"
-        ? {
-            housing: row.housing_evidence,
-            meals: row.meals_evidence,
-            pay: row.pay_evidence,
-          }
-        : HOST_CONFIRMED_EVIDENCE,
+    // ALWAYS the real columns: verified-native rows are 'confirmed' by
+    // migration default, sourced rows carry stated/not_stated, and a converted
+    // row keeps 'not_stated' for any benefit the employer never explicitly
+    // addressed — the constant would fabricate a confirmation there.
+    benefitEvidence: {
+      housing: row.housing_evidence,
+      meals: row.meals_evidence,
+      pay: row.pay_evidence,
+    },
   };
 }
 

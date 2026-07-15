@@ -226,10 +226,15 @@ alter table public.listings
       or (source_id is not null and source_name is not null)
     );
 
--- Dedup anchor: one live sourced listing per (source, external posting id).
+-- Dedup anchors: one sourced listing per (source, external posting id), and
+-- one per canonical source URL for URL-identified sources — concurrent or
+-- retried imports hit a unique violation instead of double-inserting.
 create unique index if not exists uq_listings_source_external
   on public.listings (source_id, source_external_id)
   where provenance = 'sourced' and source_external_id is not null;
+create unique index if not exists uq_listings_source_url
+  on public.listings (source_url)
+  where provenance = 'sourced' and source_url is not null;
 
 create index if not exists idx_listings_provenance
   on public.listings (provenance) where provenance = 'sourced';
@@ -259,6 +264,11 @@ create table if not exists public.listing_claims (
   authority_evidence      jsonb       not null default '{}'::jsonb,
   review_notes            text,
   reviewed_by_user_id     text,
+  -- Snapshot of every listing field convert_claimed_listing() overwrites,
+  -- captured atomically AT conversion. If the conversion is later revoked
+  -- (fraudulent claim), the listing reverts to exactly this pre-conversion
+  -- sourced state — no verified badge, host, or employer edit survives.
+  pre_conversion_snapshot jsonb,
   created_at              timestamptz not null default now(),
   updated_at              timestamptz not null default now(),
   decided_at              timestamptz
@@ -347,6 +357,49 @@ begin
          updated_at   = now()
    where id = p_claim_id;
 
+  -- REVOKING A CONVERSION: the listing must not keep the verified state a
+  -- now-revoked claim granted it. Restore the exact pre-conversion sourced
+  -- snapshot captured by convert_claimed_listing() — provenance, host
+  -- detachment, evidence, and every overwritten field come back; source
+  -- lineage columns were never touched. Falls back to a conservative
+  -- detach-and-downgrade if a legacy claim has no snapshot.
+  if v_claim.status = 'converted' and p_to_status = 'revoked' then
+    if v_claim.pre_conversion_snapshot is not null then
+      update public.listings l
+         set provenance          = coalesce(s.snap->>'provenance', 'sourced'),
+             host_profile_id     = null,
+             claim_summary       = 'unclaimed',
+             housing_evidence    = coalesce(s.snap->>'housing_evidence', 'stated'),
+             meals_evidence      = coalesce(s.snap->>'meals_evidence', 'stated'),
+             pay_evidence        = coalesce(s.snap->>'pay_evidence', 'stated'),
+             title               = coalesce(s.snap->>'title', l.title),
+             description         = s.snap->>'description',
+             location_display    = s.snap->>'location_display',
+             housing_included    = coalesce((s.snap->>'housing_included')::boolean, l.housing_included),
+             meals_included      = coalesce((s.snap->>'meals_included')::boolean, l.meals_included),
+             housing_description = s.snap->>'housing_description',
+             meals_description   = s.snap->>'meals_description',
+             compensation_min_cents = (s.snap->>'compensation_min_cents')::integer,
+             compensation_max_cents = (s.snap->>'compensation_max_cents')::integer,
+             compensation_unit      = s.snap->>'compensation_unit',
+             compensation_summary   = s.snap->>'compensation_summary',
+             begins_at              = (s.snap->>'begins_at')::timestamptz,
+             ends_at                = (s.snap->>'ends_at')::timestamptz,
+             updated_at             = now()
+        from (select v_claim.pre_conversion_snapshot as snap) s
+       where l.id = v_claim.listing_id;
+    else
+      update public.listings
+         set provenance = 'sourced',
+             host_profile_id = null,
+             claim_summary = 'unclaimed',
+             updated_at = now()
+       where id = v_claim.listing_id;
+    end if;
+
+    return jsonb_build_object('ok', true, 'from', v_claim.status, 'to', p_to_status, 'reverted', true);
+  end if;
+
   -- Keep the listing-level summary coherent (claim_pending covers every
   -- active state; rejected/revoked pre-conversion falls back to unclaimed).
   update public.listings
@@ -411,13 +464,59 @@ begin
     return jsonb_build_object('ok', false, 'error', 'listing_not_sourced');
   end if;
 
+  -- Snapshot every field this conversion overwrites, so a later revocation
+  -- can restore the exact pre-conversion sourced state (see
+  -- transition_listing_claim's converted→revoked branch).
+  update public.listing_claims
+     set pre_conversion_snapshot = jsonb_build_object(
+           'provenance',             v_listing.provenance,
+           'housing_evidence',       v_listing.housing_evidence,
+           'meals_evidence',         v_listing.meals_evidence,
+           'pay_evidence',           v_listing.pay_evidence,
+           'title',                  v_listing.title,
+           'description',            v_listing.description,
+           'location_display',       v_listing.location_display,
+           'housing_included',       v_listing.housing_included,
+           'meals_included',         v_listing.meals_included,
+           'housing_description',    v_listing.housing_description,
+           'meals_description',      v_listing.meals_description,
+           'compensation_min_cents', v_listing.compensation_min_cents,
+           'compensation_max_cents', v_listing.compensation_max_cents,
+           'compensation_unit',      v_listing.compensation_unit,
+           'compensation_summary',   v_listing.compensation_summary,
+           'begins_at',              v_listing.begins_at,
+           'ends_at',                v_listing.ends_at
+         ),
+         updated_at = now()
+   where id = p_claim_id;
+
   update public.listings
      set provenance          = 'verified',
          host_profile_id     = p_host_profile_id,
          claim_summary       = 'converted',
-         housing_evidence    = 'confirmed',
-         meals_evidence      = 'confirmed',
-         pay_evidence        = 'confirmed',
+         -- EVIDENCE HONESTY: a benefit becomes 'confirmed' only when the
+         -- employer explicitly supplied it in p_confirmed, or when the source
+         -- had STATED a value the employer reviewed and accepted as-is. A
+         -- benefit that was never stated and never explicitly confirmed stays
+         -- 'not_stated' — conversion must not fabricate "employer confirmed
+         -- this benefit is absent" out of a column default.
+         housing_evidence    = case
+           when p_confirmed ? 'housingIncluded' then 'confirmed'
+           when housing_evidence = 'not_stated' then 'not_stated'
+           else 'confirmed'
+         end,
+         meals_evidence      = case
+           when p_confirmed ? 'mealsIncluded' then 'confirmed'
+           when meals_evidence = 'not_stated' then 'not_stated'
+           else 'confirmed'
+         end,
+         pay_evidence        = case
+           when p_confirmed ? 'compensationMinCents'
+             or p_confirmed ? 'compensationMaxCents'
+             or p_confirmed ? 'compensationSummary' then 'confirmed'
+           when pay_evidence = 'not_stated' then 'not_stated'
+           else 'confirmed'
+         end,
          -- Employer-confirmed values (whitelist; absent key = accept as-is).
          title                  = coalesce(p_confirmed->>'title', title),
          description            = coalesce(p_confirmed->>'description', description),

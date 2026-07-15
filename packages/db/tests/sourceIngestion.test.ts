@@ -425,3 +425,83 @@ describe("validateSourceConfig", () => {
     expect(result.errors.join(" ")).toContain("categoryMap");
   });
 });
+
+/* --------------------------------------------------- update-column safety */
+
+describe("import column sets — updates never touch ownership/claim state", () => {
+  it("update columns exclude provenance/host/claim; insert columns include them", async () => {
+    const { plannedToListingColumns, insertColumns } = await import(
+      "../src/queries/sourcedListings"
+    );
+    const normalizedResult = normalizeRecord(baseRaw, MAPPING);
+    if (!normalizedResult.ok) throw new Error("normalize failed");
+    const entry = {
+      raw: baseRaw,
+      record: normalizedResult.record,
+      classification: classifyCategory(normalizedResult.record, MAPPING.categoryMap),
+      fingerprint: contentFingerprint(normalizedResult.record),
+      outcome: "updated" as const,
+      rejectReason: null,
+      matchedListingId: "l-1",
+    };
+    const source = {
+      id: "src-1",
+      name: "CoolWorks",
+      kind: "csv" as const,
+      complianceStatus: "approved" as const,
+      allowRawSnapshot: true,
+      fullSnapshot: false,
+      config: {},
+    };
+
+    const updateCols = plannedToListingColumns(entry, source, "2026-07-14T00:00:00.000Z");
+    // A re-import UPDATE must never reset an in-flight claim, detach/attach a
+    // host, or rewrite provenance (adversarial-review finding, fixed).
+    expect(updateCols).not.toHaveProperty("claim_summary");
+    expect(updateCols).not.toHaveProperty("host_profile_id");
+    expect(updateCols).not.toHaveProperty("provenance");
+
+    const insertCols = insertColumns(entry, source, "2026-07-14T00:00:00.000Z");
+    expect(insertCols.provenance).toBe("sourced");
+    expect(insertCols.host_profile_id).toBeNull();
+    expect(insertCols.claim_summary).toBe("unclaimed");
+  });
+});
+
+/* ------------------------------------------------ review-fleet regressions */
+
+describe("adversarial-review regressions", () => {
+  it("fuzzy verified-match is review-flagged (a hypothesis, never a silent skip)", async () => {
+    const { recordNeedsReview } = await import("../src/lib/sourceIngestion");
+    const key = fuzzyIdentityKey({
+      employerName: "Sunrise Orchards",
+      title: "Orchard harvest crew",
+      location: "Hood River, OR",
+    })!;
+    const index: InventoryIndex = {
+      ...emptyIndex,
+      byFuzzyKey: new Map([[key, [{ listingId: "l-v", provenance: "verified", fingerprint: null }]]]),
+    };
+    const plan = planImport(
+      [{ ...baseRaw, posting_id: "SO-200", link: "https://elsewhere.example.com/200" }],
+      MAPPING,
+      "src-1",
+      index,
+    );
+    expect(plan.records[0].outcome).toBe("verified_match");
+    expect(recordNeedsReview(plan.records[0])).toBe(true);
+  });
+
+  it("IDENTITY verified-match is conclusive — no review queue noise", async () => {
+    const { recordNeedsReview } = await import("../src/lib/sourceIngestion");
+    const index: InventoryIndex = {
+      ...emptyIndex,
+      byExternalId: new Map([
+        ["src-1␟SO-42", { listingId: "l-v", provenance: "verified", fingerprint: null }],
+      ]),
+    };
+    const plan = planImport([baseRaw], MAPPING, "src-1", index);
+    expect(plan.records[0].outcome).toBe("verified_match");
+    expect(recordNeedsReview(plan.records[0])).toBe(false);
+  });
+});

@@ -9,7 +9,6 @@ import {
 	type SearchFilters,
 } from "@explore-and-earn/db";
 import {
-	HOST_CONFIRMED_EVIDENCE,
 	MARKETPLACE_CATEGORIES,
 	PUBLIC_API_DEFAULT_PAGE_SIZE,
 	PUBLIC_API_MAX_PAGE_SIZE,
@@ -267,13 +266,14 @@ function rowToSummaryV1(row: ListingRow): PublicListingSummaryV1 {
 						employerName: row.source_employer_name,
 					}
 				: null,
-		benefitEvidence: isSourced
-			? {
-					housing: row.housing_evidence,
-					meals: row.meals_evidence,
-					pay: row.pay_evidence,
-				}
-			: HOST_CONFIRMED_EVIDENCE,
+		// ALWAYS the row's real evidence columns: verified-native rows default
+		// 'confirmed'; a converted listing keeps 'not_stated' for any benefit its
+		// employer never explicitly addressed — agents must see that honestly.
+		benefitEvidence: {
+			housing: row.housing_evidence,
+			meals: row.meals_evidence,
+			pay: row.pay_evidence,
+		},
 	};
 }
 
