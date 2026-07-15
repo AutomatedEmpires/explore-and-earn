@@ -9,6 +9,7 @@ import {
 	getSwipeListings,
 } from "../../../components/discovery/data";
 import { BucketPage, SwipeDeck } from "../../../components/seeker";
+import { DEV_USER_ID, isDevBenchEnabled } from "../../../lib/devBench";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,11 @@ export default async function SwipePage() {
 	if (userId) {
 		const token = await getToken({ template: "supabase" });
 		if (token) {
-			const savedIds = await getSavedListingIds(token, userId);
+			const isSyntheticBenchUser =
+				isDevBenchEnabled() && userId === DEV_USER_ID;
+			const savedIds = isSyntheticBenchUser
+				? []
+				: await getSavedListingIds(token, userId);
 			const batch = await getSwipeListings(token, userId, savedIds);
 			listings = batch.listings;
 			initialCursor = batch.nextCursor;

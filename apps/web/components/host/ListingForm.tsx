@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type FormEvent } from "react";
 
 
-import { Button, Icon } from "@explore-and-earn/ui";
+import {
+  Button,
+  DiscoveryCard,
+  Icon,
+  type DiscoveryCardData,
+} from "@explore-and-earn/ui";
 import {
   uploadListingMedia,
   deleteListingMedia,
@@ -14,6 +19,7 @@ import {
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
+  resolveListingPayDraft,
   type CompensationUnit,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
@@ -42,6 +48,7 @@ export interface ListingFormInitialValues {
   readonly payMin?: string;
   readonly payMax?: string;
   readonly payPeriod?: CompensationUnit;
+  readonly payCurrency?: string;
   readonly summary?: string;
   readonly startDate?: string;
   readonly endDate?: string;
@@ -60,6 +67,9 @@ export interface ListingFormProps {
    * hidden.
    */
   readonly hostProfileId?: string;
+  /** Real host identity shown in the seeker-facing live card preview. */
+  readonly hostDisplayName?: string;
+  readonly hostAvatarUrl?: string;
 }
 
 const PAY_PERIOD_LABEL: Record<CompensationUnit, string> = {
@@ -77,13 +87,29 @@ function categoryLabel(category: MarketplaceCategory): string {
   return category.charAt(0).toUpperCase() + category.slice(1);
 }
 
+function formatPreviewDate(value: string): string | undefined {
+  if (!value) return undefined;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
 /**
  * Shared create/edit listing form. Client component that gathers the listing
  * basics plus the Housing / Meals / Pay triad (product law — never "Perks";
  * see AGENTS.md and packages/contracts/src/benefits.ts) and submits to the
  * listing server actions. Token-only styling via the CSS module.
  */
-export function ListingForm({ mode, listingId, initial, hostProfileId }: ListingFormProps) {
+export function ListingForm({
+  mode,
+  listingId,
+  initial,
+  hostProfileId,
+  hostDisplayName,
+  hostAvatarUrl,
+}: ListingFormProps) {
   const router = useRouter();
   const getToken = useOptionalGetToken();
   const [isPending, startTransition] = useTransition();
@@ -113,6 +139,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
   const [payPeriod, setPayPeriod] = useState<CompensationUnit>(
     initial?.payPeriod ?? "hour",
   );
+  const payCurrency = initial?.payCurrency?.trim().toUpperCase() || "USD";
   const [summary, setSummary] = useState(initial?.summary ?? "");
   const [startDate, setStartDate] = useState(initial?.startDate ?? "");
   const [endDate, setEndDate] = useState(initial?.endDate ?? "");
@@ -121,7 +148,39 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
   const [benefitKind, setBenefitKind] = useState<BenefitKind | null>(null);
   const canEditBenefits = mode === "edit" && Boolean(listingId);
 
-  const submitLabel = mode === "create" ? "Create listing" : "Save changes";
+  const housingPreview = housingDescription.trim();
+  const mealsPreview = mealsDescription.trim();
+  const payDraft = resolveListingPayDraft({
+    minInput: payMin,
+    maxInput: payMax,
+    unit: payPeriod,
+    currency: payCurrency,
+  });
+  const payPreview = payDraft.projection;
+  const previewData: DiscoveryCardData = {
+    id: listingId ?? "listing-draft-preview",
+    hostName: hostDisplayName?.trim() || "Your organization",
+    title: title.trim() || "Untitled opportunity",
+    category,
+    location: locationName.trim(),
+    opportunityWindow: startDate || endDate ? "Flexible dates" : "Timing not set",
+    begins: formatPreviewDate(startDate),
+    ends: formatPreviewDate(endDate),
+    coverImageUrl: coverPhotoUrl || undefined,
+    hostAvatarUrl: hostAvatarUrl || undefined,
+    triad: {
+      housing: housingPreview || "Add housing details",
+      meals: mealsPreview || "Add meal details",
+      pay: payPreview.summary,
+    },
+    benefitProvision: {
+      housing: housingPreview ? "provided" : undefined,
+      meals: mealsPreview ? "provided" : undefined,
+      pay: payPreview.provision,
+    },
+  };
+
+  const submitLabel = mode === "create" ? "Create draft & continue" : "Save changes";
   const cancelHref = listingId ? `/host/listings/${listingId}` : "/host/listings";
 
   async function uploadCover(file: File): Promise<string> {
@@ -175,6 +234,10 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
       setError("A listing title is required.");
       return;
     }
+    if (!payDraft.ok) {
+      setError(payDraft.error);
+      return;
+    }
 
     const formData = new FormData();
     formData.set("title", title.trim());
@@ -185,6 +248,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
     formData.set("payMin", payMin.trim());
     formData.set("payMax", payMax.trim());
     formData.set("payPeriod", payPeriod);
+    formData.set("payCurrency", payCurrency);
     formData.set("summary", summary.trim());
     formData.set("startDate", startDate.trim());
     formData.set("endDate", endDate.trim());
@@ -217,6 +281,7 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
 
   return (
     <>
+    <div className={styles.composer}>
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       {error ? (
         <p className={styles.error} role="alert">
@@ -334,6 +399,16 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
           Housing, Meals, and Pay are the core promise to seekers — the three
           things they decide on, shown on every card. Be specific and honest.
         </p>
+        {!canEditBenefits ? (
+          <div className={styles.benefitNextStep}>
+            <Icon name="system.info" size={20} aria-hidden />
+            <p>
+              <strong>Benefit photo slots unlock after the first save.</strong>{" "}
+              Create the draft, then add four truthful Housing views and four
+              Meals views before publishing.
+            </p>
+          </div>
+        ) : null}
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="listing-housing">
@@ -400,6 +475,8 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
               step="0.01"
               value={payMin}
               onChange={(event) => setPayMin(event.target.value)}
+              disabled={payPeriod === "exchange"}
+              aria-describedby="listing-pay-note"
               placeholder="18"
             />
           </div>
@@ -417,6 +494,8 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
               step="0.01"
               value={payMax}
               onChange={(event) => setPayMax(event.target.value)}
+              disabled={payPeriod === "exchange"}
+              aria-describedby="listing-pay-note"
               placeholder="24"
             />
           </div>
@@ -439,8 +518,10 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
             </select>
           </div>
         </div>
-        <p className={styles.fieldsetNote}>
-          Pay is entered in whole currency units (e.g. dollars) and stored to the cent.
+        <p className={styles.fieldsetNote} id="listing-pay-note">
+          {payPeriod === "exchange"
+            ? "Work exchange stores no cash minimum or maximum."
+            : `Pay is entered in ${payCurrency} and stored to the cent.`}
         </p>
       </fieldset>
 
@@ -483,6 +564,41 @@ export function ListingForm({ mode, listingId, initial, hostProfileId }: Listing
         </Link>
       </div>
     </form>
+
+    <section
+      className={styles.preview}
+      role="region"
+      aria-label="Live listing preview"
+    >
+      <div className={styles.previewSticky}>
+        <div className={styles.previewHeading}>
+          <div>
+            <p className={styles.previewEyebrow}>Seeker view</p>
+            <h2 className={styles.previewTitle}>Live listing preview</h2>
+          </div>
+          <Icon name="action.view" size={20} aria-hidden />
+        </div>
+        <p className={styles.previewNote}>
+          This is how the core opportunity details read while you compose them.
+          Publish controls stay inactive in preview.
+        </p>
+        <div className={styles.previewCard}>
+          <DiscoveryCard
+            data={previewData}
+            surface="discovery_feed"
+            cardState="draft"
+            imageLoading="eager"
+            actions={
+              <div className={styles.previewOnly}>
+                <Icon name="action.view" size={16} aria-hidden />
+                Draft preview
+              </div>
+            }
+          />
+        </div>
+      </div>
+    </section>
+    </div>
 
     {/* Structured benefit editor — mounted OUTSIDE the form so its Save never
         submits the listing form. Edit mode only (needs a saved listing id). */}

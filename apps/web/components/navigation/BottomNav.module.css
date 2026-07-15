@@ -1,93 +1,89 @@
 /**
- * BottomNav — the shared pinned dock for the user (public + seeker) scope.
+ * BottomNav — shared public dock in the Golden Hour navigation language.
  *
- * A real app navigation bar: pinned flat to the bottom of the viewport, ALWAYS,
- * full-bleed edge-to-edge (no side inset, no floating capsule, no radius). A
- * warm surface, a single ink-warm hairline on top, a whisper top-lift, and a
- * sky-gradient-filled active lane. It resizes fluidly across mobile / tablet /
- * desktop. One design across every scope; the seeker/host/admin OS docks share
- * it verbatim.
- *
- * Flex list (not a fixed 4-col grid) so the same stylesheet also fits the host
- * dock's 5th "More" control. z-index 70 sits above page chrome; each shell's
- * reserved padding-bottom clears the pinned bar. Safe-area padding clears the
- * iOS home indicator.
+ * It remains full-width and pinned at every viewport to preserve existing
+ * navigation behavior. A warm glass surface and restrained amber active state
+ * now match the global header.
  */
 
 .nav {
 	position: fixed;
-	left: 0;
 	right: 0;
 	bottom: 0;
+	left: 0;
 	z-index: var(--z-dock);
 	width: 100%;
-	background: var(--color-surface);
-	border-top: 1px solid var(--border-ink-warm);
-	/* Fixed chrome over scrolling content — a whisper lift, not a card shadow. */
-	box-shadow: 0 -2px 12px color-mix(in srgb, var(--palette-ink) 7%, transparent);
 	padding-bottom: env(safe-area-inset-bottom, 0px);
+	border-top: 1px solid color-mix(in srgb, var(--border-soft) 88%, transparent);
+	background: var(--color-surface);
+	background: color-mix(in srgb, var(--color-surface) 92%, var(--color-paper));
+	box-shadow: 0 -10px 30px color-mix(in srgb, var(--palette-ink) 8%, transparent);
+	backdrop-filter: blur(18px) saturate(1.08);
+	-webkit-backdrop-filter: blur(18px) saturate(1.08);
 }
 
 .list {
 	display: flex;
 	align-items: stretch;
 	gap: var(--space-4);
-	width: 100%;
-	margin: 0;
+	width: min(100%, 720px);
+	margin: 0 auto;
 	padding: var(--space-8);
 	list-style: none;
 }
 
 .item {
-	flex: 1;
 	min-width: 0;
+	flex: 1;
 }
 
 .tab {
+	position: relative;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: var(--space-3);
+	gap: var(--space-4);
 	width: 100%;
-	min-height: var(--tap-min);
+	min-height: 3.25rem;
 	padding: var(--space-6) var(--space-2);
-	border: 0;
-	border-radius: var(--radius-cell);
+	border: 1px solid transparent;
+	border-radius: var(--radius-input);
 	background: transparent;
-	color: var(--text-muted);
+	color: var(--text-secondary);
 	font-family: var(--font-ui);
-	/* 10px so a 5-tab dock (…Community) fits full-width at 380px without ellipsis. */
 	font-size: 0.625rem;
-	line-height: var(--type-label-lh);
 	font-weight: var(--font-weight-semibold);
-	letter-spacing: 0.01em;
+	line-height: var(--type-label-lh);
+	letter-spacing: 0.02em;
 	text-decoration: none;
 	cursor: pointer;
+	outline: none;
 	transition:
-		color var(--motion-fast) var(--ease-standard),
-		background var(--motion-fast) var(--ease-standard),
-		transform var(--motion-fast) var(--ease-standard);
+		border-color var(--motion-fast) var(--ease-out),
+		background-color var(--motion-fast) var(--ease-out),
+		color var(--motion-fast) var(--ease-out),
+		transform var(--motion-fast) var(--ease-out);
 }
 
 .tab :global(svg) {
-	transition: transform var(--motion-base) var(--ease-standard);
+	transition: transform var(--motion-base) var(--ease-out);
 }
 
 .label {
-	font: inherit;
-	letter-spacing: 0.01em;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
 	max-width: 100%;
+	overflow: hidden;
+	font: inherit;
+	letter-spacing: inherit;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-/* Hover is a pointer-device affordance only — the cell warms, the icon lifts. */
 @media (hover: hover) {
 	.tab:hover {
+		border-color: var(--border-soft);
+		background: var(--color-surface-sunken);
 		color: var(--text-primary);
-		background: color-mix(in srgb, var(--color-ink) 6%, transparent);
 	}
 
 	.tab:hover :global(svg) {
@@ -95,26 +91,47 @@
 	}
 }
 
-/* Tactile press — the whole tab settles a hair. */
 .tab:active {
 	transform: translateY(1px);
 }
 
 .tab:focus-visible {
-	outline: none;
 	box-shadow: var(--ui-focus-ring);
 }
 
-/* ── Active lane — sky-gradient fill, white glyph + label (matches the OS docks) ── */
 .active,
 .active:hover {
-	color: var(--color-cta-text);
-	background: var(--gradient-sky);
-	font-weight: var(--font-weight-semibold);
+	border-color: color-mix(in srgb, var(--palette-amber) 26%, var(--border-soft));
+	background: color-mix(in srgb, var(--palette-amber-light) 70%, var(--color-surface));
+	color: var(--text-primary);
+}
+
+.active::before {
+	position: absolute;
+	top: 0.25rem;
+	left: 50%;
+	width: 1.5rem;
+	height: 2px;
+	border-radius: var(--radius-pill);
+	background: var(--palette-amber);
+	content: "";
+	transform: translateX(-50%);
 }
 
 .active :global(svg) {
-	color: var(--color-cta-text);
+	color: var(--palette-amber-deep);
+}
+
+@media (min-width: 768px) {
+	.list {
+		width: min(100%, 640px);
+	}
+}
+
+@media (min-width: 1024px) {
+	.nav {
+		display: none;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {

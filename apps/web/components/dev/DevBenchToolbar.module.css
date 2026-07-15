@@ -5,7 +5,9 @@
   position: fixed;
   right: 12px;
   bottom: 84px; /* clear the seeker/host bottom nav */
-  z-index: 2147483000; /* above all app chrome */
+  /* Above product chrome and banners, but below a real modal scrim. Review
+     tooling must never intercept an overlay's footer or close controls. */
+  z-index: calc(var(--z-overlay) - 1);
   display: flex;
   align-items: center;
   gap: 8px;

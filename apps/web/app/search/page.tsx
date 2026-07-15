@@ -15,6 +15,7 @@ import { MARKETPLACE_CATEGORIES, matchBandFor } from "@explore-and-earn/contract
 import type { SearchListing } from "../../components/search/listing";
 import { SEARCH_FIXTURES } from "../../components/search/fixtures";
 import { SearchView } from "../../components/search/SearchView";
+import { canUseDiscoveryFixtureFallback } from "../../components/discovery/data";
 import { cachedSeekerProfile, getSupabaseToken } from "../../lib/serverCache";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +101,10 @@ function rowToSearchListing(row: ListingRow): SearchListing {
 		hostName: fields.host.name,
 		category: fields.category,
 		location: fields.location,
+		hasCoordinates: Boolean(fields.coordinates),
 		opportunityWindow: fields.opportunityWindow,
+		coverImageUrl: fields.coverImageUrl,
+		payInsight: fields.payInsight,
 		benefits: {
 			housing: {
 				provision: housing.provision,
@@ -189,6 +193,16 @@ export default async function SearchPage({
 	// Raw rows kept alongside `listings` (same order) to score a signed-in
 	// seeker's fit per card below. Empty on the fixture path.
 	let scorableRows: ListingRow[] = [];
+	const canUseFixtures = canUseDiscoveryFixtureFallback();
+	const localListings = () =>
+		applyLocalFilters(SEARCH_FIXTURES, {
+			query,
+			category,
+			housing,
+			meals,
+			payMin,
+			location,
+		});
 
 	if (hasPublicDataConfig) {
 		// Server-side DB query — uses the search_vector GIN index (migration 022)
@@ -208,16 +222,11 @@ export default async function SearchPage({
 		const rows = await searchListings(filters);
 		scorableRows = rows;
 		listings = rows.map(rowToSearchListing);
-	} else {
+	} else if (canUseFixtures) {
 		// Dev / preview: filter the typed fixture set locally.
-		listings = applyLocalFilters(SEARCH_FIXTURES, {
-			query,
-			category,
-			housing,
-			meals,
-			payMin,
-			location,
-		});
+		listings = localListings();
+	} else {
+		listings = [];
 	}
 
 	// Stamp each result with the signed-in seeker's ADR-040 fit — the SAME score

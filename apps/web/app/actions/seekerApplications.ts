@@ -21,7 +21,7 @@ async function currentUserId(): Promise<string | undefined> {
 
 async function setOfferStatus(
   applicationId: string,
-  newStatus: "accepted" | "not_selected",
+  newStatus: "accepted" | "withdrawn",
 ): Promise<OfferActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
@@ -38,6 +38,7 @@ async function setOfferStatus(
   if (result.ok) {
     revalidatePath("/offered");
     revalidatePath("/accepted");
+    revalidatePath("/withdrawn");
     revalidatePath("/applied");
     revalidatePath(`/applied/${applicationId}`);
   }
@@ -68,7 +69,7 @@ export async function declineOfferAction(
   applicationId: string,
 ): Promise<OfferActionResult> {
   try {
-    return await setOfferStatus(applicationId, "not_selected");
+    return await setOfferStatus(applicationId, "withdrawn");
   } catch (error) {
     reportError(error, {
       action: "declineOfferAction",

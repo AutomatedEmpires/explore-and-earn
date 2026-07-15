@@ -26,7 +26,6 @@
   "apps/web/components/host/HousingFormDrawer.module.css": 52,
   "apps/web/components/host/MealsFormDrawer.module.css": 52,
   "apps/web/components/map/MapViewLazy.tsx": 1,
-  "apps/web/components/overlay/PopupShell.module.css": 19,
   "apps/web/components/seeker/CommunityDashboard.module.css": 163,
   "apps/web/components/seeker/FeaturedEmployerStrip.module.css": 16,
   "apps/web/components/seeker/HeroPhotoPickerModal.module.css": 9,

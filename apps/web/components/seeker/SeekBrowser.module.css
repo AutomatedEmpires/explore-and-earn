@@ -1,48 +1,119 @@
-/* Seek browser \u2014 filters + sort over the canonical DiscoveryCard grid.
-   Mobile-first; semantic tokens only; px appears ONLY in breakpoint media
-   queries (mirrors --bp-* values). */
+/*
+ * Seek browser — Golden Hour Hybrid.
+ *
+ * The masthead is the compact immersive moment; search, filters, employer
+ * curation, and the canonical DiscoveryCard grid stay in the light-working
+ * register. Semantic tokens only, so the approved global palette swap flows
+ * through without another component rewrite.
+ */
 
 .wrap {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-section);
-	padding: var(--space-gutter);
-	background: var(--color-paper);
+	width: 100%;
+	max-width: 78rem;
 	min-height: 100vh;
+	margin-inline: auto;
+	padding: var(--space-4) 0 var(--space-24);
+	background: transparent;
 }
 
+/* ─── Immersive editorial masthead ─────────────────────────────────────── */
+
 .header {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-4);
+	gap: var(--space-8);
+	padding: clamp(var(--space-24), 4vw, var(--space-40));
+	border: 1px solid color-mix(in srgb, var(--palette-white) 18%, transparent);
+	border-radius: var(--radius-modal);
+	background:
+		radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--color-gold) 50%, transparent) 0, transparent 34%),
+		radial-gradient(circle at 8% 110%, color-mix(in srgb, var(--color-teal) 54%, transparent) 0, transparent 42%),
+		var(--gradient-golden-hour, var(--gradient-category-mix));
+	box-shadow: var(--elev-card, var(--elevation-card));
+}
+
+.header::before {
+	content: "";
+	position: absolute;
+	inset: auto -8% -58% auto;
+	width: 48%;
+	aspect-ratio: 1;
+	border: 1px solid color-mix(in srgb, var(--palette-white) 15%, transparent);
+	border-radius: 50%;
+	box-shadow:
+		0 0 0 var(--space-16) color-mix(in srgb, var(--palette-white) 4%, transparent),
+		0 0 0 var(--space-40) color-mix(in srgb, var(--palette-white) 3%, transparent);
+	pointer-events: none;
+}
+
+.header::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background-image: var(--grain, none);
+	background-repeat: repeat;
+	opacity: var(--grain-opacity, 0.14);
+	mix-blend-mode: overlay;
+	pointer-events: none;
+}
+
+.heading,
+.subheading {
+	position: relative;
+	z-index: 1;
 }
 
 .heading {
 	margin: 0;
+	max-width: 15ch;
 	font-family: var(--font-display);
-	font-size: var(--type-page-size);
-	line-height: var(--type-page-lh);
-	font-weight: var(--font-weight-regular);
-	color: var(--text-primary);
+	font-size: clamp(2rem, 3.4vw, 2.75rem);
+	line-height: 1.08;
+	font-weight: 600;
+	letter-spacing: -0.025em;
+	color: var(--palette-bone, var(--color-card-warm));
+	text-wrap: balance;
 }
 
 .subheading {
+	max-width: 48rem;
 	margin: 0;
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
-	line-height: var(--type-body-lh);
-	color: var(--text-secondary);
+	line-height: 1.6;
+	color: color-mix(in srgb, var(--palette-bone, var(--color-card-warm)) 78%, transparent);
+	text-wrap: pretty;
 }
+
+/* ─── Light-working control surface ────────────────────────────────────── */
 
 .filters {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-12);
+	padding: var(--space-16);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background:
+		linear-gradient(
+			145deg,
+			color-mix(in srgb, var(--color-surface) 96%, var(--color-gold) 4%),
+			var(--color-surface)
+		);
+	box-shadow: var(--elev-whisper, var(--elevation-card));
 }
 
 .search {
 	display: grid;
-	gap: var(--space-8);
+	gap: var(--space-6);
+	min-width: 0;
 }
 
 .sortLabel {
@@ -52,18 +123,41 @@
 	font-weight: var(--font-weight-semibold);
 	letter-spacing: var(--type-label-tracking);
 	text-transform: uppercase;
-	color: var(--text-secondary);
+	color: var(--text-muted);
 }
 
 .searchInput {
-	padding: var(--space-8) var(--space-12);
+	width: 100%;
+	min-height: 3rem;
+	padding: var(--space-10) var(--space-16);
+	border: 1px solid var(--field-border, var(--border-soft));
 	border-radius: var(--radius-input);
-	border: 1px solid var(--border-soft);
-	background: var(--color-surface);
+	appearance: none;
+	-webkit-appearance: none;
+	background: var(--field-bg, var(--color-surface-raised));
 	color: var(--text-primary);
 	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
+	font-size: max(1rem, var(--type-body-size));
 	line-height: var(--type-body-lh);
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--palette-white) 74%, transparent);
+	transition:
+		border-color var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard);
+}
+
+.searchInput::-webkit-search-cancel-button,
+.searchInput::-webkit-search-decoration {
+	-webkit-appearance: none;
+	appearance: none;
+}
+
+.searchInput::placeholder {
+	color: var(--text-muted);
+}
+
+.searchInput:hover {
+	border-color: var(--field-border-hover, var(--border-ink));
 }
 
 .searchInput:focus-visible,
@@ -73,10 +167,15 @@
 	box-shadow: var(--ui-focus-ring);
 }
 
+.searchInput:focus-visible {
+	border-color: var(--color-cta);
+	background: var(--color-surface-raised);
+}
+
 .controlRow {
 	display: flex;
 	gap: var(--space-8);
-	flex-wrap: wrap;
+	flex-wrap: nowrap;
 }
 
 .controlButton {
@@ -84,17 +183,37 @@
 	align-items: center;
 	justify-content: center;
 	gap: var(--space-8);
-	min-height: 2.75rem;
-	padding: var(--space-10) var(--space-14);
-	border-radius: var(--radius-pill);
+	min-height: 3rem;
+	padding: var(--space-10) var(--space-16);
 	border: 1px solid var(--border-soft);
-	background: var(--color-surface);
+	border-radius: var(--radius-pill);
+	appearance: none;
+	-webkit-appearance: none;
+	background: var(--color-surface-raised);
 	color: var(--text-primary);
 	font-family: var(--font-ui);
 	font-size: var(--type-label-size);
 	line-height: var(--type-label-lh);
 	font-weight: var(--font-weight-semibold);
+	letter-spacing: 0.02em;
 	cursor: pointer;
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--palette-white) 72%, transparent);
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		color var(--motion-fast) var(--ease-standard);
+}
+
+.controlButton:hover {
+	border-color: color-mix(in srgb, var(--color-teal) 44%, var(--border-soft));
+	background: color-mix(in srgb, var(--color-teal) 8%, var(--color-surface-raised));
+	color: var(--palette-teal-deep, var(--color-teal));
+	transform: translateY(-1px);
+}
+
+.controlButton:active {
+	transform: translateY(0) scale(0.98);
 }
 
 .controlLabel {
@@ -109,10 +228,11 @@
 	height: 1.4rem;
 	padding: 0 var(--space-6);
 	border-radius: var(--radius-pill);
-	background: var(--text-primary);
-	color: var(--color-surface-raised);
+	background: var(--gradient-amber, var(--gradient-gold));
+	color: var(--color-gold-text, var(--text-primary));
 	font-size: var(--type-meta-size);
 	line-height: 1;
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-gold) 36%, transparent);
 }
 
 .activeBar {
@@ -120,25 +240,33 @@
 	flex-wrap: wrap;
 	gap: var(--space-8);
 	align-items: center;
+	padding-top: var(--space-2);
+	border-top: 1px solid color-mix(in srgb, var(--border-soft) 70%, transparent);
 }
 
 .activeChip {
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-6);
+	min-height: 2rem;
 	padding: var(--space-6) var(--space-10);
+	border: 1px solid color-mix(in srgb, var(--color-teal) 25%, var(--border-soft));
 	border-radius: var(--radius-pill);
-	border: 1px solid color-mix(in srgb, var(--border-soft) 88%, transparent);
-	background: color-mix(in srgb, var(--color-surface-raised) 92%, white);
+	background: color-mix(in srgb, var(--color-teal) 9%, var(--color-surface-raised));
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	line-height: var(--type-meta-lh);
-	color: var(--text-primary);
+	font-weight: var(--font-weight-medium);
+	color: var(--palette-teal-deep, var(--color-teal));
 }
 
 .clearButton {
+	min-height: var(--tap-min);
 	padding: var(--space-6) var(--space-10);
 	border: none;
+	border-radius: var(--radius-pill);
+	appearance: none;
+	-webkit-appearance: none;
 	background: transparent;
 	color: var(--text-secondary);
 	font-family: var(--font-ui);
@@ -146,8 +274,17 @@
 	line-height: var(--type-meta-lh);
 	font-weight: var(--font-weight-semibold);
 	cursor: pointer;
+	transition:
+		color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard);
 }
 
+.clearButton:hover {
+	background: color-mix(in srgb, var(--color-gold) 10%, transparent);
+	color: var(--palette-amber-deep, var(--text-primary));
+}
+
+/* Retained for any date controls composed into the seek toolbar. */
 .dateField {
 	display: inline-flex;
 	flex-direction: column;
@@ -165,13 +302,15 @@
 }
 
 .dateInput {
+	min-height: 3rem;
 	padding: var(--space-8) var(--space-12);
-	border-radius: var(--radius-input);
 	border: 1px solid var(--border-soft);
-	background: var(--color-surface);
+	border-radius: var(--radius-input);
+	appearance: none;
+	background: var(--color-surface-raised);
 	color: var(--text-primary);
 	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
+	font-size: max(1rem, var(--type-body-size));
 	line-height: var(--type-body-lh);
 	cursor: pointer;
 }
@@ -182,11 +321,16 @@
 }
 
 .count {
+	align-self: flex-start;
 	margin: 0;
+	padding: var(--space-4) var(--space-10);
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--color-gold) 10%, transparent);
 	font-family: var(--font-ui);
 	font-size: var(--type-label-size);
 	line-height: var(--type-label-lh);
-	color: var(--text-secondary);
+	font-weight: var(--font-weight-semibold);
+	color: var(--palette-amber-deep, var(--text-secondary));
 }
 
 .emptyWrap {
@@ -194,6 +338,7 @@
 	flex-direction: column;
 	align-items: center;
 	gap: var(--space-12);
+	padding: var(--space-16) 0;
 }
 
 .clearLink {
@@ -201,8 +346,9 @@
 	font-size: var(--type-label-size);
 	line-height: var(--type-label-lh);
 	font-weight: var(--font-weight-semibold);
-	color: var(--text-primary);
-	text-decoration: underline;
+	color: var(--palette-teal-deep, var(--text-primary));
+	text-decoration-color: color-mix(in srgb, currentColor 44%, transparent);
+	text-underline-offset: 0.2em;
 }
 
 .clearLink:focus-visible {
@@ -211,12 +357,18 @@
 	border-radius: var(--radius-input);
 }
 
-/* ─── Listing sections (featured / all) ─────────────────────────────────── */
+/* ─── Editorial listing sections ───────────────────────────────────────── */
 
 .listingSection {
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-16);
+	padding-top: var(--space-4);
+}
+
+.listingSection + .listingSection {
+	padding-top: var(--space-section);
+	border-top: 1px solid var(--border-soft);
 }
 
 .listingSectionHead {
@@ -224,15 +376,18 @@
 	align-items: baseline;
 	justify-content: space-between;
 	gap: var(--space-12);
+	padding-bottom: var(--space-10);
+	border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 78%, transparent);
 	flex-wrap: wrap;
 }
 
 .listingSectionTitle {
 	margin: 0;
 	font-family: var(--font-display);
-	font-size: var(--type-section-size);
-	line-height: var(--type-section-lh);
-	font-weight: var(--font-weight-regular);
+	font-size: clamp(1.45rem, 2.4vw, 1.85rem);
+	line-height: 1.15;
+	font-weight: 600;
+	letter-spacing: -0.018em;
 	color: var(--text-primary);
 }
 
@@ -241,25 +396,92 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	line-height: var(--type-meta-lh);
-	color: var(--text-secondary);
+	font-weight: var(--font-weight-medium);
+	color: var(--text-muted);
 }
 
-/* ─── Card grid ─────────────────────────────────────────────────────────── */
+/* ─── Canonical DiscoveryCard grid ─────────────────────────────────────── */
 
 .grid {
 	display: grid;
-	grid-template-columns: 1fr;
-	gap: var(--space-section);
+	grid-template-columns: minmax(0, 1fr);
+	gap: var(--space-20, var(--space-section));
 }
 
 @media (min-width: 640px) {
 	.grid {
-		grid-template-columns: repeat(2, 1fr);
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 	}
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
+	.filters {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: end;
+		gap: var(--space-12) var(--space-16);
+		padding: var(--space-20);
+	}
+
+	.filters > :nth-child(3),
+	.activeBar {
+		grid-column: 1 / -1;
+		min-width: 0;
+	}
+}
+
+/* The seeker sidebar is present at this width; wait until the content well is
+   genuinely wide before asking DiscoveryCard to carry a third column. */
+@media (min-width: 1280px) {
 	.grid {
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 639px) {
+	.wrap {
+		gap: var(--space-20, var(--space-section));
+	}
+
+	.header {
+		padding: var(--space-24) var(--space-20);
+		border-radius: var(--radius-card);
+	}
+
+	.heading {
+		font-size: clamp(2rem, 10vw, 2.5rem);
+	}
+
+	.subheading {
+		font-size: 1rem;
+		line-height: 1.5;
+	}
+
+	.filters {
+		padding: var(--space-14) var(--space-12);
+	}
+
+	.controlButton {
+		flex: 1 1 0;
+		padding-inline: var(--space-12);
+	}
+
+	.listingSectionHead {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.searchInput,
+	.controlButton,
+	.clearButton {
+		transition: none;
+	}
+
+	.controlButton:hover,
+	.controlButton:active {
+		transform: none;
 	}
 }

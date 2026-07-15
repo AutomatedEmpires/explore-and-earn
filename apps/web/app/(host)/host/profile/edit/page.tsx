@@ -46,6 +46,7 @@ export default async function HostProfileEditPage() {
     tagline: hostProfile?.tagline ?? undefined,
     location: hostProfile?.primaryLocationName ?? undefined,
     bio: hostProfile?.about ?? undefined,
+    photoUrl: hostProfile?.photoUrl ?? undefined,
     verified: hasVerifiedHostSubscription(hostProfile?.subscriptionTier),
     websiteUrl: hostProfile?.websiteUrl ?? undefined,
     instagram: hostProfile?.socialLinks.instagram ?? undefined,

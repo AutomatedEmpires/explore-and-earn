@@ -21,7 +21,7 @@ export default async function WithdrawnPage() {
 		return (
 			<BucketPage
 				title="Withdrawn"
-				description="Applications you withdrew from."
+				description="Applications you withdrew or offers you declined."
 			>
 				<EmptyState
 					title="Sign in to see your withdrawn applications"
@@ -39,7 +39,7 @@ export default async function WithdrawnPage() {
 	return (
 		<BucketPage
 			title="Withdrawn"
-			description="Applications you withdrew from."
+			description="Applications you withdrew or offers you declined."
 		>
 			{withdrawn.length > 0 ? (
 				<div className={styles.grid}>
@@ -52,6 +52,8 @@ export default async function WithdrawnPage() {
 								day: "numeric",
 							})
 							: null;
+						const declinedOffer =
+							application.withdrawnReason === "offer_declined";
 						return (
 							<DiscoveryCard
 								key={application.id}
@@ -61,7 +63,7 @@ export default async function WithdrawnPage() {
 								actions={
 									<CardStatus
 										icon="action.close"
-										label="Withdrawn"
+										label={declinedOffer ? "Offer declined" : "Withdrawn"}
 										detail={withdrawnOn ? `Applied ${withdrawnOn}` : undefined}
 									/>
 								}

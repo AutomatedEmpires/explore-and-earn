@@ -12,7 +12,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const mockFrom = vi.fn();
-const mockClient = { from: mockFrom };
+const mockRpc = vi.fn();
+const mockClient = { from: mockFrom, rpc: mockRpc };
 vi.mock("../src/client.js", () => ({
   authedClient: () => mockClient,
 }));
@@ -43,23 +44,24 @@ const SEEKER_PROFILE = { data: { id: "seeker-1" }, error: null };
 
 beforeEach(() => {
   mockFrom.mockReset();
+  mockRpc.mockReset();
+  mockRpc.mockResolvedValue({ data: { ok: true }, error: null });
 });
 
 describe("withdrawApplication", () => {
   for (const status of ["applied", "reviewing", "saved_by_host"] as const) {
-    it(`withdraws an application in '${status}' and stamps seeker_withdrew`, async () => {
+    it(`withdraws an application in '${status}' through the scoped RPC`, async () => {
       const appRead = makeChain({
         data: { id: "app-1", seeker_profile_id: "seeker-1", status },
       });
-      const update = makeChain({ error: null });
-      queueFromResults(makeChain(SEEKER_PROFILE), appRead, update);
+      queueFromResults(makeChain(SEEKER_PROFILE), appRead);
 
       const result = await withdrawApplication("token", "user_1", "app-1");
 
       expect(result).toEqual({ ok: true });
-      expect(update.update).toHaveBeenCalledWith({
-        status: "withdrawn",
-        withdrawn_reason: "seeker_withdrew",
+      expect(mockRpc).toHaveBeenCalledWith("seeker_transition_application", {
+        p_application_id: "app-1",
+        p_intent: "withdraw",
       });
     });
   }
@@ -75,6 +77,7 @@ describe("withdrawApplication", () => {
     expect(result).toEqual({ ok: false, error: "invalid_status" });
     // The guard fires before any update — only profile + app reads happened.
     expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   for (const status of ["withdrawn", "not_selected", "accepted"] as const) {
@@ -87,6 +90,7 @@ describe("withdrawApplication", () => {
       const result = await withdrawApplication("token", "user_1", "app-1");
 
       expect(result).toEqual({ ok: false, error: "invalid_status" });
+      expect(mockRpc).not.toHaveBeenCalled();
     });
   }
 
@@ -100,6 +104,7 @@ describe("withdrawApplication", () => {
 
     expect(result).toEqual({ ok: false, error: "forbidden" });
     expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it("returns not_found for an application id that doesn't exist", async () => {
@@ -108,6 +113,7 @@ describe("withdrawApplication", () => {
     const result = await withdrawApplication("token", "user_1", "missing");
 
     expect(result).toEqual({ ok: false, error: "not_found" });
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it("returns profile_not_found when the user has no seeker profile", async () => {
@@ -117,17 +123,15 @@ describe("withdrawApplication", () => {
 
     expect(result).toEqual({ ok: false, error: "profile_not_found" });
     expect(mockFrom).toHaveBeenCalledTimes(1);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it("surfaces the DB error message when the update fails", async () => {
+  it("surfaces the RPC error message when the transition fails", async () => {
     const appRead = makeChain({
       data: { id: "app-1", seeker_profile_id: "seeker-1", status: "applied" },
     });
-    queueFromResults(
-      makeChain(SEEKER_PROFILE),
-      appRead,
-      makeChain({ error: { message: "boom" } }),
-    );
+    queueFromResults(makeChain(SEEKER_PROFILE), appRead);
+    mockRpc.mockResolvedValue({ data: null, error: { message: "boom" } });
 
     const result = await withdrawApplication("token", "user_1", "app-1");
 

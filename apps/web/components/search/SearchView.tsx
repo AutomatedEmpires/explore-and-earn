@@ -11,6 +11,8 @@ import {
 } from "@explore-and-earn/contracts";
 import { Chip, DiscoveryCard, type IconKey } from "@explore-and-earn/ui";
 
+import { BenefitTrustModal } from "../discovery/BenefitTrustModal";
+import { PayDetailsDrawer } from "../discovery/PayDetailsDrawer";
 import type { SearchListing } from "./listing";
 import { toDiscoveryCardData } from "./filtering";
 import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
@@ -73,6 +75,26 @@ export function SearchView({
 	const [payUnitValue, setPayUnitValue] = useState(payUnit ?? "");
 	const [startAfterText, setStartAfterText] = useState(startAfter ?? "");
 	const [startBeforeText, setStartBeforeText] = useState(startBefore ?? "");
+	const [activeBenefit, setActiveBenefit] = useState<{
+		readonly id: string;
+		readonly bucket: "housing" | "meals";
+	} | null>(null);
+	const [activePayId, setActivePayId] = useState<string | null>(null);
+	const activeFilterCount = [
+		category,
+		housing,
+		meals,
+		payMin,
+		payUnit,
+		initialLocation,
+		startAfter,
+		startBefore,
+	].filter(Boolean).length;
+
+	const activeBenefitListing =
+		listings.find((listing) => listing.id === activeBenefit?.id) ?? null;
+	const activePayListing =
+		listings.find((listing) => listing.id === activePayId) ?? null;
 
 	/**
 	 * Build a /search URL incorporating local input state plus any overrides.
@@ -151,13 +173,39 @@ export function SearchView({
 
 	return (
 		<section className="ee-search">
+			<header className="ee-search__page-header">
+				<div className="ee-search__page-heading">
+					<p className="ee-search__eyebrow">Open opportunities</p>
+					<h1 className="ee-search__title">Search opportunities</h1>
+					<p className="ee-search__intro">
+						Compare the place, season, housing, meals, and pay before you
+						commit.
+					</p>
+				</div>
+				<div className="ee-search__result-summary" aria-live="polite">
+					<strong>{listings.length}</strong>
+					<span>{listings.length === 1 ? "open role" : "open roles"}</span>
+				</div>
+			</header>
+
+			<aside className="ee-search__controls" aria-label="Search filters">
+				<div className="ee-search__controls-head">
+					<div>
+						<p className="ee-search__controls-kicker">Refine your search</p>
+						<h2 className="ee-search__controls-title">Find the right fit</h2>
+					</div>
+					{activeFilterCount > 0 ? (
+						<a className="ee-search__clear" href="/search">
+							Clear all
+						</a>
+					) : null}
+				</div>
+
 			<form className="ee-search__form" onSubmit={handleSubmit} role="search">
 				<header className="ee-search__header">
-					<h1 className="ee-search__title">Search opportunities</h1>
-
 					<div className="ee-search__field">
 						<label className="ee-search__label" htmlFor="ee-search-query">
-							Search
+							Role or host
 						</label>
 						<input
 							id="ee-search-query"
@@ -187,84 +235,76 @@ export function SearchView({
 						/>
 					</div>
 
-					<div className="ee-search__field-row">
-						<div className="ee-search__field">
-							<label
-								className="ee-search__label"
-								htmlFor="ee-search-start-after"
-							>
-								Starts after
-							</label>
-							<input
-								id="ee-search-start-after"
-								className="ee-search__input"
-								type="date"
-								value={startAfterText}
-								onChange={(event) => setStartAfterText(event.target.value)}
-							/>
-						</div>
-						<div className="ee-search__field">
-							<label
-								className="ee-search__label"
-								htmlFor="ee-search-start-before"
-							>
-								Starts before
-							</label>
-							<input
-								id="ee-search-start-before"
-								className="ee-search__input"
-								type="date"
-								value={startBeforeText}
-								onChange={(event) => setStartBeforeText(event.target.value)}
-							/>
-						</div>
-					</div>
+					<details className="ee-search__advanced">
+						<summary className="ee-search__advanced-summary">
+							<span>Dates &amp; pay</span>
+							<span aria-hidden>+</span>
+						</summary>
+						<div className="ee-search__advanced-fields">
+							<div className="ee-search__field-row">
+								<div className="ee-search__field">
+									<label className="ee-search__label" htmlFor="ee-search-start-after">
+										Starts after
+									</label>
+									<input
+										id="ee-search-start-after"
+										className="ee-search__input"
+										type="date"
+										value={startAfterText}
+										onChange={(event) => setStartAfterText(event.target.value)}
+									/>
+								</div>
+								<div className="ee-search__field">
+									<label className="ee-search__label" htmlFor="ee-search-start-before">
+										Starts before
+									</label>
+									<input
+										id="ee-search-start-before"
+										className="ee-search__input"
+										type="date"
+										value={startBeforeText}
+										onChange={(event) => setStartBeforeText(event.target.value)}
+									/>
+								</div>
+							</div>
 
-					<div className="ee-search__pay-row">
-						<div className="ee-search__field">
-							<label
-								className="ee-search__label"
-								htmlFor="ee-search-pay-min"
-							>
-								Min pay
-							</label>
-							<input
-								id="ee-search-pay-min"
-								className="ee-search__input"
-								type="number"
-								min="0"
-								step="1"
-								placeholder="e.g. 20"
-								value={payMinText}
-								onChange={(event) => setPayMinText(event.target.value)}
-							/>
+							<div className="ee-search__pay-row">
+								<div className="ee-search__field">
+									<label className="ee-search__label" htmlFor="ee-search-pay-min">
+										Minimum pay
+									</label>
+									<input
+										id="ee-search-pay-min"
+										className="ee-search__input"
+										type="number"
+										min="0"
+										step="1"
+										placeholder="e.g. 20"
+										value={payMinText}
+										onChange={(event) => setPayMinText(event.target.value)}
+									/>
+								</div>
+								<div className="ee-search__field">
+									<label className="ee-search__label" htmlFor="ee-search-pay-unit">
+										Pay period
+									</label>
+									<select
+										id="ee-search-pay-unit"
+										className="ee-search__input ee-search__select"
+										value={payUnitValue}
+										onChange={(event) => setPayUnitValue(event.target.value)}
+									>
+										<option value="">Any period</option>
+										<option value="hour">Per hour</option>
+										<option value="day">Per day</option>
+									</select>
+								</div>
+							</div>
 						</div>
-						<div className="ee-search__field">
-							<label
-								className="ee-search__label"
-								htmlFor="ee-search-pay-unit"
-							>
-								Per
-							</label>
-							<select
-								id="ee-search-pay-unit"
-								className="ee-search__input ee-search__select"
-								value={payUnitValue}
-								onChange={(event) => setPayUnitValue(event.target.value)}
-							>
-								{/* Intentionally limited to the two time-rate units that are
-								    meaningful as search filters. Other CompensationUnit values
-								    (week, month, year, stipend, exchange, other) are not
-								    commonly used as filter criteria. */}
-								<option value="">Any</option>
-								<option value="hour">Hour</option>
-								<option value="day">Day</option>
-							</select>
-						</div>
-					</div>
+					</details>
 
 					<button className="ee-search__submit" type="submit">
-						Search
+						Search opportunities
 					</button>
 				</header>
 			</form>
@@ -330,13 +370,22 @@ export function SearchView({
 					</button>
 				</div>
 			</div>
+			</aside>
 
 			<div className="ee-search__results" aria-live="polite">
-				<p className="ee-search__count">
-					{listings.length === 0
-						? "No matches"
-						: `${listings.length} ${listings.length === 1 ? "result" : "results"}`}
-				</p>
+				<div className="ee-search__results-head">
+					<div>
+						<p className="ee-search__results-kicker">Marketplace</p>
+						<h2 className="ee-search__results-title">
+							{listings.length === 0 ? "No matches yet" : "Available now"}
+						</h2>
+					</div>
+					<p className="ee-search__count">
+						{listings.length === 0
+							? "Try a broader search"
+							: `${listings.length} ${listings.length === 1 ? "result" : "results"}`}
+					</p>
+				</div>
 
 				{listings.length === 0 ? (
 					<div className="ee-search__empty" role="status">
@@ -357,13 +406,32 @@ export function SearchView({
 									surface={SEARCH_SURFACE}
 									onOpen={(id) => router.push(`/listing/${id}`)}
 									onApply={(id) => router.push(`/listing/${id}`)}
-									onLocationClick={(id) => router.push(`/map?focus=${id}`)}
+									onLocationClick={listing.hasCoordinates
+										? (id) => router.push(`/map?focus=${id}`)
+										: undefined}
+									onHousingClick={(id) =>
+										setActiveBenefit({ id, bucket: "housing" })
+									}
+									onMealsClick={(id) =>
+										setActiveBenefit({ id, bucket: "meals" })
+									}
+									onPayClick={setActivePayId}
 								/>
 							</li>
 						))}
 					</ul>
 				)}
 			</div>
+
+			<BenefitTrustModal
+				listing={activeBenefitListing}
+				bucket={activeBenefit?.bucket ?? null}
+				onClose={() => setActiveBenefit(null)}
+			/>
+			<PayDetailsDrawer
+				listing={activePayListing}
+				onClose={() => setActivePayId(null)}
+			/>
 		</section>
 	);
 }

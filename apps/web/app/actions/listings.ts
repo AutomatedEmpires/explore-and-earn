@@ -12,9 +12,8 @@ import {
   type ListingWriteFields,
 } from "@explore-and-earn/db";
 import {
-  COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
-  type CompensationUnit,
+  resolveListingPayDraft,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
@@ -70,26 +69,13 @@ function resolveCategory(raw: FormDataEntryValue | null): MarketplaceCategory | 
     : undefined;
 }
 
-function resolvePayPeriod(raw: FormDataEntryValue | null): CompensationUnit | undefined {
-  const value = typeof raw === "string" ? raw : "";
-  return (COMPENSATION_UNIT as readonly string[]).includes(value)
-    ? (value as CompensationUnit)
-    : undefined;
-}
-
-function parseAmount(raw: FormDataEntryValue | null): number | null | undefined {
-  if (typeof raw !== "string") return undefined;
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
-  const value = Number(trimmed);
-  return Number.isFinite(value) ? value : null;
-}
-
 /**
  * Read the create/edit listing form into ListingWriteFields. Only keys the form
  * actually submits are set, so the same reader serves create and update.
  */
-function readListingFields(formData: FormData): ListingWriteFields {
+function readListingFields(
+  formData: FormData,
+): { ok: true; fields: ListingWriteFields } | { ok: false; error: string } {
   const fields: ListingWriteFields = {};
 
   const title = optionalString(formData.get("title"));
@@ -111,16 +97,37 @@ function readListingFields(formData: FormData): ListingWriteFields {
     fields.mealsDescription = optionalString(formData.get("mealsDescription")) ?? null;
   }
 
-  const payMin = parseAmount(formData.get("payMin"));
-  if (payMin !== undefined) fields.payMin = payMin;
-  const payMax = parseAmount(formData.get("payMax"));
-  if (payMax !== undefined) fields.payMax = payMax;
+  if (
+    formData.has("payMin") ||
+    formData.has("payMax") ||
+    formData.has("payPeriod")
+  ) {
+    const pay = resolveListingPayDraft({
+      minInput:
+        typeof formData.get("payMin") === "string"
+          ? String(formData.get("payMin"))
+          : "",
+      maxInput:
+        typeof formData.get("payMax") === "string"
+          ? String(formData.get("payMax"))
+          : "",
+      unit:
+        typeof formData.get("payPeriod") === "string"
+          ? String(formData.get("payPeriod"))
+          : "",
+      currency: optionalString(formData.get("payCurrency")),
+    });
+    if (!pay.ok) return { ok: false, error: pay.error };
 
-  const payPeriod = resolvePayPeriod(formData.get("payPeriod"));
-  if (payPeriod !== undefined) fields.payPeriod = payPeriod;
-
-  const payCurrency = optionalString(formData.get("payCurrency"));
-  if (payCurrency !== undefined) fields.payCurrency = payCurrency;
+    // Explicit nulls are intentional: an edit with a cleared field must clear
+    // the old cents value instead of silently omitting that column from PATCH.
+    fields.payMin = pay.value.minAmount;
+    fields.payMax = pay.value.maxAmount;
+    fields.payPeriod = pay.value.unit;
+    if (formData.has("payCurrency")) {
+      fields.payCurrency = pay.value.currency;
+    }
+  }
 
   if (formData.has("startDate")) {
     fields.startDate = optionalString(formData.get("startDate")) ?? null;
@@ -146,7 +153,7 @@ function readListingFields(formData: FormData): ListingWriteFields {
     }
   }
 
-  return fields;
+  return { ok: true, fields };
 }
 
 export async function createListingAction(
@@ -157,7 +164,9 @@ export async function createListingAction(
     return { ok: false, error: authResult.error };
   }
 
-  const fields = readListingFields(formData);
+  const parsed = readListingFields(formData);
+  if (!parsed.ok) return parsed;
+  const { fields } = parsed;
   if (!isAllowedStorageUrl(fields.coverPhotoUrl)) {
     return { ok: false, error: "Invalid cover photo URL." };
   }
@@ -201,7 +210,9 @@ export async function updateListingAction(
     return { ok: false, error: authResult.error };
   }
 
-  const fields = readListingFields(formData);
+  const parsed = readListingFields(formData);
+  if (!parsed.ok) return parsed;
+  const { fields } = parsed;
   if (!isAllowedStorageUrl(fields.coverPhotoUrl)) {
     return { ok: false, error: "Invalid cover photo URL." };
   }

@@ -7,7 +7,11 @@ import { useRouter } from "next/navigation";
 import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
 
-import type { DiscoveryListing } from "../discovery";
+import {
+  BenefitTrustModal,
+  PayDetailsDrawer,
+  type DiscoveryListing,
+} from "../discovery";
 import { toDiscoveryCardData } from "../discovery/listing";
 import { FeaturedEmployersRail, type FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import {
@@ -265,6 +269,15 @@ function AnnouncementRail({ items }: { items: readonly HomeAnnouncement[] }) {
 function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
   const router = useRouter();
   const shown = listings.slice(0, 6);
+  const [activeBenefit, setActiveBenefit] = useState<{
+    readonly id: string;
+    readonly bucket: "housing" | "meals";
+  } | null>(null);
+  const [activePayId, setActivePayId] = useState<string | null>(null);
+  const activeBenefitListing =
+    shown.find((listing) => listing.id === activeBenefit?.id) ?? null;
+  const activePayListing =
+    shown.find((listing) => listing.id === activePayId) ?? null;
 
   return (
     <section className={styles.section} aria-labelledby="featured-jobs-title">
@@ -296,14 +309,25 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
               onOpen={(id) => router.push(`/listing/${id}`)}
               onApply={(id) => router.push(`/listing/${id}`)}
               onHostClick={() => router.push("/seek")}
-              onLocationClick={(id) => router.push(`/map?focus=${id}`)}
-              onHousingClick={(id) => router.push(`/listing/${id}`)}
-              onMealsClick={(id) => router.push(`/listing/${id}`)}
-              onPayClick={(id) => router.push(`/listing/${id}`)}
+              onLocationClick={listing.coordinates
+                ? (id) => router.push(`/map?focus=${id}`)
+                : undefined}
+              onHousingClick={(id) => setActiveBenefit({ id, bucket: "housing" })}
+              onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
+              onPayClick={setActivePayId}
             />
           ))}
         </div>
       )}
+      <BenefitTrustModal
+        listing={activeBenefitListing}
+        bucket={activeBenefit?.bucket ?? null}
+        onClose={() => setActiveBenefit(null)}
+      />
+      <PayDetailsDrawer
+        listing={activePayListing}
+        onClose={() => setActivePayId(null)}
+      />
     </section>
   );
 }

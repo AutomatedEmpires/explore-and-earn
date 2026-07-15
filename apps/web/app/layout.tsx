@@ -1,29 +1,20 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { Patrick_Hand, Cabin_Sketch, Inter } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import "../styles/tokens.css";
+import "../styles/base.css";
 import "../styles/primitives.css";
 
-// The locked 3-font stack (visual-system.md §2): Patrick Hand display,
-// Inter UI, Cabin Sketch marketing accents. Nothing else ships.
-const patrickHand = Patrick_Hand({
-	weight: "400",
+// Golden Hour Hybrid uses a single editorial display face and one UI face.
+const fraunces = Fraunces({
 	subsets: ["latin"],
-	variable: "--font-patrick-hand",
-	display: "swap",
-});
-
-const cabinSketch = Cabin_Sketch({
-	weight: ["400", "700"],
-	subsets: ["latin"],
-	variable: "--font-cabin-sketch",
+	variable: "--font-fraunces",
 	display: "swap",
 });
 
 const inter = Inter({
-	weight: ["400", "500", "600"],
 	subsets: ["latin"],
 	variable: "--font-inter",
 	display: "swap",
@@ -74,7 +65,7 @@ function AuthBoundary({ children }: { children: ReactNode }) {
 export default function RootLayout({ children }: { children: ReactNode }) {
 	return (
 		<AuthBoundary>
-			<html lang="en" className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable}`}>
+			<html lang="en" className={`${fraunces.variable} ${inter.variable}`}>
 				<body>
 					<SentryUserProvider />
 					<Providers>

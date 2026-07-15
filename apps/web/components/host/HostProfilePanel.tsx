@@ -8,7 +8,16 @@ import {
 } from "@explore-and-earn/ui";
 
 import { sparkFromCount } from "../../lib/sparkline";
-import type { HostProfileSummary, HostStats } from "./models";
+import {
+  deriveHostProfileReadiness,
+  type HostProfileReadinessField,
+  type HostProfileReadinessInput,
+} from "./hostReadiness";
+import {
+  resolveHostProfileReadinessInput,
+  type HostProfileSummary,
+  type HostStats,
+} from "./models";
 import styles from "./HostProfilePanel.module.css";
 
 export interface HostProfilePanelProps {
@@ -16,6 +25,8 @@ export interface HostProfilePanelProps {
   readonly stats: HostStats;
   /** Where the "Edit public profile" CTA routes. Presentation only. */
   readonly editHref?: string;
+  /** Raw persisted fields; explicit null means no host profile exists. */
+  readonly readinessProfile?: HostProfileReadinessInput | null;
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -36,10 +47,10 @@ const CATEGORY_ICON: Record<string, IconKey> = {
 
 /**
  * Profile-strength signals shown beside the editor. PRESENTATION ONLY — these
- * are conversion hints derived from what the host has already filled in (bio,
- * location, categories, verification, benefit promises). No scoring/matching is
- * computed here (match isolation is enforced by guardrails); each row simply
- * reflects whether a public-profile field is present.
+ * are readiness hints derived from public identity fields the host controls:
+ * organization, story, location, photo, and categories. Subscription-gated
+ * verification and truthful "not offered" benefit states do not affect profile
+ * completion. No scoring/matching is computed here.
  */
 interface ChecklistRow {
   readonly label: string;
@@ -47,36 +58,43 @@ interface ChecklistRow {
   readonly done: boolean;
 }
 
-function buildChecklist(profile: HostProfileSummary): readonly ChecklistRow[] {
-  return [
-    {
-      label: "Write a public bio",
-      hint: "Describe your farm, crew, and what a season looks like.",
-      done: Boolean(profile.bio && profile.bio.trim().length > 0),
-    },
-    {
-      label: "Add your home base",
-      hint: "Seekers filter and travel by region — show where you are.",
-      done: Boolean(profile.location && profile.location.trim().length > 0),
-    },
-    {
-      label: "Choose your categories",
-      hint: "Match into the right lanes — Farm, Maritime, Remote, Seasonal.",
-      done: (profile.categoryScopes?.length ?? 0) > 0,
-    },
-    {
-      label: "Set your housing & meals promise",
-      hint: "HOUSING and MEALS upfront build seeker trust before they apply.",
-      done: Boolean(
-        profile.housingOfferedGenerally || profile.mealsOfferedGenerally,
-      ),
-    },
-    {
-      label: "Get your Verified Host badge",
-      hint: "Automatic on any active paid plan — verified hosts convert more seekers per listing view.",
-      done: profile.verified,
-    },
-  ];
+const PROFILE_CHECKLIST_COPY: Record<
+  HostProfileReadinessField,
+  Pick<ChecklistRow, "label" | "hint">
+> = {
+  company: {
+    label: "Name your organization",
+    hint: "Use the organization name seekers will recognize.",
+  },
+  story: {
+    label: "Write a public bio",
+    hint: "Describe your operation, crew, and what the work feels like.",
+  },
+  location: {
+    label: "Add your home base",
+    hint: "Seekers plan travel by region — show where you are.",
+  },
+  photo: {
+    label: "Add a profile photo",
+    hint: "Give seekers a real visual identity for your organization.",
+  },
+  categories: {
+    label: "Choose your categories",
+    hint: "Place your opportunities in Farm, Maritime, Remote, or Seasonal.",
+  },
+};
+
+function buildChecklist(
+  readinessInput: HostProfileReadinessInput,
+): readonly ChecklistRow[] {
+  const readiness = deriveHostProfileReadiness(readinessInput);
+  const missing = new Set(readiness.missing);
+  return (Object.keys(PROFILE_CHECKLIST_COPY) as HostProfileReadinessField[]).map(
+    (key) => ({
+      ...PROFILE_CHECKLIST_COPY[key],
+      done: !missing.has(key),
+    }),
+  );
 }
 
 /**
@@ -93,8 +111,11 @@ export function HostProfilePanel({
   profile,
   stats,
   editHref = "/host/profile/edit",
+  readinessProfile,
 }: HostProfilePanelProps) {
-  const checklist = buildChecklist(profile);
+  const checklist = buildChecklist(
+    resolveHostProfileReadinessInput(profile, readinessProfile),
+  );
   const strength = deriveProfileStrength(checklist);
   const completeCount = checklist.filter((r) => r.done).length;
 

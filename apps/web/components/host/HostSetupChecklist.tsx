@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Icon } from "@explore-and-earn/ui";
 
+import type { HostReadiness } from "./hostReadiness";
 import styles from "./HostSetupChecklist.module.css";
 
 interface SetupStep {
@@ -14,12 +15,7 @@ interface SetupStep {
 }
 
 export interface HostSetupChecklistProps {
-  /** Host profile exists (a company/farm name is set). */
-  readonly hasProfile: boolean;
-  /** Total listings the host has created (any status). */
-  readonly listingCount: number;
-  /** Listings currently live in discovery. */
-  readonly liveCount: number;
+  readonly readiness: HostReadiness;
 }
 
 /**
@@ -27,34 +23,43 @@ export interface HostSetupChecklistProps {
  * opportunity live" checklist. Every step is derived from real dashboard signals
  * (no fabrication); the first incomplete step is promoted with the primary CTA
  * so a novice always has an obvious next action. Shown on the dashboard until the
- * host has a live listing, then it retires itself.
+ * public profile is complete and a listing is live, then it retires itself.
  */
 export function HostSetupChecklist({
-  hasProfile,
-  listingCount,
-  liveCount,
+  readiness,
 }: HostSetupChecklistProps) {
+  const hasListing = readiness.inventory !== "none";
+  const hasLiveListing = readiness.inventory === "live";
+  const listingStep = readiness.inventoryStep;
+  const finalStepLabel =
+    readiness.inventory === "under_review"
+      ? "Marketplace review"
+      : readiness.inventory === "inactive"
+        ? "Return to discovery"
+        : hasLiveListing
+          ? "Live in discovery"
+          : "Add photos & publish";
   const steps: readonly SetupStep[] = [
     {
       label: "Set up your host profile",
       hint: "Your public page — who seekers see they're applying to.",
       href: "/host/profile/edit",
       cta: "Edit profile",
-      done: hasProfile,
+      done: readiness.profile.ready,
     },
     {
       label: "Post your first opportunity",
       hint: "Add the role with Housing, Meals & Pay up front.",
       href: "/host/listings/new",
       cta: "Create listing",
-      done: listingCount > 0,
+      done: hasListing,
     },
     {
-      label: "Add photos & publish",
-      hint: "Framed photos, then submit for review to go live.",
-      href: listingCount > 0 ? "/host/listings" : "/host/listings/new",
-      cta: listingCount > 0 ? "Finish & publish" : "Create listing",
-      done: liveCount > 0,
+      label: finalStepLabel,
+      hint: listingStep.hint,
+      href: hasListing ? listingStep.href : "/host/listings/new",
+      cta: hasListing ? listingStep.cta : "Create listing",
+      done: hasLiveListing,
     },
   ];
   const doneCount = steps.filter((step) => step.done).length;
@@ -70,7 +75,9 @@ export function HostSetupChecklist({
         <div className="host-panel__titles">
           <span className="host-panel__eyebrow">Getting started</span>
           <h2 id="host-setup-heading" className="host-panel__title">
-            Get your first opportunity live
+            {hasLiveListing
+              ? "Finish your marketplace setup"
+              : "Get your first opportunity live"}
           </h2>
         </div>
         <span

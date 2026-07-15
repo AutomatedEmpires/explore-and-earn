@@ -96,11 +96,14 @@ export interface SeekerResumeCardProps {
   readonly resume: SeekerResume;
   /** Override display name (e.g. from host view when name is known separately) */
   readonly displayNameOverride?: string | null;
+  /** Keep credential affordances readable but non-interactive in previews. */
+  readonly interactive?: boolean;
 }
 
 export function SeekerResumeCard({
   resume,
   displayNameOverride,
+  interactive = true,
 }: SeekerResumeCardProps) {
   const profile = resume.profile;
   const displayName =
@@ -294,17 +297,31 @@ export function SeekerResumeCard({
                 )}
                 {cert.credentialUrl && (() => {
                   const safeHref = safeExternalUrl(cert.credentialUrl);
-                  return safeHref ? (
+                  if (!safeHref) return null;
+
+                  const label = (
+                    <>
+                      View credential
+                      <Icon name="action.forward" size={16} aria-hidden />
+                    </>
+                  );
+
+                  return interactive ? (
                     <a
                       href={safeHref}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={styles.credLink}
                     >
-                      View credential
-                      <Icon name="action.forward" size={16} aria-hidden />
+                      {label}
                     </a>
-                  ) : null;
+                  ) : (
+                    <span
+                      className={`${styles.credLink} ${styles.credLinkPreview}`}
+                    >
+                      {label}
+                    </span>
+                  );
                 })()}
               </div>
             ))}

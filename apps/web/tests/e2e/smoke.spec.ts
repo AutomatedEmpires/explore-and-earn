@@ -48,6 +48,7 @@ test.describe("public surfaces (guest)", () => {
     await expect(publicNav(page)).toBeVisible();
     await expect(seekerNav(page)).toHaveCount(0);
     await expect(hostNav(page)).toHaveCount(0);
+    await expect(page.getByText(/% match/i)).toHaveCount(0);
   });
 
   test("/search renders the shared public dock and never error-boundaries", async ({
@@ -57,9 +58,8 @@ test.describe("public surfaces (guest)", () => {
 
     await expect(publicNav(page)).toHaveCount(1);
     await expect(hostNav(page)).toHaveCount(0);
-    // Guards the anon data path end-to-end (migration 056's grant): a missing
-    // RLS column grant previously crashed anonymous /search behind HTTP 200.
-    // Do not weaken this assertion.
+    // The keyless E2E harness intentionally uses canonical no-config fixtures;
+    // assert the complete public shell still reaches meaningful DOM.
     await expect(page.getByText(/something went sideways/i)).toHaveCount(0);
   });
 
@@ -67,9 +67,11 @@ test.describe("public surfaces (guest)", () => {
     page,
   }) => {
     await expectRouteToLoad("/seek", page);
-    // A data-layer failure (e.g. an RLS column grant missing for anon) renders
-    // the route error boundary behind HTTP 200 — assert the real content
-    // world rendered instead. (Caught live: migration 056.)
+    // HTTP 200 alone can still hide a streamed error boundary, so assert the
+    // real content world rendered rather than a loading or failure shell.
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Seek opportunities" }),
+    ).toBeVisible();
     await expect(page.getByText(/something went sideways/i)).toHaveCount(0);
   });
 
@@ -122,6 +124,9 @@ test.describe("impersonated seeker (dev bench)", () => {
     await expect(seekerNav(page)).toHaveCount(1);
     await expect(seekerNav(page)).toBeVisible();
     await expect(hostNav(page)).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1, name: "Swipe" })).toBeVisible();
+    await expect(page.locator("article").first()).toBeVisible();
+    await expect(page.getByText(/something went sideways/i)).toHaveCount(0);
   });
 });
 

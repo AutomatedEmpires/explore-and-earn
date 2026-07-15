@@ -372,14 +372,14 @@
   font-weight: var(--font-weight-semibold);
   text-decoration: none;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(26, 142, 206, 0.28);
+  box-shadow: var(--elevation-card);
   transition: background var(--motion-fast) var(--ease-standard),
               box-shadow  var(--motion-fast) var(--ease-standard);
 }
 
 .ctaPrimary:hover {
-  background: var(--palette-sky-dark);
-  box-shadow: 0 4px 12px rgba(26, 142, 206, 0.38);
+  background: var(--palette-amber-deep);
+  box-shadow: var(--elevation-hover);
 }
 
 .ctaPrimary:focus-visible {

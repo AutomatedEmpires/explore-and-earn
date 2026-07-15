@@ -81,7 +81,7 @@ function ListingSection({
 						onHousingClick={(lid) => onBenefit({ id: lid, bucket: "housing" })}
 						onMealsClick={(lid) => onBenefit({ id: lid, bucket: "meals" })}
 						onPayClick={onPay}
-						onLocationClick={onLocation}
+						onLocationClick={listing.coordinates ? onLocation : undefined}
 						onReport={onReport}
 					/>
 				))}
@@ -475,7 +475,9 @@ export function SeekBrowser({
 									onHousingClick={(id) => setActiveBenefit({ id, bucket: "housing" })}
 									onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
 									onPayClick={(id) => setActivePayId(id)}
-									onLocationClick={(id) => router.push(`/map?focus=${id}`)}
+									onLocationClick={listing.coordinates
+										? (id) => router.push(`/map?focus=${id}`)
+										: undefined}
 									onReport={(id) => setReportId(id)}
 								/>
 							))}

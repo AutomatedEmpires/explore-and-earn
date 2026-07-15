@@ -1,119 +1,210 @@
 /**
- * Triad-first quick filters — a prominent, scannable chip row. Token-driven so
- * it themes to the seeker scope; horizontally scrollable on mobile (no wrap
- * overflow); triad chips carry their benefit accent when active.
+ * Triad-first quick filters.
+ *
+ * A single horizontal decision strip on phones and a quiet editorial toolbar
+ * on larger screens. Benefit and category meaning comes from the locked token
+ * pairs; the controls never fall back to raw browser button styling.
  */
 
 .root {
-  margin-bottom: var(--space-12);
+	min-width: 0;
+	margin: 0;
 }
 
 .scroll {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  overflow-x: auto;
-  padding-bottom: var(--space-4);
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	min-width: 0;
+	overflow-x: auto;
+	overscroll-behavior-inline: contain;
+	padding: var(--space-2);
+	scroll-padding-inline: var(--space-2);
+	scroll-snap-type: x proximity;
+	scrollbar-width: none;
+	-webkit-overflow-scrolling: touch;
 }
+
 .scroll::-webkit-scrollbar {
-  display: none;
+	display: none;
 }
 
 .triad,
 .lanes {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  flex: none;
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	flex: none;
 }
 
 .divider {
-  flex: none;
-  width: 1px;
-  height: 24px;
-  background: var(--border-soft);
+	flex: none;
+	width: 1px;
+	height: 1.5rem;
+	margin-inline: var(--space-2);
+	background: var(--border-soft);
 }
 
 .chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-  min-height: var(--tap-min, 44px);
-  padding: 0 var(--space-14);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-soft);
-  background: var(--color-surface);
-  color: var(--text-secondary);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard),
-    transform var(--motion-fast) var(--ease-standard);
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min, 44px);
+	padding: 0 var(--space-14);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
+	appearance: none;
+	-webkit-appearance: none;
+	background: var(--color-surface-raised);
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: 1;
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+	cursor: pointer;
+	scroll-snap-align: start;
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--palette-white) 74%, transparent);
+	transition:
+		background var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard),
+		color var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard),
+		transform var(--motion-fast) var(--ease-standard);
 }
 
 .chip:hover {
-  border-color: var(--border-ink);
-  color: var(--text-primary);
+	border-color: color-mix(in srgb, var(--color-teal) 38%, var(--border-soft));
+	color: var(--text-primary);
+	box-shadow: var(--elev-whisper, var(--elevation-card));
+	transform: translateY(-1px);
 }
 
 .chip:active {
-  transform: scale(0.97);
+	transform: translateY(0) scale(0.97);
 }
 
 .chip:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
-/* Active (generic lane) — tinted accent fill, never a heavy block. */
+/* Generic selected treatment; category lanes below replace it with their own
+   paired background/foreground tokens. */
 .chip[data-on] {
-  background: color-mix(in srgb, var(--color-cta) 18%, transparent);
-  border-color: color-mix(in srgb, var(--color-cta) 50%, transparent);
-  color: var(--color-cta);
+	border-color: color-mix(in srgb, var(--color-teal) 48%, transparent);
+	background: var(--palette-teal-light, var(--color-action-soft));
+	color: var(--palette-teal-deep, var(--color-teal));
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-teal) 8%, transparent);
 }
 
-/* Active triad chips carry their own benefit colour — the signature. */
+/* Housing + meals remain Explore&Earn's signature first decisions. */
 .housing[data-on] {
-  background: var(--benefit-housing-bg);
-  border-color: color-mix(in srgb, var(--benefit-housing-fg) 50%, transparent);
-  color: var(--benefit-housing-fg);
+	border-color: color-mix(in srgb, var(--benefit-housing-fg) 42%, transparent);
+	background: var(--benefit-housing-bg);
+	color: var(--benefit-housing-fg);
 }
+
 .meals[data-on] {
-  background: var(--benefit-meals-bg);
-  border-color: color-mix(in srgb, var(--benefit-meals-fg) 50%, transparent);
-  color: var(--benefit-meals-fg);
+	border-color: color-mix(in srgb, var(--benefit-meals-fg) 42%, transparent);
+	background: var(--benefit-meals-bg);
+	color: var(--benefit-meals-fg);
+}
+
+/* LANES order is founder-locked in SeekQuickFilters.tsx:
+   farm · maritime · remote · seasonal. */
+.lanes .chip:nth-child(1)[data-on] {
+	border-color: color-mix(in srgb, var(--accent-farm-fg) 42%, transparent);
+	background: var(--accent-farm-bg);
+	color: var(--accent-farm-fg);
+}
+
+.lanes .chip:nth-child(2)[data-on] {
+	border-color: color-mix(in srgb, var(--accent-maritime-fg) 42%, transparent);
+	background: var(--accent-maritime-bg);
+	color: var(--accent-maritime-fg);
+}
+
+.lanes .chip:nth-child(3)[data-on] {
+	border-color: color-mix(in srgb, var(--accent-remote-fg) 42%, transparent);
+	background: var(--accent-remote-bg);
+	color: var(--accent-remote-fg);
+}
+
+.lanes .chip:nth-child(4)[data-on] {
+	border-color: color-mix(in srgb, var(--accent-seasonal-fg) 42%, transparent);
+	background: var(--accent-seasonal-bg);
+	color: var(--accent-seasonal-fg);
 }
 
 .more {
-  margin-left: auto;
+	margin-left: auto;
+	border-color: color-mix(in srgb, var(--color-gold) 28%, var(--border-soft));
+}
+
+.more:hover {
+	border-color: color-mix(in srgb, var(--color-gold) 54%, var(--border-soft));
+	background: color-mix(in srgb, var(--color-gold) 8%, var(--color-surface-raised));
+	color: var(--palette-amber-deep, var(--text-primary));
 }
 
 .count {
-  display: grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: var(--radius-pill);
-  background: var(--color-cta);
-  color: var(--color-cta-text);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-weight-bold);
+	display: grid;
+	place-items: center;
+	min-width: 1.125rem;
+	height: 1.125rem;
+	padding: 0 var(--space-4);
+	border-radius: var(--radius-pill);
+	background: var(--gradient-amber, var(--gradient-gold));
+	color: var(--color-cta-text);
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-bold);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-gold) 30%, transparent);
+}
+
+@media (max-width: 639px) {
+	/* Let the strip reach the panel edges so its final clipped chip clearly
+	   communicates horizontal continuation, without clipping focus rings. */
+	.root {
+		margin-inline: calc(-1 * var(--space-12));
+	}
+
+	.scroll {
+		gap: var(--space-6);
+		padding: var(--space-2) var(--space-12) var(--space-4);
+		scroll-padding-inline: var(--space-12);
+	}
+
+	.triad,
+	.lanes {
+		gap: var(--space-6);
+	}
+
+	.chip {
+		min-height: 2.5rem;
+		padding-inline: var(--space-12);
+		font-size: var(--type-meta-size);
+	}
+
+	.divider {
+		margin-inline: var(--space-2);
+	}
+
+	.more {
+		margin-left: 0;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chip {
-    transition: none;
-  }
-  .chip:active {
-    transform: none;
-  }
+	.chip {
+		transition: none;
+	}
+
+	.chip:hover,
+	.chip:active {
+		transform: none;
+	}
 }

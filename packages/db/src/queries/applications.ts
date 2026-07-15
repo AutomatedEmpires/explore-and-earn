@@ -10,6 +10,8 @@ import type {
 import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
+import { projectEmbeddedListingPay } from "../lib/embeddedListingPay";
+import { transitionSeekerApplication } from "./seekerApplicationTransitions";
 
 export interface ApplyResult {
   readonly ok: boolean;
@@ -107,8 +109,7 @@ export async function getSeekerApplicationIds(
   const { data, error } = await authedClient(clerkToken)
     .from("applications")
     .select("listing_id")
-    .eq("seeker_profile_id", seekerProfileId)
-    .neq("status", "withdrawn");
+    .eq("seeker_profile_id", seekerProfileId);
 
   if (error) {
     throw new Error(`getSeekerApplicationIds: ${error.message}`);
@@ -121,6 +122,7 @@ export interface SeekerApplication {
   readonly id: string;
   readonly listingId: string;
   readonly status: string;
+  readonly withdrawnReason: string | null;
   readonly submittedAt: string;
   readonly expiresAt: string | null;
 }
@@ -137,7 +139,7 @@ export async function getSeekerApplications(
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data, error } = await untyped
     .from("applications")
-    .select("id, listing_id, status, submitted_at, expires_at")
+    .select("id, listing_id, status, withdrawn_reason, submitted_at, expires_at")
     .eq("seeker_profile_id", seekerProfileId)
     .order("submitted_at", { ascending: false });
 
@@ -149,6 +151,8 @@ export async function getSeekerApplications(
     id: row.id as string,
     listingId: row.listing_id as string,
     status: row.status as string,
+    withdrawnReason:
+      typeof row.withdrawn_reason === "string" ? row.withdrawn_reason : null,
     submittedAt: typeof row.submitted_at === "string" ? row.submitted_at : "",
     expiresAt: typeof row.expires_at === "string" ? row.expires_at : null,
   }));
@@ -456,42 +460,6 @@ export type ApplicationWithListing = SeekerApplication & {
   readonly listing: ApplicationListing | null;
 };
 
-function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    return row.compensation_summary;
-  }
-  const minCents =
-    typeof row.compensation_min_cents === "number"
-      ? row.compensation_min_cents
-      : null;
-  if (minCents != null) {
-    const unit =
-      typeof row.compensation_unit === "string"
-        ? row.compensation_unit
-        : "other";
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(minCents);
-    const maxCents =
-      typeof row.compensation_max_cents === "number"
-        ? row.compensation_max_cents
-        : null;
-    const max = maxCents != null ? fmt(maxCents) : null;
-    const range = max && max !== min ? `${min}\u2013${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
-}
-
 function rowToDiscoveryListing(value: unknown): ApplicationListing | null {
   const row = firstOf(value);
   if (!row) {
@@ -502,13 +470,14 @@ function rowToDiscoveryListing(value: unknown): ApplicationListing | null {
     row.housing_included === true ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision =
     row.meals_included === true ? "provided" : "not_provided";
+  const pay = projectEmbeddedListingPay(row);
 
   const benefits: BenefitTriad = {
     housing: { provision: housingProvision },
     meals: { provision: mealsProvision },
     pay: {
-      provision: "provided",
-      summary: embeddedCompensationSummary(row),
+      provision: pay.provision,
+      summary: pay.summary,
     },
   };
 
@@ -554,7 +523,7 @@ export async function getSeekerApplicationsWithListings(
   const { data, error } = await untyped
     .from("applications")
     .select(
-      "id, listing_id, status, submitted_at, expires_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)",
+      "id, listing_id, status, withdrawn_reason, submitted_at, expires_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, compensation_currency, timeline_summary)",
     )
     .eq("seeker_profile_id", seekerProfileId)
     .in("status", statuses)
@@ -570,6 +539,8 @@ export async function getSeekerApplicationsWithListings(
       id: String(r.id),
       listingId: String(r.listing_id),
       status: typeof r.status === "string" ? r.status : "applied",
+      withdrawnReason:
+        typeof r.withdrawn_reason === "string" ? r.withdrawn_reason : null,
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
       expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
       listing: rowToDiscoveryListing(r.listings),
@@ -585,7 +556,7 @@ export async function getSeekerApplicationsWithListings(
  * Statuses the SEEKER may set from their own /applied dashboard.
  * Only accept/decline a live offer. Host-settable statuses live above.
  */
-const SEEKER_SETTABLE_STATUSES = ["accepted", "not_selected"] as const;
+const SEEKER_SETTABLE_STATUSES = ["accepted", "withdrawn"] as const;
 export type SeekerSettableStatus = (typeof SEEKER_SETTABLE_STATUSES)[number];
 
 /**
@@ -604,7 +575,7 @@ export type SeekerApplicationWithListing = SeekerApplication & {
 };
 
 const SEEKER_APPLICATION_SELECT =
-  "id, listing_id, status, cover_message, submitted_at, expires_at, " +
+  "id, listing_id, status, withdrawn_reason, cover_message, submitted_at, expires_at, " +
   "listings!listing_id(id, title, category, location_display, status, " +
   "housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
@@ -630,13 +601,14 @@ function rowToSeekerApplicationListing(
     row.housing_included === true ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision =
     row.meals_included === true ? "provided" : "not_provided";
+  const pay = projectEmbeddedListingPay(row);
 
   const benefits: BenefitTriad = {
     housing: { provision: housingProvision },
     meals: { provision: mealsProvision },
     pay: {
-      provision: "provided",
-      summary: embeddedCompensationSummary(row),
+      provision: pay.provision,
+      summary: pay.summary,
     },
   };
 
@@ -695,6 +667,8 @@ export async function getApplicationsForSeekerWithListings(
       id: String(r.id),
       listingId: String(r.listing_id),
       status: typeof r.status === "string" ? r.status : "applied",
+      withdrawnReason:
+        typeof r.withdrawn_reason === "string" ? r.withdrawn_reason : null,
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
       expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
       coverMessage:
@@ -733,6 +707,8 @@ export async function getApplicationById(
     id: String(r.id),
     listingId: String(r.listing_id),
     status: typeof r.status === "string" ? r.status : "applied",
+    withdrawnReason:
+      typeof r.withdrawn_reason === "string" ? r.withdrawn_reason : null,
     submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
     expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
     coverMessage:
@@ -748,7 +724,7 @@ export async function getApplicationById(
  *  1. newStatus is in SEEKER_SETTABLE_STATUSES
  *  2. Caller owns the application (seeker_profile_id matches)
  *  3. Current application status is 'offered' (can only act on a live offer)
- *  4. When accepting: the listing still has remaining capacity
+ *  4. The scoped RPC atomically revalidates ownership, state, and capacity
  */
 export async function updateApplicationStatusBySeeker(
   clerkToken: string,
@@ -759,6 +735,7 @@ export async function updateApplicationStatusBySeeker(
   if (!(SEEKER_SETTABLE_STATUSES as readonly string[]).includes(newStatus)) {
     return { ok: false, error: "invalid_status" };
   }
+  const seekerStatus = newStatus as SeekerSettableStatus;
 
   const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
@@ -784,41 +761,11 @@ export async function updateApplicationStatusBySeeker(
     return { ok: false, error: "invalid_transition" };
   }
 
-  // Pre-check capacity before accepting so seekers receive a clear error
-  // instead of a raw Postgres CHECK-violation. The DB constraint is the
-  // authoritative guard; this avoids the round-trip when obviously full.
-  if (newStatus === "accepted") {
-    const { data: listingRow, error: listingError } = await untyped
-      .from("listings")
-      .select("remaining_role_count")
-      .eq("id", String(row.listing_id))
-      .maybeSingle();
-    if (listingError) return { ok: false, error: listingError.message };
-    const remaining = Number(
-      (listingRow as Record<string, unknown> | null)?.remaining_role_count ?? 0,
-    );
-    if (remaining <= 0) {
-      return { ok: false, error: "listing_full" };
-    }
-  }
-
-  const { error: updateError } = await untyped
-    .from("applications")
-    .update({ status: newStatus })
-    .eq("id", applicationId)
-    .eq("seeker_profile_id", seekerProfileId);
-
-  if (updateError) {
-    // 23514 = check_violation. Distinguish lifecycle guard (message starts with
-    // "Illegal ") from a capacity violation on the listings CHECK constraint.
-    const code = (updateError as { code?: string; message?: string }).code;
-    const msg = (updateError as { message?: string }).message ?? "";
-    if (code === CHECK_VIOLATION && !msg.startsWith("Illegal ") && newStatus === "accepted") {
-      return { ok: false, error: "listing_full" };
-    }
-    return { ok: false, error: msg || updateError.message };
-  }
-  return { ok: true };
+  return transitionSeekerApplication(
+    clerkToken,
+    applicationId,
+    seekerStatus === "accepted" ? "accept_offer" : "decline_offer",
+  );
 }
 
 /* -------------------------------------------------------------------------- */

@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { Icon } from "@explore-and-earn/ui";
-import { ANNOUNCEMENT_MONTHLY_QUOTA } from "@explore-and-earn/contracts";
+import {
+  ANNOUNCEMENT_MONTHLY_QUOTA,
+  ANNOUNCEMENT_PRICE_CENTS,
+} from "@explore-and-earn/contracts";
 
 import type {
   ActivateDraftResult,
@@ -13,7 +16,6 @@ import {
   activateDraftAnnouncementAction,
   createAnnouncementCheckoutAction,
   postHostAnnouncementAction,
-  ANNOUNCEMENT_PRICE_CENTS,
 } from "../../app/actions/community";
 import styles from "./HostAnnouncementComposer.module.css";
 

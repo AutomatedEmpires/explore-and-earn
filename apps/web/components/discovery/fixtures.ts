@@ -11,6 +11,9 @@ import { cloudinaryPhoto } from "@explore-and-earn/ui";
  * only to place a marker on the /map Mapbox surface. The "Remote · Worldwide"
  * listing intentionally has no coordinates — it is discoverable in the feed but
  * omitted from the map.
+ *
+ * Fixtures intentionally omit `matchScore`: fit is seeker-specific and must be
+ * produced by the authenticated scoring pipeline, never static demo content.
  */
 export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
   {
@@ -42,7 +45,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     coverImageUrl: cloudinaryPhoto("farm", "sokmean-nou-mjeqdrpwefc", "hero"),
-    matchScore: 88,
     founding: true,
     payInsight: {
       meterValue: 68,
@@ -120,7 +122,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
         alt: "Cozy cabin desk with a laptop overlooking pines",
       },
     },
-    matchScore: 72,
     coverImageUrl: cloudinaryPhoto("remote", "kevin-schmid-mta8r0bxhbo", "hero"),
     visaSupport: true,
     payInsight: {
@@ -199,7 +200,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
         alt: "Bright communal courtyard of a tiled eco-hostel",
       },
     },
-    matchScore: 65,
     visaSupport: true,
     payInsight: {
       meterValue: 54,

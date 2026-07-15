@@ -9,7 +9,7 @@ import {
 } from "@explore-and-earn/db";
 import { matchBandFor } from "@explore-and-earn/contracts";
 import { cachedSeekerProfile, getPublicListingsCached } from "../../lib/serverCache";
-import { isDevBenchEnabled } from "../../lib/devBench";
+import { DEV_USER_ID, isDevBenchEnabled } from "../../lib/devBench";
 import { DISCOVERY_FIXTURES } from "./fixtures";
 import type { DiscoveryListing } from "./listing";
 
@@ -164,7 +164,7 @@ export async function getSwipeListings(
   cursor?: string,
 ): Promise<SwipeBatch> {
   // DEV MOCK BENCH: serve a fixture deck so /swipe renders without a real token.
-  if (isDevBenchEnabled()) {
+  if (isDevBenchEnabled() && clerkUserId === DEV_USER_ID) {
     return { listings: [...DISCOVERY_FIXTURES], nextCursor: null };
   }
   const rows = await getSwipeBatch(clerkToken, clerkUserId, excludeIds, cursor);

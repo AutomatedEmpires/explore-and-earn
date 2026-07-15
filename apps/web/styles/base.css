@@ -1,0 +1,159 @@
+/**
+ * Browser baseline.
+ *
+ * Component styles continue to own their controls. The zero-specificity field
+ * rules below are an intentional fallback for native inputs that have not yet
+ * moved onto a shared primitive.
+ */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	min-width: 320px;
+	background: var(--color-paper);
+	color-scheme: light;
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+}
+
+body {
+	min-height: 100%;
+	margin: 0;
+	background: var(--color-paper);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-optical-sizing: auto;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+}
+
+:where(h1, h2, h3, h4, p, figure, blockquote, dl, dd) {
+	margin: 0;
+}
+
+:where(img, picture, video, canvas, svg) {
+	display: block;
+	max-width: 100%;
+}
+
+:where(button, input, select, textarea) {
+	font: inherit;
+	color: inherit;
+}
+
+:where(button) {
+	-webkit-tap-highlight-color: transparent;
+}
+
+:where(a) {
+	color: inherit;
+}
+
+:where(
+	input:not([type="button"]):not([type="checkbox"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="image"]):not([type="radio"]):not([type="range"]):not([type="reset"]):not([type="submit"]),
+	select,
+	textarea
+) {
+	width: 100%;
+	min-height: var(--tap-min);
+	padding: var(--space-12) var(--space-14);
+	border: 1px solid var(--field-border);
+	border-radius: var(--radius-input);
+	background: var(--field-bg);
+	box-shadow: var(--elev-whisper);
+	transition:
+		border-color var(--motion-fast) var(--ease-out),
+		box-shadow var(--motion-fast) var(--ease-out),
+		background-color var(--motion-fast) var(--ease-out);
+}
+
+:where(
+	input:not([type="button"]):not([type="checkbox"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="image"]):not([type="radio"]):not([type="range"]):not([type="reset"]):not([type="submit"]),
+	select,
+	textarea
+):hover:not(:disabled) {
+	border-color: var(--palette-line-strong);
+}
+
+:where(
+	input:not([type="button"]):not([type="checkbox"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="image"]):not([type="radio"]):not([type="range"]):not([type="reset"]):not([type="submit"]),
+	select,
+	textarea
+):focus-visible {
+	outline: none;
+	border-color: var(--field-border-focus);
+	box-shadow: var(--ui-focus-ring);
+}
+
+:where(textarea) {
+	min-height: 7rem;
+	resize: vertical;
+}
+
+:where(input[type="checkbox"], input[type="radio"]) {
+	width: 1rem;
+	height: 1rem;
+	accent-color: var(--color-cta);
+}
+
+:where(input, select, textarea)::placeholder {
+	color: var(--field-placeholder);
+	opacity: 1;
+}
+
+:where(
+	input:not([type="button"]):not([type="checkbox"]):not([type="color"]):not([type="file"]):not([type="hidden"]):not([type="image"]):not([type="radio"]):not([type="range"]):not([type="reset"]):not([type="submit"]),
+	select,
+	textarea
+):disabled {
+	border-color: var(--border-soft);
+	background: var(--field-disabled-bg);
+	color: var(--text-muted);
+	box-shadow: none;
+}
+
+:where(button, input, select, textarea):disabled {
+	cursor: not-allowed;
+}
+
+.grain {
+	position: relative;
+	isolation: isolate;
+}
+
+.grain::after {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	border-radius: inherit;
+	background-image: var(--grain);
+	background-repeat: repeat;
+	background-size: var(--grain-size);
+	content: "";
+	mix-blend-mode: overlay;
+	opacity: var(--grain-opacity);
+	pointer-events: none;
+}
+
+::selection {
+	background: var(--palette-amber-light);
+	color: var(--text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:where(input, select, textarea) {
+		transition: none;
+	}
+}
+
+@media (forced-colors: active) {
+	.grain::after {
+		display: none;
+	}
+}

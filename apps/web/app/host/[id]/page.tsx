@@ -11,12 +11,20 @@ import {
 } from "@explore-and-earn/db";
 import { getPublicHostProfileCached } from "../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
-import type { MarketplaceCategory } from "@explore-and-earn/contracts";
+import {
+  projectListingPay,
+  type MarketplaceCategory,
+} from "@explore-and-earn/contracts";
 
 import { HostProfileHero } from "../../../components/host/HostProfileHero";
 import { HostTrustBand } from "../../../components/host/HostTrustBand";
 import { HostReviews } from "../../../components/host/HostReviews";
 import { LeaveReview } from "../../../components/host/LeaveReview";
+import {
+  buildPublicHostLocationContext,
+  type PublicHostLocationContext,
+  type PublicHostLocationPoint,
+} from "../../../components/host/publicHostLocation";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { generateBreadcrumbJsonLd } from "../../../lib/seo";
 import { isUuid } from "../../../lib/ids";
@@ -202,7 +210,16 @@ function ListingsSection({
 
       {hasListings ? (
         <div className={styles.listingsGrid}>
-          {listings.map((listing) => (
+          {listings.map((listing) => {
+            const pay = projectListingPay({
+              summary: listing.compensationSummary,
+              minCents: listing.compensationMinCents,
+              maxCents: listing.compensationMaxCents,
+              unit: listing.compensationUnit,
+              currency: listing.compensationCurrency,
+            });
+
+            return (
             <article key={listing.id} className={styles.listingArticle}>
               {/* Category band */}
               <Link href={`/listing/${listing.id}`} className={styles.listingLink}>
@@ -248,26 +265,16 @@ function ListingsSection({
                         Meals
                       </span>
                     ) : null}
-                    {listing.compensationSummary ?? (listing.compensationMinCents != null
-                      ? (
-                        <span className={styles.listingPay}>
-                          <Icon name="analytics.meter" size={16} aria-hidden />
-                          {new Intl.NumberFormat("en-US", {
-                            style: "currency",
-                            currency: listing.compensationCurrency,
-                            maximumFractionDigits: 0,
-                          }).format(listing.compensationMinCents / 100)}
-                          {listing.compensationUnit && listing.compensationUnit !== "other"
-                            ? `/${listing.compensationUnit}`
-                            : ""}
-                        </span>
-                      )
-                      : null)}
+                    <span className={styles.listingPay}>
+                      <Icon name="analytics.meter" size={16} aria-hidden />
+                      {pay.summary}
+                    </span>
                   </div>
                 </div>
               </Link>
             </article>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className={styles.emptyListings}>
@@ -286,34 +293,82 @@ function ListingsSection({
   );
 }
 
-function LocationMapCard({ location }: { location: string }) {
-  const mapsUrl = `https://maps.google.com/?q=${encodeURIComponent(location)}`;
+function LocationName({ location }: { location: PublicHostLocationPoint }) {
+  if (!location.mapsUrl) {
+    return <span className={styles.locationName}>{location.label}</span>;
+  }
   return (
-    <div className={styles.mapCard}>
-      {/* Topographic map surface — no paid API, clean placeholder */}
-      <div className={styles.mapSurface} aria-hidden>
-        <div className={styles.mapContours} />
-        <div className={styles.mapPin}>
-          <Icon name="nav.map" size={20} aria-hidden />
+    <a
+      href={location.mapsUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={styles.locationNameLink}
+      aria-label={`Open ${location.label} in Maps`}
+    >
+      {location.label}
+      <Icon name="action.forward" size={16} aria-hidden />
+    </a>
+  );
+}
+
+function LocationContextCard({
+  context,
+}: {
+  context: PublicHostLocationContext;
+}) {
+  return (
+    <section
+      className={styles.locationCard}
+      aria-labelledby="host-location-heading"
+    >
+      <header className={styles.locationHead}>
+        <span className={styles.locationIcon} aria-hidden>
+          <Icon name="nav.map" size={20} />
+        </span>
+        <div>
+          <span className={styles.locationEyebrow}>Location context</span>
+          <h3 id="host-location-heading" className={styles.locationTitle}>
+            Where this host operates
+          </h3>
         </div>
-      </div>
-      <div className={styles.mapBody}>
-        <h3 className={styles.mapTitle}>Location</h3>
-        <p className={styles.mapLocation}>
-          <Icon name="nav.map" size={16} aria-hidden />
-          {location}
-        </p>
-        <a
-          href={mapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={styles.mapLink}
-        >
-          Open in Maps
-          <Icon name="action.forward" size={16} aria-hidden />
-        </a>
-      </div>
-    </div>
+      </header>
+
+      {context.hostBase ? (
+        <div className={styles.locationBase}>
+          <span className={styles.locationLabel}>Host base</span>
+          <LocationName location={context.hostBase} />
+        </div>
+      ) : null}
+
+      {context.opportunityLocations.length > 0 ? (
+        <div className={styles.locationOpportunities}>
+          <span className={styles.locationLabel}>Current opportunities</span>
+          <ul className={styles.locationList}>
+            {context.opportunityLocations.map((location) => (
+              <li
+                key={location.label.toLocaleLowerCase("en-US")}
+                className={styles.locationRow}
+              >
+                <LocationName location={location} />
+                <span className={styles.locationCount}>
+                  {location.opportunityCount === 1
+                    ? "1 live opportunity"
+                    : `${location.opportunityCount} live opportunities`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <p className={styles.locationSource}>
+        {context.hostBase
+          ? context.opportunityLocations.length > 0
+            ? "From this host’s public profile and live opportunities."
+            : "From this host’s public profile."
+          : "From this host’s live opportunities."}
+      </p>
+    </section>
   );
 }
 
@@ -397,8 +452,13 @@ export default async function PublicHostProfilePage({ params }: Props) {
     ? new Date(host.createdAt).getFullYear()
     : null;
 
+  const locationContext = buildPublicHostLocationContext(
+    host.primaryLocationName,
+    listings,
+  );
+
   const hasSidebar =
-    !!host.primaryLocationName ||
+    locationContext !== null ||
     host.housingOfferedGenerally ||
     host.mealsOfferedGenerally;
 
@@ -457,11 +517,11 @@ export default async function PublicHostProfilePage({ params }: Props) {
           <ListingsSection listings={listings} />
         </div>
 
-        {/* Sidebar: location, housing/meals — only renders if data exists */}
+        {/* Sidebar: persisted location context + host-level benefit promises. */}
         {hasSidebar ? (
           <aside className={styles.sidebar}>
-            {host.primaryLocationName ? (
-              <LocationMapCard location={host.primaryLocationName} />
+            {locationContext ? (
+              <LocationContextCard context={locationContext} />
             ) : null}
             {(host.housingOfferedGenerally || host.mealsOfferedGenerally) ? (
               <HousingMealsCard

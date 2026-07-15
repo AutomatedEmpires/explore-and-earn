@@ -157,10 +157,37 @@
 }
 
 .triadCell {
+  width: 100%;
   padding: var(--space-16);
   border-radius: var(--radius-card);
   border: 1px solid var(--cell-border);
   background-color: var(--cell-bg);
+  text-align: left;
+}
+
+.triadButton {
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.triadButton:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elevation-card);
+}
+
+.triadButton:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.triadCell.triadCellNotProvided {
+  --cell-bg: var(--status-error-bg);
+  --cell-border: var(--status-error-fg);
+  --cell-fg: var(--status-error-fg);
 }
 
 .triadCellHousing {
@@ -198,9 +225,16 @@
 }
 
 .triadValue {
+  display: block;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   color: var(--cell-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .triadButton {
+    transition: none;
+  }
 }
 
 /* ─── Description ─────────────────────────────────────────────────────────── */
@@ -256,6 +290,18 @@
   z-index: var(--z-content-bar);
 }
 
+/* The public dock is hidden on desktop, so the action bar returns to the
+   viewport edge and the page only reserves space for the bar itself. */
+@media (min-width: 64rem) {
+  .page {
+    padding-bottom: calc(var(--space-80) + env(safe-area-inset-bottom, 0px));
+  }
+
+  .actionBar {
+    bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
 /* Gentle nudge shown to seekers whose profile is too thin to compute an honest
    fit — links to onboarding. Borders-first, token-only, matches the fit panel. */
 .fitPrompt {
@@ -276,4 +322,3 @@
 .fitPrompt span {
   flex: 1;
 }
-

@@ -258,7 +258,7 @@
 	min-height: var(--tap-min);
 	border: none;
 	border-radius: var(--radius-input);
-	background: var(--gradient-sky);
+	background: var(--gradient-amber);
 	color: var(--color-cta-text);
 	font-family: var(--font-ui);
 	font-size: var(--type-button-size);
@@ -308,7 +308,7 @@
 	padding: 0 var(--space-20);
 	border-radius: var(--radius-button);
 	border: none;
-	background: var(--gradient-sky);
+	background: var(--gradient-amber);
 	color: var(--color-cta-text);
 	font-family: var(--font-ui);
 	font-size: var(--type-button-size);
@@ -852,7 +852,7 @@
 .previewCta {
 	display: inline-flex; align-items: center; gap: var(--space-8); align-self: flex-start;
 	min-height: var(--tap-min); padding: 0 var(--space-16); border-radius: var(--radius-button);
-	background: var(--gradient-sky); color: var(--color-cta-text);
+	background: var(--gradient-amber); color: var(--color-cta-text);
 	font-family: var(--font-ui); font-size: var(--type-button-size); font-weight: var(--font-weight-semibold);
 	text-decoration: none;
 	transition: transform var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
@@ -927,7 +927,7 @@
 	transition: transform var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
 }
 .planCta { border: 1.5px solid var(--border-ink); background: var(--color-surface-raised); color: var(--text-primary); }
-.planCtaPrimary { border: none; background: var(--gradient-sky); color: var(--color-cta-text); }
+.planCtaPrimary { border: none; background: var(--gradient-amber); color: var(--color-cta-text); }
 .planCta:hover { background: var(--color-action-soft); transform: translateY(-1px); }
 .planCtaPrimary:hover { filter: brightness(1.04); transform: translateY(-1px); }
 .planCta:active, .planCtaPrimary:active { transform: translateY(0) scale(0.98); }
@@ -964,7 +964,7 @@
 .finalPrimary {
 	display: inline-flex; align-items: center; gap: var(--space-8);
 	min-height: var(--tap-min); padding: 0 var(--space-24); border-radius: var(--radius-button);
-	border: none; background: var(--gradient-sky); color: var(--color-cta-text);
+	border: none; background: var(--gradient-amber); color: var(--color-cta-text);
 	font-family: var(--font-ui); font-size: var(--type-button-size); font-weight: var(--font-weight-semibold); text-decoration: none;
 	transition: transform var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
 }

@@ -16,6 +16,7 @@ const ERROR_TEXT: Record<string, string> = {
 	forbidden: "You don't have permission to respond to this offer.",
 	invalid_transition: "This offer has already been responded to or has expired.",
 	invalid_status: "This offer has already been responded to or has expired.",
+	offer_expired: "This offer has expired.",
 };
 
 export interface OfferedActionsProps {
@@ -50,7 +51,7 @@ function isExpiringSoon(expiresAt: string): boolean {
 export function OfferedActions({ applicationId, expiresAt }: OfferedActionsProps) {
 	const [isPending, startTransition] = useTransition();
 	const [pendingAction, setPendingAction] = useState<
-		"accepted" | "not_selected" | null
+		"accepted" | "withdrawn" | null
 	>(null);
 	const [message, setMessage] = useState<{
 		readonly ok: boolean;
@@ -60,7 +61,7 @@ export function OfferedActions({ applicationId, expiresAt }: OfferedActionsProps
 	const expired = expiresAt ? isExpired(expiresAt) : false;
 	const expiringSoon = !expired && expiresAt ? isExpiringSoon(expiresAt) : false;
 
-	function handleAction(action: "accepted" | "not_selected") {
+	function handleAction(action: "accepted" | "withdrawn") {
 		setMessage(null);
 		setPendingAction(action);
 		startTransition(async () => {
@@ -124,10 +125,10 @@ export function OfferedActions({ applicationId, expiresAt }: OfferedActionsProps
 				<Button
 					variant="ghost"
 					type="button"
-					onClick={() => handleAction("not_selected")}
+					onClick={() => handleAction("withdrawn")}
 					disabled={isPending}
 				>
-					{isPending && pendingAction === "not_selected"
+					{isPending && pendingAction === "withdrawn"
 						? "Working…"
 						: "Decline"}
 				</Button>

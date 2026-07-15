@@ -9,6 +9,7 @@ import type {
 import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { adminClient } from "../adminClient";
+import { projectEmbeddedListingPay } from "../lib/embeddedListingPay";
 import type { SeekerApplicationListing } from "./applications";
 
 /**
@@ -473,32 +474,7 @@ export async function getAdminListingDetail(
     row.housing_included === true ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision =
     row.meals_included === true ? "provided" : "not_provided";
-
-  let paySummary: string;
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    paySummary = row.compensation_summary;
-  } else if (typeof row.compensation_min_cents === "number") {
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(row.compensation_min_cents);
-    const maxCents =
-      typeof row.compensation_max_cents === "number"
-        ? row.compensation_max_cents
-        : null;
-    const range = maxCents != null ? `${min}–${fmt(maxCents)}` : `From ${min}`;
-    const unit =
-      typeof row.compensation_unit === "string" ? row.compensation_unit : null;
-    paySummary = unit ? `${range}/${unit}` : range;
-  } else {
-    paySummary = "Unpaid / exchange";
-  }
+  const pay = projectEmbeddedListingPay(row);
 
   const opportunityWindow =
     typeof row.timeline_summary === "string" &&
@@ -525,7 +501,7 @@ export async function getAdminListingDetail(
     benefits: {
       housing: { provision: housingProvision },
       meals: { provision: mealsProvision },
-      pay: { provision: "provided", summary: paySummary },
+      pay: { provision: pay.provision, summary: pay.summary },
     },
     coverImageUrl:
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,

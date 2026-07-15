@@ -2,6 +2,7 @@ import type {
 	BenefitKind,
 	BenefitProvision,
 	DiscoveryCardConditionalBadge,
+	ListingPayInsight,
 	MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
@@ -27,7 +28,11 @@ export interface SearchListing {
 	readonly hostName: string;
 	readonly category: MarketplaceCategory;
 	readonly location: string;
+	/** Whether the location can resolve to a focused Map opportunity. */
+	readonly hasCoordinates?: boolean;
 	readonly opportunityWindow: string;
+	readonly coverImageUrl?: string;
+	readonly payInsight?: ListingPayInsight;
 	readonly benefits: SearchBenefits;
 	readonly verifiedHost?: boolean;
 	readonly conditionalBadges?: readonly DiscoveryCardConditionalBadge[];

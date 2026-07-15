@@ -422,8 +422,8 @@
 /* ── FILLED tones: primary + soon read as the dominant module ── */
 .primary {
   border-color: transparent;
-  color: var(--color-cta-text);
-  background: var(--gradient-progress);
+  color: var(--text-on-dark);
+  background: var(--gradient-teal);
   box-shadow: var(--elevation-overlay), 0 10px 30px -8px color-mix(in srgb, var(--color-cta) 55%, transparent);
 }
 .soon {
@@ -470,20 +470,45 @@
   border: 1px solid color-mix(in srgb, var(--color-cta-text) 30%, transparent);
 }
 
-.primary .calloutEyebrow,
+.primary .calloutIcon {
+  color: var(--text-on-dark);
+  background: color-mix(in srgb, var(--text-on-dark) 20%, transparent);
+  border-color: color-mix(in srgb, var(--text-on-dark) 30%, transparent);
+}
+
+.primary .calloutEyebrow { color: color-mix(in srgb, var(--text-on-dark) 82%, transparent); }
+.primary .calloutTitle { color: var(--text-on-dark); }
+.primary .calloutSub { color: color-mix(in srgb, var(--text-on-dark) 86%, transparent); }
+.primary .calloutCta {
+  color: var(--text-on-dark);
+  background: color-mix(in srgb, var(--text-on-dark) 18%, transparent);
+  border-color: color-mix(in srgb, var(--text-on-dark) 28%, transparent);
+}
+
 .soon .calloutEyebrow { color: color-mix(in srgb, var(--color-cta-text) 82%, transparent); }
 
-.primary .calloutTitle,
 .soon .calloutTitle { color: var(--color-cta-text); }
 
-.primary .calloutSub,
 .soon .calloutSub { color: color-mix(in srgb, var(--color-cta-text) 86%, transparent); }
 
-.primary .calloutCta,
 .soon .calloutCta {
   color: var(--color-cta-text);
   background: color-mix(in srgb, var(--color-cta-text) 18%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-cta-text) 28%, transparent);
+}
+
+.primary::before {
+  background: radial-gradient(
+    120% 140% at 88% -20%,
+    color-mix(in srgb, var(--text-on-dark) 26%, transparent) 0%,
+    transparent 60%
+  );
+}
+
+.primary:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--color-paper),
+    0 0 0 4px var(--text-on-dark);
 }
 
 /* ── Calm tone: quiet, bordered (it is not an action that demands attention) ── */

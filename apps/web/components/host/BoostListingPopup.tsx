@@ -2,11 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { Icon } from "@explore-and-earn/ui";
-import { BOOST_DURATIONS, type BoostDuration } from "@explore-and-earn/contracts";
+import {
+  BOOST_DURATIONS,
+  BOOST_PRICING,
+  type BoostDuration,
+} from "@explore-and-earn/contracts";
 
 import {
   createBoostCheckoutAction,
-  BOOST_PRICING,
   type BoostCheckoutResult,
 } from "../../app/actions/boost";
 import { PopupShell } from "../overlay/PopupShell";

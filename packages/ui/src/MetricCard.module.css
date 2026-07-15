@@ -32,6 +32,7 @@
 }
 
 .label {
+	min-width: 0;
   font-size: var(--type-label-size);
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -40,14 +41,26 @@
 }
 
 .trend {
-  flex: none;
+	min-width: 0;
+	max-width: 100%;
+	flex: 0 1 auto;
+	overflow: hidden;
   padding: 2px 9px;
   border-radius: var(--radius-pill, 999px);
   font-size: var(--type-caption-size);
   font-weight: 700;
   white-space: nowrap;
+	text-overflow: ellipsis;
   background: color-mix(in srgb, var(--color-cta) 16%, transparent);
   color: var(--color-cta);
+}
+
+@media (max-width: 480px) {
+	.top {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: var(--space-4, 4px);
+	}
 }
 
 .trendUp {

@@ -64,12 +64,11 @@ export default async function HostProfilePage() {
   // real source yet (messaging not built), so unreadMessages stays 0.
   const stats = deriveHostStats(listings, applicants, []);
 
-  // company name comes from the host_profiles embed on the host's own listings
-  // (rowToDiscoveryFields); about + location come straight from the host_profiles
-  // row. Contact name + tagline have no backing column yet, so the page uses
-  // neutral placeholders instead of sample fixture content. Verification is
-  // read straight from the host's own subscription tier — not derived from a
-  // listing embed, so it's correct even before the host has published anything.
+  // Prefer the listing embed only for a marketplace-tested organization name;
+  // every editable profile field otherwise comes straight from host_profiles so
+  // the owner preview and edit form describe the same persisted public identity.
+  // Verification is read from the subscription tier and remains independent of
+  // profile readiness.
   const realHost = listings
     .map((item) => item.listing.host)
     .find((host) => host.name && host.name !== "Unknown Host");
@@ -79,9 +78,17 @@ export default async function HostProfilePage() {
     ? {
         hostName: hostProfile.hostName ?? hostProfile.companyName ?? "Host",
         orgName: realHost?.name ?? hostProfile.companyName ?? "Your organization",
+        tagline: hostProfile.tagline ?? undefined,
         location: hostProfile.primaryLocationName ?? undefined,
         bio: hostProfile.about ?? undefined,
+        photoUrl: hostProfile.photoUrl ?? undefined,
         verified,
+        websiteUrl: hostProfile.websiteUrl ?? undefined,
+        instagram: hostProfile.socialLinks.instagram ?? undefined,
+        twitter: hostProfile.socialLinks.twitter ?? undefined,
+        housingOfferedGenerally: hostProfile.housingOfferedGenerally,
+        mealsOfferedGenerally: hostProfile.mealsOfferedGenerally,
+        categoryScopes: hostProfile.categoryScopes,
       }
     : {
         hostName: realHost?.name ?? "Host",
@@ -97,7 +104,11 @@ export default async function HostProfilePage() {
         actionLabel="Edit profile"
         actionHref="/host/profile/edit"
       />
-      <HostProfilePanel profile={profile} stats={stats} />
+      <HostProfilePanel
+        profile={profile}
+        stats={stats}
+        readinessProfile={hostProfile}
+      />
     </section>
   );
 }

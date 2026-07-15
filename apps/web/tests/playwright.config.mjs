@@ -50,13 +50,15 @@ export default defineConfig({
     // @clerk/nextjs/server to the dev-bench shim (next.config.ts webpack()),
     // which the impersonated smoke specs need for synthetic auth() sessions.
     //
-    // KEYLESS on purpose: with real Clerk keys, clerkMiddleware's
+    // KEYLESS and DATA-CONFIG-FREE on purpose: with real Clerk keys, clerkMiddleware's
     // first-request fetch hangs ~30s per request on this WSL2 box under BOTH
     // bundlers (the audit's historic "socket hang up" / ECONNRESET). Keyless,
     // the middleware uses its fail-closed fallback — public routes pass,
     // protected routes 401 (asserted as a security property in smoke.spec) —
-    // and authed shells are traversed via the dev-bench ee_dev_role cookie,
-    // exactly like local QA.
+    // and authed shells are traversed via the dev-bench ee_dev_role cookie.
+    // Public Supabase config is blanked so discovery tests deterministically
+    // exercise the canonical no-config fixtures instead of depending on whether
+    // a developer's local Supabase happens to be running.
     command: `corepack pnpm exec next dev --hostname 127.0.0.1 --port ${PORT}`,
     cwd: webRoot,
     reuseExistingServer: Boolean(process.env.PW_REUSE_SERVER),
@@ -70,7 +72,9 @@ export default defineConfig({
     env: {
       ...process.env,
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
-      CLERK_SECRET_KEY: ""
+      CLERK_SECRET_KEY: "",
+      NEXT_PUBLIC_SUPABASE_URL: "",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
     }
   }
 });

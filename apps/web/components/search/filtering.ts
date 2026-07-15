@@ -67,10 +67,16 @@ export function toDiscoveryCardData(listing: SearchListing): DiscoveryCardData {
 		category: listing.category,
 		location: listing.location,
 		opportunityWindow: listing.opportunityWindow,
+		coverImageUrl: listing.coverImageUrl,
 		triad: {
 			housing: listing.benefits.housing.summary,
 			meals: listing.benefits.meals.summary,
 			pay: listing.benefits.pay.summary,
+		},
+		benefitProvision: {
+			housing: listing.benefits.housing.provision,
+			meals: listing.benefits.meals.provision,
+			pay: listing.benefits.pay.provision,
 		},
 		verifiedHost: listing.verifiedHost,
 		conditionalBadges: listing.conditionalBadges,

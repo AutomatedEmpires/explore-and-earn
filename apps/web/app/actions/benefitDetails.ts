@@ -98,16 +98,22 @@ function sanitizeBenefitDetail(input: unknown): BenefitDetail {
 /**
  * Public (no-auth) read of a live listing's benefit detail — backs the
  * seeker-facing Housing/Meals viewer (photos + structured detail the host
- * published). Returns {} for non-live/missing listings.
+ * published). Missing or non-live listings resolve to an empty successful map;
+ * infrastructure failures stay distinguishable so the UI never presents an
+ * outage as an affirmative "not published" claim.
  */
 export async function getPublicBenefitDetailsAction(
   listingId: string,
-): Promise<BenefitDetailsMap> {
-  if (!listingId) return {};
+): Promise<
+  | { ok: true; details: BenefitDetailsMap }
+  | { ok: false; error: string }
+> {
+  const unavailable = "Benefit details are temporarily unavailable.";
+  if (!listingId) return { ok: false, error: unavailable };
   try {
-    return await getPublicBenefitDetails(listingId);
+    return { ok: true, details: await getPublicBenefitDetails(listingId) };
   } catch {
-    return {};
+    return { ok: false, error: unavailable };
   }
 }
 
