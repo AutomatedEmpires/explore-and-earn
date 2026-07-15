@@ -1,7 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { getLocale } from "next-intl/server";
 import { Patrick_Hand, Cabin_Sketch, Inter } from "next/font/google";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import "../styles/tokens.css";
@@ -35,6 +35,7 @@ import { HideOnHost } from "../components/HideOnHost";
 import { SentryUserProvider } from "../components/providers/SentryUserProvider";
 import { AppShell } from "../components/shell";
 import { DevBenchToolbar } from "../components/dev/DevBenchToolbar";
+import { PwaProvider } from "../components/pwa/PwaProvider";
 import { isDevBenchEnabled } from "../lib/devBench";
 import { Providers } from "./providers";
 
@@ -54,6 +55,22 @@ export const metadata: Metadata = {
 	title: { default: "Explore & Earn", template: "%s | Explore & Earn" },
 	description:
 		"Discover lifestyle work opportunities — housing, meals, and pay included. Farm, maritime, remote, and seasonal.",
+	applicationName: "Explore & Earn",
+	// app/manifest.ts is auto-served at /manifest.webmanifest; declare it
+	// explicitly so the <link rel="manifest"> is emitted for installability.
+	manifest: "/manifest.webmanifest",
+	// iOS/iPadOS installability + status-bar treatment (no beforeinstallprompt
+	// on Safari — this is how "Add to Home Screen" gets a proper standalone app).
+	appleWebApp: {
+		capable: true,
+		title: "Explore & Earn",
+		statusBarStyle: "default",
+	},
+	icons: {
+		// app/icon.tsx still provides the generated favicon; this adds the
+		// PWA/home-screen icons from the Glacier maskable set.
+		apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+	},
 	openGraph: {
 		siteName: "Explore & Earn",
 		type: "website",
@@ -72,6 +89,34 @@ export const metadata: Metadata = {
 			"x-default": "/",
 		},
 	},
+};
+
+/**
+ * Viewport + dynamic theme-color (Glacier day/night).
+ *
+ * `themeColor` declares BOTH themes as a media-keyed pair, so the browser
+ * chrome (address bar / status bar / task-switcher) tints ice-white in light
+ * and cool-graphite at night — matching the page base tokens in tokens.css
+ * (--palette-paper: #EDF2F6 light / #0B141B dark). These metas follow the OS
+ * `prefers-color-scheme`, which covers the no-JS/SSR baseline and the common
+ * case. NOTE: meta theme-color can only key off the OS media query, not the
+ * `data-theme` attribute, so during a clock-driven night override while the OS
+ * is in light mode the toolbar tint tracks the OS while page content tracks the
+ * clock — an accepted, documented limitation (the no-flash theme-init script
+ * that resolves the clock/stored theme is intentionally left untouched).
+ *
+ * `viewport-fit: cover` lets the standalone PWA paint under the notch/safe-area
+ * insets (the install prompt and offline page respect env(safe-area-inset-*)).
+ */
+export const viewport: Viewport = {
+	width: "device-width",
+	initialScale: 1,
+	viewportFit: "cover",
+	colorScheme: "light dark",
+	themeColor: [
+		{ media: "(prefers-color-scheme: light)", color: "#EDF2F6" },
+		{ media: "(prefers-color-scheme: dark)", color: "#0B141B" },
+	],
 };
 
 // BCP-47 codes that render right-to-left. Empty today (en is LTR); listed here
@@ -145,6 +190,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 							<SiteFooter />
 						</HideOnHost>
 						<CookieBanner />
+						<PwaProvider />
 					</Providers>
 					{isDevBenchEnabled() && <DevBenchToolbar />}
 				</body>

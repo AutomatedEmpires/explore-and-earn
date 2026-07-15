@@ -79,7 +79,28 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["@phosphor-icons/react", "@explore-and-earn/ui"],
   },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      {
+        // PWA service worker: never long-cache the SW script itself, so a
+        // redeploy's updated worker is fetched promptly. Root scope is served
+        // from /public so no Service-Worker-Allowed override is needed, but we
+        // set it explicitly for clarity/future-proofing.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" }
+        ]
+      },
+      {
+        // Manifest is served by app/manifest.ts at /manifest.webmanifest; keep
+        // it lightly cached so icon/name changes propagate without a hard purge.
+        source: "/manifest.webmanifest",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, must-revalidate" }
+        ]
+      }
+    ];
   },
   images: {
     remotePatterns: [

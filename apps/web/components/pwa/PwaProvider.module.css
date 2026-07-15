@@ -1,0 +1,91 @@
+/* Subtle, dismissible "Install app" affordance. Glacier tokens only — reads
+   correctly in both light and night themes via the cascading semantic tokens. */
+
+.prompt {
+	position: fixed;
+	left: 50%;
+	transform: translateX(-50%);
+	/* Clear the seeker bottom dock on small screens. */
+	bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+	z-index: var(--z-banner);
+
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	width: min(440px, calc(100vw - 24px));
+	padding: 14px 16px;
+
+	background: var(--color-surface-raised);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	box-shadow: var(--elevation-overlay);
+}
+
+@media (min-width: 768px) {
+	.prompt {
+		left: auto;
+		right: 24px;
+		transform: none;
+		bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+	}
+}
+
+.mark {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 42px;
+	height: 42px;
+	border-radius: var(--radius-pill);
+	color: #fff;
+	background: var(--gradient-action);
+	box-shadow: var(--elevation-pin);
+}
+
+.copy {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.title {
+	font-weight: 600;
+	font-size: 0.95rem;
+	color: var(--text-primary);
+	line-height: 1.25;
+}
+
+.sub {
+	font-size: 0.8rem;
+	color: var(--text-secondary);
+	line-height: 1.35;
+}
+
+.actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+}
+
+.dismiss {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	padding: 0;
+	border: 0;
+	border-radius: var(--radius-pill);
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+.dismiss:hover {
+	background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+	color: var(--text-primary);
+}
