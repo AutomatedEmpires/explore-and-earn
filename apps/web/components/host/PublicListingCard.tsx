@@ -2,7 +2,10 @@ import Link from "next/link";
 import Image from "next/image";
 import type { PublicHostListing } from "@explore-and-earn/db";
 import { Icon } from "@explore-and-earn/ui";
-import type { MarketplaceCategory } from "@explore-and-earn/contracts";
+import {
+  projectListingPay,
+  type MarketplaceCategory,
+} from "@explore-and-earn/contracts";
 import { CategoryBadge } from "../listing/CategoryBadge";
 
 import styles from "./PublicListingCard.module.css";
@@ -12,15 +15,13 @@ interface Props {
 }
 
 export function PublicListingCard({ listing }: Props) {
-  const paySummary =
-    listing.compensationSummary ??
-    (listing.compensationMinCents != null
-      ? `${new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: listing.compensationCurrency,
-          maximumFractionDigits: 0,
-        }).format(listing.compensationMinCents / 100)}${listing.compensationUnit && listing.compensationUnit !== "other" ? `/${listing.compensationUnit}` : ""}`
-      : "See listing");
+  const pay = projectListingPay({
+    summary: listing.compensationSummary,
+    minCents: listing.compensationMinCents,
+    maxCents: listing.compensationMaxCents,
+    unit: listing.compensationUnit,
+    currency: listing.compensationCurrency,
+  });
 
   return (
     <Link href={`/listing/${listing.id}`} className={styles.card}>
@@ -49,7 +50,7 @@ export function PublicListingCard({ listing }: Props) {
           </div>
         )}
 
-        <div className={styles.pay}>{paySummary}</div>
+        <div className={styles.pay}>{pay.summary}</div>
       </div>
     </Link>
   );

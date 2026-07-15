@@ -5,7 +5,19 @@ import { Button, Icon } from "@explore-and-earn/ui";
 import { PopupShell } from "../overlay/PopupShell";
 
 import { CATEGORY_ICON, type DiscoveryListing } from "./listing";
+import {
+	canOpenPayDetails,
+	getPayBenchmarkState,
+	getPayDetailsHeadline,
+} from "./payDetailsState";
 import styles from "./PayDetailsDrawer.module.css";
+
+/** Minimum truthful listing shape required by the shared pay overlay. */
+export type PayDetailsListing = Pick<
+	DiscoveryListing,
+	"category" | "benefits"
+> &
+	Partial<Pick<DiscoveryListing, "coverImageUrl" | "payInsight">>;
 
 const CATEGORY_LABEL: Record<DiscoveryListing["category"], string> = {
 	farm: "Farm",
@@ -22,33 +34,6 @@ const CATEGORY_RAIL: readonly DiscoveryListing["category"][] = [
 	"remote",
 ];
 
-function formatHeadlineAmount(listing: DiscoveryListing): string {
-	const insight = listing.payInsight;
-	const currency = insight?.currency ?? "USD";
-	const min = insight?.minCents;
-	const max = insight?.maxCents;
-	const unit = insight?.unit;
-
-	if (typeof min === "number" && typeof max === "number" && max > min) {
-		const formatter = new Intl.NumberFormat("en-US", {
-			style: "currency",
-			currency,
-			maximumFractionDigits: 0,
-		});
-		return `${formatter.format(min / 100)}–${formatter.format(max / 100)}${unit && unit !== "other" ? `/${unit}` : ""}`;
-	}
-
-	if (typeof min === "number") {
-		return `${new Intl.NumberFormat("en-US", {
-			style: "currency",
-			currency,
-			maximumFractionDigits: 0,
-		}).format(min / 100)}${unit && unit !== "other" ? `/${unit}` : ""}`;
-	}
-
-	return listing.benefits.pay.summary ?? "See listing";
-}
-
 function benchmarkLabel(meterValue: number | undefined): string {
 	if (typeof meterValue !== "number") return "Benchmark pending";
 	if (meterValue >= 67) return "Above average";
@@ -57,23 +42,19 @@ function benchmarkLabel(meterValue: number | undefined): string {
 }
 
 export interface PayDetailsDrawerProps {
-	readonly listing: DiscoveryListing | null;
+	readonly listing: PayDetailsListing | null;
 	readonly onClose: () => void;
 }
 
 export function PayDetailsDrawer({ listing, onClose }: PayDetailsDrawerProps) {
 	const meterValue = useMemo(() => listing?.payInsight?.meterValue, [listing]);
-	const headlineAmount = useMemo(
-		() => (listing ? formatHeadlineAmount(listing) : "See listing"),
-		[listing],
-	);
-	const benchmarkText = useMemo(
-		() =>
-			listing
-				? `${benchmarkLabel(meterValue)} for ${CATEGORY_LABEL[listing.category]} roles`
-				: "Benchmark pending",
-		[meterValue, listing],
-	);
+	const payProvision = listing?.benefits.pay.provision ?? "not_provided";
+	const benchmarkState = getPayBenchmarkState(payProvision, meterValue);
+	const headlineAmount = getPayDetailsHeadline(listing?.benefits.pay.summary);
+	const benchmarkText =
+		listing && benchmarkState.hasBenchmark
+			? `${benchmarkLabel(meterValue)} for ${CATEGORY_LABEL[listing.category]} roles`
+			: benchmarkState.headline;
 	const railCategories = useMemo<readonly DiscoveryListing["category"][]>(
 		() =>
 			listing?.category === "mix"
@@ -131,7 +112,7 @@ export function PayDetailsDrawer({ listing, onClose }: PayDetailsDrawerProps) {
 					</div>
 				</div>
 
-				{typeof meterValue === "number" ? (
+					{benchmarkState.hasBenchmark && typeof meterValue === "number" ? (
 					<div className={styles.scaleWrap} aria-label={`Benchmark scale at ${meterValue}%`}>
 						<div className={styles.scaleBand}>
 							<div className={styles.scaleBar}>
@@ -153,46 +134,56 @@ export function PayDetailsDrawer({ listing, onClose }: PayDetailsDrawerProps) {
 							<span>Above Avg</span>
 						</div>
 					</div>
-				) : (
-					<div className={styles.emptyState}>
-						<span className={styles.emptyKicker}>Range not published</span>
-						<p className={styles.note}>
-							Pay summary provided but not enough range data to render a benchmark yet.
-						</p>
-					</div>
-				)}
-			</section>
+					) : (
+						<div className={styles.emptyState}>
+							<span className={styles.emptyKicker}>
+								{benchmarkState.emptyKicker}
+							</span>
+							<p className={styles.note}>
+								{benchmarkState.emptyMessage}
+							</p>
+						</div>
+					)}
+				</section>
 
-			{/* Category benchmark rail */}
-			<div className={styles.categoryRail} role="list" aria-label="Category benchmarks">
-				{railCategories.map((category) => {
-					const active = category === listing.category;
-					return (
-						<span
-							key={category}
-							role="listitem"
-							className={
-								active
-									? `${styles.categoryChip} ${styles.categoryChipActive}`
-									: styles.categoryChip
-							}
+				{/* Category benchmark rail */}
+				{benchmarkState.hasBenchmark ? (
+					<>
+						<div
+							className={styles.categoryRail}
+							role="list"
+							aria-label="Category benchmarks"
 						>
-							{active ? (
-								<Icon name={CATEGORY_ICON[category]} size={16} aria-hidden />
-							) : null}
-							{CATEGORY_LABEL[category]}
-						</span>
-					);
-				})}
-			</div>
+							{railCategories.map((category) => {
+								const active = category === listing.category;
+								return (
+									<span
+										key={category}
+										role="listitem"
+										className={
+											active
+												? `${styles.categoryChip} ${styles.categoryChipActive}`
+												: styles.categoryChip
+										}
+									>
+										{active ? (
+											<Icon name={CATEGORY_ICON[category]} size={16} aria-hidden />
+										) : null}
+										{CATEGORY_LABEL[category]}
+									</span>
+								);
+							})}
+						</div>
 
-			{/* Benchmark source note */}
-			<div className={styles.benchmarkNote}>
-				<Icon name="system.info" size={16} aria-hidden />
-				<p className={styles.caption}>
-					Benchmarks are based on similar Explore &amp; Earn listings.
-				</p>
-			</div>
+						{/* Benchmark source note */}
+						<div className={styles.benchmarkNote}>
+							<Icon name="system.info" size={16} aria-hidden />
+							<p className={styles.caption}>
+								Benchmarks are based on similar Explore &amp; Earn listings.
+							</p>
+						</div>
+					</>
+				) : null}
 
 			{listing.payInsight?.note ? (
 				<div className={styles.noteCard}>
@@ -201,12 +192,14 @@ export function PayDetailsDrawer({ listing, onClose }: PayDetailsDrawerProps) {
 			) : null}
 
 			{/* Disclaimer */}
-			<div className={styles.disclaimer} role="note">
-				<Icon name="system.info" size={16} aria-hidden />
-				<p className={styles.disclaimerText}>
-					Pay ranges are host-provided estimates and not guaranteed. Confirm exact compensation directly with the host before accepting.
-				</p>
-			</div>
+				{canOpenPayDetails(payProvision) ? (
+					<div className={styles.disclaimer} role="note">
+						<Icon name="system.info" size={16} aria-hidden />
+						<p className={styles.disclaimerText}>
+							Pay ranges are host-provided estimates and not guaranteed. Confirm exact compensation directly with the host before accepting.
+						</p>
+					</div>
+				) : null}
 		</PopupShell>
 	);
 }

@@ -9,7 +9,11 @@ import type {
   OpportunityCategory,
   OpportunityListing,
 } from "@explore-and-earn/contracts";
-import { MARKETPLACE_CATEGORIES, hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  MARKETPLACE_CATEGORIES,
+  hasVerifiedHostSubscription,
+  projectListingPay,
+} from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 import { getSeekerApplicationIds } from "./applications";
 import { getPassedListingIds } from "./passedListings";
@@ -87,36 +91,6 @@ function formatOpportunityWindow(
   return "Open";
 }
 
-function buildCompensationSummary(
-  row: Pick<
-    ListingRow,
-    | "compensation_summary"
-    | "compensation_min_cents"
-    | "compensation_max_cents"
-    | "compensation_unit"
-    | "compensation_currency"
-  >,
-): string {
-  if (row.compensation_summary) return row.compensation_summary;
-  const unit = row.compensation_unit ?? "other";
-  const currency = row.compensation_currency;
-  if (row.compensation_min_cents != null) {
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(row.compensation_min_cents);
-    const max = row.compensation_max_cents != null ? fmt(row.compensation_max_cents) : null;
-    const range = max && max !== min ? `${min}\u2013${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
-}
-
 function toListingRow(raw: RawListingRow): ListingRow {
   return { ...raw, category: raw.category as OpportunityCategory };
 }
@@ -125,6 +99,13 @@ function toListingRow(raw: RawListingRow): ListingRow {
 export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
   const hostName = row.host_profiles?.company_name ?? "Unknown Host";
   const verified = hasVerifiedHostSubscription(row.host_profiles?.subscription_tier);
+  const pay = projectListingPay({
+    summary: row.compensation_summary,
+    minCents: row.compensation_min_cents,
+    maxCents: row.compensation_max_cents,
+    unit: row.compensation_unit,
+    currency: row.compensation_currency,
+  });
 
   const housingProvision: BenefitProvision = row.housing_included ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision = row.meals_included ? "provided" : "not_provided";
@@ -153,17 +134,17 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
         summary: row.meals_description ?? undefined,
       },
       pay: {
-        provision: "provided" as BenefitProvision,
-        summary: buildCompensationSummary(row),
+        provision: pay.provision,
+        summary: pay.summary,
       },
     },
     payInsight:
-      row.compensation_min_cents != null || row.compensation_max_cents != null
+      pay.hasNumericPay
         ? {
-            minCents: row.compensation_min_cents ?? undefined,
-            maxCents: row.compensation_max_cents ?? undefined,
-            unit: (row.compensation_unit as CompensationUnit | null) ?? null,
-            currency: row.compensation_currency,
+            minCents: pay.minCents ?? undefined,
+            maxCents: pay.maxCents ?? undefined,
+            unit: pay.unit,
+            currency: pay.currency,
           }
         : undefined,
     visaSupport: row.visa_support,
@@ -810,8 +791,10 @@ async function resolveSeekerProfileIdForListings(
 }
 
 /**
- * Whether the authed seeker has an active (non-withdrawn) application to a
- * listing. Returns false when the seeker has no profile yet.
+ * Whether the authed seeker has any application history for a listing.
+ * Applications are unique per seeker/listing and withdrawn is terminal, so a
+ * historical row must still suppress an impossible second Apply action.
+ * Returns false when the seeker has no profile yet.
  * `clerkUserId` must come from auth().userId.
  */
 export async function hasApplied(
@@ -831,7 +814,6 @@ export async function hasApplied(
     .select("id")
     .eq("seeker_profile_id", seekerProfileId)
     .eq("listing_id", listingId)
-    .neq("status", "withdrawn")
     .maybeSingle();
   if (error) throw new Error(`hasApplied: ${error.message}`);
   return Boolean(data);

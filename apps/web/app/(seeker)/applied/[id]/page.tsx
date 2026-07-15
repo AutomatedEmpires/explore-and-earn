@@ -95,6 +95,8 @@ interface TimelineStep {
 }
 
 function buildTimeline(application: RichSeekerApplication): TimelineStep[] {
+  const declinedOffer = application.withdrawnReason === "offer_declined";
+  const acceptedOffer = application.status === "accepted";
   return [
     {
       key: "submitted",
@@ -110,8 +112,16 @@ function buildTimeline(application: RichSeekerApplication): TimelineStep[] {
     },
     {
       key: "decided",
-      label: "Decision made",
-      description: "The host reached a final decision.",
+      label: declinedOffer
+        ? "Offer declined"
+        : acceptedOffer
+          ? "Offer accepted"
+          : "Decision made",
+      description: declinedOffer
+        ? "You declined the host's offer."
+        : acceptedOffer
+          ? "You accepted the host's offer."
+          : "The host reached a final decision.",
       at: formatDate(application.decidedAt),
     },
   ];
@@ -133,7 +143,10 @@ export default async function AppliedDetailPage({ params }: Props) {
   }
 
   const { listing, status } = application;
-  const label = STATUS_LABEL[status] ?? "Applied";
+  const label =
+    status === "withdrawn" && application.withdrawnReason === "offer_declined"
+      ? "Offer declined"
+      : (STATUS_LABEL[status] ?? "Applied");
   const variant = STATUS_VARIANT[status] ?? "neutral";
   const canWithdraw = WITHDRAWABLE_STATUSES.has(status);
   const timeline = buildTimeline(application);

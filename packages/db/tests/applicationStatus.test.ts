@@ -16,13 +16,18 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type MockInstance } from "vitest";
+import {
+  APPLICATION_TRANSITIONS,
+  canTransition,
+} from "@explore-and-earn/contracts";
 
 // ── Mock server-only so the import doesn't crash in the test environment ───
 vi.mock("server-only", () => ({}));
 
 // ── Stub authedClient before importing the module under test ───────────────
 const mockFrom = vi.fn();
-const mockClient = { from: mockFrom };
+const mockRpc = vi.fn();
+const mockClient = { from: mockFrom, rpc: mockRpc };
 vi.mock("../src/client.js", () => ({
   authedClient: () => mockClient,
 }));
@@ -58,10 +63,6 @@ function makeChain(result: { data: unknown; error: unknown }) {
   return chain;
 }
 
-// SEEKER_SETTABLE_STATUSES is not exported; mirror it here for the membership
-// test. Any drift would manifest as functional failures in the test cases below.
-const SEEKER_SETTABLE_STATUSES = ["accepted", "not_selected"] as const;
-
 // ── Status membership tests ────────────────────────────────────────────────
 
 describe("HOST_SETTABLE_STATUSES", () => {
@@ -81,9 +82,14 @@ describe("HOST_SETTABLE_STATUSES", () => {
   });
 });
 
-describe("SEEKER_SETTABLE_STATUSES", () => {
-  it('includes "accepted" so seekers can confirm an offer', () => {
-    expect(SEEKER_SETTABLE_STATUSES).toContain("accepted");
+describe("seeker offer lifecycle", () => {
+  it("uses the canonical offered -> withdrawn edge for a declined offer", () => {
+    expect(
+      canTransition(APPLICATION_TRANSITIONS, "offered", "withdrawn"),
+    ).toBe(true);
+    expect(
+      canTransition(APPLICATION_TRANSITIONS, "offered", "not_selected"),
+    ).toBe(false);
   });
 });
 
@@ -246,27 +252,24 @@ describe("updateApplicationStatusBySeeker", () => {
    * Wire mockFrom to handle the seeker path:
    * 1. seeker_profiles (resolve profile id)
    * 2. applications select
-   * 3. [optional] listings select (only when accepting)
-   * 4. applications update
+   * The final mutation is the scoped seeker_transition_application RPC.
    */
   function setupSeekerChains(
     seekerProfileResult: unknown,
     appResult: unknown,
-    listingResult: unknown,
-    updateError: unknown,
   ) {
     let call = 0;
     (mockFrom as MockInstance).mockImplementation(() => {
       call++;
       if (call === 1) return makeChain({ data: seekerProfileResult, error: null }); // seeker_profiles
-      if (call === 2) return makeChain({ data: appResult, error: null });             // applications select
-      if (call === 3) return makeChain({ data: listingResult, error: null });         // listings select
-      return makeChain({ data: null, error: updateError });                            // applications update
+      return makeChain({ data: appResult, error: null }); // applications select
     });
   }
 
   beforeEach(() => {
     mockFrom.mockReset();
+    mockRpc.mockReset();
+    mockRpc.mockResolvedValue({ data: { ok: true }, error: null });
   });
 
   it('returns invalid_status for an unknown status', async () => {
@@ -295,8 +298,6 @@ describe("updateApplicationStatusBySeeker", () => {
     setupSeekerChains(
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: "other-sp", status: "offered", listing_id: LISTING_ID },
-      null,
-      null,
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "forbidden" });
@@ -306,48 +307,56 @@ describe("updateApplicationStatusBySeeker", () => {
     setupSeekerChains(
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "reviewing", listing_id: LISTING_ID },
-      null,
-      null,
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "invalid_transition" });
   });
 
-  it('returns listing_full (pre-check) when remaining_role_count is 0', async () => {
+  it("delegates acceptance and its capacity decision to the atomic RPC", async () => {
     setupSeekerChains(
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "offered", listing_id: LISTING_ID },
-      { remaining_role_count: 0 },
-      null,
-    );
-    const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
-    expect(result).toEqual({ ok: false, error: "listing_full" });
-  });
-
-  it('returns ok:true when seeker accepts with capacity available', async () => {
-    setupSeekerChains(
-      { id: SEEKER_PROFILE_ID },
-      { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "offered", listing_id: LISTING_ID },
-      { remaining_role_count: 1 },
-      null,
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: true });
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(mockRpc).toHaveBeenCalledWith("seeker_transition_application", {
+      p_application_id: APP_ID,
+      p_intent: "accept_offer",
+    });
   });
 
-  it('maps DB 23514 check_violation to listing_full on race-condition accept', async () => {
+  it("surfaces an atomic RPC listing_full result", async () => {
     setupSeekerChains(
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "offered", listing_id: LISTING_ID },
-      { remaining_role_count: 1 }, // passed pre-check; race happened during write
-      { code: "23514", message: "check_violation" },
     );
+    mockRpc.mockResolvedValue({
+      data: { ok: false, error: "listing_full" },
+      error: null,
+    });
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "listing_full" });
   });
 
-  it('does not check capacity when seeker declines (not_selected)', async () => {
-    // Only 2 DB calls expected: seeker_profiles + applications update (no listing check)
+  it("rejects seeker-written not_selected because that outcome belongs to the host", async () => {
+    (mockFrom as MockInstance).mockReturnValue(
+      makeChain({ data: null, error: null }),
+    );
+
+    const result = await updateApplicationStatusBySeeker(
+      TOKEN,
+      USER,
+      APP_ID,
+      "not_selected",
+    );
+
+    expect(result).toEqual({ ok: false, error: "invalid_status" });
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it("declines an offer through the scoped RPC with no capacity pre-query", async () => {
+    // Only two table reads are expected: seeker profile + application.
     let call = 0;
     (mockFrom as MockInstance).mockImplementation(() => {
       call++;
@@ -362,13 +371,54 @@ describe("updateApplicationStatusBySeeker", () => {
           },
           error: null,
         });
-      // call=3 is the update, no listing select expected
       return makeChain({ data: null, error: null });
     });
-    const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "not_selected");
+    const result = await updateApplicationStatusBySeeker(
+      TOKEN,
+      USER,
+      APP_ID,
+      "withdrawn",
+    );
     expect(result).toEqual({ ok: true });
-    // Listing select (call 3) should NOT have been called; only 3 calls total
-    // (seeker_profiles, applications select, applications update).
-    expect(call).toBe(3);
+    expect(mockRpc).toHaveBeenCalledWith("seeker_transition_application", {
+      p_application_id: APP_ID,
+      p_intent: "decline_offer",
+    });
+    expect(call).toBe(2);
+  });
+
+  it("maps a lifecycle race while declining to invalid_transition", async () => {
+    let call = 0;
+    (mockFrom as MockInstance).mockImplementation(() => {
+      call++;
+      if (call === 1) {
+        return makeChain({ data: { id: SEEKER_PROFILE_ID }, error: null });
+      }
+      if (call === 2) {
+        return makeChain({
+          data: {
+            id: APP_ID,
+            seeker_profile_id: SEEKER_PROFILE_ID,
+            status: "offered",
+            listing_id: LISTING_ID,
+          },
+          error: null,
+        });
+      }
+      return makeChain({ data: null, error: null });
+    });
+    mockRpc.mockResolvedValue({
+      data: { ok: false, error: "invalid_transition" },
+      error: null,
+    });
+
+    const result = await updateApplicationStatusBySeeker(
+      TOKEN,
+      USER,
+      APP_ID,
+      "withdrawn",
+    );
+
+    expect(result).toEqual({ ok: false, error: "invalid_transition" });
   });
 });

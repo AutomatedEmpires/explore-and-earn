@@ -1,19 +1,34 @@
 .banner {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  /* Above the floating host bottom-nav (z-70) so consent is always reachable
-     (consent-first); still below modals. */
+  left: var(--space-12);
+  right: var(--space-12);
+  bottom: calc(var(--size-bottom-nav) + var(--space-12) + env(safe-area-inset-bottom, 0px));
   z-index: var(--z-banner);
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
+  max-width: 44rem;
+  max-height: min(56svh, 24rem);
+  overflow: auto;
   padding: var(--space-16);
-  padding-bottom: calc(var(--space-16) + env(safe-area-inset-bottom));
-  background: var(--color-surface-raised);
-  border-top: 1px solid var(--border-ink);
+  background: color-mix(in srgb, var(--color-surface-raised) 96%, transparent);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--elevation-overlay);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   color: var(--text-primary);
+}
+
+.banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--space-16);
+  right: var(--space-16);
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-gold);
 }
 
 .copy {
@@ -25,25 +40,47 @@
 }
 
 .link {
-  color: var(--text-primary);
+  color: var(--color-cta);
+  font-weight: var(--font-weight-semibold);
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-8);
-  justify-content: flex-end;
+}
+
+.actions > * {
+  width: 100%;
 }
 
 @media (min-width: 640px) {
   .banner {
+    left: auto;
+    right: var(--space-20);
+    bottom: var(--space-20);
+    width: min(44rem, calc(100vw - var(--space-40)));
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-16);
+    padding: var(--space-18);
   }
 
   .actions {
+    display: flex;
     flex-shrink: 0;
+  }
+
+  .actions > * {
+    width: auto;
+  }
+}
+
+@media (max-width: 379px) {
+  .actions {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

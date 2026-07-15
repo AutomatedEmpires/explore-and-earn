@@ -10,6 +10,7 @@ import type {
 import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
+import { projectEmbeddedListingPay } from "../lib/embeddedListingPay";
 
 /**
  * Resolve seeker_profiles.id for the authed Clerk user.
@@ -68,46 +69,6 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    return row.compensation_summary;
-  }
-  const minCents =
-    typeof row.compensation_min_cents === "number"
-      ? row.compensation_min_cents
-      : null;
-  if (minCents != null) {
-    const unit =
-      typeof row.compensation_unit === "string"
-        ? row.compensation_unit
-        : "other";
-    const currency =
-      typeof row.compensation_currency === "string"
-        ? row.compensation_currency
-        : "USD";
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(minCents);
-    const maxCents =
-      typeof row.compensation_max_cents === "number"
-        ? row.compensation_max_cents
-        : null;
-    const max = maxCents != null ? fmt(maxCents) : null;
-    const range = max && max !== min ? `${min}\u2013${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
-}
-
 function embeddedOpportunityWindow(row: Record<string, unknown>): string {
   if (
     typeof row.timeline_summary === "string" &&
@@ -138,13 +99,14 @@ function rowToInviteListing(
     row.housing_included === true ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision =
     row.meals_included === true ? "provided" : "not_provided";
+  const pay = projectEmbeddedListingPay(row);
 
   const benefits: BenefitTriad = {
     housing: { provision: housingProvision },
     meals: { provision: mealsProvision },
     pay: {
-      provision: "provided",
-      summary: embeddedCompensationSummary(row),
+      provision: pay.provision,
+      summary: pay.summary,
     },
   };
 

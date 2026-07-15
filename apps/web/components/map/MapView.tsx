@@ -244,6 +244,8 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
         illustration="error.generic"
         title="Map unavailable"
         message="The map could not be loaded right now. You can still browse every opportunity from the Seek tab — please try the map again shortly."
+        actionLabel="Browse all opportunities"
+        actionHref="/seek"
       />
     );
   }
@@ -254,6 +256,8 @@ export function MapView({ listings, initialFocusId }: MapViewProps) {
         illustration="empty.map"
         title="No mapped opportunities"
         message="None of the current opportunities have a fixed location yet. Head to the Seek tab to browse everything, including remote roles."
+        actionLabel="Browse all opportunities"
+        actionHref="/seek"
       />
     );
   }

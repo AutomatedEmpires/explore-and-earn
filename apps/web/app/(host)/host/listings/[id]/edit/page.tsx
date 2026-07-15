@@ -59,6 +59,7 @@ export default async function HostListingEditPage({
     payPeriod: listing.compensation_unit
       ? (listing.compensation_unit as CompensationUnit)
       : undefined,
+    payCurrency: listing.compensation_currency,
     startDate: listing.begins_at ? listing.begins_at.slice(0, 10) : undefined,
     endDate: listing.ends_at ? listing.ends_at.slice(0, 10) : undefined,
     coverPhotoUrl: listing.cover_photo_url ?? undefined,
@@ -78,6 +79,10 @@ export default async function HostListingEditPage({
         listingId={id}
         initial={initial}
         hostProfileId={hostProfile?.id}
+        hostDisplayName={
+          hostProfile?.companyName || hostProfile?.hostName || undefined
+        }
+        hostAvatarUrl={hostProfile?.photoUrl ?? undefined}
       />
     </section>
   );

@@ -7,7 +7,10 @@ import {
   getHostAnalytics,
 } from "@explore-and-earn/db";
 
-import { HostDashboard } from "../../../components/host";
+import {
+  deriveHostReadiness,
+  HostDashboard,
+} from "../../../components/host";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -43,6 +46,13 @@ export default async function HostDashboardPage() {
     })),
   ]);
 
+  const readiness = deriveHostReadiness(
+    hostProfile,
+    stats.listingsByStatus,
+    analytics.perListingStats.length,
+    analytics.activeListingCount,
+  );
+
   return (
     <div className={styles.block}>
       <HostDashboard
@@ -51,6 +61,7 @@ export default async function HostDashboardPage() {
         companyName={hostProfile?.companyName ?? null}
         primaryLane={hostProfile?.categoryScopes?.[0] ?? null}
         analytics={analytics}
+        readiness={readiness}
       />
     </div>
   );

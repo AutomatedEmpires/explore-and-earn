@@ -1,3 +1,10 @@
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+  gap: var(--space-section);
+  align-items: start;
+}
+
 .form {
   display: flex;
   flex-direction: column;
@@ -6,6 +13,102 @@
   background: var(--color-surface-raised);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
+}
+
+.preview {
+  min-width: 0;
+}
+
+.previewSticky {
+	/* The seeker-facing preview is deliberately a light working island inside
+	   the dark Host OS. Re-establish the root semantics here so its heading,
+	   card, benefits and disabled preview action match what seekers will see. */
+	--color-paper: var(--palette-paper);
+	--color-surface: var(--palette-surface);
+	--color-surface-raised: var(--palette-white);
+	--color-parchment: var(--palette-surface-2);
+	--border-soft: var(--palette-line);
+	--border-strong: var(--palette-line-strong);
+	--border-ink: var(--palette-ink-stroke);
+	--text-primary: var(--palette-ink);
+	--text-secondary: var(--palette-ink-soft);
+	--text-muted: var(--palette-ink-muted);
+	--field-bg: var(--palette-white);
+	--field-border: var(--palette-line-strong);
+	--color-cta: var(--palette-amber);
+	--color-cta-text: var(--palette-ink);
+
+  position: sticky;
+  top: calc(var(--space-16) + 4.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--gradient-paper-warm);
+  box-shadow: var(--elevation-card);
+}
+
+.previewHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  color: var(--text-primary);
+}
+
+.previewEyebrow,
+.previewTitle,
+.previewNote {
+  margin: 0;
+}
+
+.previewEyebrow {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.previewTitle {
+  margin-top: var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--type-heading-size);
+  line-height: var(--type-heading-lh);
+  color: var(--text-primary);
+}
+
+.previewNote {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.previewCard {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.previewOnly {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  border: 1px dashed var(--border-ink);
+  border-radius: var(--radius-cell);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
 .row {
@@ -18,6 +121,20 @@
 @media (max-width: 639px) {
   .row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1023px) {
+  .composer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .preview {
+    order: -1;
+  }
+
+  .previewSticky {
+    position: static;
   }
 }
 
@@ -130,6 +247,24 @@
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
   color: var(--text-secondary);
+}
+
+.benefitNextStep {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background: var(--color-action-soft);
+  color: var(--text-primary);
+}
+
+.benefitNextStep p {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
 }
 
 /* Inline coaching under a field (e.g. what each category lane means). */

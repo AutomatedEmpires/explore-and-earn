@@ -94,7 +94,10 @@ function ApplicationRow({
   application: RichSeekerApplication;
 }) {
   const { listing, status } = application;
-  const label = STATUS_LABEL[status] ?? "Applied";
+  const label =
+    status === "withdrawn" && application.withdrawnReason === "offer_declined"
+      ? "Offer declined"
+      : (STATUS_LABEL[status] ?? "Applied");
   const variant = STATUS_VARIANT[status] ?? "neutral";
   const submitted = formatSubmitted(application.submittedAt);
   const canWithdraw = WITHDRAWABLE_STATUSES.has(status);

@@ -50,9 +50,9 @@ export interface DiscoveryCardData {
 	readonly begins?: string
 	readonly ends?: string
 	readonly benefitProvision?: {
-		readonly housing: BenefitProvision
-		readonly meals: BenefitProvision
-		readonly pay: BenefitProvision
+		readonly housing?: BenefitProvision
+		readonly meals?: BenefitProvision
+		readonly pay?: BenefitProvision
 	}
 	readonly housingOccupancy?: "solo" | "shared"
 	readonly fillPercent?: number
@@ -144,33 +144,34 @@ const UI_FONT      = "var(--font-ui)"
 /** Parchment stamp — base for all overlay badges. No border — shadow provides definition. */
 const STAMP: CSSProperties = {
 	display: "inline-flex", alignItems: "center", gap: "5px",
-	padding: "5px 11px", borderRadius: "8px",
-	fontFamily: DISPLAY_FONT,
-	fontSize: "11px", fontWeight: 700,
+	padding: "6px 10px", borderRadius: "var(--radius-pill)",
+	fontFamily: UI_FONT,
+	fontSize: "10px", fontWeight: 700,
 	letterSpacing: "0.08em", textTransform: "uppercase",
 	background: "color-mix(in srgb, var(--palette-paper) 88%, var(--palette-amber))",
 	backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-	boxShadow: "var(--elevation-card), 0 1px 0 rgba(255,255,255,0.55) inset",
+	boxShadow: "var(--elevation-card)",
 	whiteSpace: "nowrap",
 }
 
 /** Info row cell (name / job / location) — clean warm tray, V2 soft depth */
 const ROW_CELL: CSSProperties = {
 	display: "flex", alignItems: "center", justifyContent: "center",
-	gap: "6px", padding: "10px 14px",
-	background: PAPER, border: "1px solid var(--palette-line)",
-	borderRadius: "12px", textAlign: "center",
-	boxShadow: "var(--elevation-card)",
+	gap: "6px", padding: "6px 8px 9px",
+	background: "transparent", border: "none",
+	borderBottom: "1px solid var(--palette-line)",
+	borderRadius: 0, textAlign: "center",
+	boxShadow: "none",
 }
 
 /** Strip cell — stacked (begins/ends columns) — clean warm tray */
 const STRIP_CELL: CSSProperties = {
 	display: "flex", flexDirection: "column",
 	alignItems: "center", justifyContent: "center",
-	gap: "3px", padding: "9px 6px",
+	gap: "3px", padding: "8px 6px",
 	background: PAPER, border: "1px solid var(--palette-line)",
-	borderRadius: "12px", textAlign: "center",
-	boxShadow: "var(--elevation-card)",
+	borderRadius: "var(--radius-input)", textAlign: "center",
+	boxShadow: "none",
 }
 
 /* Hierarchy: the ROLE is the card's primary object; the host is trust
@@ -182,19 +183,19 @@ const hostNameText: CSSProperties = {
 }
 
 const jobTitleText: CSSProperties = {
-	fontFamily: DISPLAY_FONT, fontSize: "clamp(16px, 4.4vw, 19px)",
-	fontWeight: 700, letterSpacing: "0.02em",
+	fontFamily: DISPLAY_FONT, fontSize: "clamp(17px, 4.4vw, 21px)",
+	fontWeight: 600, letterSpacing: "-0.01em",
 	lineHeight: 1.15, color: INK, textAlign: "center",
 }
 
 const locationText: CSSProperties = {
 	fontFamily: UI_FONT, fontSize: "clamp(12px, 2.8vw, 14px)",
-	fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
+	fontWeight: 600, letterSpacing: "0",
 	color: INK, textAlign: "center",
 }
 
 const stripLabel: CSSProperties = {
-	fontFamily: DISPLAY_FONT, fontSize: "clamp(10px, 2.2vw, 12px)",
+	fontFamily: UI_FONT, fontSize: "clamp(9px, 2.1vw, 11px)",
 	fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase",
 	lineHeight: 1, color: INK,
 }
@@ -211,26 +212,46 @@ const stripValue: CSSProperties = {
 // A clickable cell (photo bucket / pay scale) renders as a <button>.
 function BenefitTriadCell({
 	kind,
-	provided,
+	provision,
 	value,
 	onClick,
 }: {
 	readonly kind: "housing" | "meals" | "pay"
-	readonly provided?: boolean
+	readonly provision?: BenefitProvision
 	readonly value: string
 	readonly onClick?: () => void
 }) {
 	const isPay = kind === "pay"
+	const availability =
+		provision === "provided" || provision === "partial"
+			? "provided"
+			: provision === "not_provided"
+				? "not_provided"
+				: "unknown"
 	const stateClass = isPay
 		? styles.benefitPay
-		: provided
+		: availability === "provided"
 			? styles.benefitProvided
-			: styles.benefitNot
+			: availability === "not_provided"
+				? styles.benefitNot
+				: styles.benefitUnknown
 	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
 	const icon: IconKey =
 		kind === "housing" ? "benefit.housing" : kind === "meals" ? "benefit.meals" : "benefit.pay"
-	const stateText = isPay ? "" : provided ? "offered" : "not offered"
+	const stateText = isPay
+		? ""
+		: availability === "provided"
+			? "offered"
+			: availability === "not_provided"
+				? "not offered"
+				: "not confirmed"
 	const aria = `${label}${stateText ? `: ${stateText}` : ""}${value ? ` — ${value}` : ""}`
+	const stateIcon: IconKey =
+		availability === "provided"
+			? "system.success"
+			: availability === "not_provided"
+				? "system.error"
+				: "system.info"
 
 	const inner = (
 		<>
@@ -239,7 +260,8 @@ function BenefitTriadCell({
 				<span>{label}</span>
 				{!isPay ? (
 					<span className={styles.benefitState}>
-						<Icon name={provided ? "system.success" : "system.error"} size={13} aria-hidden />
+						<Icon name={stateIcon} size={13} aria-hidden />
+						<span className={styles.benefitStateText}>{stateText}</span>
 					</span>
 				) : null}
 			</span>
@@ -254,7 +276,7 @@ function BenefitTriadCell({
 			{inner}
 		</button>
 	) : (
-		<div className={`${styles.benefit} ${stateClass}`} aria-label={aria}>
+		<div className={`${styles.benefit} ${stateClass}`}>
 			{inner}
 		</div>
 	)
@@ -292,8 +314,8 @@ export function DiscoveryCard({
 	// a row of em-dashes).
 	const hasLocation = Boolean(data.location) && data.location !== "Location not specified"
 	const hasDates    = Boolean(data.begins || data.ends)
-	const cellBg          = "var(--cat-cell)"
-	const ROW_CELL_CAT:   CSSProperties = { ...ROW_CELL,   background: cellBg }
+	const cellBg          = "color-mix(in srgb, var(--cat-accent) 7%, var(--palette-surface))"
+	const ROW_CELL_CAT:   CSSProperties = { ...ROW_CELL }
 	const STRIP_CELL_CAT: CSSProperties = { ...STRIP_CELL, background: cellBg }
 	const verified = data.verifiedHost === true
 	const isDisabled            = variant === "disabled"
@@ -306,8 +328,8 @@ export function DiscoveryCard({
 	const hp = data.benefitProvision?.housing
 	const mp = data.benefitProvision?.meals
 
-	const canOpenHousing = Boolean(onHousingClick && hp !== "not_provided")
-	const canOpenMeals   = Boolean(onMealsClick   && mp !== "not_provided")
+	const canOpenHousing = Boolean(onHousingClick && (hp === "provided" || hp === "partial"))
+	const canOpenMeals   = Boolean(onMealsClick   && (mp === "provided" || mp === "partial"))
 
 	// "seasonal" is a category; "featured" is not a platform concept — only "boosted" is valid
 	const isBoosted = (data.conditionalBadges ?? []).includes("boosted")
@@ -387,7 +409,7 @@ export function DiscoveryCard({
 		: isInvited   ? "View Invite"
 		: isReported  ? "Under Review"
 		: isNotSelected ? "Not Selected"
-		: isWithdrawn ? "Re-Apply"
+		: isWithdrawn ? "Withdrawn"
 		: isDraft     ? "Edit Draft"
 		: isPaused    ? "Resume"
 		: isExpired   ? "Renew"
@@ -397,14 +419,13 @@ export function DiscoveryCard({
 		: onApply     ? "Quick Apply"
 		:               "Open Role"
 
-	const ctaDisabled = isApplied || isNotSelected || isReported || isDisabled
+	const ctaDisabled = isApplied || isNotSelected || isWithdrawn || isReported || isDisabled
 	const ctaHandler  = ctaDisabled ? undefined
 		: isSeekerSurface ? (onOpen ? () => onOpen(data.id) : undefined)
 		: isScheduled ? (onOpen  ? () => onOpen(data.id)  : undefined)
 		: isOffered   ? (onOpen  ? () => onOpen(data.id)  : undefined)
 		: isAccepted  ? (onOpen  ? () => onOpen(data.id)  : undefined)
 		: isInvited   ? (onOpen  ? () => onOpen(data.id)  : undefined)
-		: isWithdrawn ? (onApply ? () => onApply(data.id) : onOpen ? () => onOpen(data.id) : undefined)
 		: isMatched   ? (onApply ? () => onApply(data.id) : onOpen ? () => onOpen(data.id) : undefined)
 		: isDraft     ? (onOpen  ? () => onOpen(data.id)  : undefined)
 		: isPaused    ? (onOpen  ? () => onOpen(data.id)  : undefined)
@@ -422,23 +443,19 @@ export function DiscoveryCard({
 	const cardStyle: CSSProperties = {
 		position: "relative",
 		display: "flex", flexDirection: "column",
-		width: "min(100%, 360px)",
+		width: "100%", maxWidth: "440px",
 		overflow: "hidden",
 		background: "var(--cat-body)",
 		border: `1px solid var(--palette-line)`,
-		borderTop: `3px solid var(--cat-accent)`,
-		borderRadius: "20px",
+		borderTop: `2px solid var(--cat-accent)`,
+		borderRadius: "var(--radius-card)",
 		color: INK,
 		opacity: isDisabled ? 0.6 : 1,
-		boxShadow: [
-			"inset 0 1px 0 rgba(255,255,255,0.55)",        /* top catch-light */
-			`inset 0 -44px 56px var(--cat-glow)`,         /* category ambient from below */
-			"var(--elevation-card)",                        /* V2 soft depth */
-		].join(", "),
+		boxShadow: "var(--elevation-card)",
 	}
 
 	const heroStyle: CSSProperties = {
-		position: "relative", width: "100%", aspectRatio: "16 / 10",
+		position: "relative", width: "100%", aspectRatio: "16 / 9",
 		overflow: "hidden", flexShrink: 0,
 		background: "var(--cat-cover)",
 		borderBottom: `1px solid var(--palette-line)`,
@@ -447,10 +464,9 @@ export function DiscoveryCard({
 	const hostCircle: CSSProperties = {
 		width: "var(--dc-host-size, 74px)", height: "var(--dc-host-size, 74px)",
 		borderRadius: "50%",
-		border: "3px solid rgba(255,248,225,0.95)",
-		// dark ring + category-colored glow ring + deep shadow
-		boxShadow: `0 0 0 2.5px ${INK}, 0 0 0 5px var(--cat-accent), 0 6px 20px rgba(26,43,60,0.40)`,
-		background: data.hostAvatarUrl ? "transparent" : "rgba(255,248,225,0.22)",
+		border: "2px solid var(--palette-surface)",
+		boxShadow: `0 0 0 1px color-mix(in srgb, ${INK} 62%, transparent), var(--elevation-pin)`,
+		background: data.hostAvatarUrl ? "transparent" : "color-mix(in srgb, var(--palette-surface) 24%, transparent)",
 		backdropFilter: data.hostAvatarUrl ? "none" : "blur(4px)",
 		WebkitBackdropFilter: data.hostAvatarUrl ? "none" : "blur(4px)",
 		display: "flex", alignItems: "center", justifyContent: "center",
@@ -458,12 +474,31 @@ export function DiscoveryCard({
 		color: PAPER, flexShrink: 0,
 	}
 
-	const isPassiveCta = isApplied || isNotSelected || isReported || isDisabled
-	const ctaBg        = isPassiveCta ? "transparent" : INK
-	const ctaColor     = isPassiveCta ? INK_SOFT      : PAPER
-	const ctaBorderVal = isPassiveCta ? `1.5px solid rgba(26,43,60,0.22)` : `2.5px solid ${INK}`
+	const isPassiveCta =
+		isApplied || isNotSelected || isWithdrawn || isReported || isDisabled
+	const ctaBg        = isPassiveCta ? "transparent" : "var(--color-cta)"
+	const ctaColor     = isPassiveCta ? INK_SOFT      : "var(--color-cta-text)"
+	const ctaBorderVal = isPassiveCta ? `1px solid var(--palette-line)` : `1px solid color-mix(in srgb, var(--color-cta) 72%, ${INK})`
 	const ctaShadow    = isPassiveCta ? "none"
-		: `4px 5px 0 rgba(26,43,60,0.36), inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -2px 0 rgba(0,0,0,0.12)`
+		: "var(--elevation-card)"
+	const hostBadgeContent = data.hostAvatarUrl ? (
+		<img
+			src={data.hostAvatarUrl}
+			alt={`${data.hostName} host avatar`}
+			loading="lazy"
+			decoding="async"
+			style={{ width: "100%", height: "100%", objectFit: "cover" }}
+		/>
+	) : (
+		<span style={{
+			fontFamily: UI_FONT, fontSize: "clamp(10px, 2.6vw, 12px)",
+			fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
+			color: PAPER, textShadow: "0 1px 3px rgba(23,19,13,0.4)",
+			lineHeight: 1, userSelect: "none",
+		}}>
+			{circleLabel}
+		</span>
+	)
 
 	return (
 		<article
@@ -517,31 +552,18 @@ export function DiscoveryCard({
 
 				{/* ── HOST BADGE (top-left) ── */}
 				<div style={{ position: "absolute", top: "12px", left: "12px", zIndex: 3, display: "inline-block" }}>
-					<button
-						type="button"
-						style={hostCircle}
-						onClick={onHostClick ? () => onHostClick(data.id) : undefined}
-						aria-label={verified ? `${data.hostName} — Verified Host` : data.hostName}
-					>
-						{data.hostAvatarUrl ? (
-							<img
-								src={data.hostAvatarUrl}
-								alt={`${data.hostName} host avatar`}
-								loading="lazy"
-								decoding="async"
-								style={{ width: "100%", height: "100%", objectFit: "cover" }}
-							/>
-						) : (
-							<span style={{
-								fontFamily: DISPLAY_FONT, fontSize: "clamp(10px, 2.6vw, 13px)",
-								fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
-								color: PAPER, textShadow: "0 1px 3px rgba(23,19,13,0.4)",
-								lineHeight: 1, userSelect: "none",
-							}}>
-								{circleLabel}
-							</span>
-						)}
-					</button>
+					{onHostClick ? (
+						<button
+							type="button"
+							style={hostCircle}
+							onClick={() => onHostClick(data.id)}
+							aria-label={verified ? `${data.hostName} — Verified Host` : data.hostName}
+						>
+							{hostBadgeContent}
+						</button>
+					) : (
+						<div style={hostCircle}>{hostBadgeContent}</div>
+					)}
 
 					{/* Verified check — listing surfaces only; not shown on applicant review */}
 					{verified && !isApplicantReview ? (
@@ -556,6 +578,7 @@ export function DiscoveryCard({
 								color: "var(--palette-paper)", flexShrink: 0,
 							}}
 							aria-label="Verified Host"
+							role="img"
 						>
 							<Icon name="trust.verified_host" size={16} aria-hidden />
 						</span>
@@ -806,18 +829,19 @@ export function DiscoveryCard({
 					<div className={styles.triad}>
 						<BenefitTriadCell
 							kind="housing"
-							provided={hp !== "not_provided"}
+							provision={hp}
 							value={data.triad.housing}
 							onClick={canOpenHousing ? () => onHousingClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="meals"
-							provided={mp !== "not_provided"}
+							provision={mp}
 							value={data.triad.meals}
 							onClick={canOpenMeals ? () => onMealsClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="pay"
+							provision={data.benefitProvision?.pay}
 							value={data.triad.pay}
 							onClick={onPayClick ? () => onPayClick(data.id) : undefined}
 						/>
@@ -951,15 +975,14 @@ export function DiscoveryCard({
 								background: ctaBg,
 								color: ctaColor,
 								border: ctaBorderVal,
-								borderRadius: "10px",
-								fontFamily: DISPLAY_FONT,
-								fontSize: "clamp(14px, 3.5vw, 17px)",
+								borderRadius: "var(--radius-button)",
+								fontFamily: UI_FONT,
+								fontSize: "clamp(13px, 3.2vw, 15px)",
 								fontWeight: 700,
-								letterSpacing: "0.10em",
-								textTransform: "uppercase",
-								padding: "11px 16px",
+								letterSpacing: "0.01em",
+								padding: "12px 16px",
 								display: "flex", alignItems: "center",
-								justifyContent: "center", gap: "14px",
+								justifyContent: "center", gap: "10px",
 								cursor: ctaDisabled ? "not-allowed" : "pointer",
 								opacity: ctaDisabled ? 0.60 : 1,
 								boxShadow: ctaShadow,

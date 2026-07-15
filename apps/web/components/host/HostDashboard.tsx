@@ -1,12 +1,17 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { Badge, Icon } from "@explore-and-earn/ui";
+import { Badge, Icon, type IconKey } from "@explore-and-earn/ui";
 
 import type {
   HostAnalytics,
   HostDashboardStats,
   RecentActivity,
 } from "@explore-and-earn/db";
+import {
+  canShowHostAllClear,
+  type HostReadiness,
+  type HostReadinessStepKind,
+} from "./hostReadiness";
 import { HostSetupChecklist } from "./HostSetupChecklist";
 import styles from "./HostDashboard.module.css";
 import { StaggerReveal } from "./StaggerReveal";
@@ -20,6 +25,8 @@ export interface HostDashboardProps {
   readonly primaryLane: string | null;
   /** Full host analytics for the performance cards. */
   readonly analytics: HostAnalytics;
+  /** Truthful public-profile + listing readiness derived from persisted fields. */
+  readonly readiness: HostReadiness;
 }
 
 /** Map activity type to an icon key from the registry. */
@@ -28,6 +35,15 @@ const ACTIVITY_ICON: Record<RecentActivity["type"], string> = {
   invite_sent: "action.forward",
   listing_published: "status.open",
 } as const;
+
+const READINESS_ICON: Record<HostReadinessStepKind, IconKey> = {
+  complete_profile: "nav.profile",
+  create_listing: "status.open",
+  finish_draft: "status.draft",
+  awaiting_review: "action.view",
+  manage_inactive: "category.mix",
+  ready: "status.open",
+};
 
 /**
  * Format an ISO timestamp relative to now using Intl.RelativeTimeFormat.
@@ -63,6 +79,7 @@ export function HostDashboard({
   companyName,
   primaryLane,
   analytics,
+  readiness,
 }: HostDashboardProps) {
   // Primary counts come from analytics — getHostAnalytics is the reliable host
   // resolver (live listings + applications by status); the month-scoped stats
@@ -149,6 +166,7 @@ export function HostDashboard({
 
   const pending = stats.pendingActions > 0 ? stats.pendingActions : pendingReview;
   const isNewHost = totalListings === 0;
+  const hasLiveInventory = readiness.inventory === "live";
   // Exactly one KPI leads as the dominant tile — the host's most urgent job
   // (pending review > new applicants). Avoids two competing "primary" tiles.
   const leadKpi: "pending" | "new" | null =
@@ -157,7 +175,20 @@ export function HostDashboard({
   const heroPrimary =
     pending > 0
       ? { href: "/host/applicants", label: `Review ${pending} applicant${pending === 1 ? "" : "s"}`, icon: "action.apply" as const }
-      : { href: "/host/listings/new", label: "Create a listing", icon: "status.open" as const };
+      : {
+          href: readiness.nextStep.href,
+          label: readiness.nextStep.cta,
+          icon: READINESS_ICON[readiness.nextStep.kind],
+        };
+  const showReadinessAttention =
+    readiness.nextStep.kind !== "ready" &&
+    !(readiness.nextStep.kind === "finish_draft" && draftCount > 0);
+  const allClear = canShowHostAllClear(
+    readiness,
+    pending,
+    newApps,
+    draftCount,
+  );
 
   return (
     <StaggerReveal className={`host-page ${styles.dashboard}`}>
@@ -169,9 +200,9 @@ export function HostDashboard({
             {companyName ? `Welcome back, ${companyName}` : "Host dashboard"}
           </h1>
           <p className="host-hero__sub">
-            {isNewHost
-              ? "Post your first opportunity to start reaching work-travelers."
-              : "Your listings, applicants, and activity at a glance."}
+            {readiness.nextStep.kind === "ready"
+              ? "Your listings, applicants, and activity at a glance."
+              : readiness.nextStep.hint}
           </p>
         </div>
         <div className="host-hero__actions">
@@ -179,7 +210,7 @@ export function HostDashboard({
             <Icon name={heroPrimary.icon} size={20} aria-hidden />
             {heroPrimary.label}
           </Link>
-          {!isNewHost ? (
+          {hasLiveInventory ? (
             <Link className="host-hero__cta host-hero__cta--ghost" href="/host/listings/new">
               <Icon name="action.forward" size={20} aria-hidden />
               New listing
@@ -195,13 +226,9 @@ export function HostDashboard({
         ) : null}
       </section>
 
-      {/* ── First-run setup checklist — until the host has a live listing ─ */}
-      {liveCount === 0 ? (
-        <HostSetupChecklist
-          hasProfile={companyName !== null}
-          listingCount={totalListings}
-          liveCount={liveCount}
-        />
+      {/* ── Setup stays visible until both public identity and inventory are ready. ─ */}
+      {readiness.nextStep.kind !== "ready" ? (
+        <HostSetupChecklist readiness={readiness} />
       ) : null}
 
       {/* ── KPI row ─────────────────────────────────────────────────── */}
@@ -281,25 +308,29 @@ export function HostDashboard({
               <Icon name="action.forward" size={20} aria-hidden />
             </Link>
           ) : null}
-          {pending === 0 && newApps === 0 && draftCount === 0 ? (
-            isNewHost ? (
-              // A brand-new host is NOT "caught up" — the next action is the
-              // setup path (saying otherwise contradicted the 0/3 checklist
-              // rendered above it).
-              <Link className="host-attention" href="/host/listings/new">
-                <span className="host-attention__count">1</span>
-                <span className="host-attention__text">
-                  <span className="host-attention__title">Get your first opportunity live</span>
-                  <span className="host-attention__sub">Post a role with Housing, Meals &amp; Pay to start reaching seekers</span>
+          {showReadinessAttention ? (
+            <Link className="host-attention" href={readiness.nextStep.href}>
+              <span className="host-attention__count">1</span>
+              <span className="host-attention__text">
+                <span className="host-attention__title">
+                  {readiness.nextStep.title}
                 </span>
-                <Icon name="action.forward" size={20} aria-hidden />
-              </Link>
-            ) : (
-              <p className={styles.allClear}>
-                <Icon name="system.success" size={20} aria-hidden />
-                You&rsquo;re all caught up.
-              </p>
-            )
+                <span className="host-attention__sub">
+                  {readiness.nextStep.hint}
+                </span>
+              </span>
+              <Icon
+                name={READINESS_ICON[readiness.nextStep.kind]}
+                size={20}
+                aria-hidden
+              />
+            </Link>
+          ) : null}
+          {allClear ? (
+            <p className={styles.allClear}>
+              <Icon name="system.success" size={20} aria-hidden />
+              You&rsquo;re all caught up.
+            </p>
           ) : null}
         </div>
       </section>
@@ -410,19 +441,19 @@ export function HostDashboard({
               <span className="host-panel__eyebrow">Reach</span>
               <h2 className="host-panel__title">Conversion radar</h2>
             </div>
-            {!isNewHost ? (
+            {hasLiveInventory ? (
               <Badge
                 variant={conversionScore >= 70 ? "success" : "neutral"}
                 label={radarTone}
               />
             ) : null}
           </div>
-          {isNewHost ? (
+          {!hasLiveInventory ? (
             // Pre-launch: there is nothing to measure yet — a punishing
             // "0% NEEDS WORK" on day one misreads setup as failure.
             <p className={styles.allClear}>
               <Icon name="system.info" size={20} aria-hidden />
-              Health tracking starts once your first listing is live.
+              Health tracking starts once a listing is live.
             </p>
           ) : (
           <div className={styles.radarSplit}>

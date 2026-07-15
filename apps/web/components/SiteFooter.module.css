@@ -86,3 +86,9 @@
   -webkit-text-fill-color: transparent;
   color: transparent;
 }
+
+@media (min-width: 1024px) {
+  .footer {
+    padding-bottom: 0;
+  }
+}

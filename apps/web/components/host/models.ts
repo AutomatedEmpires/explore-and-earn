@@ -2,6 +2,7 @@ import type { MatchBand } from "@explore-and-earn/contracts";
 import type { IconKey } from "@explore-and-earn/ui";
 
 import type { DiscoveryListing } from "../discovery";
+import type { HostProfileReadinessInput } from "./hostReadiness";
 
 /**
  * Host lane — LOCAL view models.
@@ -25,6 +26,8 @@ export interface HostProfileSummary {
   readonly location?: string;
   /** Longer "about" blurb shown on the host profile. */
   readonly bio?: string;
+  /** Public host/profile photo used by the readiness checklist. */
+  readonly photoUrl?: string;
   /** Subscription-gated verified host — automatic, not self-declared. Rendered via VerifiedHostBadge. */
   readonly verified: boolean;
   /** Host website URL. */
@@ -39,6 +42,37 @@ export interface HostProfileSummary {
   readonly mealsOfferedGenerally?: boolean;
   /** Marketplace categories this host operates in. */
   readonly categoryScopes?: readonly string[];
+}
+
+/**
+ * Keep presentation fallbacks separate from persisted readiness truth.
+ *
+ * `undefined` preserves the component's backwards-compatible behavior for
+ * callers that only have a display summary. An explicit `null` means the data
+ * layer found no persisted host profile, so every readiness field must remain
+ * empty even when the display model uses friendly placeholder copy.
+ */
+export function resolveHostProfileReadinessInput(
+  displayProfile: HostProfileSummary,
+  persistedProfile: HostProfileReadinessInput | null | undefined,
+): HostProfileReadinessInput {
+  if (persistedProfile === undefined) {
+    return {
+      companyName: displayProfile.orgName,
+      about: displayProfile.bio,
+      primaryLocationName: displayProfile.location,
+      photoUrl: displayProfile.photoUrl,
+      categoryScopes: displayProfile.categoryScopes,
+    };
+  }
+
+  return {
+    companyName: persistedProfile?.companyName ?? null,
+    about: persistedProfile?.about ?? null,
+    primaryLocationName: persistedProfile?.primaryLocationName ?? null,
+    photoUrl: persistedProfile?.photoUrl ?? null,
+    categoryScopes: persistedProfile?.categoryScopes ?? [],
+  };
 }
 
 export type HostListingState =

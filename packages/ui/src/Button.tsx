@@ -1,11 +1,7 @@
 import type { ButtonHTMLAttributes, PropsWithChildren } from "react";
 import { Icon, type IconKey } from "./icons";
 
-/**
- * Button — placeholder primitive. Token-driven styling only (no hardcoded
- * colors/spacing). Real interaction states + motion tokens land with
- * Design System V1.
- */
+/** Canonical token-driven button primitive. */
 export interface ButtonProps
 	extends PropsWithChildren,
 		ButtonHTMLAttributes<HTMLButtonElement> {
@@ -18,10 +14,15 @@ export function Button({
 	variant = "primary",
 	icon,
 	type = "button",
+	className,
 	...rest
 }: ButtonProps) {
+	const classes = ["ui-button", `ui-button--${variant}`, className]
+		.filter(Boolean)
+		.join(" ");
+
 	return (
-		<button type={type} className={`ui-button ui-button--${variant}`} {...rest}>
+		<button {...rest} type={type} className={classes}>
 			{icon ? <Icon aria-hidden name={icon} size={20} /> : null}
 			<span className="ui-button__label">{children}</span>
 		</button>

@@ -95,7 +95,7 @@
   padding: var(--space-20);
   border-radius: var(--radius-card);
   background: var(--gradient-sky); /* default / no-lane fallback */
-  color: var(--color-cta-text);
+  color: var(--text-on-dark);
   box-shadow: var(--elevation-card);
 }
 /* Lane atmosphere — the hero reflects the host's primary marketplace lane.
@@ -121,7 +121,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-cta-text) 78%, transparent);
+  color: color-mix(in srgb, var(--text-on-dark) 78%, transparent);
 }
 .host-hero__title {
   position: relative;
@@ -129,7 +129,7 @@
   font-family: var(--font-display);
   font-size: var(--type-page-size);
   line-height: var(--type-page-lh);
-  color: var(--color-cta-text);
+  color: var(--text-on-dark);
 }
 .host-hero__sub {
   position: relative;
@@ -137,7 +137,7 @@
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
-  color: color-mix(in srgb, var(--color-cta-text) 86%, transparent);
+  color: color-mix(in srgb, var(--text-on-dark) 86%, transparent);
 }
 .host-hero__actions { position: relative; display: flex; flex-wrap: wrap; gap: var(--space-8); }
 /* (removed unused .host-hero__meter* rules — the dashboard hero has no meter) */
@@ -159,14 +159,14 @@
   transition: transform var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
 }
 .host-hero__cta:hover { filter: brightness(1.03); transform: translateY(-1px); }
-.host-hero__cta:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-cta-text), 0 0 0 4px var(--palette-sky-dark); }
+.host-hero__cta:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--text-on-dark), 0 0 0 4px var(--palette-sky-dark); }
 
 .host-hero__cta--ghost {
-  background: color-mix(in srgb, var(--color-cta-text) 14%, transparent);
-  color: var(--color-cta-text);
-  border: 1px solid color-mix(in srgb, var(--color-cta-text) 38%, transparent);
+  background: color-mix(in srgb, var(--text-on-dark) 14%, transparent);
+  color: var(--text-on-dark);
+  border: 1px solid color-mix(in srgb, var(--text-on-dark) 38%, transparent);
 }
-.host-hero__cta--ghost:hover { background: color-mix(in srgb, var(--color-cta-text) 22%, transparent); }
+.host-hero__cta--ghost:hover { background: color-mix(in srgb, var(--text-on-dark) 22%, transparent); }
 
 /* =================================================================== */
 /* KPI — compact metric card                                           */
@@ -358,7 +358,7 @@ a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-
   background: var(--status-match-bg);
   border-color: var(--status-match-fg);
 }
-.host-action-tile--primary .host-action-tile__icon { background: var(--status-match-fg); color: var(--color-cta-text); }
+.host-action-tile--primary .host-action-tile__icon { background: var(--status-match-fg); color: var(--text-on-dark); }
 
 /* =================================================================== */
 /* Attention row — actionable "needs review" item                      */
@@ -386,7 +386,7 @@ a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-
   padding: 0 var(--space-6);
   border-radius: var(--radius-pill);
   background: var(--status-match-fg);
-  color: var(--color-cta-text);
+  color: var(--text-on-dark);
   font-family: var(--font-ui);
   font-size: var(--type-caption-size);
   font-weight: var(--font-weight-semibold);

@@ -14,6 +14,10 @@ import {
 	uploadBenefitPhotoAction,
 } from "../../app/actions/benefitDetails";
 import { PopupShell } from "../overlay/PopupShell";
+import {
+	benefitDismissBlocker,
+	publicBenefitPhotoStatus,
+} from "./benefitTrustState";
 import type { DiscoveryListing } from "./listing";
 import styles from "./BenefitTrustModal.module.css";
 
@@ -51,10 +55,12 @@ type PhotoSlot = {
 // ── Housing config ─────────────────────────────────────────────────────────────
 
 const HOUSING_SLOTS: readonly PhotoSlot[] = [
-	{ id: "outside", label: "Outside" },
-	{ id: "inside", label: "Inside" },
+	// Storage ids stay backward-compatible; labels describe the four views
+	// seekers were promised in the product model.
+	{ id: "outside", label: "Exterior" },
+	{ id: "inside", label: "Interior" },
 	{ id: "bathroom", label: "Bathroom" },
-	{ id: "misc", label: "Misc" },
+	{ id: "misc", label: "Other view" },
 ];
 
 const HOUSING_FIELDS: readonly FieldDef[] = [
@@ -112,9 +118,9 @@ const HOUSING_CHIP_SECTIONS: readonly ChipSection[] = [
 
 const MEALS_SLOTS: readonly PhotoSlot[] = [
 	{ id: "kitchen", label: "Kitchen" },
-	{ id: "prepared", label: "Prepared Meal" },
-	{ id: "dining", label: "Dining Area" },
-	{ id: "misc", label: "Misc" },
+	{ id: "prepared", label: "Typical meal" },
+	{ id: "dining", label: "Dining area" },
+	{ id: "misc", label: "Other view" },
 ];
 
 const MEALS_FIELDS: readonly FieldDef[] = [
@@ -179,7 +185,8 @@ const MEALS_CHIP_SECTIONS: readonly ChipSection[] = [
 
 type KindConfig = {
 	readonly title: string;
-	readonly subtitle: string;
+	readonly editSubtitle: string;
+	readonly viewSubtitle: string;
 	readonly icon: "benefit.housing" | "benefit.meals";
 	readonly photoLabel: string;
 	readonly saveLabel: string;
@@ -192,8 +199,10 @@ type KindConfig = {
 const KIND_CONFIG: Record<BenefitKind, KindConfig> = {
 	housing: {
 		title: "Housing",
-		subtitle:
+		editSubtitle:
 			"Add housing details and photos to help seekers know what to expect and build trust.",
+		viewSubtitle:
+			"See exactly what the host has confirmed about where you will stay.",
 		icon: "benefit.housing",
 		photoLabel: "Housing photos",
 		saveLabel: "Save housing",
@@ -204,8 +213,10 @@ const KIND_CONFIG: Record<BenefitKind, KindConfig> = {
 	},
 	meals: {
 		title: "Meals",
-		subtitle:
+		editSubtitle:
 			"Add meal details and photos to help seekers know what to expect and build trust.",
+		viewSubtitle:
+			"See exactly what the host has confirmed about meals and shared food spaces.",
 		icon: "benefit.meals",
 		photoLabel: "Meal photos",
 		saveLabel: "Save meals",
@@ -274,7 +285,7 @@ export interface BenefitTrustModalEditProps {
 
 export interface BenefitTrustModalViewProps {
 	readonly mode?: "view";
-	readonly listing: DiscoveryListing | null;
+	readonly listing: Pick<DiscoveryListing, "id" | "benefits"> | null;
 	readonly bucket: BenefitKind | null;
 	readonly onClose: () => void;
 }
@@ -318,6 +329,8 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
 	const [addingTo, setAddingTo] = useState<string | null>(null);
 	const [draftChip, setDraftChip] = useState("");
+	const [dirty, setDirty] = useState(false);
+	const [publicLoadUnavailable, setPublicLoadUnavailable] = useState(false);
 
 	// Hydrate from saved detail whenever the modal opens (or the kind switches
 	// while open). EDIT pulls the host-scoped detail; VIEW pulls the public
@@ -328,6 +341,8 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		if (!open || !kind) return;
 		const sections = KIND_CONFIG[kind].chipSections;
 		setError(null);
+		setDirty(false);
+		setPublicLoadUnavailable(false);
 		setAddingTo(null);
 		setDraftChip("");
 		setFieldValues({});
@@ -347,10 +362,16 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 					if (!res.ok) throw new Error(res.error ?? "load_failed");
 					return res.details?.[kind];
 				})
-			: getPublicBenefitDetailsAction(listingId).then((map) => map?.[kind]);
+			: getPublicBenefitDetailsAction(listingId).then((res) => {
+					if (!res.ok) throw new Error(res.error);
+					return res.details?.[kind];
+				});
 		load
 			.then((detail) => {
-				if (cancelled || !detail) return;
+				if (cancelled) return;
+				setPublicLoadUnavailable(false);
+				setDirty(false);
+				if (!detail) return;
 				setFieldValues({ ...detail.fields });
 				setPhotos({ ...detail.photos });
 				setCustomChips(
@@ -370,7 +391,13 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				});
 			})
 			.catch(() => {
-				if (!cancelled && isEdit) setError("Could not load saved details.");
+				if (cancelled) return;
+				if (isEdit) {
+					setError("Could not load saved details.");
+				} else {
+					setPublicLoadUnavailable(true);
+					setError("Benefit details are temporarily unavailable.");
+				}
 			})
 			.finally(() => {
 				if (!cancelled) setHydrating(false);
@@ -388,8 +415,9 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		: null;
 	const benefitInfo = viewListing ? viewListing.benefits[kind] : null;
 	const canUpload = Boolean(listingId);
-	// Edit shows all slots (to upload into); view shows only slots the host filled.
-	const slotsToShow = isEdit ? cfg.slots : cfg.slots.filter((s) => photos[s.id]);
+	// Always show the canonical four-slot story. In public view, unfilled slots
+	// render an explicit empty state instead of disappearing or implying imagery.
+	const slotsToShow = cfg.slots;
 	// Saved single-select facts (housing type, meal style…) for the read-only view.
 	const viewFacts = isEdit
 		? []
@@ -398,6 +426,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				.filter((f): f is { label: string; value: string } => Boolean(f.value));
 
 	function toggleOption(sectionId: string, optId: string) {
+		setDirty(true);
 		setToggles((prev) => {
 			const cur = new Set(prev[sectionId] ?? []);
 			if (cur.has(optId)) cur.delete(optId);
@@ -417,6 +446,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			if (res.ok && res.url) {
 				const url = res.url;
 				setPhotos((prev) => ({ ...prev, [slotId]: url }));
+				setDirty(true);
 			} else {
 				setError(res.error ?? "Upload failed. Please try again.");
 			}
@@ -426,6 +456,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	}
 
 	function removePhoto(slotId: string) {
+		setDirty(true);
 		setPhotos((prev) => {
 			const next = { ...prev };
 			delete next[slotId];
@@ -445,6 +476,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				.replace(/[^a-z0-9]+/g, "-")
 				.replace(/^-+|-+$/g, "") || "item";
 		const id = `custom-${slug}`;
+		setDirty(true);
 		setCustomChips((prev) => {
 			const list = prev[sectionId] ?? [];
 			if (list.some((c) => c.id === id)) return prev;
@@ -456,6 +488,37 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		}));
 		setDraftChip("");
 		setAddingTo(null);
+	}
+
+	function canClose(): boolean {
+		if (isEdit && saving) {
+			setError("Wait for benefit details to finish saving before closing.");
+			return false;
+		}
+		const blocker = benefitDismissBlocker(
+			isEdit ? "edit" : "view",
+			dirty,
+			uploadingSlot !== null,
+		);
+		if (blocker === "uploading") {
+			setError("Wait for the photo upload to finish before closing.");
+			return false;
+		}
+		if (
+			blocker === "dirty" &&
+			!window.confirm(
+				"Discard unsaved benefit changes? Newly uploaded photos will not be published until you save.",
+			)
+		) {
+			return false;
+		}
+		setDirty(false);
+		return true;
+	}
+
+	function requestClose() {
+		if (!canClose()) return;
+		props.onClose();
 	}
 
 	async function handleSave() {
@@ -475,8 +538,12 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				customChips,
 			};
 			const res = await saveBenefitDetailsAction(listingId, kind, detail);
-			if (res.ok) props.onClose();
-			else setError(res.error ?? "Could not save. Please try again.");
+			if (res.ok) {
+				setDirty(false);
+				props.onClose();
+			} else {
+				setError(res.error ?? "Could not save. Please try again.");
+			}
 		} finally {
 			setSaving(false);
 		}
@@ -484,20 +551,24 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 
 	const footer = isEdit ? (
 		<div className={styles.footerRow}>
-			<Button variant="secondary" onClick={props.onClose} disabled={saving}>
+			<Button
+				variant="secondary"
+				onClick={requestClose}
+				disabled={saving || uploadingSlot !== null}
+			>
 				Cancel
 			</Button>
 			<Button
 				variant="primary"
 				className={styles.saveBtn}
 				onClick={handleSave}
-				disabled={saving || hydrating}
+				disabled={saving || hydrating || uploadingSlot !== null}
 			>
 				{saving ? "Saving…" : cfg.saveLabel}
 			</Button>
 		</div>
 	) : (
-		<Button variant="primary" className={styles.saveBtn} onClick={props.onClose}>
+		<Button variant="primary" className={styles.saveBtn} onClick={requestClose}>
 			Got it
 		</Button>
 	);
@@ -505,6 +576,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	return (
 		<PopupShell
 			open={open}
+			onBeforeClose={canClose}
 			onClose={props.onClose}
 			title={cfg.title}
 			headerIcon={<Icon name={cfg.icon} size={24} aria-hidden />}
@@ -512,18 +584,29 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			size="wide"
 			closeLabel={`Close ${cfg.title.toLowerCase()} details`}
 		>
-			<p className={styles.subtitle}>{cfg.subtitle}</p>
+			<p className={styles.subtitle}>
+				{isEdit ? cfg.editSubtitle : cfg.viewSubtitle}
+			</p>
 
-			{/* ── Photo grid (edit: all slots; view: only the ones filled) ── */}
-			{isEdit || slotsToShow.length > 0 ? (
-			<section className={styles.photoSection} aria-label={cfg.photoLabel}>
+			{/* ── Canonical four-slot photo story ─────────────────────── */}
+			<section
+				className={styles.photoSection}
+				aria-label={cfg.photoLabel}
+				aria-busy={hydrating}
+			>
 				<div className={styles.photoGrid}>
 					{slotsToShow.map((slot) => (
 						<div
 							key={slot.id}
 							className={`${styles.photoSlot} ${slotClass(kind, slot.id)}`}
 						>
-							<div className={styles.photoArea}>
+							<div
+								className={
+									!isEdit && !photos[slot.id]
+										? `${styles.photoArea} ${styles.photoAreaEmpty}`
+										: styles.photoArea
+								}
+							>
 								{photos[slot.id] ? (
 									<>
 										<Image
@@ -582,7 +665,17 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 											</label>
 										</>
 									)
-								) : null}
+								) : (
+									<span className={styles.emptyPhotoState}>
+										<Icon name="nav.photos" size={20} aria-hidden />
+										<span>
+											{publicBenefitPhotoStatus(
+												hydrating,
+												publicLoadUnavailable,
+											)}
+										</span>
+									</span>
+								)}
 							</div>
 							<span className={styles.slotLabel}>
 								{slot.label.toUpperCase()}
@@ -591,7 +684,6 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 					))}
 				</div>
 			</section>
-			) : null}
 
 			{isEdit ? (
 				<>
@@ -606,12 +698,13 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 									id={f.id}
 									className={styles.select}
 									value={fieldValues[f.id] ?? ""}
-									onChange={(e) =>
+									onChange={(e) => {
+										setDirty(true);
 										setFieldValues((prev) => ({
 											...prev,
 											[f.id]: e.target.value,
-										}))
-									}
+										}));
+									}}
 								>
 									<option value="">{f.placeholder}</option>
 									{f.options.map((o) => (
@@ -670,7 +763,10 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 												maxLength={24}
 												placeholder={section.addLabel}
 												aria-label={section.addLabel}
-												onChange={(e) => setDraftChip(e.target.value)}
+											onChange={(e) => {
+												setDraftChip(e.target.value);
+												setDirty(true);
+											}}
 												onKeyDown={(e) => {
 													if (e.key === "Enter") {
 														e.preventDefault();
@@ -764,7 +860,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				</div>
 			) : null}
 
-			{isEdit && error ? (
+			{error ? (
 				<p className={styles.formError} role="alert">
 					{error}
 				</p>

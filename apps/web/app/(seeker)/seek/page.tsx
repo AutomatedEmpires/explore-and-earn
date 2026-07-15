@@ -157,6 +157,20 @@ function matchesLocalFilters(
 	return beginsWithinRange(listing, filters.startRangeMonths);
 }
 
+function fixturePage(
+	filters: SearchFilters,
+	offset: number,
+): { readonly listings: DiscoveryListing[]; readonly hasNextPage: boolean } {
+	const filtered = DISCOVERY_FIXTURES.filter((listing) =>
+		matchesLocalFilters(listing, filters),
+	);
+	const pageRows = filtered.slice(offset, offset + PAGE_SIZE + 1);
+	return {
+		listings: pageRows.slice(0, PAGE_SIZE),
+		hasNextPage: pageRows.length > PAGE_SIZE,
+	};
+}
+
 export default async function SeekPage({
 	searchParams,
 }: {
@@ -215,12 +229,9 @@ export default async function SeekPage({
 		scorableRows = pageRows;
 		listings = pageRows.map((row) => rowToDiscoveryFields(row) as DiscoveryListing);
 	} else if (canUseFixtures) {
-		const filtered = DISCOVERY_FIXTURES.filter((listing) =>
-			matchesLocalFilters(listing, filters),
-		);
-		const pageRows = filtered.slice(offset, offset + PAGE_SIZE + 1);
-		hasNextPage = pageRows.length > PAGE_SIZE;
-		listings = pageRows.slice(0, PAGE_SIZE);
+		const fallback = fixturePage(filters, offset);
+		listings = fallback.listings;
+		hasNextPage = fallback.hasNextPage;
 	} else {
 		warnIfDiscoveryDataMissingInProduction("seek/page");
 	}

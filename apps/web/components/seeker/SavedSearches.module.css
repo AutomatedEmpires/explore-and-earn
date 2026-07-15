@@ -1,154 +1,217 @@
-/**
- * Saved searches row — re-run chips + a "save this search" affordance. Mirrors
- * the SeekQuickFilters chip language; token-driven, scrollable on overflow.
- */
+/** Compact saved-search shelf for the canonical Seek surface. */
 
 .root {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-8);
-  margin-bottom: var(--space-12);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space-8);
+	min-width: 0;
+	padding: var(--space-10) var(--space-12);
+	border: 1px solid color-mix(in srgb, var(--color-gold) 22%, var(--border-soft));
+	border-radius: var(--radius-cell);
+	background: color-mix(in srgb, var(--palette-amber-light) 34%, var(--color-surface));
 }
 
 .scroll {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex: 1 1 auto;
-  min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-x: auto;
+	overscroll-behavior-inline: contain;
+	scroll-snap-type: x proximity;
+	scrollbar-width: none;
+	-webkit-overflow-scrolling: touch;
 }
+
 .scroll::-webkit-scrollbar {
-  display: none;
+	display: none;
 }
 
 .lead {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--palette-amber-deep, var(--text-muted));
 }
 
 .chip {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-soft);
-  background: var(--color-surface);
-  overflow: hidden;
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	overflow: hidden;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	scroll-snap-align: start;
+	box-shadow: inset 0 1px 0 color-mix(in srgb, var(--palette-white) 72%, transparent);
+	transition:
+		border-color var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
 }
+
+.chip:hover {
+	border-color: color-mix(in srgb, var(--color-gold) 44%, var(--border-soft));
+}
+
 .chip:focus-within {
-  border-color: var(--color-cta);
-  box-shadow: var(--ui-focus-ring);
+	border-color: var(--color-cta);
+	box-shadow: var(--ui-focus-ring);
 }
 
 .chipLink {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-min, 44px);
-  padding: 0 var(--space-12);
-  color: var(--text-secondary);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
-  text-decoration: none;
-  transition: color var(--motion-fast) var(--ease-standard);
+	display: inline-flex;
+	align-items: center;
+	min-height: var(--tap-min, 44px);
+	padding: 0 var(--space-12);
+	color: var(--text-secondary);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	white-space: nowrap;
+	text-decoration: none;
+	transition:
+		color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard);
 }
+
 .chipLink:hover {
-  color: var(--text-primary);
+	background: color-mix(in srgb, var(--color-gold) 7%, transparent);
+	color: var(--text-primary);
 }
 
 .newBadge {
-  margin-left: var(--space-8);
-  padding: 1px var(--space-8);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--color-cta) 22%, transparent);
-  color: var(--color-cta);
-  font-size: var(--type-label-size);
-  font-weight: var(--font-weight-bold);
-  white-space: nowrap;
+	margin-left: var(--space-8);
+	padding: 2px var(--space-8);
+	border-radius: var(--radius-pill);
+	background: var(--palette-teal-light, var(--status-success-bg));
+	color: var(--palette-teal-deep, var(--status-success-fg));
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-bold);
+	white-space: nowrap;
 }
 
 .remove {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  min-height: var(--tap-min, 44px);
-  border: 0;
-  border-left: 1px solid var(--border-soft);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+	display: grid;
+	place-items: center;
+	width: 2.5rem;
+	min-height: var(--tap-min, 44px);
+	padding: 0;
+	border: 0;
+	border-left: 1px solid var(--border-soft);
+	appearance: none;
+	-webkit-appearance: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	transition:
+		color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard),
+		transform var(--motion-fast) var(--ease-standard);
 }
+
 .remove:hover {
-  color: var(--status-error-fg, var(--text-primary));
+	background: var(--status-error-bg);
+	color: var(--status-error-fg, var(--text-primary));
 }
+
 .remove:active {
-  transform: scale(0.9);
+	transform: scale(0.92);
 }
+
 .remove:disabled {
-  opacity: 0.5;
-  cursor: default;
+	opacity: 0.5;
+	cursor: default;
 }
 
 .saveBtn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-  min-height: var(--tap-min, 44px);
-  padding: 0 var(--space-16);
-  border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--color-cta) 40%, transparent);
-  background: color-mix(in srgb, var(--color-cta) 14%, transparent);
-  color: var(--color-cta);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: background var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min, 44px);
+	padding: 0 var(--space-16);
+	border: 1px solid color-mix(in srgb, var(--color-gold) 42%, transparent);
+	border-radius: var(--radius-pill);
+	appearance: none;
+	-webkit-appearance: none;
+	background: var(--gradient-amber, var(--gradient-gold));
+	color: var(--color-cta-text);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+	box-shadow: 0 5px 14px color-mix(in srgb, var(--color-gold) 18%, transparent);
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		box-shadow var(--motion-fast) var(--ease-standard);
 }
+
 .saveBtn:hover {
-  background: color-mix(in srgb, var(--color-cta) 22%, transparent);
+	box-shadow: 0 8px 20px color-mix(in srgb, var(--color-gold) 25%, transparent);
+	transform: translateY(-1px);
 }
+
 .saveBtn:active {
-  transform: scale(0.97);
+	transform: translateY(0) scale(0.98);
 }
+
 .saveBtn:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
+
 .saveBtn:disabled {
-  opacity: 0.6;
-  cursor: default;
+	opacity: 0.6;
+	cursor: default;
 }
 
 .savedFlag {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--status-success-fg, var(--color-cta));
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min);
+	color: var(--status-success-fg, var(--color-teal));
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 639px) {
+	.root {
+		flex-wrap: nowrap;
+		padding: var(--space-8) var(--space-10);
+	}
+
+	.scroll {
+		gap: var(--space-6);
+	}
+
+	.lead {
+		font-size: var(--type-caption-size);
+	}
+
+	.saveBtn {
+		padding-inline: var(--space-12);
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chipLink,
-  .remove,
-  .saveBtn {
-    transition: none;
-  }
-  .remove:active,
-  .saveBtn:active {
-    transform: none;
-  }
+	.chip,
+	.chipLink,
+	.remove,
+	.saveBtn {
+		transition: none;
+	}
+
+	.remove:active,
+	.saveBtn:hover,
+	.saveBtn:active {
+		transform: none;
+	}
 }

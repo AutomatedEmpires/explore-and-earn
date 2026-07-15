@@ -41,8 +41,8 @@ Antidote to "reads like a generic admin template":
 ## 4. Modals / overlays / popups
 
 - Use `Modal` / `ui-modal` / `PopupShell` (the layered-scrim, catch-light, textured premium shell — preserve it; one shell, many payloads).
-- **Radius `--radius-modal` 28; scrim via `--elevation-overlay`.** Enter + **exit** animation must both exist (`--motion-drawer`) — `PopupShell` currently lacks an exit; fix when touched.
-- **Mobile = bottom sheet**, not center dialog, for anything content-heavy; draggable, swipe-down to dismiss, safe-area aware. Confirm before dismissing with unsaved changes.
+- **Radius `--radius-modal` 28; scrim via `--elevation-overlay`.** Enter + **exit** animation must both exist (`--motion-drawer`); `PopupShell` provides the canonical lifecycle, including reduced-motion handling.
+- **Mobile = bottom sheet**, not center dialog, for anything content-heavy; draggable, swipe-down to dismiss, safe-area aware. Use `PopupShell.onBeforeClose` for synchronous unsaved/busy vetoes so confirmation happens before exit motion or focus cleanup.
 - One primary action; clear close affordance; focus trap; `Esc` closes; return focus to trigger.
 
 ## 5. Empty states

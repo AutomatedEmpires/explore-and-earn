@@ -97,7 +97,7 @@ export function HostShell({ companyName, photoUrl, tier, unread = 0, children }:
         </div>
         <div
           className="hostos-hostcard"
-          style={photoUrl ? { backgroundImage: `url(${photoUrl})` } : { background: "var(--gradient-category-farm, linear-gradient(135deg,#2A1608,#CC9440))" }}
+          style={photoUrl ? { backgroundImage: `url(${photoUrl})` } : { background: "var(--gradient-category-farm)" }}
         >
           {tier ? <span className="hostos-chip">{tier} Host</span> : null}
           <b>{companyName ?? "Your farm"}</b>

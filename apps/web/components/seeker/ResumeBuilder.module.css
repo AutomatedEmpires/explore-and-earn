@@ -8,6 +8,105 @@
 	padding-bottom: calc(var(--space-section) * 2);
 }
 
+.builderWorkspace {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	grid-template-areas:
+		"editor"
+		"footer"
+		"preview";
+	align-items: start;
+	gap: var(--space-section);
+}
+
+.editorPane {
+	grid-area: editor;
+	min-width: 0;
+}
+
+.reviewWorkspace {
+	grid-template-areas:
+		"preview"
+		"footer";
+}
+
+.previewPane,
+.reviewPreview {
+	grid-area: preview;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: var(--space-12);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: color-mix(in srgb, var(--color-cta) 4%, var(--color-surface));
+}
+
+.reviewPreview {
+	width: min(100%, 760px);
+	margin-inline: auto;
+}
+
+.previewHeader {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.previewEyebrow {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-4);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--color-cta);
+}
+
+.previewTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh, 1.2);
+	color: var(--text-primary);
+}
+
+.previewDescription {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.previewCard {
+	min-width: 0;
+}
+
+@media (min-width: 1024px) {
+	.builderWorkspace {
+		grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+		grid-template-areas:
+			"editor preview"
+			"footer footer";
+	}
+
+	.reviewWorkspace {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-areas:
+			"preview"
+			"footer";
+	}
+
+	.previewPane {
+		position: sticky;
+		top: var(--space-16);
+	}
+}
+
 /* ── Stepper (progress ring + segmented rail) ─────────────────────────────── */
 
 .stepper {
@@ -207,9 +306,18 @@
 	box-shadow: 0 0 0 4px var(--status-match-bg);
 }
 
-.node:hover .nodeDot {
+.node:hover:not(:disabled) .nodeDot {
 	border-color: var(--color-cta);
 	color: var(--color-cta);
+}
+
+.node:disabled,
+.nodeActive:disabled,
+.nodeDone:disabled,
+.backBtn:disabled,
+.continueBtn:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
 }
 
 .nodeLabel {
@@ -756,6 +864,12 @@
 	color: var(--color-cta);
 }
 
+.cat[data-secondary],
+.catSelected[data-secondary] {
+	opacity: 0.68;
+	border-style: dashed;
+}
+
 /* ── Skills picker ────────────────────────────────────────────────────────── */
 
 .skillsDivider {
@@ -821,6 +935,7 @@
 /* ── Step footer ──────────────────────────────────────────────────────────── */
 
 .stepFooter {
+	grid-area: footer;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -829,9 +944,9 @@
 	border-top: 1px solid var(--border-soft);
 }
 
-/* On phones the Back / Save & continue controls stick to the bottom so
-   advancing is always reachable on long steps (e.g. Experience with several
-   saved cards). The primary affordance dominates the bar. */
+/* On phones the Back / Continue controls stay at the viewport edge after the
+   active editor, so the following host-view preview never pushes navigation
+   out of reach. The primary affordance dominates the bar. */
 @media (max-width: 640px) {
 	.stepFooter {
 		position: sticky;

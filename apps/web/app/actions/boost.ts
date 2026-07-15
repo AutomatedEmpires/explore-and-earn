@@ -4,7 +4,6 @@ import { auth } from "@clerk/nextjs/server";
 
 import {
   BOOST_DURATIONS,
-  BOOST_PRICING,
   type BoostDuration,
 } from "@explore-and-earn/contracts";
 import {
@@ -16,11 +15,6 @@ import {
   createBoostCheckoutSession,
   hasStripeServerConfig,
 } from "../../services/stripe";
-
-// Re-export the launch boost pricing so the client popup imports tiers from the
-// action module (mirrors HostAnnouncementComposer importing ANNOUNCEMENT_PRICE_CENTS
-// through the community action).
-export { BOOST_DURATIONS, BOOST_PRICING };
 
 export type BoostCheckoutResult =
   | { ok: true; sessionUrl: string }

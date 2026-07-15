@@ -10,7 +10,9 @@ import type {
 import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
+import { projectEmbeddedListingPay } from "../lib/embeddedListingPay";
 import type { SeekerApplicationListing } from "./applications";
+import { transitionSeekerApplication } from "./seekerApplicationTransitions";
 
 /*
  * Seeker self-service dashboard data (Agent 2 / PR 2).
@@ -47,42 +49,6 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    return row.compensation_summary;
-  }
-  const minCents =
-    typeof row.compensation_min_cents === "number"
-      ? row.compensation_min_cents
-      : null;
-  if (minCents != null) {
-    const unit =
-      typeof row.compensation_unit === "string"
-        ? row.compensation_unit
-        : "other";
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(minCents);
-    const maxCents =
-      typeof row.compensation_max_cents === "number"
-        ? row.compensation_max_cents
-        : null;
-    const max = maxCents != null ? fmt(maxCents) : null;
-    const range = max && max !== min ? `${min}–${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
-}
-
 function rowToSeekerApplicationListing(
   value: unknown,
 ): SeekerApplicationListing | null {
@@ -104,13 +70,14 @@ function rowToSeekerApplicationListing(
     row.housing_included === true ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision =
     row.meals_included === true ? "provided" : "not_provided";
+  const pay = projectEmbeddedListingPay(row);
 
   const benefits: BenefitTriad = {
     housing: { provision: housingProvision },
     meals: { provision: mealsProvision },
     pay: {
-      provision: "provided",
-      summary: embeddedCompensationSummary(row),
+      provision: pay.provision,
+      summary: pay.summary,
     },
   };
 
@@ -151,6 +118,7 @@ export interface RichSeekerApplication {
   readonly id: string;
   readonly listingId: string;
   readonly status: string;
+  readonly withdrawnReason: string | null;
   readonly submittedAt: string;
   readonly reviewedAt: string | null;
   readonly decidedAt: string | null;
@@ -159,7 +127,7 @@ export interface RichSeekerApplication {
 }
 
 const RICH_SEEKER_APPLICATION_SELECT =
-  "id, listing_id, status, cover_message, submitted_at, reviewed_at, " +
+  "id, listing_id, status, withdrawn_reason, cover_message, submitted_at, reviewed_at, " +
   "decided_at, listings!listing_id(id, title, category, location_display, " +
   "status, housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
@@ -194,6 +162,8 @@ export async function getSeekerApplicationsRich(
       id: String(r.id),
       listingId: String(r.listing_id),
       status: typeof r.status === "string" ? r.status : "applied",
+      withdrawnReason:
+        typeof r.withdrawn_reason === "string" ? r.withdrawn_reason : null,
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
       reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
       decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
@@ -237,6 +207,8 @@ export async function getSeekerApplicationRichById(
     id: String(r.id),
     listingId: String(r.listing_id),
     status: typeof r.status === "string" ? r.status : "applied",
+    withdrawnReason:
+      typeof r.withdrawn_reason === "string" ? r.withdrawn_reason : null,
     submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
     reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
     decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
@@ -264,7 +236,7 @@ const WITHDRAWABLE_STATUSES = new Set(["applied", "reviewing", "saved_by_host"])
 /**
  * Withdraw the authed seeker's own application.
  *
- * App-level guards (RLS is gated to a separate change):
+ * App-level guards plus the migration-058 RPC enforce:
  * - profile_not_found — no seeker_profiles row
  * - not_found         — application id does not exist (or not visible)
  * - forbidden         — application belongs to a different seeker
@@ -304,14 +276,5 @@ export async function withdrawApplication(
     return { ok: false, error: "invalid_status" };
   }
 
-  const { error: updateError } = await untyped
-    .from("applications")
-    .update({ status: "withdrawn", withdrawn_reason: "seeker_withdrew" })
-    .eq("id", applicationId)
-    .eq("seeker_profile_id", seekerProfileId);
-  if (updateError) {
-    return { ok: false, error: updateError.message };
-  }
-
-  return { ok: true };
+  return transitionSeekerApplication(clerkToken, applicationId, "withdraw");
 }

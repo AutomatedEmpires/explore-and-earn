@@ -12,6 +12,12 @@
 		linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 68%, transparent), color-mix(in srgb, var(--color-ink) 56%, transparent)),
 		radial-gradient(circle at bottom, color-mix(in srgb, var(--color-ink) 18%, transparent), transparent 58%);
 	backdrop-filter: blur(10px);
+	animation: scrimIn var(--motion-drawer) var(--ease-standard) both;
+}
+
+.scrimClosing {
+	pointer-events: none;
+	animation-name: scrimOut;
 }
 
 .panel {
@@ -21,18 +27,22 @@
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
-	border: 2px solid color-mix(in srgb, var(--border-ink) 96%, #20160d 4%);
-	border-radius: calc(var(--radius-card) + 0.35rem);
-	background:
-		radial-gradient(circle at top, color-mix(in srgb, #f7e7c6 48%, transparent), transparent 48%),
-		linear-gradient(180deg, color-mix(in srgb, #fcf3dc 94%, var(--color-surface-raised)) 0%, color-mix(in srgb, #f8edd7 92%, var(--color-surface)) 100%);
-	box-shadow:
-		0 28px 80px color-mix(in srgb, var(--color-ink) 36%, transparent),
-		0 8px 24px color-mix(in srgb, var(--color-ink) 16%, transparent),
-		0 2px 0 rgba(0,0,0,0.36),
-		inset 0 1px 0 rgba(255,255,255,0.68);
+	border: 2px solid var(--border-ink);
+	border-radius: var(--radius-modal);
+	background: var(--gradient-paper-warm);
+	box-shadow: var(--elevation-overlay);
 	color: var(--text-primary);
-	animation: popupIn var(--motion-drawer) var(--ease-standard);
+	animation: popupIn var(--motion-drawer) var(--ease-standard) both;
+	transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.panelClosing {
+	animation-name: popupOut;
+}
+
+.panelDragging {
+	animation: none;
+	transition: none;
 }
 
 /* Top catch-light — simulates light landing on the panel surface */
@@ -43,8 +53,8 @@
 	left: 0;
 	right: 0;
 	height: 4rem;
-	background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, transparent 100%);
-	border-radius: calc(var(--radius-card) + 0.35rem) calc(var(--radius-card) + 0.35rem) 0 0;
+	background: linear-gradient(180deg, color-mix(in srgb, white 14%, transparent) 0%, transparent 100%);
+	border-radius: var(--radius-modal) var(--radius-modal) 0 0;
 	pointer-events: none;
 	z-index: 0;
 }
@@ -53,8 +63,8 @@
 	content: "";
 	position: absolute;
 	inset: 0.4rem;
-	border: 1px solid color-mix(in srgb, var(--border-ink) 86%, #6d5636 14%);
-	border-radius: calc(var(--radius-card) + 0.05rem);
+	border: 1px solid color-mix(in srgb, var(--border-ink) 86%, transparent);
+	border-radius: calc(var(--radius-modal) - 0.4rem);
 	pointer-events: none;
 	opacity: 0.9;
 }
@@ -123,10 +133,8 @@
 	height: 3rem;
 	flex: none;
 	border-radius: var(--radius-pill);
-	border: 1.5px solid color-mix(in srgb, var(--border-ink) 88%, #6d5636 12%);
-	background:
-		radial-gradient(circle at top, color-mix(in srgb, white 64%, transparent), transparent 55%),
-		linear-gradient(180deg, color-mix(in srgb, #fff3db 90%, var(--color-surface-raised)) 0%, color-mix(in srgb, #f2e4c5 92%, var(--color-surface)) 100%);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 88%, transparent);
+	background: var(--gradient-paper-warm);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, white 40%, transparent);
 	color: var(--text-primary);
 }
@@ -160,7 +168,7 @@
 	padding: 0;
 	border: 1.5px solid color-mix(in srgb, var(--border-ink) 72%, transparent);
 	border-radius: var(--radius-pill);
-	background: color-mix(in srgb, #fff8ea 90%, var(--color-surface-raised));
+	background: var(--color-surface-raised);
 	color: var(--text-primary);
 	cursor: pointer;
 	transition:
@@ -171,7 +179,7 @@
 }
 
 .closeButton:hover {
-	background: color-mix(in srgb, #fff1d0 92%, var(--color-surface-raised));
+	background: var(--color-action-soft);
 	border-color: color-mix(in srgb, var(--border-ink) 92%, var(--text-primary) 8%);
 	box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 10%, transparent);
 	transform: scale(1.06);
@@ -194,11 +202,9 @@
 
 .hero {
 	overflow: hidden;
-	border: 1px solid color-mix(in srgb, var(--border-ink) 84%, #7e6542 16%);
+	border: 1px solid color-mix(in srgb, var(--border-ink) 84%, transparent);
 	border-radius: var(--radius-card);
-	background:
-		linear-gradient(180deg, color-mix(in srgb, #f5ead4 76%, transparent), color-mix(in srgb, #e8dcc3 74%, transparent)),
-		color-mix(in srgb, #d8c8a8 58%, var(--color-surface));
+	background: var(--gradient-paper-warm);
 	min-height: 6rem;
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, white 42%, transparent);
 }
@@ -275,29 +281,64 @@
 	padding-top: var(--space-8);
 	padding-bottom: var(--space-6);
 	border-top: 1px solid color-mix(in srgb, var(--border-ink) 22%, transparent);
-	background:
-		linear-gradient(
-			to bottom,
-			color-mix(in srgb, transparent 0%, color-mix(in srgb, #fcf3dc 90%, var(--color-surface)) 22%),
-			color-mix(in srgb, #f8edd7 94%, var(--color-surface)) 100%
-		);
+	background: var(--gradient-paper-warm);
 }
 
 @media (max-width: 639px) {
 	.scrim {
-		padding: var(--space-16);
-		padding-bottom: max(var(--space-16), env(safe-area-inset-bottom));
+		align-items: flex-end;
+		padding: 0;
 	}
 
 	.panel,
-	.wide {
-		width: 100%;
-		max-height: min(90vh, 46rem);
-	}
-
+	.wide,
 	.compact {
 		width: 100%;
-		max-height: min(90vh, 46rem);
+		max-height: min(92dvh, 46rem);
+		border-bottom: 0;
+		border-radius: var(--radius-modal) var(--radius-modal) 0 0;
+		animation-name: sheetIn;
+	}
+
+	.panel::after {
+		border-radius: var(--radius-modal) var(--radius-modal) 0 0;
+	}
+
+	.panel::before {
+		bottom: 0;
+		border-radius: calc(var(--radius-modal) - 0.4rem)
+			calc(var(--radius-modal) - 0.4rem) 0 0;
+	}
+
+	.panelClosing {
+		animation-name: sheetOut;
+	}
+
+	.panelDragging {
+		animation: none;
+	}
+
+	.handleWrap {
+		display: flex;
+		min-height: var(--tap-min);
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		cursor: grab;
+		touch-action: none;
+		user-select: none;
+	}
+
+	.handleWrap:active {
+		cursor: grabbing;
+	}
+
+	.handle {
+		display: block;
+		width: 2.5rem;
+		height: 0.3rem;
+		border-radius: var(--radius-pill);
+		background: color-mix(in srgb, var(--text-secondary) 42%, transparent);
 	}
 
 	.chrome,
@@ -335,5 +376,73 @@
 	to {
 		transform: scale(1) translateY(0);
 		opacity: 1;
+	}
+}
+
+.panelEntered {
+	animation: none;
+}
+
+@keyframes popupOut {
+	from {
+		transform: scale(1) translateY(0);
+		opacity: 1;
+	}
+
+	to {
+		transform: scale(0.96) translateY(12px);
+		opacity: 0;
+	}
+}
+
+@keyframes sheetIn {
+	from {
+		transform: translateY(100%);
+		opacity: 0.92;
+	}
+
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+@keyframes sheetOut {
+	from {
+		transform: translateY(var(--popup-drag-offset, 0px));
+		opacity: 1;
+	}
+
+	to {
+		transform: translateY(100%);
+		opacity: 0.92;
+	}
+}
+
+@keyframes scrimIn {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes scrimOut {
+	from {
+		opacity: 1;
+	}
+
+	to {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.scrim,
+	.panel {
+		animation-duration: 1ms;
+		transition-duration: 1ms;
 	}
 }

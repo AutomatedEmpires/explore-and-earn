@@ -398,103 +398,117 @@
   margin: 0;
 }
 
-/* ── Location map card ─────────────────────────────────────────── */
-/* Clean placeholder — no paid API. SVG-pattern topographic surface. */
+/* ── Persisted location context ────────────────────────────────── */
 
-.mapCard {
+.locationCard {
   background: var(--color-surface-raised);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
-  overflow: hidden;
-}
-
-/* Topographic map surface — purely CSS / decorative */
-.mapSurface {
-  position: relative;
-  height: 120px;
-  overflow: hidden;
-  background: linear-gradient(
-    155deg,
-    var(--palette-steel) 0%,
-    var(--palette-chrome) 50%,
-    var(--palette-sky-light) 100%
-  );
-}
-
-/* Contour rings — centered on the pin */
-.mapContours {
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-radial-gradient(
-      ellipse at 50% 70%,
-      transparent,
-      transparent 20px,
-      rgba(26, 142, 206, 0.08) 20px,
-      rgba(26, 142, 206, 0.08) 21px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 24px,
-      rgba(200, 216, 232, 0.28) 24px,
-      rgba(200, 216, 232, 0.28) 25px
-    );
-}
-
-/* Pin centered horizontally, anchored at bottom */
-.mapPin {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--color-cta);
-  color: #fff;
+  padding: var(--space-20);
   display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.locationHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.locationIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-input);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 10px rgba(26, 142, 206, 0.4), 0 0 0 4px rgba(26, 142, 206, 0.15);
+  flex-shrink: 0;
+  background: var(--color-steel);
+  color: var(--color-cta);
 }
 
-.mapBody {
-  padding: var(--space-16);
-  border-top: 1px solid var(--border-soft);
+.locationEyebrow,
+.locationLabel {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-.mapTitle {
+.locationTitle {
   font-family: var(--font-display);
   font-size: var(--type-body-size);
-  line-height: 1;
+  line-height: var(--type-body-lh);
   color: var(--text-primary);
-  margin: 0 0 var(--space-8);
+  margin: var(--space-2) 0 0;
 }
 
-.mapLocation {
+.locationBase,
+.locationOpportunities {
   display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  color: var(--text-secondary);
-  margin: 0 0 var(--space-12);
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+  background: var(--color-paper);
 }
 
-.mapLink {
+.locationName,
+.locationNameLink {
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.locationNameLink {
   color: var(--color-cta);
   text-decoration: none;
   transition: opacity var(--motion-fast) ease;
 }
 
-.mapLink:hover { opacity: 0.8; }
+.locationNameLink:hover { opacity: 0.8; }
+
+.locationList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.locationRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-8) 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.locationRow:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.locationRow:last-child { padding-bottom: 0; }
+
+.locationCount,
+.locationSource {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  color: var(--text-secondary);
+}
+
+.locationSource { margin: 0; }
 
 /* ── Housing + meals benefit card ─────────────────────────────── */
 
@@ -581,7 +595,7 @@
   .listingArticle,
   .listingCoverImg,
   .ctaPrimary,
-  .mapLink,
+  .locationNameLink,
   .browseCta,
   .benefitCardLink { transition: none; }
   .listingArticle:hover .listingCoverImg { transform: none; }

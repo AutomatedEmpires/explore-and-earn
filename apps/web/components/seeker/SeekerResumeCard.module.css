@@ -274,6 +274,14 @@
 	text-decoration: underline;
 }
 
+.credLinkPreview {
+	cursor: default;
+}
+
+.credLinkPreview:hover {
+	text-decoration: none;
+}
+
 /* ── Skill chips + cloud ──────────────────────────────────────────────────── */
 
 .chipRow {

@@ -16,12 +16,21 @@ import {
   getSupabaseToken,
 } from "../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
+import {
+  projectListingPay,
+  type BenefitTriad,
+  type ListingPayInsight,
+} from "@explore-and-earn/contracts";
 import { CategoryBadge } from "../../../components/listing/CategoryBadge";
 import { HostSummaryBlock } from "../../../components/listing/HostSummaryBlock";
 import { SeekerFitSignal } from "../../../components/listing/SeekerFitSignal";
 import { TrueValue } from "../../../components/listing/TrueValue";
 import { VerifiedHostBadge } from "@explore-and-earn/ui";
 import { ApplyButton } from "./ApplyButton";
+import {
+  ListingBenefitTriad,
+  type ListingBenefitOverlayListing,
+} from "./ListingBenefitTriad";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../lib/seo";
 import { isUuid } from "../../../lib/ids";
 import { optionalAuth } from "../../../lib/optionalAuth";
@@ -154,15 +163,42 @@ export default async function ListingDetailPage({ params }: Props) {
   // Build benefit triad data
   const housingLabel = listing.housingIncluded ? "Included" : "Not included";
   const mealsLabel = listing.mealsIncluded ? "Included" : "Not included";
-  const paySummary =
-    listing.compensationSummary ??
-    (listing.compensationMinCents != null
-      ? `${new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: listing.compensationCurrency,
-          maximumFractionDigits: 0,
-        }).format(listing.compensationMinCents / 100)}${listing.compensationUnit && listing.compensationUnit !== "other" ? `/${listing.compensationUnit}` : ""}`
-      : "See listing");
+  const pay = projectListingPay({
+    summary: listing.compensationSummary,
+    minCents: listing.compensationMinCents,
+    maxCents: listing.compensationMaxCents,
+    unit: listing.compensationUnit,
+    currency: listing.compensationCurrency,
+  });
+  const benefitTriad: BenefitTriad = {
+    housing: {
+      provision: listing.housingIncluded ? "provided" : "not_provided",
+      summary: housingLabel,
+    },
+    meals: {
+      provision: listing.mealsIncluded ? "provided" : "not_provided",
+      summary: mealsLabel,
+    },
+    pay: {
+      provision: pay.provision,
+      summary: pay.summary,
+    },
+  };
+  const payInsight: ListingPayInsight | undefined = pay.hasNumericPay
+    ? {
+        ...(pay.minCents != null ? { minCents: pay.minCents } : {}),
+        ...(pay.maxCents != null ? { maxCents: pay.maxCents } : {}),
+        unit: pay.unit,
+        currency: pay.currency,
+      }
+    : undefined;
+  const benefitOverlayListing: ListingBenefitOverlayListing = {
+    id: listing.id,
+    category: listing.category,
+    benefits: benefitTriad,
+    ...(listing.coverPhotoUrl ? { coverImageUrl: listing.coverPhotoUrl } : {}),
+    ...(payInsight ? { payInsight } : {}),
+  };
 
   const dateLabel =
     listing.beginsAt && listing.endsAt
@@ -301,37 +337,13 @@ export default async function ListingDetailPage({ params }: Props) {
           )}
 
           {/* Benefit triad */}
-          <div className={styles.triad}>
-            <div className={`${styles.triadCell} ${styles.triadCellHousing}`}>
-              <div className={styles.triadHeader}>
-                <Icon name="benefit.housing" size={16} aria-hidden />
-                <span className={styles.triadLabel}>Housing</span>
-              </div>
-              <div className={styles.triadValue}>{housingLabel}</div>
-            </div>
-
-            <div className={`${styles.triadCell} ${styles.triadCellMeals}`}>
-              <div className={styles.triadHeader}>
-                <Icon name="benefit.meals" size={16} aria-hidden />
-                <span className={styles.triadLabel}>Meals</span>
-              </div>
-              <div className={styles.triadValue}>{mealsLabel}</div>
-            </div>
-
-            <div className={`${styles.triadCell} ${styles.triadCellPay}`}>
-              <div className={styles.triadHeader}>
-                <Icon name="benefit.pay" size={16} aria-hidden />
-                <span className={styles.triadLabel}>Pay</span>
-              </div>
-              <div className={styles.triadValue}>{paySummary}</div>
-            </div>
-          </div>
+          <ListingBenefitTriad listing={benefitOverlayListing} />
 
           {/* True value — what the covered housing/meals are really worth */}
           <TrueValue
             housingIncluded={listing.housingIncluded}
             mealsIncluded={listing.mealsIncluded}
-            paySummary={paySummary}
+            paySummary={pay.summary}
           />
 
           {/* Description */}

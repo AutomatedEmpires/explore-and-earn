@@ -13,8 +13,9 @@ const TABS: ReadonlyArray<{
 	href: string;
 	label: string;
 	icon: IconKey;
+	aliases?: readonly string[];
 }> = [
-	{ href: "/seek", label: "Seek", icon: "nav.seek" },
+	{ href: "/seek", label: "Seek", icon: "nav.seek", aliases: ["/search"] },
 	{ href: "/swipe", label: "Swipe", icon: "nav.swipe" },
 	{ href: "/map", label: "Map", icon: "nav.map" },
 	{ href: "/profile", label: "Profile", icon: "nav.profile" },
@@ -28,8 +29,10 @@ export function PublicBottomNav() {
 		<nav className={styles.nav} aria-label="Primary">
 			<ul className={styles.list}>
 				{TABS.map((tab) => {
-					const active =
-						pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+					const activePaths = [tab.href, ...(tab.aliases ?? [])];
+					const active = activePaths.some(
+						(path) => pathname === path || pathname.startsWith(`${path}/`),
+					);
 
 					return (
 						<li key={tab.href} className={styles.item}>

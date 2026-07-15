@@ -211,7 +211,6 @@ export async function getSavedListingsWithDetails(
       .from("applications")
       .select("listing_id")
       .eq("seeker_profile_id", seekerProfileId)
-      .neq("status", "withdrawn")
       .in("listing_id", savedIds),
   ]);
 

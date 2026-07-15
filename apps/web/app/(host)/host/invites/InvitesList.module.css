@@ -157,7 +157,7 @@
   height: 44px;
   border-radius: var(--radius-pill);
   background: var(--gradient-sky);
-  color: var(--color-cta-text);
+  color: var(--text-on-dark);
   font-family: var(--font-display);
   font-size: var(--type-card-size);
   line-height: 1;

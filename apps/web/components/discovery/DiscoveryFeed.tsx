@@ -93,7 +93,9 @@ export function DiscoveryFeed({
                 onOpen={(id) => setActiveId(id)}
                 onApply={(id) => router.push(`/listing/${id}`)}
                 onHostClick={(id) => setActiveHostId(id)}
-                onLocationClick={(id) => router.push(`/map?focus=${id}`)}
+                onLocationClick={listing.coordinates
+                  ? (id) => router.push(`/map?focus=${id}`)
+                  : undefined}
                 onHousingClick={(id) => setActiveBenefit({ id, bucket: "housing" })}
                 onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
                 onPayClick={(id) => setActivePayId(id)}

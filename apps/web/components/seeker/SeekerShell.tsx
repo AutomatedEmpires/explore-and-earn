@@ -120,7 +120,7 @@ export function SeekerShell({
 
         <div
           className="seekeros-card"
-          style={photoUrl ? { backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,.04), rgba(0,0,0,.62)), url(${photoUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+          style={photoUrl ? { backgroundImage: `var(--gradient-hero-scrim), url(${photoUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
         >
           <div className="seekeros-avatarimg">
             <span className="seekeros-avatar">{initial}</span>
