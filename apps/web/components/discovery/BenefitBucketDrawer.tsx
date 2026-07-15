@@ -131,7 +131,7 @@ export function BenefitBucketDrawer({
 				</p>
 				<p className={styles.verifyNote} role="note">
 					<Icon name="system.info" size={16} aria-hidden />
-					<span>Always verify accuracy with the host.</span>
+					<span>Always confirm the exact arrangements with the host.</span>
 				</p>
 				<div className={styles.factGrid}>
 					<div className={styles.factCard}>

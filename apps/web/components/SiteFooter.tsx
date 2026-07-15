@@ -34,6 +34,7 @@ const FOOTER_COLUMNS = [
 			{ label: "Terms",   href: "/terms"   },
 			{ label: "Privacy", href: "/privacy" },
 			{ label: "Cookies", href: "/cookies" },
+			{ label: "Refunds", href: "/refunds" },
 		],
 	},
 ] as const;

@@ -13,6 +13,7 @@ const PAGES: ReadonlyArray<{ href: string; label: string; icon: IconKey; accent:
 	{ href: "/terms",   label: "Terms",   icon: "trust.verified_host", accent: "#2f667a" },
 	{ href: "/privacy", label: "Privacy", icon: "nav.profile",         accent: "#185848" },
 	{ href: "/cookies", label: "Cookies", icon: "nav.seek",            accent: "#8a6a3a" },
+	{ href: "/refunds", label: "Refunds", icon: "benefit.pay",         accent: "#185848" },
 ];
 
 const SECTIONS: Record<string, ReadonlyArray<{ id: string; label: string }>> = {
@@ -53,6 +54,15 @@ const SECTIONS: Record<string, ReadonlyArray<{ id: string; label: string }>> = {
 		{ id: "essential-vs-analytics",  label: "Essential vs opt-in" },
 		{ id: "opt-out",                 label: "Opt out"             },
 		{ id: "contact",                 label: "Contact"             },
+	],
+	"/refunds": [
+		{ id: "seekers",       label: "Seekers free"   },
+		{ id: "subscriptions", label: "Subscriptions"  },
+		{ id: "cancel",        label: "Cancellations"  },
+		{ id: "eligible",      label: "When we refund" },
+		{ id: "one-off",       label: "Boosts"         },
+		{ id: "request",       label: "How to request" },
+		{ id: "contact",       label: "Contact"        },
 	],
 };
 

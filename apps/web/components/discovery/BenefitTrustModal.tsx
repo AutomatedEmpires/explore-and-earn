@@ -780,8 +780,9 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			) : null}
 
 			{/* ── Trust note ──────────────────────────────────────────────
-			   Edit (host): encouraging call to add detail. View (seeker):
-			   quiet, consistent "verify with the host" caption. */}
+			   Edit (host): encouraging call to add detail, above the shared
+			   verify caption. Both modes end on the same quiet, secondary
+			   "confirm the arrangements" note at the very bottom. */}
 			{isEdit ? (
 				<div className={styles.trustNote} data-kind={kind} role="note">
 					<span className={styles.trustIcon} aria-hidden>
@@ -789,12 +790,11 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 					</span>
 					<p className={styles.trustText}>{cfg.trustNote}</p>
 				</div>
-			) : (
-				<p className={styles.verifyNote} role="note">
-					<Icon name="system.info" size={16} aria-hidden />
-					<span>Always verify accuracy with the host.</span>
-				</p>
-			)}
+			) : null}
+			<p className={styles.verifyNote} role="note">
+				<Icon name="system.info" size={16} aria-hidden />
+				<span>Always confirm the exact arrangements with the host.</span>
+			</p>
 		</PopupShell>
 	);
 }
