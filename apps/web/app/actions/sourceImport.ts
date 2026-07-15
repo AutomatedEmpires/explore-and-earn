@@ -103,7 +103,14 @@ export async function runSourceImportAction(args: {
 
 		// Strip the (potentially large) dry-run plan from the wire response —
 		// the deterministic stats + needsReview are the review surface.
-		const { plan: _plan, ...wireReport } = report
+		const wireReport: ImportReport = {
+			ok: report.ok,
+			runId: report.runId,
+			stats: report.stats,
+			needsReview: report.needsReview,
+			...(report.error ? { error: report.error } : {}),
+			...(report.idempotentReplay ? { idempotentReplay: true } : {}),
+		}
 
 		await recordEvent({
 			eventType: report.ok ? "source_import_completed" : "source_import_failed",
