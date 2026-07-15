@@ -132,3 +132,33 @@ export async function awardSeekerBadgesAdmin(
   if (error) return { ok: false, inserted: 0, error: error.message };
   return { ok: true, inserted: (data ?? []).length };
 }
+
+/**
+ * Set (or clear, with null) the seeker's FEATURED badge — the one highlighted on
+ * their public profile. Stored as `metadata.featured=true` on the chosen
+ * seeker_badges row (no schema change needed), so at most one is featured. The
+ * reconciler's ignoreDuplicates upsert never clobbers it. Service-role write.
+ * The caller MUST verify the badge is earned before featuring it.
+ */
+export async function setSeekerFeaturedBadgeAdmin(
+  seekerProfileId: string,
+  badgeKey: BadgeKey | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const db = adminClient() as unknown as SupabaseClient;
+
+  // Clear any existing featured flag (badges carry no other metadata today).
+  const { error: clearError } = await db
+    .from("seeker_badges")
+    .update({ metadata: null })
+    .eq("seeker_profile_id", seekerProfileId);
+  if (clearError) return { ok: false, error: clearError.message };
+
+  if (!badgeKey) return { ok: true };
+
+  const { error: setError } = await db
+    .from("seeker_badges")
+    .update({ metadata: { featured: true } })
+    .eq("seeker_profile_id", seekerProfileId)
+    .eq("badge_key", badgeKey);
+  return setError ? { ok: false, error: setError.message } : { ok: true };
+}

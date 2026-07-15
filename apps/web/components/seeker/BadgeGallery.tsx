@@ -14,6 +14,10 @@ import styles from "./BadgeGallery.module.css";
 export interface BadgeGalleryProps {
   readonly earned: readonly BadgeKey[];
   readonly stats: SeekerBadgeStats;
+  /** The badge currently featured on the profile, if any. */
+  readonly featured?: BadgeKey | null;
+  /** Progressive-enhancement form action to feature/un-feature a badge. */
+  readonly featureAction?: (formData: FormData) => void | Promise<void>;
 }
 
 const GROUP_ORDER: readonly BadgeGroup[] = [
@@ -29,7 +33,12 @@ const GROUP_ORDER: readonly BadgeGroup[] = [
  * locked ones dimmed with a progress bar toward the next milestone. Pure display —
  * the earned set + stats snapshot come from the badge reconciler.
  */
-export function BadgeGallery({ earned, stats }: BadgeGalleryProps) {
+export function BadgeGallery({
+  earned,
+  stats,
+  featured = null,
+  featureAction,
+}: BadgeGalleryProps) {
   const earnedSet = new Set<BadgeKey>(earned);
   const earnedCount = ALL_BADGE_KEYS.filter((key) => earnedSet.has(key)).length;
 
@@ -67,6 +76,7 @@ export function BadgeGallery({ earned, stats }: BadgeGalleryProps) {
                     className={styles.card}
                     data-earned={isEarned ? "true" : undefined}
                     data-tier={meta.tier}
+                    data-featured={isEarned && featured === key ? "true" : undefined}
                   >
                     <span className={styles.medal} aria-hidden="true">
                       <Icon name={meta.icon as IconKey} size={22} />
@@ -84,10 +94,25 @@ export function BadgeGallery({ earned, stats }: BadgeGalleryProps) {
                       ) : null}
                     </span>
                     <span className={styles.badgeStatus}>
-                      {isEarned ? (
-                        <Icon name="system.success" size={16} aria-label="Earned" />
-                      ) : (
+                      {!isEarned ? (
                         <Icon name="system.lock" size={15} aria-label="Locked" />
+                      ) : featureAction ? (
+                        <form action={featureAction}>
+                          <input
+                            type="hidden"
+                            name="badgeKey"
+                            value={featured === key ? "" : key}
+                          />
+                          <button
+                            type="submit"
+                            className={styles.featureBtn}
+                            data-on={featured === key ? "true" : undefined}
+                          >
+                            {featured === key ? "Featured" : "Feature"}
+                          </button>
+                        </form>
+                      ) : (
+                        <Icon name="system.success" size={16} aria-label="Earned" />
                       )}
                     </span>
                   </li>

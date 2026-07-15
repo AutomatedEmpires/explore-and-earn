@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   awardSeekerBadgesAdmin,
+  BADGE_META,
   getSavedListingIds,
   getSeekerApplicationsRich,
   getSeekerBadges,
@@ -96,12 +97,17 @@ export async function gatherSeekerBadgeStats(
 export async function syncSeekerBadges(
   token: string,
   userId: string,
-): Promise<{ stats: SeekerBadgeStats; earned: BadgeKey[] }> {
+): Promise<{ stats: SeekerBadgeStats; earned: BadgeKey[]; featured: BadgeKey | null }> {
   const stats = await gatherSeekerBadgeStats(token, userId);
   const qualified = qualifyingBadges(stats);
 
   if (isDevBenchEnabled()) {
-    return { stats, earned: qualified };
+    // Feature the highest-tier earned badge so the "Featured" state is visible.
+    const featured =
+      qualified.find((k) => BADGE_META[k].tier === "elite") ??
+      qualified[qualified.length - 1] ??
+      null;
+    return { stats, earned: qualified, featured };
   }
 
   try {
@@ -114,5 +120,8 @@ export async function syncSeekerBadges(
   }
 
   const earnedRows = await getSeekerBadges(token, userId).catch(() => []);
-  return { stats, earned: earnedRows.map((row) => row.badgeKey) };
+  const featured =
+    earnedRows.find((row) => (row.metadata as { featured?: boolean } | null)?.featured === true)
+      ?.badgeKey ?? null;
+  return { stats, earned: earnedRows.map((row) => row.badgeKey), featured };
 }

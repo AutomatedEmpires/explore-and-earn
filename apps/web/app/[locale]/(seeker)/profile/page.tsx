@@ -68,7 +68,12 @@ export default async function ProfilePage() {
 
 				appliedCount = apps.length;
 				resumeCompletion = computeResumeCompletion(resume);
-				badges = earnedBadges;
+				// Lead the strip with the featured badge (metadata.featured), if any.
+				badges = [...earnedBadges].sort((a, b) => {
+					const af = (a.metadata as { featured?: boolean } | null)?.featured ? 1 : 0;
+					const bf = (b.metadata as { featured?: boolean } | null)?.featured ? 1 : 0;
+					return bf - af;
+				});
 				matchedListings = matched.slice(0, 12);
 
 				if (profile) {

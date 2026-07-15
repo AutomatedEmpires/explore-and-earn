@@ -139,6 +139,50 @@
   color: var(--color-cta);
 }
 
+/* Feature / Featured toggle (server-action form, no client JS). */
+.featureBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px var(--space-10);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-ink);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.featureBtn:hover {
+  border-color: var(--color-cta);
+  color: var(--color-cta);
+}
+
+.featureBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.featureBtn[data-on="true"] {
+  border-color: var(--color-cta);
+  background: var(--color-action-soft);
+  color: var(--color-cta);
+}
+
+/* The featured badge card gets a clear accent ring. */
+.card[data-featured="true"] {
+  border-color: var(--color-cta);
+  box-shadow:
+    0 0 0 1px var(--color-cta),
+    0 2px 14px color-mix(in srgb, var(--color-cta) 18%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card {
     transition: none;

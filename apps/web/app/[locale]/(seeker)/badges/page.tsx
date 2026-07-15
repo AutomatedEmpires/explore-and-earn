@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { BadgeGallery, BucketPage } from "../../../../components/seeker";
 import { EmptyState } from "../../../../components/discovery";
 import { syncSeekerBadges } from "../../../../lib/seekerBadges";
+import { featureBadgeAction } from "../../../actions/seekerBadges";
 
 export const metadata: Metadata = {
   title: "Badges",
@@ -31,14 +32,19 @@ export default async function BadgesPage() {
   }
 
   // Reconcile from current state (awards any newly-earned) and read back the set.
-  const { stats, earned } = await syncSeekerBadges(token, userId);
+  const { stats, earned, featured } = await syncSeekerBadges(token, userId);
 
   return (
     <BucketPage
       title="Badges"
-      description="Milestones you earn as you explore & earn — collect them all."
+      description="Milestones you earn as you explore & earn — collect them all. Feature one on your profile."
     >
-      <BadgeGallery earned={earned} stats={stats} />
+      <BadgeGallery
+        earned={earned}
+        stats={stats}
+        featured={featured}
+        featureAction={featureBadgeAction}
+      />
     </BucketPage>
   );
 }
