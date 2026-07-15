@@ -48,9 +48,11 @@ function readStored(): ThemePref {
       return raw;
     }
   } catch {
-    /* localStorage may be unavailable (private mode) — fall through to auto. */
+    /* localStorage may be unavailable (private mode) — fall through to default. */
   }
-  return "auto";
+  // DEFAULT ENTRY is dark (founder 2026-07); Light/Auto are opt-in. Matches the
+  // no-flash bootstrap in app/layout.tsx (unstored -> dark).
+  return "dark";
 }
 
 function applyTheme(pref: ThemePref): void {
@@ -61,10 +63,10 @@ function applyTheme(pref: ThemePref): void {
 }
 
 export function AppearanceControl() {
-  // Default to "auto" for SSR + first client render (matches the bootstrap's
-  // default), then reconcile to the stored value after mount to avoid a
+  // Default to "dark" for SSR + first client render (matches the bootstrap's
+  // unstored default), then reconcile to the stored value after mount to avoid a
   // hydration mismatch.
-  const [pref, setPref] = useState<ThemePref>("auto");
+  const [pref, setPref] = useState<ThemePref>("dark");
 
   useEffect(() => {
     setPref(readStored());

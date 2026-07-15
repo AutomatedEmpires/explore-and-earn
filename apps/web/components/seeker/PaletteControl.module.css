@@ -1,0 +1,69 @@
+/* PaletteControl — accent palette swatch picker (Settings › Appearance). */
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  min-width: 66px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.option:hover {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.option:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.option[data-selected="true"] {
+  border-color: var(--color-cta);
+  color: var(--text-primary);
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 14%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--color-ink) 18%, transparent);
+}
+
+/* Selected swatch gets a palette-tinted ring (the ring color IS the live accent). */
+.option[data-selected="true"] .swatch {
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--color-ink) 18%, transparent),
+    0 0 0 2px var(--color-surface-raised),
+    0 0 0 4px var(--color-cta);
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .option {
+    transition: none;
+  }
+}

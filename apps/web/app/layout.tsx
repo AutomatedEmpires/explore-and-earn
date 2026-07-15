@@ -5,6 +5,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import "../styles/tokens.css";
+import "../styles/palettes.css";
 import "../styles/primitives.css";
 
 // The locked 3-font stack (visual-system.md §2): Patrick Hand display,
@@ -142,9 +143,14 @@ function AuthBoundary({ children }: { children: ReactNode }) {
  * Runs synchronously in <head> BEFORE first paint, so the correct theme is
  * committed to <html data-theme> with zero flash. Resolution order:
  *   1. an EXPLICIT stored preference ("ee-theme" = "dark" | "light"), else
- *   2. "auto" (the stored value, or the default when nothing is stored):
- *      a. auto by local clock — dark 20:00–06:00 (matches Sweepza), else
- *      b. during daytime, fall back to the OS prefers-color-scheme.
+ *   2. "auto" (explicitly stored) — by local clock (dark 20:00–06:00, matches
+ *      Sweepza), falling back to the OS prefers-color-scheme in daytime, else
+ *   3. DEFAULT ENTRY (nothing stored) — DARK (founder 2026-07; Light/Auto are
+ *      opt-in via the Appearance control).
+ *
+ * It also applies the optional accent PALETTE ("ee-palette" -> data-palette)
+ * flash-free in the same pass (see styles/palettes.css); "glacier" is the
+ * default and needs no attribute.
  *
  * The Appearance control in seeker Settings (AppearanceControl.tsx) writes the
  * "ee-theme" key with one of "auto" | "dark" | "light" and applies the same
@@ -161,7 +167,7 @@ function AuthBoundary({ children }: { children: ReactNode }) {
  *   • Integrate locale logic ALONGSIDE this script; do not remove it. Keep it
  *     first in <head> so it stays render-blocking and flash-free.
  */
-const THEME_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var p=null;try{p=localStorage.getItem('ee-theme');}catch(e){}var t;if(p==='dark'||p==='light'){t=p;}else{/* 'auto', null, or any legacy value -> clock + OS fallback */var h=new Date().getHours();var night=h>=20||h<6;var osDark=typeof window.matchMedia==='function'&&window.matchMedia('(prefers-color-scheme: dark)').matches;t=(night||osDark)?'dark':'light';}d.dataset.theme=t;d.style.colorScheme=t;}catch(e){}})();`;
+const THEME_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var p=null;try{p=localStorage.getItem('ee-theme');}catch(e){}var t;if(p==='dark'||p==='light'){t=p;}else if(p==='auto'){/* explicit auto -> clock (dark 20:00-06:00) + OS fallback */var h=new Date().getHours();var night=h>=20||h<6;var osDark=typeof window.matchMedia==='function'&&window.matchMedia('(prefers-color-scheme: dark)').matches;t=(night||osDark)?'dark':'light';}else{/* DEFAULT ENTRY: dark (founder 2026-07). Light/Auto are opt-in. */t='dark';}d.dataset.theme=t;d.style.colorScheme=t;try{var pal=localStorage.getItem('ee-palette');if(pal&&/^[a-z]{2,12}$/.test(pal)&&pal!=='glacier'){d.dataset.palette=pal;}}catch(e){}}catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
 	// Negotiated by the next-intl middleware and resolved via i18n/request.ts.

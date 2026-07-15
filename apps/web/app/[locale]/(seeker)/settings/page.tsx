@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import {
 	AppearanceControl,
 	NotificationPrefsForm,
+	PaletteControl,
 	SectionHeading,
 	SeekerPage,
 	SettingsAssurances,
@@ -56,9 +57,10 @@ export default async function SettingsPage() {
 				<section className={styles.section}>
 					<SectionHeading
 						title="Appearance"
-						description="Choose Light, Dark, or Auto. Auto follows the time of day and your device."
+						description="Dark by default — switch to Light or Auto (Auto follows the time of day and your device), and pick an accent palette to recolor the app."
 					/>
 					<AppearanceControl />
+					<PaletteControl />
 				</section>
 
 				<section className={styles.section}>
