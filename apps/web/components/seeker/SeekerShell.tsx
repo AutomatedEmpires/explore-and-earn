@@ -54,6 +54,7 @@ const SECTIONS: readonly SectionDef[] = [
   { href: "/messages", label: "Messages", icon: "nav.messages", badgeKey: "unread" },
   { href: "/community", label: "Community", icon: "nav.feed", badgeKey: "community" },
   { href: "/journey", label: "Journey", icon: "analytics.meter" },
+  { href: "/badges", label: "Badges", icon: "status.featured" },
 ];
 
 // Reference-y footer — pinned to the bottom of the rail / drawer.

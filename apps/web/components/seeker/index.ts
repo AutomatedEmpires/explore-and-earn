@@ -38,6 +38,7 @@ export { SettingsPanel } from "./SettingsPanel";
 export type { SettingsPanelProps } from "./SettingsPanel";
 export { AppearanceControl } from "./AppearanceControl";
 export { PaletteControl } from "./PaletteControl";
+export { BadgeGallery } from "./BadgeGallery";
 export { SettingsAssurances } from "./SettingsAssurances";
 export type { SettingsAssurancesProps } from "./SettingsAssurances";
 export { NotificationPrefsForm } from "./NotificationPrefsForm";
