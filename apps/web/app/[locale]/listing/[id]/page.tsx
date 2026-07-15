@@ -7,6 +7,7 @@ import {
   getSeekerResumeStatus,
   hasApplied,
   hasSaved,
+  recordEvent,
   seekerHasMatchInputs,
 } from "@explore-and-earn/db";
 import {
@@ -249,6 +250,19 @@ export default async function ListingDetailPage({ params }: Props) {
   // have) and its host block is structurally absent from the data anyway.
   const isSourced = listing.provenanceInfo?.provenance === "sourced";
   const jsonLd = isSourced ? null : generateJobPostingJsonLd(listing, listing.host, baseUrl);
+
+  // Sourced-inventory analytics — a real (non-fixture) sourced listing view.
+  // Best-effort (recordEvent never throws) and privacy-safe (id only, no user).
+  if (isSourced && !isFixtureListing) {
+    await recordEvent({
+      eventType: "sourced_listing_viewed",
+      actorScope: viewerRole === "seeker" ? "seeker" : "platform",
+      subjectType: "listing",
+      subjectId: listing.id,
+      listingId: listing.id,
+      sourceSurface: "listing_detail",
+    });
+  }
   const breadcrumbJsonLd = generateBreadcrumbJsonLd([
     { name: "Explore & Earn", url: baseUrl },
     ...(listing.host && listing.host.id

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Icon, type IconKey } from "@explore-and-earn/ui";
 import type { BenefitProvision } from "@explore-and-earn/contracts";
 import { saveListingAction } from "../../app/actions/swipe";
+import { recordSourceClickAction } from "../../app/actions/sourcedAnalytics";
 import { PopupShell } from "../overlay/PopupShell";
 import { CATEGORY_ICON, CATEGORY_LABEL, type DiscoveryListing } from "./listing";
 import styles from "./QuickPeekDrawer.module.css";
@@ -128,6 +129,10 @@ export function QuickPeekDrawer({ listing, onClose }: QuickPeekDrawerProps) {
 								href={provenance.source.sourceUrl}
 								target="_blank"
 								rel="noopener noreferrer nofollow"
+								onClick={() => {
+									// Fire-and-forget analytics; never block navigation.
+									void recordSourceClickAction(listing.id);
+								}}
 							>
 								View original posting
 								<Icon name="action.forward" size={14} aria-hidden />

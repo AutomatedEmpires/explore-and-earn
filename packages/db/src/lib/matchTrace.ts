@@ -413,6 +413,13 @@ function housingMealsSignals(
 			component: "housingMealsFit",
 			polarity: "missing",
 		})
+	} else if (listing.housingEvidence === "not_stated") {
+		// The source didn't state housing — UNKNOWN, never a false claim either way.
+		signals.push({
+			code: "housing_not_stated_by_source",
+			component: "housingMealsFit",
+			polarity: "missing",
+		})
 	} else if (listing.housingIncluded === true && housingWanted) {
 		signals.push({
 			code: "housing_included_matches_need",
@@ -435,7 +442,16 @@ function housingMealsSignals(
 	const mealsWanted =
 		seeker.mealsPreference === "required" || seeker.mealsPreference === "preferred"
 	if (mealsWanted) {
-		if (listing.mealsIncluded === true) {
+		// A sourced listing that didn't state meals is UNKNOWN — the missing note,
+		// never the false "not included" claim (the boolean is a meaningless
+		// default when evidence is not_stated).
+		if (listing.mealsEvidence === "not_stated") {
+			signals.push({
+				code: "meals_unspecified_preferred",
+				component: "housingMealsFit",
+				polarity: "missing",
+			})
+		} else if (listing.mealsIncluded === true) {
 			signals.push({
 				code: "meals_included_matches_need",
 				component: "housingMealsFit",

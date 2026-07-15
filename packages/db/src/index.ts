@@ -55,4 +55,5 @@ export * from "./queries/events";
 export * from "./queries/sourcingRollups";
 export * from "./lib/sourceIngestion";
 export * from "./queries/sourcedListings";
+export * from "./queries/sourcedFreshness";
 export * from "./queries/listingClaims";
