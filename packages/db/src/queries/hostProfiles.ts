@@ -17,7 +17,12 @@ import { anonClient, authedClient } from "../client";
  * defense in depth.
  */
 
-const PENDING_ATTESTATION = "pending" as const;
+// The initial attestation state MUST be a value the 003 CHECK constraint
+// permits: ('not_attested','attested','attested_stale','withdrawn'). The
+// previous literal "pending" was outside that set — a fresh INSERT would
+// violate the constraint (23514) and surface as an opaque create failure on
+// the exact path host onboarding AND the claim-to-verify flow depend on.
+const PENDING_ATTESTATION = "not_attested" as const;
 
 /** Postgres unique_violation SQLSTATE (host_profiles.clerk_user_id is UNIQUE). */
 const UNIQUE_VIOLATION = "23505";
