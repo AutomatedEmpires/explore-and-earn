@@ -67,6 +67,72 @@ self.addEventListener("message", (event) => {
 	if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
+/*
+ * ── Web push (Lifecycle & Engagement Notification Engine) ───────────────────
+ * Additive: everything below only runs for push events the user explicitly
+ * opted into (PushManager.subscribe happens on the settings toggle, never on
+ * load). Payloads are produced ONLY by the server's dispatcher from persisted
+ * domain events and carry pre-rendered localized title/body plus a SAME-APP
+ * path — no auth material, no message content beyond the rendered copy.
+ */
+
+/** Only rooted same-app paths may be opened from a notification click. */
+function safeNotificationPath(path) {
+	if (typeof path !== "string") return "/";
+	if (!path.startsWith("/") || path.startsWith("//")) return "/";
+	if (path.includes("://") || /[\r\n\\]/.test(path)) return "/";
+	return path;
+}
+
+self.addEventListener("push", (event) => {
+	let payload = null;
+	try {
+		payload = event.data ? event.data.json() : null;
+	} catch {
+		payload = null;
+	}
+	// No fabricated notifications: a push without a usable engine payload is
+	// dropped, never replaced with invented copy.
+	if (!payload || typeof payload.title !== "string" || payload.title.length === 0) {
+		return;
+	}
+	const title = payload.title;
+	const options = {
+		body: typeof payload.body === "string" ? payload.body : "",
+		icon: "/icons/icon-192.png",
+		badge: "/icons/icon-192.png",
+		// Collapse: same tag (thread/entity) replaces instead of stacking.
+		tag: typeof payload.tag === "string" && payload.tag ? payload.tag : undefined,
+		data: { path: safeNotificationPath(payload.path) },
+	};
+	event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+	event.notification.close();
+	const path = safeNotificationPath(
+		event.notification.data && event.notification.data.path,
+	);
+	const target = new URL(path, self.location.origin).href;
+	event.waitUntil(
+		self.clients
+			.matchAll({ type: "window", includeUncontrolled: true })
+			.then((windows) => {
+				for (const client of windows) {
+					// Reuse an existing app window when we can.
+					if (client.url === target && "focus" in client) return client.focus();
+				}
+				for (const client of windows) {
+					if ("navigate" in client && "focus" in client) {
+						return client.navigate(target).then((c) => (c ? c.focus() : undefined));
+					}
+				}
+				return self.clients.openWindow(target);
+			})
+			.catch(() => undefined),
+	);
+});
+
 function isStaticAsset(url) {
 	if (url.pathname.startsWith("/_next/static/")) return true;
 	if (url.pathname.startsWith("/icons/")) return true;

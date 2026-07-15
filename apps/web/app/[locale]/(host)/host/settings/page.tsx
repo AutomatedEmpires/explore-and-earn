@@ -4,7 +4,9 @@ import { getHostProfile } from "@explore-and-earn/db";
 
 import { HostSectionHeading } from "../../../../../components/host";
 import { HostSettings } from "../../../../../components/host/HostSettings";
+import { EngagementNotificationSettings } from "../../../../../components/seeker";
 import { EmptyState } from "../../../../../components/discovery";
+import { getEngineNotificationSettingsAction } from "../../../../actions/notificationEngine";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -32,7 +34,10 @@ export default async function HostSettingsPage() {
     );
   }
 
-  const hostProfile = await getHostProfile(token, userId);
+  const [hostProfile, engineSettings] = await Promise.all([
+    getHostProfile(token, userId),
+    getEngineNotificationSettingsAction(),
+  ]);
 
   return (
     <section className={styles.block}>
@@ -45,6 +50,11 @@ export default async function HostSettingsPage() {
         companyName={hostProfile?.companyName ?? ""}
         hostProfileId={hostProfile?.id ?? null}
       />
+      <HostSectionHeading
+        title="Notifications"
+        description="Choose how we reach you — channels, digests, and quiet hours."
+      />
+      <EngagementNotificationSettings initial={engineSettings} />
     </section>
   );
 }

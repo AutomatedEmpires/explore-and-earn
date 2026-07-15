@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 
 import {
 	AppearanceControl,
-	NotificationPrefsForm,
+	EngagementNotificationSettings,
 	SectionHeading,
 	SeekerPage,
 	SettingsAssurances,
@@ -12,7 +12,7 @@ import {
 	buildAccountGroups,
 } from "../../../../components/seeker";
 import { getClerkContact } from "../../../../lib/clerkUser";
-import { getNotificationPrefsAction } from "../../../actions/notificationPrefs";
+import { getEngineNotificationSettingsAction } from "../../../actions/notificationEngine";
 import styles from "./settings.module.css";
 
 export const metadata: Metadata = {
@@ -33,8 +33,8 @@ async function resolveEmail(): Promise<string | null> {
 }
 
 export default async function SettingsPage() {
-	const [prefs, email] = await Promise.all([
-		getNotificationPrefsAction(),
+	const [engineSettings, email] = await Promise.all([
+		getEngineNotificationSettingsAction(),
 		resolveEmail(),
 	]);
 	const groups = buildAccountGroups(email);
@@ -48,9 +48,9 @@ export default async function SettingsPage() {
 				<section className={styles.section}>
 					<SectionHeading
 						title="Notifications"
-						description="Choose which emails you get. Changes save the moment you toggle them."
+						description="Choose how we reach you — channels, digests, and quiet hours. Changes save the moment you make them."
 					/>
-					<NotificationPrefsForm initialPrefs={prefs} />
+					<EngagementNotificationSettings initial={engineSettings} />
 				</section>
 
 				<section className={styles.section}>
