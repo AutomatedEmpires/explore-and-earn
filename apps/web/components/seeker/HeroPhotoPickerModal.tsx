@@ -1,19 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
-
+import { useCallback, useEffect, useState } from "react";
 
 import { Icon } from "@explore-and-earn/ui";
 import { uploadProfilePhoto } from "@explore-and-earn/db/client";
 import { saveHeroCoverAction } from "../../app/actions/seekerProfile";
 import { useOptionalGetToken } from "../../lib/useOptionalGetToken";
-import { curatedCovers } from "../../lib/curatedPhotos";
+import { bucketPhotoUrl } from "../../lib/photoBuckets";
+import { BucketPhotoPicker } from "../photos/BucketPhotoPicker";
 import styles from "./HeroPhotoPickerModal.module.css";
-
-// Predefined COVER options for the seeker scope (cover is always separate from
-// the profile logo/avatar). Distinct from host & admin sets — see curatedPhotos.
-const SEEKER_COVERS = curatedCovers("seeker");
 
 export interface HeroPhotoPickerModalProps {
   readonly open: boolean;
@@ -53,7 +48,6 @@ export function HeroPhotoPickerModal({
   seekerProfileId,
 }: HeroPhotoPickerModalProps) {
   const getToken = useOptionalGetToken();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,64 +133,24 @@ export function HeroPhotoPickerModal({
         </div>
 
         <div className={styles.body}>
-          {/* Upload custom photo */}
-          {seekerProfileId && (
-            <div className={styles.uploadSection}>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className={styles.fileInput}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleUpload(file);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                className={styles.uploadBtn}
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-              >
-                <Icon name="action.more" size={20} />
-                {uploading ? "Uploading…" : "Upload your own photo"}
-              </button>
-              <p className={styles.uploadHint}>Your own photo looks best.</p>
-            </div>
-          )}
+          {/* Shared photo picker — upload (primary) + seekerCover bucket
+              presets (fallback). Same primitive used by host & admin surfaces. */}
+          <BucketPhotoPicker
+            bucketId="seekerCover"
+            value={currentUrl}
+            uploading={uploading}
+            uploadLabel="Upload your own photo"
+            presetLabel="Or pick a cover"
+            size="hero"
+            onUpload={
+              seekerProfileId ? (file) => void handleUpload(file) : undefined
+            }
+            onSelectPreset={(publicId) =>
+              void handleSelectCover(bucketPhotoUrl(publicId, "hero"))
+            }
+          />
 
           {error && <p className={styles.error} role="alert">{error}</p>}
-
-          {/* Predefined cover photos (seeker set) */}
-          <p className={styles.sectionLabel}>Or pick a cover</p>
-          <div className={styles.gradientGrid}>
-            {SEEKER_COVERS.map((opt) => {
-              const selected = currentUrl === opt.value;
-              return (
-                <button
-                  key={opt.key}
-                  type="button"
-                  className={`${styles.gradientSwatch} ${selected ? styles.swatchSelected : ""}`}
-                  style={opt.kind === "gradient" ? { background: opt.value } : undefined}
-                  onClick={() => void handleSelectCover(opt.value)}
-                  aria-label={opt.label}
-                  aria-pressed={selected}
-                >
-                  {opt.kind === "photo" ? (
-                    <Image
-                      src={opt.value}
-                      alt=""
-                      fill
-                      sizes="(max-width: 520px) 33vw, 160px"
-                      className={styles.coverPhoto}
-                    />
-                  ) : null}
-                  <span className={styles.swatchLabel}>{opt.label}</span>
-                </button>
-              );
-            })}
-          </div>
 
           {/* Landscape gradients */}
           <p className={styles.sectionLabel}>Landscapes</p>
