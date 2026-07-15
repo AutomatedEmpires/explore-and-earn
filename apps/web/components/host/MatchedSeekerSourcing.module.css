@@ -1,0 +1,264 @@
+/*
+ * Host "Matched seekers" sourcing surface — quota meter + per-listing buckets.
+ * Glacier semantic tokens only; renders correctly on the (host) dark-glass
+ * shell and the light theme. Value is always shown; only the action is gated.
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* --- Quota meter ---------------------------------------------------------- */
+.quota {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+  padding: var(--space-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.quota[data-blocked="true"] {
+  border-color: color-mix(in srgb, var(--status-error-fg) 40%, var(--border-soft));
+}
+
+.quotaMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.quotaHeadline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+}
+
+.quotaNum {
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: 1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.quotaUnit {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.quotaBreak {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.meter {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 14%, transparent);
+  overflow: hidden;
+  max-width: 22rem;
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-cta);
+  transition: width var(--motion-base) var(--ease-standard);
+}
+
+.quotaUnmetered {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.quotaUnmetered svg {
+  flex: none;
+  color: var(--color-cta);
+}
+
+/* --- Blocked / out-of-credits banner ------------------------------------- */
+.blocked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+  padding: var(--space-14) var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 32%, transparent);
+  background: var(--status-error-bg);
+  color: var(--status-error-fg);
+}
+
+.blocked svg {
+  flex: none;
+}
+
+.blockedText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  flex: 1 1 18rem;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.blockedText strong {
+  color: var(--text-primary);
+}
+
+.blockedText span {
+  color: var(--text-secondary);
+}
+
+/* --- Buckets -------------------------------------------------------------- */
+.buckets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.bucket {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.bucketHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-10);
+}
+
+.bucketTitles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.bucketTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.bucketTitle svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.bucketSub {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-12);
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* --- Per-card action ------------------------------------------------------ */
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+}
+
+.invited {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-6) var(--space-12);
+  border-radius: var(--radius-pill);
+  background: var(--status-success-bg);
+  color: var(--status-success-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.error {
+  color: var(--status-error-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+}
+
+/* --- Empty state ---------------------------------------------------------- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-32) var(--space-16);
+  text-align: center;
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-card);
+  color: var(--text-secondary);
+}
+
+.empty svg {
+  color: var(--status-match-fg);
+}
+
+.empty p {
+  margin: 0;
+  max-width: 42ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meterFill {
+    transition: none;
+  }
+}

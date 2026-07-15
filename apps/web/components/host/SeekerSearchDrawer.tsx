@@ -14,6 +14,26 @@ import { searchSeekersAction, sendInviteAction } from "../../app/actions/invites
 import { PopupShell } from "../overlay/PopupShell";
 import styles from "./SeekerSearchDrawer.module.css";
 
+/**
+ * Map a server invite-action error code to host-facing copy. Never surfaces a
+ * raw code — `invite_credits_required` is the metered blocked state (out of
+ * monthly allowance + purchased credits), phrased as an upsell.
+ */
+function inviteErrorMessage(error?: string): string {
+  switch (error) {
+    case "already_invited":
+      return "You already sent an invite to this seeker for this listing.";
+    case "invite_credits_required":
+      return "You're out of invite credits this month. Buy more from the Matched seekers panel, or wait for next month's allowance.";
+    case "rate_limit_exceeded":
+      return "You've hit the hourly invite limit. Try again shortly.";
+    case "forbidden":
+      return "That listing isn't one of yours.";
+    default:
+      return "Something went wrong. Please try again.";
+  }
+}
+
 export interface SeekerSearchDrawerProps {
   /** The listing the host wants to invite seekers to. */
   readonly listingId: string;
@@ -78,11 +98,7 @@ export function SeekerSearchDrawer({
         setSelected(null);
         setMessage("");
       } else {
-        setSendError(
-          result.error === "already_invited"
-            ? "You already sent an invite to this seeker for this listing."
-            : result.error ?? "Something went wrong. Please try again.",
-        );
+        setSendError(inviteErrorMessage(result.error));
       }
     });
   }

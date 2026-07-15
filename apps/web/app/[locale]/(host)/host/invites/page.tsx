@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
-import { getHostInvites, getHostListings } from "@explore-and-earn/db";
+import {
+  getHostInvites,
+  getHostListings,
+  getInviteEntitlement,
+  getMatchedSeekersForListing,
+} from "@explore-and-earn/db";
 import type { HostInvite, ListingRow } from "@explore-and-earn/db/client";
 import { Chip, Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
 import { HostSectionHeading } from "../../../../../components/host";
+import {
+  MatchedSeekerSourcing,
+  type SourcingBucketVM,
+} from "../../../../../components/host/MatchedSeekerSourcing";
 import { EmptyState } from "../../../../../components/discovery";
 import { InvitesList } from "./InvitesList";
 import styles from "./page.module.css";
+
+/** How many matched seekers to source per listing bucket. */
+const SEEKERS_PER_LISTING = 12;
 
 export const metadata: Metadata = { title: "Invites" };
 
@@ -100,10 +112,33 @@ export default async function HostInvitesPage() {
     );
   }
 
-  const [invites, listings] = await Promise.all([
+  const [invites, listings, entitlement] = await Promise.all([
     getHostInvites(token, userId).catch(() => [] as HostInvite[]),
     getHostListings(token, userId).catch(() => [] as ListingRow[]),
+    getInviteEntitlement(token, userId).catch(() => null),
   ]);
+
+  // Per-listing matched-seeker buckets (ownership + discovery-safe projection
+  // enforced inside getMatchedSeekersForListing). A degraded/empty bucket never
+  // fails the page — the surface renders its honest empty state instead.
+  const bucketResults = await Promise.all(
+    listings.map(async (listing) => {
+      const result = await getMatchedSeekersForListing(
+        token,
+        userId,
+        listing.id,
+        SEEKERS_PER_LISTING,
+      ).catch(() => null);
+      return { listing, seekers: result?.seekers ?? [] };
+    }),
+  );
+  const sourcingBuckets: SourcingBucketVM[] = bucketResults.map(({ listing, seekers }) => ({
+    listingId: listing.id,
+    listingTitle: listing.title || "Untitled listing",
+    category: listing.category,
+    locationDisplay: listing.location_display,
+    seekers,
+  }));
 
   // --- Real metrics derived from the invite data --------------------------
   const sent = invites.length;
@@ -304,6 +339,18 @@ export default async function HostInvitesPage() {
           )}
         </div>
       </div>
+
+      {/* --- Matched seekers: per-listing buckets + metered invite --------- */}
+      <div className={styles.section}>
+        <div className={styles.sectionText}>
+          <h2 className={styles.sectionTitle}>Matched seekers</h2>
+          <p className={styles.sectionLede}>
+            Ranked, real-fit seekers for each of your listings. Invite the strongest matches to
+            apply — every send draws from your monthly allowance.
+          </p>
+        </div>
+      </div>
+      <MatchedSeekerSourcing buckets={sourcingBuckets} entitlement={entitlement} />
 
       {/* --- Sent invites + the real send/withdraw flow (unchanged) -------- */}
       <div className={styles.section}>
