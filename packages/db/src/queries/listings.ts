@@ -3,9 +3,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type {
+  BenefitEvidenceStatus,
   BenefitProvision,
   CompensationUnit,
   DiscoveryCardConditionalBadge,
+  ListingClaimSummary,
+  ListingProvenanceInfo,
   ListingStatus,
   OpportunityCategory,
   OpportunityListing,
@@ -50,6 +53,23 @@ export interface ListingRow {
     company_name: string;
     subscription_tier: string | null;
   } | null;
+  /* ── Provenance (migration 064) ──
+     'verified' = host-authored/claimed; 'sourced' = real attributable public
+     posting, NOT employer-confirmed. Evidence columns carry the epistemic
+     status per triad benefit ('not_stated' means the boolean value columns are
+     MEANINGLESS for that benefit — render/rank as missing, never as "no"). */
+  provenance: "verified" | "sourced";
+  source_name: string | null;
+  source_url: string | null;
+  source_external_id: string | null;
+  source_employer_name: string | null;
+  source_published_at: string | null;
+  source_last_seen_at: string | null;
+  source_status: string;
+  claim_summary: string;
+  housing_evidence: BenefitEvidenceStatus;
+  meals_evidence: BenefitEvidenceStatus;
+  pay_evidence: BenefitEvidenceStatus;
 }
 
 type RawListingRow = {
@@ -79,6 +99,18 @@ type RawListingRow = {
   cover_photo_url: string | null;
   gallery_photo_urls: string[] | null;
   host_profiles: { company_name: string; subscription_tier: string | null } | null;
+  provenance: string;
+  source_name: string | null;
+  source_url: string | null;
+  source_external_id: string | null;
+  source_employer_name: string | null;
+  source_published_at: string | null;
+  source_last_seen_at: string | null;
+  source_status: string;
+  claim_summary: string;
+  housing_evidence: string;
+  meals_evidence: string;
+  pay_evidence: string;
 };
 
 // Display strings (opportunity window + compensation summary) are formatted via
@@ -114,8 +146,79 @@ function buildCompensationSummary(
   });
 }
 
+const asEvidence = (value: string | null | undefined): BenefitEvidenceStatus =>
+  value === "not_stated" || value === "stated" ? value : "confirmed";
+
 function toListingRow(raw: RawListingRow): ListingRow {
-  return { ...raw, category: raw.category as OpportunityCategory };
+  return {
+    ...raw,
+    category: raw.category as OpportunityCategory,
+    provenance: raw.provenance === "sourced" ? "sourced" : "verified",
+    housing_evidence: asEvidence(raw.housing_evidence),
+    meals_evidence: asEvidence(raw.meals_evidence),
+    pay_evidence: asEvidence(raw.pay_evidence),
+  };
+}
+
+/**
+ * Build the contract provenance block for a row. Returns undefined for
+ * verified-NATIVE rows (legacy behavior, zero new payload) and a full block —
+ * attribution, claim summary, per-benefit evidence — for sourced rows and for
+ * converted rows (which stay 'verified' but preserve their source lineage).
+ */
+export function rowProvenanceInfo(
+  row: Pick<
+    ListingRow,
+    | "provenance"
+    | "source_name"
+    | "source_url"
+    | "source_external_id"
+    | "source_employer_name"
+    | "source_published_at"
+    | "source_last_seen_at"
+    | "claim_summary"
+    | "housing_evidence"
+    | "meals_evidence"
+    | "pay_evidence"
+  >,
+): ListingProvenanceInfo | undefined {
+  const converted = row.provenance === "verified" && row.claim_summary === "converted";
+  if (row.provenance !== "sourced" && !converted) return undefined;
+
+  const claimStatus: ListingClaimSummary =
+    row.claim_summary === "claim_pending" || row.claim_summary === "converted"
+      ? row.claim_summary
+      : row.provenance === "sourced"
+        ? "unclaimed"
+        : "not_applicable";
+
+  return {
+    provenance: row.provenance,
+    // Attribution only travels on SOURCED (unconfirmed) listings; a converted
+    // listing keeps its lineage in the DB but presents as its host's own.
+    ...(row.provenance === "sourced" && row.source_name
+      ? {
+          source: {
+            sourceName: row.source_name,
+            sourceUrl: row.source_url,
+            sourcePostingId: row.source_external_id,
+            publishedAt: row.source_published_at,
+            retrievedAt: row.source_last_seen_at,
+            employerName: row.source_employer_name,
+          },
+        }
+      : {}),
+    claimStatus,
+    // ALWAYS the real columns: verified-native rows are 'confirmed' by
+    // migration default, sourced rows carry stated/not_stated, and a converted
+    // row keeps 'not_stated' for any benefit the employer never explicitly
+    // addressed — the constant would fabricate a confirmation there.
+    benefitEvidence: {
+      housing: row.housing_evidence,
+      meals: row.meals_evidence,
+      pay: row.pay_evidence,
+    },
+  };
 }
 
 /**
@@ -170,8 +273,15 @@ export function rowToDiscoveryFields(
   row: ListingRow,
   enrich?: DiscoveryEnrichment,
 ): DiscoveryFields {
-  const hostName = row.host_profiles?.company_name ?? "Unknown Host";
-  const verified = hasVerifiedHostSubscription(row.host_profiles?.subscription_tier);
+  const isSourced = row.provenance === "sourced";
+  // A sourced listing has NO host: the "host" slot carries the employer name
+  // AS STATED BY THE SOURCE (falling back to the source's own name), display-
+  // only — never verified, never linked to a host profile, never tiered.
+  const hostName = isSourced
+    ? row.source_employer_name ?? row.source_name ?? "Employer not stated"
+    : row.host_profiles?.company_name ?? "Unknown Host";
+  const verified =
+    !isSourced && hasVerifiedHostSubscription(row.host_profiles?.subscription_tier);
 
   const housingProvision: BenefitProvision = row.housing_included ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision = row.meals_included ? "provided" : "not_provided";
@@ -204,20 +314,26 @@ export function rowToDiscoveryFields(
     matchScore,
     previouslySkipped,
     host: {
-      id: row.host_profile_id ?? undefined,
+      // Sourced listings expose NO host id — there is no host profile to
+      // open, review, or navigate to (structural, not cosmetic).
+      id: isSourced ? undefined : row.host_profile_id ?? undefined,
       name: hostName,
       verified,
       // Monetization ranking ("pay more, show more"): expose the host's real
       // active subscription tier so Enterprise > Professional > Starter is
       // honored. Never fabricated — anything other than a known paid tier
       // (incl. null/free/unknown) maps to "none" (ranks last, never hidden).
+      // Sourced inventory is always "none": unconfirmed listings never carry
+      // monetization rank.
       tier:
-        row.host_profiles?.subscription_tier === "starter" ||
-        row.host_profiles?.subscription_tier === "professional" ||
-        row.host_profiles?.subscription_tier === "enterprise"
-          ? row.host_profiles.subscription_tier
+        !isSourced &&
+        (row.host_profiles?.subscription_tier === "starter" ||
+          row.host_profiles?.subscription_tier === "professional" ||
+          row.host_profiles?.subscription_tier === "enterprise")
+          ? row.host_profiles!.subscription_tier as "starter" | "professional" | "enterprise"
           : "none",
     },
+    provenanceInfo: rowProvenanceInfo(row),
     benefits: {
       housing: {
         provision: housingProvision,
@@ -302,8 +418,16 @@ export function enrichmentFromScope(
   };
 }
 
+/** Provenance columns (migration 064) shared by BOTH column constants below. */
+const PROVENANCE_COLUMNS =
+  "provenance,source_name,source_url,source_external_id,source_employer_name," +
+  "source_published_at,source_last_seen_at,source_status,claim_summary," +
+  "housing_evidence,meals_evidence,pay_evidence";
+
 const LISTING_COLUMNS =
-  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profiles(company_name,subscription_tier)";
+  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls," +
+  PROVENANCE_COLUMNS +
+  ",host_profiles(company_name,subscription_tier)";
 
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;
@@ -947,6 +1071,14 @@ export interface PublicListingDetail {
   activities?: string[];
   /** Host-level perks from the narrative (distinct from listing-level `perks`). */
   hostPerks?: string[];
+
+  /* ── Provenance (migration 064) ──
+     Absent for verified-native listings (legacy behavior). Present for
+     sourced listings (attribution + per-benefit evidence — the detail page
+     MUST render the sourced disclosure, suppress every host block, and show
+     'not_stated' benefits as missing information) and for converted listings
+     (lineage retained, presents as the host's own). */
+  provenanceInfo?: ListingProvenanceInfo;
 }
 
 const LISTING_DETAIL_COLUMNS =
@@ -956,7 +1088,8 @@ const LISTING_DETAIL_COLUMNS =
   "compensation_summary,compensation_min_cents," +
   "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
   "begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profile_id," +
-  "host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier,narrative)";
+  PROVENANCE_COLUMNS +
+  ",host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier,narrative)";
 
 function firstEmbed(value: unknown): Record<string, unknown> | null {
   const candidate = Array.isArray(value) ? value[0] : value;
@@ -1029,7 +1162,11 @@ export async function getListingDetailPublic(
   if (!data) return null;
 
   const row = data as unknown as Record<string, unknown>;
-  const hostRow = firstEmbed(row.host_profiles);
+  const isSourced = row.provenance === "sourced";
+  // STRUCTURAL suppression: a sourced listing exposes NO host object at all —
+  // the page cannot render a host block, reviews, or a verified badge for it
+  // even by accident, because there is nothing to render from.
+  const hostRow = isSourced ? null : firstEmbed(row.host_profiles);
 
   const host: PublicListingDetailHost | null = hostRow
     ? {
@@ -1114,6 +1251,21 @@ export async function getListingDetailPublic(
     hostProfileId:
       typeof row.host_profile_id === "string" ? row.host_profile_id : null,
     host,
+    provenanceInfo: rowProvenanceInfo({
+      provenance: isSourced ? "sourced" : "verified",
+      source_name: toDetailText(row.source_name),
+      source_url: toDetailText(row.source_url),
+      source_external_id: toDetailText(row.source_external_id),
+      source_employer_name: toDetailText(row.source_employer_name),
+      source_published_at:
+        typeof row.source_published_at === "string" ? row.source_published_at : null,
+      source_last_seen_at:
+        typeof row.source_last_seen_at === "string" ? row.source_last_seen_at : null,
+      claim_summary: typeof row.claim_summary === "string" ? row.claim_summary : "not_applicable",
+      housing_evidence: asEvidence(row.housing_evidence as string | null),
+      meals_evidence: asEvidence(row.meals_evidence as string | null),
+      pay_evidence: asEvidence(row.pay_evidence as string | null),
+    }),
 
     // Immersive fields — undefined-when-empty so the page omits empty sections.
     responsibilities: responsibilities.length > 0 ? responsibilities : undefined,

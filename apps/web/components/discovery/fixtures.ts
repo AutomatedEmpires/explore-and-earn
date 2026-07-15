@@ -234,4 +234,39 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     },
     coverImageUrl: cloudinaryPhoto("farm", "tim-hufner-6-ktk6b8mq8", "hero"),
   },
+  {
+    // A SOURCED fixture (dev/preview only) so the sourced-card journey renders
+    // without a backend: no host, source attribution, meals NOT STATED.
+    id: "lst_sourced_kelp_farm",
+    title: "Kelp Farm Field Technician",
+    category: "maritime",
+    location: "Kodiak, Alaska",
+    coordinates: { lat: 57.79, lon: -152.407 },
+    opportunityWindow: "May–Aug 2026",
+    begins: "May 4, 2026",
+    ends: "Aug 29, 2026",
+    status: "live",
+    // Sourced listings carry no host id, are never verified, and rank at "none".
+    host: { name: "Kodiak Kelp Co.", verified: false, tier: "none" },
+    benefits: {
+      housing: { provision: "provided", summary: "Bunkhouse berth" },
+      // Meals were NOT stated by the source — never shown as "not provided".
+      meals: { provision: "not_provided", summary: "Not stated" },
+      pay: { provision: "provided", summary: "$21/hr" },
+    },
+    coverImageUrl: cloudinaryPhoto("maritime", "joseph-barrientos-8mdls-a3o8q", "hero"),
+    provenanceInfo: {
+      provenance: "sourced",
+      claimStatus: "unclaimed",
+      benefitEvidence: { housing: "stated", meals: "not_stated", pay: "stated" },
+      source: {
+        sourceName: "CoastWork",
+        sourceUrl: "https://example.com/coastwork/kelp-tech-2026",
+        sourcePostingId: "cw-kelp-2026",
+        publishedAt: "2026-04-10T00:00:00Z",
+        retrievedAt: "2026-07-12T00:00:00Z",
+        employerName: "Kodiak Kelp Co.",
+      },
+    },
+  },
 ];

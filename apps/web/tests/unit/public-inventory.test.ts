@@ -62,6 +62,39 @@ const rawRow = {
   cover_photo_url: "https://img.example/cover.jpg",
   gallery_photo_urls: ["https://img.example/1.jpg"],
   host_profiles: { company_name: "Sunrise Orchards", subscription_tier: "professional" },
+  // Provenance (064): a verified host-authored row.
+  provenance: "verified" as const,
+  source_name: null,
+  source_url: null,
+  source_external_id: null,
+  source_employer_name: null,
+  source_published_at: null,
+  source_last_seen_at: null,
+  source_status: "not_applicable",
+  claim_summary: "not_applicable",
+  housing_evidence: "confirmed" as const,
+  meals_evidence: "confirmed" as const,
+  pay_evidence: "confirmed" as const,
+};
+
+/** A sourced (unconfirmed, attributable) row — no host, stated/not_stated evidence. */
+const sourcedRow = {
+  ...rawRow,
+  id: "33333333-2222-3333-4444-555555555555",
+  host_profile_id: null,
+  host_profiles: null,
+  provenance: "sourced" as const,
+  source_name: "CoolWorks",
+  source_url: "https://example.com/jobs/123",
+  source_external_id: "cw-123",
+  source_employer_name: "Sunrise Orchards LLC",
+  source_published_at: "2026-07-01T00:00:00Z",
+  source_last_seen_at: "2026-07-10T00:00:00Z",
+  source_status: "active",
+  claim_summary: "unclaimed",
+  housing_evidence: "stated" as const,
+  meals_evidence: "not_stated" as const,
+  pay_evidence: "stated" as const,
 };
 
 beforeEach(() => {
@@ -144,6 +177,7 @@ describe("DTO privacy — pinned public key sets (PII leakage gate)", () => {
     expect(Object.keys(listing).sort()).toEqual(
       [
         "beginsAt",
+        "benefitEvidence",
         "benefits",
         "category",
         "coverPhotoUrl",
@@ -152,7 +186,9 @@ describe("DTO privacy — pinned public key sets (PII leakage gate)", () => {
         "location",
         "organizationId",
         "organizationName",
+        "provenance",
         "publishedAt",
+        "source",
         "title",
         "url",
         "visaSupport",
@@ -160,9 +196,42 @@ describe("DTO privacy — pinned public key sets (PII leakage gate)", () => {
     );
     expect(Object.keys(listing.location).sort()).toEqual(["label", "point", "precision"]);
     expect(Object.keys(listing.benefits).sort()).toEqual(["housing", "meals", "pay"]);
+    // Verified host-authored rows: confirmed evidence, no source block.
+    expect(listing.provenance).toBe("verified");
+    expect(listing.source).toBeNull();
+    expect(listing.benefitEvidence).toEqual({
+      housing: "confirmed",
+      meals: "confirmed",
+      pay: "confirmed",
+    });
     // The raw row's status / subscription_tier / internal joins never leak.
     expect(JSON.stringify(listing)).not.toContain("subscription_tier");
     expect(JSON.stringify(listing)).not.toContain('"status"');
+  });
+
+  it("sourced listing exposes attribution + evidence, never a platform organization", async () => {
+    mockDb.searchListings.mockResolvedValue([sourcedRow]);
+    const result = await searchPublicListings({ limit: 24, offset: 0 });
+    const listing = result.listings[0]!;
+    expect(listing.provenance).toBe("sourced");
+    // Attribution is real and complete.
+    expect(listing.source).toEqual({
+      name: "CoolWorks",
+      url: "https://example.com/jobs/123",
+      postingId: "cw-123",
+      publishedAt: "2026-07-01T00:00:00Z",
+      retrievedAt: "2026-07-10T00:00:00Z",
+      employerName: "Sunrise Orchards LLC",
+    });
+    // NO platform organization: the employer name is display-only.
+    expect(listing.organizationId).toBeNull();
+    expect(listing.organizationName).toBe("Sunrise Orchards LLC");
+    // Evidence: meals were never stated — never collapsed into a "no".
+    expect(listing.benefitEvidence).toEqual({
+      housing: "stated",
+      meals: "not_stated",
+      pay: "stated",
+    });
   });
 
   it("listing detail adds only description + gallery", async () => {
@@ -172,6 +241,7 @@ describe("DTO privacy — pinned public key sets (PII leakage gate)", () => {
     expect(Object.keys(listing!).sort()).toEqual(
       [
         "beginsAt",
+        "benefitEvidence",
         "benefits",
         "category",
         "coverPhotoUrl",
@@ -182,7 +252,9 @@ describe("DTO privacy — pinned public key sets (PII leakage gate)", () => {
         "location",
         "organizationId",
         "organizationName",
+        "provenance",
         "publishedAt",
+        "source",
         "title",
         "url",
         "visaSupport",

@@ -64,6 +64,7 @@ export const MATCH_SIGNAL_CODES = [
 	"housing_included_matches_need",
 	"housing_not_included_preferred",
 	"housing_needs_unknown",
+	"housing_not_stated_by_source",
 	"meals_included_matches_need",
 	"meals_not_included_preferred",
 	"meals_unspecified_preferred",
@@ -268,6 +269,10 @@ const SIGNAL_TEMPLATES: Record<MatchSignalCode, SignalTemplates> = {
 	housing_needs_unknown: {
 		seeker: "You haven't set a housing preference, so housing fit is only partly evaluated.",
 		host: "They haven't stated a housing preference.",
+	},
+	housing_not_stated_by_source: {
+		seeker: "This sourced listing doesn't state whether housing is included — worth asking.",
+		host: "The source didn't state housing; confirm it if you claim this listing.",
 	},
 	meals_included_matches_need: {
 		seeker: "Meals are included, matching your preference.",

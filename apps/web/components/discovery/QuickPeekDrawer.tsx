@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Icon, type IconKey } from "@explore-and-earn/ui";
 import type { BenefitProvision } from "@explore-and-earn/contracts";
 import { saveListingAction } from "../../app/actions/swipe";
+import { recordSourceClickAction } from "../../app/actions/sourcedAnalytics";
 import { PopupShell } from "../overlay/PopupShell";
 import { CATEGORY_ICON, CATEGORY_LABEL, type DiscoveryListing } from "./listing";
 import styles from "./QuickPeekDrawer.module.css";
@@ -20,20 +21,24 @@ interface BenefitChipProps {
 	label: string;
 	value: string;
 	provision: BenefitProvision;
+	/** Sourced listing: the source didn't state this — neutral, not red. */
+	notStated?: boolean;
 }
 
-function BenefitChip({ icon, label, value, provision }: BenefitChipProps) {
+function BenefitChip({ icon, label, value, provision, notStated }: BenefitChipProps) {
 	const cls =
 		label === "Pay"
 			? styles.chipPay
-			: provision === "provided" || provision === "partial"
-				? styles.chipGreen
-				: styles.chipRed;
+			: notStated
+				? styles.chipNeutral
+				: provision === "provided" || provision === "partial"
+					? styles.chipGreen
+					: styles.chipRed;
 	return (
 		<div className={`${styles.chip} ${cls}`}>
 			<Icon name={icon} size={16} aria-hidden />
 			<span className={styles.chipLabel}>{label}</span>
-			<span className={styles.chipValue}>{value}</span>
+			<span className={styles.chipValue}>{notStated ? "Not stated" : value}</span>
 		</div>
 	);
 }
@@ -80,6 +85,10 @@ export function QuickPeekDrawer({ listing, onClose }: QuickPeekDrawerProps) {
 	const housingValue = listing.benefits.housing.summary ?? PROVISION_LABEL[hp];
 	const mealsValue   = listing.benefits.meals.summary   ?? PROVISION_LABEL[mp];
 
+	const provenance = listing.provenanceInfo;
+	const isSourced = provenance?.provenance === "sourced";
+	const evidence = provenance?.benefitEvidence;
+
 	return (
 		<PopupShell
 			open={Boolean(listing)}
@@ -102,6 +111,37 @@ export function QuickPeekDrawer({ listing, onClose }: QuickPeekDrawerProps) {
 			}
 			closeLabel="Close opportunity details"
 		>
+			{/* Sourced disclosure + attribution — first, honest, unmissable. */}
+			{isSourced ? (
+				<div className={styles.sourcedNote}>
+					<Icon name="system.info" size={16} aria-hidden />
+					<div>
+						<strong>Sourced · not yet confirmed by Explore &amp; Earn</strong>
+						{provenance?.source?.sourceName ? (
+							<span className={styles.sourceLine}>
+								From {provenance.source.sourceName}
+								{provenance.source.employerName ? ` · ${provenance.source.employerName}` : ""}
+							</span>
+						) : null}
+						{provenance?.source?.sourceUrl ? (
+							<a
+								className={styles.sourceLink}
+								href={provenance.source.sourceUrl}
+								target="_blank"
+								rel="noopener noreferrer nofollow"
+								onClick={() => {
+									// Fire-and-forget analytics; never block navigation.
+									void recordSourceClickAction(listing.id);
+								}}
+							>
+								View original posting
+								<Icon name="action.forward" size={14} aria-hidden />
+							</a>
+						) : null}
+					</div>
+				</div>
+			) : null}
+
 			{/* Dates */}
 			<div className={styles.dateRow}>
 				<div className={styles.dateCell}>
@@ -117,11 +157,11 @@ export function QuickPeekDrawer({ listing, onClose }: QuickPeekDrawerProps) {
 				</div>
 			</div>
 
-			{/* Benefit triad */}
+			{/* Benefit triad — evidence-aware: a not_stated benefit is neutral. */}
 			<div className={styles.triad}>
-				<BenefitChip icon="benefit.housing" label="Housing" value={housingValue} provision={hp} />
-				<BenefitChip icon="benefit.meals"   label="Meals"   value={mealsValue}   provision={mp} />
-				<BenefitChip icon="benefit.pay"     label="Pay"     value={payValue}     provision={pp} />
+				<BenefitChip icon="benefit.housing" label="Housing" value={housingValue} provision={hp} notStated={evidence?.housing === "not_stated"} />
+				<BenefitChip icon="benefit.meals"   label="Meals"   value={mealsValue}   provision={mp} notStated={evidence?.meals === "not_stated"} />
+				<BenefitChip icon="benefit.pay"     label="Pay"     value={payValue}     provision={pp} notStated={evidence?.pay === "not_stated"} />
 			</div>
 
 			{/* Pay note — single line, no card wrapper */}

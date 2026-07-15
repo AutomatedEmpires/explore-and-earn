@@ -159,6 +159,10 @@ export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardDat
     verifiedHost: listing.host.verified,
     conditionalBadges: listing.conditionalBadges,
     matchScore: listing.matchScore,
+    // Provenance (contracts/provenance.ts): sourced listings render the sourced
+    // disclosure + evidence-driven benefits and NEVER a verified host.
+    provenance: listing.provenanceInfo?.provenance,
+    benefitEvidence: listing.provenanceInfo?.benefitEvidence,
   };
 }
 

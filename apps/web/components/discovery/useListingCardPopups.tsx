@@ -131,9 +131,25 @@ export function useListingCardPopups(
     [listings, reportId],
   );
 
+  // A sourced listing has NO host profile — its "host" tap must never open the
+  // host-profile popup (which would present a phantom/unverified host). Route
+  // it to Quick Peek instead, where the source attribution + disclosure live.
+  const sourcedIds = useMemo(
+    () =>
+      new Set(
+        listings
+          .filter((listing) => listing.provenanceInfo?.provenance === "sourced")
+          .map((listing) => listing.id),
+      ),
+    [listings],
+  );
+
   // ── Default popup openers (stable identity) ───────────────────────────────
   const openQuickPeek = useCallback((id: string) => setActiveId(id), []);
-  const openHost = useCallback((id: string) => setActiveHostId(id), []);
+  const openHost = useCallback(
+    (id: string) => (sourcedIds.has(id) ? setActiveId(id) : setActiveHostId(id)),
+    [sourcedIds],
+  );
   const openHousing = useCallback(
     (id: string) => setActiveBenefit({ id, bucket: "housing" }),
     [],

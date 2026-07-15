@@ -214,6 +214,7 @@ function locationOf(args: {
 }
 
 function rowToSummaryV1(row: ListingRow): PublicListingSummaryV1 {
+	const isSourced = row.provenance === "sourced";
 	return {
 		id: row.id,
 		url: `${BASE_URL}/listing/${row.id}`,
@@ -246,9 +247,33 @@ function rowToSummaryV1(row: ListingRow): PublicListingSummaryV1 {
 		endsAt: row.ends_at,
 		publishedAt: row.published_at,
 		coverPhotoUrl: row.cover_photo_url,
-		organizationId: row.host_profile_id,
-		organizationName: row.host_profiles?.company_name ?? null,
+		// Sourced listings have no platform organization: the employer is a
+		// display-only, source-stated name (never an /organizations/{id} target).
+		organizationId: isSourced ? null : row.host_profile_id,
+		organizationName: isSourced
+			? row.source_employer_name ?? null
+			: row.host_profiles?.company_name ?? null,
 		visaSupport: row.visa_support === true,
+		provenance: isSourced ? "sourced" : "verified",
+		source:
+			isSourced && row.source_name
+				? {
+						name: row.source_name,
+						url: row.source_url,
+						postingId: row.source_external_id,
+						publishedAt: row.source_published_at,
+						retrievedAt: row.source_last_seen_at,
+						employerName: row.source_employer_name,
+					}
+				: null,
+		// ALWAYS the row's real evidence columns: verified-native rows default
+		// 'confirmed'; a converted listing keeps 'not_stated' for any benefit its
+		// employer never explicitly addressed — agents must see that honestly.
+		benefitEvidence: {
+			housing: row.housing_evidence,
+			meals: row.meals_evidence,
+			pay: row.pay_evidence,
+		},
 	};
 }
 
