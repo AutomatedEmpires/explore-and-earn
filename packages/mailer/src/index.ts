@@ -95,15 +95,20 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
   const { to, subject, html, text, headers, idempotencyKey } = opts;
   const from = resolveFrom(opts.from);
 
-  // Guard: skip if we already sent this within the dedup window.
+  // Guard: skip if this key was already claimed within the dedup window.
+  // CLAIM-then-send (not send-then-record): two concurrent calls with the
+  // same key would otherwise both pass a read-only check before either
+  // recorded it. The claim is rolled back on failure so retries still work.
   if (idempotencyKey) {
     const lastSent = _sentKeys.get(idempotencyKey);
     if (lastSent !== undefined && Date.now() - lastSent < IDEMPOTENCY_TTL_MS) {
       return { ok: true, isDuplicate: true };
     }
+    _sentKeys.set(idempotencyKey, Date.now());
   }
 
   if (!to || to.trim().length === 0) {
+    if (idempotencyKey) _sentKeys.delete(idempotencyKey);
     return { ok: false, error: "recipient address is empty" };
   }
 
@@ -115,9 +120,9 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
       console.info(
         `[mailer:dev] would send\n  to: ${to}\n  subject: ${subject}\n  idempotencyKey: ${idempotencyKey ?? "(none)"}`,
       );
-      if (idempotencyKey) _sentKeys.set(idempotencyKey, Date.now());
       return { ok: true };
     }
+    if (idempotencyKey) _sentKeys.delete(idempotencyKey);
     const error = "RESEND_API_KEY is not set";
     console.error(`[mailer] ${error}`);
     return { ok: false, error };
@@ -143,6 +148,7 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
     });
 
     if (!response.ok) {
+      if (idempotencyKey) _sentKeys.delete(idempotencyKey);
       const detail = await response.text().catch(() => "");
       const error = `Resend ${response.status}: ${detail.slice(0, 300)}`;
       console.error(`[mailer] send failed: ${error}`);
@@ -157,9 +163,9 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
       // Body is informational only — a success without a parsable id is fine.
     }
 
-    if (idempotencyKey) _sentKeys.set(idempotencyKey, Date.now());
     return { ok: true, status: response.status, providerMessageId };
   } catch (err) {
+    if (idempotencyKey) _sentKeys.delete(idempotencyKey);
     const error = err instanceof Error ? err.message : "unknown";
     console.error("[mailer] send threw:", err);
     return { ok: false, error };

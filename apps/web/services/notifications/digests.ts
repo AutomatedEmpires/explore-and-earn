@@ -2,6 +2,8 @@ import "server-only"
 
 import type { NotificationIntent } from "@explore-and-earn/contracts"
 import {
+	cancelDigestMemberships,
+	claimDigestDelivery,
 	collapseDeliveriesInto,
 	getDeliveryByDedupKey,
 	getEnginePrefsMap,
@@ -25,6 +27,7 @@ import { escapeHtml, renderEmailLayout } from "../../lib/emails/layout"
 import { getClerkContact } from "../../lib/clerkUser"
 import { reportError } from "../../lib/sentry"
 import { enqueueScheduleDerived } from "./dispatcher"
+import { resolvePrefs } from "./prefs"
 import { localizedPath, renderMessage } from "./render"
 import type { PreIntent } from "./taxonomy"
 import { createUnsubscribeToken } from "./unsubscribe"
@@ -145,11 +148,22 @@ async function sendDigestForRecipient(args: {
 	])
 	const digestRow = await getDeliveryByDedupKey(dedupKey)
 	if (!digestRow) return "failed"
-	if (digestRow.status === "delivered" || digestRow.status === "suppressed") {
+	if (
+		digestRow.status === "delivered" ||
+		digestRow.status === "suppressed" ||
+		digestRow.status === "cancelled"
+	) {
 		// Another run already handled this window; release any stragglers.
 		await markDigestMembershipsSent(items.map((i) => i.membershipId), digestRow.id)
 		return "skipped"
 	}
+
+	// ATOMIC window claim: exactly one concurrent digest run may proceed past
+	// this point (overlapping hourly runs / manual re-triggers otherwise both
+	// see the held row and double-send). Crashed runs are reclaimable after
+	// the lease expires.
+	const claimed = await claimDigestDelivery(digestRow.id)
+	if (!claimed) return "skipped"
 
 	const contact = await getClerkContact(recipientClerkUserId)
 	if (!contact.email) return "failed" // retried next run; memberships stay queued
@@ -281,11 +295,33 @@ export async function runDigests(
 	if (byRecipient.size === 0) return stats
 
 	const prefsMap = await getEnginePrefsMap([...byRecipient.keys()])
-	for (const [recipient, rows] of byRecipient) {
+	for (const [recipient, allRows] of byRecipient) {
 		const prefsRow = prefsMap.get(recipient) ?? null
 		const windowKey = dueWindowKey(cadence, prefsRow?.timezone ?? null, nowMs)
 		if (!windowKey) continue
 		stats.recipientsDue += 1
+
+		// CONSENT RE-CHECK at send time: memberships can queue for days —
+		// categories (or email entirely) the user has since turned off are
+		// cancelled here, never sent. resolvePrefs on the CURRENT row.
+		const currentPrefs = resolvePrefs(prefsRow)
+		const withdrawn: string[] = []
+		const rows: QueuedDigestMembership[] = []
+		for (const row of allRows) {
+			const category = row.category as keyof typeof currentPrefs.categories
+			const categoryPrefs = currentPrefs.categories[category]
+			const consented =
+				currentPrefs.emailEnabled && categoryPrefs !== undefined && categoryPrefs.email !== "off"
+			if (consented) rows.push(row)
+			else withdrawn.push(row.id)
+		}
+		if (withdrawn.length > 0) {
+			await cancelDigestMemberships(withdrawn).catch((err) =>
+				reportError(err, { action: "notifications.runDigests.cancelWithdrawn" }),
+			)
+		}
+		if (rows.length === 0) continue
+
 		try {
 			const outcome = await sendDigestForRecipient({
 				recipientClerkUserId: recipient,
@@ -361,7 +397,10 @@ export async function enqueueScheduledReminders(nowMs: number): Promise<Reminder
 				...reminderKeys("offer_expiring"),
 				values: {
 					listingTitle: listing?.title ?? "",
-					hoursLeft: Math.max(1, Math.round((Date.parse(offer.expires_at) - nowMs) / 3_600_000)),
+					// ceil: "within N hours" must never OVERSTATE remaining time —
+					// an offer 5 minutes from expiry says "within 1 hour", never
+					// "about 1 hour" of imagined slack.
+					hoursLeft: Math.max(1, Math.ceil((Date.parse(offer.expires_at) - nowMs) / 3_600_000)),
 				},
 				entity: { type: "application", id: offer.id },
 				expiresAt: offer.expires_at,
@@ -391,7 +430,7 @@ export async function enqueueScheduledReminders(nowMs: number): Promise<Reminder
 				...reminderKeys("listing_expiring"),
 				values: {
 					listingTitle: listing.title,
-					daysLeft: Math.max(1, Math.round((Date.parse(listing.expires_at) - nowMs) / 86_400_000)),
+					daysLeft: Math.max(1, Math.ceil((Date.parse(listing.expires_at) - nowMs) / 86_400_000)),
 				},
 				entity: { type: "listing", id: listing.id },
 				expiresAt: listing.expires_at,

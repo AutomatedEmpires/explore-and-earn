@@ -8,6 +8,7 @@ import {
 	getHostListings,
 	getHostProfile,
 	getHostClerkIdByProfileId,
+	isEmailSuppressed,
 	recordEvent,
 	restoreInviteCreditForInvite,
 	searchSeekersForInvite,
@@ -145,7 +146,10 @@ async function respondToInviteActionImpl(
 						getClerkContact(hostClerkUserId),
 						getClerkContact(userId),
 					])
-					if (host.email) {
+					// Suppression-list integrity: this is the one remaining inline
+					// email path (invite acceptance sits outside the engine's
+					// taxonomy) — it must still honor hard bounces/complaints.
+					if (host.email && !(await isEmailSuppressed(host.email))) {
 						const seekerName = seeker.name ?? "A seeker"
 						const listingTitle = match.listing?.title || "your listing"
 						await sendEmail({

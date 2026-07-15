@@ -95,7 +95,17 @@ export function EngagementNotificationSettings({
 				return;
 			}
 			try {
-				const registration = await navigator.serviceWorker.ready;
+				// serviceWorker.ready never settles when no SW is registered
+				// (dev builds don't register one) — race a timeout so the probe
+				// resolves to an explained state instead of hanging silently.
+				const registration = await Promise.race([
+					navigator.serviceWorker.ready,
+					new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+				]);
+				if (!registration) {
+					if (!cancelled) setPushDevice("not_configured");
+					return;
+				}
 				const existing = await registration.pushManager.getSubscription();
 				if (!cancelled) setPushDevice(existing ? "subscribed" : "unsubscribed");
 			} catch {
@@ -280,7 +290,7 @@ export function EngagementNotificationSettings({
 									type="checkbox"
 									className={styles.checkbox}
 									checked={enabled}
-									disabled={isPending}
+									disabled={isPending || pushBusy}
 									onChange={(event) => setMaster(channel, event.currentTarget.checked)}
 									aria-label={t(`master.${channel}.label`)}
 								/>
@@ -294,19 +304,22 @@ export function EngagementNotificationSettings({
 									) : pushDevice === "not_configured" ? (
 										<p className={styles.description}>{t("pushDevice.notConfigured")}</p>
 									) : pushDevice === "subscribed" ? (
-										<button
-											type="button"
-											className={styles.pushButton}
-											disabled={pushBusy}
-											onClick={disablePushOnDevice}
-										>
-											{t("pushDevice.disable")}
-										</button>
+										<>
+											<p className={styles.description}>{t("pushDevice.enabled")}</p>
+											<button
+												type="button"
+												className={styles.pushButton}
+												disabled={pushBusy || isPending}
+												onClick={disablePushOnDevice}
+											>
+												{t("pushDevice.disable")}
+											</button>
+										</>
 									) : (
 										<button
 											type="button"
 											className={styles.pushButton}
-											disabled={pushBusy || pushDevice === "unknown"}
+											disabled={pushBusy || isPending || pushDevice === "unknown"}
 											onClick={enablePushOnDevice}
 										>
 											{t("pushDevice.enable")}
@@ -342,7 +355,7 @@ export function EngagementNotificationSettings({
 										<select
 											className={styles.select}
 											value={value.email}
-											disabled={isPending || !prefs.emailEnabled}
+											disabled={isPending || pushBusy || !prefs.emailEnabled}
 											onChange={(event) =>
 												setCategory(category, {
 													email: event.currentTarget.value as NotificationCadence,
@@ -361,7 +374,7 @@ export function EngagementNotificationSettings({
 										<select
 											className={styles.select}
 											value={value.push}
-											disabled={isPending || !prefs.pushEnabled}
+											disabled={isPending || pushBusy || !prefs.pushEnabled}
 											onChange={(event) =>
 												setCategory(category, {
 													push: event.currentTarget.value as "immediate" | "off",
@@ -377,7 +390,7 @@ export function EngagementNotificationSettings({
 										<select
 											className={styles.select}
 											value={value.inApp}
-											disabled={isPending || !prefs.inAppEnabled}
+											disabled={isPending || pushBusy || !prefs.inAppEnabled}
 											onChange={(event) =>
 												setCategory(category, {
 													inApp: event.currentTarget.value as "on" | "off",
@@ -407,7 +420,7 @@ export function EngagementNotificationSettings({
 								type="checkbox"
 								className={styles.checkbox}
 								checked={quiet.enabled}
-								disabled={isPending}
+								disabled={isPending || pushBusy}
 								onChange={(event) => setQuietHours({ enabled: event.currentTarget.checked })}
 								aria-label={t("quiet.label")}
 							/>
@@ -420,7 +433,7 @@ export function EngagementNotificationSettings({
 										type="time"
 										className={styles.timeInput}
 										value={minutesToTime(quiet.startMinute)}
-										disabled={isPending}
+										disabled={isPending || pushBusy}
 										onChange={(event) =>
 											setQuietHours({
 												enabled: true,
@@ -435,7 +448,7 @@ export function EngagementNotificationSettings({
 										type="time"
 										className={styles.timeInput}
 										value={minutesToTime(quiet.endMinute)}
-										disabled={isPending}
+										disabled={isPending || pushBusy}
 										onChange={(event) =>
 											setQuietHours({
 												enabled: true,

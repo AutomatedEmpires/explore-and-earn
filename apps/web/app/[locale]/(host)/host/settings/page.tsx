@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
+import { getTranslations } from "next-intl/server";
 import { getHostProfile } from "@explore-and-earn/db";
 
 import { HostSectionHeading } from "../../../../../components/host";
@@ -34,9 +35,10 @@ export default async function HostSettingsPage() {
     );
   }
 
-  const [hostProfile, engineSettings] = await Promise.all([
+  const [hostProfile, engineSettings, t] = await Promise.all([
     getHostProfile(token, userId),
     getEngineNotificationSettingsAction(),
+    getTranslations("Notifications.settings"),
   ]);
 
   return (
@@ -50,10 +52,7 @@ export default async function HostSettingsPage() {
         companyName={hostProfile?.companyName ?? ""}
         hostProfileId={hostProfile?.id ?? null}
       />
-      <HostSectionHeading
-        title="Notifications"
-        description="Choose how we reach you — channels, digests, and quiet hours."
-      />
+      <HostSectionHeading title={t("heading")} description={t("description")} />
       <EngagementNotificationSettings initial={engineSettings} />
     </section>
   );

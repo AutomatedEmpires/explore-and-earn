@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
+import { getTranslations } from "next-intl/server";
 
 import {
 	AppearanceControl,
@@ -33,9 +34,10 @@ async function resolveEmail(): Promise<string | null> {
 }
 
 export default async function SettingsPage() {
-	const [engineSettings, email] = await Promise.all([
+	const [engineSettings, email, t] = await Promise.all([
 		getEngineNotificationSettingsAction(),
 		resolveEmail(),
+		getTranslations("Notifications.settings"),
 	]);
 	const groups = buildAccountGroups(email);
 
@@ -46,10 +48,7 @@ export default async function SettingsPage() {
 		>
 			<div className={styles.stack}>
 				<section className={styles.section}>
-					<SectionHeading
-						title="Notifications"
-						description="Choose how we reach you — channels, digests, and quiet hours. Changes save the moment you make them."
-					/>
+					<SectionHeading title={t("heading")} description={t("description")} />
 					<EngagementNotificationSettings initial={engineSettings} />
 				</section>
 

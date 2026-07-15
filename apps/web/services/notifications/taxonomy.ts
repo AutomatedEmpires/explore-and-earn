@@ -228,9 +228,13 @@ export async function expandEvent(
 						? { type: "application", id: ctx.applicationId }
 						: undefined,
 					// Repeated back-and-forth status flips on one application
-					// collapse to the latest state rather than stacking.
+					// collapse to the latest state rather than stacking — EXCEPT
+					// an offer, which must never silently replace (and be masked
+					// by) an unread routine status notification.
 					collapseKey: ctx.applicationId
-						? `application_status:${ctx.applicationId}`
+						? type === "application_offered"
+							? `application_offered:${ctx.applicationId}`
+							: `application_status:${ctx.applicationId}`
 						: undefined,
 				}),
 			]

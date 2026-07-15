@@ -13,13 +13,13 @@ import {
 	getEnginePrefs,
 	getLegacySeekerEmailBooleans,
 	updateNotificationPrefs as updateLegacyPrefsQuery,
-	upsertEnginePrefs,
 } from "@explore-and-earn/db"
 
 import {
 	overlayLegacyEmailBooleans,
 	resolvePrefs,
 } from "../../services/notifications/prefs"
+import { upsertEnginePrefsSeeded } from "../../services/notifications/prefsWrite"
 import { reportError } from "../../lib/sentry"
 
 /**
@@ -106,7 +106,9 @@ export async function updateEngineMasterSwitchesAction(
 		if (typeof patch.pushEnabled === "boolean") clean.pushEnabled = patch.pushEnabled
 		if (typeof patch.inAppEnabled === "boolean") clean.inAppEnabled = patch.inAppEnabled
 		if (Object.keys(clean).length === 0) return { ok: false, error: "empty_patch" }
-		await upsertEnginePrefs(userId, clean)
+		// Seeded write: a first row must inherit the user's effective prefs
+		// (incl. legacy email opt-outs), never the raw column defaults.
+		await upsertEnginePrefsSeeded(userId, clean)
 		revalidatePath("/settings")
 		return { ok: true }
 	} catch (error) {
@@ -161,7 +163,7 @@ export async function updateEngineCategoryPrefAction(
 			push: push ?? map[category].push,
 			in_app: inApp ?? map[category].in_app,
 		}
-		await upsertEnginePrefs(userId, { categoryPrefs: map })
+		await upsertEnginePrefsSeeded(userId, { categoryPrefs: map })
 
 		// Mirror into the legacy boolean so the old store never disagrees about
 		// consent (best-effort: the seeker row may not exist for hosts).
@@ -221,14 +223,14 @@ export async function updateQuietHoursAction(
 			if (typeof patch.timezone !== "string" || !isValidTimezone(patch.timezone)) {
 				return { ok: false, error: "invalid_timezone" }
 			}
-			await upsertEnginePrefs(userId, {
+			await upsertEnginePrefsSeeded(userId, {
 				quietHoursEnabled: true,
 				quietStartMinute: patch.startMinute,
 				quietEndMinute: patch.endMinute,
 				timezone: patch.timezone,
 			})
 		} else {
-			await upsertEnginePrefs(userId, { quietHoursEnabled: false })
+			await upsertEnginePrefsSeeded(userId, { quietHoursEnabled: false })
 		}
 		revalidatePath("/settings")
 		return { ok: true }

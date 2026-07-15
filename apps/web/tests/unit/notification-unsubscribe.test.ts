@@ -109,9 +109,16 @@ describe("applyUnsubscribe", () => {
 		db.upsertEnginePrefs.mockResolvedValue(undefined);
 	});
 
-	it("'all' scope flips the email master switch off", async () => {
+	it("'all' scope flips the email master switch off (seeding the first row)", async () => {
 		await applyUnsubscribe("clerk_u1", "all");
-		expect(db.upsertEnginePrefs).toHaveBeenCalledWith("clerk_u1", { emailEnabled: false });
+		expect(db.upsertEnginePrefs).toHaveBeenCalledWith(
+			"clerk_u1",
+			expect.objectContaining({ emailEnabled: false }),
+		);
+		// First-row materialization seeds the full effective category map so a
+		// later email re-enable can't resurrect silently-defaulted categories.
+		const [, patch] = db.upsertEnginePrefs.mock.calls[0];
+		expect(patch.categoryPrefs).toBeDefined();
 	});
 
 	it("category scope turns off exactly that category's email", async () => {

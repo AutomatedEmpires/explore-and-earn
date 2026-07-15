@@ -4,10 +4,10 @@ import { auth } from "@clerk/nextjs/server"
 import {
 	deletePushSubscription,
 	getEnginePrefs,
-	upsertEnginePrefs,
 	upsertPushSubscription,
 } from "@explore-and-earn/db"
 
+import { upsertEnginePrefsSeeded } from "../../services/notifications/prefsWrite"
 import { reportError } from "../../lib/sentry"
 
 /**
@@ -64,8 +64,10 @@ export async function savePushSubscriptionAction(
 			timezone: input.timezone?.slice(0, 64) ?? null,
 			locale: input.locale?.slice(0, 16) ?? null,
 		})
-		// Subscribing IS the push opt-in: flip the master switch on.
-		await upsertEnginePrefs(userId, { pushEnabled: true })
+		// Subscribing IS the push opt-in: flip the master switch on. Seeded
+		// write: creating the user's first prefs row must not discard their
+		// legacy email opt-outs.
+		await upsertEnginePrefsSeeded(userId, { pushEnabled: true })
 		return { ok: true }
 	} catch (error) {
 		reportError(error, { action: "savePushSubscriptionAction" })
@@ -96,7 +98,7 @@ export async function disablePushAction(): Promise<{ ok: boolean; error?: string
 		if (!userId) return { ok: false, error: "unauthenticated" }
 		const existing = await getEnginePrefs(userId)
 		if (existing?.push_enabled !== false) {
-			await upsertEnginePrefs(userId, { pushEnabled: false })
+			await upsertEnginePrefsSeeded(userId, { pushEnabled: false })
 		}
 		return { ok: true }
 	} catch (error) {

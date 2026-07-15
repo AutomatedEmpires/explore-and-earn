@@ -116,6 +116,42 @@ export async function getDeliveryIdsByDedupKeys(
   return map;
 }
 
+/**
+ * ATOMIC digest-window claim: transitions the digest delivery row into
+ * 'processing' iff it is currently held ('deferred') or abandoned by a
+ * crashed run ('processing' with an expired lease). Exactly one concurrent
+ * digest run wins; the rest see zero affected rows and skip. This is the
+ * digest counterpart of claim_notification_deliveries.
+ */
+export async function claimDigestDelivery(
+  deliveryId: string,
+  leaseSeconds = 300,
+): Promise<boolean> {
+  const nowIso = new Date().toISOString();
+  const lease = new Date(Date.now() + leaseSeconds * 1000).toISOString();
+  // Try the 'deferred' hold first (the common case)…
+  const held = await admin()
+    .from("notification_deliveries")
+    .update({ status: "processing", lease_expires_at: lease, updated_at: nowIso })
+    .eq("id", deliveryId)
+    .eq("status", "deferred")
+    .select("id");
+  if (held.error) throw new Error(`claimDigestDelivery failed: ${held.error.message}`);
+  if ((held.data ?? []).length > 0) return true;
+  // …then crash recovery: an expired 'processing' lease is reclaimable.
+  const reclaimed = await admin()
+    .from("notification_deliveries")
+    .update({ status: "processing", lease_expires_at: lease, updated_at: nowIso })
+    .eq("id", deliveryId)
+    .eq("status", "processing")
+    .lt("lease_expires_at", nowIso)
+    .select("id");
+  if (reclaimed.error) {
+    throw new Error(`claimDigestDelivery failed: ${reclaimed.error.message}`);
+  }
+  return (reclaimed.data ?? []).length > 0;
+}
+
 /** One delivery's id+status by its dedup key (digest-run crash recovery). */
 export async function getDeliveryByDedupKey(
   dedupKey: string,
@@ -205,6 +241,12 @@ export async function settleDelivery(args: {
   readonly nextAttemptAt?: string;
   readonly collapsedIntoDeliveryId?: string;
   readonly deliveredAt?: string;
+  /**
+   * Explicit attempt-count correction. Deferrals (quiet hours, throttle)
+   * REFUND the claim's increment — attempt_count must count real send
+   * attempts, or long quiet hours would eat the retry budget.
+   */
+  readonly attemptCount?: number;
 }): Promise<void> {
   const patch: Record<string, unknown> = {
     status: args.status,
@@ -212,6 +254,9 @@ export async function settleDelivery(args: {
     lease_expires_at: null,
     updated_at: new Date().toISOString(),
   };
+  if (args.attemptCount !== undefined) {
+    patch.attempt_count = Math.max(0, args.attemptCount);
+  }
   if (args.providerMessageId !== undefined) patch.provider_message_id = args.providerMessageId;
   if (args.failureClass !== undefined) patch.failure_class = args.failureClass;
   if (args.failureDetail !== undefined) {
@@ -263,12 +308,15 @@ export async function findOpenCollapsibleDeliveries(args: {
 }): Promise<
   Array<{ readonly id: string; readonly dedup_key: string; readonly created_at: string }>
 > {
+  // 'processing' is included so two workers concurrently holding SIBLING
+  // deliveries in one collapse group can still see each other — the
+  // strictly-newer one survives, the older cancels itself.
   let query = admin()
     .from("notification_deliveries")
     .select("id, dedup_key, created_at")
     .eq("recipient_clerk_user_id", args.recipientClerkUserId)
     .eq("channel", args.channel)
-    .in("status", ["pending", "deferred", "failed_retryable"])
+    .in("status", ["pending", "deferred", "failed_retryable", "processing"])
     .eq("intent->>collapseKey", args.collapseKey);
   if (args.excludeDeliveryId) query = query.neq("id", args.excludeDeliveryId);
   const { data, error } = await query;
@@ -527,11 +575,14 @@ export async function suppressEmail(args: {
   readonly reason: "hard_bounce" | "complaint" | "manual" | "invalid";
   readonly source?: string;
 }): Promise<void> {
+  const email = args.email.trim().toLowerCase();
+  // Defense in depth behind the signed webhook: never store garbage rows.
+  if (email.length === 0 || email.length > 320 || !email.includes("@")) return;
   const { error } = await admin()
     .from("email_suppressions")
     .upsert(
       {
-        email: args.email.trim().toLowerCase(),
+        email,
         reason: args.reason,
         source: args.source ?? null,
       },

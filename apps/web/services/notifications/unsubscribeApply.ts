@@ -7,10 +7,10 @@ import {
 import {
 	getEnginePrefs,
 	getLegacySeekerEmailBooleans,
-	upsertEnginePrefs,
 } from "@explore-and-earn/db"
 
 import { overlayLegacyEmailBooleans, resolvePrefs } from "./prefs"
+import { upsertEnginePrefsSeeded } from "./prefsWrite"
 import type { UnsubscribeScope } from "./unsubscribe"
 
 /**
@@ -28,7 +28,10 @@ export async function applyUnsubscribe(
 	const existing = await getEnginePrefs(clerkUserId)
 
 	if (scope === "all") {
-		await upsertEnginePrefs(clerkUserId, { emailEnabled: false })
+		// Seeded write: even the master-switch opt-out must materialize the
+		// row from effective prefs so a later re-enable of email doesn't
+		// resurrect categories the user's legacy booleans had turned off.
+		await upsertEnginePrefsSeeded(clerkUserId, { emailEnabled: false })
 		return
 	}
 
@@ -49,5 +52,5 @@ export async function applyUnsubscribe(
 			in_app: prefs.inApp,
 		}
 	}
-	await upsertEnginePrefs(clerkUserId, { categoryPrefs })
+	await upsertEnginePrefsSeeded(clerkUserId, { categoryPrefs })
 }

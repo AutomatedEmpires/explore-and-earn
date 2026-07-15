@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
-import { processDueDeliveries } from "../../../../services/notifications/dispatcher";
+import { drainDueDeliveries } from "../../../../services/notifications/dispatcher";
 import {
   enqueueScheduledReminders,
   runDigests,
@@ -35,7 +35,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const reminders = await enqueueScheduledReminders(nowMs);
     const daily = await runDigests("daily", nowMs);
     const weekly = await runDigests("weekly", nowMs);
-    const delivery = await processDueDeliveries(nowMs);
+    const delivery = await drainDueDeliveries(nowMs);
     return NextResponse.json({ ok: true, reminders, daily, weekly, delivery });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";

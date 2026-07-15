@@ -104,29 +104,6 @@ export async function getEnabledSavedSearchesForAlerts(
   });
 }
 
-async function insertSavedSearchAlert(
-  job: SavedSearchAlertJob,
-  newCount: number,
-): Promise<void> {
-  if (!job.recipientClerkUserId) return;
-  const qs = savedSearchToQueryString(job.filters);
-  await db().from("notifications").insert({
-    recipient_user_id: null,
-    recipient_clerk_user_id: job.recipientClerkUserId,
-    category: "system",
-    priority: "informational",
-    channel: "in_app",
-    title:
-      newCount === 1
-        ? `1 new match for "${job.label}"`
-        : `${newCount} new matches for "${job.label}"`,
-    body: `New opportunities match your saved search "${job.label}". Take a look before they fill.`,
-    subject_type: "saved_search",
-    subject_id: job.savedSearchId,
-    action_url: qs ? `/seek?${qs}` : "/seek",
-  });
-}
-
 export interface SavedSearchAlertRunResult {
   readonly processed: number;
   readonly alerted: number;
@@ -147,14 +124,14 @@ export interface SavedSearchAlertBatch {
  * Process every enabled saved search: re-run it, alert on newly-published
  * matches, and advance the high-water mark. Best-effort per search.
  *
- * `deliver` (optional) replaces the legacy direct in-app insert — the web
- * layer passes the notification engine's enqueue so saved-search alerts get
- * preferences/quiet-hours/dedup across channels. Without it, the legacy
- * in-app insert keeps working (back-compat).
+ * `deliver` is REQUIRED: alerts go through the notification engine (the web
+ * cron passes its enqueue) so they always get preferences, quiet hours,
+ * localization and dedup. The old direct in-app insert (no dedupe key, no
+ * prefs, hardcoded English) was removed deliberately — do not resurrect it.
  */
 export async function runSavedSearchAlerts(
-  nowIso: string = new Date().toISOString(),
-  deliver?: (batch: SavedSearchAlertBatch) => Promise<void>,
+  nowIso: string,
+  deliver: (batch: SavedSearchAlertBatch) => Promise<void>,
 ): Promise<SavedSearchAlertRunResult> {
   const jobs = await getEnabledSavedSearchesForAlerts();
   let alerted = 0;
@@ -175,16 +152,12 @@ export async function runSavedSearchAlerts(
         .eq("id", job.savedSearchId);
 
       if (fresh.length > 0) {
-        if (deliver) {
-          await deliver({
-            job,
-            newCount: fresh.length,
-            floorIso: floor,
-            queryString: savedSearchToQueryString(job.filters),
-          });
-        } else {
-          await insertSavedSearchAlert(job, fresh.length);
-        }
+        await deliver({
+          job,
+          newCount: fresh.length,
+          floorIso: floor,
+          queryString: savedSearchToQueryString(job.filters),
+        });
         alerted += 1;
         listingsMatched += fresh.length;
       }

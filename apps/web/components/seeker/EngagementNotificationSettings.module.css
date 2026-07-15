@@ -42,9 +42,10 @@
 
 .rowHead {
 	display: flex;
-	align-items: flex-start;
+	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-12);
+	min-height: var(--tap-min);
 }
 
 .text {

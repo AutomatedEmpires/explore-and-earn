@@ -54,7 +54,9 @@ create table if not exists public.notification_deliveries (
   -- saved-search inventory) and re-checked against that state immediately
   -- before send — plus the digest envelope itself (whose member events are
   -- each individually event-anchored via digest_memberships.event_id).
-  event_id                  uuid        references public.events(id) on delete cascade,
+  -- RESTRICT: the delivery LEDGER must never be silently cascade-deleted —
+  -- any future events-purge path has to handle this table explicitly.
+  event_id                  uuid        references public.events(id) on delete restrict,
   recipient_clerk_user_id   text        not null,
   channel                   text        not null check (channel in ('in_app', 'email', 'push')),
   -- Category mirrors the settings model (see contracts NOTIFICATION_CATEGORIES).
@@ -115,6 +117,15 @@ create index if not exists idx_notif_deliveries_event
 --   * per-recipient throttling window + history;
 create index if not exists idx_notif_deliveries_recipient_created
   on public.notification_deliveries (recipient_clerk_user_id, created_at desc);
+--   * throttle window (delivered outbound per recipient per hour);
+create index if not exists idx_notif_deliveries_recipient_delivered
+  on public.notification_deliveries (recipient_clerk_user_id, delivered_at)
+  where status = 'delivered';
+--   * burst-collapse lookup (open siblings in one collapse group);
+create index if not exists idx_notif_deliveries_collapse
+  on public.notification_deliveries
+    (recipient_clerk_user_id, channel, (intent->>'collapseKey'))
+  where status in ('pending', 'deferred', 'failed_retryable', 'processing');
 --   * lease recovery sweep;
 create index if not exists idx_notif_deliveries_processing_lease
   on public.notification_deliveries (lease_expires_at)
@@ -135,6 +146,22 @@ create or replace function public.claim_notification_deliveries(
 language plpgsql
 as $$
 begin
+  -- Crash-loop bound: a row whose worker repeatedly dies AFTER a successful
+  -- send but BEFORE settling never reaches the failure path's attempt budget
+  -- (it keeps being reclaimed on lease expiry). Rows that have burned the
+  -- whole attempt budget while stuck in 'processing' are dead-lettered here
+  -- instead of being re-sent forever.
+  update public.notification_deliveries d
+     set status = 'dead_letter',
+         failure_class = 'terminal',
+         failure_detail = 'lease repeatedly expired past the attempt budget',
+         worker_id = null,
+         lease_expires_at = null,
+         updated_at = now()
+   where d.status = 'processing'
+     and d.lease_expires_at < now()
+     and d.attempt_count >= 6;
+
   return query
   with claimable as (
     select d.id
@@ -151,7 +178,7 @@ begin
   update public.notification_deliveries d
      set status = 'processing',
          worker_id = p_worker_id,
-         lease_expires_at = now() + make_interval(secs => greatest(30, p_lease_seconds)),
+         lease_expires_at = now() + make_interval(secs => greatest(30, least(p_lease_seconds, 3600))),
          attempt_count = d.attempt_count + 1,
          updated_at = now()
     from claimable
@@ -177,6 +204,13 @@ create table if not exists public.notification_processed_events (
 
 alter table public.notification_processed_events enable row level security;
 -- Service-role only.
+
+-- Composite index serving the unprocessed-feed's (occurred_at, id) ordering.
+-- events is still small (first writers landed with the sourcing engine), so
+-- a plain CREATE INDEX here is cheap; if events grows unboundedly, replace
+-- the anti-join below with a watermark cursor.
+create index if not exists idx_events_occurred_at_id
+  on public.events (occurred_at, id);
 
 -- Unprocessed-event feed for the dispatcher: oldest-first events the taxonomy
 -- has not yet expanded. Anti-join via the watermark table; bounded.
@@ -266,8 +300,10 @@ create table if not exists public.digest_memberships (
   constraint digest_memberships_unique unique (recipient_clerk_user_id, cadence, event_id)
 );
 
+-- Matches the actual due-queue read: WHERE cadence=? AND status='queued'
+-- ORDER BY created_at (grouping by recipient happens in the app).
 create index if not exists idx_digest_memberships_due
-  on public.digest_memberships (recipient_clerk_user_id, cadence, status)
+  on public.digest_memberships (cadence, status, created_at)
   where status = 'queued';
 
 alter table public.digest_memberships enable row level security;
@@ -321,6 +357,10 @@ create policy notification_engine_prefs_select_own on public.notification_engine
 -- additive: every existing row stays valid and existing writers are
 -- unaffected. Mirrors contracts enums.ts NOTIFICATION_CATEGORY.
 
+-- NOT VALID + VALIDATE: adding a plain CHECK would re-validate every existing
+-- row under an ACCESS EXCLUSIVE lock on the live notifications table.
+-- NOT VALID makes the swap instant; VALIDATE then only takes SHARE UPDATE
+-- EXCLUSIVE (concurrent reads/writes unblocked) while proving the superset.
 alter table public.notifications
   drop constraint if exists notifications_category_check;
 alter table public.notifications
@@ -329,6 +369,8 @@ alter table public.notifications
       'applications', 'offers', 'invites', 'matches', 'messages', 'billing',
       'safety', 'community', 'scheduling', 'verification', 'refunds', 'system'
     )
-  );
+  ) not valid;
+alter table public.notifications
+  validate constraint notifications_category_check;
 
 commit;

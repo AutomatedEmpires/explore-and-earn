@@ -64,8 +64,8 @@
 				"body": "The host is reviewing your application to {listingTitle}."
 			},
 			"application_shortlisted": {
-				"title": "A host saved your profile",
-				"body": "The host saved your application to {listingTitle} — a good sign they're interested."
+				"title": "A host saved your application",
+				"body": "The host saved your application to {listingTitle} to review further."
 			},
 			"application_offered": {
 				"title": "You received an offer",
@@ -81,7 +81,7 @@
 			},
 			"new_strong_match": {
 				"title": "New strong match",
-				"body": "{listingTitle} strongly matches your profile. Take a look before it fills."
+				"body": "{listingTitle} strongly matches your profile."
 			},
 			"saved_search_results": {
 				"title": "{count, plural, one {1 new match for \"{searchLabel}\"} other {# new matches for \"{searchLabel}\"}}",
@@ -97,7 +97,7 @@
 			},
 			"offer_expiring": {
 				"title": "Your offer expires soon",
-				"body": "Your offer for {listingTitle} expires in about {hoursLeft, plural, one {# hour} other {# hours}}. Respond before it lapses."
+				"body": "Your offer for {listingTitle} expires within {hoursLeft, plural, one {# hour} other {# hours}}. Respond before it lapses."
 			},
 			"message_received": {
 				"title": "New message",
@@ -109,7 +109,7 @@
 			},
 			"listing_expiring": {
 				"title": "Your listing expires soon",
-				"body": "{listingTitle} expires in {daysLeft, plural, one {# day} other {# days}}. Extend or refresh it to stay visible."
+				"body": "{listingTitle} expires within {daysLeft, plural, one {# day} other {# days}}. Extend or refresh it to stay visible."
 			},
 			"resume_nudge": {
 				"title": "Finish your résumé to start applying",

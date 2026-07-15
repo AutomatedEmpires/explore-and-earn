@@ -5,8 +5,8 @@ import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
 import { runSavedSearchAlerts } from "@explore-and-earn/db";
 
 import {
+  drainDueDeliveries,
   enqueueScheduleDerived,
-  processDueDeliveries,
 } from "../../../../services/notifications/dispatcher";
 
 // Alert sweep must always run fresh (never statically cached).
@@ -56,8 +56,9 @@ export async function GET(request: Request): Promise<NextResponse> {
       ]);
     });
 
-    // Push the freshly enqueued alerts out in the same run.
-    const delivery = await processDueDeliveries(Date.now());
+    // Drain the freshly enqueued alerts in this run (batched until empty;
+    // anything past the drain cap is picked up by the 5-min dispatch cron).
+    const delivery = await drainDueDeliveries(Date.now());
     return NextResponse.json({ ok: true, ...result, delivery });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";

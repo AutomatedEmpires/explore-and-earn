@@ -351,6 +351,20 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 
 	for (const delivery of claimed) {
 		try {
+			// Digest envelope rows are sent by the digest run's own atomic claim,
+			// never by this loop — if one is ever claimed here (e.g. after a
+			// digest-run crash mutated its next_attempt), put it back on hold.
+			if (delivery.notification_type === "digest") {
+				await settleDelivery({
+					id: delivery.id,
+					status: "deferred",
+					nextAttemptAt: DIGEST_HOLD_ISO,
+					attemptCount: delivery.attempt_count - 1,
+				})
+				stats.deferred += 1
+				continue
+			}
+
 			const intent = delivery.intent
 			if (!isValidIntent(intent)) {
 				await settleDelivery({
@@ -375,7 +389,27 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 				continue
 			}
 
-			// 2. Burst collapse: a NEWER open delivery with the same collapse key
+			// 2. CONSENT RE-CHECK at send time: channels were planned at
+			// materialization, but deferred/retried rows can sit for hours —
+			// if the user has since turned this channel/category off, honor
+			// it NOW. (Digest members get the same re-check in the digest run.)
+			const consentCtx = recipients.get(delivery.recipient_clerk_user_id)
+			if (consentCtx) {
+				const stillPlanned = planChannels(intent, consentCtx.prefs).some(
+					(plan) => plan.channel === delivery.channel,
+				)
+				if (!stillPlanned) {
+					await settleDelivery({
+						id: delivery.id,
+						status: "suppressed",
+						suppressionReason: "preference withdrawn before send",
+					})
+					stats.suppressed += 1
+					continue
+				}
+			}
+
+			// 3. Burst collapse: a NEWER open delivery with the same collapse key
 			// supersedes this one (latest state wins; the ledger records why).
 			if (intent.collapseKey) {
 				const open = await findOpenCollapsibleDeliveries({
@@ -410,6 +444,9 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 							id: delivery.id,
 							status: "deferred",
 							nextAttemptAt: new Date(quiet.resumeAtMs).toISOString(),
+							// No send was attempted — refund the claim's increment so
+							// quiet hours never eat the retry budget.
+							attemptCount: delivery.attempt_count - 1,
 						})
 						stats.deferred += 1
 						continue
@@ -428,6 +465,7 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 							id: delivery.id,
 							status: "deferred",
 							nextAttemptAt: new Date(nowMs + THROTTLE_DEFER_MS).toISOString(),
+							attemptCount: delivery.attempt_count - 1,
 						})
 						stats.deferred += 1
 						continue
@@ -473,13 +511,42 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 	return stats
 }
 
+/**
+ * Drain due deliveries: keep claiming batches until the eligible queue is
+ * empty (bounded by maxBatches — the sweeper cron picks up any tail).
+ */
+export async function drainDueDeliveries(
+	nowMs: number,
+	maxBatches = 20,
+): Promise<DeliveryStats> {
+	const total: {
+		claimed: number
+		delivered: number
+		deferred: number
+		cancelled: number
+		suppressed: number
+		failed: number
+	} = { claimed: 0, delivered: 0, deferred: 0, cancelled: 0, suppressed: 0, failed: 0 }
+	for (let i = 0; i < maxBatches; i += 1) {
+		const stats = await processDueDeliveries(nowMs)
+		total.claimed += stats.claimed
+		total.delivered += stats.delivered
+		total.deferred += stats.deferred
+		total.cancelled += stats.cancelled
+		total.suppressed += stats.suppressed
+		total.failed += stats.failed
+		if (stats.claimed < CLAIM_BATCH) break
+	}
+	return total
+}
+
 /** One full dispatcher pass: expansion then delivery. Safe to run concurrently. */
 export async function runDispatchOnce(): Promise<{
 	expansion: ExpansionStats
 	delivery: DeliveryStats
 }> {
 	const expansion = await expandPendingEvents()
-	const delivery = await processDueDeliveries(Date.now())
+	const delivery = await drainDueDeliveries(Date.now())
 	return { expansion, delivery }
 }
 
