@@ -51,3 +51,7 @@ export * from "./queries/refunds";
 export * from "./queries/seekerBadges";
 export * from "./queries/community";
 export * from "./queries/communityViews";
+export * from "./queries/events";
+export * from "./queries/sourcingRollups";
+export * from "./lib/sourceIngestion";
+export * from "./queries/sourcedListings";
