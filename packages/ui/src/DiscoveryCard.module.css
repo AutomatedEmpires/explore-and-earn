@@ -730,6 +730,34 @@ button.benefit:focus-visible {
     var(--palette-surface) 100%);
 }
 
+/* Sourced disclosure band — first row of the body on a sourced listing.
+   Full-width, honest, unmissable; a neutral info tone (never a verified/gold
+   or alarm color). Tokens only. */
+.sourcedRibbon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-8);
+  border-radius: var(--radius-input);
+  border: 1px solid color-mix(in srgb, var(--palette-sky) 32%, var(--palette-line));
+  background: color-mix(in srgb, var(--palette-sky-light) 55%, var(--palette-surface));
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+}
+.sourcedRibbon svg { color: var(--palette-sky); flex-shrink: 0; }
+
+/* Not stated (sourced listings) — NEUTRAL, never the red "not included" tone.
+   Absence of information is not evidence the benefit is unavailable. */
+.benefitNotStated {
+  border-color: var(--palette-line);
+  background: var(--palette-surface);
+}
+.benefitNotStated .benefitLabel { color: var(--text-secondary); }
+.benefitNotStated .benefitHead { color: var(--palette-ink-muted); }
+
 .benefitHead {
   display: inline-flex;
   align-items: center;

@@ -271,6 +271,9 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 	const mealsIncluded = provided(f.benefits.meals.provision);
 	const enrich = DETAIL_ENRICHMENT_BY_CATEGORY[f.category];
 	const gallery = GALLERY_BY_CATEGORY[f.category];
+	// A sourced fixture has NO host block (structural) — mirror the real
+	// getListingDetailPublic behavior so the preview journey matches production.
+	const isSourced = f.provenanceInfo?.provenance === "sourced";
 	return {
 		id: f.id,
 		title: f.title,
@@ -294,21 +297,26 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 		coverPhotoUrl: f.coverImageUrl ?? null,
 		galleryPhotoUrls: gallery ? [...gallery] : [],
 		hostProfileId: null,
-		host: {
-			// Fixture hosts have no public profile row — the empty id tells
-			// host-link renderers to skip the link.
-			id: "",
-			companyName: f.host.name,
-			photoUrl: null,
-			about: f.host.tagline ?? null,
-			primaryLocationName: f.location,
-			verified: f.host.verified === true,
-		},
+		host: isSourced
+			? null
+			: {
+					// Fixture hosts have no public profile row — the empty id tells
+					// host-link renderers to skip the link.
+					id: "",
+					companyName: f.host.name,
+					photoUrl: null,
+					about: f.host.tagline ?? null,
+					primaryLocationName: f.location,
+					verified: f.host.verified === true,
+				},
+		provenanceInfo: f.provenanceInfo,
 
 		// ── Immersive detail sample content (dev/preview only) ──
-		responsibilities: enrich ? [...enrich.responsibilities] : undefined,
-		requirements: enrich ? [...enrich.requirements] : undefined,
-		perks: enrich ? [...enrich.perks] : undefined,
+		// A sourced listing has none of this rich host-authored narrative — the
+		// source stated only the basics. Keep it empty so the preview is honest.
+		responsibilities: !isSourced && enrich ? [...enrich.responsibilities] : undefined,
+		requirements: !isSourced && enrich ? [...enrich.requirements] : undefined,
+		perks: !isSourced && enrich ? [...enrich.perks] : undefined,
 		// Reuse the listing's real benefit summary first; fall back to the richer
 		// per-category descriptor so the "deal, upfront" section reads fully in
 		// dev. Only present when the benefit is actually provided.
@@ -320,9 +328,9 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 			mealsIncluded && enrich
 				? f.benefits.meals.summary ?? enrich.mealsDescription
 				: undefined,
-		whyWorkForUs: enrich ? enrich.whyWorkForUs : undefined,
-		team: enrich ? enrich.team.map((member) => ({ ...member })) : undefined,
-		activities: enrich ? [...enrich.activities] : undefined,
-		hostPerks: enrich ? [...enrich.hostPerks] : undefined,
+		whyWorkForUs: !isSourced && enrich ? enrich.whyWorkForUs : undefined,
+		team: !isSourced && enrich ? enrich.team.map((member) => ({ ...member })) : undefined,
+		activities: !isSourced && enrich ? [...enrich.activities] : undefined,
+		hostPerks: !isSourced && enrich ? [...enrich.hostPerks] : undefined,
 	};
 }

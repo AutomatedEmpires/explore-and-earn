@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Icon } from "@explore-and-earn/ui";
+import type { BenefitEvidenceStatus } from "@explore-and-earn/contracts";
 
 import { ListingSection } from "./ListingSection";
 import styles from "./DealUpfront.module.css";
@@ -14,8 +15,23 @@ export interface DealUpfrontProps {
   readonly mealsDescription: string | null;
   /** Already-formatted pay summary, e.g. "$18/hr" or "See listing". */
   readonly paySummary: string;
+  /**
+   * Per-benefit evidence (sourced listings). When a benefit is 'not_stated'
+   * the cell reads "Not stated" — the source didn't say, so we never present
+   * it as "Not included". Omitted → host-confirmed listing (unchanged).
+   */
+  readonly evidence?: {
+    readonly housing: BenefitEvidenceStatus;
+    readonly meals: BenefitEvidenceStatus;
+    readonly pay: BenefitEvidenceStatus;
+  };
   /** TrueValue ("what you'll save") slot, rendered inside the section. */
   readonly children?: ReactNode;
+}
+
+function benefitCellValue(included: boolean, evidence: BenefitEvidenceStatus | undefined): string {
+  if (evidence === "not_stated") return "Not stated";
+  return included ? "Included" : "Not included";
 }
 
 /**
@@ -30,8 +46,10 @@ export function DealUpfront({
   housingDescription,
   mealsDescription,
   paySummary,
+  evidence,
   children,
 }: DealUpfrontProps) {
+  const payNotStated = evidence?.pay === "not_stated";
   return (
     <ListingSection
       title="The deal, upfront"
@@ -46,7 +64,7 @@ export function DealUpfront({
             <span className={styles.cellLabel}>Housing</span>
           </div>
           <div className={styles.cellValue}>
-            {housingIncluded ? "Included" : "Not included"}
+            {benefitCellValue(housingIncluded, evidence?.housing)}
           </div>
           {housingIncluded && housingDescription ? (
             <p className={styles.cellDesc}>{housingDescription}</p>
@@ -59,7 +77,7 @@ export function DealUpfront({
             <span className={styles.cellLabel}>Meals</span>
           </div>
           <div className={styles.cellValue}>
-            {mealsIncluded ? "Included" : "Not included"}
+            {benefitCellValue(mealsIncluded, evidence?.meals)}
           </div>
           {mealsIncluded && mealsDescription ? (
             <p className={styles.cellDesc}>{mealsDescription}</p>
@@ -71,7 +89,7 @@ export function DealUpfront({
             <Icon name="benefit.pay" size={16} aria-hidden />
             <span className={styles.cellLabel}>Pay</span>
           </div>
-          <div className={styles.cellValue}>{paySummary}</div>
+          <div className={styles.cellValue}>{payNotStated ? "Not stated" : paySummary}</div>
         </div>
       </div>
 

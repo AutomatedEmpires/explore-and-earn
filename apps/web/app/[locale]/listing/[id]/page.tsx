@@ -17,6 +17,7 @@ import {
 } from "../../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
 import { HostSummaryBlock } from "../../../../components/listing/HostSummaryBlock";
+import { SourcedNotice } from "../../../../components/listing/SourcedNotice";
 import { TrueValue } from "../../../../components/listing/TrueValue";
 import { ListingHero } from "../../../../components/listing/ListingHero";
 import { ListingGallery } from "../../../../components/listing/ListingGallery";
@@ -243,7 +244,11 @@ export default async function ListingDetailPage({ params }: Props) {
     new Set([...(listing.perks ?? []), ...(listing.hostPerks ?? [])]),
   );
 
-  const jsonLd = generateJobPostingJsonLd(listing, listing.host, baseUrl);
+  // A sourced listing is unconfirmed inventory: it must NOT emit a JobPosting
+  // (that structured type asserts a real hiring org + confirmed facts we don't
+  // have) and its host block is structurally absent from the data anyway.
+  const isSourced = listing.provenanceInfo?.provenance === "sourced";
+  const jsonLd = isSourced ? null : generateJobPostingJsonLd(listing, listing.host, baseUrl);
   const breadcrumbJsonLd = generateBreadcrumbJsonLd([
     { name: "Explore & Earn", url: baseUrl },
     ...(listing.host && listing.host.id
@@ -286,6 +291,10 @@ export default async function ListingDetailPage({ params }: Props) {
         <ListingGallery title={listing.title} photoUrls={listing.galleryPhotoUrls} />
 
         <div className={styles.content}>
+          {/* Sourced disclosure — first, before any listing content. Renders
+              only for sourced listings; verified listings are unaffected. */}
+          <SourcedNotice listingId={listing.id} provenance={listing.provenanceInfo} />
+
           {/* 3. At a glance */}
           <ListingGlance items={glanceItems} />
 
@@ -299,12 +308,18 @@ export default async function ListingDetailPage({ params }: Props) {
             housingDescription={listing.housingDescription ?? null}
             mealsDescription={listing.mealsDescription ?? null}
             paySummary={paySummary}
+            evidence={listing.provenanceInfo?.benefitEvidence}
           >
+            {/* TrueValue's "what you'll save" math only makes sense for
+                confirmed/stated benefits — omit it for sourced listings so we
+                never compute savings off unstated data. */}
+            {!isSourced && (
             <TrueValue
               housingIncluded={listing.housingIncluded}
               mealsIncluded={listing.mealsIncluded}
               paySummary={paySummary}
             />
+            )}
           </DealUpfront>
 
           {/* 6. About this position */}

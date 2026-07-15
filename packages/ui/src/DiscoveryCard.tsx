@@ -1,9 +1,11 @@
 import type { CSSProperties, ReactNode } from "react"
 
 import type {
+	BenefitEvidenceStatus,
 	BenefitProvision,
 	DiscoveryCardConditionalBadge,
 	DiscoveryCardSurface,
+	ListingProvenance,
 	MarketplaceCategory,
 	OpportunityTriad,
 } from "@explore-and-earn/contracts"
@@ -58,6 +60,20 @@ export interface DiscoveryCardData {
 		readonly pay: BenefitProvision
 	}
 	readonly housingOccupancy?: "solo" | "shared"
+	/**
+	 * Listing provenance (contracts/provenance.ts). Absent/"verified" = a
+	 * host-confirmed listing (all existing behavior). "sourced" = a real,
+	 * attributable public posting Explore & Earn has NOT confirmed: the card
+	 * renders the sourced disclosure, labels the badge "SOURCE" not a verified
+	 * host, and shows benefits by their evidence (not_stated ≠ not provided).
+	 */
+	readonly provenance?: ListingProvenance
+	/** Per-benefit evidence; drives not_stated vs not-provided rendering. */
+	readonly benefitEvidence?: {
+		readonly housing: BenefitEvidenceStatus
+		readonly meals: BenefitEvidenceStatus
+		readonly pay: BenefitEvidenceStatus
+	}
 	readonly fillPercent?: number
 	/** Top skills shown in place of H/M/P on host_applicant_review surface (max 3) */
 	readonly skills?: readonly string[]
@@ -184,25 +200,34 @@ const SECONDARY_TONE_CLASS: Record<SecondaryTone, string> = {
 function BenefitTriadCell({
 	kind,
 	provided,
+	notStated,
 	value,
 	onClick,
 }: {
 	readonly kind: "housing" | "meals" | "pay"
 	readonly provided?: boolean
+	/**
+	 * The source did not state this benefit (sourced listings only). Renders a
+	 * NEUTRAL "Not stated" cell — never the red "not included" tone. Absence of
+	 * information is not evidence the benefit is unavailable (product law).
+	 */
+	readonly notStated?: boolean
 	readonly value: string
 	readonly onClick?: () => void
 }) {
 	const isPay = kind === "pay"
 	const stateClass = isPay
 		? styles.benefitPay
-		: provided
-			? styles.benefitProvided
-			: styles.benefitNot
+		: notStated
+			? styles.benefitNotStated
+			: provided
+				? styles.benefitProvided
+				: styles.benefitNot
 	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
 	// Housing/Meals carry NO icon and NO checkmark on the card — just the label on
-	// a COLOR-CODED cell (green = included, red = not); the detail lives in the
-	// popup. Pay shows the rate. Compact, single tier. aria still states the state.
-	const stateText = isPay ? "" : provided ? "included" : "not included"
+	// a COLOR-CODED cell (green = included, red = not, neutral = not stated); the
+	// detail lives in the popup. Pay shows the rate. aria still states the state.
+	const stateText = isPay ? "" : notStated ? "not stated" : provided ? "included" : "not included"
 	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
 
 	const inner = isPay ? (
@@ -211,7 +236,7 @@ function BenefitTriadCell({
 			<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{value}</span>
 		</>
 	) : (
-		<span className={styles.benefitLabel}>{label}</span>
+		<span className={styles.benefitLabel}>{notStated ? "Not stated" : label}</span>
 	)
 
 	return onClick ? (
@@ -258,13 +283,17 @@ export function DiscoveryCard({
 	// a row of em-dashes).
 	const hasLocation = Boolean(data.location) && data.location !== "Location not specified"
 	const hasDates    = Boolean(data.begins || data.ends)
-	const verified = data.verifiedHost === true
+	// A sourced listing is real-but-unconfirmed inventory: NEVER verified, the
+	// circle reads SOURCE (not a host), and the sourced disclosure always shows.
+	const isSourced = data.provenance === "sourced"
+	const verified = !isSourced && data.verifiedHost === true
+	const ev = data.benefitEvidence
 	const isDisabled            = variant === "disabled"
 	const isApplicantReview     = surface === "host_applicant_review"
 	const isAdminReview         = surface === "admin_review"
 	const isDiscoveryFeed       = surface === "discovery_feed"
 	const isSeekerSurface       = isApplicantReview  // alias kept for CTA compat
-	const circleLabel           = isApplicantReview ? "SEEKER" : "HOST"
+	const circleLabel           = isApplicantReview ? "SEEKER" : isSourced ? "SOURCE" : "HOST"
 
 	const hp = data.benefitProvision?.housing
 	const mp = data.benefitProvision?.meals
@@ -457,9 +486,10 @@ export function DiscoveryCard({
 						)}
 					</button>
 
-					{/* Verified check — EVERY host gets it on listing surfaces (founder:
-					    "host always verified"); never shown on seeker applicant cards. */}
-					{!isApplicantReview ? (
+					{/* Verified check — host listing surfaces only. NEVER on a seeker
+					    applicant card, and NEVER on a sourced listing (unconfirmed
+					    inventory must not present as Explore & Earn-verified). */}
+					{!isApplicantReview && !isSourced ? (
 						<span className={styles.verifiedDot} aria-label="Verified Host">
 							<Icon name="trust.verified_host" size={16} aria-hidden />
 						</span>
@@ -556,18 +586,37 @@ export function DiscoveryCard({
 			{/* ── INFO ROWS ── */}
 			<div className={styles.body}>
 
-				{/* 2. HOST NAME — icon + name (icon in every field) */}
-				{titleHandler ? (
-					<button type="button" className={`${styles.metaRow} ${styles.hostRow}`} onClick={titleHandler}>
-						<Icon name={isApplicantReview ? "nav.profile" : "trust.verified_host"} size={18} aria-hidden />
-						<span className={styles.hostName}>{data.hostName}</span>
-					</button>
-				) : (
-					<div className={`${styles.metaRow} ${styles.hostRow}`}>
-						<Icon name={isApplicantReview ? "nav.profile" : "trust.verified_host"} size={18} aria-hidden />
-						<span className={styles.hostName}>{data.hostName}</span>
+				{/* Sourced disclosure — the FIRST thing in the body, full-width and
+				    unmissable. Never softened: this listing is real and attributable
+				    but NOT confirmed by Explore & Earn (no host, no verified badge). */}
+				{isSourced ? (
+					<div className={styles.sourcedRibbon}>
+						<Icon name="system.info" size={14} aria-hidden />
+						<span>Sourced · not yet confirmed by Explore &amp; Earn</span>
 					</div>
-				)}
+				) : null}
+
+				{/* 2. HOST NAME — icon + name (icon in every field) */}
+				{(() => {
+					// Sourced listings carry NO verified-host glyph on the name row —
+					// the employer name is source-stated, not a verified host.
+					const hostIcon = isApplicantReview
+						? "nav.profile"
+						: isSourced
+							? "nav.hosts"
+							: "trust.verified_host"
+					return titleHandler ? (
+						<button type="button" className={`${styles.metaRow} ${styles.hostRow}`} onClick={titleHandler}>
+							<Icon name={hostIcon} size={18} aria-hidden />
+							<span className={styles.hostName}>{data.hostName}</span>
+						</button>
+					) : (
+						<div className={`${styles.metaRow} ${styles.hostRow}`}>
+							<Icon name={hostIcon} size={18} aria-hidden />
+							<span className={styles.hostName}>{data.hostName}</span>
+						</div>
+					)
+				})()}
 
 				{/* 3. JOB TITLE — the card's single dominant text element */}
 				{onOpen ? (
@@ -640,12 +689,14 @@ export function DiscoveryCard({
 						<BenefitTriadCell
 							kind="housing"
 							provided={hp !== "not_provided"}
+							notStated={ev?.housing === "not_stated"}
 							value={data.triad.housing}
 							onClick={canOpenHousing ? () => onHousingClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="meals"
 							provided={mp !== "not_provided"}
+							notStated={ev?.meals === "not_stated"}
 							value={data.triad.meals}
 							onClick={canOpenMeals ? () => onMealsClick!(data.id) : undefined}
 						/>
