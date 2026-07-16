@@ -101,22 +101,147 @@ export async function getMyListingClaims(
   return ((data ?? []) as Array<Record<string, unknown>>).map(rowToClaim);
 }
 
+/** One admin-review row: the claim plus the claimed listing's title. */
+export type ListingClaimReviewRow = ListingClaimRecord & {
+  readonly claimantClerkUserId: string;
+  readonly authorityEvidence: unknown;
+  readonly listingTitle: string;
+};
+
+function rowToReviewClaim(row: Record<string, unknown>): ListingClaimReviewRow {
+  const listing = row.listings as { title?: unknown } | null;
+  return {
+    ...rowToClaim(row),
+    claimantClerkUserId: String(row.claimant_clerk_user_id),
+    authorityEvidence: row.authority_evidence,
+    listingTitle: typeof listing?.title === "string" ? listing.title : "",
+  };
+}
+
+const REVIEW_SELECT = `${CLAIM_SELECT}, claimant_clerk_user_id, authority_evidence, listings ( title )`;
+
 /** Admin review queue: claims awaiting a decision. */
-export async function getClaimsAwaitingReview(limit = 50): Promise<
-  Array<ListingClaimRecord & { claimantClerkUserId: string; authorityEvidence: unknown }>
-> {
+export async function getClaimsAwaitingReview(limit = 50): Promise<ListingClaimReviewRow[]> {
   const { data, error } = await db()
     .from("listing_claims")
-    .select(`${CLAIM_SELECT}, claimant_clerk_user_id, authority_evidence`)
+    .select(REVIEW_SELECT)
     .in("status", ["requires_review", "verification_pending"])
     .order("created_at", { ascending: true })
     .limit(limit);
   if (error) throw new Error(`getClaimsAwaitingReview: ${error.message}`);
-  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
-    ...rowToClaim(row),
+  return ((data ?? []) as Array<Record<string, unknown>>).map(rowToReviewClaim);
+}
+
+/** Admin audit trail: the most recently decided claims (any terminal-ish state). */
+export async function getRecentlyDecidedClaims(limit = 20): Promise<ListingClaimReviewRow[]> {
+  const { data, error } = await db()
+    .from("listing_claims")
+    .select(REVIEW_SELECT)
+    .in("status", ["approved", "confirming", "converted", "rejected", "revoked"])
+    .order("decided_at", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) throw new Error(`getRecentlyDecidedClaims: ${error.message}`);
+  return ((data ?? []) as Array<Record<string, unknown>>).map(rowToReviewClaim);
+}
+
+/**
+ * Service-role claim context for the notification taxonomy and the review
+ * actions: who claimed, on which listing, with which (if any) host profile.
+ * Read-only; the claimant clerk id stays server-side (events/properties never
+ * carry it — see packages/db/src/queries/events.ts privacy law).
+ */
+export async function adminClaimContext(claimId: string): Promise<{
+  readonly claimantClerkUserId: string;
+  readonly listingId: string;
+  readonly hostProfileId: string | null;
+  readonly status: ListingClaimStatus;
+} | null> {
+  const { data, error } = await db()
+    .from("listing_claims")
+    .select("claimant_clerk_user_id, listing_id, host_profile_id, status")
+    .eq("id", claimId)
+    .maybeSingle();
+  if (error) throw new Error(`adminClaimContext: ${error.message}`);
+  if (!data) return null;
+  const row = data as Record<string, unknown>;
+  return {
     claimantClerkUserId: String(row.claimant_clerk_user_id),
-    authorityEvidence: row.authority_evidence,
-  }));
+    listingId: String(row.listing_id),
+    hostProfileId: typeof row.host_profile_id === "string" ? row.host_profile_id : null,
+    status: row.status as ListingClaimStatus,
+  };
+}
+
+/**
+ * Every sourced value the confirmation form must SHOW the employer — exactly
+ * the field set convert_claimed_listing/sanitizeConfirmed accept, plus the
+ * triad evidence so 'not_stated' renders as "Not stated" (never as a no).
+ */
+export interface ClaimConfirmationFields {
+  readonly title: string;
+  readonly description: string | null;
+  readonly locationDisplay: string | null;
+  readonly housingIncluded: boolean;
+  readonly housingDescription: string | null;
+  readonly mealsIncluded: boolean;
+  readonly mealsDescription: string | null;
+  readonly compensationMinCents: number | null;
+  readonly compensationMaxCents: number | null;
+  readonly compensationUnit: string | null;
+  readonly compensationSummary: string | null;
+  readonly beginsAt: string | null;
+  readonly endsAt: string | null;
+  readonly housingEvidence: string;
+  readonly mealsEvidence: string;
+  readonly payEvidence: string;
+}
+
+/**
+ * The current sourced values of a claimed listing, for the claimant's
+ * field-review step. Caller (server component/action) must have verified the
+ * viewer IS the claimant of a claim on this listing — this is a service-role
+ * read with no authz of its own.
+ */
+export async function getClaimConfirmationFields(
+  listingId: string,
+): Promise<ClaimConfirmationFields | null> {
+  const { data, error } = await db()
+    .from("listings")
+    .select(
+      "title, description, location_display, housing_included, housing_description, meals_included, meals_description, compensation_min_cents, compensation_max_cents, compensation_unit, compensation_summary, begins_at, ends_at, housing_evidence, meals_evidence, pay_evidence",
+    )
+    .eq("id", listingId)
+    .maybeSingle();
+  if (error) throw new Error(`getClaimConfirmationFields: ${error.message}`);
+  if (!data) return null;
+  const row = data as Record<string, unknown>;
+  const text = (key: string): string | null =>
+    typeof row[key] === "string" && (row[key] as string).length > 0 ? (row[key] as string) : null;
+  const cents = (key: string): number | null =>
+    typeof row[key] === "number" && Number.isFinite(row[key] as number)
+      ? (row[key] as number)
+      : null;
+  return {
+    title: String(row.title ?? ""),
+    description: text("description"),
+    locationDisplay: text("location_display"),
+    housingIncluded: row.housing_included === true,
+    housingDescription: text("housing_description"),
+    mealsIncluded: row.meals_included === true,
+    mealsDescription: text("meals_description"),
+    compensationMinCents: cents("compensation_min_cents"),
+    compensationMaxCents: cents("compensation_max_cents"),
+    compensationUnit: text("compensation_unit"),
+    compensationSummary: text("compensation_summary"),
+    beginsAt: text("begins_at"),
+    endsAt: text("ends_at"),
+    // Missing/corrupt evidence must resolve to the most CONSERVATIVE state —
+    // defaulting to 'confirmed' would fabricate an employer confirmation the
+    // provenance contract forbids.
+    housingEvidence: String(row.housing_evidence ?? "not_stated"),
+    mealsEvidence: String(row.meals_evidence ?? "not_stated"),
+    payEvidence: String(row.pay_evidence ?? "not_stated"),
+  };
 }
 
 /* ------------------------------------------------------------------- writes */

@@ -1,0 +1,123 @@
+/*
+ * Claim confirmation — the field-by-field review step of the claim-to-verify
+ * flow. Mirrors ClaimListingForm.module.css (same card, field, and input
+ * grammar) so the claim journey reads as one surface. Token-driven only.
+ */
+
+.card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+	max-width: 640px;
+	margin: 0 auto;
+	padding: var(--space-24);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--gradient-chrome);
+	box-shadow: var(--elevation-card);
+}
+
+.title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-title-size);
+	color: var(--text-primary);
+}
+
+.lead {
+	margin: 0;
+	font-size: var(--type-body-size);
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-14);
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+	flex: 1 1 0;
+}
+
+.label {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.notStated {
+	font-size: var(--type-label-size);
+	color: var(--palette-ink-muted);
+	font-style: italic;
+}
+
+.input,
+.textarea {
+	width: 100%;
+	padding: var(--space-10) var(--space-12);
+	border-radius: var(--radius-input);
+	border: 1.5px solid var(--palette-line);
+	background: var(--palette-surface);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+}
+.input:focus-visible,
+.textarea:focus-visible {
+	outline: none;
+	border-color: var(--palette-sky);
+	box-shadow: var(--ui-focus-ring, 0 0 0 3px color-mix(in srgb, var(--palette-sky) 40%, transparent));
+}
+.textarea { resize: vertical; }
+
+.fieldset {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-10);
+	margin: 0;
+	padding: var(--space-14);
+	border-radius: var(--radius-input);
+	border: 1px solid var(--border-soft);
+}
+
+.legend {
+	padding: 0 var(--space-6);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.rowPair {
+	display: flex;
+	gap: var(--space-12);
+}
+
+@media (max-width: 480px) {
+	.rowPair {
+		flex-direction: column;
+	}
+}
+
+.error {
+	display: flex;
+	align-items: center;
+	gap: var(--space-6);
+	margin: 0;
+	color: var(--status-error-fg);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+}
+
+.disclaimer {
+	margin: 0;
+	font-size: var(--type-label-size);
+	line-height: 1.4;
+	color: var(--palette-ink-muted);
+}

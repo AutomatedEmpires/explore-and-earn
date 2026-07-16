@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
+import { getClaimConfirmationFields } from "@explore-and-earn/db";
 
 import { getClaimContextAction } from "../../../actions/listingClaims";
 import { optionalAuth } from "../../../../lib/optionalAuth";
@@ -20,10 +21,12 @@ interface Props {
 }
 
 /**
- * Employer claim entry point for a SOURCED listing. A real employer asserts
- * authority; the claim routes into founder review, then (once approved) into
- * the confirm-and-convert flow. Only live sourced, unconverted listings are
- * claimable — anything else 404s or bounces to the listing.
+ * Employer claim surface for a SOURCED listing — status-aware across the whole
+ * claim-to-verify journey. A caller WITH a claim on this listing always sees
+ * their claim's real state (pending review, approved, confirming, converted,
+ * rejected), even after the listing itself converted or closed. A caller
+ * WITHOUT a claim can only start one on a live sourced, unconverted listing —
+ * anything else 404s or bounces to the listing.
  */
 export default async function ClaimListingPage({ params }: Props) {
   const { id } = await params;
@@ -37,10 +40,15 @@ export default async function ClaimListingPage({ params }: Props) {
   const { listing, myClaim } = await getClaimContextAction(id);
   if (!listing) notFound();
 
-  // Only sourced, unclaimed-by-someone-else, live listings are claimable here.
-  if (listing.provenance !== "sourced" || listing.status !== "live") {
+  // No claim of your own → only sourced, live listings are claimable here.
+  if (!myClaim && (listing.provenance !== "sourced" || listing.status !== "live")) {
     redirect(`/listing/${id}`);
   }
+
+  // The field-review step needs every sourced value, prefetched server-side.
+  // Only the claimant of a CONFIRMING claim ever receives this payload.
+  const confirmationPrefill =
+    myClaim?.status === "confirming" ? await getClaimConfirmationFields(id) : null;
 
   return (
     <PublicShell>
@@ -51,6 +59,7 @@ export default async function ClaimListingPage({ params }: Props) {
           sourceName={listing.sourceName}
           employerName={listing.sourceEmployerName}
           existingClaim={myClaim}
+          confirmationPrefill={confirmationPrefill}
         />
       </div>
     </PublicShell>

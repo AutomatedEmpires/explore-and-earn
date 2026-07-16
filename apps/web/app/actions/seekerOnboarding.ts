@@ -10,6 +10,7 @@ import {
   type SeekerProfileUpdate,
 } from "@explore-and-earn/db";
 
+import { queueSeekerMatchRecompute } from "../../lib/matchRecompute";
 import { reportError } from "../../lib/sentry";
 
 /**
@@ -37,6 +38,21 @@ export type OnboardingStepData = {
 };
 
 const MAX_FREEFORM_TAGS = 10;
+
+/**
+ * Step fields the ADR-040 engine actually scores — a step that only touches
+ * display fields (name, bio, open-to statement) doesn't need a rescore.
+ */
+const MATCH_INPUT_STEP_KEYS: readonly (keyof OnboardingStepData)[] = [
+  "locationPref",
+  "housingPref",
+  "mealsPref",
+  "payExpectationMinCents",
+  "payExpectationMaxCents",
+  "payFlexible",
+  "categories",
+  "freeformSkills",
+];
 
 async function currentUserId(): Promise<string | undefined> {
   try {
@@ -101,7 +117,19 @@ async function saveOnboardingStepImpl(
       : undefined),
   };
 
-  return saveSeekerProfile(token, userId, update);
+  const result = await saveSeekerProfile(token, userId, update);
+
+  // Stored ADR-040 scores go stale the moment the engine's inputs change —
+  // rescore fire-and-forget after the response (bounded + best-effort inside
+  // queueSeekerMatchRecompute) so the seeker's pills reflect the new profile.
+  if (
+    result.ok &&
+    MATCH_INPUT_STEP_KEYS.some((key) => stepData[key] !== undefined)
+  ) {
+    queueSeekerMatchRecompute(userId);
+  }
+
+  return result;
 }
 
 export async function saveOnboardingStep(

@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 import {
+	adminClaimContext,
 	beginClaimConfirmation,
 	confirmAndConvertClaim,
 	getClaimableListing,
@@ -237,16 +238,56 @@ export async function reviewClaimAction(
 
 		const result = await transitionListingClaim(claimId, decision, userId, notes)
 		if (result.ok) {
+			// Anchor the event to the claimed listing so the notification taxonomy
+			// (and analytics rollups) can resolve context without guessing. The
+			// claimant's identity is looked up server-side downstream — clerk ids
+			// never ride in event properties (events.ts privacy law).
+			const claim = await adminClaimContext(claimId).catch(() => null)
 			await recordEvent({
 				eventType: decision === "approved" ? "listing_claim_approved" : "listing_claim_rejected",
 				actorScope: "admin",
 				subjectType: "listing_claim",
 				subjectId: claimId,
+				...(claim ? { listingId: claim.listingId } : {}),
 			})
+			revalidatePath("/admin/claims")
 		}
 		return result
 	} catch (error) {
 		reportError(error, { action: "reviewClaimAction" })
 		return { ok: false, error: "review_failed" }
+	}
+}
+
+/**
+ * Fraud response: revoke a CONVERTED (or approved) claim. The SQL function
+ * restores the exact pre-conversion sourced snapshot and detaches the host —
+ * this action only gates and triggers it. No event is recorded: there is no
+ * seeded listing_claim_revoked event type yet (adding one is a migration, out
+ * of this slice), and recording a mislabeled type would be dishonest.
+ */
+export async function revokeClaimAction(
+	claimId: string,
+	notes?: string,
+): Promise<{ ok: boolean; error?: string }> {
+	try {
+		const { userId } = await auth()
+		if (!userId) return { ok: false, error: "unauthenticated" }
+		if (!(await isCurrentUserAdmin())) return { ok: false, error: "forbidden" }
+
+		const result = await transitionListingClaim(claimId, "revoked", userId, notes)
+		if (result.ok) {
+			revalidatePath("/admin/claims")
+			// The listing may have just reverted verified → sourced.
+			const claim = await adminClaimContext(claimId).catch(() => null)
+			if (claim) {
+				revalidatePath(`/listing/${claim.listingId}`)
+				revalidatePath("/host/listings")
+			}
+		}
+		return result
+	} catch (error) {
+		reportError(error, { action: "revokeClaimAction" })
+		return { ok: false, error: "revoke_failed" }
 	}
 }

@@ -22,6 +22,7 @@ const checkRateLimitMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
 
 const dbMocks = vi.hoisted(() => ({
+  adminClaimContext: vi.fn(),
   beginClaimConfirmation: vi.fn(),
   confirmAndConvertClaim: vi.fn(),
   getClaimableListing: vi.fn(),
@@ -44,6 +45,7 @@ import {
   getMyClaimsAction,
   initiateClaimAction,
   reviewClaimAction,
+  revokeClaimAction,
 } from "../../app/actions/listingClaims";
 
 const VALID_EVIDENCE = {
@@ -220,6 +222,12 @@ describe("reviewClaimAction — admin gate", () => {
     authAs("user_admin_1");
     isCurrentUserAdminMock.mockResolvedValueOnce(true);
     dbMocks.transitionListingClaim.mockResolvedValueOnce({ ok: true });
+    dbMocks.adminClaimContext.mockResolvedValueOnce({
+      claimantClerkUserId: "user_claimant",
+      listingId: "listing-77",
+      hostProfileId: null,
+      status: "rejected",
+    });
 
     const result = await reviewClaimAction("claim-4", "rejected", "not a legitimate employer");
 
@@ -230,14 +238,87 @@ describe("reviewClaimAction — admin gate", () => {
       "user_admin_1",
       "not a legitimate employer",
     );
+    // Event is anchored to the claimed LISTING (taxonomy/rollup context) but
+    // never carries the claimant's clerk id (events privacy law).
     expect(dbMocks.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: "listing_claim_rejected",
         actorScope: "admin",
         subjectType: "listing_claim",
         subjectId: "claim-4",
+        listingId: "listing-77",
       }),
     );
+    expect(JSON.stringify(dbMocks.recordEvent.mock.calls[0][0])).not.toContain("user_claimant");
+  });
+
+  it("still records the decision event when the claim context read fails", async () => {
+    authAs("user_admin_1");
+    isCurrentUserAdminMock.mockResolvedValueOnce(true);
+    dbMocks.transitionListingClaim.mockResolvedValueOnce({ ok: true });
+    dbMocks.adminClaimContext.mockRejectedValueOnce(new Error("boom"));
+
+    const result = await reviewClaimAction("claim-5", "approved");
+
+    expect(result).toEqual({ ok: true });
+    expect(dbMocks.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "listing_claim_approved",
+        subjectId: "claim-5",
+      }),
+    );
+  });
+});
+
+describe("revokeClaimAction — admin gate + transition", () => {
+  it("denies a non-admin with forbidden and never calls transitionListingClaim", async () => {
+    authAs("user_not_admin");
+    isCurrentUserAdminMock.mockResolvedValueOnce(false);
+
+    const result = await revokeClaimAction("claim-6");
+
+    expect(result).toEqual({ ok: false, error: "forbidden" });
+    expect(dbMocks.transitionListingClaim).not.toHaveBeenCalled();
+  });
+
+  it("runs the converted→revoked transition for an admin (SQL restores the snapshot)", async () => {
+    authAs("user_admin_1");
+    isCurrentUserAdminMock.mockResolvedValueOnce(true);
+    dbMocks.transitionListingClaim.mockResolvedValueOnce({ ok: true });
+    dbMocks.adminClaimContext.mockResolvedValueOnce({
+      claimantClerkUserId: "user_claimant",
+      listingId: "listing-88",
+      hostProfileId: "host-9",
+      status: "revoked",
+    });
+
+    const result = await revokeClaimAction("claim-6", "fraudulent conversion");
+
+    expect(result).toEqual({ ok: true });
+    expect(dbMocks.transitionListingClaim).toHaveBeenCalledWith(
+      "claim-6",
+      "revoked",
+      "user_admin_1",
+      "fraudulent conversion",
+    );
+    // No listing_claim_revoked event type is seeded — nothing is recorded
+    // rather than a mislabeled event.
+    expect(dbMocks.recordEvent).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/listing/listing-88");
+  });
+
+  it("surfaces an illegal-transition error from the SQL wrapper unchanged", async () => {
+    authAs("user_admin_1");
+    isCurrentUserAdminMock.mockResolvedValueOnce(true);
+    dbMocks.transitionListingClaim.mockResolvedValueOnce({
+      ok: false,
+      error: "illegal_transition",
+    });
+
+    const result = await revokeClaimAction("claim-7");
+
+    expect(result).toEqual({ ok: false, error: "illegal_transition" });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });
 

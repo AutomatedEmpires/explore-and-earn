@@ -82,6 +82,33 @@
 	color: var(--palette-ink-muted);
 }
 
+.reviewNote {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	margin: 0;
+	padding: var(--space-10) var(--space-12);
+	border-radius: var(--radius-input);
+	background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+	font-size: var(--type-meta-size);
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.reviewNoteLabel {
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--palette-ink-muted);
+}
+
+.backLink {
+	font-size: var(--type-meta-size);
+	color: var(--text-secondary);
+	text-decoration: underline;
+}
+
 .doneIcon {
 	display: inline-flex;
 	align-items: center;

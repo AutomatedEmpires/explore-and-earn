@@ -39,6 +39,13 @@ async function applyToListingActionImpl(
 		return { ok: false, error: "rate_limit_exceeded" }
 	}
 
+	// Action-boundary cap on the optional note to the host. The apply form has
+	// no maxLength, so this is deliberately generous — it only stops scripted
+	// oversized payloads, never a real cover note.
+	if (typeof coverMessage === "string" && coverMessage.length > 2000) {
+		return { ok: false, error: "cover_message_too_long" }
+	}
+
 	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
