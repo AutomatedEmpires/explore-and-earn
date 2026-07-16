@@ -27,8 +27,15 @@ import {
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 
-/** Every file that RENDERS either honesty label to a user. */
-const RENDER_SITES = [
+/**
+ * The files this test guards: the four that re-typed a label as a raw literal
+ * and now import the constant instead.
+ *
+ * NOT an exhaustive list of every consumer — ClaimConfirmationForm, for one,
+ * already imported NOT_STATED_LABEL correctly and needs no guarding. New
+ * render sites should be added here.
+ */
+const GUARDED_SITES = [
   "apps/web/components/listing/DealUpfront.tsx",
   "apps/web/components/listing/SourcedNotice.tsx",
   "apps/web/components/discovery/QuickPeekDrawer.tsx",
@@ -53,23 +60,27 @@ describe("evidence-honesty copy is single-sourced", () => {
     );
   });
 
-  for (const site of RENDER_SITES) {
+  for (const site of GUARDED_SITES) {
     it(`${site} re-types neither honesty label`, () => {
       const code = readSite(site);
-      // The literal copy must not appear outside comments…
-      expect(code).not.toContain(`"${NOT_STATED_LABEL}"`);
+      // Match the BARE copy, not a quoted form: "Not stated", 'Not stated',
+      // `Not stated` and a bare JSX text node <span>Not stated</span> must all
+      // fail. Quoting the needle would only catch the one form we happened to
+      // write, which is exactly the drift this test exists to stop.
+      expect(code).not.toContain(NOT_STATED_LABEL);
+      // The disclosure's own ampersand differs by encoding across JSX/TS, so
+      // assert on the stable prefix rather than the full constant.
       expect(code).not.toContain("Sourced · not yet confirmed");
-      // …including the JSX-escaped ampersand form that reads identically.
       expect(code).not.toContain("Sourced &middot; not yet confirmed");
     });
   }
 
-  it("every render site imports the constant it uses", () => {
-    for (const site of RENDER_SITES) {
+  it("every guarded site imports the constant it uses", () => {
+    for (const site of GUARDED_SITES) {
       const code = readSite(site);
       const usesNotStated = code.includes("NOT_STATED_LABEL");
       const usesSourced = code.includes("SOURCED_DISCLOSURE_LABEL");
-      // Each site renders at least one of the two labels.
+      // Each guarded site renders at least one of the two labels.
       expect(usesNotStated || usesSourced, `${site} renders neither label`).toBe(true);
       // Whatever it uses must come from the contracts package.
       expect(code, `${site} must import from @explore-and-earn/contracts`).toContain(
