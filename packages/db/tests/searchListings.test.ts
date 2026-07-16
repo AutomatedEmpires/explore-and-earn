@@ -32,6 +32,7 @@ function recordingBuilder(result: { data?: unknown; error?: unknown }) {
     "eq",
     "or",
     "in",
+    "not",
     "gte",
     "lte",
     "ilike",
@@ -54,6 +55,17 @@ vi.mock("../src/client.js", () => ({
 vi.mock("../src/adminClient.js", () => ({
   adminClient: () => ({ from: vi.fn() }),
 }));
+// Applied ids are server-resolved through this seam when a SeekerScope is
+// passed — controllable per test, defaults to "nothing applied".
+const mockGetSeekerApplicationIds = vi.fn(async () => [] as string[]);
+vi.mock("../src/queries/idReaders.js", () => ({
+  getSeekerApplicationIds: (...args: unknown[]) =>
+    mockGetSeekerApplicationIds(...(args as [])),
+  getActiveBoostedListingIds: vi.fn(async () => new Set<string>()),
+}));
+vi.mock("../src/queries/passedListings.js", () => ({
+  getPassedListingIds: vi.fn(async () => [] as string[]),
+}));
 
 import { searchListings } from "../src/queries/listings.js";
 
@@ -65,6 +77,8 @@ beforeEach(() => {
   calls = [];
   mockFrom.mockReset();
   mockFrom.mockImplementation(() => recordingBuilder({}));
+  mockGetSeekerApplicationIds.mockReset();
+  mockGetSeekerApplicationIds.mockResolvedValue([]);
 });
 
 describe("searchListings filter semantics", () => {
@@ -142,12 +156,36 @@ describe("searchListings filter semantics", () => {
     expect(callsFor("range")).toHaveLength(0);
   });
 
-  it("orders newest-published first", async () => {
+  it("orders newest-published first with an id tiebreak (stable range() pages)", async () => {
     await searchListings({});
-    expect(callsFor("order")[0].args).toEqual([
-      "published_at",
-      { ascending: false },
+    expect(callsFor("order").map((c) => c.args)).toEqual([
+      ["published_at", { ascending: false }],
+      ["id", { ascending: false }],
     ]);
+  });
+
+  it("HARD-excludes the seeker's applied listings when a scope is passed", async () => {
+    const applied = [
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+    ];
+    mockGetSeekerApplicationIds.mockResolvedValue(applied);
+    await searchListings({}, { clerkToken: "token", clerkUserId: "user_1" });
+    expect(mockGetSeekerApplicationIds).toHaveBeenCalledWith("token", "user_1");
+    expect(callsFor("not")[0].args).toEqual(["id", "in", `(${applied.join(",")})`]);
+  });
+
+  it("applies no exclusion filter on the anonymous path (no scope)", async () => {
+    await searchListings({});
+    expect(mockGetSeekerApplicationIds).not.toHaveBeenCalled();
+    expect(callsFor("not")).toHaveLength(0);
+  });
+
+  it("degrades to an unfiltered search when the applied lookup faults", async () => {
+    mockGetSeekerApplicationIds.mockRejectedValue(new Error("down"));
+    await searchListings({}, { clerkToken: "token", clerkUserId: "user_1" });
+    expect(callsFor("not")).toHaveLength(0);
+    expect(callsFor("eq")[0]).toEqual({ method: "eq", args: ["status", "live"] });
   });
 
   it("throws with context when the query fails", async () => {

@@ -8,6 +8,7 @@ import {
 } from "@explore-and-earn/db"
 
 import { upsertEnginePrefsSeeded } from "../../services/notifications/prefsWrite"
+import { checkRateLimit } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
 /**
@@ -46,6 +47,13 @@ export async function savePushSubscriptionAction(
 	try {
 		const { userId } = await auth()
 		if (!userId) return { ok: false, error: "unauthenticated" }
+
+		// Rate limit: 10 subscription saves per hour per user. A browser saves at
+		// most a couple per device; without this a scripted caller can persist
+		// unbounded rows with distinct endpoints, each becoming dispatch work.
+		const { allowed } = checkRateLimit(`push-subscription:${userId}`, 10, 60 * 60 * 1000)
+		if (!allowed) return { ok: false, error: "rate_limit_exceeded" }
+
 		if (
 			!isValidEndpoint(input.endpoint) ||
 			typeof input.keys?.p256dh !== "string" ||

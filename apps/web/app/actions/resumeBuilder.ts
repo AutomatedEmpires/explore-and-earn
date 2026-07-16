@@ -19,6 +19,7 @@ import {
   type ResumeCertificationInput,
   type SeekerProfileInfoInput,
 } from "@explore-and-earn/db";
+import { queueSeekerMatchRecompute } from "../../lib/matchRecompute";
 import { reportError } from "../../lib/sentry";
 
 export interface ResumeActionResult {
@@ -90,6 +91,9 @@ export async function saveInfoAction(input: SaveInfoInput): Promise<ResumeAction
     if (!bioResult.ok) return bioResult;
 
     revalidate();
+    // desiredCategories / generalSkills are ADR-040 engine inputs — refresh
+    // the seeker's stored scores fire-and-forget so every pill stays honest.
+    queueSeekerMatchRecompute(session.userId);
     return { ok: true };
   } catch (error) {
     reportError(error, { action: "saveInfoAction" });
@@ -192,7 +196,11 @@ export async function addCertificationAction(
     const session = await getAuth();
     if (!session) return { ok: false, error: "unauthenticated" };
     const result = await addSeekerCertification(session.token, session.userId, input);
-    if (result.ok) revalidate();
+    if (result.ok) {
+      revalidate();
+      // Certifications gate the engine's cert cap — rescore on change.
+      queueSeekerMatchRecompute(session.userId);
+    }
     return result;
   } catch (error) {
     reportError(error, { action: "addCertificationAction" });
@@ -208,7 +216,10 @@ export async function updateCertificationAction(
     const session = await getAuth();
     if (!session) return { ok: false, error: "unauthenticated" };
     const result = await updateSeekerCertification(session.token, session.userId, id, input);
-    if (result.ok) revalidate();
+    if (result.ok) {
+      revalidate();
+      queueSeekerMatchRecompute(session.userId);
+    }
     return result;
   } catch (error) {
     reportError(error, { action: "updateCertificationAction" });
@@ -221,7 +232,10 @@ export async function deleteCertificationAction(id: string): Promise<ResumeActio
     const session = await getAuth();
     if (!session) return { ok: false, error: "unauthenticated" };
     const result = await deleteSeekerCertification(session.token, session.userId, id);
-    if (result.ok) revalidate();
+    if (result.ok) {
+      revalidate();
+      queueSeekerMatchRecompute(session.userId);
+    }
     return result;
   } catch (error) {
     reportError(error, { action: "deleteCertificationAction" });

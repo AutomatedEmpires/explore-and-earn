@@ -100,6 +100,12 @@ function resolveFeedback(searchParams: BillingSearchParams): {
         message:
           "Stripe checkout could not be started. Verify the Stripe keys and price ids, then try again.",
       };
+    case "rate_limited":
+      return {
+        tone: "error",
+        message:
+          "You've started several billing sessions just now. Give it a few minutes, then try again.",
+      };
     default:
       return null;
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -11,7 +11,6 @@ import {
 } from "@explore-and-earn/contracts";
 import { Chip, type IconKey } from "@explore-and-earn/ui";
 
-import type { SearchListing } from "./listing";
 import {
 	ListingCard,
 	ListingCardProvider,
@@ -23,47 +22,6 @@ import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
 // canonical value. Deliberately not "matched" (that triggers the match meter).
 const SEARCH_SURFACE: DiscoveryCardSurface = "discovery_feed";
 
-/**
- * Adapt the Search lane's own thin `SearchListing` view-model into the canonical
- * `DiscoveryListing` the shared <ListingCard> renders. Only fields the search
- * query actually carries are populated — `status: "live"` is honest (searchListings
- * only returns live rows), and structured data the search projection never fetched
- * (host id, pay insight, coordinates, begin/end dates) is left ABSENT rather than
- * fabricated. Because the host id is absent, the host tap routes to the listing
- * detail (see the provider override) instead of opening a match-all host popup.
- */
-function searchListingToDiscovery(listing: SearchListing): DiscoveryListing {
-	return {
-		id: listing.id,
-		title: listing.title,
-		category: listing.category,
-		location: listing.location,
-		opportunityWindow: listing.opportunityWindow,
-		status: "live",
-		host: {
-			name: listing.hostName,
-			verified: listing.verifiedHost ?? false,
-			tier: "none",
-		},
-		benefits: {
-			housing: {
-				provision: listing.benefits.housing.provision,
-				summary: listing.benefits.housing.summary,
-			},
-			meals: {
-				provision: listing.benefits.meals.provision,
-				summary: listing.benefits.meals.summary,
-			},
-			pay: {
-				provision: listing.benefits.pay.provision,
-				summary: listing.benefits.pay.summary,
-			},
-		},
-		conditionalBadges: listing.conditionalBadges,
-		matchScore: listing.matchScore,
-	};
-}
-
 const CATEGORY_LABELS: Record<MarketplaceCategory, string> = {
 	farm: "Farm",
 	maritime: "Maritime",
@@ -73,7 +31,12 @@ const CATEGORY_LABELS: Record<MarketplaceCategory, string> = {
 };
 
 export interface SearchViewProps {
-	listings: readonly SearchListing[];
+	/**
+	 * Canonical discovery cards — the SAME view-model /seek renders, produced by
+	 * the shared rowToDiscoveryFields mapper (provenance/evidence honesty, the
+	 * stored >=75 match pill, boosted/skipped enrichment all travel with it).
+	 */
+	listings: readonly DiscoveryListing[];
 	/** Current active text query (from URL). */
 	query?: string;
 	/** Currently selected category lane (from URL). */
@@ -107,12 +70,6 @@ export function SearchView({
 	startBefore = "",
 }: SearchViewProps) {
 	const router = useRouter();
-
-	// Adapt the thin search results to the canonical card view-model ONCE.
-	const cards = useMemo(
-		() => listings.map(searchListingToDiscovery),
-		[listings],
-	);
 
 	// Local state for text/number/date inputs.
 	// Changes navigate on form submit (Enter or the Search button).
@@ -401,17 +358,16 @@ export function SearchView({
 					</div>
 				) : (
 					<ListingCardProvider
-						listings={cards}
+						listings={listings}
 						overrides={{
 							onApply: (id) => router.push(`/listing/${id}`),
-							// Search rows carry no host id — route the host tap to
-							// the listing detail rather than open a host popup that
-							// would (mis)match every search result.
-							onHostClick: (id) => router.push(`/listing/${id}`),
+							// The host tap keeps the shared default (host profile
+							// popup) — search rows now carry the real host id via
+							// the shared read model, same as /seek.
 						}}
 					>
 						<ul className="ee-search__list">
-							{cards.map((listing) => (
+							{listings.map((listing) => (
 								<li key={listing.id} className="ee-search__list-item">
 									<ListingCard listing={listing} surface={SEARCH_SURFACE} />
 								</li>

@@ -6,9 +6,11 @@ import type { EventType } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 
 /**
- * Analytics event recorder over the append-only `public.events` log
- * (migration 008_notifications_events.sql). Nothing writes this table today —
- * this module is the one and only entry point for it.
+ * Domain event recorder over the append-only `public.events` log
+ * (migration 008_notifications_events.sql). This module is the one and only
+ * write path for it; producers include the application/invite/claim/message
+ * server actions and the matching alert cron, and the notification engine's
+ * dispatcher consumes the log (taxonomy expansion, migration 065).
  *
  * Writes go through the SERVICE ROLE client (`adminClient`) because `events`
  * is RLS deny-by-default: there are no authenticated insert policies, by

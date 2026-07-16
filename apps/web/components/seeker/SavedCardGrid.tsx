@@ -22,6 +22,10 @@ export interface SavedCardGridProps {
  * skipped" photo flag (Saved is a demote-but-visible surface). One popup host
  * is shared across the whole grid via the provider. The "Quick Apply" CTA
  * resolves to the listing detail page.
+ *
+ * Saved listings that are NO LONGER live render honestly instead of vanishing:
+ * a muted, non-actionable "No longer available" card (data-driven off the
+ * listing's real status — no extra prop to drift).
  */
 export function SavedCardGrid({ listings }: SavedCardGridProps) {
 	const router = useRouter();
@@ -32,19 +36,23 @@ export function SavedCardGrid({ listings }: SavedCardGridProps) {
 			overrides={{ onApply: (id) => router.push(`/listing/${id}`) }}
 		>
 			<div className={styles.grid}>
-				{listings.map((listing, index) => (
-					<div
-						key={listing.id}
-						className={styles.cell}
-						style={{ "--i": index } as CSSProperties}
-					>
-						<ListingCard
-							listing={listing}
-							surface="discovery_feed"
-							cardState="saved"
-						/>
-					</div>
-				))}
+				{listings.map((listing, index) => {
+					const unavailable = listing.status !== "live";
+					return (
+						<div
+							key={listing.id}
+							className={styles.cell}
+							style={{ "--i": index } as CSSProperties}
+						>
+							<ListingCard
+								listing={listing}
+								surface="discovery_feed"
+								cardState={unavailable ? "unavailable" : "saved"}
+								variant={unavailable ? "disabled" : undefined}
+							/>
+						</div>
+					);
+				})}
 			</div>
 		</ListingCardProvider>
 	);

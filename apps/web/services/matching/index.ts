@@ -174,6 +174,27 @@ export async function computeAndStoreMatchesForSeeker(
 }
 
 /**
+ * Clerk-id variant of {@link computeAndStoreMatchesForSeeker} for the profile
+ * save seams (actions only hold auth().userId, not seeker_profiles.id).
+ * Resolves the profile via the service role, then runs the same bounded
+ * (CANDIDATE_CAP = 500 live listings) recompute. No-op when the seeker has no
+ * profile yet.
+ */
+export async function computeAndStoreMatchesForSeekerByClerkId(
+  clerkUserId: string,
+  nowMs: number = Date.now(),
+): Promise<{ stored: number }> {
+  const { data: profile } = await db()
+    .from("seeker_profiles")
+    .select("id")
+    .eq("clerk_user_id", clerkUserId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!profile) return { stored: 0 };
+  return computeAndStoreMatchesForSeeker(String((profile as Row).id), nowMs);
+}
+
+/**
  * Compute + persist the single (this seeker × this listing) match score.
  *
  * The targeted, cheap variant used on apply: when a seeker applies to a listing
