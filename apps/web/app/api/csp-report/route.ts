@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readCappedBodyText } from "../../../lib/bodyLimit";
 import { checkRateLimit } from "../../../lib/rateLimit";
 
 import { reportMessage } from "../../../lib/sentry";
@@ -32,17 +33,21 @@ export async function POST(request: Request): Promise<NextResponse> {
 	try {
 		// Unauthenticated public sink — cap the amplification surface: a bounded
 		// body, a bounded number of forwarded reports, and a per-IP budget.
-		const contentLength = Number(request.headers.get("content-length") ?? 0);
-		if (contentLength > 64 * 1024) {
-			return new NextResponse(null, { status: 204 });
-		}
 		const ip =
 			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 		if (!checkRateLimit(`csp-report:${ip}`, 30, 60 * 1000).allowed) {
 			return new NextResponse(null, { status: 204 });
 		}
 
-		const raw = (await request.json()) as unknown;
+		// Byte-accurate cap on the ACTUAL body stream (shared with the assistant
+		// route) — Content-Length is client-supplied and trivially spoofed or
+		// absent under chunked encoding, so it is never trusted. Oversized or
+		// unreadable bodies are dropped without processing anything.
+		const rawBody = await readCappedBodyText(request, 64 * 1024);
+		if (rawBody === null) {
+			return new NextResponse(null, { status: 204 });
+		}
+		const raw = JSON.parse(rawBody) as unknown;
 
 		// Legacy `application/csp-report`: { "csp-report": {...} }.
 		// Reporting API `application/reports+json`: [{ body: {...} }, ...].

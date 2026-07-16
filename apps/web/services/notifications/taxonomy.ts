@@ -204,6 +204,29 @@ export async function expandEvent(
 		}
 		case "application_status_changed": {
 			const status = prop(event, "status")
+			// SEEKER-actor transitions notify the HOST (the counterparty), never
+			// the seeker about their own action. Today that is exactly one case:
+			// the seeker accepting an offer. (Decline travels as
+			// application_withdrawn with reason='seeker_declined_offer' below.)
+			if (prop(event, "actor") === "seeker") {
+				if (status !== "accepted") return []
+				const ctx = await applicationParties(event, resolvers)
+				if (!ctx?.hostClerk || ctx.hostClerk === ctx.seekerClerk) return []
+				return [
+					makeIntent({
+						event,
+						type: "offer_accepted",
+						recipientClerkUserId: ctx.hostClerk,
+						destinationPath: ctx.applicationId
+							? `/host/applicants/${ctx.applicationId}`
+							: "/host/applicants",
+						values: { listingTitle: ctx.listingTitle },
+						entity: ctx.applicationId
+							? { type: "application", id: ctx.applicationId }
+							: undefined,
+					}),
+				]
+			}
 			const type = status ? seekerTypeForApplicationStatus(status) : null
 			if (!type) return []
 			const ctx = await applicationParties(event, resolvers)
@@ -258,12 +281,17 @@ export async function expandEvent(
 		case "application_withdrawn": {
 			const ctx = await applicationParties(event, resolvers)
 			if (!ctx?.hostClerk || ctx.hostClerk === ctx.seekerClerk) return []
+			// A withdrawal that is actually a declined offer gets its own honest
+			// copy ("declined your offer") instead of the generic withdrawal.
+			const declined = prop(event, "reason") === "seeker_declined_offer"
 			return [
 				makeIntent({
 					event,
-					type: "application_withdrawn",
+					type: declined ? "offer_declined" : "application_withdrawn",
 					recipientClerkUserId: ctx.hostClerk,
-					destinationPath: "/host/applicants",
+					destinationPath: ctx.applicationId
+						? `/host/applicants/${ctx.applicationId}`
+						: "/host/applicants",
 					values: { listingTitle: ctx.listingTitle },
 					entity: ctx.applicationId
 						? { type: "application", id: ctx.applicationId }

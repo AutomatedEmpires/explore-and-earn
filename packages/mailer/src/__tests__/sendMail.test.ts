@@ -7,7 +7,7 @@ import {
   vi,
 } from "vitest";
 
-import { _resetDedup, sendMail } from "../index.js";
+import { _resetDedup, hashIdempotencyKey, sendMail } from "../index.js";
 
 const mockFetch = vi.fn();
 
@@ -226,5 +226,41 @@ describe("sendMail", () => {
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("provider-side idempotency header", () => {
+  it("sends a hashed Idempotency-Key header when a key is provided", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
+
+    await sendMail({
+      to: "user@example.com",
+      subject: "Hi",
+      html: "<p>Hi</p>",
+      // Engine dedup keys carry U+241F separators, which HTTP header values
+      // cannot — the transport must hash to an ASCII form.
+      idempotencyKey: "evt-1␟clerk_host␟applications␟email␟default",
+    });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    const headerValue = headers["Idempotency-Key"];
+    expect(headerValue).toBe(
+      hashIdempotencyKey("evt-1␟clerk_host␟applications␟email␟default"),
+    );
+    // sha-256 hex: deterministic, 64 ASCII chars.
+    expect(headerValue).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("omits the header when no idempotency key is provided", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
+
+    await sendMail({ to: "user@example.com", subject: "Hi", html: "<p>Hi</p>" });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers).not.toHaveProperty("Idempotency-Key");
   });
 });

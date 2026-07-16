@@ -27,6 +27,7 @@ import { escapeHtml, renderEmailLayout } from "../../lib/emails/layout"
 import { getClerkContact } from "../../lib/clerkUser"
 import { reportError } from "../../lib/sentry"
 import { enqueueScheduleDerived } from "./dispatcher"
+import { resolveEngineStage, stageGateForSend } from "./stage"
 import { resolvePrefs } from "./prefs"
 import { localizedPath, renderMessage } from "./render"
 import type { PreIntent } from "./taxonomy"
@@ -284,6 +285,14 @@ export async function runDigests(
 	cadence: "daily" | "weekly",
 	nowMs: number,
 ): Promise<DigestRunStats> {
+	// Stage gate: digests EMAIL, so below internal_preview nothing runs — and
+	// crucially the queued memberships are left untouched (windows are only
+	// consumed for recipients the stage allows), so raising the stage later
+	// resumes digests without losing anything.
+	const stage = resolveEngineStage()
+	if (stage === "disabled" || stage === "ledger_only" || stage === "dry_run") {
+		return { recipientsDue: 0, digestsSent: 0, digestsSkipped: 0, digestsFailed: 0 }
+	}
 	const memberships = await getQueuedDigestMemberships(cadence)
 	const byRecipient = new Map<string, QueuedDigestMembership[]>()
 	for (const m of memberships) {
@@ -296,6 +305,9 @@ export async function runDigests(
 
 	const prefsMap = await getEnginePrefsMap([...byRecipient.keys()])
 	for (const [recipient, allRows] of byRecipient) {
+		// Per-recipient stage gate (internal_preview/limited): gated recipients
+		// are skipped entirely — memberships stay queued, windows unconsumed.
+		if (!stageGateForSend(stage, recipient).send) continue
 		const prefsRow = prefsMap.get(recipient) ?? null
 		const windowKey = dueWindowKey(cadence, prefsRow?.timezone ?? null, nowMs)
 		if (!windowKey) continue
@@ -372,8 +384,11 @@ export interface ReminderStats {
  * at send time (recheck.ts) and idempotent per entity/window.
  */
 export async function enqueueScheduledReminders(nowMs: number): Promise<ReminderStats> {
-	const nowIso = new Date(nowMs).toISOString()
 	const stats = { offerReminders: 0, listingReminders: 0, resumeNudges: 0 }
+	// Stage gate: 'disabled' derives nothing (no table access). Other stages
+	// enqueue so the ledger shows what WOULD remind; the delivery gate rules.
+	if (resolveEngineStage() === "disabled") return stats
+	const nowIso = new Date(nowMs).toISOString()
 
 	// Offers (applications at status='offered') expiring within 48h — urgent.
 	const offers = await getExpiringOfferedApplications(48)

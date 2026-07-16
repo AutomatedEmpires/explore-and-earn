@@ -179,6 +179,8 @@ function reasonMessage(reason: Exclude<BoostCheckoutResult, { ok: true }>["reaso
     case "not_host":
     case "unauthenticated":
       return "Please sign in as a host to boost a listing.";
+    case "rate_limited":
+      return "You've started several checkouts just now — give it a few minutes.";
     default:
       return "Payment setup failed — please try again.";
   }

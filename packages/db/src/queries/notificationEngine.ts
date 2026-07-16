@@ -970,3 +970,174 @@ export async function cancelDigestMemberships(ids: readonly string[]): Promise<v
     .in("id", [...ids]);
   if (error) throw new Error(`cancelDigestMemberships failed: ${error.message}`);
 }
+
+/* --------------------------------------------------------------- admin ops */
+/* Read-only observability + narrow repair verbs for /admin/notifications.
+ * Service-role like everything else here; the admin server actions re-verify
+ * the caller with isCurrentUserAdmin() before calling in. There is
+ * DELIBERATELY no bulk-send or bulk-requeue verb on this surface. */
+
+export const DELIVERY_STATUSES: readonly DeliveryStatus[] = [
+  "pending",
+  "deferred",
+  "processing",
+  "delivered",
+  "suppressed",
+  "failed_retryable",
+  "failed_terminal",
+  "dead_letter",
+  "cancelled",
+];
+
+/** Per-status delivery counts (exact, head-only — no row transfer). */
+export async function adminDeliveryStatusCounts(): Promise<Record<DeliveryStatus, number>> {
+  const entries = await Promise.all(
+    DELIVERY_STATUSES.map(async (status) => {
+      const { count, error } = await admin()
+        .from("notification_deliveries")
+        .select("id", { count: "exact", head: true })
+        .eq("status", status);
+      if (error) throw new Error(`adminDeliveryStatusCounts(${status}): ${error.message}`);
+      return [status, count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(entries) as Record<DeliveryStatus, number>;
+}
+
+export interface AdminDeliveryRow {
+  readonly id: string;
+  readonly recipient_clerk_user_id: string;
+  readonly channel: string;
+  readonly notification_type: string;
+  readonly status: string;
+  readonly attempt_count: number;
+  readonly failure_class: string | null;
+  readonly failure_detail: string | null;
+  readonly suppression_reason: string | null;
+  readonly next_attempt_at: string;
+  readonly delivered_at: string | null;
+  readonly created_at: string;
+}
+
+const ADMIN_DELIVERY_COLUMNS =
+  "id, recipient_clerk_user_id, channel, notification_type, status, attempt_count, " +
+  "failure_class, failure_detail, suppression_reason, next_attempt_at, delivered_at, created_at";
+
+/** Recent deliveries, newest first, optionally filtered by status. */
+export async function adminListDeliveries(args: {
+  readonly status?: DeliveryStatus;
+  readonly limit?: number;
+}): Promise<AdminDeliveryRow[]> {
+  let query = admin()
+    .from("notification_deliveries")
+    .select(ADMIN_DELIVERY_COLUMNS)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(Math.max(args.limit ?? 50, 1), 200));
+  if (args.status) query = query.eq("status", args.status);
+  const { data, error } = await query;
+  if (error) throw new Error(`adminListDeliveries: ${error.message}`);
+  return (data ?? []) as unknown as AdminDeliveryRow[];
+}
+
+export interface AdminSuppressionRow {
+  readonly id: string;
+  readonly email: string;
+  readonly reason: string;
+  readonly source: string | null;
+  readonly created_at: string;
+}
+
+export async function adminListEmailSuppressions(limit = 50): Promise<AdminSuppressionRow[]> {
+  const { data, error } = await admin()
+    .from("email_suppressions")
+    .select("id, email, reason, source, created_at")
+    .order("created_at", { ascending: false })
+    .limit(Math.min(Math.max(limit, 1), 200));
+  if (error) throw new Error(`adminListEmailSuppressions: ${error.message}`);
+  return (data ?? []) as unknown as AdminSuppressionRow[];
+}
+
+export interface AdminDigestQueueSummary {
+  readonly dailyQueued: number;
+  readonly weeklyQueued: number;
+}
+
+export async function adminDigestQueueSummary(): Promise<AdminDigestQueueSummary> {
+  const [daily, weekly] = await Promise.all(
+    (["daily", "weekly"] as const).map(async (cadence) => {
+      const { count, error } = await admin()
+        .from("digest_memberships")
+        .select("id", { count: "exact", head: true })
+        .eq("cadence", cadence)
+        .eq("status", "queued");
+      if (error) throw new Error(`adminDigestQueueSummary(${cadence}): ${error.message}`);
+      return count ?? 0;
+    }),
+  );
+  return { dailyQueued: daily, weeklyQueued: weekly };
+}
+
+export interface AdminPushSubscriptionSummary {
+  readonly active: number;
+  readonly revoked: number;
+}
+
+export async function adminPushSubscriptionSummary(): Promise<AdminPushSubscriptionSummary> {
+  const [active, revoked] = await Promise.all([
+    admin()
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .is("revoked_at", null),
+    admin()
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .not("revoked_at", "is", null),
+  ]);
+  if (active.error) throw new Error(`adminPushSubscriptionSummary: ${active.error.message}`);
+  if (revoked.error) throw new Error(`adminPushSubscriptionSummary: ${revoked.error.message}`);
+  return { active: active.count ?? 0, revoked: revoked.count ?? 0 };
+}
+
+/**
+ * Requeue ONE terminally-failed delivery for a fresh attempt cycle. Narrow on
+ * purpose: only dead_letter / failed_terminal rows qualify (anything else is
+ * either in flight or a deliberate suppression), and the WHERE carries the
+ * status filter so a concurrent transition can never be clobbered.
+ */
+export async function adminRequeueDelivery(deliveryId: string): Promise<boolean> {
+  const { data, error } = await admin()
+    .from("notification_deliveries")
+    .update({
+      status: "pending",
+      attempt_count: 0,
+      next_attempt_at: new Date().toISOString(),
+      failure_class: null,
+      failure_detail: null,
+      worker_id: null,
+      lease_expires_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", deliveryId)
+    .in("status", ["dead_letter", "failed_terminal"])
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(`adminRequeueDelivery: ${error.message}`);
+  return data !== null;
+}
+
+/** Cancel ONE not-yet-sent delivery (pending/deferred/failed_retryable). */
+export async function adminCancelDelivery(deliveryId: string): Promise<boolean> {
+  const { data, error } = await admin()
+    .from("notification_deliveries")
+    .update({
+      status: "cancelled",
+      suppression_reason: "admin_cancelled",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", deliveryId)
+    .in("status", ["pending", "deferred", "failed_retryable"])
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(`adminCancelDelivery: ${error.message}`);
+  return data !== null;
+}

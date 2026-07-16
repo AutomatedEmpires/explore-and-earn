@@ -18,6 +18,7 @@ import {
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
+import { checkRateLimit } from "../../lib/rateLimit";
 import { isAllowedStorageUrl } from "../../lib/storageUrl";
 
 // Host-controllable transitions. The authoritative gate is canTransitionListing
@@ -61,6 +62,34 @@ function optionalString(raw: FormDataEntryValue | null): string | undefined {
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * Action-boundary length caps for the free-text listing fields. The composer
+ * enforces no maxLength, so these are deliberately generous — far beyond any
+ * legitimate submission — and exist to stop scripted megabyte payloads, not to
+ * police hosts. Returns a host-facing message, or null when everything fits.
+ */
+const TEXT_FIELD_CAPS: ReadonlyArray<{
+  key: "title" | "locationName" | "summary" | "housingDescription" | "mealsDescription";
+  max: number;
+  label: string;
+}> = [
+  { key: "title", max: 200, label: "title" },
+  { key: "locationName", max: 200, label: "location name" },
+  { key: "summary", max: 10000, label: "summary" },
+  { key: "housingDescription", max: 2000, label: "housing description" },
+  { key: "mealsDescription", max: 2000, label: "meals description" },
+];
+
+function oversizedFieldError(fields: ListingWriteFields): string | null {
+  for (const { key, max, label } of TEXT_FIELD_CAPS) {
+    const value = fields[key];
+    if (typeof value === "string" && value.length > max) {
+      return `The ${label} is too long — keep it under ${max} characters.`;
+    }
+  }
+  return null;
 }
 
 function resolveCategory(raw: FormDataEntryValue | null): MarketplaceCategory | undefined {
@@ -157,7 +186,25 @@ export async function createListingAction(
     return { ok: false, error: authResult.error };
   }
 
+  // Rate limit: 10 new listings per day per host — real hosts publish a few,
+  // and every create lands in the moderation queue (spam pre-moderation guard).
+  const { allowed } = checkRateLimit(
+    `listing-create:${authResult.auth.userId}`,
+    10,
+    24 * 60 * 60 * 1000,
+  );
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "You've created several listings today — please try again tomorrow.",
+    };
+  }
+
   const fields = readListingFields(formData);
+  const oversized = oversizedFieldError(fields);
+  if (oversized) {
+    return { ok: false, error: oversized };
+  }
   if (!isAllowedStorageUrl(fields.coverPhotoUrl)) {
     return { ok: false, error: "Invalid cover photo URL." };
   }
@@ -202,6 +249,10 @@ export async function updateListingAction(
   }
 
   const fields = readListingFields(formData);
+  const oversized = oversizedFieldError(fields);
+  if (oversized) {
+    return { ok: false, error: oversized };
+  }
   if (!isAllowedStorageUrl(fields.coverPhotoUrl)) {
     return { ok: false, error: "Invalid cover photo URL." };
   }
@@ -301,6 +352,20 @@ export async function duplicateListingAction(
   const authResult = await resolveHostAuth();
   if (!authResult.ok) {
     return { ok: false, error: authResult.error };
+  }
+
+  // Rate limit: 10 duplicates per day per host — same budget as create, since
+  // a duplicate mints a whole new listing row.
+  const { allowed } = checkRateLimit(
+    `listing-duplicate:${authResult.auth.userId}`,
+    10,
+    24 * 60 * 60 * 1000,
+  );
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "You've duplicated several listings today — please try again tomorrow.",
+    };
   }
 
   const result = await duplicateListingRow(

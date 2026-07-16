@@ -45,7 +45,8 @@ function makeChain(result: { data: unknown; error: unknown }) {
   const terminal = () => Promise.resolve(result);
   const self = () => chain;
   chain.select = self;
-  chain.update = self;
+  // vi.fn so tests can assert the UPDATE payload (e.g. withdrawn_reason).
+  chain.update = vi.fn(self) as unknown as () => typeof chain;
   chain.insert = self;
   chain.eq = self;
   chain.neq = self;
@@ -60,7 +61,9 @@ function makeChain(result: { data: unknown; error: unknown }) {
 
 // SEEKER_SETTABLE_STATUSES is not exported; mirror it here for the membership
 // test. Any drift would manifest as functional failures in the test cases below.
-const SEEKER_SETTABLE_STATUSES = ["accepted", "not_selected"] as const;
+// Decline is 'withdrawn' (offered -> withdrawn is the seeded lifecycle edge);
+// 'not_selected' is host-only vocabulary.
+const SEEKER_SETTABLE_STATUSES = ["accepted", "withdrawn"] as const;
 
 // ── Status membership tests ────────────────────────────────────────────────
 
@@ -96,12 +99,16 @@ describe("updateApplicationStatus", () => {
   const LISTING_ID = "listing-1";
   const HOST_PROFILE_ID = "hp-1";
 
-  /** Wire mockFrom to return the correct result for each table call in order. */
+  /**
+   * Wire mockFrom to return the correct result for each table call in order.
+   * The UPDATE now chains .select("id").maybeSingle(), so its stub carries the
+   * matched row (or null for the zero-row / conflict case) alongside the error.
+   */
   function setupChains(
     hostResult: unknown,
     appResult: unknown,
     listingResult: unknown,
-    updateResult: unknown,
+    updateResult: { data: unknown; error: unknown },
   ) {
     let call = 0;
     (mockFrom as MockInstance).mockImplementation(() => {
@@ -109,9 +116,12 @@ describe("updateApplicationStatus", () => {
       if (call === 1) return makeChain({ data: hostResult, error: null });   // host_profiles
       if (call === 2) return makeChain({ data: appResult, error: null });     // applications select
       if (call === 3) return makeChain({ data: listingResult, error: null }); // listings select
-      return makeChain({ data: null, error: updateResult });                  // applications update
+      return makeChain(updateResult);                                         // applications update
     });
   }
+
+  const UPDATE_OK = { data: { id: APP_ID }, error: null };
+  const UPDATE_UNREACHED = { data: null, error: null };
 
   beforeEach(() => {
     mockFrom.mockReset();
@@ -146,7 +156,7 @@ describe("updateApplicationStatus", () => {
       [{ id: HOST_PROFILE_ID }],
       { id: APP_ID, listing_id: LISTING_ID },
       { id: LISTING_ID, host_profile_id: "other-hp", remaining_role_count: 1 },
-      null,
+      UPDATE_UNREACHED,
     );
     const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "reviewing");
     expect(result).toEqual({ ok: false, error: "forbidden" });
@@ -157,7 +167,7 @@ describe("updateApplicationStatus", () => {
       [{ id: HOST_PROFILE_ID }],
       { id: APP_ID, listing_id: LISTING_ID },
       { id: LISTING_ID, host_profile_id: HOST_PROFILE_ID, remaining_role_count: 0 },
-      null,
+      UPDATE_UNREACHED,
     );
     const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "listing_full" });
@@ -168,7 +178,7 @@ describe("updateApplicationStatus", () => {
       [{ id: HOST_PROFILE_ID }],
       { id: APP_ID, listing_id: LISTING_ID },
       { id: LISTING_ID, host_profile_id: HOST_PROFILE_ID, remaining_role_count: -1 },
-      null,
+      UPDATE_UNREACHED,
     );
     const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "listing_full" });
@@ -179,7 +189,7 @@ describe("updateApplicationStatus", () => {
       [{ id: HOST_PROFILE_ID }],
       { id: APP_ID, listing_id: LISTING_ID },
       { id: LISTING_ID, host_profile_id: HOST_PROFILE_ID, remaining_role_count: 2 },
-      null, // no update error
+      UPDATE_OK,
     );
     const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: true });
@@ -190,7 +200,7 @@ describe("updateApplicationStatus", () => {
       [{ id: HOST_PROFILE_ID }],
       { id: APP_ID, listing_id: LISTING_ID },
       { id: LISTING_ID, host_profile_id: HOST_PROFILE_ID, remaining_role_count: 1 },
-      { code: "23514", message: "check_violation" }, // race-condition scenario
+      { data: null, error: { code: "23514", message: "check_violation" } }, // race-condition scenario
     );
     const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "listing_full" });
@@ -203,7 +213,7 @@ describe("updateApplicationStatus", () => {
       [{ id: HOST_PROFILE_ID }],
       { id: APP_ID, listing_id: LISTING_ID },
       { id: LISTING_ID, host_profile_id: HOST_PROFILE_ID, remaining_role_count: 1 },
-      { code: "23514", message: "Illegal application lifecycle transition: reviewing -> accepted" },
+      { data: null, error: { code: "23514", message: "Illegal application lifecycle transition: reviewing -> accepted" } },
     );
     const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "invalid_transition" });
@@ -214,7 +224,7 @@ describe("updateApplicationStatus", () => {
       [{ id: HOST_PROFILE_ID }],
       { id: APP_ID, listing_id: LISTING_ID },
       { id: LISTING_ID, host_profile_id: HOST_PROFILE_ID, remaining_role_count: 1 },
-      { code: "23514", message: "Illegal application lifecycle transition: ..." },
+      { data: null, error: { code: "23514", message: "Illegal application lifecycle transition: ..." } },
     );
     const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "reviewing");
     expect(result).toEqual({ ok: false, error: "invalid_transition" });
@@ -225,11 +235,22 @@ describe("updateApplicationStatus", () => {
       [{ id: HOST_PROFILE_ID }],
       { id: APP_ID, listing_id: LISTING_ID },
       { id: LISTING_ID, host_profile_id: HOST_PROFILE_ID, remaining_role_count: 0 },
-      null,
+      UPDATE_OK,
     );
     // remaining_role_count=0 should NOT block a non-accept transition
     const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "reviewing");
     expect(result).toEqual({ ok: true });
+  });
+
+  it('returns conflict when the UPDATE matches no row (race or RLS filter)', async () => {
+    setupChains(
+      [{ id: HOST_PROFILE_ID }],
+      { id: APP_ID, listing_id: LISTING_ID },
+      { id: LISTING_ID, host_profile_id: HOST_PROFILE_ID, remaining_role_count: 2 },
+      UPDATE_UNREACHED, // UPDATE reached but matched nothing
+    );
+    const result = await updateApplicationStatus(TOKEN, USER, APP_ID, "reviewing");
+    expect(result).toEqual({ ok: false, error: "conflict" });
   });
 });
 
@@ -253,7 +274,7 @@ describe("updateApplicationStatusBySeeker", () => {
     seekerProfileResult: unknown,
     appResult: unknown,
     listingResult: unknown,
-    updateError: unknown,
+    updateResult: { data: unknown; error: unknown },
   ) {
     let call = 0;
     (mockFrom as MockInstance).mockImplementation(() => {
@@ -261,9 +282,12 @@ describe("updateApplicationStatusBySeeker", () => {
       if (call === 1) return makeChain({ data: seekerProfileResult, error: null }); // seeker_profiles
       if (call === 2) return makeChain({ data: appResult, error: null });             // applications select
       if (call === 3) return makeChain({ data: listingResult, error: null });         // listings select
-      return makeChain({ data: null, error: updateError });                            // applications update
+      return makeChain(updateResult);                                                  // applications update
     });
   }
+
+  const SEEKER_UPDATE_OK = { data: { id: APP_ID }, error: null };
+  const SEEKER_UPDATE_UNREACHED = { data: null, error: null };
 
   beforeEach(() => {
     mockFrom.mockReset();
@@ -296,7 +320,7 @@ describe("updateApplicationStatusBySeeker", () => {
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: "other-sp", status: "offered", listing_id: LISTING_ID },
       null,
-      null,
+      SEEKER_UPDATE_UNREACHED,
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "forbidden" });
@@ -307,7 +331,7 @@ describe("updateApplicationStatusBySeeker", () => {
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "reviewing", listing_id: LISTING_ID },
       null,
-      null,
+      SEEKER_UPDATE_UNREACHED,
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "invalid_transition" });
@@ -318,7 +342,7 @@ describe("updateApplicationStatusBySeeker", () => {
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "offered", listing_id: LISTING_ID },
       { remaining_role_count: 0 },
-      null,
+      SEEKER_UPDATE_UNREACHED,
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "listing_full" });
@@ -329,7 +353,7 @@ describe("updateApplicationStatusBySeeker", () => {
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "offered", listing_id: LISTING_ID },
       { remaining_role_count: 1 },
-      null,
+      SEEKER_UPDATE_OK,
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: true });
@@ -340,15 +364,17 @@ describe("updateApplicationStatusBySeeker", () => {
       { id: SEEKER_PROFILE_ID },
       { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "offered", listing_id: LISTING_ID },
       { remaining_role_count: 1 }, // passed pre-check; race happened during write
-      { code: "23514", message: "check_violation" },
+      { data: null, error: { code: "23514", message: "check_violation" } },
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: false, error: "listing_full" });
   });
 
-  it('does not check capacity when seeker declines (not_selected)', async () => {
-    // Only 2 DB calls expected: seeker_profiles + applications update (no listing check)
+  it('declines via withdrawn without a capacity check, stamping seeker_declined_offer', async () => {
+    // Only 3 DB calls expected: seeker_profiles, applications select,
+    // applications update (no listing capacity check on a decline).
     let call = 0;
+    const update = makeChain({ data: { id: APP_ID }, error: null });
     (mockFrom as MockInstance).mockImplementation(() => {
       call++;
       if (call === 1) return makeChain({ data: { id: SEEKER_PROFILE_ID }, error: null });
@@ -362,13 +388,32 @@ describe("updateApplicationStatusBySeeker", () => {
           },
           error: null,
         });
-      // call=3 is the update, no listing select expected
-      return makeChain({ data: null, error: null });
+      return update;
     });
-    const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "not_selected");
+    const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "withdrawn");
     expect(result).toEqual({ ok: true });
-    // Listing select (call 3) should NOT have been called; only 3 calls total
-    // (seeker_profiles, applications select, applications update).
     expect(call).toBe(3);
+    // The decline is offered -> withdrawn with the distinguishing reason —
+    // never not_selected (that edge does not exist for seekers).
+    expect(update.update).toHaveBeenCalledWith({
+      status: "withdrawn",
+      withdrawn_reason: "seeker_declined_offer",
+    });
+  });
+
+  it('rejects the legacy not_selected decline value as invalid_status', async () => {
+    const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "not_selected");
+    expect(result).toEqual({ ok: false, error: "invalid_status" });
+  });
+
+  it('returns conflict when the UPDATE matches no row (race or RLS filter)', async () => {
+    setupSeekerChains(
+      { id: SEEKER_PROFILE_ID },
+      { id: APP_ID, seeker_profile_id: SEEKER_PROFILE_ID, status: "offered", listing_id: LISTING_ID },
+      { remaining_role_count: 1 },
+      { data: null, error: null }, // UPDATE matched nothing
+    );
+    const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
+    expect(result).toEqual({ ok: false, error: "conflict" });
   });
 });
