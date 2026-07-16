@@ -15,6 +15,10 @@ import { adminClient } from "../adminClient";
  *    does not go stale because its origin posting vanished.
  *  - listings the source has explicitly withdrawn (source_status='withdrawn')
  *    are left to their own flow.
+ *  - listings with an IN-FLIGHT claim (claim_summary='claim_pending') are
+ *    skipped: closing a listing mid-review would strand a real employer's
+ *    claim. The claim decision (or its terminal states) releases the hold and
+ *    the next sweep picks the row up normally.
  *  - it CLOSES stale rows (status 'live'→'closed', source_status 'stale'), a
  *    reversible lifecycle state — it never deletes, so import reconciliation
  *    and lineage stay intact.
@@ -54,6 +58,7 @@ export async function sweepStaleSourcedListings(
       })
       .eq("provenance", "sourced")
       .eq("status", "live")
+      .neq("claim_summary", "claim_pending")
       .lt("source_last_seen_at", cutoffIso)
       .select("id");
     if (error) return { ok: false, closed: 0, ids: [], error: error.message };

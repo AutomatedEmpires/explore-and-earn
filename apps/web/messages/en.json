@@ -104,8 +104,20 @@
 				"body": "You have a new message waiting on Explore & Earn."
 			},
 			"sourced_listing_claim_submitted": {
-				"title": "We received your claim",
-				"body": "Your claim for {listingTitle} was submitted and is pending review. We'll let you know once it's decided — submitting a claim doesn't grant ownership."
+				"title": "New listing claim to review",
+				"body": "Someone claimed {listingTitle} and is awaiting review. Verify their authority before anything on the listing changes — a submitted claim grants nothing by itself."
+			},
+			"listing_claim_approved": {
+				"title": "Your claim was approved",
+				"body": "Your claim for {listingTitle} was approved. Review and confirm every detail to publish it as your verified listing — nothing changes until you do."
+			},
+			"listing_claim_rejected": {
+				"title": "Update on your claim",
+				"body": "Your claim for {listingTitle} was not approved. The listing stays as-is; you can submit a new claim with stronger evidence of your authority."
+			},
+			"listing_claim_converted": {
+				"title": "Your listing is now verified",
+				"body": "You confirmed {listingTitle} and it's now published as your verified listing. Manage it from your host dashboard."
 			},
 			"listing_expiring": {
 				"title": "Your listing expires soon",
@@ -128,7 +140,11 @@
 				"new_strong_match": "View listing",
 				"saved_search_results": "See new matches",
 				"resume_nudge": "Finish résumé",
-				"listing_expiring": "Manage listing"
+				"listing_expiring": "Manage listing",
+				"sourced_listing_claim_submitted": "Review claim",
+				"listing_claim_approved": "Confirm your listing",
+				"listing_claim_rejected": "View claim",
+				"listing_claim_converted": "Manage listing"
 			},
 			"footerNote": "You're receiving this because you have an Explore & Earn account.",
 			"unsubscribe": "Unsubscribe"

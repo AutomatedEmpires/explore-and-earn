@@ -41,6 +41,7 @@ const SECTIONS: readonly AdminNavDef[] = [
   { href: "/listings", label: "Listings", icon: "category.mix" },
   { href: "/hosts", label: "Hosts", icon: "nav.profile" },
   { href: "/admin/reports", label: "Reports", icon: "action.report" },
+  { href: "/admin/claims", label: "Claims", icon: "profile.verification" },
   { href: "/admin/refunds", label: "Refunds", icon: "benefit.pay" },
 ];
 

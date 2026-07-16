@@ -58,7 +58,10 @@ export const NOTIFICATION_TYPES = [
 	// Messaging
 	"message_received", // counterparty only, thread-collapsed
 	// Sourced / host lifecycle
-	"sourced_listing_claim_submitted", // operational/host contact: claim INITIATED (never implies approval)
+	"sourced_listing_claim_submitted", // admin/founder: a claim was INITIATED and awaits review (never implies approval)
+	"listing_claim_approved", // claimant: authority accepted — confirmation may begin
+	"listing_claim_rejected", // claimant: claim denied (truthful, no listing change)
+	"listing_claim_converted", // claimant: listing converted sourced → verified under their host profile
 	"listing_expiring", // host: real expires_at approaching
 	// Seeker lifecycle
 	"resume_nudge", // seeker: genuinely-incomplete résumé, cooldown-gated
@@ -79,6 +82,9 @@ export const NOTIFICATION_TYPE_CATEGORY: Record<NotificationType, EngagementCate
 	offer_expiring: "offers_invites",
 	message_received: "messages",
 	sourced_listing_claim_submitted: "listing_lifecycle",
+	listing_claim_approved: "listing_lifecycle",
+	listing_claim_rejected: "listing_lifecycle",
+	listing_claim_converted: "listing_lifecycle",
 	listing_expiring: "listing_lifecycle",
 	resume_nudge: "account_progress",
 }
@@ -104,6 +110,9 @@ export const NOTIFICATION_TYPE_INAPP_CATEGORY: Record<NotificationType, InAppNot
 	offer_expiring: "offers",
 	message_received: "messages",
 	sourced_listing_claim_submitted: "verification",
+	listing_claim_approved: "verification",
+	listing_claim_rejected: "verification",
+	listing_claim_converted: "verification",
 	listing_expiring: "system",
 	resume_nudge: "system",
 }

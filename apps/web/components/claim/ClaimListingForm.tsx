@@ -1,23 +1,44 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Icon } from "@explore-and-earn/ui";
 import type { ListingClaimStatus } from "@explore-and-earn/contracts";
 
-import { initiateClaimAction } from "../../app/actions/listingClaims";
+import {
+  beginClaimConfirmationAction,
+  initiateClaimAction,
+} from "../../app/actions/listingClaims";
+import {
+  ClaimConfirmationForm,
+  type ConfirmationPrefill,
+} from "./ClaimConfirmationForm";
 import styles from "./ClaimListingForm.module.css";
 
 interface ExistingClaim {
+  readonly id: string;
   readonly status: ListingClaimStatus;
+  readonly hostProfileId: string | null;
+  readonly reviewNotes: string | null;
 }
 
 /**
- * The employer claim form for a sourced listing. Collects authority evidence
- * (work email, role, statement) and initiates the claim, which enters founder
- * review. All authorization is server-side; this only gathers the evidence a
- * human reviewer needs. If the caller already has a claim, its status is shown
- * instead of a second form (the server also blocks duplicate active claims).
+ * The employer claim surface for a sourced listing — STATUS-AWARE across the
+ * whole claim-to-verify journey:
+ *
+ *   no claim            → authority-evidence form (work email, role, statement)
+ *   in review           → honest "submitted, pending review" card
+ *   approved            → explanation + "Begin confirmation" (host-onboarding
+ *                         hand-off when the claimant has no host profile yet)
+ *   confirming          → field-by-field review of EVERY sourced value
+ *                         (ClaimConfirmationForm — accept-as-is is explicit)
+ *   converted           → success card linking the host listing manager
+ *   rejected / revoked  → honest decision card with the review note, plus the
+ *                         option to submit a fresh claim
+ *
+ * All authorization is server-side; this only gathers evidence and confirmed
+ * values. The server also blocks duplicate active claims.
  */
 export function ClaimListingForm({
   listingId,
@@ -25,12 +46,15 @@ export function ClaimListingForm({
   sourceName,
   employerName,
   existingClaim,
+  confirmationPrefill,
 }: {
   readonly listingId: string;
   readonly listingTitle: string;
   readonly sourceName: string | null;
   readonly employerName: string | null;
   readonly existingClaim: ExistingClaim | null;
+  /** Current sourced values, provided by the page ONLY while status === 'confirming'. */
+  readonly confirmationPrefill: ConfirmationPrefill | null;
 }) {
   const router = useRouter();
   const [workEmail, setWorkEmail] = useState("");
@@ -39,11 +63,9 @@ export function ClaimListingForm({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  const activeClaim =
-    existingClaim &&
-    existingClaim.status !== "rejected" &&
-    existingClaim.status !== "revoked";
+  const [reclaiming, setReclaiming] = useState(false);
+  const [beginning, setBeginning] = useState(false);
+  const [needsHostProfile, setNeedsHostProfile] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,12 +79,184 @@ export function ClaimListingForm({
     setSubmitting(false);
     if (result.ok) {
       setSubmitted(true);
+      setReclaiming(false);
+      router.refresh();
     } else {
       setError(errorCopy(result.error));
     }
   }
 
-  if (submitted || activeClaim) {
+  async function handleBeginConfirmation() {
+    if (!existingClaim) return;
+    setError(null);
+    setBeginning(true);
+    const result = await beginClaimConfirmationAction(existingClaim.id).catch(() => ({
+      ok: false,
+      error: "network",
+    }));
+    setBeginning(false);
+    if (result.ok) {
+      router.refresh();
+    } else if (result.error === "host_profile_required") {
+      setNeedsHostProfile(true);
+    } else {
+      setError(errorCopy(result.error));
+    }
+  }
+
+  const status = existingClaim?.status ?? null;
+
+  /* ── Converted: the loop is closed ────────────────────────────────────── */
+  if (status === "converted") {
+    return (
+      <div className={styles.card}>
+        <div className={styles.doneIcon}>
+          <Icon name="system.success" size={28} aria-hidden />
+        </div>
+        <h1 className={styles.title}>This listing is yours</h1>
+        <p className={styles.lead}>
+          You confirmed <strong>{listingTitle}</strong> and it&apos;s now published
+          as your verified Explore &amp; Earn listing, managed from your host
+          dashboard like any listing you created yourself.
+        </p>
+        <Button variant="primary" onClick={() => router.push("/host/listings")}>
+          Manage your listings
+        </Button>
+        <Button variant="secondary" onClick={() => router.push(`/listing/${listingId}`)}>
+          View the listing
+        </Button>
+      </div>
+    );
+  }
+
+  /* ── Confirming: field-by-field review ────────────────────────────────── */
+  if (status === "confirming" && existingClaim) {
+    if (!confirmationPrefill || !existingClaim.hostProfileId) {
+      return (
+        <div className={styles.card}>
+          <h1 className={styles.title}>Confirmation unavailable</h1>
+          <p className={styles.lead}>
+            We couldn&apos;t load the listing details for confirmation. Please
+            refresh the page and try again.
+          </p>
+          <Button variant="secondary" onClick={() => router.refresh()}>
+            Refresh
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <ClaimConfirmationForm
+        claimId={existingClaim.id}
+        hostProfileId={existingClaim.hostProfileId}
+        listingId={listingId}
+        prefill={confirmationPrefill}
+      />
+    );
+  }
+
+  /* ── Approved: begin confirmation (or host-onboarding hand-off) ───────── */
+  if (status === "approved") {
+    if (needsHostProfile) {
+      return (
+        <div className={styles.card}>
+          <h1 className={styles.title}>One step first: create your host profile</h1>
+          <p className={styles.lead}>
+            Your claim for <strong>{listingTitle}</strong> is approved. To take
+            over the listing you need a host profile — that&apos;s the verified
+            identity the listing will belong to.
+          </p>
+          <p className={styles.note}>
+            Set up your host profile, then come back to this page and press
+            &quot;Begin confirmation&quot; again to review every detail.
+          </p>
+          <Button variant="primary" onClick={() => router.push("/host/onboarding")}>
+            Create your host profile
+          </Button>
+          <Button variant="ghost" onClick={() => setNeedsHostProfile(false)}>
+            Back
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div className={styles.card}>
+        <div className={styles.doneIcon}>
+          <Icon name="system.success" size={28} aria-hidden />
+        </div>
+        <h1 className={styles.title}>Your claim was approved</h1>
+        <p className={styles.lead}>
+          We&apos;ve confirmed you can represent this employer. Next, you review
+          every detail of <strong>{listingTitle}</strong> — exactly as it was
+          sourced — and correct or confirm each field. Only after your explicit
+          confirmation does it become your verified listing.
+        </p>
+        <p className={styles.note}>
+          Nothing on the listing has changed yet, and nothing will until you
+          confirm it yourself.
+        </p>
+        {error ? (
+          <p className={styles.error} role="alert">
+            <Icon name="system.warning" size={16} aria-hidden />
+            {error}
+          </p>
+        ) : null}
+        <Button variant="primary" disabled={beginning} onClick={handleBeginConfirmation}>
+          {beginning ? "Starting…" : "Begin confirmation"}
+        </Button>
+      </div>
+    );
+  }
+
+  /* ── Rejected / revoked: honest decision card (+ optional re-claim) ────── */
+  if ((status === "rejected" || status === "revoked") && !reclaiming && !submitted) {
+    const rejected = status === "rejected";
+    return (
+      <div className={styles.card}>
+        <h1 className={styles.title}>
+          {rejected ? "Your claim wasn't approved" : "Your claim was revoked"}
+        </h1>
+        <p className={styles.lead}>
+          {rejected ? (
+            <>
+              We reviewed your claim for <strong>{listingTitle}</strong> and
+              couldn&apos;t confirm your authority to represent this employer.
+              The listing stays exactly as it was sourced.
+            </>
+          ) : (
+            <>
+              Your claim on <strong>{listingTitle}</strong> was revoked and the
+              listing was restored to its original sourced state.
+            </>
+          )}
+        </p>
+        {existingClaim?.reviewNotes ? (
+          <p className={styles.reviewNote}>
+            <span className={styles.reviewNoteLabel}>Reviewer&apos;s note</span>
+            {existingClaim.reviewNotes}
+          </p>
+        ) : null}
+        <p className={styles.note}>
+          If you believe this was a mistake, you can submit a new claim with
+          stronger evidence of your authority.
+        </p>
+        <Button variant="primary" onClick={() => setReclaiming(true)}>
+          Submit a new claim
+        </Button>
+        <Button variant="secondary" onClick={() => router.push(`/listing/${listingId}`)}>
+          Back to the listing
+        </Button>
+      </div>
+    );
+  }
+
+  /* ── Pending review (or just submitted) ───────────────────────────────── */
+  const pendingReview =
+    submitted ||
+    status === "initiated" ||
+    status === "verification_pending" ||
+    status === "requires_review";
+  if (pendingReview) {
     return (
       <div className={styles.card}>
         <div className={styles.doneIcon}>
@@ -85,6 +279,7 @@ export function ClaimListingForm({
     );
   }
 
+  /* ── No claim yet: the authority-evidence form ────────────────────────── */
   return (
     <div className={styles.card}>
       <h1 className={styles.title}>Claim this opportunity</h1>
@@ -155,6 +350,11 @@ export function ClaimListingForm({
           before it becomes a verified Explore &amp; Earn listing.
         </p>
       </form>
+      {reclaiming ? (
+        <Link className={styles.backLink} href={`/listing/${listingId}`}>
+          Back to the listing
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -174,7 +374,11 @@ function errorCopy(code: string | undefined): string {
       return "You've submitted several claims recently — please try again later.";
     case "unauthenticated":
       return "Please sign in to claim this listing.";
+    case "claim_not_approved":
+      return "This claim isn't in an approved state — refresh the page for its current status.";
+    case "not_claimant":
+      return "Only the person who submitted this claim can continue it.";
     default:
-      return "Something went wrong submitting your claim. Please try again.";
+      return "Something went wrong. Please try again.";
   }
 }
