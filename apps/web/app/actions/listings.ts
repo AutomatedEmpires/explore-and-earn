@@ -14,6 +14,7 @@ import {
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
+  sanitizeCategoryDepth,
   sanitizeLogistics,
   type CompensationUnit,
   type MarketplaceCategory,
@@ -189,6 +190,20 @@ function readListingFields(formData: FormData): ListingWriteFields {
         fields.logistics = sanitizeLogistics(JSON.parse(raw) as unknown);
       } catch {
         // Malformed JSON — leave logistics unset (column untouched).
+      }
+    }
+  }
+
+  // Category depth (069) — same contract, same gate, its OWN column. Kept
+  // separate from logistics all the way down so the two groups can never
+  // overwrite or re-date each other.
+  if (formData.has("categoryDepth")) {
+    const raw = formData.get("categoryDepth");
+    if (typeof raw === "string") {
+      try {
+        fields.categoryDepth = sanitizeCategoryDepth(JSON.parse(raw) as unknown);
+      } catch {
+        // Malformed JSON — leave categoryDepth unset (column untouched).
       }
     }
   }

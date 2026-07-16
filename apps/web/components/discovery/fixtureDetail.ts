@@ -280,6 +280,10 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 		// invented best case. Real fixtures get real facts only once a host form
 		// can produce them.
 		logistics: {},
+		// Same for category depth (069): a fixture that invented a vessel length
+		// would be the one thing this contract exists to prevent — a claim with no
+		// host behind it. The dev bench shows the honest empty state.
+		categoryDepth: {},
 		id: f.id,
 		title: f.title,
 		category: f.category,

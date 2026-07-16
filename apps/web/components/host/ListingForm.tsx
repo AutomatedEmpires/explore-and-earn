@@ -15,14 +15,18 @@ import {
   COMPENSATION_UNIT,
   hasVerifiedHostSubscription,
   sanitizeConnectivity,
+  sanitizeMaritimeDepth,
+  statedFactsKey,
   type CompensationUnit,
   type ConnectivityInfo,
   type MarketplaceCategory,
+  type MaritimeDepth,
 } from "@explore-and-earn/contracts";
 
 import { ImageUpload } from "../ImageUpload";
 import { BenefitTrustModal, type BenefitKind } from "../discovery";
 import { ConnectivityFields } from "./ConnectivityFields";
+import { MaritimeDepthFields } from "./MaritimeDepthFields";
 import { MediaGalleryUpload, type GalleryItem } from "./MediaGalleryUpload";
 import { createListingAction, updateListingAction } from "../../app/actions/listings";
 import { monetizationRank, type HostTier } from "../../lib/ranking";
@@ -53,6 +57,8 @@ export interface ListingFormInitialValues {
   readonly galleryUrls?: ReadonlyArray<string>;
   /** Host-stated connectivity (listings.logistics.connectivity; migration 068). */
   readonly connectivity?: ConnectivityInfo;
+  /** Host-stated vessel depth (listings.category_depth.maritime; migration 069). */
+  readonly maritime?: MaritimeDepth;
 }
 
 export interface ListingFormProps {
@@ -219,6 +225,13 @@ export function ListingForm({
   const [connectivity, setConnectivity] = useState<ConnectivityInfo>(
     initial?.connectivity ?? {},
   );
+  // Hydrated UNCONDITIONALLY, regardless of the listing's current lane. The
+  // fields only RENDER for a maritime listing, but the state must round-trip
+  // for every listing: if a host re-lanes a boat listing to farm and saves,
+  // un-hydrated state would submit `{}` and silently wipe vessel facts they
+  // never touched. (See the render gate below — they stay editable too, so the
+  // facts are never stranded.)
+  const [maritime, setMaritime] = useState<MaritimeDepth>(initial?.maritime ?? {});
   const [housingDescription, setHousingDescription] = useState(
     initial?.housingDescription ?? "",
   );
@@ -243,6 +256,12 @@ export function ListingForm({
 
   const derivedCategory = categoryFromLanes(lanes);
   const multiLane = !lanes.includes("mix") && lanes.length >= 2;
+
+  // Ask the vessel questions of a maritime listing — or of any listing that
+  // already carries vessel facts, so a host who re-lanes can still clear what
+  // they stated rather than leaving it stranded and rendered.
+  const hasMaritimeFacts = sanitizeMaritimeDepth(maritime) !== undefined;
+  const showMaritimeFields = derivedCategory === "maritime" || hasMaritimeFacts;
 
   // ── Validation ────────────────────────────────────────────────────────────
   const errors = useMemo(() => {
@@ -360,15 +379,30 @@ export function ListingForm({
   }
 
   /**
-   * The logistics payload, with an HONEST report date.
+   * The report date for a host-stated fact group — the honesty rule both
+   * groups obey, in one place so they cannot drift apart.
    *
-   * `reportedAt` is only stamped when the host actually CHANGED a connectivity
-   * answer. Re-stamping it on every save would claim "the host confirmed this
+   * `reportedAt` is only stamped when the host actually CHANGED an answer in
+   * THAT group. Re-stamping on every save would claim "the host confirmed this
    * today" every time they edited an unrelated field like pay — turning the
    * freshness signal into a lie, and a stale-but-dated report is exactly what
-   * that signal exists to expose. Unchanged answers keep their original date;
-   * a report the host never dated stays undated (freshness reads null =
-   * unknown age, which is not the same as fresh).
+   * that signal exists to expose. Unchanged answers keep their original date; a
+   * report the host never dated stays undated (freshness reads null = unknown
+   * age, which is not the same as fresh).
+   *
+   * statedFactsKey ignores the date and sorts keys, so neither the existing
+   * timestamp nor serialization order can masquerade as a change.
+   */
+  function stampedReportDate(
+    next: object,
+    previous: { readonly reportedAt?: string } | undefined,
+  ): string | undefined {
+    const changed = statedFactsKey(next) !== statedFactsKey(previous);
+    return changed ? new Date().toISOString() : previous?.reportedAt;
+  }
+
+  /**
+   * The logistics payload, with an HONEST report date (see stampedReportDate).
    */
   function buildLogisticsPayload() {
     // sanitize on the client too, so what we stamp is what will persist.
@@ -376,21 +410,31 @@ export function ListingForm({
     if (!next) return {};
 
     const previous = sanitizeConnectivity(initial?.connectivity);
-    /** The stated facts, ignoring the date — that's what "changed" means here. */
-    const stated = (info: ConnectivityInfo | undefined) =>
-      JSON.stringify(
-        Object.entries(info ?? {})
-          .filter(([key]) => key !== "reportedAt")
-          .sort(([a], [b]) => a.localeCompare(b)),
-      );
-    const changed = stated(next) !== stated(previous);
-
-    const reportedAt = changed
-      ? new Date().toISOString()
-      : previous?.reportedAt;
+    const reportedAt = stampedReportDate(next, previous);
 
     return {
       connectivity: reportedAt ? { ...next, reportedAt } : next,
+    };
+  }
+
+  /**
+   * The category-depth payload (069), with its OWN honest report date.
+   *
+   * Computed entirely separately from logistics — that separation is the whole
+   * reason 069 is its own column. If the two shared one object, editing the
+   * vessel length would look like a change to the connectivity report and stamp
+   * a fresh date on it, claiming the host re-confirmed an internet speed they
+   * never touched.
+   */
+  function buildCategoryDepthPayload() {
+    const next = sanitizeMaritimeDepth(maritime);
+    if (!next) return {};
+
+    const previous = sanitizeMaritimeDepth(initial?.maritime);
+    const reportedAt = stampedReportDate(next, previous);
+
+    return {
+      maritime: reportedAt ? { ...next, reportedAt } : next,
     };
   }
 
@@ -421,6 +465,7 @@ export function ListingForm({
     formData.set("coverPhotoUrl", coverPhotoUrl);
     formData.set("galleryUrls", JSON.stringify(galleryImages.map((img) => img.url)));
     formData.set("logistics", JSON.stringify(buildLogisticsPayload()));
+    formData.set("categoryDepth", JSON.stringify(buildCategoryDepthPayload()));
 
     startTransition(async () => {
       if (mode === "edit" && listingId) {
@@ -692,6 +737,20 @@ export function ListingForm({
               {/* Connectivity — a property of the PLACE, and often the fact that
                   decides whether someone can take the role at all. */}
               <ConnectivityFields value={connectivity} onChange={setConnectivity} />
+
+              {/* The vessel (069) — only asked of a maritime listing, because
+                  these questions are meaningless anywhere else.
+
+                  The `|| hasMaritimeFacts` clause is not redundant: a host who
+                  stated vessel facts and then re-laned the listing must still be
+                  able to SEE and CLEAR them. Gating on the lane alone would
+                  leave real, rendered facts with no way to edit them — the
+                  listing would keep telling seekers about a boat the host can no
+                  longer reach. (The submit path round-trips them either way, so
+                  nothing is silently wiped.) */}
+              {showMaritimeFields ? (
+                <MaritimeDepthFields value={maritime} onChange={setMaritime} />
+              ) : null}
             </div>
           ) : null}
 

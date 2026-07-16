@@ -10,7 +10,7 @@ import {
   recordEvent,
   seekerHasMatchInputs,
 } from "@explore-and-earn/db";
-import { hasLogistics } from "@explore-and-earn/contracts";
+import { hasCategoryDepth, hasLogistics } from "@explore-and-earn/contracts";
 import {
   cachedHostProfile,
   cachedSeekerProfile,
@@ -30,6 +30,7 @@ import { DetailList } from "../../../../components/listing/DetailList";
 import { ProseSection } from "../../../../components/listing/ProseSection";
 import { WeatherWidget } from "../../../../components/listing/WeatherWidget";
 import { ConnectivityFacts } from "../../../../components/listing/ConnectivityFacts";
+import { MaritimeFacts } from "../../../../components/listing/MaritimeFacts";
 import { LocationContext } from "../../../../components/listing/LocationContext";
 import { TeamGrid } from "../../../../components/listing/TeamGrid";
 import { WhyWorkForUs } from "../../../../components/listing/WhyWorkForUs";
@@ -188,6 +189,14 @@ export default async function ListingDetailPage({ params }: Props) {
   // widens — the section stops rendering, instead of rendering undefined.
   const connectivity = hasLogistics(listing.logistics)
     ? listing.logistics.connectivity
+    : undefined;
+  // Same gate-and-bind for category depth (069). Deliberately keyed on the
+  // FACTS existing rather than on listing.category: a host who stated the
+  // vessel and later re-laned the listing still stated those facts, and hiding
+  // them would discard a real answer. (The host form keeps them editable for
+  // the same reason — nothing becomes stranded.)
+  const maritime = hasCategoryDepth(listing.categoryDepth)
+    ? listing.categoryDepth.maritime
     : undefined;
   const weather = hasCoords
     ? await fetchWeather(listing.latitude as number, listing.longitude as number)
@@ -400,6 +409,12 @@ export default async function ListingDetailPage({ params }: Props) {
               Sits beside Weather/Location as part of "what is this place
               really like", not as a benefit (the triad stays three keys). */}
           {connectivity ? <ConnectivityFacts connectivity={connectivity} /> : null}
+
+          {/* 10c. The vessel — category depth (069). Sits beside 10b as part of
+              "what is this place really like", NOT near the triad: these are
+              facts about the workplace, not a fourth thing the host is
+              offering, and the triad is three keys by product law. */}
+          {maritime ? <MaritimeFacts maritime={maritime} /> : null}
 
           {/* 11. Weather (honest shell when the fetch fails) */}
           {hasCoords ? (

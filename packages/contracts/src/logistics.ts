@@ -26,6 +26,24 @@
 // SCOPE: this is a SEPARATE section from the Housing/Meals/Pay triad. The triad
 // is product law and must never gain a fourth key (guardrail 2b); logistics
 // sits beside it exactly as "Perks & benefits" does.
+//
+// Logistics is ROW-level: a farm, a vessel, a lodge and a remote gig all have
+// internet-or-not. Facts that only make sense for ONE lane ("how long is the
+// boat?") are category depth and live in `listings.category_depth` (069) —
+// deliberately a separate column, so the two groups keep independent
+// host-reported dates and cannot stamp each other's.
+
+import {
+	HOST_REPORT_AGING_DAYS,
+	HOST_REPORT_FRESHNESS,
+	HOST_REPORT_STALE_DAYS,
+	hostReportFreshness,
+	optionalBoolean,
+	optionalIsoDate,
+	optionalMember,
+	optionalPositiveNumber,
+	type HostReportFreshness,
+} from "./hostReport";
 
 /* ------------------------------------------------------------ connectivity */
 
@@ -114,61 +132,33 @@ export interface ListingLogistics {
 
 /* --------------------------------------------------------------- staleness */
 
-/** A host-reported logistics fact is shown as aging past this many days. */
-export const LOGISTICS_AGING_DAYS = 180;
-/** …and as stale past this many. Mirrors the sourced-freshness policy shape. */
-export const LOGISTICS_STALE_DAYS = 365;
+// The staleness policy is not about internet — it is about how long ANY host
+// self-report stays credible — so it lives in ./hostReport and is shared with
+// category depth. These names are the logistics-facing spelling of it.
 
-export const LOGISTICS_FRESHNESS = ["fresh", "aging", "stale"] as const;
-export type LogisticsFreshness = (typeof LOGISTICS_FRESHNESS)[number];
+/** A host-reported logistics fact is shown as aging past this many days. */
+export const LOGISTICS_AGING_DAYS = HOST_REPORT_AGING_DAYS;
+/** …and as stale past this many. Mirrors the sourced-freshness policy shape. */
+export const LOGISTICS_STALE_DAYS = HOST_REPORT_STALE_DAYS;
+
+export const LOGISTICS_FRESHNESS = HOST_REPORT_FRESHNESS;
+export type LogisticsFreshness = HostReportFreshness;
 
 /**
  * Freshness of a host report, DERIVED at read time (never stored — a stored
  * freshness would be wrong the moment it was written). Returns null when the
  * host never dated the report: unknown age is not the same as fresh.
  */
-export function logisticsFreshness(
-	reportedAt: string | null | undefined,
-	nowMs: number = Date.now(),
-): LogisticsFreshness | null {
-	if (!reportedAt) return null;
-	const reported = Date.parse(reportedAt);
-	if (!Number.isFinite(reported)) return null;
-	const ageDays = (nowMs - reported) / 86_400_000;
-	if (ageDays < 0) return null; // a future date is not a report
-	if (ageDays >= LOGISTICS_STALE_DAYS) return "stale";
-	if (ageDays >= LOGISTICS_AGING_DAYS) return "aging";
-	return "fresh";
-}
+export const logisticsFreshness = hostReportFreshness;
 
 /* -------------------------------------------------------------- boundaries */
 
 /** Plausible ceiling for a host-reported speed — beyond this it is a typo. */
 const MAX_PLAUSIBLE_MBPS = 10_000;
 
+/** One decimal is as precise as an honest self-report gets. */
 function optionalMbps(value: unknown): number | undefined {
-	if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
-	if (value <= 0 || value > MAX_PLAUSIBLE_MBPS) return undefined;
-	// One decimal is as precise as an honest self-report gets.
-	return Math.round(value * 10) / 10;
-}
-
-function optionalBoolean(value: unknown): boolean | undefined {
-	return typeof value === "boolean" ? value : undefined;
-}
-
-function optionalMember<T extends string>(
-	value: unknown,
-	allowed: readonly T[],
-): T | undefined {
-	return typeof value === "string" && (allowed as readonly string[]).includes(value)
-		? (value as T)
-		: undefined;
-}
-
-function optionalIsoDate(value: unknown): string | undefined {
-	if (typeof value !== "string") return undefined;
-	return Number.isFinite(Date.parse(value)) ? value : undefined;
+	return optionalPositiveNumber(value, MAX_PLAUSIBLE_MBPS, 1);
 }
 
 /**
