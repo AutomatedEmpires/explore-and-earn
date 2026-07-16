@@ -4,7 +4,7 @@
  * timestamp again:
  *  - a composite cursor produces the or() keyset group (lt OR eq+id.lt)
  *  - a legacy bare-timestamp cursor still pages via the parameterized .lt()
- *  - a malformed composite falls back to the legacy path (never interpolated)
+ *  - a malformed cursor is IGNORED entirely (no filter — degrade, never 400)
  *  - the fetch order is (published_at DESC, id DESC) — the keyset's mirror
  *  - encodeSwipeCursor round-trips through getSwipeBatch's parser
  *
@@ -82,11 +82,17 @@ describe("getSwipeBatch cursor keyset", () => {
     expect(callsFor("lt")[0]?.args).toEqual(["published_at", TS]);
   });
 
-  it("never interpolates a malformed composite — falls back to the legacy path", async () => {
+  it("ignores a malformed composite entirely — no filter ever reaches PostgREST", async () => {
     const malformed = `not-a-timestamp|also-not-a-uuid`;
     await getSwipeBatch("token", "user_1", [], malformed);
     expect(callsFor("or")).toHaveLength(0);
-    expect(callsFor("lt")[0]?.args).toEqual(["published_at", malformed]);
+    expect(callsFor("lt")).toHaveLength(0);
+  });
+
+  it("ignores a non-timestamp bare cursor (hostile/garbage) — no filter, no 400", async () => {
+    await getSwipeBatch("token", "user_1", [], "garbage-cursor");
+    expect(callsFor("or")).toHaveLength(0);
+    expect(callsFor("lt")).toHaveLength(0);
   });
 
   it("issues no cursor filter at all on the first page", async () => {

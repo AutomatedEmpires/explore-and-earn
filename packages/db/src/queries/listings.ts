@@ -543,17 +543,20 @@ const SWIPE_CURSOR_UUID_RE =
 
 /**
  * Parse a swipe cursor, tolerating BOTH formats in flight:
- *   - composite `"<published_at>|<id>"` (current, complete keyset), and
+ *   - composite `"<published_at>|<id>"` (current, complete keyset),
  *   - legacy bare published_at (clients holding a cursor from before the
- *     composite format shipped \u2014 degrades to the old timestamp-only page).
+ *     composite format shipped \u2014 degrades to the old timestamp-only page),
+ *   - anything else \u2192 null: the cursor is IGNORED (first page) rather than
+ *     handed to PostgREST, where an invalid timestamp fails the whole request.
  *
  * The composite path is taken only when both halves pass their strict shape
- * checks \u2014 they are interpolated into a PostgREST or() group, so anything
- * malformed falls back to the parameterized .lt() legacy path instead.
+ * checks \u2014 they are interpolated into a PostgREST or() group. The legacy path
+ * also requires a valid timestamp shape: paging is best-effort, and a
+ * malformed/hostile cursor must degrade, never 400.
  */
 function parseSwipeCursor(
   cursor: string,
-): { publishedAt: string; id: string } | { publishedAt: string; id?: undefined } {
+): { publishedAt: string; id: string } | { publishedAt: string; id?: undefined } | null {
   const sep = cursor.indexOf("|");
   if (sep !== -1) {
     const publishedAt = cursor.slice(0, sep);
@@ -561,8 +564,9 @@ function parseSwipeCursor(
     if (SWIPE_CURSOR_TIMESTAMP_RE.test(publishedAt) && SWIPE_CURSOR_UUID_RE.test(id)) {
       return { publishedAt, id };
     }
+    return null;
   }
-  return { publishedAt: cursor };
+  return SWIPE_CURSOR_TIMESTAMP_RE.test(cursor) ? { publishedAt: cursor } : null;
 }
 
 /**
@@ -607,7 +611,7 @@ export async function getSwipeBatch(
 
   if (cursor) {
     const parsed = parseSwipeCursor(cursor);
-    if (parsed.id) {
+    if (parsed?.id) {
       // Complete (published_at, id) keyset: strictly-older timestamps PLUS the
       // rest of the boundary timestamp's rows (id DESC below the cursor id).
       // Both halves are shape-validated above, so the or() string is inert;
@@ -616,11 +620,12 @@ export async function getSwipeBatch(
         `published_at.lt."${parsed.publishedAt}",` +
           `and(published_at.eq."${parsed.publishedAt}",id.lt.${parsed.id})`,
       );
-    } else {
-      // Legacy bare-timestamp cursor (or unparseable composite): the old
-      // timestamp-only page via the parameterized builder.
-      builder = builder.lt("published_at", cursor);
+    } else if (parsed) {
+      // Legacy bare-timestamp cursor: the old timestamp-only page.
+      builder = builder.lt("published_at", parsed.publishedAt);
     }
+    // parsed === null: malformed/hostile cursor — ignored (first page) rather
+    // than sent to PostgREST, where an invalid timestamp 400s the request.
   }
   if (exclude.length > 0) {
     // PostgREST not-in group: values are UUIDs (validated at the action layer),
