@@ -80,9 +80,11 @@ export default async function AdminNotificationsPage() {
     }));
     digestQueue = digests;
     pushSubscriptions = push;
-  } catch {
+  } catch (error) {
     // Missing tables (pre-065) or a transient read failure — render the
-    // inert state; never 500 the admin shell.
+    // unavailable state; never 500 the admin shell. Logged so a REAL outage
+    // is distinguishable from the expected pre-migration state.
+    console.error("[admin/notifications] ledger read failed:", error);
     ledgerAvailable = false;
   }
 

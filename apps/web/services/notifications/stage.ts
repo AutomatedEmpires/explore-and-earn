@@ -59,30 +59,52 @@ function isStage(value: string): value is NotificationEngineStage {
 export function resolveEngineStage(): NotificationEngineStage {
 	const raw = process.env.NOTIFICATION_ENGINE_STAGE?.trim().toLowerCase() ?? ""
 	if (raw && isStage(raw)) return raw
+	const fallback: NotificationEngineStage =
+		process.env.NODE_ENV === "production" ? "disabled" : "enabled"
 	if (raw) {
-		// Misconfiguration is loud, and never widens delivery.
+		// Misconfiguration is loud, and in production never widens delivery.
 		console.error(
-			`[notifications] invalid NOTIFICATION_ENGINE_STAGE "${raw}" — falling back to the fail-closed default`,
+			`[notifications] invalid NOTIFICATION_ENGINE_STAGE "${raw}" — falling back to "${fallback}"`,
 		)
 	}
-	return process.env.NODE_ENV === "production" ? "disabled" : "enabled"
+	return fallback
 }
 
-/** Comma-separated Clerk ids allowed real delivery in internal_preview/limited. */
+/**
+ * Comma-separated Clerk ids allowed real delivery in internal_preview/limited.
+ * Memoized on the raw env string: dispatcher/digest loops call the gate once
+ * per delivery, and re-splitting per call is pure waste — while keying on the
+ * raw value keeps vi.stubEnv-driven tests (and any runtime env change) honest.
+ */
+let allowlistCache: { raw: string; set: ReadonlySet<string> } | null = null
 function internalAllowlist(): ReadonlySet<string> {
-	return new Set(
-		(process.env.NOTIFICATION_INTERNAL_ALLOWLIST ?? "")
-			.split(",")
-			.map((id) => id.trim())
-			.filter(Boolean),
-	)
+	const raw = process.env.NOTIFICATION_INTERNAL_ALLOWLIST ?? ""
+	if (allowlistCache?.raw !== raw) {
+		allowlistCache = {
+			raw,
+			set: new Set(
+				raw
+					.split(",")
+					.map((id) => id.trim())
+					.filter(Boolean),
+			),
+		}
+	}
+	return allowlistCache.set
 }
 
 /** Clamped [0,100] rollout percentage for the 'limited' stage (default 0). */
+let percentCache: { raw: string; value: number } | null = null
 function limitedPercent(): number {
-	const parsed = Number.parseInt(process.env.NOTIFICATION_LIMITED_PERCENT ?? "", 10)
-	if (!Number.isFinite(parsed)) return 0
-	return Math.min(100, Math.max(0, parsed))
+	const raw = process.env.NOTIFICATION_LIMITED_PERCENT ?? ""
+	if (percentCache?.raw !== raw) {
+		const parsed = Number.parseInt(raw, 10)
+		percentCache = {
+			raw,
+			value: Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0,
+		}
+	}
+	return percentCache.value
 }
 
 /**

@@ -193,9 +193,10 @@ export function NotificationOps(props: NotificationOpsProps) {
 
       {!props.ledgerAvailable ? (
         <p className={styles.empty}>
-          The delivery ledger tables are not present — migration 065 has not
-          been applied to this database yet. The engine is safely inert; every
-          dispatch pass is a no-op while the stage is disabled.
+          The delivery ledger could not be read. Most commonly migration 065
+          has not been applied to this database yet (the engine is safely
+          inert while the stage is disabled) — but a transient read failure
+          looks identical here, so check the server logs before concluding.
         </p>
       ) : (
         <>
