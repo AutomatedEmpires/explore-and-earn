@@ -5,7 +5,7 @@ import {
 	type DiscoveryEnrichment,
 	enrichmentFromScope,
 	getMatchScoresForSeeker,
-	getNonLiveListingsByIds,
+	getNonLiveSavedListings,
 	getPublicListingsByIds,
 	getSavedListingIds,
 	resolveSeekerDiscoveryScope,
@@ -79,11 +79,11 @@ export default async function SavedPage() {
 	const rowById = new Map(rows.map((row) => [row.id, row] as const));
 
 	// Saved listings that are no longer live are invisible to the public read
-	// (RLS is live-only) — fetch them via the dedicated honesty read so they
+	// (RLS is live-only) — fetch them via the dedicated honesty read (which
+	// derives the id set from THIS seeker's own saved rows internally) so they
 	// render as a muted "no longer available" card instead of silently
 	// vanishing from the seeker's own saved bucket. Best-effort ([] on fault).
-	const missingIds = savedIds.filter((id) => !rowById.has(id));
-	const nonLiveRows = await getNonLiveListingsByIds(missingIds);
+	const nonLiveRows = await getNonLiveSavedListings(token, userId);
 	for (const row of nonLiveRows) rowById.set(row.id, row);
 
 	const listings: DiscoveryListing[] = savedIds

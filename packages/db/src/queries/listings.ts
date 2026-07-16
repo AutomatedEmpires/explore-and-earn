@@ -489,29 +489,36 @@ export async function getPublicListingsByIds(ids: string[]): Promise<ListingRow[
 }
 
 /**
- * NON-live listings by id — the /saved honesty read.
+ * NON-live listings the seeker has SAVED — the /saved honesty read.
  *
  * RLS (listings_select_public) hides non-live rows from seekers, so a saved
  * listing that closed/paused/archived silently VANISHES from the saved bucket.
- * This fetches exactly the requested ids that are no longer live via the
- * service role so the surface can render an honest muted "no longer available"
- * card instead of nothing.
+ * This renders an honest muted "no longer available" card instead of nothing.
  *
- * SECURITY: callers MUST pass only ids already proven to belong to the
- * requesting seeker (e.g. from getSavedListingIds under their own token) —
- * never a client-supplied id set. The seeker saw this listing while it was
- * live; this read only lets them see that it no longer is.
+ * SECURITY: the id set is derived INSIDE this function from the caller's own
+ * saved rows (getSavedListingIds under their own token) — the service-role
+ * read that follows can only ever surface listings this seeker saved while
+ * they were live, no matter how a future call site invokes it. The safe path
+ * is the only path; there is no raw-ids variant.
  *
  * Best-effort by design: environments without a service-role key, or any read
  * fault, degrade to [] (the listing stays hidden — the pre-existing behavior).
  */
-export async function getNonLiveListingsByIds(ids: string[]): Promise<ListingRow[]> {
-  if (ids.length === 0) return [];
+export async function getNonLiveSavedListings(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<ListingRow[]> {
   try {
+    // Lazy import: savedListings.ts statically imports from THIS module, so a
+    // static back-import would create a cycle (the same class idReaders.ts
+    // exists to break). Call-time resolution keeps the modules acyclic.
+    const { getSavedListingIds } = await import("./savedListings");
+    const savedIds = await getSavedListingIds(clerkToken, clerkUserId);
+    if (savedIds.length === 0) return [];
     const { data, error } = await (adminClient() as unknown as SupabaseClient)
       .from("listings")
       .select(LISTING_COLUMNS)
-      .in("id", ids)
+      .in("id", savedIds)
       .neq("status", "live");
     if (error) return [];
     return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
