@@ -36,6 +36,17 @@ export interface ApplyResult {
   readonly seekerProfileId?: string;
 }
 
+/**
+ * Where an application came from (007: applications.source + origin_invite_id).
+ * Omitted → a direct apply from a discovery surface. Supplied by
+ * respondToInvite so an invite-originated application is attributable end to
+ * end (host pipeline, analytics, and the seeker's own history).
+ */
+export interface ApplyOrigin {
+  readonly source: "invite";
+  readonly originInviteId: string;
+}
+
 /** Postgres unique_violation SQLSTATE -- surfaced as the already-applied case. */
 const UNIQUE_VIOLATION = "23505";
 /** Postgres check_violation SQLSTATE -- surfaced as invalid_transition or listing_full. */
@@ -74,13 +85,19 @@ async function resolveSeekerProfileId(
  * - `cannot_apply_to_own_listing` — host cannot apply to their own listing
  * - `resume_incomplete` — résumé does not yet satisfy the server-authoritative
  *   completeness gate (see isSeekerResumeComplete); enforced here so a
- *   determined client cannot bypass the UI-side ApplyButton gate.
+ *   determined client cannot bypass the UI-side ApplyButton gate. An INVITED
+ *   seeker hits this gate too: an invite is a request to apply, never a bypass
+ *   of the résumé requirement (founder law — resume-gated apply).
+ *
+ * `origin` marks an invite-originated application (respondToInvite). Every
+ * guard below applies identically — the invite changes attribution, not rules.
  */
 export async function applyToListing(
   clerkToken: string,
   clerkUserId: string,
   listingId: string,
   coverMessage?: string,
+  origin?: ApplyOrigin,
 ): Promise<ApplyResult> {
   const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
@@ -138,6 +155,12 @@ export async function applyToListing(
       withdrawn_reason: null,
     };
     if (coverMessage !== undefined) reactivatePatch.cover_message = coverMessage;
+    // A revived application that came back via an invite IS invite-originated —
+    // record the attribution rather than leaving it as the original direct apply.
+    if (origin) {
+      reactivatePatch.source = origin.source;
+      reactivatePatch.origin_invite_id = origin.originInviteId;
+    }
 
     const { data: reactivated, error: reactivateError } = await authed
       .from("applications")
@@ -172,6 +195,10 @@ export async function applyToListing(
       listing_id: listingId,
       seeker_profile_id: seekerProfileId,
       cover_message: coverMessage ?? null,
+      // Omitted for a direct apply: the column defaults to 'direct' (007).
+      ...(origin
+        ? { source: origin.source, origin_invite_id: origin.originInviteId }
+        : {}),
     })
     .select("id")
     .maybeSingle();

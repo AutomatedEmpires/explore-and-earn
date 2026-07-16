@@ -13,7 +13,9 @@ import {
   hasVerifiedHostSubscription,
 } from "@explore-and-earn/contracts";
 
+import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
+import { applyToListing } from "./applications";
 
 /**
  * Resolve seeker_profiles.id for the authed Clerk user.
@@ -181,14 +183,24 @@ export async function getSeekerInvites(
     throw new Error(`getSeekerInvites: ${error.message}`);
   }
 
-  return (data ?? []).map((raw) => {
-    const r = raw as unknown as Record<string, unknown>;
+  const rows = (data ?? []).map((raw) => raw as unknown as Record<string, unknown>);
+
+  // Reaching the seeker's own list IS delivery — stamp the 'created' ones so
+  // the host's credit-restore rule (undelivered only) tells the truth. Awaited
+  // but non-throwing, so the returned statuses match what was just written.
+  await markInvitesDelivered(
+    rows.filter((r) => r.status === "created").map((r) => String(r.id)),
+  );
+
+  return rows.map((r) => {
+    const status = typeof r.status === "string" ? r.status : "created";
     return {
       invite: {
         id: String(r.id),
         listingId: String(r.listing_id),
         hostProfileId: String(r.host_profile_id),
-        status: typeof r.status === "string" ? r.status : "created",
+        // Reflect the delivery we just stamped rather than the pre-write read.
+        status: status === "created" ? "delivered" : status,
         message: typeof r.message === "string" ? r.message : null,
         createdAt: typeof r.created_at === "string" ? r.created_at : "",
         expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
@@ -218,12 +230,28 @@ function invitePath(
   return from === "created" ? ["delivered", "applied"] : ["applied"];
 }
 
+/**
+ * Seeker responds to an invite they received.
+ *
+ * ACCEPTING AN INVITE CREATES A REAL APPLICATION. Before this, accept only
+ * walked the invite row to 'applied' — no applications row was ever created,
+ * so the host was told someone accepted and found an EMPTY /host/applicants.
+ * The application is created FIRST (through applyToListing, so every guard —
+ * résumé gate, self-apply, dedup, 063 reactivation — applies identically);
+ * only then does the invite advance. If the application is refused (e.g.
+ * `resume_incomplete`), the invite stays actionable so the seeker can finish
+ * their résumé and accept again — an invite is a request to apply, never a
+ * bypass of the résumé requirement.
+ *
+ * On success the result carries the applicationId so the action layer can
+ * anchor the host's application_submitted notification to a real row.
+ */
 export async function respondToInvite(
   clerkToken: string,
   clerkUserId: string,
   inviteId: string,
   response: InviteResponse,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; applicationId?: string; listingId?: string }> {
   const target = RESPONSE_TARGET[response];
   if (!target) {
     return { ok: false, error: "invalid_response" };
@@ -238,7 +266,7 @@ export async function respondToInvite(
 
   const { data: inviteRow, error: loadError } = await untyped
     .from("invites")
-    .select("id, status")
+    .select("id, status, listing_id, application_id")
     .eq("id", inviteId)
     .eq("seeker_profile_id", seekerProfileId)
     .maybeSingle();
@@ -249,18 +277,46 @@ export async function respondToInvite(
     return { ok: false, error: "not_found" };
   }
 
-  const current =
-    typeof (inviteRow as Record<string, unknown>).status === "string"
-      ? String((inviteRow as Record<string, unknown>).status)
-      : "";
+  const row = inviteRow as Record<string, unknown>;
+  const current = typeof row.status === "string" ? String(row.status) : "";
+  const listingId = typeof row.listing_id === "string" ? row.listing_id : "";
 
   if (current === target) {
-    return { ok: true };
+    // Already responded — idempotent, and report the linked application (if
+    // any) so a retried accept still resolves to the same row.
+    return {
+      ok: true,
+      ...(typeof row.application_id === "string"
+        ? { applicationId: row.application_id }
+        : {}),
+      ...(listingId ? { listingId } : {}),
+    };
   }
 
   const path = invitePath(current, target);
   if (!path) {
     return { ok: false, error: "already_responded" };
+  }
+
+  // ── Accept: the application must exist BEFORE the invite advances ────────
+  let applicationId: string | undefined;
+  if (target === "applied") {
+    if (!listingId) {
+      return { ok: false, error: "not_found" };
+    }
+    const applied = await applyToListing(clerkToken, clerkUserId, listingId, undefined, {
+      source: "invite",
+      originInviteId: inviteId,
+    });
+    if (!applied.ok) {
+      // 'already_applied' is not a failure here: the seeker applied directly
+      // before accepting. Adopt that application and let the invite close.
+      if (applied.error !== "already_applied") {
+        return { ok: false, error: applied.error };
+      }
+    } else {
+      applicationId = applied.applicationId;
+    }
   }
 
   for (const next of path) {
@@ -282,7 +338,73 @@ export async function respondToInvite(
     }
   }
 
-  return { ok: true };
+  // Server-authoritative linkage. Migration 066 deliberately grants the seeker
+  // token UPDATE on invites.status ALONE, so these columns are stamped through
+  // the service role: they are facts the server derives (which application this
+  // invite produced, and when the response landed), never client input. A
+  // failure here is best-effort — the response itself is already recorded, and
+  // a missing link must not fail a real acceptance.
+  await stampInviteResponse(inviteId, applicationId);
+
+  return {
+    ok: true,
+    ...(applicationId ? { applicationId } : {}),
+    ...(listingId ? { listingId } : {}),
+  };
+}
+
+/**
+ * Stamp responded_at (+ the produced application) on an invite via the service
+ * role. Best-effort by design: never throws, never fails the caller.
+ */
+async function stampInviteResponse(
+  inviteId: string,
+  applicationId: string | undefined,
+): Promise<void> {
+  try {
+    await (adminClient() as unknown as SupabaseClient)
+      .from("invites")
+      .update({
+        responded_at: new Date().toISOString(),
+        ...(applicationId ? { application_id: applicationId } : {}),
+      })
+      .eq("id", inviteId);
+  } catch {
+    // Linkage is an attribution nicety; the response is already durable.
+  }
+}
+
+/**
+ * Mark invites as DELIVERED once they have actually reached the seeker.
+ *
+ * The invite lifecycle promises created -> delivered -> viewed -> applied, but
+ * nothing ever advanced past 'created': delivered_at/viewed_at were never
+ * written. That made withdrawInvite's `wasUndelivered` — which decides whether
+ * the host's invite credit is restored — permanently TRUE, so every withdrawal
+ * refunded a credit even for invites the seeker had already seen.
+ *
+ * Fetching the seeker's own invite list IS delivery: the invite is now in the
+ * recipient's hands. Stamped through the service role (a system fact, not a
+ * seeker action) and best-effort: a stamping failure must never break the
+ * seeker's invite list. Only 'created' rows are touched, so the common path
+ * writes nothing.
+ *
+ * FOUNDER POLICY (2026-07-16): invite credits are restored ONLY for invites
+ * that were never delivered. This function is what makes that honest.
+ */
+async function markInvitesDelivered(inviteIds: readonly string[]): Promise<void> {
+  if (inviteIds.length === 0) return;
+  try {
+    await (adminClient() as unknown as SupabaseClient)
+      .from("invites")
+      .update({ status: "delivered", delivered_at: new Date().toISOString() })
+      .in("id", [...inviteIds])
+      // Status-scoped: a concurrent withdraw/response is never clobbered, and
+      // 'created' -> 'delivered' is a seeded lifecycle edge (001).
+      .eq("status", "created");
+  } catch {
+    // Delivery stamping is best-effort; the list render is what matters.
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -312,6 +434,13 @@ export type WithdrawInviteResult = {
    * True iff the invite was status 'created' (never delivered) AT THE MOMENT
    * the withdraw UPDATE matched — derived from the update itself, not a prior
    * read, so callers can safely key credit restoration off it (no TOCTOU).
+   *
+   * FOUNDER POLICY (2026-07-16): the host's invite credit is restored ONLY
+   * when the invite never reached the seeker. This flag now means what it
+   * says: delivery is stamped for real (markInvitesDelivered) the moment an
+   * invite reaches the seeker's list. Previously nothing ever advanced past
+   * 'created', so this was permanently true and EVERY withdrawal refunded a
+   * credit — including invites the seeker had already read.
    */
   wasUndelivered?: boolean;
 };

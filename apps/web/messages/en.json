@@ -57,7 +57,11 @@
 		"types": {
 			"application_received": {
 				"title": "New application received",
-				"body": "Someone applied to {listingTitle}. Review their profile to keep things moving."
+				"body": "Someone applied to {listingTitle}. Review their profile to keep things moving.",
+				"invite_accepted": {
+					"title": "Your invite was accepted",
+					"body": "Someone you invited accepted and applied to {listingTitle}. Their application is ready to review."
+				}
 			},
 			"application_viewed": {
 				"title": "Your application is being reviewed",
