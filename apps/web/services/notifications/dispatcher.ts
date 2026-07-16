@@ -34,6 +34,7 @@ import { MAX_DELIVERY_ATTEMPTS, nextAttemptAtMs, type FailureClass } from "./bac
 import { sendNotificationEmail } from "./channels/email"
 import { sendInApp, type ChannelSendResult } from "./channels/inApp"
 import { sendPush } from "./channels/push"
+import { resolveEngineStage, stageGateForSend, type NotificationEngineStage } from "./stage"
 import {
 	overlayLegacyEmailBooleans,
 	planChannels,
@@ -129,8 +130,19 @@ export interface ExpansionStats {
 	readonly expansionErrors: number
 }
 
+const ZERO_EXPANSION: ExpansionStats = {
+	eventsProcessed: 0,
+	deliveriesCreated: 0,
+	digestMembershipsCreated: 0,
+	expansionErrors: 0,
+}
+
 /** Phase 1: expand unprocessed events into delivery rows + digest memberships. */
 export async function expandPendingEvents(): Promise<ExpansionStats> {
+	// Stage gate: 'disabled' means the engine never touches its tables — a
+	// clean no-op both before migration 065 exists and whenever the founder
+	// turns the engine off. Every other stage expands (that IS ledger-only).
+	if (resolveEngineStage() === "disabled") return ZERO_EXPANSION
 	const resolvers = makeResolvers()
 	const events = (await getUnprocessedEvents(EXPAND_BATCH)) as unknown as DomainEventRow[]
 	let deliveriesCreated = 0
@@ -232,6 +244,9 @@ export async function enqueueScheduleDerived(
 	items: ReadonlyArray<{ readonly intent: PreIntent; readonly dedupBase: string }>,
 ): Promise<number> {
 	if (items.length === 0) return 0
+	// Stage gate: 'disabled' writes nothing (the ledger may not exist yet).
+	// All other stages enqueue — the delivery gate decides what actually sends.
+	if (resolveEngineStage() === "disabled") return 0
 	const recipients = await resolveRecipients(items.map((i) => i.intent.recipientClerkUserId))
 	const deliveries: NewDeliveryInput[] = []
 	for (const { intent: pre, dedupBase } of items) {
@@ -340,8 +355,20 @@ export interface DeliveryStats {
 	readonly failed: number
 }
 
+const ZERO_DELIVERY: DeliveryStats = {
+	claimed: 0,
+	delivered: 0,
+	deferred: 0,
+	cancelled: 0,
+	suppressed: 0,
+	failed: 0,
+}
+
 /** Phase 2: claim due deliveries and push them through their channel. */
 export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats> {
+	const stage: NotificationEngineStage = resolveEngineStage()
+	// 'disabled' never claims — the ledger is untouched (and may not exist yet).
+	if (stage === "disabled") return ZERO_DELIVERY
 	const workerId = `web-${randomUUID()}`
 	const claimed = await claimDeliveries({ workerId, limit: CLAIM_BATCH })
 	const stats = { claimed: claimed.length, delivered: 0, deferred: 0, cancelled: 0, suppressed: 0, failed: 0 }
@@ -429,6 +456,29 @@ export async function processDueDeliveries(nowMs: number): Promise<DeliveryStats
 					stats.cancelled += 1
 					continue
 				}
+			}
+
+			// 3b. STAGE GATE (staged activation): placed after recheck/consent/
+			// collapse so the ledger records each delivery's true outcome for the
+			// stage, and before quiet-hours/throttle so gated rows settle instead
+			// of bouncing through deferrals. In-app is gated too — a stage below
+			// full delivery must produce NOTHING user-visible for gated users.
+			const gate = stageGateForSend(stage, delivery.recipient_clerk_user_id)
+			if (!gate.send) {
+				if (stage === "dry_run") {
+					// Structured would-send line for operator inspection — no copy,
+					// no email address, just the routing facts.
+					console.info(
+						`[notifications:dry_run] would send ${delivery.channel}/${delivery.notification_type} to ${delivery.recipient_clerk_user_id} (delivery ${delivery.id})`,
+					)
+				}
+				await settleDelivery({
+					id: delivery.id,
+					status: "suppressed",
+					suppressionReason: gate.reason,
+				})
+				stats.suppressed += 1
+				continue
 			}
 
 			const outbound = delivery.channel === "email" || delivery.channel === "push"
@@ -542,12 +592,18 @@ export async function drainDueDeliveries(
 
 /** One full dispatcher pass: expansion then delivery. Safe to run concurrently. */
 export async function runDispatchOnce(): Promise<{
+	stage: NotificationEngineStage
 	expansion: ExpansionStats
 	delivery: DeliveryStats
 }> {
+	const stage = resolveEngineStage()
+	if (stage === "disabled") {
+		// Clean no-op: no table access at all (safe before migration 065).
+		return { stage, expansion: ZERO_EXPANSION, delivery: ZERO_DELIVERY }
+	}
 	const expansion = await expandPendingEvents()
 	const delivery = await drainDueDeliveries(Date.now())
-	return { expansion, delivery }
+	return { stage, expansion, delivery }
 }
 
 /**
