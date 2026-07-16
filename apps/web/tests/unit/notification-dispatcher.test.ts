@@ -11,7 +11,7 @@
  *  - STALENESS re-check cancels dead reminders instead of sending them.
  *  - RETRIES: bounded with backoff; the attempt budget dead-letters.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -453,5 +453,120 @@ describe("schedule-derived enqueue", () => {
 			// cron IS the schedule).
 			expect(row.cadence).toBe("immediate");
 		}
+	});
+});
+
+describe("staged activation (NOTIFICATION_ENGINE_STAGE)", () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it("disabled: dispatch passes never touch the ledger (safe pre-065)", async () => {
+		vi.stubEnv("NOTIFICATION_ENGINE_STAGE", "disabled");
+		const expansion = await expandPendingEvents();
+		expect(expansion.eventsProcessed).toBe(0);
+		expect(db.getUnprocessedEvents).not.toHaveBeenCalled();
+
+		const delivery = await processDueDeliveries(NOW);
+		expect(delivery.claimed).toBe(0);
+		expect(db.claimDeliveries).not.toHaveBeenCalled();
+
+		const enqueued = await enqueueScheduleDerived([
+			{
+				dedupBase: "offer_expiring␟app-1",
+				intent: {
+					sourceEventId: "",
+					sourceOccurredAt: new Date(NOW).toISOString(),
+					recipientClerkUserId: "clerk_host",
+					category: "offers_invites",
+					type: "offer_expiring",
+					variant: "default",
+					destinationPath: "/offered",
+					titleKey: "t",
+					bodyKey: "b",
+					values: {},
+					urgent: true,
+				},
+			},
+		]);
+		expect(enqueued).toBe(0);
+		expect(db.insertDeliveries).not.toHaveBeenCalled();
+	});
+
+	it("ledger_only: expansion runs; would-sends settle suppressed with the stage reason (in-app included)", async () => {
+		vi.stubEnv("NOTIFICATION_ENGINE_STAGE", "ledger_only");
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery(),
+			claimedDelivery({ id: "del-2", channel: "in_app" }),
+		]);
+		const stats = await processDueDeliveries(NOW);
+		expect(stats.suppressed).toBe(2);
+		expect(sendEmailMock).not.toHaveBeenCalled();
+		expect(db.insertEngineNotification).not.toHaveBeenCalled();
+		for (const call of db.settleDelivery.mock.calls) {
+			expect(call[0].status).toBe("suppressed");
+			expect(call[0].suppressionReason).toBe("stage:ledger_only");
+		}
+	});
+
+	it("internal_preview: only allowlisted recipients get real delivery", async () => {
+		vi.stubEnv("NOTIFICATION_ENGINE_STAGE", "internal_preview");
+		vi.stubEnv("NOTIFICATION_INTERNAL_ALLOWLIST", "clerk_host, clerk_other");
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery(), // clerk_host — allowlisted
+			claimedDelivery({
+				id: "del-2",
+				recipient_clerk_user_id: "clerk_outsider",
+				dedup_key: "evt-1␟clerk_outsider␟applications␟email␟default",
+				intent: { ...claimedDelivery().intent, recipientClerkUserId: "clerk_outsider" },
+			}),
+		]);
+		const stats = await processDueDeliveries(NOW);
+		expect(stats.delivered).toBe(1);
+		expect(stats.suppressed).toBe(1);
+		expect(sendEmailMock).toHaveBeenCalledTimes(1);
+		const suppressCall = db.settleDelivery.mock.calls.find(
+			(call) => call[0].status === "suppressed",
+		);
+		expect(suppressCall?.[0].suppressionReason).toBe("stage:internal_preview");
+	});
+
+	it("limited: the allowlist always sends; percent=0 gates everyone else deterministically", async () => {
+		vi.stubEnv("NOTIFICATION_ENGINE_STAGE", "limited");
+		vi.stubEnv("NOTIFICATION_INTERNAL_ALLOWLIST", "clerk_host");
+		vi.stubEnv("NOTIFICATION_LIMITED_PERCENT", "0");
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery(),
+			claimedDelivery({
+				id: "del-2",
+				recipient_clerk_user_id: "clerk_outsider",
+				dedup_key: "evt-1␟clerk_outsider␟applications␟email␟default",
+				intent: { ...claimedDelivery().intent, recipientClerkUserId: "clerk_outsider" },
+			}),
+		]);
+		const stats = await processDueDeliveries(NOW);
+		expect(stats.delivered).toBe(1);
+		expect(stats.suppressed).toBe(1);
+	});
+
+	it("stage gating happens AFTER recheck/consent/collapse so the ledger stays honest", async () => {
+		vi.stubEnv("NOTIFICATION_ENGINE_STAGE", "ledger_only");
+		// A stale reminder must settle 'cancelled' (recheck), not stage-suppressed.
+		db.getApplicationOfferState.mockResolvedValue(null);
+		db.claimDeliveries.mockResolvedValue([
+			claimedDelivery({
+				notification_type: "offer_expiring",
+				intent: {
+					...claimedDelivery().intent,
+					type: "offer_expiring",
+					category: "offers_invites",
+					entity: { type: "application", id: "app-1" },
+					urgent: true,
+				},
+			}),
+		]);
+		const stats = await processDueDeliveries(NOW);
+		expect(stats.cancelled).toBe(1);
+		expect(stats.suppressed).toBe(0);
 	});
 });
