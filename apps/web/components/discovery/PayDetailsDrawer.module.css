@@ -75,6 +75,15 @@
 	color: var(--text-secondary);
 }
 
+/* Host's fuller pay descriptor — reads under the headline rate. */
+.payDescriptor {
+	margin: var(--space-4) 0 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
 /* ── Inline artwork ──────────────────────────────────────── */
 
 .inlineArtwork {

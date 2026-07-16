@@ -2,17 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useOptimistic, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useOptimistic, useTransition } from "react";
 
 import { BADGE_META, type SeekerBadge } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { saveReadinessAction } from "../../app/actions/seekerProfile";
-import type { DiscoveryListing } from "../discovery";
+import { ListingCard, ListingCardProvider, type DiscoveryListing } from "../discovery";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
-import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
-import { MatchCardRail } from "./MatchCardRail";
+import { byMonetization } from "../../lib/ranking";
 import { ReadinessSlider } from "./ReadinessSlider";
-import { SeekerDirectory } from "./SeekerDirectory";
 import { RESUME_APPLY_THRESHOLD, type SeekerStatusSummary } from "./models";
 import styles from "./ProfileHub.module.css";
 
@@ -42,60 +41,60 @@ function formatBadgeDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-/** A single tappable status cell composed on the shared `ui-stat` primitive. */
-interface StatCell {
+function isBoosted(listing: DiscoveryListing): boolean {
+  return (listing.conditionalBadges ?? []).includes("boosted");
+}
+
+/**
+ * Monetization ordering for the job rails — the single "pay more, show more"
+ * comparator (Boosted > Enterprise > Matched≥90 > Professional > Starter).
+ * Host tier isn't carried on the embedded listing host, so it degrades
+ * gracefully to the boosted + match signals we do have; it only ORDERS and
+ * never hides. Stable, so equal-rank items keep their upstream match order.
+ */
+const rankByMonetization = byMonetization<DiscoveryListing>((listing) => ({
+  boosted: isBoosted(listing),
+  matchScore: listing.matchScore,
+}));
+
+/** A tucked secondary destination — summary index only, detail on the route. */
+interface NavItem {
   readonly href: string;
   readonly label: string;
-  readonly value: string;
   readonly icon: IconKey;
-  readonly mod?: "primary" | "soon";
+  readonly meta?: string;
 }
 
-/** The one next-best-action surfaced above the fold. Always resolves to one. */
-interface NextAction {
-  readonly tone: "primary" | "soon" | "calm";
-  readonly eyebrow: string;
-  readonly title: string;
-  readonly sub: string;
-  readonly cta: string;
-  readonly icon: IconKey;
-  readonly href: string;
-  readonly progress?: number;
-}
-
-function resolveNextAction(status: SeekerStatusSummary, resumeReady: boolean): NextAction {
-  if (status.offersCount > 0) {
-    return {
-      tone: "primary",
-      eyebrow: "Offer waiting",
-      title: status.offersCount === 1 ? "You have an offer" : `You have ${status.offersCount} offers`,
-      sub: "Review and respond before they expire.",
-      cta: "Review",
+/** The rest of the seeker's space, tucked behind a compact index (not inline). */
+function buildTuckedNav(status: SeekerStatusSummary): readonly NavItem[] {
+  return [
+    {
+      href: "/saved",
+      label: "Saved",
+      icon: "nav.saved",
+      meta: status.savedCount > 0 ? String(status.savedCount) : undefined,
+    },
+    {
+      href: "/applied",
+      label: "Applications",
+      icon: "status.applied",
+      meta: status.appliedCount > 0 ? String(status.appliedCount) : undefined,
+    },
+    {
+      href: "/invites",
+      label: "Invites",
       icon: "status.match",
-      href: "/offered",
-    };
-  }
-  if (!resumeReady) {
-    return {
-      tone: "soon",
-      eyebrow: "Almost there",
-      title: "Finish your resume",
-      sub: `${status.resumeCompletion}% — reach ${RESUME_APPLY_THRESHOLD}% to unlock applications.`,
-      cta: "Continue",
-      icon: "profile.resume",
-      href: "/resume",
-      progress: status.resumeCompletion,
-    };
-  }
-  return {
-    tone: "calm",
-    eyebrow: "You're set",
-    title: "You're ready to apply",
-    sub: "Keep exploring opportunities matched to you.",
-    cta: "Explore",
-    icon: "nav.seek",
-    href: "/seek",
-  };
+      meta: status.invitesCount > 0 ? String(status.invitesCount) : undefined,
+    },
+    {
+      href: "/messages",
+      label: "Messages",
+      icon: "nav.messages",
+      meta: status.unreadNotifications > 0 ? String(status.unreadNotifications) : undefined,
+    },
+    { href: "/journey", label: "Journey", icon: "mappin.cluster" },
+    { href: "/community", label: "Community", icon: "nav.feed" },
+  ];
 }
 
 export interface ProfileHubProps {
@@ -108,6 +107,11 @@ export interface ProfileHubProps {
   readonly bio?: string | null;
   readonly seekerProfileId?: string | null;
   readonly matchedListings?: readonly DiscoveryListing[];
+  /**
+   * Kept on the composition contract for page.tsx, but the featured-employer
+   * rail no longer lives on the decluttered profile landing (it belongs to the
+   * discovery/home surfaces). Not rendered here.
+   */
   readonly featuredEmployers?: readonly FeaturedEmployer[];
 }
 
@@ -121,8 +125,8 @@ export function ProfileHub({
   bio,
   seekerProfileId,
   matchedListings = [],
-  featuredEmployers = [],
 }: ProfileHubProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [optimisticTimeline, setOptimisticTimeline] = useOptimistic(seekingTimeline ?? null);
 
@@ -136,37 +140,26 @@ export function ProfileHub({
       .toUpperCase() || "SE";
 
   const resumeReady = status.resumeCompletion >= RESUME_APPLY_THRESHOLD;
+  const resumePct = Math.min(100, Math.max(0, status.resumeCompletion));
   const isPhoto = Boolean(heroCoverUrl && (heroCoverUrl.startsWith("http") || heroCoverUrl.startsWith("/")));
   const heroBg = isPhoto
     ? undefined
     : (CATEGORY_GRADIENTS[preferredCategories[0] ?? ""] ?? DEFAULT_GRADIENT);
 
-  const stats: readonly StatCell[] = [
-    {
-      href: "/resume",
-      label: "Resume",
-      value: `${status.resumeCompletion}%`,
-      icon: "profile.resume",
-      mod: !resumeReady && status.offersCount === 0 ? "soon" : undefined,
-    },
-    { href: "/saved", label: "Saved", value: String(status.savedCount), icon: "nav.saved" },
-    { href: "/applied", label: "Applied", value: String(status.appliedCount), icon: "action.apply" },
-    {
-      href: "/offered",
-      label: "Offers",
-      value: String(status.offersCount),
-      icon: "status.match",
-      mod: status.offersCount > 0 ? "primary" : undefined,
-    },
-    {
-      href: "/accepted",
-      label: "Upcoming",
-      value: status.acceptedUpcoming ? "1" : "—",
-      icon: "status.accepted",
-    },
-  ];
+  // Two job rails from the seeker's live matched inventory, each ordered by
+  // monetization. Boosted opportunities get their OWN rail, so the matched rail
+  // excludes them (no card appears twice on the landing).
+  const boostedListings = useMemo(
+    () => matchedListings.filter(isBoosted).slice().sort(rankByMonetization).slice(0, 8),
+    [matchedListings],
+  );
+  const matchedRail = useMemo(
+    () => matchedListings.filter((l) => !isBoosted(l)).slice().sort(rankByMonetization).slice(0, 8),
+    [matchedListings],
+  );
 
-  const nextAction = resolveNextAction(status, resumeReady);
+  const navItems = buildTuckedNav(status);
+  const hasOffers = status.offersCount > 0;
 
   function handleReadinessChange(value: string) {
     if (!seekerProfileId) return;
@@ -176,7 +169,15 @@ export function ProfileHub({
     });
   }
 
+  function openListing(id: string) {
+    router.push(`/listing/${id}`);
+  }
+
   return (
+    <ListingCardProvider
+      listings={matchedListings}
+      overrides={{ onApply: openListing }}
+    >
     <div className={styles.page}>
       {/* ── Full-bleed cover ── */}
       <section
@@ -239,87 +240,156 @@ export function ProfileHub({
         </div>
       </div>
 
-      {/* ── Availability / readiness ── */}
+      {/* ── Badges — a compact medallion strip in the identity block, only when earned ── */}
+      {badges.length > 0 && (
+        <section className={styles.badges} aria-label="Badges">
+          <ul className={styles.badgeStrip}>
+            {badges.map((b) => {
+              const meta = BADGE_META[b.badgeKey];
+              return (
+                <li key={b.id} className={styles.badgeChip}>
+                  <span className={styles.badgeChipIcon} aria-hidden="true">
+                    <Icon name={meta.icon as IconKey} size={18} />
+                  </span>
+                  <span className={styles.badgeChipName}>{meta.label}</span>
+                  <time className={styles.badgeChipDate} dateTime={b.awardedAt}>
+                    {formatBadgeDate(b.awardedAt)}
+                  </time>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {/* ── Availability / readiness timeline ── */}
       <div className={styles.readinessWrap}>
         <ReadinessSlider value={optimisticTimeline} onChange={handleReadinessChange} saving={isPending} />
       </div>
 
-      {/* ── Status — tappable cells on the shared ui-stat primitive ── */}
-      <ul className={styles.statusRow} aria-label="Your activity">
-        {stats.map((stat) => {
-          const mod =
-            stat.mod === "primary" ? "ui-stat--primary" : stat.mod === "soon" ? "ui-stat--soon" : "";
-          return (
-            <li key={stat.href}>
-              <Link href={stat.href} className={`${styles.statCell} ui-stat ${mod}`}>
-                <span className="ui-stat__label">
-                  <Icon name={stat.icon} size={16} aria-hidden /> {stat.label}
-                </span>
-                <span className="ui-stat__value">{stat.value}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-
-      {/* ── One next-best-action — the module's dominant element ── */}
-      <Link href={nextAction.href} className={`${styles.callout} ${styles[nextAction.tone]}`}>
-        <span className={styles.calloutIcon} aria-hidden="true">
-          <Icon name={nextAction.icon} size={24} />
+      {/* ── Résumé — the heart of the application, always upfront ── */}
+      <Link
+        href="/resume"
+        className={`${styles.resumeCard} ${resumeReady ? styles.resumeReady : styles.resumeUnfinished}`}
+      >
+        <span className={styles.resumeIcon} aria-hidden="true">
+          <Icon name="profile.resume" size={24} />
         </span>
-        <div className={styles.calloutText}>
-          <span className={styles.calloutEyebrow}>{nextAction.eyebrow}</span>
-          <span className={styles.calloutTitle}>{nextAction.title}</span>
-          <span className={styles.calloutSub}>{nextAction.sub}</span>
-          {nextAction.progress != null && (
-            <div className={styles.progressTrack} aria-hidden="true">
-              <div className={styles.progressFill} style={{ width: `${nextAction.progress}%` }} />
-            </div>
-          )}
+        <div className={styles.resumeText}>
+          <span className={styles.resumeEyebrow}>Résumé</span>
+          <span className={styles.resumeTitle}>
+            {resumeReady ? "Ready to apply" : "Finish your résumé"}
+          </span>
+          <span className={styles.resumeSub}>
+            {resumeReady
+              ? "Your résumé is the heart of every application — keep it sharp."
+              : `${resumePct}% complete — reach ${RESUME_APPLY_THRESHOLD}% to unlock applying.`}
+          </span>
+          <div className={styles.resumeMeter} aria-hidden="true">
+            <div className={styles.resumeMeterFill} style={{ width: `${resumePct}%` }} />
+          </div>
         </div>
-        <span className={styles.calloutCta}>
-          <span className={styles.calloutCtaLabel}>{nextAction.cta}</span>
-          <Icon name="action.forward" size={20} aria-hidden />
+        <span className={styles.resumeCta}>
+          <span>{resumeReady ? "View résumé" : "Finish résumé"}</span>
+          <Icon name="action.forward" size={18} aria-hidden />
         </span>
       </Link>
 
-      {/* ── Lower stack: matched · featured · directory · badges ── */}
-      <div className={styles.stack}>
-        {matchedListings.length > 0 && (
-          <MatchCardRail listings={matchedListings} title="Matched for you" />
-        )}
+      {/* ── Offers — critical, prominent, only when the seeker has one ── */}
+      {hasOffers && (
+        <Link href="/offered" className={styles.offersCallout}>
+          <span className={styles.offersIcon} aria-hidden="true">
+            <Icon name="status.offered" size={24} />
+          </span>
+          <div className={styles.offersText}>
+            <span className={styles.offersEyebrow}>Offer waiting</span>
+            <span className={styles.offersTitle}>
+              {status.offersCount === 1 ? "You have an offer" : `You have ${status.offersCount} offers`}
+            </span>
+            <span className={styles.offersSub}>Review and respond before they expire.</span>
+          </div>
+          <span className={styles.offersCta}>
+            <span>Review</span>
+            <Icon name="action.forward" size={18} aria-hidden />
+          </span>
+        </Link>
+      )}
 
-        {featuredEmployers.length > 0 && <FeaturedEmployerStrip employers={featuredEmployers} />}
-
-        <div className={styles.directoryWrap}>
-          <SeekerDirectory status={status} />
+      {/* ── Matched jobs (not yet applied) — a compact rail of DiscoveryCards ── */}
+      <section className={styles.railSection} aria-label="Matched for you">
+        <div className={styles.railHead}>
+          <h2 className={styles.railTitle}>
+            <Icon name="status.match" size={18} aria-hidden />
+            Matched for you
+          </h2>
+          {matchedRail.length > 0 && (
+            <Link href="/seek" className={styles.railSeeAll}>
+              See all
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
+          )}
         </div>
 
-        {badges.length > 0 && (
-          <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Badges</h2>
-            <ul className={styles.badgeList}>
-              {badges.map((b) => {
-                const meta = BADGE_META[b.badgeKey];
-                return (
-                  <li key={b.id} className={styles.badgeItem}>
-                    <span className={styles.badgeIcon} aria-hidden="true">
-                      <Icon name={meta.icon as IconKey} size={20} />
-                    </span>
-                    <div className={styles.badgeInfo}>
-                      <span className={styles.badgeName}>{meta.label}</span>
-                      <span className={styles.badgeDesc}>{meta.description}</span>
-                    </div>
-                    <time className={styles.badgeDate} dateTime={b.awardedAt}>
-                      {formatBadgeDate(b.awardedAt)}
-                    </time>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+        {matchedRail.length > 0 ? (
+          <ul className={styles.rail}>
+            {matchedRail.map((listing) => (
+              <li key={listing.id} className={styles.railItem}>
+                <ListingCard listing={listing} surface="matched" />
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className={styles.railEmpty}>
+            <p className={styles.railEmptyBody}>
+              {resumeReady
+                ? "No matches right now — keep exploring opportunities."
+                : "Complete your résumé to unlock roles matched to you."}
+            </p>
+            <Link href={resumeReady ? "/seek" : "/resume"} className={styles.railEmptyLink}>
+              {resumeReady ? "Explore roles" : "Finish résumé"}
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
+          </div>
         )}
-      </div>
+      </section>
+
+      {/* ── Boosted opportunities — a bonus rail, only when present ── */}
+      {boostedListings.length > 0 && (
+        <section className={styles.railSection} aria-label="Boosted opportunities">
+          <div className={styles.railHead}>
+            <h2 className={styles.railTitle}>
+              <Icon name="status.boosted" size={18} aria-hidden />
+              Boosted opportunities
+            </h2>
+          </div>
+          <ul className={styles.rail}>
+            {boostedListings.map((listing) => (
+              <li key={listing.id} className={styles.railItem}>
+                <ListingCard listing={listing} surface="matched" />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* ── The rest of your space — tucked behind a compact index ── */}
+      <nav className={styles.tuckedNav} aria-label="More of your space">
+        <h2 className={styles.tuckedTitle}>Your space</h2>
+        <ul className={styles.tuckedGrid}>
+          {navItems.map((item) => (
+            <li key={item.href}>
+              <Link href={item.href} className={styles.tuckedTile}>
+                <span className={styles.tuckedIcon} aria-hidden="true">
+                  <Icon name={item.icon} size={20} />
+                </span>
+                <span className={styles.tuckedLabel}>{item.label}</span>
+                {item.meta && <span className={styles.tuckedMeta}>{item.meta}</span>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </div>
+    </ListingCardProvider>
   );
 }

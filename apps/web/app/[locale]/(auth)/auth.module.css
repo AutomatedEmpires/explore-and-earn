@@ -1,0 +1,216 @@
+.authPage {
+	min-height: 100dvh;
+	display: grid;
+	place-items: center;
+	padding: var(--space-24) var(--space-gutter)
+		calc(var(--space-24) + env(safe-area-inset-bottom));
+	/* warm paper wash + a soft sky glow, palette-locked */
+	background:
+		radial-gradient(ellipse 80% 50% at 50% 0%,
+			color-mix(in srgb, var(--palette-sky-light) 40%, transparent) 0%,
+			transparent 70%),
+		var(--gradient-paper-warm);
+}
+
+.authInner {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-8);
+	width: 100%;
+}
+
+.brand {
+	font-family: var(--font-display);
+	font-size: var(--type-page-size);
+	line-height: var(--type-page-lh);
+	color: var(--text-primary);
+	text-decoration: none;
+}
+
+.brandAmp {
+	color: var(--color-cta);
+}
+
+.tagline {
+	margin: 0 0 var(--space-12);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+	text-align: center;
+}
+
+/* ── Seeker vs host chooser — segmented control shown above the Clerk widget ── */
+
+.roleTabs {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: var(--space-4);
+	width: 100%;
+	max-width: 400px;
+	margin-top: var(--space-8);
+	padding: var(--space-4);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+}
+
+.roleTab {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-6);
+	min-height: 2.75rem;
+	padding: 0 var(--space-12);
+	border-radius: var(--radius-pill);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-secondary);
+	text-decoration: none;
+	white-space: nowrap;
+	transition:
+		color var(--motion-fast) var(--ease-standard),
+		background var(--motion-fast) var(--ease-standard);
+}
+
+.roleTab:hover {
+	color: var(--text-primary);
+}
+
+.roleTabActive {
+	background: var(--gradient-action);
+	color: var(--color-cta-text);
+	box-shadow: var(--elevation-pin);
+}
+
+.roleTabActive:hover {
+	color: var(--color-cta-text);
+}
+
+.roleTab:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* Emerald "free forever" reassurance — only on the seeker path. */
+.freeBadge {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	margin-bottom: var(--space-12);
+	padding: var(--space-4) var(--space-12);
+	border-radius: var(--radius-pill);
+	background: var(--status-success-bg);
+	color: var(--status-success-fg);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	text-align: center;
+}
+
+/* Admin sign-in eyebrow (replaces the seeker/host tabs on the admin path). */
+.adminEyebrow {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	margin-top: var(--space-8);
+	padding: var(--space-4) var(--space-12);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+}
+
+/* ── Below the widget: sign-up / sign-in cross-link + quiet admin affordance ── */
+
+.altActions {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-8);
+	margin-top: var(--space-16);
+	text-align: center;
+}
+
+.altLink {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta);
+	text-decoration: none;
+}
+
+.altLink:hover {
+	text-decoration: underline;
+}
+
+.altLink:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+	border-radius: var(--radius-input);
+}
+
+.adminLink {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+	text-decoration: none;
+}
+
+.adminLink:hover {
+	color: var(--text-primary);
+	text-decoration: underline;
+}
+
+.adminLink:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+	border-radius: var(--radius-input);
+}
+
+/* Keyless local/QA stand-in for the Clerk widget (see keyless-notice.tsx). */
+.keylessNotice {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-8);
+	max-width: 360px;
+	padding: var(--space-24) var(--space-16);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface-raised);
+	text-align: center;
+}
+
+.keylessTitle {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-weight: 600;
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
+.keylessBody {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.keylessLink {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--color-cta);
+}

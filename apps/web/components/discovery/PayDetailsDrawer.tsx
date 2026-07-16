@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Button, Icon } from "@explore-and-earn/ui";
+import { formatMoney } from "../../lib/format";
 import { PopupShell } from "../overlay/PopupShell";
 
 import { CATEGORY_ICON, type DiscoveryListing } from "./listing";
@@ -24,26 +25,18 @@ const CATEGORY_RAIL: readonly DiscoveryListing["category"][] = [
 
 function formatHeadlineAmount(listing: DiscoveryListing): string {
 	const insight = listing.payInsight;
-	const currency = insight?.currency ?? "USD";
+	// Currency omitted → formatMoney falls back to its default (USD).
+	const currency = insight?.currency;
 	const min = insight?.minCents;
 	const max = insight?.maxCents;
 	const unit = insight?.unit;
 
 	if (typeof min === "number" && typeof max === "number" && max > min) {
-		const formatter = new Intl.NumberFormat("en-US", {
-			style: "currency",
-			currency,
-			maximumFractionDigits: 0,
-		});
-		return `${formatter.format(min / 100)}–${formatter.format(max / 100)}${unit && unit !== "other" ? `/${unit}` : ""}`;
+		return `${formatMoney(min, { currency })}–${formatMoney(max, { currency })}${unit && unit !== "other" ? `/${unit}` : ""}`;
 	}
 
 	if (typeof min === "number") {
-		return `${new Intl.NumberFormat("en-US", {
-			style: "currency",
-			currency,
-			maximumFractionDigits: 0,
-		}).format(min / 100)}${unit && unit !== "other" ? `/${unit}` : ""}`;
+		return `${formatMoney(min, { currency })}${unit && unit !== "other" ? `/${unit}` : ""}`;
 	}
 
 	return listing.benefits.pay.summary ?? "See listing";
@@ -67,6 +60,9 @@ export function PayDetailsDrawer({ listing, onClose }: PayDetailsDrawerProps) {
 		() => (listing ? formatHeadlineAmount(listing) : "See listing"),
 		[listing],
 	);
+	// The card's Pay cell now shows label + value only; the host's fuller pay
+	// descriptor (e.g. "Weekly, paid on Fridays") reads clearly here.
+	const paySummary = listing?.benefits.pay.summary;
 	const benchmarkText = useMemo(
 		() =>
 			listing
@@ -115,6 +111,9 @@ export function PayDetailsDrawer({ listing, onClose }: PayDetailsDrawerProps) {
 					<div className={styles.payHeadlineBlock}>
 						<p className={styles.amountValue}>{headlineAmount}</p>
 						<p className={styles.amountLabel}>Listing pay</p>
+						{paySummary && paySummary !== headlineAmount ? (
+							<p className={styles.payDescriptor}>{paySummary}</p>
+						) : null}
 					</div>
 					<div className={styles.inlineArtwork} aria-hidden>
 						{listing.coverImageUrl ? (

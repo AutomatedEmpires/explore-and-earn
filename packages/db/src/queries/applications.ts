@@ -4,16 +4,36 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   BenefitProvision,
   BenefitTriad,
+  DiscoveryCardConditionalBadge,
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
-import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  formatCompensation,
+  formatOpportunityWindow,
+  hasVerifiedHostSubscription,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
+import { isSeekerResumeComplete } from "../lib/resumeCompleteness";
+import { getActiveBoostedListingIds } from "./idReaders";
+import { MEANINGFUL_MATCH_SCORE_THRESHOLD } from "./listings";
+import { getMatchScoresForSeeker } from "./matchScores";
+import { getSeekerResume } from "./seekerResume";
 
 export interface ApplyResult {
   readonly ok: boolean;
   readonly error?: string;
+  /**
+   * True when the apply REACTIVATED a previously withdrawn application row
+   * (migration 063) rather than creating a new one. Lets the action layer show
+   * a "re-applied" confirmation; the host separately sees it via `reappliedAt`.
+   */
+  readonly reactivated?: boolean;
+  /** The created/reactivated application row id (set on ok=true). */
+  readonly applicationId?: string;
+  /** The applicant's seeker_profiles.id (set on ok=true). */
+  readonly seekerProfileId?: string;
 }
 
 /** Postgres unique_violation SQLSTATE -- surfaced as the already-applied case. */
@@ -52,6 +72,9 @@ async function resolveSeekerProfileId(
  * - `profile_not_found` — no seeker_profiles row yet (Clerk webhook pending)
  * - `already_applied`   — unique (listing_id, seeker_profile_id) violation
  * - `cannot_apply_to_own_listing` — host cannot apply to their own listing
+ * - `resume_incomplete` — résumé does not yet satisfy the server-authoritative
+ *   completeness gate (see isSeekerResumeComplete); enforced here so a
+ *   determined client cannot bypass the UI-side ApplyButton gate.
  */
 export async function applyToListing(
   clerkToken: string,
@@ -62,6 +85,14 @@ export async function applyToListing(
   const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
     return { ok: false, error: "profile_not_found" };
+  }
+
+  // Server-authoritative résumé gate: block the insert BEFORE it happens when
+  // the seeker's résumé is not complete enough to apply. This is the real
+  // enforcement point — the ApplyButton UI check is advisory only.
+  const resume = await getSeekerResume(clerkToken, clerkUserId);
+  if (!isSeekerResumeComplete(resume)) {
+    return { ok: false, error: "resume_incomplete" };
   }
 
   // Prevent self-application: host cannot apply to their own listing
@@ -77,45 +108,88 @@ export async function applyToListing(
     return { ok: false, error: "cannot_apply_to_own_listing" as const };
   }
 
-  const { error } = await authedClient(clerkToken)
+  // Re-apply reactivation (migration 063): a prior application row may already
+  // exist for this (listing, seeker) pair because of the
+  // applications_listing_seeker_unique constraint. If it is 'withdrawn', REVIVE
+  // it in place (status -> 'applied', stamp reactivated_at) instead of INSERTing
+  // a second row that would collide with 23505 — the silent lockout this fixes.
+  // Any other existing status is a genuine active application: block as before.
+  const existing = await authed
+    .from("applications")
+    .select("id, status")
+    .eq("listing_id", listingId)
+    .eq("seeker_profile_id", seekerProfileId)
+    .maybeSingle();
+
+  const existingRow = existing.data as { id: string; status: string } | null;
+  if (existingRow) {
+    if (existingRow.status !== "withdrawn") {
+      // Active (non-withdrawn) row already present — genuine double-apply.
+      return { ok: false, error: "already_applied" };
+    }
+
+    // Reactivate the withdrawn row. submitted_at is intentionally left untouched
+    // to preserve the original apply time (history); reactivated_at records the
+    // revive so the host sees "applied before" / "re-applied". The 063 lifecycle
+    // seed makes withdrawn -> applied a legal edge for the BEFORE UPDATE trigger.
+    const reactivatePatch: Record<string, unknown> = {
+      status: "applied",
+      reactivated_at: new Date().toISOString(),
+      withdrawn_reason: null,
+    };
+    if (coverMessage !== undefined) reactivatePatch.cover_message = coverMessage;
+
+    const { error: reactivateError } = await authed
+      .from("applications")
+      .update(reactivatePatch)
+      .eq("id", existingRow.id)
+      .eq("seeker_profile_id", seekerProfileId);
+
+    if (reactivateError) {
+      if (reactivateError.code === UNIQUE_VIOLATION) {
+        return { ok: false, error: "already_applied" };
+      }
+      return { ok: false, error: reactivateError.message };
+    }
+    return {
+      ok: true,
+      reactivated: true,
+      applicationId: existingRow.id,
+      seekerProfileId,
+    };
+  }
+
+  const { data: inserted, error } = await authed
     .from("applications")
     .insert({
       listing_id: listingId,
       seeker_profile_id: seekerProfileId,
       cover_message: coverMessage ?? null,
-    });
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     if (error.code === UNIQUE_VIOLATION) {
+      // Lost a race to another concurrent apply (the row appeared between our
+      // existence check and this insert). If that row is now a live withdrawn
+      // one this is unlucky timing; treat as already_applied — the seeker can
+      // retry and the reactivation branch above will pick it up.
       return { ok: false, error: "already_applied" };
     }
     return { ok: false, error: error.message };
   }
 
-  return { ok: true };
+  return {
+    ok: true,
+    applicationId: (inserted as { id: string } | null)?.id,
+    seekerProfileId,
+  };
 }
 
-export async function getSeekerApplicationIds(
-  clerkToken: string,
-  clerkUserId: string,
-): Promise<string[]> {
-  const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
-  if (!seekerProfileId) {
-    return [];
-  }
-
-  const { data, error } = await authedClient(clerkToken)
-    .from("applications")
-    .select("listing_id")
-    .eq("seeker_profile_id", seekerProfileId)
-    .neq("status", "withdrawn");
-
-  if (error) {
-    throw new Error(`getSeekerApplicationIds: ${error.message}`);
-  }
-
-  return (data ?? []).map((row) => row.listing_id);
-}
+// getSeekerApplicationIds moved to ./idReaders (breaks the listings.ts <->
+// applications.ts import cycle); re-exported from the package barrel via that
+// module. Import it from "@explore-and-earn/db" exactly as before.
 
 export interface SeekerApplication {
   readonly id: string;
@@ -163,10 +237,18 @@ export interface HostApplication {
   readonly status: string;
   readonly coverMessage: string | null;
   readonly submittedAt: string;
+  /**
+   * ISO timestamp of the latest re-apply reactivation (migration 063), or null
+   * for a first-time application. Non-null ⇒ this seeker applied, withdrew, and
+   * re-applied — the host's "applied before" / "re-applied" flag.
+   */
+  readonly reappliedAt: string | null;
+  /** Convenience boolean: `reappliedAt != null`. */
+  readonly previouslyApplied: boolean;
 }
 
 const HOST_APPLICATIONS_SELECT =
-  "id,listing_id,seeker_profile_id,status,cover_message,submitted_at,listings!listing_id!inner(title,host_profile_id,host_profiles!host_profile_id!inner(clerk_user_id)),seeker_profiles!seeker_profile_id(clerk_user_id)";
+  "id,listing_id,seeker_profile_id,status,cover_message,submitted_at,reactivated_at,listings!listing_id!inner(title,host_profile_id,host_profiles!host_profile_id!inner(clerk_user_id)),seeker_profiles!seeker_profile_id(clerk_user_id)";
 
 function firstOf(value: unknown): Record<string, unknown> | null {
   const candidate = Array.isArray(value) ? value[0] : value;
@@ -210,6 +292,9 @@ export async function getHostApplications(
         coverMessage:
           typeof r.cover_message === "string" ? r.cover_message : null,
         submittedAt: String(r.submitted_at),
+        reappliedAt:
+          typeof r.reactivated_at === "string" ? r.reactivated_at : null,
+        previouslyApplied: typeof r.reactivated_at === "string",
       } satisfies HostApplication;
     });
   } catch {
@@ -257,7 +342,7 @@ async function getHostApplicationsFallback(
 
   const { data: appRows, error: appError } = await untyped
     .from("applications")
-    .select("id,listing_id,seeker_profile_id,status,cover_message,submitted_at")
+    .select("id,listing_id,seeker_profile_id,status,cover_message,submitted_at,reactivated_at")
     .in("listing_id", listingIds)
     .order("submitted_at", { ascending: false })
     .limit(500);
@@ -298,6 +383,8 @@ async function getHostApplicationsFallback(
     status: typeof r.status === "string" ? r.status : "applied",
     coverMessage: typeof r.cover_message === "string" ? r.cover_message : null,
     submittedAt: String(r.submitted_at),
+    reappliedAt: typeof r.reactivated_at === "string" ? r.reactivated_at : null,
+    previouslyApplied: typeof r.reactivated_at === "string",
   } satisfies HostApplication));
 }
 
@@ -456,40 +543,26 @@ export type ApplicationWithListing = SeekerApplication & {
   readonly listing: ApplicationListing | null;
 };
 
+// Compensation summary via the shared, locale-ready formatter (default currency
+// applied in the formatter) \u2014 no inline currency/date formatting in the DB
+// layer. See @explore-and-earn/contracts format.ts.
 function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    return row.compensation_summary;
-  }
-  const minCents =
-    typeof row.compensation_min_cents === "number"
-      ? row.compensation_min_cents
-      : null;
-  if (minCents != null) {
-    const unit =
-      typeof row.compensation_unit === "string"
-        ? row.compensation_unit
-        : "other";
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(minCents);
-    const maxCents =
+  return formatCompensation({
+    summary:
+      typeof row.compensation_summary === "string"
+        ? row.compensation_summary
+        : null,
+    minCents:
+      typeof row.compensation_min_cents === "number"
+        ? row.compensation_min_cents
+        : null,
+    maxCents:
       typeof row.compensation_max_cents === "number"
         ? row.compensation_max_cents
-        : null;
-    const max = maxCents != null ? fmt(maxCents) : null;
-    const range = max && max !== min ? `${min}\u2013${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
+        : null,
+    unit:
+      typeof row.compensation_unit === "string" ? row.compensation_unit : null,
+  });
 }
 
 function rowToDiscoveryListing(value: unknown): ApplicationListing | null {
@@ -523,11 +596,10 @@ function rowToDiscoveryListing(value: unknown): ApplicationListing | null {
       row.location_display.length > 0
         ? row.location_display
         : "Location not specified",
-    opportunityWindow:
-      typeof row.timeline_summary === "string" &&
-      row.timeline_summary.length > 0
-        ? row.timeline_summary
-        : "Open",
+    opportunityWindow: formatOpportunityWindow({
+      timelineSummary:
+        typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+    }),
     status: (typeof row.status === "string"
       ? row.status
       : "live") as ListingStatus,
@@ -596,6 +668,21 @@ export interface SeekerApplicationListing extends ApplicationListing {
   readonly coverImageUrl: string | null;
   readonly beginsAt: string | null;
   readonly endsAt: string | null;
+  /**
+   * Conditional badges that must travel on the card even off the discovery
+   * feed. Applications don't route through rowToDiscoveryFields, so the boosted
+   * marker is stamped here (founder decision: a boosted listing ALWAYS shows its
+   * boosted marker). Empty/undefined when the listing has no active boost.
+   */
+  readonly conditionalBadges?: readonly DiscoveryCardConditionalBadge[];
+  /**
+   * Stored ADR-040 match % for the (seeker, listing) pair, surfaced ONLY when it
+   * clears MEANINGFUL_MATCH_SCORE_THRESHOLD (>= 75) — the same gate the discovery
+   * card uses (founder decision: match % shows wherever a stored score >= 75). So
+   * offered / invited / saved lifecycle cards show the same number the listing
+   * detail does. Undefined when there is no stored score or it is below the gate.
+   */
+  readonly matchScore?: number;
 }
 
 export type SeekerApplicationWithListing = SeekerApplication & {
@@ -613,6 +700,8 @@ const SEEKER_APPLICATION_SELECT =
 
 function rowToSeekerApplicationListing(
   value: unknown,
+  boostedListingIds?: ReadonlySet<string>,
+  matchScores?: ReadonlyMap<string, number>,
 ): SeekerApplicationListing | null {
   const row = firstOf(value);
   if (!row) return null;
@@ -651,11 +740,10 @@ function rowToSeekerApplicationListing(
       row.location_display.length > 0
         ? row.location_display
         : "Location not specified",
-    opportunityWindow:
-      typeof row.timeline_summary === "string" &&
-      row.timeline_summary.length > 0
-        ? row.timeline_summary
-        : "Open",
+    opportunityWindow: formatOpportunityWindow({
+      timelineSummary:
+        typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+    }),
     status: (typeof row.status === "string"
       ? row.status
       : "live") as ListingStatus,
@@ -665,6 +753,14 @@ function rowToSeekerApplicationListing(
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
     beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
     endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
+    conditionalBadges:
+      boostedListingIds?.has(String(row.id)) ? (["boosted"] as const) : undefined,
+    matchScore: (() => {
+      const stored = matchScores?.get(String(row.id));
+      return typeof stored === "number" && stored >= MEANINGFUL_MATCH_SCORE_THRESHOLD
+        ? stored
+        : undefined;
+    })(),
   };
 }
 
@@ -679,11 +775,15 @@ export async function getApplicationsForSeekerWithListings(
   if (!seekerProfileId) return [];
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data, error } = await untyped
-    .from("applications")
-    .select(SEEKER_APPLICATION_SELECT)
-    .eq("seeker_profile_id", seekerProfileId)
-    .order("submitted_at", { ascending: false });
+  const [{ data, error }, boostedListingIds, matchScores] = await Promise.all([
+    untyped
+      .from("applications")
+      .select(SEEKER_APPLICATION_SELECT)
+      .eq("seeker_profile_id", seekerProfileId)
+      .order("submitted_at", { ascending: false }),
+    getActiveBoostedListingIds(clerkToken),
+    getMatchScoresForSeeker(clerkToken, clerkUserId),
+  ]);
 
   if (error) {
     throw new Error(`getApplicationsForSeekerWithListings: ${error.message}`);
@@ -699,7 +799,11 @@ export async function getApplicationsForSeekerWithListings(
       expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
       coverMessage:
         typeof r.cover_message === "string" ? r.cover_message : null,
-      listing: rowToSeekerApplicationListing(r.listings),
+      listing: rowToSeekerApplicationListing(
+        r.listings,
+        boostedListingIds,
+        matchScores,
+      ),
     } satisfies SeekerApplicationWithListing;
   });
 }
@@ -716,12 +820,16 @@ export async function getApplicationById(
   if (!seekerProfileId) return null;
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data, error } = await untyped
-    .from("applications")
-    .select(SEEKER_APPLICATION_SELECT)
-    .eq("id", applicationId)
-    .eq("seeker_profile_id", seekerProfileId)
-    .maybeSingle();
+  const [{ data, error }, boostedListingIds, matchScores] = await Promise.all([
+    untyped
+      .from("applications")
+      .select(SEEKER_APPLICATION_SELECT)
+      .eq("id", applicationId)
+      .eq("seeker_profile_id", seekerProfileId)
+      .maybeSingle(),
+    getActiveBoostedListingIds(clerkToken),
+    getMatchScoresForSeeker(clerkToken, clerkUserId),
+  ]);
 
   if (error) {
     throw new Error(`getApplicationById: ${error.message}`);
@@ -737,7 +845,11 @@ export async function getApplicationById(
     expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
     coverMessage:
       typeof r.cover_message === "string" ? r.cover_message : null,
-    listing: rowToSeekerApplicationListing(r.listings),
+    listing: rowToSeekerApplicationListing(
+      r.listings,
+      boostedListingIds,
+      matchScores,
+    ),
   } satisfies SeekerApplicationWithListing;
 }
 

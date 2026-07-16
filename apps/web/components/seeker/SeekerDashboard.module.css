@@ -1,32 +1,91 @@
-/* SeekerDashboard — personal command center. Mobile-first, desktop grid. */
+/* SeekerDashboard — personal, content-first command center. Mobile-first. */
 
 /* ─────────────────────────────────────────────
    OUTER LAYOUT
+   The (seeker) shell owns the persistent left rail (ScopeShellNav) now, so the
+   dashboard is a single vertical content column that leads with the next action.
    ───────────────────────────────────────────── */
 
-.dashboard {
-  display: flex;
-  flex-direction: column;
-  background: var(--color-paper);
-  min-height: 100dvh;
-}
-
-/* Desktop: sidebar (col 1) + main (col 2) */
-@media (min-width: 768px) {
-  .dashboard {
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    grid-template-rows: 1fr;
-    align-items: start;
-  }
-}
-
-/* Main content column — full width on mobile, 1fr on desktop */
 .main {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--space-16);
   overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────
+   NEXT-ACTION HERO — "Welcome back, {name}" + the ONE thing to do next
+   ───────────────────────────────────────────── */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-8);
+  padding: var(--space-20) var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--color-cta) 10%, transparent), transparent 58%),
+    var(--color-surface);
+  box-shadow: var(--elevation-card);
+}
+
+.greeting {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 5.5vw, 28px);
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.heroCta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: var(--space-4);
+  min-height: 44px;
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-pill);
+  background: var(--gradient-action);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  box-shadow: var(--elevation-hover);
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.heroCta:hover {
+  transform: translateY(-2px);
+}
+
+.heroCta:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--color-cta);
+}
+
+@media (min-width: 768px) {
+  .hero {
+    padding: var(--space-24) var(--space-24);
+  }
 }
 
 /* ─────────────────────────────────────────────
@@ -40,10 +99,10 @@
   padding: var(--space-12) var(--space-16);
   background: linear-gradient(
     to right,
-    var(--palette-amber-light),
-    color-mix(in srgb, var(--palette-amber-light) 45%, var(--color-surface-raised))
+    var(--state-soon-bg),
+    color-mix(in srgb, var(--state-soon-bg) 45%, var(--color-surface-raised))
   );
-  border-bottom: 1px solid color-mix(in srgb, var(--palette-amber) 55%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--state-soon-fg) 40%, transparent);
   text-decoration: none;
   transition: background var(--motion-fast) var(--ease-standard);
 }
@@ -51,8 +110,8 @@
 .resumeCallout:hover {
   background: linear-gradient(
     to right,
-    color-mix(in srgb, var(--palette-amber) 35%, var(--palette-amber-light)),
-    var(--palette-amber-light)
+    color-mix(in srgb, var(--state-soon-fg) 22%, var(--state-soon-bg)),
+    var(--state-soon-bg)
   );
 }
 
@@ -92,223 +151,54 @@
 }
 
 /* ─────────────────────────────────────────────
-   QUICK STATS BAR
+   PIPELINE SECTION — the primary at-a-glance element
+   Header (title + link to the fuller applications view) sits above the
+   clickable JourneyPipeline stage row (that component owns its own styling).
    ───────────────────────────────────────────── */
 
-.statsBar {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-8);
-  padding: var(--space-14) var(--space-16);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  background: var(--color-paper);
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.statsBar::-webkit-scrollbar { display: none; }
-
-/* Resume ring chip */
-.resumeChip {
+.pipelineSection {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-8) var(--space-10);
-  border-radius: var(--radius-cell);
-  border: 1.5px solid var(--border-soft);
-  background: var(--color-surface-raised);
-  text-decoration: none;
-  flex-shrink: 0;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    transform    var(--motion-fast) var(--ease-standard);
 }
 
-.resumeChip:hover {
-  border-color: var(--border-ink);
-  transform: translateY(-1px);
-}
-
-.resumeChip:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-/* Stat chip */
-.statChip {
+.pipelineHeader {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-8) var(--space-14);
-  border-radius: var(--radius-cell);
-  border: 1.5px solid var(--border-soft);
-  background: var(--color-surface-raised);
-  text-decoration: none;
-  flex-shrink: 0;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background   var(--motion-fast) var(--ease-standard),
-    box-shadow   var(--motion-fast) var(--ease-standard),
-    transform    var(--motion-fast) var(--ease-standard);
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16) var(--space-4);
 }
 
-.statChip:hover {
-  border-color: var(--border-ink);
-  transform: translateY(-1px);
-}
-
-.statChip:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-.statHighlight {
-  border-color: var(--status-match-fg);
-  background: color-mix(in srgb, var(--status-match-bg) 55%, var(--color-surface-raised));
-  box-shadow: 0 0 0 1px var(--status-match-fg), var(--elevation-card);
-}
-
-.statHighlight .statValue { color: var(--palette-sky-dark); }
-
-.statValue {
+.pipelineHeading {
   font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1;
-}
-
-.statLabel {
-  font-family: var(--font-ui);
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-/* ─────────────────────────────────────────────
-   LIFECYCLE SECTION
-   ───────────────────────────────────────────── */
-
-.lifecycleSection {
-  padding: 20px 0 var(--space-32);
-}
-
-.sectionHeading {
-  font-family: var(--font-display);
-  font-size: clamp(18px, 5vw, 22px);
-  font-weight: 700;
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  font-weight: var(--font-weight-regular);
   color: var(--text-primary);
   margin: 0;
-  padding: 0 var(--space-16) var(--space-12);
 }
 
-/* 3-up grid */
-.teaserRow {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-8);
-  padding: 0 var(--space-16);
-}
-
-.teaserCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-14) var(--space-8);
-  border-radius: var(--radius-card);
-  border: 1.5px solid var(--border-soft);
-  background: var(--color-surface-raised);
-  text-decoration: none;
-  text-align: center;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background   var(--motion-fast) var(--ease-standard),
-    transform    var(--motion-fast) var(--ease-standard),
-    box-shadow   var(--motion-fast) var(--ease-standard);
-}
-
-.teaserCard:hover {
-  border-color: var(--border-ink);
-  transform: translateY(-2px);
-  box-shadow: var(--elevation-hover);
-}
-
-.teaserCard:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-.teaserHighlight {
-  border-color: var(--status-match-fg);
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--status-match-bg) 55%, var(--color-surface-raised)),
-    color-mix(in srgb, var(--status-match-bg) 25%, var(--color-surface-raised))
-  );
-  box-shadow: 0 0 0 1px var(--status-match-fg), var(--elevation-card);
-}
-
-.teaserHighlight .teaserIcon {
-  background: var(--status-match-fg);
-  color: var(--color-cta-text);
-}
-
-.teaserIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-button);
-  background: var(--color-steel, #EAEFEF);
-  color: var(--text-secondary);
-  flex-shrink: 0;
-  transition:
-    background var(--motion-fast) var(--ease-standard),
-    color      var(--motion-fast) var(--ease-standard);
-}
-
-.teaserInfo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.teaserLabel {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
-.teaserCount {
+.pipelineLink {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 var(--space-6);
-  border-radius: var(--radius-pill);
-  background: var(--status-match-fg);
-  color: var(--color-cta-text);
+  gap: var(--space-4);
+  min-height: 44px;
+  padding: 0 var(--space-4);
   font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-label-size);
   font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: var(--radius-button);
+  transition: color var(--motion-fast) var(--ease-standard);
 }
 
-/* Mobile: collapse the 3-up lifecycle grid so cards stay tappable */
-@media (max-width: 380px) {
-  .teaserRow {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.pipelineLink:hover {
+  color: var(--text-primary);
+}
+
+.pipelineLink:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
 }

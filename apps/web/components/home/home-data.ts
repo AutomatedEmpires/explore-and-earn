@@ -15,6 +15,7 @@
 import { cloudinaryPhoto, type PhotoCategory } from "@explore-and-earn/ui";
 import {
   FOUNDER_LOCKED_PRICING,
+  FOUNDING_LOCKED_PRICING,
   PLAN_ENTITLEMENTS,
   type OpportunityCategory,
 } from "@explore-and-earn/contracts";
@@ -31,11 +32,39 @@ function lanePhoto(category: PhotoCategory, slug: string, size: "card" | "hero" 
 
 // ─── Hero ───────────────────────────────────────────────────────────────────
 
-/** A deliberately scenic, warm "working landscape" hero — not a data cover. */
-export const HOME_HERO = {
-  imageUrl: cloudinaryPhoto("farm", "venti-views-n-ndvlwtfde", "hero"),
-  category: "farm" as OpportunityCategory,
-};
+export interface HomeHeroImage {
+  readonly imageUrl: string;
+  /** Drives the cover-gradient fallback class if the hero photo is missing. */
+  readonly category: OpportunityCategory;
+}
+
+/**
+ * HOME_HERO_ROTATION — the controllable hero "bucket". The homepage picks ONE of
+ * these per landing (client-side, after mount) so the first impression feels
+ * alive without a hydration mismatch. This is the single place the founder edits
+ * to control which images can appear: add, remove, or reorder entries here.
+ *
+ * All entries are cool/scenic, mixed lanes (coastal · mountain · farm-at-dusk) so
+ * the hero sits with the Glacier palette — a warm cover fights the ice-and-chrome
+ * UI. Slugs are the same curated lane photos referenced by DESTINATION_SEEDS; if a
+ * hero-size variant is missing, the category cover gradient shows underneath.
+ */
+export const HOME_HERO_ROTATION: readonly HomeHeroImage[] = [
+  // Alaska — coastal maritime
+  { imageUrl: cloudinaryPhoto("maritime", "venti-views-asmavys4azm", "hero"), category: "maritime" },
+  // Colorado — alpine, winter & summer
+  { imageUrl: cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"), category: "seasonal" },
+  // Wyoming — parks & high country
+  { imageUrl: cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"), category: "seasonal" },
+  // Maine — summer coast
+  { imageUrl: cloudinaryPhoto("maritime", "werner-hilversum-vfljehs-y5w", "hero"), category: "maritime" },
+  // Montana — ranch land at dusk
+  { imageUrl: cloudinaryPhoto("farm", "annie-spratt-jmjnnq2xfoy", "hero"), category: "farm" },
+];
+
+/** Stable SSR default — the first entry of the rotation renders on the server and
+ * on the first client paint, then the client advances to a rotated pick on mount. */
+export const HOME_HERO: HomeHeroImage = HOME_HERO_ROTATION[0];
 
 // ─── Destinations ("Where will you go next?") ──────────────────────────────
 
@@ -210,7 +239,10 @@ export function buildAnnouncements(
 export interface HomePlan {
   readonly key: "starter" | "professional" | "enterprise";
   readonly name: string;
+  /** Standard monthly rate (shown struck-through beside the founding rate). */
   readonly priceMonthlyCents: number;
+  /** Founding Host Program rate — the hero price while founding seats remain. */
+  readonly foundingMonthlyCents: number;
   readonly blurb: string;
   readonly features: readonly string[];
   readonly featured?: boolean;
@@ -222,6 +254,7 @@ export const HOME_PLANS: readonly HomePlan[] = [
     key: "starter",
     name: "Starter",
     priceMonthlyCents: FOUNDER_LOCKED_PRICING.starter.monthly,
+    foundingMonthlyCents: FOUNDING_LOCKED_PRICING.starter.monthly,
     blurb: "A single location getting its first season staffed.",
     features: [
       `${PLAN_ENTITLEMENTS.starter.listings} active listing`,
@@ -235,6 +268,7 @@ export const HOME_PLANS: readonly HomePlan[] = [
     key: "professional",
     name: "Professional",
     priceMonthlyCents: FOUNDER_LOCKED_PRICING.professional.monthly,
+    foundingMonthlyCents: FOUNDING_LOCKED_PRICING.professional.monthly,
     blurb: "Hosts hiring across a full season.",
     features: [
       `Up to ${PLAN_ENTITLEMENTS.professional.listings} active listings`,
@@ -250,6 +284,7 @@ export const HOME_PLANS: readonly HomePlan[] = [
     key: "enterprise",
     name: "Enterprise",
     priceMonthlyCents: FOUNDER_LOCKED_PRICING.enterprise.monthly,
+    foundingMonthlyCents: FOUNDING_LOCKED_PRICING.enterprise.monthly,
     blurb: "Multi-location operators hiring at scale.",
     features: [
       `${PLAN_ENTITLEMENTS.enterprise.listings}+ active listings`,

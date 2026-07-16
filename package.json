@@ -16,7 +16,7 @@
     "test": "corepack pnpm -r --if-present test",
     "test:e2e": "corepack pnpm --filter @explore-and-earn/web test:e2e",
     "db:assert": "corepack pnpm --filter @explore-and-earn/db-assert check",
-    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-category-taxonomy.mjs && node tools/scripts/check-canon-contracts.mjs && node tools/scripts/check-dev-bench.mjs && node tools/scripts/check-preview-readiness.mjs && node tools/scripts/check-migration-prefixes.mjs && node tools/scripts/check-raw-colors.mjs"
+    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-category-taxonomy.mjs && node tools/scripts/check-canon-contracts.mjs && node tools/scripts/check-dev-bench.mjs && node tools/scripts/check-preview-readiness.mjs && node tools/scripts/check-migration-prefixes.mjs && node tools/scripts/check-raw-colors.mjs && node tools/scripts/check-tokenization.mjs && node tools/scripts/check-locale-literals.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",

@@ -3,19 +3,33 @@ import "server-only";
 import { tool, type ToolSet } from "ai";
 import { z } from "zod";
 import {
+  analyzeResume,
   getHostApplications,
   getHostListings,
+  getInviteEntitlement,
+  getListingMatchRequirements,
+  getMatchedSeekersForListing,
   getMatchScoresForHost,
+  getSeekerResumeByProfileId,
   matchScoreKey,
+  prepareForListing,
 } from "@explore-and-earn/db";
+import { topMatchReasons } from "@explore-and-earn/contracts";
+
+import { checkRateLimit } from "../../lib/rateLimit";
 
 /**
- * Host assistant tools — the listing-coach + applicant-ranking trust boundary.
+ * Host Guide tools — the listing-coach + applicant-screening trust boundary.
  *
  * Identity ({ token, userId }) is CLOSED OVER at construction. Every tool acts
  * only as the authenticated host via the same RLS-scoped services the host
- * dashboard uses, so it can only ever see this host's own listings/applicants.
- * All tools are read-only — the assistant coaches and drafts; the host acts.
+ * dashboard uses, so it can only ever see this host's own listings/applicants;
+ * applicant resume access additionally passes the hostCanViewSeeker gate (an
+ * application or conversation must exist). All tools are read-only —
+ * screening is ASSISTIVE: the Guide summarizes, compares, and prioritizes for
+ * review; it never decides, never rejects, and never reveals anything to the
+ * candidate. Protected characteristics play no role anywhere: every signal is
+ * a work qualification (skills, certifications, dates, listing requirements).
  */
 
 export interface HostToolContext {
@@ -96,7 +110,7 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
 
     top_applicants: tool({
       description:
-        "Rank THIS host's applicants for a listing (by id) by real ADR-040 match fit (band + score), best fit first. Use to answer 'who fits best / who should I look at'.",
+        "Rank THIS host's applicants for a listing (by id) by real ADR-040 match fit (band + score), best fit first. Use to answer 'who fits best / who should I look at'. Ranking is a review PRIORITY, never a decision.",
       inputSchema: z.object({ listingId: z.string() }),
       execute: async ({ listingId }) => {
         const [applications, scores] = await Promise.all([
@@ -115,6 +129,150 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
             };
           })
           .sort((a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1));
+      },
+    }),
+
+    screen_applicant: tool({
+      description:
+        "Structured screening summary for ONE applicant (by seekerProfileId) to ONE of this host's listings (by listingId): their real resume against the listing's actual requirements, covered vs missing skills/certifications, information gaps, and grounded interview topics. ASSISTIVE ONLY — you summarize for the host's review; you never recommend rejecting anyone, never infer protected traits, and never invent work history.",
+      inputSchema: z.object({
+        listingId: z.string(),
+        seekerProfileId: z.string(),
+      }),
+      execute: async ({ listingId, seekerProfileId }) => {
+        const { allowed } = checkRateLimit(
+          `assistant-screen:${ctx.userId}`,
+          30,
+          10 * 60 * 1000,
+        );
+        if (!allowed) return { error: "rate_limited" as const };
+
+        // The applicant must have applied to a listing THIS host owns —
+        // otherwise this tool reveals nothing (not even existence).
+        const applications = await getHostApplications(ctx.token, ctx.userId);
+        const application = applications.find(
+          (app) => app.listingId === listingId && app.seekerProfileId === seekerProfileId,
+        );
+        if (!application) return { error: "applicant_not_found" as const };
+
+        // Resume read passes the hostCanViewSeeker gate inside the db layer —
+        // defense in depth on top of the application check above.
+        const [resume, requirements, scores] = await Promise.all([
+          getSeekerResumeByProfileId(ctx.token, ctx.userId, seekerProfileId),
+          getListingMatchRequirements(listingId),
+          getMatchScoresForHost(ctx.token),
+        ]);
+        if (!resume) return { error: "resume_unavailable" as const };
+
+        const insights = analyzeResume(resume, Date.now());
+        const preparation = requirements
+          ? prepareForListing(insights, requirements, resume.certifications)
+          : null;
+        const match = scores.get(matchScoreKey(listingId, seekerProfileId));
+
+        // Interview topics derive ONLY from real gaps between the listing's
+        // stated requirements and the applicant's stored records.
+        const interviewTopics: string[] = [];
+        for (const skill of preparation?.missingSkills ?? []) {
+          interviewTopics.push(`Experience with ${skill} (requested by the listing, not in their resume)`);
+        }
+        for (const cert of preparation?.missingCertifications ?? []) {
+          interviewTopics.push(`Status of the ${cert} certification the listing requires`);
+        }
+        for (const experience of resume.experiences) {
+          if (!experience.summary?.trim() && experience.roleTitle) {
+            interviewTopics.push(`Details of their time as ${experience.roleTitle}${experience.companyName ? ` at ${experience.companyName}` : ""}`);
+          }
+        }
+
+        return {
+          applicationStatus: application.status,
+          coverMessage: application.coverMessage ?? null,
+          matchBand: match?.band ?? null,
+          matchScore: match?.score ?? null,
+          resume: {
+            displayName: resume.profile?.displayName ?? null,
+            bio: resume.profile?.bio ?? null,
+            skills: resume.profile?.generalSkills ?? [],
+            experiences: resume.experiences.map((experience) => ({
+              role: experience.roleTitle,
+              company: experience.companyName,
+              start: experience.startDate,
+              end: experience.endDate,
+              current: experience.isCurrent,
+              summary: experience.summary,
+            })),
+            certifications: resume.certifications.map((cert) => ({
+              name: cert.name,
+              expires: cert.expiresAt,
+              doesNotExpire: cert.doesNotExpire,
+            })),
+          },
+          requirements: preparation
+            ? {
+                coveredSkills: preparation.coveredSkills.map((s) => s.skill),
+                missingSkills: preparation.missingSkills,
+                coveredCertifications: preparation.coveredCertifications,
+                missingCertifications: preparation.missingCertifications,
+              }
+            : null,
+          missingInformation: insights.gaps.map((gap) => gap.code),
+          interviewTopics,
+        };
+      },
+    }),
+
+    matched_seekers: tool({
+      description:
+        "Ranked matched seekers for ONE of this host's listings (by id) from real persisted ADR-040 scores, with the host's current invite allowance. Use for 'who should I invite / find candidates'. A shortlist, not the whole market — the full seeker search still exists.",
+      inputSchema: z.object({ listingId: z.string() }),
+      execute: async ({ listingId }) => {
+        const [sourced, entitlement] = await Promise.all([
+          getMatchedSeekersForListing(ctx.token, ctx.userId, listingId, 10),
+          getInviteEntitlement(ctx.token, ctx.userId).catch(() => null),
+        ]);
+        if (!sourced) return { error: "listing_not_found" as const };
+        return {
+          seekers: sourced.seekers.map((seeker) => ({
+            seekerProfileId: seeker.seekerProfileId,
+            displayName: seeker.displayName,
+            bio: seeker.shortBio,
+            skills: seeker.generalSkills,
+            matchBand: seeker.band,
+            matchScore: seeker.score,
+            topReasons: topMatchReasons(seeker.components).map((r) => r.label),
+            alreadyInvited: seeker.alreadyInvited,
+          })),
+          invites: entitlement
+            ? {
+                monthlyAllowance: entitlement.monthlyAllowance,
+                remainingThisMonth: entitlement.monthlyRemaining,
+                purchasedBalance: entitlement.purchasedBalance,
+                totalRemaining: entitlement.totalRemaining,
+                metered: entitlement.ledgerAvailable,
+              }
+            : null,
+        };
+      },
+    }),
+
+    invite_entitlement: tool({
+      description:
+        "THIS host's current invite allowance: monthly included invites (by their real plan), used/remaining this month, and purchased credit balance. Use for 'how many invites do I have left'.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const entitlement = await getInviteEntitlement(ctx.token, ctx.userId);
+        if (!entitlement) return { error: "not_a_host" as const };
+        return {
+          tier: entitlement.tier,
+          monthlyAllowance: entitlement.monthlyAllowance,
+          usedThisMonth: entitlement.monthlyUsed,
+          remainingThisMonth: entitlement.monthlyRemaining,
+          purchasedBalance: entitlement.purchasedBalance,
+          totalRemaining: entitlement.totalRemaining,
+          // False = the usage ledger isn't live yet; don't quote balances.
+          metered: entitlement.ledgerAvailable,
+        };
       },
     }),
   };

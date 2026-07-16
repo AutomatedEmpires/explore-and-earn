@@ -1,0 +1,100 @@
+.strip {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  padding-bottom: var(--space-8);
+  scrollbar-width: none;
+}
+
+.strip::-webkit-scrollbar {
+  display: none;
+}
+
+.day {
+  flex: 0 0 auto;
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-12) var(--space-8);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background-color: var(--color-surface);
+  text-align: center;
+}
+
+.weekday {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--type-label-tracking);
+  color: var(--text-muted);
+}
+
+.glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  color: var(--color-gold);
+}
+
+.glyphDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-silver);
+}
+
+.temps {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  font-family: var(--font-ui);
+}
+
+.high {
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.low {
+  font-size: var(--type-meta-size);
+  color: var(--text-muted);
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-secondary);
+}
+
+/* ─── Honest unavailable shell ────────────────────────────────────────────── */
+
+.shell {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-10);
+  padding: var(--space-16);
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-card);
+  background-color: var(--color-surface);
+}
+
+.shell svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.shellText {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}

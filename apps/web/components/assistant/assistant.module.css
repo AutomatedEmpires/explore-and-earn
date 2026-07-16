@@ -273,6 +273,98 @@
   color: var(--text-secondary);
 }
 
+/* ── NL search results — deterministic ranked listings under a search turn ── */
+
+.results {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+  padding: var(--space-12);
+  border: 1px solid var(--palette-line);
+  border-radius: var(--radius-cell);
+  background: var(--color-surface);
+}
+
+.resultsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.resultsTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-display);
+  font-size: var(--type-body-size);
+  color: var(--text-primary);
+}
+
+.parsedChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.parsedChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-8);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--palette-line);
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+}
+
+.resultsGrid {
+  display: grid;
+  gap: var(--space-12);
+}
+
+/* CTA override passed to the LOCKED DiscoveryCard's `actions` slot. */
+.resultOpen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-8) var(--space-12);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-action);
+  color: var(--color-cta-text);
+  font-size: var(--type-body-size);
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 150ms ease;
+}
+
+.resultOpen:hover {
+  transform: translateY(-1px);
+}
+
+.resultsMore {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-end;
+  gap: var(--space-4);
+  min-height: 44px;
+  padding: var(--space-4) var(--space-8);
+  font-size: var(--type-caption-size);
+  font-weight: 600;
+  color: var(--color-cta);
+  text-decoration: none;
+}
+
+.resultsMore:hover {
+  text-decoration: underline;
+}
+
 /* Visually hidden live region (announce once per state change). */
 .srOnly {
   position: absolute;

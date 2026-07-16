@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-
+import { useCallback, useEffect, useState } from "react";
 
 import { Icon } from "@explore-and-earn/ui";
 import { uploadProfilePhoto } from "@explore-and-earn/db/client";
 import { saveHeroCoverAction } from "../../app/actions/seekerProfile";
 import { useOptionalGetToken } from "../../lib/useOptionalGetToken";
+import { bucketPhotoUrl } from "../../lib/photoBuckets";
+import { BucketPhotoPicker } from "../photos/BucketPhotoPicker";
 import styles from "./HeroPhotoPickerModal.module.css";
 
 export interface HeroPhotoPickerModalProps {
@@ -47,7 +48,6 @@ export function HeroPhotoPickerModal({
   seekerProfileId,
 }: HeroPhotoPickerModalProps) {
   const getToken = useOptionalGetToken();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,11 +72,13 @@ export function HeroPhotoPickerModal({
     };
   }, [open, handleKeyDown]);
 
-  const handleGradient = useCallback(
-    async (gradient: string) => {
-      const result = await saveHeroCoverAction(gradient);
+  // One handler for any predefined cover value — a Cloudinary photo URL or a
+  // gradient token. SeekerHero renders either (isPhotoUrl decides).
+  const handleSelectCover = useCallback(
+    async (value: string) => {
+      const result = await saveHeroCoverAction(value);
       if (result.ok) {
-        onSelect(gradient);
+        onSelect(value);
         onClose();
       } else {
         setError("Could not save. Please try again.");
@@ -131,36 +133,27 @@ export function HeroPhotoPickerModal({
         </div>
 
         <div className={styles.body}>
-          {/* Upload custom photo */}
-          {seekerProfileId && (
-            <div className={styles.uploadSection}>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className={styles.fileInput}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void handleUpload(file);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                className={styles.uploadBtn}
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-              >
-                <Icon name="action.more" size={20} />
-                {uploading ? "Uploading…" : "Upload your own photo"}
-              </button>
-            </div>
-          )}
+          {/* Shared photo picker — upload (primary) + seekerCover bucket
+              presets (fallback). Same primitive used by host & admin surfaces. */}
+          <BucketPhotoPicker
+            bucketId="seekerCover"
+            value={currentUrl}
+            uploading={uploading}
+            uploadLabel="Upload your own photo"
+            presetLabel="Or pick a cover"
+            size="hero"
+            onUpload={
+              seekerProfileId ? (file) => void handleUpload(file) : undefined
+            }
+            onSelectPreset={(publicId) =>
+              void handleSelectCover(bucketPhotoUrl(publicId, "hero"))
+            }
+          />
 
           {error && <p className={styles.error} role="alert">{error}</p>}
 
-          {/* Gradient presets */}
-          <p className={styles.sectionLabel}>Choose a landscape</p>
+          {/* Landscape gradients */}
+          <p className={styles.sectionLabel}>Landscapes</p>
           <div className={styles.gradientGrid}>
             {GRADIENT_OPTIONS.map((opt) => (
               <button
@@ -168,7 +161,7 @@ export function HeroPhotoPickerModal({
                 type="button"
                 className={`${styles.gradientSwatch} ${currentUrl === opt.gradient ? styles.swatchSelected : ""}`}
                 style={{ background: opt.gradient }}
-                onClick={() => void handleGradient(opt.gradient)}
+                onClick={() => void handleSelectCover(opt.gradient)}
                 aria-label={opt.label}
                 aria-pressed={currentUrl === opt.gradient}
               >

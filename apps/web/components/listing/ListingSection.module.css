@@ -1,0 +1,33 @@
+/* Shared shell for every immersive listing-detail section. */
+
+.section {
+  margin-bottom: var(--space-section);
+}
+
+.head {
+  margin-bottom: var(--space-12);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  color: var(--text-primary);
+}
+
+.title svg {
+  flex-shrink: 0;
+  color: var(--color-cta);
+}
+
+.subtitle {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}

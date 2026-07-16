@@ -1,9 +1,0 @@
-import { HostDetailSkeleton } from "../../../../../components/host";
-
-/**
- * Loading placeholder for the message thread route. Shown during async
- * navigation so the transition never flashes a blank screen.
- */
-export default function Loading() {
-  return <HostDetailSkeleton />;
-}

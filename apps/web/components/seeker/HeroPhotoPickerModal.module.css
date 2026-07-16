@@ -128,6 +128,14 @@
   cursor: not-allowed;
 }
 
+.uploadHint {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
 .error {
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
@@ -173,6 +181,11 @@
 .gradientSwatch:focus-visible {
   outline: none;
   box-shadow: var(--ui-focus-ring);
+}
+
+/* Framed cover photo — never filtered (no filter/opacity on the image) */
+.coverPhoto {
+  object-fit: cover;
 }
 
 .swatchSelected {

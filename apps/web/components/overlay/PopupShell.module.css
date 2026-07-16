@@ -2,7 +2,7 @@
 	position: fixed;
 	inset: 0;
 	/* Overlay layer — explicitly above the z-70 docks (was a fragile tie at 70
-	   that only DOM/portal order resolved). */
+	   that only DOM/portal order resolved). Token only, no magic number. */
 	z-index: var(--z-overlay);
 	display: flex;
 	align-items: center;
@@ -12,6 +12,13 @@
 		linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 68%, transparent), color-mix(in srgb, var(--color-ink) 56%, transparent)),
 		radial-gradient(circle at bottom, color-mix(in srgb, var(--color-ink) 18%, transparent), transparent 58%);
 	backdrop-filter: blur(10px);
+	animation: scrimIn var(--motion-base) var(--ease-standard) both;
+}
+
+/* Symmetric exit — the scrim fades back out while the panel slides/scales away. */
+.scrim.closing {
+	animation: scrimOut var(--motion-base) var(--ease-standard) both;
+	pointer-events: none;
 }
 
 .panel {
@@ -21,18 +28,21 @@
 	overflow: hidden;
 	display: flex;
 	flex-direction: column;
-	border: 2px solid color-mix(in srgb, var(--border-ink) 96%, #20160d 4%);
-	border-radius: calc(var(--radius-card) + 0.35rem);
+	/* Borders-first: cool ink keyline on a cool Glacier chrome surface. */
+	border: 2px solid var(--border-ink);
+	border-radius: var(--radius-modal);
 	background:
-		radial-gradient(circle at top, color-mix(in srgb, #f7e7c6 48%, transparent), transparent 48%),
-		linear-gradient(180deg, color-mix(in srgb, #fcf3dc 94%, var(--color-surface-raised)) 0%, color-mix(in srgb, #f8edd7 92%, var(--color-surface)) 100%);
-	box-shadow:
-		0 28px 80px color-mix(in srgb, var(--color-ink) 36%, transparent),
-		0 8px 24px color-mix(in srgb, var(--color-ink) 16%, transparent),
-		0 2px 0 rgba(0,0,0,0.36),
-		inset 0 1px 0 rgba(255,255,255,0.68);
+		radial-gradient(circle at top, color-mix(in srgb, var(--palette-ice-light) 42%, transparent), transparent 50%),
+		var(--gradient-chrome);
+	/* Whisper elevation only — the single sanctioned overlay lift. */
+	box-shadow: var(--elevation-overlay);
 	color: var(--text-primary);
-	animation: popupIn var(--motion-drawer) var(--ease-standard);
+	animation: popupIn var(--motion-drawer) var(--ease-standard) both;
+}
+
+/* Desktop centered-dialog exit mirrors the enter. */
+.panel.closing {
+	animation: popupOut var(--motion-drawer) var(--ease-standard) both;
 }
 
 /* Top catch-light — simulates light landing on the panel surface */
@@ -43,8 +53,8 @@
 	left: 0;
 	right: 0;
 	height: 4rem;
-	background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, transparent 100%);
-	border-radius: calc(var(--radius-card) + 0.35rem) calc(var(--radius-card) + 0.35rem) 0 0;
+	background: linear-gradient(180deg, color-mix(in srgb, var(--palette-white) 16%, transparent) 0%, transparent 100%);
+	border-radius: var(--radius-modal) var(--radius-modal) 0 0;
 	pointer-events: none;
 	z-index: 0;
 }
@@ -52,9 +62,9 @@
 .panel::before {
 	content: "";
 	position: absolute;
-	inset: 0.4rem;
-	border: 1px solid color-mix(in srgb, var(--border-ink) 86%, #6d5636 14%);
-	border-radius: calc(var(--radius-card) + 0.05rem);
+	inset: var(--space-4);
+	border: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
+	border-radius: calc(var(--radius-modal) - var(--space-4));
 	pointer-events: none;
 	opacity: 0.9;
 }
@@ -69,12 +79,19 @@
 	max-height: min(94vh, 58rem);
 }
 
+/* Drag handle — hidden on desktop, revealed as the bottom-sheet affordance. */
 .handleWrap {
 	display: none;
+	justify-content: center;
+	padding: var(--space-8) 0 var(--space-2);
 }
 
 .handle {
-	display: none;
+	display: block;
+	width: 2.25rem;
+	height: 0.25rem;
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--text-secondary) 34%, transparent);
 }
 
 .chrome {
@@ -123,11 +140,11 @@
 	height: 3rem;
 	flex: none;
 	border-radius: var(--radius-pill);
-	border: 1.5px solid color-mix(in srgb, var(--border-ink) 88%, #6d5636 12%);
+	border: 1.5px solid color-mix(in srgb, var(--border-ink) 80%, transparent);
 	background:
-		radial-gradient(circle at top, color-mix(in srgb, white 64%, transparent), transparent 55%),
-		linear-gradient(180deg, color-mix(in srgb, #fff3db 90%, var(--color-surface-raised)) 0%, color-mix(in srgb, #f2e4c5 92%, var(--color-surface)) 100%);
-	box-shadow: inset 0 0 0 1px color-mix(in srgb, white 40%, transparent);
+		radial-gradient(circle at top, color-mix(in srgb, var(--palette-white) 60%, transparent), transparent 55%),
+		linear-gradient(180deg, color-mix(in srgb, var(--palette-parchment) 40%, var(--color-surface-raised)) 0%, color-mix(in srgb, var(--palette-parchment) 70%, var(--color-surface)) 100%);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--palette-white) 40%, transparent);
 	color: var(--text-primary);
 }
 
@@ -160,7 +177,7 @@
 	padding: 0;
 	border: 1.5px solid color-mix(in srgb, var(--border-ink) 72%, transparent);
 	border-radius: var(--radius-pill);
-	background: color-mix(in srgb, #fff8ea 90%, var(--color-surface-raised));
+	background: color-mix(in srgb, var(--palette-parchment) 20%, var(--color-surface-raised));
 	color: var(--text-primary);
 	cursor: pointer;
 	transition:
@@ -171,7 +188,7 @@
 }
 
 .closeButton:hover {
-	background: color-mix(in srgb, #fff1d0 92%, var(--color-surface-raised));
+	background: color-mix(in srgb, var(--palette-parchment) 40%, var(--color-surface-raised));
 	border-color: color-mix(in srgb, var(--border-ink) 92%, var(--text-primary) 8%);
 	box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 10%, transparent);
 	transform: scale(1.06);
@@ -183,7 +200,7 @@
 }
 
 .closeButton:focus-visible {
-	outline: 2px solid var(--color-cta, var(--palette-pine));
+	outline: 2px solid var(--color-cta);
 	outline-offset: 2px;
 }
 
@@ -194,13 +211,13 @@
 
 .hero {
 	overflow: hidden;
-	border: 1px solid color-mix(in srgb, var(--border-ink) 84%, #7e6542 16%);
+	border: 1px solid color-mix(in srgb, var(--border-ink) 70%, transparent);
 	border-radius: var(--radius-card);
 	background:
-		linear-gradient(180deg, color-mix(in srgb, #f5ead4 76%, transparent), color-mix(in srgb, #e8dcc3 74%, transparent)),
-		color-mix(in srgb, #d8c8a8 58%, var(--color-surface));
+		linear-gradient(180deg, color-mix(in srgb, var(--palette-parchment) 70%, transparent), color-mix(in srgb, var(--palette-parchment) 55%, transparent)),
+		color-mix(in srgb, var(--palette-parchment) 58%, var(--color-surface));
 	min-height: 6rem;
-	box-shadow: inset 0 0 0 1px color-mix(in srgb, white 42%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--palette-white) 42%, transparent);
 }
 
 .heroFooter {
@@ -275,35 +292,55 @@
 	padding-top: var(--space-8);
 	padding-bottom: var(--space-6);
 	border-top: 1px solid color-mix(in srgb, var(--border-ink) 22%, transparent);
-	background:
-		linear-gradient(
-			to bottom,
-			color-mix(in srgb, transparent 0%, color-mix(in srgb, #fcf3dc 90%, var(--color-surface)) 22%),
-			color-mix(in srgb, #f8edd7 94%, var(--color-surface)) 100%
-		);
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--palette-parchment) 0%, transparent) 0%,
+		color-mix(in srgb, var(--palette-parchment) 62%, var(--color-surface)) 46%,
+		color-mix(in srgb, var(--palette-parchment) 78%, var(--color-surface)) 100%
+	);
 }
 
-@media (max-width: 639px) {
+/* Mobile bottom-sheet posture (<= --bp-sm). Full-width sheet anchored to the
+   bottom edge with rounded top corners, a visible drag handle, sticky header
+   (the chrome sits outside the scroll region) and sticky action area, plus
+   safe-area padding so content never scrolls under the home indicator. */
+@media (max-width: 640px) {
 	.scrim {
-		padding: var(--space-16);
-		padding-bottom: max(var(--space-16), env(safe-area-inset-bottom));
+		align-items: flex-end;
+		padding: 0;
 	}
 
 	.panel,
+	.compact,
 	.wide {
 		width: 100%;
-		max-height: min(90vh, 46rem);
+		max-width: none;
+		max-height: 92vh;
+		border-radius: var(--radius-modal) var(--radius-modal) 0 0;
 	}
 
-	.compact {
-		width: 100%;
-		max-height: min(90vh, 46rem);
+	.panel::after {
+		border-radius: var(--radius-modal) var(--radius-modal) 0 0;
+	}
+
+	.panel::before {
+		border-radius: calc(var(--radius-modal) - var(--space-4)) calc(var(--radius-modal) - var(--space-4)) 0 0;
+	}
+
+	.handleWrap {
+		display: flex;
 	}
 
 	.chrome,
 	.body {
 		padding-left: var(--space-16);
 		padding-right: var(--space-16);
+	}
+
+	/* Single source of the bottom safe-area inset. The sticky footer sticks to
+	   the body content edge, clearing this gap above the home indicator. */
+	.body {
+		padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
 	}
 
 	.heroWrap {
@@ -322,18 +359,123 @@
 	}
 
 	.footer {
-		padding-bottom: max(var(--space-12), env(safe-area-inset-bottom));
+		padding-bottom: var(--space-8);
+	}
+
+	.panel {
+		animation-name: sheetIn;
+	}
+
+	.panel.closing {
+		animation-name: sheetOut;
 	}
 }
 
+/* Reduced motion is a hard gate: both enter and exit degrade to a plain
+   opacity fade, transform-free. Declared last so it wins on small screens. */
+@media (prefers-reduced-motion: reduce) {
+	.scrim,
+	.panel,
+	.compact,
+	.wide {
+		animation-name: popupFadeIn;
+		animation-duration: var(--motion-fast);
+	}
+
+	.scrim.closing,
+	.panel.closing {
+		animation-name: popupFadeOut;
+		animation-duration: var(--motion-fast);
+	}
+}
+
+/* Desktop centered dialog — scale + lift. */
 @keyframes popupIn {
 	from {
-		transform: scale(0.93) translateY(10px);
+		transform: scale(0.96) translateY(8px);
 		opacity: 0;
 	}
 
 	to {
-		transform: scale(1) translateY(0);
+		transform: none;
 		opacity: 1;
+	}
+}
+
+@keyframes popupOut {
+	from {
+		transform: none;
+		opacity: 1;
+	}
+
+	to {
+		transform: scale(0.96) translateY(8px);
+		opacity: 0;
+	}
+}
+
+/* Mobile bottom-sheet — slide from the bottom edge. */
+@keyframes sheetIn {
+	from {
+		transform: translateY(100%);
+		opacity: 0.6;
+	}
+
+	to {
+		transform: translateY(0);
+		opacity: 1;
+	}
+}
+
+@keyframes sheetOut {
+	from {
+		transform: translateY(0);
+		opacity: 1;
+	}
+
+	to {
+		transform: translateY(100%);
+		opacity: 0.6;
+	}
+}
+
+/* Scrim + reduced-motion fades — opacity only. */
+@keyframes scrimIn {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes scrimOut {
+	from {
+		opacity: 1;
+	}
+
+	to {
+		opacity: 0;
+	}
+}
+
+@keyframes popupFadeIn {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes popupFadeOut {
+	from {
+		opacity: 1;
+	}
+
+	to {
+		opacity: 0;
 	}
 }

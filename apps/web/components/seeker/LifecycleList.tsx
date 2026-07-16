@@ -1,8 +1,16 @@
-import type { CSSProperties, ReactNode } from "react";
-import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
-import { DiscoveryCard, type DiscoveryCardProps, type IllustrationKey } from "@explore-and-earn/ui";
+"use client";
 
-import { EmptyState, toDiscoveryCardData, type DiscoveryListing } from "../discovery";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
+import type { DiscoveryCardProps, IllustrationKey } from "@explore-and-earn/ui";
+
+import {
+  EmptyState,
+  ListingCard,
+  ListingCardProvider,
+  type DiscoveryListing,
+} from "../discovery";
 import styles from "./LifecycleList.module.css";
 
 export interface LifecycleListItem {
@@ -26,8 +34,17 @@ export interface LifecycleListProps {
 }
 
 /**
- * Generic lifecycle grid: renders the canonical DiscoveryCard for each item
- * (with an optional per-item action slot) or the shared EmptyState when empty.
+ * Generic lifecycle grid: renders the shared <ListingCard> for each item (with
+ * an optional per-item action slot) or the shared EmptyState when empty.
+ *
+ * Adopting the wrapper gives lifecycle-bucket cards (offered / invites) the same
+ * Quick Peek / Benefit / Pay / Report popups + location→map + boosted / match /
+ * previously-skipped markers as the discovery feed, from ONE shared popup host.
+ *
+ * Lifecycle listings come from the applications/invites join (ApplicationListing),
+ * which does NOT carry the host id — so the "roles by this host" popup can't be
+ * resolved here. The host tap therefore routes to the listing detail (where the
+ * host lives) instead of opening a would-be-empty/mismatched host popup.
  */
 export function LifecycleList({
   items,
@@ -38,6 +55,9 @@ export function LifecycleList({
   emptyActionLabel,
   emptyActionHref,
 }: LifecycleListProps) {
+  const router = useRouter();
+  const listings = useMemo(() => items.map((item) => item.listing), [items]);
+
   if (items.length === 0) {
     return (
       <EmptyState
@@ -50,21 +70,29 @@ export function LifecycleList({
     );
   }
   return (
-    <div className={styles.grid}>
-      {items.map((item, index) => (
-        <div
-          key={item.listing.id}
-          className={styles.cell}
-          style={{ "--i": index } as CSSProperties}
-        >
-          <DiscoveryCard
-            data={toDiscoveryCardData(item.listing)}
-            surface={surface}
-            cardState={item.cardState}
-            actions={item.actions}
-          />
-        </div>
-      ))}
-    </div>
+    <ListingCardProvider
+      listings={listings}
+      overrides={{
+        onApply: (id) => router.push(`/listing/${id}`),
+        onHostClick: (id) => router.push(`/listing/${id}`),
+      }}
+    >
+      <div className={styles.grid}>
+        {items.map((item, index) => (
+          <div
+            key={item.listing.id}
+            className={styles.cell}
+            style={{ "--i": index } as CSSProperties}
+          >
+            <ListingCard
+              listing={item.listing}
+              surface={surface}
+              cardState={item.cardState}
+              actions={item.actions}
+            />
+          </div>
+        ))}
+      </div>
+    </ListingCardProvider>
   );
 }

@@ -1,0 +1,99 @@
+import type { ReactNode } from "react";
+
+import { Icon } from "@explore-and-earn/ui";
+import type { BenefitEvidenceStatus } from "@explore-and-earn/contracts";
+
+import { ListingSection } from "./ListingSection";
+import styles from "./DealUpfront.module.css";
+
+export interface DealUpfrontProps {
+  readonly housingIncluded: boolean;
+  readonly mealsIncluded: boolean;
+  /** Free-text housing descriptor — shown under the Housing cell when present. */
+  readonly housingDescription: string | null;
+  /** Free-text meals descriptor — shown under the Meals cell when present. */
+  readonly mealsDescription: string | null;
+  /** Already-formatted pay summary, e.g. "$18/hr" or "See listing". */
+  readonly paySummary: string;
+  /**
+   * Per-benefit evidence (sourced listings). When a benefit is 'not_stated'
+   * the cell reads "Not stated" — the source didn't say, so we never present
+   * it as "Not included". Omitted → host-confirmed listing (unchanged).
+   */
+  readonly evidence?: {
+    readonly housing: BenefitEvidenceStatus;
+    readonly meals: BenefitEvidenceStatus;
+    readonly pay: BenefitEvidenceStatus;
+  };
+  /** TrueValue ("what you'll save") slot, rendered inside the section. */
+  readonly children?: ReactNode;
+}
+
+function benefitCellValue(included: boolean, evidence: BenefitEvidenceStatus | undefined): string {
+  if (evidence === "not_stated") return "Not stated";
+  return included ? "Included" : "Not included";
+}
+
+/**
+ * "The deal, upfront" — the honest money-and-living block. The HOUSING / MEALS /
+ * PAY triad with each benefit's real included/not-included state and any free-text
+ * descriptor the host provided, followed by the TrueValue calculator passed as
+ * children. No fabricated figures: descriptors render only when present.
+ */
+export function DealUpfront({
+  housingIncluded,
+  mealsIncluded,
+  housingDescription,
+  mealsDescription,
+  paySummary,
+  evidence,
+  children,
+}: DealUpfrontProps) {
+  const payNotStated = evidence?.pay === "not_stated";
+  return (
+    <ListingSection
+      title="The deal, upfront"
+      icon="benefit.pay"
+      headingId="listing-deal"
+      subtitle="What's covered, what you'll earn, and what that's really worth."
+    >
+      <div className={styles.triad}>
+        <div className={`${styles.cell} ${styles.housing}`}>
+          <div className={styles.cellHead}>
+            <Icon name="benefit.housing" size={16} aria-hidden />
+            <span className={styles.cellLabel}>Housing</span>
+          </div>
+          <div className={styles.cellValue}>
+            {benefitCellValue(housingIncluded, evidence?.housing)}
+          </div>
+          {housingIncluded && housingDescription ? (
+            <p className={styles.cellDesc}>{housingDescription}</p>
+          ) : null}
+        </div>
+
+        <div className={`${styles.cell} ${styles.meals}`}>
+          <div className={styles.cellHead}>
+            <Icon name="benefit.meals" size={16} aria-hidden />
+            <span className={styles.cellLabel}>Meals</span>
+          </div>
+          <div className={styles.cellValue}>
+            {benefitCellValue(mealsIncluded, evidence?.meals)}
+          </div>
+          {mealsIncluded && mealsDescription ? (
+            <p className={styles.cellDesc}>{mealsDescription}</p>
+          ) : null}
+        </div>
+
+        <div className={`${styles.cell} ${styles.pay}`}>
+          <div className={styles.cellHead}>
+            <Icon name="benefit.pay" size={16} aria-hidden />
+            <span className={styles.cellLabel}>Pay</span>
+          </div>
+          <div className={styles.cellValue}>{payNotStated ? "Not stated" : paySummary}</div>
+        </div>
+      </div>
+
+      {children}
+    </ListingSection>
+  );
+}

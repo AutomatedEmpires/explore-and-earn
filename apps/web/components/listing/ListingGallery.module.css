@@ -1,0 +1,30 @@
+.gallery {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  padding: var(--space-16) var(--space-gutter);
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+
+.gallery::-webkit-scrollbar {
+  display: none;
+}
+
+.thumb {
+  position: relative;
+  flex: 0 0 auto;
+  width: 220px;
+  max-width: 72vw;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-image);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  background-color: var(--color-surface);
+  box-shadow: var(--elevation-card);
+  scroll-snap-align: start;
+}
+
+.image {
+  object-fit: cover;
+}

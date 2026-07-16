@@ -48,6 +48,60 @@ export function isDevBenchEnabled(): boolean {
 }
 
 /**
+ * Is NEXT_PUBLIC_SUPABASE_URL pointed at a demonstrably NON-production Supabase?
+ *
+ * Fail-closed: only explicitly-local hosts pass. Any hosted project (including a
+ * hosted *.supabase.co dev project), a missing URL, or an unparseable URL is
+ * treated as potentially-production and returns false. This is the axis that a
+ * stray `next dev` against prod env cannot satisfy — prod's NEXT_PUBLIC_SUPABASE_URL
+ * is a hosted host, not localhost.
+ */
+function isNonProdSupabaseUrl(): boolean {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!raw) return false;
+  let host: string;
+  try {
+    host = new URL(raw).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "0.0.0.0" ||
+    host === "host.docker.internal" ||
+    host === "kong" || // Supabase CLI local stack service name
+    host.endsWith(".localhost") ||
+    host.endsWith(".local")
+  );
+}
+
+/**
+ * SECOND, INDEPENDENT dev-bench gate (belt-and-suspenders on top of
+ * `isDevBenchEnabled`). Governs the bench's PRIVILEGED grants — the middleware
+ * auth bypass, the admin allow-list grant, and the real service-role token
+ * handed to the impersonated session.
+ *
+ * Requires ALL of:
+ *   1. isDevBenchEnabled()            — the existing NODE_ENV gate (not weakened).
+ *   2. NEXT_PUBLIC_DEV_BENCH === "1"  — EXPLICIT opt-in (note: stricter than the
+ *      base gate's `!== "0"`; a developer must deliberately turn it on).
+ *   3. isNonProdSupabaseUrl()         — the data target is a local, non-prod DB.
+ *
+ * So a stray `next dev` against production env — which has a hosted Supabase URL
+ * and would not have NEXT_PUBLIC_DEV_BENCH=1 set — can never hand out admin or
+ * the service-role key, even though NODE_ENV happens to be non-production.
+ */
+export function isDevBenchPrivileged(): boolean {
+  return (
+    isDevBenchEnabled() &&
+    process.env.NEXT_PUBLIC_DEV_BENCH === "1" &&
+    isNonProdSupabaseUrl()
+  );
+}
+
+/**
  * Minimal Clerk-`auth()`-shaped object for the impersonated reviewer. Only the
  * fields the app actually reads (`userId`, `getToken`) are meaningful; the rest
  * of the real Auth surface is filled in by a cast at the shim boundary.
@@ -62,8 +116,13 @@ export function devSession() {
     // Real Supabase service-role key so the authed db client bypasses RLS and
     // returns the impersonated demo user's ACTUAL seeded data (queries still
     // filter explicitly by clerk_user_id). Review tooling only — never bundled
-    // in a prod build. Falls back to the inert sentinel if the key is unset.
-    getToken: async () => process.env.SUPABASE_SERVICE_ROLE_KEY ?? DEV_TOKEN,
+    // in a prod build. The key is handed out ONLY behind the hardened
+    // `isDevBenchPrivileged()` gate (explicit opt-in + non-prod Supabase URL),
+    // so a stray `next dev` against prod env gets the inert sentinel, never the
+    // real service-role key. Also falls back to the sentinel when the key is unset.
+    getToken: async () =>
+      (isDevBenchPrivileged() ? process.env.SUPABASE_SERVICE_ROLE_KEY : undefined) ??
+      DEV_TOKEN,
   };
 }
 

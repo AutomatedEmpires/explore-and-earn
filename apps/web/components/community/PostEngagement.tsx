@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useTransition, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
+import { Icon, type IconKey } from "@explore-and-earn/ui";
 import {
   REACTION_KEYS,
-  REACTION_EMOJIS,
   type CommunityComment,
   type ReactionCounts,
   type ReactionKey,
@@ -17,6 +17,25 @@ import {
   toggleReactionAction,
 } from "../../app/actions/community";
 import styles from "./PostEngagement.module.css";
+
+// ─── Defined reactions ─────────────────────────────────────────────────────────
+
+/** Human names for the five community reactions. A tasteful, defined set so
+ *  every reaction reads clearly. Glyphs render as on-brand Phosphor icons via the
+ *  Icon registry (see `reactionIconFor`) — no emoji. */
+const REACTION_LABELS: Record<ReactionKey, string> = {
+  smile:   "Like",
+  heart:   "Love",
+  sparkle: "Inspiring",
+  clap:    "Congrats",
+  hundred: "Been there",
+};
+
+/** Registry key for a reaction's glyph. The `reaction.*` keys mirror the
+ *  contract's ReactionKey values 1:1, so this is a direct, total mapping. */
+function reactionIconFor(key: ReactionKey): IconKey {
+  return `reaction.${key}`;
+}
 
 // ─── Time formatter ────────────────────────────────────────────────────────────
 
@@ -296,16 +315,21 @@ export function PostEngagement({
         {REACTION_KEYS.map(key => {
           const isActive = active.has(key);
           const count    = displayCounts[key];
+          const label    = REACTION_LABELS[key];
           return (
             <button
               key={key}
               type="button"
               className={`${styles.reaction}${isActive ? ` ${styles.reactionActive}` : ""}`}
-              aria-label={`React with ${REACTION_EMOJIS[key]}${isActive ? " — you reacted" : ""}`}
+              aria-label={`${label}${isActive ? " — you reacted" : ""}`}
               aria-pressed={isActive}
+              title={label}
               onClick={() => toggle(key)}
             >
-              <span className={styles.reactionEmoji} aria-hidden>{REACTION_EMOJIS[key]}</span>
+              <span className={styles.reactionIcon} aria-hidden>
+                <Icon name={reactionIconFor(key)} size={20} weight={isActive ? "fill" : "regular"} aria-hidden />
+              </span>
+              <span className={styles.reactionLabel}>{label}</span>
               <span className={styles.reactionCount}>{count}</span>
             </button>
           );
@@ -320,7 +344,9 @@ export function PostEngagement({
             aria-label={`${commentsOpen ? "Hide" : "Show"} comments`}
             onClick={() => setCommentsOpen(prev => !prev)}
           >
-            <span className={styles.commentsBtnIcon} aria-hidden>💬</span>
+            <span className={styles.commentsBtnIcon} aria-hidden>
+              <Icon name="action.message" size={20} aria-hidden />
+            </span>
             <span className={styles.commentsBtnLabel}>
               {totalComments > 0 ? totalComments : "Comment"}
             </span>

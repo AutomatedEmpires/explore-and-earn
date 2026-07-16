@@ -16,6 +16,10 @@ import type {
   SeekerStatusSummary,
 } from "./models";
 import {
+  type DiscoveryEnrichment,
+  getActiveBoostedListingIds,
+  getMatchScoresForSeeker,
+  getPassedListingIds,
   getSavedListingIds,
   getSeekerApplicationIds,
   getSeekerApplications,
@@ -24,12 +28,11 @@ import {
   getSeekerResume,
   getUnreadNotificationCount,
   rowToDiscoveryFields,
-  scoreSeekerListingRow,
-  seekerHasMatchInputs,
 } from "@explore-and-earn/db";
 import { matchBandFor } from "@explore-and-earn/contracts";
 
 import { cachedSeekerProfile, getPublicListingsCached } from "../../lib/serverCache";
+import { rankForSeeker } from "../../lib/ranking";
 import { computeResumeCompletion } from "./resumeAdapter";
 
 const allowFixtureFallback = process.env.NODE_ENV !== "production";
@@ -40,6 +43,7 @@ const EMPTY_SEEKER_STATUS: SeekerStatusSummary = {
   savedCount: 0,
   appliedCount: 0,
   offersCount: 0,
+  acceptedCount: 0,
   acceptedUpcoming: undefined,
   unreadNotifications: 0,
   invitesCount: 0,
@@ -113,6 +117,7 @@ export async function getSeekerStatus(
       savedCount: savedIds.length,
       appliedCount: applications.length,
       offersCount,
+      acceptedCount: acceptedWithListings.length,
       acceptedUpcoming,
       unreadNotifications: unread,
       invitesCount,
@@ -170,13 +175,22 @@ export function getNotSelectedItems(): Promise<NotSelectedItem[]> {
 }
 
 /**
- * Matched-listing preview for Seeker Home.
+ * Matched-listing preview for Seeker Home (backs the SeekerDashboard "Boosted
+ * picks" / matched rails and the ProfileHub boosted rail).
  *
- * Reads the signed-in seeker's profile, live public listings, applied ids, and
- * saved ids; filters out already-applied listings; scores every remaining live
- * listing using the deterministic DB match scorer; then returns the top 20 by
- * score (saved listings win a same-score tie so familiar opportunities stay
- * easy to find). Match score is carried into the DiscoveryCard's neutral Meter.
+ * Resolves the active-boost id set, the seeker's previously-skipped ids, the
+ * applied ids, and the STORED ADR-040 match scores (migration 052) once, then
+ * threads a single enrichment object onto every rail card via
+ * rowToDiscoveryFields — so conditionalBadges=['boosted'], the numeric match %,
+ * and the previously-skipped flag actually TRAVEL onto the cards. This is what
+ * fixes the permanently-empty ProfileHub boosted rail and the missing boosted
+ * marker on the dashboard "Boosted picks" rail (both filter cards by
+ * conditionalBadges.includes('boosted'), which was never set before).
+ *
+ * Reads stored scores instead of recomputing per render. Only developing+ bands
+ * belong on a "matched" rail; already-applied listings are dropped. Ordering is
+ * MATCH-PRIMARY via rankForSeeker, with previously-skipped listings DEMOTED (not
+ * hidden). Top 20.
  */
 export async function getMatchedListings(
   token?: string | null,
@@ -187,45 +201,42 @@ export async function getMatchedListings(
   }
 
   try {
-    const [baseProfile, listings, appliedIds, savedIds] = await Promise.all([
-      cachedSeekerProfile(token, clerkUserId),
-      getPublicListingsCached(),
-      getSeekerApplicationIds(token, clerkUserId),
-      getSavedListingIds(token, clerkUserId),
-    ]);
-
-    if (!baseProfile || !seekerHasMatchInputs(baseProfile)) {
-      // No honest signal to rank with — an empty rail prompts profile
-      // completion instead of showing scores derived from nothing.
-      return [];
-    }
+    const [boostedListingIds, skippedIds, listings, appliedIds, storedScores] =
+      await Promise.all([
+        getActiveBoostedListingIds(token),
+        getPassedListingIds(token, clerkUserId).catch(() => [] as string[]),
+        getPublicListingsCached(),
+        getSeekerApplicationIds(token, clerkUserId),
+        getMatchScoresForSeeker(token, clerkUserId),
+      ]);
 
     const applied = new Set(appliedIds);
-    const saved = new Set(savedIds);
+    const previouslySkippedIds = new Set(skippedIds);
 
-    // ADR-040: the SAME engine as the /seek grid, /search, the swipe deck,
-    // and the listing detail — the rail's fit % can never disagree with the
-    // card it opens.
-    return listings
+    // ONE enrichment object, threaded onto every rail card: boosted marker +
+    // stored match % (gated >= 75 inside rowToDiscoveryFields) + skipped flag.
+    const enrichment: DiscoveryEnrichment = {
+      boostedListingIds,
+      previouslySkippedIds,
+      matchScores: storedScores,
+    };
+
+    const cards = listings
       .filter((listing) => !applied.has(listing.id))
-      .map((listing) => {
-        const matchScore = scoreSeekerListingRow(baseProfile, listing);
-        return {
-          listing: {
-            ...(rowToDiscoveryFields(listing) as DiscoveryListing),
-            matchScore,
-          },
-          matchScore,
-          saved: saved.has(listing.id),
-        };
+      .filter((listing) => {
+        const score = storedScores.get(listing.id);
+        return score !== undefined && matchBandFor(score) !== "needs_attention";
       })
-      .filter((item) => matchBandFor(item.matchScore) !== "needs_attention")
-      .sort((a, b) => {
-        if (b.matchScore !== a.matchScore) return b.matchScore - a.matchScore;
-        return Number(b.saved) - Number(a.saved);
-      })
-      .slice(0, 20)
-      .map((item) => item.listing);
+      .map(
+        (listing) => rowToDiscoveryFields(listing, enrichment) as DiscoveryListing,
+      );
+
+    return rankForSeeker(cards, (listing) => ({
+      boosted: listing.conditionalBadges?.includes("boosted") ?? false,
+      hostTier: listing.host.tier,
+      matchScore: storedScores.get(listing.id),
+      previouslySkipped: listing.previouslySkipped,
+    })).slice(0, 20);
   } catch {
 		return allowFixtureFallback ? [...MATCHED_LISTINGS] : [];
   }

@@ -1,0 +1,410 @@
+// Event → notification-intent expansion: the ONLY place a domain event may
+// become user-facing notifications. Pure decision logic — all data access
+// goes through injected resolvers so the mapping is testable without a DB.
+//
+// HONESTY INVARIANTS enforced here:
+//   * every intent derives from a persisted events row that the dispatcher
+//     hands in (fabricating engagement is structurally impossible — there is
+//     no code path from "no event" to "intent");
+//   * the acting user is never notified about their own action (recipients
+//     are always the counterparty by construction, with a same-user guard);
+//   * unknown event types / unknown statuses expand to NOTHING — never to a
+//     guessed notification.
+
+import {
+	NOTIFICATION_TYPE_CATEGORY,
+	URGENT_NOTIFICATION_TYPES,
+	type NotificationIntent,
+	type NotificationType,
+} from "@explore-and-earn/contracts"
+
+/** Persisted events-table row (migration 008), as the dispatcher reads it. */
+export interface DomainEventRow {
+	readonly id: string
+	readonly event_type: string
+	readonly actor_scope: string | null
+	readonly subject_type: string | null
+	readonly subject_id: string | null
+	readonly listing_id: string | null
+	readonly host_profile_id: string | null
+	readonly seeker_profile_id: string | null
+	readonly properties: Record<string, unknown> | null
+	readonly occurred_at: string
+}
+
+/** Locale is stamped later (from recipient prefs) by the dispatcher. */
+export type PreIntent = Omit<NotificationIntent, "locale">
+
+/**
+ * Authoritative lookups the taxonomy needs. Implementations must read REAL
+ * rows (service role) — resolvers returning null cause the intent to be
+ * dropped, never guessed.
+ */
+export interface TaxonomyResolvers {
+	seekerClerkId(seekerProfileId: string): Promise<string | null>
+	hostClerkId(hostProfileId: string): Promise<string | null>
+	listingContext(
+		listingId: string,
+	): Promise<{ readonly title: string; readonly hostProfileId: string | null } | null>
+	conversationContext(conversationId: string): Promise<{
+		readonly seekerProfileId: string | null
+		readonly hostProfileId: string | null
+		readonly listingId: string | null
+	} | null>
+	applicationContext(applicationId: string): Promise<{
+		readonly seekerProfileId: string | null
+		readonly listingId: string | null
+	} | null>
+}
+
+function keysFor(type: NotificationType): { titleKey: string; bodyKey: string } {
+	return {
+		titleKey: `Notifications.types.${type}.title`,
+		bodyKey: `Notifications.types.${type}.body`,
+	}
+}
+
+function makeIntent(args: {
+	readonly event: DomainEventRow
+	readonly type: NotificationType
+	readonly recipientClerkUserId: string
+	readonly destinationPath: string
+	readonly values: Readonly<Record<string, string | number>>
+	readonly variant?: string
+	readonly entity?: { readonly type: string; readonly id: string }
+	readonly collapseKey?: string
+	readonly expiresAt?: string
+}): PreIntent {
+	return {
+		sourceEventId: args.event.id,
+		sourceOccurredAt: args.event.occurred_at,
+		recipientClerkUserId: args.recipientClerkUserId,
+		category: NOTIFICATION_TYPE_CATEGORY[args.type],
+		type: args.type,
+		variant: args.variant ?? "default",
+		destinationPath: args.destinationPath,
+		...keysFor(args.type),
+		values: args.values,
+		...(args.entity ? { entity: args.entity } : {}),
+		...(args.collapseKey ? { collapseKey: args.collapseKey } : {}),
+		...(args.expiresAt ? { expiresAt: args.expiresAt } : {}),
+		urgent: (URGENT_NOTIFICATION_TYPES as readonly string[]).includes(args.type),
+	}
+}
+
+function prop(event: DomainEventRow, key: string): string | null {
+	const v = event.properties?.[key]
+	return typeof v === "string" && v.length > 0 ? v : null
+}
+
+/**
+ * application_status_changed → seeker-facing type, or null for statuses that
+ * are not seeker notifications (unknown/none → nothing, never a guess).
+ */
+export function seekerTypeForApplicationStatus(status: string): NotificationType | null {
+	// Real application statuses (007 CHECK): applied, reviewing, saved_by_host,
+	// offered, accepted, active, completed, not_selected, withdrawn, expired.
+	switch (status) {
+		case "reviewing":
+			// The host actually opened/started reviewing — the honest "viewed".
+			return "application_viewed"
+		case "saved_by_host":
+			return "application_shortlisted"
+		case "offered":
+			return "application_offered"
+		case "not_selected":
+			return "application_rejected"
+		default:
+			// accepted/active/completed etc. are not in the charter taxonomy —
+			// no notification rather than an invented one.
+			return null
+	}
+}
+
+/** Application-lifecycle context shared by several expansions. */
+async function applicationParties(
+	event: DomainEventRow,
+	resolvers: TaxonomyResolvers,
+): Promise<{
+	applicationId: string | null
+	listingTitle: string
+	listingId: string | null
+	seekerClerk: string | null
+	hostClerk: string | null
+} | null> {
+	const applicationId = event.subject_type === "application" ? event.subject_id : null
+	let seekerProfileId = event.seeker_profile_id
+	let listingId = event.listing_id
+	if ((!seekerProfileId || !listingId) && applicationId) {
+		const app = await resolvers.applicationContext(applicationId)
+		seekerProfileId = seekerProfileId ?? app?.seekerProfileId ?? null
+		listingId = listingId ?? app?.listingId ?? null
+	}
+	const listing = listingId ? await resolvers.listingContext(listingId) : null
+	const hostProfileId = event.host_profile_id ?? listing?.hostProfileId ?? null
+	const [seekerClerk, hostClerk] = await Promise.all([
+		seekerProfileId ? resolvers.seekerClerkId(seekerProfileId) : Promise.resolve(null),
+		hostProfileId ? resolvers.hostClerkId(hostProfileId) : Promise.resolve(null),
+	])
+	return {
+		applicationId,
+		listingTitle: listing?.title ?? "",
+		listingId,
+		seekerClerk,
+		hostClerk,
+	}
+}
+
+/**
+ * Expand one persisted domain event into notification intents. Events with
+ * no notification meaning return [] — the dispatcher still watermarks them.
+ */
+export async function expandEvent(
+	event: DomainEventRow,
+	resolvers: TaxonomyResolvers,
+): Promise<PreIntent[]> {
+	switch (event.event_type) {
+		/* ------------------------------------------------ application lifecycle */
+		case "application_submitted": {
+			const ctx = await applicationParties(event, resolvers)
+			// Host is notified someone applied; never the applicant themself.
+			if (!ctx?.hostClerk || ctx.hostClerk === ctx.seekerClerk) return []
+			return [
+				makeIntent({
+					event,
+					type: "application_received",
+					recipientClerkUserId: ctx.hostClerk,
+					destinationPath: ctx.applicationId
+						? `/host/applicants/${ctx.applicationId}`
+						: "/host/applicants",
+					values: { listingTitle: ctx.listingTitle },
+					entity: ctx.applicationId
+						? { type: "application", id: ctx.applicationId }
+						: undefined,
+				}),
+			]
+		}
+		case "application_viewed_by_host": {
+			const ctx = await applicationParties(event, resolvers)
+			if (!ctx?.seekerClerk || ctx.seekerClerk === ctx.hostClerk) return []
+			return [
+				makeIntent({
+					event,
+					type: "application_viewed",
+					recipientClerkUserId: ctx.seekerClerk,
+					destinationPath: ctx.applicationId ? `/applied/${ctx.applicationId}` : "/applied",
+					values: { listingTitle: ctx.listingTitle },
+					entity: ctx.applicationId
+						? { type: "application", id: ctx.applicationId }
+						: undefined,
+					// A burst of host views of the same application collapses.
+					collapseKey: ctx.applicationId ? `application_viewed:${ctx.applicationId}` : undefined,
+				}),
+			]
+		}
+		case "application_status_changed": {
+			const status = prop(event, "status")
+			const type = status ? seekerTypeForApplicationStatus(status) : null
+			if (!type) return []
+			const ctx = await applicationParties(event, resolvers)
+			if (!ctx?.seekerClerk || ctx.seekerClerk === ctx.hostClerk) return []
+			const destinationPath =
+				type === "application_offered"
+					? "/offered"
+					: ctx.applicationId
+						? `/applied/${ctx.applicationId}`
+						: "/applied"
+			// The live offer flow IS applications.status='offered' (the offers
+			// table is dormant): an offer with a real expires_at also seeds the
+			// offer-expiring reminder path (schedule-derived, re-checked at send).
+			return [
+				makeIntent({
+					event,
+					type,
+					recipientClerkUserId: ctx.seekerClerk,
+					destinationPath,
+					values: { listingTitle: ctx.listingTitle },
+					entity: ctx.applicationId
+						? { type: "application", id: ctx.applicationId }
+						: undefined,
+					// Repeated back-and-forth status flips on one application
+					// collapse to the latest state rather than stacking — EXCEPT
+					// an offer, which must never silently replace (and be masked
+					// by) an unread routine status notification.
+					collapseKey: ctx.applicationId
+						? type === "application_offered"
+							? `application_offered:${ctx.applicationId}`
+							: `application_status:${ctx.applicationId}`
+						: undefined,
+				}),
+			]
+		}
+		case "application_not_selected": {
+			const ctx = await applicationParties(event, resolvers)
+			if (!ctx?.seekerClerk || ctx.seekerClerk === ctx.hostClerk) return []
+			return [
+				makeIntent({
+					event,
+					type: "application_rejected",
+					recipientClerkUserId: ctx.seekerClerk,
+					destinationPath: ctx.applicationId ? `/applied/${ctx.applicationId}` : "/applied",
+					values: { listingTitle: ctx.listingTitle },
+					entity: ctx.applicationId
+						? { type: "application", id: ctx.applicationId }
+						: undefined,
+				}),
+			]
+		}
+		case "application_withdrawn": {
+			const ctx = await applicationParties(event, resolvers)
+			if (!ctx?.hostClerk || ctx.hostClerk === ctx.seekerClerk) return []
+			return [
+				makeIntent({
+					event,
+					type: "application_withdrawn",
+					recipientClerkUserId: ctx.hostClerk,
+					destinationPath: "/host/applicants",
+					values: { listingTitle: ctx.listingTitle },
+					entity: ctx.applicationId
+						? { type: "application", id: ctx.applicationId }
+						: undefined,
+				}),
+			]
+		}
+
+		/* ------------------------------------------------------------- matching */
+		case "match_generated": {
+			if (!event.seeker_profile_id || !event.listing_id) return []
+			const [seekerClerk, listing] = await Promise.all([
+				resolvers.seekerClerkId(event.seeker_profile_id),
+				resolvers.listingContext(event.listing_id),
+			])
+			if (!seekerClerk || !listing) return []
+			return [
+				makeIntent({
+					event,
+					type: "new_strong_match",
+					recipientClerkUserId: seekerClerk,
+					destinationPath: `/listing/${event.listing_id}`,
+					values: { listingTitle: listing.title },
+					entity: { type: "listing", id: event.listing_id },
+				}),
+			]
+		}
+
+		/* -------------------------------------------------- invitations & offers */
+		case "invite_created":
+		case "invite_sent": {
+			if (!event.seeker_profile_id) return []
+			const [seekerClerk, listing] = await Promise.all([
+				resolvers.seekerClerkId(event.seeker_profile_id),
+				event.listing_id
+					? resolvers.listingContext(event.listing_id)
+					: Promise.resolve(null),
+			])
+			if (!seekerClerk) return []
+			return [
+				makeIntent({
+					event,
+					type: "invite_received",
+					recipientClerkUserId: seekerClerk,
+					destinationPath: "/invites",
+					values: { listingTitle: listing?.title ?? "" },
+					entity: event.subject_id
+						? { type: "invite", id: event.subject_id }
+						: undefined,
+					// Duplicate producer instrumentation (created+sent) collapses to
+					// one logical notification per invite.
+					collapseKey: event.subject_id ? `invite:${event.subject_id}` : undefined,
+				}),
+			]
+		}
+		case "offer_created":
+		case "offer_sent": {
+			const ctx = await applicationParties(event, resolvers)
+			if (!ctx?.seekerClerk || ctx.seekerClerk === ctx.hostClerk) return []
+			return [
+				makeIntent({
+					event,
+					type: "offer_received",
+					recipientClerkUserId: ctx.seekerClerk,
+					destinationPath: "/offered",
+					values: { listingTitle: ctx.listingTitle },
+					entity: event.subject_id ? { type: "offer", id: event.subject_id } : undefined,
+					collapseKey: event.subject_id ? `offer:${event.subject_id}` : undefined,
+				}),
+			]
+		}
+
+		/* ------------------------------------------------------------ messaging */
+		case "message_sent": {
+			const conversationId =
+				event.subject_type === "conversation" ? event.subject_id : null
+			if (!conversationId) return []
+			const senderRole = prop(event, "sender_role")
+			if (senderRole !== "seeker" && senderRole !== "host") return []
+			const convo = await resolvers.conversationContext(conversationId)
+			if (!convo) return []
+			// Recipient is the OTHER side — the sender is never notified.
+			const recipientRole = senderRole === "seeker" ? "host" : "seeker"
+			const recipientProfileId =
+				recipientRole === "host" ? convo.hostProfileId : convo.seekerProfileId
+			const senderProfileId =
+				senderRole === "host" ? convo.hostProfileId : convo.seekerProfileId
+			if (!recipientProfileId || !senderProfileId) return []
+			const [recipientClerk, senderClerk, listing] = await Promise.all([
+				recipientRole === "host"
+					? resolvers.hostClerkId(recipientProfileId)
+					: resolvers.seekerClerkId(recipientProfileId),
+				senderRole === "host"
+					? resolvers.hostClerkId(senderProfileId)
+					: resolvers.seekerClerkId(senderProfileId),
+				convo.listingId ? resolvers.listingContext(convo.listingId) : Promise.resolve(null),
+			])
+			// Same-human guard (one person on both sides of a thread).
+			if (!recipientClerk || recipientClerk === senderClerk) return []
+			return [
+				makeIntent({
+					event,
+					type: "message_received",
+					recipientClerkUserId: recipientClerk,
+					destinationPath:
+						recipientRole === "host"
+							? `/host/messages/${conversationId}`
+							: `/messages/${conversationId}`,
+					// Message CONTENT is never placed in an intent: push payloads and
+					// email bodies must not carry private thread text.
+					values: { listingTitle: listing?.title ?? "" },
+					entity: { type: "conversation", id: conversationId },
+					// Thread-aware collapse: a burst in one thread → one notification.
+					collapseKey: `conversation:${conversationId}`,
+				}),
+			]
+		}
+
+		/* -------------------------------------------- sourced / host lifecycle */
+		case "listing_claim_initiated": {
+			// Copy is explicit that the claim is RECEIVED and PENDING — it never
+			// implies approval (see the message catalog).
+			if (!event.host_profile_id || !event.listing_id) return []
+			const [hostClerk, listing] = await Promise.all([
+				resolvers.hostClerkId(event.host_profile_id),
+				resolvers.listingContext(event.listing_id),
+			])
+			if (!hostClerk) return []
+			return [
+				makeIntent({
+					event,
+					type: "sourced_listing_claim_submitted",
+					recipientClerkUserId: hostClerk,
+					destinationPath: `/claim/${event.listing_id}`,
+					values: { listingTitle: listing?.title ?? "" },
+					entity: { type: "listing", id: event.listing_id },
+				}),
+			]
+		}
+
+		default:
+			return []
+	}
+}

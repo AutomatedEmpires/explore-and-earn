@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 
-import { DEV_USER_ID, isDevBenchEnabled } from "./devBench";
+import { DEV_USER_ID, isDevBenchPrivileged } from "./devBench";
 
 /**
  * Founder allow-list for the admin panel.
@@ -19,8 +19,10 @@ export const ADMIN_USER_IDS: string[] = [
 export function isAdminUserId(userId: string | null | undefined): boolean {
   // DEV MOCK BENCH (review tooling only): the synthetic bench user id only ever
   // appears when the Clerk shim is already impersonating, so granting it admin
-  // here lets the (admin) lane be reviewed locally. False in production/preview.
-  if (isDevBenchEnabled() && userId === DEV_USER_ID) {
+  // here lets the (admin) lane be reviewed locally. Gated by the HARDENED
+  // isDevBenchPrivileged() (explicit NEXT_PUBLIC_DEV_BENCH=1 + non-prod Supabase
+  // URL), so a stray non-prod build against prod env can never self-grant admin.
+  if (isDevBenchPrivileged() && userId === DEV_USER_ID) {
     return true;
   }
   return typeof userId === "string" && ADMIN_USER_IDS.includes(userId);

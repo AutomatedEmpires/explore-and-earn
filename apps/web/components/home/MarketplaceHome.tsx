@@ -1,19 +1,23 @@
 "use client";
 
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
-import type { OpportunityCategory } from "@explore-and-earn/contracts";
+import { useTranslations } from "next-intl";
+import { Icon, type IconKey } from "@explore-and-earn/ui";
+import { FOUNDING_SEAT_CAP } from "@explore-and-earn/contracts";
 
-import type { DiscoveryListing } from "../discovery";
-import { toDiscoveryCardData } from "../discovery/listing";
+import {
+  ListingCard,
+  ListingCardProvider,
+  type DiscoveryListing,
+} from "../discovery";
 import { FeaturedEmployersRail, type FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import {
   HOME_CATEGORIES,
   HOME_PLANS,
-  HOME_HERO,
+  HOME_HERO_ROTATION,
   formatUsd,
   type HomeAnnouncement,
   type HomeDestination,
@@ -31,23 +35,34 @@ interface MarketplaceHomeProps {
 // ─── Small shared pieces ───────────────────────────────────────────────────
 
 function SectionHead({
+  id,
   eyebrow,
   title,
   sub,
   seeAllHref,
   seeAllLabel,
+  emphasis,
 }: {
+  /** Heading id — sections reference it via aria-labelledby. */
+  id: string;
   eyebrow: string;
   title: string;
   sub?: string;
   seeAllHref?: string;
   seeAllLabel?: string;
+  /** Bumps the title to the display-section scale (a louder section headline). */
+  emphasis?: boolean;
 }) {
   return (
     <div className={styles.sectionHead}>
       <div className={styles.sectionHeadText}>
         <p className={styles.eyebrow}>{eyebrow}</p>
-        <h2 className={styles.sectionTitle}>{title}</h2>
+        <h2
+          id={id}
+          className={`${styles.sectionTitle}${emphasis ? ` ${styles.sectionTitleEmphasis}` : ""}`}
+        >
+          {title}
+        </h2>
         {sub ? <p className={styles.sectionSub}>{sub}</p> : null}
       </div>
       {seeAllHref ? (
@@ -60,30 +75,39 @@ function SectionHead({
   );
 }
 
-const TRIAD_BADGES: ReadonlyArray<{ key: string; label: string; icon: IconKey }> = [
-  { key: "housing", label: "Housing", icon: "benefit.housing" },
-  { key: "meals", label: "Meals", icon: "benefit.meals" },
-  { key: "pay", label: "Pay", icon: "benefit.pay" },
-  { key: "season", label: "Season", icon: "status.seasonal" },
-  { key: "remote", label: "Remote", icon: "category.remote" },
-  { key: "verified", label: "Verified Host", icon: "trust.verified_host" },
+// The signature promise — the triad reads instantly, nothing diluting it.
+const TRIAD_BADGES: ReadonlyArray<{ key: string; labelKey: "triadHousing" | "triadMeals" | "triadPay"; icon: IconKey }> = [
+  { key: "housing", labelKey: "triadHousing", icon: "benefit.housing" },
+  { key: "meals", labelKey: "triadMeals", icon: "benefit.meals" },
+  { key: "pay", labelKey: "triadPay", icon: "benefit.pay" },
 ];
 
 // ─── Hero ──────────────────────────────────────────────────────────────────
 
 function HomeHero({
-  heroImage,
-  heroCategory,
   peek,
 }: {
-  heroImage?: string;
-  heroCategory: OpportunityCategory;
   peek?: DiscoveryListing;
 }) {
   const router = useRouter();
+  const t = useTranslations("Home");
+  const tc = useTranslations("Common");
   const [role, setRole] = useState("");
   const [loc, setLoc] = useState("");
   const [category, setCategory] = useState("");
+
+  // Dynamic hero — rotate through the controllable HOME_HERO_ROTATION bucket.
+  // Start on index 0 (matches the server render and first client paint), then
+  // advance to a rotated pick after mount. Because the pick happens in an effect
+  // it never runs during SSR/hydration, so there's no hydration mismatch.
+  const [heroIndex, setHeroIndex] = useState(0);
+  useEffect(() => {
+    if (HOME_HERO_ROTATION.length <= 1) return;
+    setHeroIndex(Math.floor(Math.random() * HOME_HERO_ROTATION.length));
+  }, []);
+  const hero = HOME_HERO_ROTATION[heroIndex] ?? HOME_HERO_ROTATION[0];
+  const heroImage = hero.imageUrl;
+  const heroCategory = hero.category;
 
   const onSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -115,56 +139,58 @@ function HomeHero({
         <div className={styles.heroInner}>
           <p className={styles.heroEyebrow}>
             <span className={styles.liveDot} aria-hidden="true" />
-            Built for seekers, by seekers
+            {t("eyebrow")}
           </p>
-          <h1 id="home-hero-title" className={styles.heroTitle}>
-            Find seasonal work with housing, meals, pay &amp; a place — upfront.
+          {/* The anthem — the loudest thing after the photo. */}
+          <h1 id="home-hero-title" className={styles.heroAnthem}>
+            {t("anthemLine1")}
+            <br />
+            {t("anthemLine2")}
           </h1>
-          <p className={styles.heroSub}>
-            Free forever for seekers. Hosts pay for visibility — you never pay to find work.
-          </p>
+          <p className={styles.heroPromise}>{t("promise")}</p>
+          <p className={styles.heroSub}>{t("sub")}</p>
 
           <form className={styles.searchBar} onSubmit={onSearch} role="search" aria-label="Search opportunities">
             <label className={styles.searchField}>
-              <span className={styles.searchLabel}>Role</span>
+              <span className={styles.searchLabel}>{t("searchRoleLabel")}</span>
               <input
                 className={styles.searchInput}
                 type="text"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                placeholder="Deckhand, harvest…"
+                placeholder={t("searchRolePlaceholder")}
               />
             </label>
             <span className={styles.searchDivider} aria-hidden="true" />
             <label className={styles.searchField}>
-              <span className={styles.searchLabel}>Where</span>
+              <span className={styles.searchLabel}>{t("searchWhereLabel")}</span>
               <input
                 className={styles.searchInput}
                 type="text"
                 value={loc}
                 onChange={(e) => setLoc(e.target.value)}
-                placeholder="Alaska, remote…"
+                placeholder={t("searchWherePlaceholder")}
               />
             </label>
             <span className={styles.searchDivider} aria-hidden="true" />
             <label className={styles.searchField}>
-              <span className={styles.searchLabel}>Category</span>
+              <span className={styles.searchLabel}>{t("searchCategoryLabel")}</span>
               <select
                 className={styles.searchSelect}
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                aria-label="Category"
+                aria-label={t("searchCategoryLabel")}
               >
-                <option value="">All work</option>
-                <option value="farm">Farm &amp; ranch</option>
-                <option value="maritime">Maritime</option>
-                <option value="remote">Remote</option>
-                <option value="seasonal">Seasonal</option>
+                <option value="">{t("categoryAll")}</option>
+                <option value="farm">{t("categoryFarm")}</option>
+                <option value="maritime">{t("categoryMaritime")}</option>
+                <option value="remote">{t("categoryRemote")}</option>
+                <option value="seasonal">{t("categorySeasonal")}</option>
               </select>
             </label>
             <button className={styles.searchSubmit} type="submit">
               <Icon name="action.search" size={20} aria-hidden />
-              <span>Explore jobs</span>
+              <span>{tc("exploreJobs")}</span>
             </button>
           </form>
 
@@ -172,18 +198,14 @@ function HomeHero({
             {TRIAD_BADGES.map((b) => (
               <li key={b.key} className={styles.trustBadge}>
                 <Icon name={b.icon} size={16} aria-hidden />
-                {b.label}
+                {t(b.labelKey)}
               </li>
             ))}
           </ul>
 
           <div className={styles.heroCtas}>
-            <Link className={styles.heroPrimary} href="/seek">
-              Explore jobs
-              <Icon name="action.forward" size={16} aria-hidden />
-            </Link>
             <Link className={styles.heroSecondary} href="/for-hosts">
-              Post a job
+              {tc("postAJob")}
             </Link>
           </div>
         </div>
@@ -224,6 +246,67 @@ function HomeHero({
   );
 }
 
+// ─── Three questions (the product thesis) ──────────────────────────────────
+
+const THREE_QUESTIONS: ReadonlyArray<{
+  key: "housing" | "meals" | "pay";
+  label: string;
+  question: string;
+  line: string;
+  icon: IconKey;
+}> = [
+  {
+    key: "housing",
+    label: "Housing",
+    question: "Where will I sleep?",
+    line: "Cabin, bunkhouse, or crew quarters — named on the listing.",
+    icon: "benefit.housing",
+  },
+  {
+    key: "meals",
+    label: "Meals",
+    question: "What will I eat?",
+    line: "Provided, stipend, or kitchen access — spelled out.",
+    icon: "benefit.meals",
+  },
+  {
+    key: "pay",
+    label: "Pay",
+    question: "What will I earn?",
+    line: "Real numbers, before you apply.",
+    icon: "benefit.pay",
+  },
+];
+
+function ThreeQuestions() {
+  return (
+    <section className={styles.section} aria-labelledby="triad-title">
+      <div className={styles.triadBand}>
+        <div className={styles.triadHead}>
+          <p className={styles.triadEyebrow}>The deal, upfront</p>
+          <h2 id="triad-title" className={styles.triadTitle}>
+            Every listing answers three questions. Always.
+          </h2>
+        </div>
+        <div className={styles.triadGrid}>
+          {THREE_QUESTIONS.map((q) => (
+            <div key={q.key} className={`${styles.triadCard} ${styles[`triad_${q.key}`]}`}>
+              <span className={styles.triadIcon}>
+                <Icon name={q.icon} size={24} aria-hidden />
+              </span>
+              <span className={styles.triadText}>
+                <span className={styles.triadLabel}>{q.label}</span>
+                <span className={styles.triadQuestion}>{q.question}</span>
+                <span className={styles.triadLine}>{q.line}</span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Rolling announcements ─────────────────────────────────────────────────
 
 const ANNOUNCEMENT_TONE: Record<AnnouncementLabel, string> = {
@@ -240,7 +323,7 @@ function AnnouncementRail({ items }: { items: readonly HomeAnnouncement[] }) {
       <div className={styles.announceHeadRow}>
         <span className={styles.announceKicker}>
           <Icon name="nav.announcements" size={16} aria-hidden />
-          Dispatches
+          Hiring now
         </span>
       </div>
       <div className={styles.announceScroller}>
@@ -264,11 +347,13 @@ function AnnouncementRail({ items }: { items: readonly HomeAnnouncement[] }) {
 
 function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
   const router = useRouter();
+  // Six cards on desktop (3-up grid); the module CSS caps mobile at four.
   const shown = listings.slice(0, 6);
 
   return (
     <section className={styles.section} aria-labelledby="featured-jobs-title">
       <SectionHead
+        id="featured-jobs-title"
         eyebrow="Open now"
         title="Featured jobs"
         sub="Housing, meals, and pay on every card — no digging."
@@ -286,24 +371,96 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
           </Link>
         </div>
       ) : (
-        <div className={styles.jobsGrid}>
-          {shown.map((listing, index) => (
-            <DiscoveryCard
-              key={listing.id}
-              data={toDiscoveryCardData(listing)}
-              surface="discovery_feed"
-              imageLoading={index < 2 ? "eager" : "lazy"}
-              onOpen={(id) => router.push(`/listing/${id}`)}
-              onApply={(id) => router.push(`/listing/${id}`)}
-              onHostClick={() => router.push("/seek")}
-              onLocationClick={(id) => router.push(`/map?focus=${id}`)}
-              onHousingClick={(id) => router.push(`/listing/${id}`)}
-              onMealsClick={(id) => router.push(`/listing/${id}`)}
-              onPayClick={(id) => router.push(`/listing/${id}`)}
-            />
-          ))}
-        </div>
+        // Mirror /seek (DiscoveryFeed): the triad, host, card body, and report
+        // flag open popups in place; only Apply and Location route. The shared
+        // host resolves against the FULL prop list (a host popup can point at a
+        // sibling outside the six shown), and the Report drawer is now wired
+        // too (was missing before this migration).
+        <ListingCardProvider
+          listings={listings}
+          overrides={{ onApply: (id) => router.push(`/listing/${id}`) }}
+        >
+          <div className={styles.jobsGrid}>
+            {shown.map((listing, index) => (
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                surface="discovery_feed"
+                imageLoading={index < 2 ? "eager" : "lazy"}
+              />
+            ))}
+          </div>
+        </ListingCardProvider>
       )}
+    </section>
+  );
+}
+
+// ─── Discover your way (Seek · Swipe · Map) ────────────────────────────────
+
+const DISCOVER_MODES: ReadonlyArray<{
+  key: "seek" | "swipe" | "map";
+  name: string;
+  promise: string;
+  icon: IconKey;
+  href: string;
+}> = [
+  { key: "seek", name: "Seek", promise: "Browse the whole grid — filter by lane, season & pay.", icon: "nav.seek", href: "/seek" },
+  { key: "swipe", name: "Swipe", promise: "One opportunity at a time. Save it or let it go.", icon: "nav.swipe", href: "/swipe" },
+  { key: "map", name: "Map", promise: "See the season on a map — browse by state or region.", icon: "nav.map", href: "/map" },
+];
+
+function DiscoverModes({ listings }: { listings: readonly DiscoveryListing[] }) {
+  const pins = listings.filter((l) => l.coordinates).slice(0, 5);
+  const shownPins = pins.length > 0 ? pins : listings.slice(0, 5);
+
+  return (
+    <section className={styles.section} aria-labelledby="discover-title">
+      <SectionHead
+        id="discover-title"
+        eyebrow="Discover your way"
+        title="Three ways in — same honest listings"
+        sub="Location is a feeling, not a filter. Pick the lens that fits how you wander."
+      />
+      <div className={styles.modeGrid}>
+        {DISCOVER_MODES.map((m, i) => (
+          <Link
+            key={m.key}
+            className={`${styles.modeCard} ${styles.reveal}`}
+            href={m.href}
+            style={{ "--reveal-index": i } as CSSProperties}
+          >
+            {m.key === "map" ? (
+              <span className={styles.mapCanvas} aria-hidden="true">
+                <span className={styles.mapLand} />
+                <span className={styles.mapLand2} />
+                <span className={styles.mapGrid} />
+                {shownPins.map((l, pi) => (
+                  <span
+                    key={l.id}
+                    className={`${styles.mapPin} ${styles[`pin_${l.category}`]}`}
+                    style={{ "--pin-x": `${[18, 38, 55, 72, 84][pi] ?? 50}%`, "--pin-y": `${[42, 26, 58, 34, 66][pi] ?? 50}%` } as CSSProperties}
+                  >
+                    <Icon name="nav.map" size={16} aria-hidden />
+                  </span>
+                ))}
+              </span>
+            ) : null}
+            <span className={styles.modeBody}>
+              <span className={styles.modeIcon}>
+                <Icon name={m.icon} size={24} aria-hidden />
+              </span>
+              <span className={styles.modeText}>
+                <span className={styles.modeName}>{m.name}</span>
+                <span className={styles.modePromise}>{m.promise}</span>
+              </span>
+              <span className={styles.modeArrow} aria-hidden="true">
+                <Icon name="action.forward" size={16} aria-hidden />
+              </span>
+            </span>
+          </Link>
+        ))}
+      </div>
     </section>
   );
 }
@@ -314,6 +471,7 @@ function CategoryGrid() {
   return (
     <section className={styles.section} aria-labelledby="categories-title">
       <SectionHead
+        id="categories-title"
         eyebrow="Browse"
         title="Browse by category"
         sub="Pick a lane — the work looks like the place."
@@ -357,11 +515,13 @@ function DestinationGrid({ destinations }: { destinations: readonly HomeDestinat
   return (
     <section className={styles.section} aria-labelledby="destinations-title">
       <SectionHead
+        id="destinations-title"
         eyebrow="Destinations"
         title="Where will you go next?"
         sub="Discover where to work next — before you commit."
         seeAllHref="/map"
         seeAllLabel="Open the map"
+        emphasis
       />
       <div className={styles.destinationGrid}>
         {destinations.map((d, i) => (
@@ -410,52 +570,7 @@ function DestinationGrid({ destinations }: { destinations: readonly HomeDestinat
   );
 }
 
-// ─── Map discovery ─────────────────────────────────────────────────────────
-
-function MapDiscovery({ listings }: { listings: readonly DiscoveryListing[] }) {
-  const pins = listings.filter((l) => l.coordinates).slice(0, 5);
-
-  return (
-    <section className={styles.section} aria-labelledby="surfaces-title">
-      <SectionHead
-        eyebrow="Discover your way"
-        title="See the season on a map"
-        sub="Location is a feeling, not a filter — browse clustered jobs by state or region."
-        seeAllHref="/map"
-        seeAllLabel="Open the map"
-      />
-      <div className={`${styles.surfaceCard} ${styles.mapFeature}`}>
-        <div className={styles.mapCanvas} aria-hidden="true">
-          <span className={styles.mapLand} />
-          <span className={styles.mapLand2} />
-          <span className={styles.mapGrid} />
-          {(pins.length > 0 ? pins : listings.slice(0, 5)).map((l, i) => (
-            <span
-              key={l.id}
-              className={`${styles.mapPin} ${styles[`pin_${l.category}`]}`}
-              style={{ "--pin-x": `${[18, 38, 55, 72, 84][i] ?? 50}%`, "--pin-y": `${[42, 26, 58, 34, 66][i] ?? 50}%` } as CSSProperties}
-            >
-              <Icon name="nav.map" size={16} aria-hidden />
-            </span>
-          ))}
-          <span className={styles.mapCluster} style={{ "--pin-x": "62%", "--pin-y": "44%" } as CSSProperties}>12</span>
-          <span className={styles.mapClusterSm} style={{ "--pin-x": "27%", "--pin-y": "72%" } as CSSProperties}>5</span>
-        </div>
-        <div className={styles.surfaceBody}>
-          <p className={styles.surfaceKicker}><Icon name="nav.map" size={16} aria-hidden />Map discovery</p>
-          <h3 className={styles.surfaceTitle}>Open the job map</h3>
-          <p className={styles.surfaceText}>Clustered jobs, housing &amp; pay on every pin. Browse by state or region.</p>
-          <Link className={styles.surfaceCta} href="/map">
-            Open the job map
-            <Icon name="action.forward" size={16} aria-hidden />
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Product previews (seeker dashboard + community) ───────────────────────
+// ─── Free forever for seekers (dashboard + community, one band) ────────────
 
 // Capability statements, not fabricated live numbers (no-mock-data rule).
 const SEEKER_MODULES: ReadonlyArray<{ label: string; value: string; icon: IconKey }> = [
@@ -472,55 +587,49 @@ const COMMUNITY_TOPICS: ReadonlyArray<{ label: string; icon: IconKey }> = [
   { label: "Host transparency & reviews", icon: "trust.verified_host" },
 ];
 
-function ProductPreviews() {
+function FreeForeverBand() {
   return (
-    <section className={styles.section} aria-labelledby="previews-title">
+    <section className={styles.section} aria-labelledby="free-title">
       <SectionHead
+        id="free-title"
         eyebrow="Free forever for seekers"
-        title="Everything you get, at no cost"
+        title="You never pay to find work"
         sub="The job board tells you what's open. The community tells you what it's actually like."
       />
-      <div className={styles.previewGrid}>
-        {/* Seeker dashboard preview */}
-        <div className={styles.previewCard}>
-          <div className={styles.previewHead}>
-            <p className={styles.surfaceKicker}><Icon name="nav.dashboard" size={16} aria-hidden />Seeker dashboard</p>
-            <span className={styles.freeTag}>Free forever</span>
-          </div>
-          <ul className={styles.previewList} role="list">
+      <div className={styles.freeBand}>
+        <div className={styles.freeCol}>
+          <p className={styles.surfaceKicker}>
+            <Icon name="nav.dashboard" size={16} aria-hidden />
+            Seeker dashboard
+          </p>
+          <ul className={styles.freeList} role="list">
             {SEEKER_MODULES.map((m) => (
-              <li key={m.label} className={styles.previewRow}>
-                <span className={styles.previewIcon}><Icon name={m.icon} size={20} aria-hidden /></span>
-                <span className={styles.previewRowText}>
-                  <strong>{m.label}</strong>
-                  <small>{m.value}</small>
-                </span>
+              <li key={m.label} className={styles.freeRow}>
+                <Icon name={m.icon} size={16} aria-hidden />
+                <strong>{m.label}</strong>
+                <small>{m.value}</small>
               </li>
             ))}
           </ul>
-          <Link className={styles.previewCta} href="/seek">
-            See your dashboard
+          <Link className={styles.freeCta} href="/seek">
+            Start exploring
             <Icon name="action.forward" size={16} aria-hidden />
           </Link>
         </div>
-
-        {/* Community preview */}
-        <div className={styles.previewCard}>
-          <div className={styles.previewHead}>
-            <p className={styles.surfaceKicker}><Icon name="nav.feed" size={16} aria-hidden />Community</p>
-            <span className={styles.communityTag}>Seeker-to-seeker</span>
-          </div>
-          <ul className={styles.previewList} role="list">
+        <div className={styles.freeCol}>
+          <p className={styles.surfaceKicker}>
+            <Icon name="nav.feed" size={16} aria-hidden />
+            Community
+          </p>
+          <ul className={styles.freeList} role="list">
             {COMMUNITY_TOPICS.map((t) => (
-              <li key={t.label} className={styles.previewRow}>
-                <span className={styles.previewIcon}><Icon name={t.icon} size={20} aria-hidden /></span>
-                <span className={styles.previewRowText}>
-                  <strong>{t.label}</strong>
-                </span>
+              <li key={t.label} className={styles.freeRow}>
+                <Icon name={t.icon} size={16} aria-hidden />
+                <strong>{t.label}</strong>
               </li>
             ))}
           </ul>
-          <Link className={styles.previewCta} href="/community">
+          <Link className={styles.freeCta} href="/community">
             Join the community
             <Icon name="action.forward" size={16} aria-hidden />
           </Link>
@@ -530,7 +639,7 @@ function ProductPreviews() {
   );
 }
 
-// ─── Host pitch (tiers + monetization) ─────────────────────────────────────
+// ─── Host pitch (founding-first + tiers) ───────────────────────────────────
 
 const HOST_FEATURES: ReadonlyArray<{ label: string; icon: IconKey }> = [
   { label: "Boosted listings", icon: "status.boosted" },
@@ -546,11 +655,24 @@ function HostPitch() {
     <section id="plans" className={`${styles.section} ${styles.hostSection}`} aria-labelledby="host-title">
       <div className={styles.hostHead}>
         <p className={styles.eyebrow}>For hosts &amp; employers</p>
-        <h2 className={styles.hostTitle}>Hire seasonal workers where they actually search.</h2>
+        <h2 id="host-title" className={styles.hostTitle}>Hire seasonal workers where they actually search.</h2>
         <p className={styles.hostSub}>
           Seekers never pay to find work. You pay for visibility — boosted placement, featured
           spots, and homepage reach in front of people ready to move.
         </p>
+      </div>
+
+      <div className={styles.foundingBand}>
+        <span className={styles.foundingMedal} aria-hidden="true">
+          <Icon name="trust.founding_host" size={24} aria-hidden />
+        </span>
+        <div className={styles.foundingText}>
+          <p className={styles.foundingTitle}>Founding Host Program</p>
+          <p className={styles.foundingCopy}>
+            First {FOUNDING_SEAT_CAP} hosts lock this rate for life. It survives tier changes —
+            and it&rsquo;s only given up if you ever cancel.
+          </p>
+        </div>
       </div>
 
       <ul className={styles.hostFeatures} aria-label="What hosts get">
@@ -568,8 +690,16 @@ function HostPitch() {
             {p.featured ? <span className={styles.planRibbon}>Most popular</span> : null}
             <p className={styles.planName}>{p.name}</p>
             <p className={styles.planPrice}>
-              <strong>{formatUsd(p.priceMonthlyCents)}</strong>
+              <strong>{formatUsd(p.foundingMonthlyCents)}</strong>
               <span>/mo</span>
+              <s className={styles.planStd}>
+                <span className={styles.srOnly}>Standard price </span>
+                {formatUsd(p.priceMonthlyCents)}/mo
+              </s>
+            </p>
+            <p className={styles.planSeat}>
+              <Icon name="trust.founding_host" size={16} aria-hidden />
+              Founding rate — locked for life
             </p>
             <p className={styles.planBlurb}>{p.blurb}</p>
             <ul className={styles.planFeatures} role="list">
@@ -606,7 +736,7 @@ function FinalCta() {
   return (
     <section className={styles.finalCta} aria-labelledby="final-title">
       <div className={styles.finalInner}>
-        <p className={styles.finalEyebrow}>Explore by job, map, category, destination, or community intel</p>
+        <p className={styles.finalEyebrow}>Seek it, swipe it, or find it on the map</p>
         <h2 id="final-title" className={styles.finalTitle}>Discover where to work next.</h2>
         <p className={styles.finalSub}>
           Built for seekers, by seekers. Housing, meals, pay, and location — always upfront.
@@ -633,23 +763,29 @@ export function MarketplaceHome({
   destinations,
   announcements,
 }: MarketplaceHomeProps) {
-  // The hero photo is a fixed scenic "working landscape" (not a data cover) so
-  // first impression always sells the place; the floating peek is a real listing.
+  // The hero photo rotates through the controllable HOME_HERO_ROTATION bucket
+  // (picked client-side per landing) so first impression always sells the place;
+  // the floating peek is a real listing.
   const heroListing = listings.find((l) => l.conditionalBadges?.includes("boosted")) ?? listings[0];
 
+  // Organic-first sequence: promise → inventory → discovery story → browse
+  // lanes → paid rails → free-forever → host conversion arc.
   return (
     <div className={styles.home}>
-      <HomeHero heroImage={HOME_HERO.imageUrl} heroCategory={HOME_HERO.category} peek={heroListing} />
-      <AnnouncementRail items={announcements} />
-
-      {/* Server-rendered: an empty employer set is real emptiness, not loading —
-          skip the rail rather than show skeletons that never resolve. */}
-      {employers.length > 0 ? <FeaturedEmployersRail employers={employers} /> : null}
+      <HomeHero peek={heroListing} />
+      <ThreeQuestions />
       <FeaturedJobs listings={listings} />
+      <DiscoverModes listings={listings} />
       <CategoryGrid />
       <DestinationGrid destinations={destinations} />
-      <MapDiscovery listings={listings} />
-      <ProductPreviews />
+
+      {/* Paid rails — announcements + featured employers. Server-rendered: an
+          empty employer set is real emptiness, not loading — skip the rail
+          rather than show skeletons that never resolve. */}
+      <AnnouncementRail items={announcements} />
+      {employers.length > 0 ? <FeaturedEmployersRail employers={employers} /> : null}
+
+      <FreeForeverBand />
       <HostPitch />
       <FinalCta />
     </div>

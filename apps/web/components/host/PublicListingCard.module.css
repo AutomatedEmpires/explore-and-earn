@@ -1,62 +1,39 @@
-.card {
-  display: block;
-  background: var(--color-surface-raised);
-  border-radius: var(--radius-card);
-  border: 1px solid var(--border-soft);
-  overflow: hidden;
-  text-decoration: none;
-  transition: border-color var(--motion-fast) var(--ease-standard);
-}
+/* ══════════════════════════════════════════════════════════════════
+   PublicListingCard — composes the LOCKED DiscoveryCard. The card owns
+   its own styling; the only thing this module styles is the CTA slot
+   override (a crawlable "View opportunity" link for the public page).
+   Glacier tokens only.
+   ══════════════════════════════════════════════════════════════════ */
 
-.card:hover {
-  border-color: var(--border-ink);
-}
-
-.card:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-.cover {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  background: var(--color-surface);
-}
-
-.body {
-  padding: var(--space-16);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
-}
-
-.categoryRow {
-  line-height: 0;
-}
-
-.title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
-  color: var(--text-primary);
-}
-
-.location {
+.cta {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  justify-content: center;
+  gap: var(--space-8);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-10) var(--space-16);
+  border-radius: var(--radius-input);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  border: 1px solid transparent;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  line-height: var(--type-meta-lh);
-  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: background var(--motion-fast) var(--ease-standard);
 }
 
-.pay {
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-lh);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
+.cta:hover {
+  background: var(--palette-sky-dark);
+}
+
+.cta:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta { transition: none; }
 }

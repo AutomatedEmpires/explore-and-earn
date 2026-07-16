@@ -1,0 +1,246 @@
+{
+	"Nav": {
+		"explore": "Explore",
+		"community": "Community",
+		"photos": "Photos",
+		"feed": "Feed",
+		"announcements": "Announcements",
+		"signIn": "Sign in",
+		"chooseYourPath": "Choose your path",
+		"seekerTitle": "I'm a seeker",
+		"seekerSub": "Find work — free forever",
+		"hostTitle": "I'm a host",
+		"hostSub": "List your place & hire",
+		"createAccount": "New here? Create an account",
+		"becomeAdmin": "Become an admin",
+		"yourProfile": "Your profile",
+		"notifications": "Notifications",
+		"homeAriaLabel": "Explore and Earn — home"
+	},
+	"Common": {
+		"apply": "Apply",
+		"save": "Save",
+		"saved": "Saved",
+		"cancel": "Cancel",
+		"confirm": "Confirm",
+		"dismiss": "Dismiss",
+		"seeAll": "See all",
+		"postAJob": "Post a job",
+		"exploreJobs": "Explore jobs"
+	},
+	"Home": {
+		"eyebrow": "The seeker-first work marketplace",
+		"anthemLine1": "Built for seekers,",
+		"anthemLine2": "by seekers.",
+		"promise": "Find seasonal work with housing, meals, pay & a place — upfront.",
+		"sub": "Free forever for seekers. Hosts pay for visibility — you never pay to find work.",
+		"searchRoleLabel": "Role",
+		"searchRolePlaceholder": "Deckhand, harvest…",
+		"searchWhereLabel": "Where",
+		"searchWherePlaceholder": "Alaska, remote…",
+		"searchCategoryLabel": "Category",
+		"categoryAll": "All work",
+		"categoryFarm": "Farm & ranch",
+		"categoryMaritime": "Maritime",
+		"categoryRemote": "Remote",
+		"categorySeasonal": "Seasonal",
+		"triadHousing": "Housing",
+		"triadMeals": "Meals",
+		"triadPay": "Pay"
+	},
+	"Meta": {
+		"homeTitle": "Explore & Earn — Seasonal jobs with housing, meals & pay upfront",
+		"homeDescription": "Discover seasonal work in places worth living — farms, coasts, resorts, and remote roles. Every opportunity answers the three questions that matter before you apply: where you'll sleep, what you'll eat, and what you'll earn.",
+		"homeOgDescription": "A discovery marketplace for seasonal work and real-world exploration. Housing, meals, and pay — answered on every listing."
+	},
+	"Notifications": {
+		"types": {
+			"application_received": {
+				"title": "New application received",
+				"body": "Someone applied to {listingTitle}. Review their profile to keep things moving."
+			},
+			"application_viewed": {
+				"title": "Your application is being reviewed",
+				"body": "The host is reviewing your application to {listingTitle}."
+			},
+			"application_shortlisted": {
+				"title": "A host saved your application",
+				"body": "The host saved your application to {listingTitle} to review further."
+			},
+			"application_offered": {
+				"title": "You received an offer",
+				"body": "The host made you an offer for {listingTitle}. Review and respond when you're ready."
+			},
+			"application_rejected": {
+				"title": "Update on your application",
+				"body": "You weren't selected for {listingTitle} this time. Other opportunities are posting all the time — keep exploring."
+			},
+			"application_withdrawn": {
+				"title": "An applicant withdrew",
+				"body": "An applicant withdrew their application to {listingTitle}."
+			},
+			"new_strong_match": {
+				"title": "New strong match",
+				"body": "{listingTitle} strongly matches your profile."
+			},
+			"saved_search_results": {
+				"title": "{count, plural, one {1 new match for \"{searchLabel}\"} other {# new matches for \"{searchLabel}\"}}",
+				"body": "New opportunities match your saved search \"{searchLabel}\"."
+			},
+			"invite_received": {
+				"title": "You've been invited to apply",
+				"body": "A host invited you to apply to {listingTitle}."
+			},
+			"offer_received": {
+				"title": "You received an offer",
+				"body": "The host made you an offer for {listingTitle}. Review and respond when you're ready."
+			},
+			"offer_expiring": {
+				"title": "Your offer expires soon",
+				"body": "Your offer for {listingTitle} expires within {hoursLeft, plural, one {# hour} other {# hours}}. Respond before it lapses."
+			},
+			"message_received": {
+				"title": "New message",
+				"body": "You have a new message waiting on Explore & Earn."
+			},
+			"sourced_listing_claim_submitted": {
+				"title": "We received your claim",
+				"body": "Your claim for {listingTitle} was submitted and is pending review. We'll let you know once it's decided — submitting a claim doesn't grant ownership."
+			},
+			"listing_expiring": {
+				"title": "Your listing expires soon",
+				"body": "{listingTitle} expires within {daysLeft, plural, one {# day} other {# days}}. Extend or refresh it to stay visible."
+			},
+			"resume_nudge": {
+				"title": "Finish your résumé to start applying",
+				"body": "Your résumé is {completion}% complete. Hosts need a finished résumé before you can apply."
+			}
+		},
+		"email": {
+			"cta": {
+				"default": "View details",
+				"application_received": "Review application",
+				"application_offered": "View offer",
+				"offer_received": "View offer",
+				"offer_expiring": "Respond to offer",
+				"invite_received": "View invite",
+				"message_received": "Open conversation",
+				"new_strong_match": "View listing",
+				"saved_search_results": "See new matches",
+				"resume_nudge": "Finish résumé",
+				"listing_expiring": "Manage listing"
+			},
+			"footerNote": "You're receiving this because you have an Explore & Earn account.",
+			"unsubscribe": "Unsubscribe"
+		},
+		"digest": {
+			"subject": {
+				"daily": "{count, plural, one {1 update} other {# updates}} from Explore & Earn today",
+				"weekly": "Your week on Explore & Earn: {count, plural, one {1 update} other {# updates}}"
+			},
+			"heading": {
+				"daily": "Today's updates",
+				"weekly": "This week's updates"
+			},
+			"more": "{count, plural, one {…and # more update} other {…and # more updates}} in the app",
+			"cta": "Open notifications"
+		},
+		"unsubscribePage": {
+			"successTitle": "You're unsubscribed",
+			"successBody": "You won't receive these emails anymore. You can turn them back on anytime in your notification settings.",
+			"invalidTitle": "This link has expired",
+			"invalidBody": "This unsubscribe link is no longer valid. You can manage all email preferences from your notification settings."
+		},
+		"settings": {
+			"heading": "Notifications",
+			"description": "Choose how Explore & Earn reaches you. Changes save the moment you make them.",
+			"master": {
+				"email": {
+					"label": "Email",
+					"description": "Lifecycle updates and digests to your inbox."
+				},
+				"push": {
+					"label": "Push",
+					"description": "Device notifications — only after you turn them on here."
+				},
+				"inApp": {
+					"label": "In-app",
+					"description": "The notification center inside Explore & Earn."
+				}
+			},
+			"categoriesHeading": "What you hear about",
+			"categories": {
+				"applications": {
+					"label": "Applications",
+					"description": "Application updates, reviews, and decisions."
+				},
+				"offers_invites": {
+					"label": "Offers & invites",
+					"description": "Offers, invitations, and expiring-offer reminders."
+				},
+				"messages": {
+					"label": "Messages",
+					"description": "New messages from your conversations."
+				},
+				"matches": {
+					"label": "Matches",
+					"description": "Strong new matches and saved-search results."
+				},
+				"listing_lifecycle": {
+					"label": "Listings",
+					"description": "Listing expiry reminders and claim updates."
+				},
+				"account_progress": {
+					"label": "Account progress",
+					"description": "Résumé completion reminders."
+				}
+			},
+			"cadence": {
+				"immediate": "Instant",
+				"daily": "Daily digest",
+				"weekly": "Weekly digest",
+				"off": "Off"
+			},
+			"toggle": {
+				"on": "On",
+				"off": "Off"
+			},
+			"emailColumn": "Email",
+			"pushColumn": "Push",
+			"inAppColumn": "In-app",
+			"quiet": {
+				"label": "Quiet hours",
+				"description": "No emails or push during these hours in your local time. Anything that arrives waits quietly in the app.",
+				"start": "From",
+				"end": "Until",
+				"timezoneNote": "Times follow {timezone}."
+			},
+			"pushDevice": {
+				"enable": "Enable on this device",
+				"disable": "Disable on this device",
+				"enabled": "Push is on for this device.",
+				"denied": "Notifications are blocked in your browser settings for this site.",
+				"unsupported": "This browser doesn't support push notifications.",
+				"notConfigured": "Push isn't available yet."
+			},
+			"status": {
+				"saved": "Preferences saved.",
+				"error": "Couldn't save your preferences. Please try again."
+			}
+		}
+	},
+	"Apply": {
+		"signInToApply": "Sign in to apply",
+		"editListing": "Edit listing",
+		"applicationSent": "Application sent",
+		"confirmHeading": "Apply to this listing?",
+		"confirmBody": "Confirm your application to <strong>{title}</strong>. The host will review your profile and contact you if interested.",
+		"resumeGateHeading": "Complete your résumé to apply",
+		"resumeGateBody": "Hosts move people across the world on a handshake — so they need to know who they're inviting. Finish your résumé (your bio, location, timeline, and skills) before applying to listings.",
+		"finishResume": "Finish your résumé",
+		"errorHeading": "Could not submit application",
+		"errorRateLimit": "You're applying too quickly. Please wait a moment and try again.",
+		"errorSessionExpired": "Your session expired. Please sign in and try again.",
+		"errorGeneric": "Something went wrong. Please try again."
+	}
+}

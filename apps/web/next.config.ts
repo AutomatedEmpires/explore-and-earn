@@ -3,8 +3,14 @@ import path from "node:path";
 
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 
 const require = createRequire(import.meta.url);
+
+// next-intl: threads the per-request i18n config (locale + messages) into the
+// build. Points at i18n/request.ts. Applied to the base config BELOW, then
+// wrapped by Sentry so both integrations compose.
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
 // Baseline security headers applied to every response.
 //
@@ -73,7 +79,28 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["@phosphor-icons/react", "@explore-and-earn/ui"],
   },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      {
+        // PWA service worker: never long-cache the SW script itself, so a
+        // redeploy's updated worker is fetched promptly. Root scope is served
+        // from /public so no Service-Worker-Allowed override is needed, but we
+        // set it explicitly for clarity/future-proofing.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" }
+        ]
+      },
+      {
+        // Manifest is served by app/manifest.ts at /manifest.webmanifest; keep
+        // it lightly cached so icon/name changes propagate without a hard purge.
+        source: "/manifest.webmanifest",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, must-revalidate" }
+        ]
+      }
+    ];
   },
   images: {
     remotePatterns: [
@@ -128,7 +155,7 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withNextIntl(nextConfig), {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: !process.env.CI,

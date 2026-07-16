@@ -1,0 +1,190 @@
+/* BadgeGallery — seeker badge showcase (earned lit, locked dimmed + progress). */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.summary {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.summary strong {
+  color: var(--color-cta);
+  font-variant-numeric: tabular-nums;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.groupTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-primary);
+}
+
+.grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-8);
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  opacity: 0.6; /* locked = dimmed */
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.card[data-earned="true"] {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--color-cta) 45%, var(--border-soft));
+  box-shadow: 0 1px 10px color-mix(in srgb, var(--color-cta) 14%, transparent);
+}
+
+.medal {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text-muted);
+}
+
+/* Earned medallions light up in the live accent. */
+.card[data-earned="true"] .medal {
+  background: var(--color-action-soft);
+  color: var(--color-cta);
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.desc {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.track {
+  margin-top: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-chrome);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-cta);
+}
+
+.badgeStatus {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.card[data-earned="true"] .badgeStatus {
+  color: var(--color-cta);
+}
+
+/* Feature / Featured toggle (server-action form, no client JS). */
+.featureBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px var(--space-10);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-ink);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.featureBtn:hover {
+  border-color: var(--color-cta);
+  color: var(--color-cta);
+}
+
+.featureBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.featureBtn[data-on="true"] {
+  border-color: var(--color-cta);
+  background: var(--color-action-soft);
+  color: var(--color-cta);
+}
+
+/* The featured badge card gets a clear accent ring. */
+.card[data-featured="true"] {
+  border-color: var(--color-cta);
+  box-shadow:
+    0 0 0 1px var(--color-cta),
+    0 2px 14px color-mix(in srgb, var(--color-cta) 18%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}

@@ -7,15 +7,16 @@ import { getHostApplications } from "./applications";
  * Seeker resume data access (read + bio write).
  *
  * SCHEMA RECONCILIATION (verified against supabase/migrations/003_profiles.sql,
- * 004_seeker_resume.sql and 009_clerk_user_sync_schema.sql):
- *   - `seeker_profiles` exposes `short_bio` (there is NO `bio` column) and has
- *     NO `headline`, `display_name` or `skills` columns. Migration 009 only
- *     added `clerk_user_id`. Per the build brief's missing-column fallback we
- *     map bio -> short_bio, derive resume "skills" from per-experience
- *     skill_tags, and treat display_name as not-yet-available (see
- *     getSeekerDisplayName) until a column lands.
- *   - `seeker_resume_experiences` / `seeker_resume_educations` match the brief
- *     and both carry a `sort_order` column used for stable ordering.
+ * 004_seeker_resume.sql, 009_clerk_user_sync_schema.sql and 032_*):
+ *   - `seeker_profiles` exposes `short_bio` (there is NO `bio` column) so we map
+ *     bio -> short_bio. There is still NO `headline` column (mapped to null).
+ *     Migration 032 ADDED `display_name`, `relative_location`, `seeking_timeline`
+ *     and `general_skill_tags`, which are now read here and are load-bearing for
+ *     the résumé-complete apply gate (see @explore-and-earn/db resumeCompleteness
+ *     — displayName / location / seekingTimeline / skills are required to apply).
+ *   - `seeker_resume_experiences` / `seeker_resume_educations` carry a
+ *     `sort_order` column used for stable ordering; resume "skills" also derive
+ *     from per-experience skill_tags.
  *
  * SECURITY: these tables predate generated types (types.gen.ts is a
  * placeholder), so we cast the authed client to an untyped SupabaseClient and

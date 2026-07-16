@@ -91,7 +91,7 @@ function EmployerCard({ employer }: { employer: FeaturedEmployer }) {
       className={`${styles.card} ${styles[`card_${employer.category}`]}`}
       href={href}
       aria-label={`${employer.hostName} — ${employer.location}${
-        employer.isBoosted ? " (featured employer)" : ""
+        employer.isBoosted ? " (boosted)" : ""
       }`}
     >
       <div className={styles.imageSection}>
@@ -109,11 +109,13 @@ function EmployerCard({ employer }: { employer: FeaturedEmployer }) {
         </div>
 
         {/* Curated paid-placement marker — gold, paired with the verified mark.
-            Reads as deliberate selection, not a per-card noise label. */}
+            Reads as deliberate selection, not a per-card noise label. Canon:
+            'featured' is archived; the only valid paid-visibility term is
+            'boosted'. */}
         {employer.isBoosted ? (
           <span className={styles.featuredMark}>
             <Icon name="trust.featured_employer" size={16} aria-hidden />
-            Featured
+            Boosted
           </span>
         ) : null}
 

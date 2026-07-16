@@ -710,14 +710,23 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			) : benefitInfo ? (
 				/* ── View mode (seeker): provision + summary + published detail ── */
 				<div className={styles.viewSummary}>
-					<span
-						className={`${styles.provisionBadge} ${PROVISION_CLASS[benefitInfo.provision]}`}
+					<div className={styles.viewSummaryHead}>
+						<span className={styles.summaryLabel}>
+							What&apos;s provided
+						</span>
+						<span
+							className={`${styles.provisionBadge} ${PROVISION_CLASS[benefitInfo.provision]}`}
+						>
+							{PROVISION_LABEL[benefitInfo.provision]}
+						</span>
+					</div>
+					<p
+						className={
+							benefitInfo.summary ? styles.descriptor : styles.descriptorMuted
+						}
 					>
-						{PROVISION_LABEL[benefitInfo.provision]}
-					</span>
-					{benefitInfo.summary ? (
-						<p className={styles.summaryText}>{benefitInfo.summary}</p>
-					) : null}
+						{benefitInfo.summary ?? "The host hasn't added a description yet."}
+					</p>
 
 					{viewFacts.length > 0 ? (
 						<dl className={styles.viewFacts}>
@@ -770,13 +779,22 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				</p>
 			) : null}
 
-			{/* ── Trust note ──────────────────────────────────────────── */}
-			<div className={styles.trustNote} data-kind={kind} role="note">
-				<span className={styles.trustIcon} aria-hidden>
-					<Icon name="trust.verified_host" size={20} />
-				</span>
-				<p className={styles.trustText}>{cfg.trustNote}</p>
-			</div>
+			{/* ── Trust note ──────────────────────────────────────────────
+			   Edit (host): encouraging call to add detail, above the shared
+			   verify caption. Both modes end on the same quiet, secondary
+			   "confirm the arrangements" note at the very bottom. */}
+			{isEdit ? (
+				<div className={styles.trustNote} data-kind={kind} role="note">
+					<span className={styles.trustIcon} aria-hidden>
+						<Icon name="trust.verified_host" size={20} />
+					</span>
+					<p className={styles.trustText}>{cfg.trustNote}</p>
+				</div>
+			) : null}
+			<p className={styles.verifyNote} role="note">
+				<Icon name="system.info" size={16} aria-hidden />
+				<span>Always confirm the exact arrangements with the host.</span>
+			</p>
 		</PopupShell>
 	);
 }

@@ -1,89 +1,701 @@
 /**
- * DiscoveryCard — per-category atmosphere mapping.
+ * DiscoveryCard — "Glacier" one-design (founder direction 2026-07-13).
  *
- * The light category atmospheres are defined ONCE in the app token layer
- * (apps/web/styles/tokens.css → --cat-<lane>-body|cover|cell|accent|glow) so a
- * "farm" card and a "farm" rail render the same gold. This module just maps the
- * card's data-category to the generic --cat-* the component reads; nested
- * elements inherit them. (CSS custom properties resolve from :root at runtime,
- * so this library module reads the app's tokens.)
+ * ONE premium card for all four lanes: a white/chrome surface with a
+ * glacier-blue→teal action gradient, rounded corners, and a whisper lift so it
+ * pops. The card NEVER tints by category — the lane reads only from the single
+ * glassy category badge (icon + label) top-right of the photo.
+ *
+ * Layout: photo (host circle + verify check, one category badge top-right,
+ * match/boosted per the badge rules) → boxed near-equal info rows (host / title
+ * / location / begins·ends) → HOUSING·MEALS·PAY on one row (green ✓ = included,
+ * red ✕ = not, pay = steel) → Skip·Apply·Save action bar. Tokens only.
  */
 
 .card {
-  --cat-body: var(--cat-mix-body);
-  --cat-cover: var(--cat-mix-cover);
-  --cat-cell: var(--cat-mix-cell);
-  --cat-accent: var(--cat-mix-accent);
-  --cat-glow: var(--cat-mix-glow);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 360px);
+  /* An inline-size container so the title + photo badges shrink to fit narrow
+     card widths (prevents the center badge colliding with the top-right one). */
+  container-type: inline-size;
+  overflow: hidden;
+  background: var(--gradient-chrome);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  color: var(--text-primary);
+  box-shadow: var(--elevation-card);
+  transition: transform var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard);
 }
 
-.card[data-category="farm"] {
-  --cat-body: var(--cat-farm-body);
-  --cat-cover: var(--cat-farm-cover);
-  --cat-cell: var(--cat-farm-cell);
-  --cat-accent: var(--cat-farm-accent);
-  --cat-glow: var(--cat-farm-glow);
+.card:hover {
+  box-shadow: var(--elevation-hover);
 }
 
-.card[data-category="maritime"] {
-  --cat-body: var(--cat-maritime-body);
-  --cat-cover: var(--cat-maritime-cover);
-  --cat-cell: var(--cat-maritime-cell);
-  --cat-accent: var(--cat-maritime-accent);
-  --cat-glow: var(--cat-maritime-glow);
+.card[data-variant="disabled"] {
+  opacity: 0.6;
 }
 
-.card[data-category="remote"] {
-  --cat-body: var(--cat-remote-body);
-  --cat-cover: var(--cat-remote-cover);
-  --cat-cell: var(--cat-remote-cell);
-  --cat-accent: var(--cat-remote-accent);
-  --cat-glow: var(--cat-remote-glow);
+/* ── 1. HERO / COVER ──────────────────────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--gradient-category-default);
+  border-bottom: 1px solid var(--border-soft);
 }
 
-.card[data-category="seasonal"] {
-  --cat-body: var(--cat-seasonal-body);
-  --cat-cover: var(--cat-seasonal-cover);
-  --cat-cell: var(--cat-seasonal-cell);
-  --cat-accent: var(--cat-seasonal-accent);
-  --cat-glow: var(--cat-seasonal-glow);
+.card[data-category="maritime"] .hero { background: var(--gradient-category-maritime); }
+.card[data-category="farm"]     .hero { background: var(--gradient-category-farm); }
+.card[data-category="remote"]   .hero { background: var(--gradient-category-remote); }
+.card[data-category="seasonal"] .hero { background: var(--gradient-category-seasonal); }
+.card[data-category="mix"]      .hero { background: var(--gradient-category-mix); }
+
+.heroImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
-.card[data-category="mix"] {
-  --cat-body: var(--cat-mix-body);
-  --cat-cover: var(--cat-mix-cover);
-  --cat-cell: var(--cat-mix-cell);
-  --cat-accent: var(--cat-mix-accent);
-  --cat-glow: var(--cat-mix-glow);
+/* No cover yet — a large category watermark so the frame reads as intentional. */
+.heroWatermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--palette-white) 45%, transparent);
+  transform: scale(2.7);
 }
 
-/* ── HOUSING · MEALS · PAY — the card's DOMINANT module ─────────────────────
- * The triad is the reason the product exists, so it is the visual anchor of
- * the card, not a footnote: taller cells, real values, and a glance-readable
- * state. Housing/Meals read OFFERED (green ✓) / NOT OFFERED (red ✕) via icon
- * AND colour (a11y-safe, never colour alone). Pay is always gold — money is
- * always present, so it carries no ✕. Tokens only; no raw hex. */
+/* Text-legibility scrim — the one sanctioned photo overlay. */
+.heroScrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--gradient-hero-scrim);
+}
+
+/* ── HOST BADGE (top-left over the photo) ─────────────────────────────────── */
+
+.hostSlot {
+  position: absolute;
+  top: var(--space-12);
+  left: var(--space-12);
+  z-index: 3;
+  display: inline-block;
+}
+
+.hostCircle {
+  width: var(--dc-host-size, 60px);
+  height: var(--dc-host-size, 60px);
+  border-radius: var(--radius-pill);
+  border: 2.5px solid var(--palette-white);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--palette-ink) 12%, transparent), var(--elevation-pin);
+  background: var(--gradient-sky);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  color: var(--color-surface);
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.hostCircleClickable {
+  cursor: pointer;
+}
+
+.hostCircleClickable:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--palette-white), var(--ui-focus-ring);
+}
+
+.hostCircleHasAvatar {
+  background: var(--palette-steel);
+}
+
+.hostAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hostCircleLabel {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--color-surface);
+  text-shadow: 0 1px 3px color-mix(in srgb, var(--palette-ink) 45%, transparent);
+  line-height: 1;
+  user-select: none;
+}
+
+/* Verified check — listing surfaces only (every host; never on seeker cards) */
+.verifiedDot {
+  position: absolute;
+  bottom: calc(-1 * var(--space-3));
+  right: calc(-1 * var(--space-3));
+  z-index: 4;
+  width: var(--space-20);
+  height: var(--space-20);
+  border-radius: var(--radius-pill);
+  background: var(--gradient-state-ready);
+  border: 2px solid var(--palette-white);
+  box-shadow: var(--elevation-pin);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--palette-white);
+  flex-shrink: 0;
+}
+
+/* ── STAMPS (photo overlay badges) ────────────────────────────────────────── */
+
+.centerSlot {
+  position: absolute;
+  top: var(--space-12);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+}
+
+.rightSlot {
+  position: absolute;
+  top: var(--space-12);
+  right: var(--space-12);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  align-items: flex-end;
+}
+
+/* Glassy stamp — base for all overlay badges. Frosted dark ice, white label. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-10);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  line-height: var(--type-label-lh);
+  background: color-mix(in srgb, var(--palette-ink) 46%, transparent);
+  color: var(--palette-white);
+  border: 1px solid color-mix(in srgb, var(--palette-white) 34%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+
+/* Category stamp — the ONE lane signal; icon tinted with the lane accent. */
+.stampCategory {
+  gap: var(--space-6);
+}
+
+.stampCategoryIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--palette-ice);
+}
+
+/* Match score — centered pill, colour-coded by band with a mini fill bar. The
+   band colour + fill length both signal "how well it fits" (--dc-match-fg /
+   --dc-bar-pct set by the band class + inline style). */
+.matchPill {
+  position: absolute;
+  top: var(--space-12);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  line-height: 1;
+  color: var(--palette-white);
+  background: color-mix(in srgb, var(--palette-ink) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dc-match-fg, var(--palette-ice)) 70%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+
+.matchPillNum {
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-bold);
+  color: var(--dc-match-fg, var(--palette-ice));
+}
+
+.matchPillLabel {
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--palette-white) 88%, transparent);
+}
+
+.matchPillTrack {
+  width: 34px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--palette-white) 26%, transparent);
+  overflow: hidden;
+}
+
+.matchPillFill {
+  display: block;
+  height: 100%;
+  width: var(--dc-bar-pct, 0%);
+  border-radius: var(--radius-pill);
+  background: var(--dc-match-fg, var(--palette-ice));
+}
+
+/* Bands — strong (emerald) · good (teal) · fair (glacier) · low (steel).
+   Values are named tokens (light-identical) so the card is fully token-driven. */
+.matchStrong { --dc-match-fg: var(--match-strong); }
+.matchGood   { --dc-match-fg: var(--match-good); }
+.matchFair   { --dc-match-fg: var(--match-fair); }
+.matchLow    { --dc-match-fg: var(--match-low); }
+
+/* Narrow cards (phones, compact grids) — shrink + cap the photo badges so the
+   centered match/boost pill never collides with the top-right category badge. */
+@container (max-width: 370px) {
+  .stamp {
+    font-size: 9px;
+    padding: var(--space-3) var(--space-6);
+    gap: var(--space-2);
+  }
+  .stamp :global(svg) { width: 12px; height: 12px; }
+  .rightSlot { max-width: 34cqw; }
+  .stampCategory > :last-child,
+  .stampOutline {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  .centerSlot,
+  .matchPill { max-width: 28cqw; }
+  .matchPill { padding: var(--space-2) var(--space-6); gap: var(--space-3); }
+  .matchPillLabel { display: none; }
+  .matchPillTrack { width: 22px; }
+  .centerSlot .stamp { max-width: 100%; }
+  .centerSlot .stamp > :last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Center-slot solid tones */
+.stampSuccess {
+  background: var(--gradient-state-ready);
+  color: var(--palette-white);
+  border-color: transparent;
+}
+
+.stampError {
+  background: var(--status-error-fg);
+  color: var(--palette-white);
+  border-color: transparent;
+}
+
+.stampBoosted {
+  background: var(--gradient-gold);
+  color: var(--color-gold-text);
+  border-color: color-mix(in srgb, var(--color-gold-text) 24%, transparent);
+}
+
+/* Secondary (right-slot) badges — solid glass with a toned label */
+.stampOutline {
+  background: color-mix(in srgb, var(--palette-ink) 52%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 42%, transparent);
+}
+
+.toneSuccess { color: var(--tone-success); }
+.toneMatch   { color: var(--palette-ice); }
+.toneWarning { color: var(--tone-warning); }
+.toneMuted   { color: color-mix(in srgb, var(--palette-white) 82%, transparent); }
+.toneError   { color: var(--tone-error); }
+
+/* Boosted secondary badge — gold, sits under the category badge when a match
+   score has taken the center slot (founder badge rule). */
+.stampBoostedSecondary {
+  background: var(--gradient-gold);
+  color: var(--color-gold-text);
+  border: 1px solid color-mix(in srgb, var(--color-gold-text) 22%, transparent);
+}
+
+/* Little "— label —" rule marks inside decorated stamps / skip button */
+.stampRule {
+  display: inline-block;
+  width: var(--space-12);
+  height: 1px;
+  background: currentColor;
+  opacity: 0.4;
+}
+
+/* ── HERO BAR (fill signal only; match now uses the centered pill) ────────── */
+
+.heroBar {
+  position: absolute;
+  top: var(--space-16);
+  left: calc(var(--dc-host-size, 60px) + var(--space-24));
+  right: calc(var(--space-80) + var(--space-12));
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.heroBarTrack {
+  width: 100%;
+  height: var(--space-8);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--palette-white) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--palette-white) 30%, transparent);
+  overflow: hidden;
+}
+
+.heroBarFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  width: var(--dc-bar-pct, 0%);
+}
+
+.heroBarFillMatch {
+  background: var(--gradient-action);
+}
+
+.heroBarFillQuantity {
+  background: var(--gradient-progress);
+}
+
+.heroBarLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-10);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  line-height: var(--type-caption-lh);
+  white-space: nowrap;
+  color: var(--palette-white);
+  background: color-mix(in srgb, var(--palette-ink) 44%, transparent);
+  border: 1px solid color-mix(in srgb, var(--palette-white) 32%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.heroBarLabelPaper {
+  color: var(--palette-white);
+}
+
+/* ── PREVIOUSLY-SKIPPED MARKER (bottom-left over the photo) ────────────────── */
+/* Subtle, non-intrusive: demoted-but-visible signal. Frosted ice like the other
+   overlay chips but quieter (muted label, no accent), works over any photo and
+   in dark mode since it's a self-contained glass chip on the scrimmed hero. */
+.skippedMarker {
+  position: absolute;
+  left: var(--space-12);
+  bottom: var(--space-12);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: calc(100% - var(--space-80));
+  padding: var(--space-3) var(--space-8);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  line-height: var(--type-label-lh);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--palette-white) 82%, transparent);
+  background: color-mix(in srgb, var(--palette-ink) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--palette-white) 26%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.skippedMarker :global(svg) {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+/* ── REPORT FLAG (bottom-right over the photo) ────────────────────────────── */
+
+.reportBtn {
+  position: absolute;
+  right: var(--space-12);
+  bottom: var(--space-12);
+  z-index: 3;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--palette-ink) 42%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in srgb, var(--palette-white) 34%, transparent);
+  box-shadow: var(--elevation-pin);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  color: var(--palette-white);
+}
+
+.reportBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* ── BODY (boxed near-equal info rows) ────────────────────────────────────── */
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dc-gap, var(--space-8));
+  padding: var(--dc-padding, var(--space-12));
+}
+
+/* Every field sits in its own chrome box — clean definition, near-equal. The
+   icon+text group is CENTERED (founder direction 2026-07-14): the icon stays
+   immediately left of the text, and the whole group is centered in the box. */
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+  text-align: center;
+  color: var(--text-primary);
+}
+
+button.metaRow {
+  cursor: pointer;
+  font: inherit;
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+button.metaRow:hover {
+  border-color: color-mix(in srgb, var(--color-cta) 45%, var(--border-soft));
+}
+
+button.metaRow:active {
+  transform: scale(0.99);
+}
+
+button.metaRow:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* 2. HOST NAME */
+.hostRow {
+  min-height: 40px;
+}
+
+.hostName {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+/* 3. JOB TITLE — the dominant field, but still a boxed row */
+.titleRow {
+  gap: var(--space-8);
+  color: var(--text-primary);
+  background: var(--gradient-sky-soft);
+  border-color: color-mix(in srgb, var(--color-cta) 22%, var(--border-soft));
+}
+
+.titleRow > :global(svg),
+.titleRow :global(svg) {
+  color: var(--color-cta);
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+}
+
+@container (max-width: 300px) {
+  .title {
+    font-size: var(--type-body-size);
+    line-height: 1.2;
+  }
+}
+
+/* 4. LOCATION */
+.locationRow {
+  color: var(--text-primary);
+}
+
+.locationRow :global(svg) {
+  color: var(--color-cta);
+  flex-shrink: 0;
+}
+
+.location {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+/* 5. BEGINS | ENDS — two near-equal boxes on one row */
+.datesRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+}
+
+.dateCell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+}
+
+.dateLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dateValue {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+/* Fallback single opportunity-window row */
+.windowRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: var(--space-8) var(--space-12);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+  color: var(--text-secondary);
+}
+
+/* ── SKILLS (host_applicant_review) ───────────────────────────────────────── */
+
+.skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.skill {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-cta);
+  background: var(--palette-sky-light);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 30%, transparent);
+  border-radius: var(--radius-pill);
+  padding: var(--space-4) var(--space-10);
+  line-height: var(--type-meta-lh);
+}
+
+/* ── HOUSING · MEALS · PAY — the card's dominant module, one row ───────────── */
+
 .triad {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--dc-gap, var(--space-8));
+  gap: var(--space-8);
 }
 
 .benefit {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 5px;
-  min-height: 72px;
-  padding: 9px 6px 10px;
+  justify-content: center;
+  gap: 1px;
+  min-height: 44px;
+  padding: var(--space-6) var(--space-4);
   border-radius: var(--radius-input);
   border: 1.5px solid var(--palette-line);
   background: var(--palette-surface);
-  color: var(--palette-ink);
+  color: var(--text-primary);
   text-align: center;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
 }
+
+/* Housing/Meals — label only, on a COLOR-CODED cell (no icon, no check). */
+.benefitLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.1;
+}
+.benefitProvided .benefitLabel { color: var(--status-success-fg); }
+.benefitNot .benefitLabel { color: var(--status-error-fg); }
 
 button.benefit {
   width: 100%;
@@ -92,6 +704,7 @@ button.benefit {
 }
 button.benefit:hover {
   transform: translateY(-1px);
+  box-shadow: var(--elevation-card);
 }
 button.benefit:focus-visible {
   outline: none;
@@ -99,23 +712,57 @@ button.benefit:focus-visible {
 }
 
 .benefitProvided {
-  border-color: color-mix(in srgb, var(--status-success-fg) 48%, var(--palette-line));
-  background: color-mix(in srgb, var(--status-success-bg) 55%, var(--palette-surface));
+  border-color: color-mix(in srgb, var(--status-success-fg) 55%, var(--palette-line));
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--status-success-bg) 80%, var(--palette-surface)) 0%,
+    var(--palette-surface) 100%);
 }
 .benefitNot {
-  border-color: color-mix(in srgb, var(--status-error-fg) 44%, var(--palette-line));
-  background: color-mix(in srgb, var(--status-error-bg) 52%, var(--palette-surface));
+  border-color: color-mix(in srgb, var(--status-error-fg) 50%, var(--palette-line));
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--status-error-bg) 75%, var(--palette-surface)) 0%,
+    var(--palette-surface) 100%);
 }
 .benefitPay {
-  border-color: color-mix(in srgb, var(--palette-amber) 60%, var(--palette-line));
-  background: color-mix(in srgb, var(--palette-amber) 16%, var(--palette-surface));
+  border-color: color-mix(in srgb, var(--palette-sky) 42%, var(--palette-line));
+  background: linear-gradient(160deg,
+    color-mix(in srgb, var(--palette-sky-light) 85%, var(--palette-surface)) 0%,
+    var(--palette-surface) 100%);
 }
+
+/* Sourced disclosure band — first row of the body on a sourced listing.
+   Full-width, honest, unmissable; a neutral info tone (never a verified/gold
+   or alarm color). Tokens only. */
+.sourcedRibbon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-8);
+  border-radius: var(--radius-input);
+  border: 1px solid color-mix(in srgb, var(--palette-sky) 32%, var(--palette-line));
+  background: color-mix(in srgb, var(--palette-sky-light) 55%, var(--palette-surface));
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+}
+.sourcedRibbon svg { color: var(--palette-sky); flex-shrink: 0; }
+
+/* Not stated (sourced listings) — NEUTRAL, never the red "not included" tone.
+   Absence of information is not evidence the benefit is unavailable. */
+.benefitNotStated {
+  border-color: var(--palette-line);
+  background: var(--palette-surface);
+}
+.benefitNotStated .benefitLabel { color: var(--text-secondary); }
+.benefitNotStated .benefitHead { color: var(--palette-ink-muted); }
 
 .benefitHead {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -125,7 +772,7 @@ button.benefit:focus-visible {
 }
 .benefitProvided .benefitHead { color: var(--status-success-fg); }
 .benefitNot .benefitHead { color: var(--status-error-fg); }
-.benefitPay .benefitHead { color: color-mix(in srgb, var(--palette-amber) 55%, var(--palette-ink)); }
+.benefitPay .benefitHead { color: var(--palette-pay-fg); }
 
 .benefitState {
   display: inline-flex;
@@ -138,7 +785,7 @@ button.benefit:focus-visible {
   font-size: clamp(11px, 2.7vw, 13px);
   font-weight: 700;
   line-height: 1.12;
-  color: var(--palette-ink);
+  color: var(--text-primary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -147,5 +794,219 @@ button.benefit:focus-visible {
 }
 .benefitPayValue {
   font-size: clamp(13px, 3.4vw, 16px);
-  color: color-mix(in srgb, var(--palette-amber) 42%, var(--palette-ink));
+  color: var(--palette-pay-fg);
+}
+
+/* ── 7. CTA — gradient action bar; Skip · Apply · Save split ───────────────── */
+
+.cta {
+  width: 100%;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  background: var(--gradient-action);
+  color: var(--color-cta-text);
+  border: none;
+  border-radius: var(--radius-button);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--palette-teal) 32%, transparent);
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
+}
+
+.cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: var(--gradient-action-hover);
+}
+
+.cta:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.cta:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+/* Passive / resolved states — quiet chrome outline, no gradient */
+.ctaPassive {
+  background: var(--color-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+  box-shadow: none;
+}
+
+/* Seeker decision bar — Skip · Apply · Save, always 20 / 60 / 20 */
+.ctaRow {
+  display: grid;
+  grid-template-columns: 1fr 3fr 1fr;
+  gap: var(--space-8);
+}
+
+.ctaBtn {
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-10) var(--space-8);
+  border-radius: var(--radius-button);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.ctaBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.ctaBtn:active {
+  transform: scale(0.97);
+}
+
+.ctaSkip {
+  background: var(--color-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+}
+.ctaSkip:hover {
+  border-color: color-mix(in srgb, var(--status-error-fg) 45%, var(--border-soft));
+  color: var(--status-error-fg);
+}
+
+.ctaApply {
+  background: var(--gradient-action);
+  color: var(--color-cta-text);
+  border: none;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--palette-teal) 32%, transparent);
+}
+.ctaApply:hover {
+  transform: translateY(-1px);
+  background: var(--gradient-action-hover);
+}
+
+.ctaSave {
+  background: var(--color-surface);
+  color: var(--color-cta);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 35%, var(--border-soft));
+}
+.ctaSave:hover {
+  background: var(--palette-sky-light);
+}
+
+/* ── ACTION STRIPS (admin_review / host_applicant_review) ─────────────────── */
+
+.actionStrip {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-8);
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  padding: var(--space-10) var(--space-6);
+  border-radius: var(--radius-button);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
+}
+
+.actionBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.actionBtn:active {
+  transform: scale(0.97);
+}
+
+.actionApprove {
+  background: var(--gradient-state-ready);
+  color: var(--palette-white);
+  border: none;
+}
+
+.actionWarn {
+  background: var(--color-surface);
+  color: var(--status-warning-fg);
+  border: 1px solid color-mix(in srgb, var(--status-warning-fg) 45%, var(--border-soft));
+}
+
+.actionRemove {
+  background: var(--color-surface);
+  color: var(--status-error-fg);
+  border: 1px solid color-mix(in srgb, var(--status-error-fg) 45%, var(--border-soft));
+}
+
+.actionSkip {
+  background: var(--color-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+}
+
+.actionSave {
+  background: var(--color-surface);
+  color: var(--color-cta);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 35%, var(--border-soft));
+}
+
+.actionSchedule {
+  background: var(--gradient-action);
+  color: var(--color-cta-text);
+  border: none;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--palette-teal) 30%, transparent);
+}
+
+/* ── Reduced motion — hard gate ───────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .benefit,
+  .cta,
+  .ctaBtn,
+  .actionBtn,
+  button.metaRow {
+    transition: none;
+  }
+  .card:hover,
+  button.benefit:hover,
+  .cta:hover:not(:disabled),
+  .cta:active:not(:disabled),
+  .ctaBtn:active,
+  .ctaApply:hover,
+  .actionBtn:active,
+  button.metaRow:active {
+    transform: none;
+  }
 }

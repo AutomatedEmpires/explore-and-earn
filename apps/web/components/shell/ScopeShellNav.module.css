@@ -1,0 +1,442 @@
+/*
+ * ScopeShellNav — desktop left rail + mobile hamburger drawer.
+ * Tokens only (Glacier). Borders-first, safe-area aware, reduced-motion safe.
+ */
+
+/* ─── Desktop rail (≥1024px) ──────────────────────────────────────────────
+   Hidden by default (mobile-first); revealed as a fixed left rail at --bp-lg.
+   Consuming shells offset content by 240px (see SCOPE_RAIL_WIDTH).            */
+.rail {
+	display: none;
+}
+
+@media (min-width: 1024px) {
+	.rail {
+		position: fixed;
+		inset-block: 0;
+		inset-inline-start: 0;
+		z-index: var(--z-dock);
+		width: 240px;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-8);
+		padding: var(--space-20) var(--space-12) var(--space-16);
+		background: var(--color-surface);
+		/* Ink hairline on the right edge only. */
+		border-inline-end: 1px solid var(--border-ink);
+		/* Clip; the nav list scrolls inside its own box (see .railNav) so a long
+		   rail never overflows onto the pinned footer. */
+		overflow: hidden;
+	}
+
+	.hamburger {
+		display: none;
+	}
+}
+
+/* ─── Scope head (brand + label) ─────────────────────────────────────────── */
+.head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding: var(--space-4) var(--space-8);
+}
+
+.brand {
+	display: flex;
+	align-items: center;
+	min-height: 28px;
+	color: var(--text-primary);
+}
+
+.scopeLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+/* ─── Nav lists ──────────────────────────────────────────────────────────── */
+.railNav,
+.drawerNav {
+	flex: 1 1 auto;
+	min-height: 0;
+	/* Scroll the list INSIDE its own box so a long nav never overflows onto the
+	   pinned footer (this was the cause of the crushed / overlapping drawer). */
+	overflow-y: auto;
+	scrollbar-width: thin;
+	scrollbar-color: color-mix(in srgb, var(--text-secondary) 28%, transparent) transparent;
+}
+
+.navList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.navItem {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: var(--space-12);
+	min-height: 44px;
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-card);
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+	transition:
+		background var(--motion-base) var(--ease-standard),
+		color var(--motion-fast) var(--ease-standard);
+}
+
+.navItem:hover {
+	background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+	color: var(--text-primary);
+}
+
+.navItem:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* Active lane — --color-cta tint + a solid left accent bar. */
+.navItem[data-active="true"] {
+	background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+	color: var(--color-cta);
+}
+
+.navItem[data-active="true"]::before {
+	content: "";
+	position: absolute;
+	inset-inline-start: 0;
+	inset-block: var(--space-8);
+	width: 3px;
+	border-radius: var(--radius-pill);
+	background: var(--color-cta);
+}
+
+.navIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 24px;
+	height: 24px;
+}
+
+.navLabel {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.badge {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 var(--space-6);
+	border-radius: var(--radius-pill);
+	background: var(--gradient-action);
+	color: var(--color-cta-text);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: 1;
+	font-weight: var(--font-weight-semibold);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ─── Footer (pinned): footer nav + user row ─────────────────────────────── */
+.foot {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding-top: var(--space-8);
+	border-top: 1px solid color-mix(in srgb, var(--border-ink) 40%, transparent);
+}
+
+.footNav .navList {
+	gap: var(--space-2);
+}
+
+.userRow {
+	display: flex;
+	align-items: center;
+	gap: var(--space-12);
+	min-height: 44px;
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-card);
+	color: var(--text-primary);
+	text-decoration: none;
+	transition: background var(--motion-base) var(--ease-standard);
+}
+
+a.userRow:hover {
+	background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+}
+
+a.userRow:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+.userAvatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 36px;
+	height: 36px;
+	border-radius: var(--radius-pill);
+	overflow: hidden;
+	background: var(--color-action-soft);
+	color: var(--color-cta);
+}
+
+.userMeta {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.userName {
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: 1.2;
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.userScope {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	color: var(--text-secondary);
+}
+
+/* ─── Mobile hamburger (<1024px) ─────────────────────────────────────────── */
+.hamburger {
+	position: fixed;
+	inset-block-start: max(var(--scope-nav-top, var(--space-12)), env(safe-area-inset-top));
+	inset-inline-start: max(var(--space-12), env(safe-area-inset-left));
+	z-index: var(--z-banner);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* border-box so the 1px border is INSIDE the declared 44px. Without it the
+	   button rendered 46px (content-box + border) and overhung the exact 44px
+	   gutter every scope shell reserves (padding-inline-start: calc(44px + …)),
+	   reading as off-center against the top bar. The bar glyph is flex-centered
+	   so it stays dead-center in the circle either way. */
+	box-sizing: border-box;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		background var(--motion-base) var(--ease-standard);
+}
+
+.hamburger:hover {
+	background: color-mix(in srgb, var(--color-cta) 8%, var(--color-surface-raised));
+}
+
+.hamburger:active {
+	transform: scale(0.94);
+}
+
+.hamburger:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* CSS-bar hamburger affordance (not an icon — registry has no menu glyph). */
+.hamburgerBars {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 4px;
+	width: 18px;
+}
+
+.hamburgerBars > span {
+	display: block;
+	height: 2px;
+	width: 100%;
+	border-radius: var(--radius-pill);
+	background: currentColor;
+}
+
+/* ─── Drawer scrim + panel ───────────────────────────────────────────────── */
+.scrim {
+	position: fixed;
+	inset: 0;
+	z-index: var(--z-overlay);
+	display: flex;
+	/* Centered in the viewport — founder canon: menus + popups center in the
+	   device screen, never hang off the left edge. */
+	align-items: center;
+	justify-content: center;
+	padding: var(--space-20);
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--color-ink) 60%, transparent), color-mix(in srgb, var(--color-ink) 50%, transparent));
+	backdrop-filter: blur(8px);
+	animation: scrimIn var(--motion-base) var(--ease-standard) both;
+}
+
+.scrim.closing {
+	animation: scrimOut var(--motion-base) var(--ease-standard) both;
+	pointer-events: none;
+}
+
+.drawer {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	width: min(92vw, 380px);
+	max-height: min(86vh, 40rem);
+	padding: var(--space-16) var(--space-12);
+	background: var(--color-surface);
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-modal);
+	box-shadow: var(--elevation-overlay);
+	/* Clip; the nav list scrolls internally (see .drawerNav) so the head + footer
+	   stay pinned and the items never crush together. */
+	overflow: hidden;
+	animation: drawerIn var(--motion-drawer) var(--ease-standard) both;
+}
+
+.drawer.closing {
+	animation: drawerOut var(--motion-drawer) var(--ease-standard) both;
+}
+
+.drawerHead {
+	flex: none;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-8);
+}
+
+.close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 1px solid color-mix(in srgb, var(--border-ink) 72%, transparent);
+	border-radius: var(--radius-pill);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	cursor: pointer;
+	transition:
+		transform var(--motion-fast) var(--ease-standard),
+		background var(--motion-base) var(--ease-standard);
+}
+
+.close:hover {
+	background: color-mix(in srgb, var(--color-cta) 8%, var(--color-surface-raised));
+}
+
+.close:active {
+	transform: scale(0.94);
+}
+
+.close:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
+/* ─── Motion ─────────────────────────────────────────────────────────────── */
+@keyframes drawerIn {
+	from {
+		opacity: 0;
+		transform: scale(0.96) translateY(8px);
+	}
+
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes drawerOut {
+	from {
+		opacity: 1;
+		transform: none;
+	}
+
+	to {
+		opacity: 0;
+		transform: scale(0.96) translateY(8px);
+	}
+}
+
+@keyframes scrimIn {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+@keyframes scrimOut {
+	from {
+		opacity: 1;
+	}
+
+	to {
+		opacity: 0;
+	}
+}
+
+/* Reduced motion: opacity-only, transform-free. Declared last so it wins. */
+@media (prefers-reduced-motion: reduce) {
+	.scrim,
+	.scrim.closing,
+	.drawer,
+	.drawer.closing {
+		animation-name: scrimIn;
+		animation-duration: var(--motion-fast);
+	}
+
+	.scrim.closing,
+	.drawer.closing {
+		animation-name: scrimOut;
+	}
+
+	.navItem,
+	.userRow,
+	.hamburger,
+	.close {
+		transition: none;
+	}
+}

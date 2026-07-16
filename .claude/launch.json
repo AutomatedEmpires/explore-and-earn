@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "explore-and-earn-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "apps/web", "exec", "next", "dev", "-p", "3100"],
+      "port": 3100,
+      "autoPort": false
+    }
+  ]
+}

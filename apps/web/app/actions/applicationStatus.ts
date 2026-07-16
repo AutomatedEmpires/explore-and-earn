@@ -2,17 +2,15 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import {
-  getApplicationSeekerContact,
-  getNotificationPrefs,
+  recordEvent,
   updateApplicationStatus,
   type HostSettableStatus,
 } from "@explore-and-earn/db";
 
-import { getClerkContact } from "../../lib/clerkUser";
-import { absoluteUrl, sendEmail } from "../../lib/email";
-import { applicationStatusEmail } from "../../lib/emails";
+import { triggerDispatch } from "../../services/notifications/dispatcher";
 import { reportError } from "../../lib/sentry";
 
 export interface StatusActionResult {
@@ -27,18 +25,6 @@ async function currentUserId(): Promise<string | undefined> {
     return undefined;
   }
 }
-
-/**
- * Human-readable status labels shown to the seeker in the notification email.
- * Source of truth is the build brief's explicit status map.
- */
-const STATUS_LABELS: Record<HostSettableStatus, string> = {
-  reviewing: "Under Review",
-  saved_by_host: "Host Saved Your Profile",
-  offered: "You Got an Offer! \uD83C\uDF89",
-  not_selected: "Application Update",
-  accepted: "Congratulations — You\u2019re In!",
-};
 
 /**
  * Host server action: change an application's status. Auth is verified here
@@ -68,42 +54,20 @@ async function updateApplicationStatusActionImpl(
   );
 
   if (result.ok) {
-    // Best-effort: email the seeker about the status change, unless they have
-    // opted out of status-change emails. Never block the status update.
-    try {
-      const contact = await getApplicationSeekerContact(token, applicationId);
-      if (contact?.seekerClerkUserId) {
-        // Cross-user prefs read: host's token, seeker's userId. May fail under RLS.
-        // Degrade silently — never block the status update or email.
-        let prefs = null;
-        try {
-          prefs = await getNotificationPrefs(token, contact.seekerClerkUserId);
-        } catch {
-          // Cross-user read failed; skip notification prefs check.
-        }
-        if (prefs === null || prefs.emailOnStatusChange) {
-          const seeker = await getClerkContact(contact.seekerClerkUserId);
-          if (seeker.email) {
-            const statusLabel = STATUS_LABELS[newStatus];
-            const listingTitle = contact.listingTitle || "your opportunity";
-            await sendEmail({
-              to: seeker.email,
-              subject: `Your application to ${listingTitle} \u2014 ${statusLabel}`,
-              html: applicationStatusEmail({
-                listingTitle,
-                newStatus,
-                statusLabel,
-                dashboardUrl: absoluteUrl("/applied"),
-              }),
-              template: "applicationStatus",
-              idempotencyKey: `applicationStatus:${applicationId}:${newStatus}`,
-            });
-          }
-        }
-      }
-    } catch (e) {
-      console.error("[email] status notification failed:", e);
-    }
+    // Persist the real status-change event; the notification engine derives
+    // the seeker's notification from it (localized, preference-/quiet-hours-/
+    // unsubscribe-aware, deduped per event) — this replaces the previous
+    // inline email, and the seeker's legacy email_on_status_change opt-out
+    // keeps holding via the engine's legacy-boolean overlay.
+    await recordEvent({
+      eventType: "application_status_changed",
+      actorScope: "host",
+      subjectType: "application",
+      subjectId: applicationId,
+      sourceSurface: "host_status_action",
+      properties: { status: newStatus },
+    });
+    after(triggerDispatch);
 
     revalidatePath("/host/applicants");
     revalidatePath(`/host/applicants/${applicationId}`);

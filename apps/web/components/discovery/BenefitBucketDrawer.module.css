@@ -46,7 +46,88 @@
 .summaryCard {
 	display: flex;
 	flex-direction: column;
+	gap: var(--space-10);
+}
+
+.summaryHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	gap: var(--space-8);
+}
+
+/* Descriptor — the card's Housing/Meals cell now shows color only, so the
+   host summary (e.g. "Shared bunkhouse") is the prominent lead here. */
+.descriptorLead {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: clamp(1.1rem, 3.4vw, 1.32rem);
+	line-height: 1.28;
+	letter-spacing: -0.005em;
+	color: var(--text-primary);
+}
+
+.descriptorMuted {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-muted);
+}
+
+/* Quiet, muted verify caption — icon + text, consistent across popups. */
+.verifyNote {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-muted);
+}
+
+/* Honest empty photo slots — never a fabricated photo. */
+.slotGrid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: var(--space-8);
+}
+
+.slot {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--space-6);
+}
+
+.slotArea {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	aspect-ratio: 1 / 1;
+	border-radius: var(--radius-cell);
+	border: 1px dashed color-mix(in srgb, var(--border-ink) 26%, transparent);
+	background: color-mix(in srgb, var(--color-surface-raised) 90%, var(--color-surface));
+	color: color-mix(in srgb, var(--text-muted) 72%, transparent);
+}
+
+.slotLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+	text-align: center;
+}
+
+@media (max-width: 479px) {
+	.slotGrid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
 }
 
 .factGrid {
@@ -85,6 +166,9 @@
 }
 
 .summaryLabel {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
 	font-family: var(--font-ui);
 	font-size: var(--type-label-size);
 	line-height: var(--type-label-lh);
@@ -111,36 +195,6 @@
 	color: var(--text-secondary);
 }
 
-.benefit {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-4);
-	padding: var(--space-12);
-	background: color-mix(in srgb, var(--color-surface-raised) 92%, var(--color-surface));
-	border: 1px solid color-mix(in srgb, var(--border-ink) 18%, transparent);
-	border-radius: var(--radius-cell);
-}
-
-.benefitHead {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: var(--space-8);
-}
-
-.benefitLabel {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-4);
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	line-height: var(--type-label-lh);
-	font-weight: var(--font-weight-semibold);
-	letter-spacing: var(--type-label-tracking);
-	text-transform: uppercase;
-	color: var(--text-secondary);
-}
-
 .benefitProvision {
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
@@ -148,73 +202,12 @@
 	color: var(--text-secondary);
 }
 
-.benefitValue {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
-	line-height: var(--type-body-lh);
-	color: var(--text-primary);
-}
-
-.empty {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	text-align: center;
-	gap: var(--space-6);
-	padding: var(--space-12);
-	background: color-mix(in srgb, var(--color-surface-raised) 92%, var(--color-surface));
-	border: 1px dashed color-mix(in srgb, var(--border-ink) 22%, transparent);
-	border-radius: var(--radius-cell);
-}
-
-.emptyKicker {
-	font-family: var(--font-ui);
-	font-size: var(--type-label-size);
-	line-height: var(--type-label-lh);
-	font-weight: var(--font-weight-semibold);
-	letter-spacing: var(--type-label-tracking);
-	text-transform: uppercase;
-	color: var(--text-secondary);
-}
-
-.emptyIcon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--text-secondary);
-}
-
-.emptyTitle {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
-	line-height: var(--type-body-lh);
-	font-weight: var(--font-weight-semibold);
-	color: var(--text-primary);
-}
-
-.emptyBody {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-meta-size);
-	line-height: var(--type-meta-lh);
-	color: var(--text-secondary);
-}
-
-.noteCard {
-	padding: var(--space-14);
-	border: 1px solid color-mix(in srgb, var(--border-ink) 16%, transparent);
-	border-radius: var(--radius-cell);
-	background: color-mix(in srgb, var(--color-surface-raised) 84%, white 16%);
-}
-
 .noteText {
 	margin: 0;
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	line-height: var(--type-meta-lh);
-	color: var(--text-primary);
+	color: var(--text-secondary);
 }
 
 .footer {

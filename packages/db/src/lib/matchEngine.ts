@@ -40,6 +40,15 @@ export interface MatchListingInput {
   readonly locationDisplay?: string | null
   readonly housingIncluded: boolean
   readonly mealsIncluded?: boolean | null
+  /**
+   * Per-benefit evidence (sourced listings). When 'not_stated', the value
+   * columns are meaningless: the engine treats the benefit as UNKNOWN — it
+   * never scores it as provided (no dishonest positive) and never fires the
+   * "not included" honesty cap on it (we don't know it's absent). Omitted →
+   * host-confirmed listing, evaluated exactly as before.
+   */
+  readonly housingEvidence?: "not_stated" | "stated" | "confirmed" | null
+  readonly mealsEvidence?: "not_stated" | "stated" | "confirmed" | null
   readonly compensationMinCents: number | null
   readonly compensationMaxCents?: number | null
   readonly visaSupport?: boolean | null
@@ -255,10 +264,37 @@ function fitScore(pref: string | null | undefined, provided: boolean): number {
   }
 }
 
+/** Neutral "unknown" fit for a benefit the source didn't state. */
+const UNKNOWN_BENEFIT_FIT = 65
+
+/**
+ * Fit for one benefit. A not_stated benefit is UNKNOWN — never scored as
+ * provided (dishonest positive) and never as a hard not-provided penalty; a
+ * seeker who requires it isn't handed a false "met", and one who doesn't isn't
+ * penalized for missing data.
+ */
+function benefitFit(
+  pref: string | null | undefined,
+  included: boolean,
+  evidence: MatchListingInput["housingEvidence"],
+): number {
+  if (evidence === "not_stated") {
+    // "not_needed" is genuinely met regardless of the listing.
+    return pref === "not_needed" ? 100 : UNKNOWN_BENEFIT_FIT
+  }
+  return fitScore(pref, included)
+}
+
 function housingMealsFit(seeker: MatchSeekerInput, listing: MatchListingInput): number {
-  const h = fitScore(seeker.housingPreference, listing.housingIncluded === true)
-  if (seeker.mealsPreference == null && listing.mealsIncluded == null) return h
-  const m = fitScore(seeker.mealsPreference, listing.mealsIncluded === true)
+  const h = benefitFit(seeker.housingPreference, listing.housingIncluded === true, listing.housingEvidence)
+  if (
+    seeker.mealsPreference == null &&
+    listing.mealsIncluded == null &&
+    listing.mealsEvidence !== "not_stated"
+  ) {
+    return h
+  }
+  const m = benefitFit(seeker.mealsPreference, listing.mealsIncluded === true, listing.mealsEvidence)
   return Math.round(h * 0.7 + m * 0.3)
 }
 
@@ -389,7 +425,15 @@ export function computeMatch(
   if (availability.impossibleConflict) {
     capsApplied.push("impossibleTimelineConflict")
   }
-  if (seeker.housingPreference === "required" && listing.housingIncluded !== true) {
+  // The "housing required but not included" cap fires ONLY when housing is
+  // affirmatively absent. A not_stated (sourced) housing benefit is UNKNOWN —
+  // capping it would assert "not included", a fact we don't have. The unknown
+  // benefit already scores neutral (never a false positive) via benefitFit.
+  if (
+    seeker.housingPreference === "required" &&
+    listing.housingIncluded !== true &&
+    listing.housingEvidence !== "not_stated"
+  ) {
     capsApplied.push("housingRequiredButNotIncluded")
   }
   if (seeker.visaSupportNeeded === true && listing.visaSupport !== true) {

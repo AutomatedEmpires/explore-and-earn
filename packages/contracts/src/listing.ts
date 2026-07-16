@@ -19,6 +19,7 @@ import type { DiscoveryCardConditionalBadge } from "./card";
 import type { OpportunityCategory } from "./categories";
 import type { CompensationUnit, ListingStatus } from "./enums";
 import type { ImageSelection } from "./media";
+import type { ListingProvenanceInfo } from "./provenance";
 
 /** Host summary embedded in an OpportunityListing. */
 export interface ListingHost {
@@ -32,6 +33,13 @@ export interface ListingHost {
   readonly verified: boolean;
   /** Short employer tagline for the featured-employer rail (1–2 punchy sentences). */
   readonly tagline?: string;
+  /**
+   * Host subscription tier — powers monetization ranking ("pay more, show more":
+   * Enterprise > Professional > Starter, below Boosted and strong Match). Derived
+   * from the host's active subscription; never self-declared. Omitted/"none" for
+   * free or unknown hosts (ranks last, never hidden). See apps/web/lib/ranking.ts.
+   */
+  readonly tier?: "enterprise" | "professional" | "starter" | "none";
 }
 
 /**
@@ -101,4 +109,14 @@ export interface OpportunityListing {
   /** Whether the host offers visa/work-permit support. */
   readonly visaSupport?: boolean;
   readonly coordinates?: ListingCoordinates;
+  /**
+   * Provenance block (contracts/provenance.ts). OPTIONAL + additive: absent
+   * means a legacy verified listing (all pre-provenance behavior unchanged).
+   * When `provenance === 'sourced'` the listing is real-but-unconfirmed
+   * inventory: surfaces MUST render the sourced disclosure + source
+   * attribution, must NOT render a host profile / reviews / verified badge,
+   * and must render `not_stated` benefits as missing information — never as
+   * "not provided".
+   */
+  readonly provenanceInfo?: ListingProvenanceInfo;
 }

@@ -1,0 +1,280 @@
+/* Card + Popup Catalog — dev-only gallery chrome (Glacier tokens).
+   Review tooling; never bundled in production. */
+
+.page {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: var(--space-32) var(--space-20) var(--space-80);
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+  background: var(--color-paper);
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+
+.head {
+  margin-bottom: var(--space-24);
+}
+
+.kicker {
+  margin: 0 0 var(--space-4);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  color: var(--color-teal);
+}
+
+.title {
+  margin: 0 0 var(--space-8);
+  font-size: 30px;
+  font-weight: var(--font-weight-bold);
+}
+
+.lede {
+  margin: 0 0 var(--space-12);
+  max-width: 64ch;
+  color: var(--text-secondary);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-teal);
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+/* ── Size selector ── */
+
+.sizeBar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  margin-bottom: var(--space-24);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.sizeBarLabel {
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sizeButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.size,
+.sizeActive {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 44px;
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.size:hover {
+  border-color: var(--color-teal);
+}
+
+.sizeActive {
+  background: var(--gradient-action);
+  border-color: transparent;
+  color: var(--palette-white);
+}
+
+.sizePx {
+  font-size: 11px;
+  font-weight: var(--font-weight-regular);
+  opacity: 0.75;
+}
+
+/* ── Stage + device frame ── */
+
+.stage {
+  overflow-x: auto;
+  padding-bottom: var(--space-16);
+}
+
+.frame {
+  max-width: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-modal);
+  background: var(--color-surface);
+  overflow: hidden;
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--color-teal) 12%, transparent);
+}
+
+.frameBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-10) var(--space-16);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--color-surface-raised);
+}
+
+.frameDot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--border-soft);
+}
+
+.frameWidth {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.frameBody {
+  padding: var(--space-20) var(--space-16) var(--space-32);
+}
+
+/* ── Sections ── */
+
+.section {
+  margin-top: var(--space-32);
+}
+
+.section:first-child {
+  margin-top: 0;
+}
+
+.sectionHead {
+  margin-bottom: var(--space-16);
+  padding-bottom: var(--space-8);
+  border-bottom: 2px solid var(--border-soft);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-4);
+  font-size: 18px;
+  font-weight: var(--font-weight-bold);
+}
+
+.sectionHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── Card deck ── */
+
+.deck {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: var(--space-24);
+  align-items: start;
+}
+
+.specimen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  margin: 0;
+}
+
+.caption {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* ── Popups ── */
+
+.popupGroup {
+  margin-top: var(--space-16);
+}
+
+.popupGroupTitle {
+  margin: 0 0 var(--space-8);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.popupButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.popupBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: 44px;
+  padding: var(--space-10) var(--space-16);
+  border-radius: var(--radius-button);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.popupBtn:hover {
+  border-color: var(--color-teal);
+  color: var(--color-teal);
+}
+
+.unavailableList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.unavailableItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-10) var(--space-12);
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+}
+
+.unavailableName {
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.unavailableNote {
+  font-size: 12px;
+  color: var(--text-muted);
+}

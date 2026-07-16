@@ -1,0 +1,96 @@
+/*
+ * ACCENT PALETTES — optional, user-selectable accent reskins.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * The Glacier design system in tokens.css is the LOCKED default. This file adds
+ * opt-in accent palettes on a SECOND axis (`data-palette` on <html>), orthogonal
+ * to the light/dark `data-theme` axis. Selecting one is purely cosmetic and never
+ * changes the default: with no `data-palette` (or "glacier"), tokens.css wins.
+ *
+ * HOW IT WORKS
+ * The entire primary accent — CTA, links, focus ring, the action gradient, the
+ * progress gradient, the header band, and the soft accent tints — derives from
+ * just two TIER-1 seeds: `--palette-sky` (primary) and `--palette-teal` (the
+ * gradient's second stop), plus their `-hover` variants. So each palette only
+ * overrides those four seeds for LIGHT, and re-brightens `--color-cta` for DARK
+ * (the dark theme sets --color-cta to a lightened accent directly, mirroring the
+ * Glacier base at tokens.css:456). Everything else cascades automatically.
+ *
+ * WHAT IS DELIBERATELY NOT TOUCHED
+ * The founder-locked CATEGORY triad (farm/maritime/remote/seasonal accents) and
+ * all SEMANTIC state colors (match/ready/soon/warning/…) are independent tokens
+ * and stay put — a palette only swaps the app's primary brand accent, so lane
+ * identity and status meaning never shift with the palette.
+ *
+ * CONTRAST
+ * Each light primary is chosen dark enough to serve BOTH as link text on the
+ * near-white surface (≥ ~4.5:1) and as a button ground under white --color-cta-
+ * text; each dark --color-cta is light enough on the dark surface. The gradient's
+ * teal end is decorative (the button ground is dominated by the darker start).
+ *
+ * ADD A PALETTE: add its light seed rule + the two dark --color-cta rules here,
+ * then add the id to PALETTES in components/seeker/PaletteControl.tsx.
+ */
+
+/* ── Sunset — deep coral → amber ─────────────────────────────────────────── */
+:root[data-palette="sunset"] {
+	--palette-sky: #C4461F;
+	--palette-sky-hover: #A93C1A;
+	--palette-teal: #E8843A;
+	--palette-teal-hover: #D6742E;
+}
+:root[data-theme="dark"][data-palette="sunset"] {
+	--color-cta: #F0925E;
+}
+@media (prefers-color-scheme: dark) {
+	:root[data-palette="sunset"]:not([data-theme="light"]) {
+		--color-cta: #F0925E;
+	}
+}
+
+/* ── Meadow — deep emerald → fresh green ─────────────────────────────────── */
+:root[data-palette="meadow"] {
+	--palette-sky: #15774A;
+	--palette-sky-hover: #10633D;
+	--palette-teal: #3E9E63;
+	--palette-teal-hover: #338A54;
+}
+:root[data-theme="dark"][data-palette="meadow"] {
+	--color-cta: #4CC98D;
+}
+@media (prefers-color-scheme: dark) {
+	:root[data-palette="meadow"]:not([data-theme="light"]) {
+		--color-cta: #4CC98D;
+	}
+}
+
+/* ── Orchid — deep violet → magenta ──────────────────────────────────────── */
+:root[data-palette="orchid"] {
+	--palette-sky: #7B3FC9;
+	--palette-sky-hover: #6833B0;
+	--palette-teal: #B84FA8;
+	--palette-teal-hover: #A43F95;
+}
+:root[data-theme="dark"][data-palette="orchid"] {
+	--color-cta: #BC93F0;
+}
+@media (prefers-color-scheme: dark) {
+	:root[data-palette="orchid"]:not([data-theme="light"]) {
+		--color-cta: #BC93F0;
+	}
+}
+
+/* ── Ember — deep crimson → orange ───────────────────────────────────────── */
+:root[data-palette="ember"] {
+	--palette-sky: #C62433;
+	--palette-sky-hover: #A91C2A;
+	--palette-teal: #E85E38;
+	--palette-teal-hover: #D44E2B;
+}
+:root[data-theme="dark"][data-palette="ember"] {
+	--color-cta: #F26A6F;
+}
+@media (prefers-color-scheme: dark) {
+	:root[data-palette="ember"]:not([data-theme="light"]) {
+		--color-cta: #F26A6F;
+	}
+}

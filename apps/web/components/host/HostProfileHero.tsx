@@ -2,12 +2,18 @@ import Image from "next/image";
 import type { PublicHostProfile } from "@explore-and-earn/db";
 import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
 
+import { HostCoverLogoPicker } from "./HostCoverLogoPicker";
 import styles from "./HostProfileHero.module.css";
 
 export interface HostProfileHeroProps {
   readonly host: PublicHostProfile;
   readonly coverPhotoUrl: string | null;
   readonly listingCount: number;
+  /**
+   * When true, the owner is viewing their own profile — show the cover/logo
+   * photo pickers. Defaults false so the public profile is unaffected.
+   */
+  readonly editable?: boolean;
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -40,6 +46,7 @@ export function HostProfileHero({
   host,
   coverPhotoUrl,
   listingCount,
+  editable = false,
 }: HostProfileHeroProps) {
   const verified = host.verified;
   const hasListings = listingCount > 0;
@@ -64,6 +71,15 @@ export function HostProfileHero({
           <div className={styles.coverFallback} />
         )}
         <div className={styles.coverScrim} />
+
+        {/* Owner-only cover + logo photo pickers (cover ≠ logo) */}
+        {editable ? (
+          <HostCoverLogoPicker
+            companyName={host.companyName}
+            coverUrl={coverPhotoUrl}
+            logoUrl={host.photoUrl}
+          />
+        ) : null}
       </div>
 
       {/* ── Identity row — overlaps cover ── */}
@@ -161,7 +177,7 @@ export function HostProfileHero({
         <div className={styles.ctaCol}>
           {hasListings ? (
             <a href="#listings" className={styles.ctaPrimary}>
-              View listings
+              See opportunities
               <Icon name="action.forward" size={16} aria-hidden />
             </a>
           ) : null}

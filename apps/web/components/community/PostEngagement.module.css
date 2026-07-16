@@ -20,7 +20,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-8);
+  min-height: 44px;
+  padding: var(--space-4) var(--space-10);
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-full);
   background: var(--color-surface);
@@ -48,9 +49,25 @@
   color: var(--color-cta);
 }
 
-.reactionEmoji {
-  font-size: 1em;
+/* Reaction glyph (Phosphor via the Icon registry). Inherits `currentColor`, so
+   the active tint (--color-cta, set on .reactionActive) flows into the icon. */
+.reactionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
+}
+
+/* Defined reaction name. Hidden on the tightest widths to keep the bar compact
+   (the emoji + accessible name carry it there); shown from 400px up. */
+.reactionLabel {
+  display: none;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+@media (min-width: 400px) {
+  .reactionLabel { display: inline; }
 }
 
 .reactionCount {
@@ -64,7 +81,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-8);
+  min-height: 44px;
+  padding: var(--space-4) var(--space-10);
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-full);
   background: var(--color-surface);
@@ -87,7 +105,9 @@
 }
 
 .commentsBtnIcon {
-  font-size: 0.9em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 

@@ -428,15 +428,6 @@
   gap: var(--space-8);
 }
 
-.diagState {
-  font-family: var(--font-ui);
-  font-size: 0.66rem;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-cta);
-}
-
 .improveBtn {
   display: inline-flex;
   align-items: center;

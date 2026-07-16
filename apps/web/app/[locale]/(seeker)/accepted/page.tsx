@@ -1,0 +1,207 @@
+import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
+import { DiscoveryCard, Icon } from "@explore-and-earn/ui";
+import {
+	getApplicationsForSeekerWithListings,
+	type SeekerApplicationListing,
+} from "@explore-and-earn/db";
+
+import { BucketPage, CardStatus } from "../../../../components/seeker";
+import {
+	CATEGORY_ICON,
+	EmptyState,
+	seekerApplicationListingToCardData,
+} from "../../../../components/discovery";
+import styles from "./accepted.module.css";
+
+export const metadata: Metadata = {
+	title: "Accepted",
+};
+
+// Per-seeker application data must never be statically cached.
+export const dynamic = "force-dynamic";
+
+/**
+ * Whole-day delta between now and a start date. Rounds on calendar-day
+ * boundaries so "starts in N days" never drifts by wall-clock hours.
+ * Returns null when the date is missing or unparseable — the hero then omits
+ * the countdown entirely rather than inventing one.
+ */
+function daysUntilStart(beginsAt: string | null): number | null {
+	if (!beginsAt) return null;
+	const start = new Date(beginsAt);
+	if (Number.isNaN(start.getTime())) return null;
+	const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+	const now = new Date();
+	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	return Math.round((startDay.getTime() - today.getTime()) / 86_400_000);
+}
+
+/** Honest, human countdown from a real start date (or null to omit). */
+function countdownLabel(days: number | null): string | null {
+	if (days === null) return null;
+	if (days < 0) return "Season underway";
+	if (days === 0) return "Starts today";
+	if (days === 1) return "Starts tomorrow";
+	return `Starts in ${days} days`;
+}
+
+function formatStartDate(beginsAt: string | null): string | null {
+	if (!beginsAt) return null;
+	const start = new Date(beginsAt);
+	if (Number.isNaN(start.getTime())) return null;
+	return start.toLocaleDateString("en-US", {
+		month: "long",
+		day: "numeric",
+		year: "numeric",
+	});
+}
+
+/**
+ * Celebratory "next departure" band for the soonest-starting confirmed role.
+ * Every value comes from real listing data; anything missing is simply omitted.
+ */
+function NextDepartureHero({ listing }: { readonly listing: SeekerApplicationListing }) {
+	const days = daysUntilStart(listing.beginsAt);
+	const countdown = countdownLabel(days);
+	const startDate = formatStartDate(listing.beginsAt);
+	const timeframe = startDate ?? listing.opportunityWindow;
+
+	const triad: { icon: "benefit.housing" | "benefit.meals" | "benefit.pay"; label: string }[] = [];
+	if (listing.benefits.housing.provision === "provided") {
+		triad.push({ icon: "benefit.housing", label: "Housing provided" });
+	}
+	if (listing.benefits.meals.provision === "provided") {
+		triad.push({ icon: "benefit.meals", label: "Meals provided" });
+	}
+	if (listing.benefits.pay.provision === "provided") {
+		triad.push({
+			icon: "benefit.pay",
+			label: listing.benefits.pay.summary ?? "Pay provided",
+		});
+	}
+
+	return (
+		<section className={styles.hero} aria-labelledby="next-departure-title">
+			<div className={styles.heroHeader}>
+				<span className={styles.heroEyebrow}>
+					<Icon name="status.accepted" size={16} aria-hidden />
+					Next departure
+				</span>
+				{countdown ? <span className={styles.heroCountdown}>{countdown}</span> : null}
+			</div>
+			<h2 id="next-departure-title" className={styles.heroTitle}>
+				{listing.title}
+			</h2>
+			<p className={styles.heroHost}>{listing.host.name}</p>
+			<div className={styles.heroFacts}>
+				<span className={styles.heroFact}>
+					<Icon name={CATEGORY_ICON[listing.category]} size={16} aria-hidden />
+					{listing.location}
+				</span>
+				<span className={styles.heroFact}>
+					<Icon name="status.begins" size={16} aria-hidden />
+					{timeframe}
+				</span>
+			</div>
+			{triad.length > 0 ? (
+				<ul className={styles.heroTriad}>
+					{triad.map((item) => (
+						<li key={item.icon} className={styles.triadChip}>
+							<Icon name={item.icon} size={16} aria-hidden />
+							{item.label}
+						</li>
+					))}
+				</ul>
+			) : null}
+		</section>
+	);
+}
+
+/** Pick the soonest-starting accepted role: nearest future start, else earliest known start, else first. */
+function pickNextDeparture(
+	listings: readonly SeekerApplicationListing[],
+): SeekerApplicationListing | null {
+	if (listings.length === 0) return null;
+	const dated = listings
+		.filter((l) => daysUntilStart(l.beginsAt) !== null)
+		.sort((a, b) => new Date(a.beginsAt as string).getTime() - new Date(b.beginsAt as string).getTime());
+	const upcoming = dated.filter((l) => (daysUntilStart(l.beginsAt) ?? -1) >= 0);
+	return upcoming[0] ?? dated[0] ?? listings[0];
+}
+
+export default async function AcceptedPage() {
+	const { userId, getToken } = await auth();
+	const token = userId ? await getToken() : null;
+
+	if (!userId || !token) {
+		return (
+			<BucketPage
+				title="Accepted"
+				description="Your confirmed roles and pre-arrival steps."
+			>
+				<EmptyState
+					title="Sign in to see your accepted roles"
+					message="Sign in to see your confirmed roles and pre-arrival steps."
+				/>
+			</BucketPage>
+		);
+	}
+
+	const applications = await getApplicationsForSeekerWithListings(token, userId).catch(() => []);
+	const accepted = applications.filter(
+		(app) => app.status === "accepted" && app.listing !== null,
+	);
+
+	const nextDeparture = pickNextDeparture(
+		accepted.map((app) => app.listing).filter((l): l is SeekerApplicationListing => l !== null),
+	);
+
+	return (
+		<BucketPage
+			title="Accepted"
+			description="Your confirmed roles and pre-arrival steps."
+		>
+			{accepted.length > 0 ? (
+				<>
+					{nextDeparture ? <NextDepartureHero listing={nextDeparture} /> : null}
+					<div className={styles.grid}>
+						{accepted.map((application) => {
+							const { listing } = application;
+							if (!listing) return null;
+							const appliedOn = application.submittedAt
+								? new Date(application.submittedAt).toLocaleDateString("en-US", {
+									month: "long",
+									day: "numeric",
+								})
+								: null;
+							return (
+								<DiscoveryCard
+									key={application.id}
+									data={seekerApplicationListingToCardData(listing)}
+									surface="applied"
+									cardState="accepted"
+									actions={
+										<CardStatus
+											icon="system.success"
+											label="Accepted"
+											detail={appliedOn ? `Applied ${appliedOn}` : undefined}
+										/>
+									}
+								/>
+							);
+						})}
+					</div>
+				</>
+			) : (
+				<EmptyState
+					illustration="empty.accepted"
+					title="No accepted roles yet"
+					message="When you accept an offer, your upcoming role will live here. Keep exploring opportunities under Seek."
+					actionLabel="Explore opportunities"
+					actionHref="/seek"
+				/>
+			)}
+		</BucketPage>
+	);
+}

@@ -20,12 +20,15 @@
 		"@explore-and-earn/db": "workspace:*",
 		"@explore-and-earn/mailer": "workspace:*",
 		"@explore-and-earn/ui": "workspace:*",
+		"@modelcontextprotocol/sdk": "1.26.0",
 		"@sentry/nextjs": "^10.63.0",
 		"@supabase/supabase-js": "^2.110.0",
 		"ai": "^7.0.14",
 		"import-in-the-middle": "^3.3.0",
 		"mapbox-gl": "^3.25.0",
+		"mcp-handler": "^1.1.0",
 		"next": "^15.5.20",
+		"next-intl": "^4.13.2",
 		"posthog-js": "^1.396.5",
 		"react": "^19.2.7",
 		"react-dom": "^19.2.7",
@@ -34,9 +37,11 @@
 		"sharp": "^0.34.5",
 		"stripe": "^22.2.0",
 		"svix": "^1.96.1",
+		"web-push": "^3.6.7",
 		"zod": "^4.4.3"
 	},
 	"devDependencies": {
+		"@types/web-push": "^3.6.4",
 		"vitest": "4.1.9"
 	}
 }

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title>Offline · Explore &amp; Earn</title>
+		<meta name="theme-color" media="(prefers-color-scheme: light)" content="#EDF2F6" />
+		<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B141B" />
+		<!-- Mirror the app's Glacier day/night no-flash resolution (clock + OS + stored ee-theme). -->
+		<script>
+			(function () {
+				try {
+					var d = document.documentElement;
+					var p = null;
+					try { p = localStorage.getItem("ee-theme"); } catch (e) {}
+					var t;
+					if (p === "dark" || p === "light") { t = p; }
+					else {
+						var h = new Date().getHours();
+						var night = h >= 20 || h < 6;
+						var osDark = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+						t = (night || osDark) ? "dark" : "light";
+					}
+					d.dataset.theme = t;
+					d.style.colorScheme = t;
+				} catch (e) {}
+			})();
+		</script>
+		<style>
+			:root {
+				--page: #edf2f6;
+				--surface: #ffffff;
+				--ink: #0f1b24;
+				--ink-soft: #3e5460;
+				--line: #d5e0e8;
+				--sky: #1e6a9e;
+				--teal: #0e9488;
+			}
+			:root[data-theme="dark"] {
+				--page: #0b141b;
+				--surface: #131e27;
+				--ink: #edf2f6;
+				--ink-soft: #8296a4;
+				--line: #2a3a46;
+			}
+			* { box-sizing: border-box; }
+			html, body { margin: 0; height: 100%; }
+			body {
+				min-height: 100dvh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 24px;
+				background: var(--page);
+				color: var(--ink);
+				font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+				text-align: center;
+			}
+			.card {
+				max-width: 420px;
+				width: 100%;
+				background: var(--surface);
+				border: 1px solid var(--line);
+				border-radius: 20px;
+				padding: 40px 28px;
+				box-shadow: 0 12px 40px rgba(10, 22, 32, 0.12);
+			}
+			.mark {
+				width: 72px;
+				height: 84px;
+				margin: 0 auto 20px;
+				display: block;
+			}
+			h1 { font-size: 1.4rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+			p { margin: 0 0 24px; color: var(--ink-soft); line-height: 1.5; }
+			button {
+				appearance: none;
+				border: 0;
+				cursor: pointer;
+				font: inherit;
+				font-weight: 600;
+				color: #fff;
+				padding: 12px 28px;
+				border-radius: 999px;
+				background: linear-gradient(135deg, var(--sky) 0%, var(--teal) 100%);
+				box-shadow: 0 6px 18px rgba(30, 106, 158, 0.35);
+			}
+			button:active { transform: translateY(1px); }
+		</style>
+	</head>
+	<body>
+		<main class="card">
+			<svg class="mark" viewBox="0 0 36 42" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+				<path d="M18 1.5C9.99 1.5 3.5 8 3.5 16c0 5.36 2.88 10.06 7.16 12.7L18 40.5l7.34-11.8C29.62 26.06 32.5 21.36 32.5 16 32.5 8 26.01 1.5 18 1.5z" fill="url(#g)" />
+				<line x1="8" y1="21" x2="28" y2="21" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round" opacity="0.7" />
+				<path d="M8.5 21L13.5 13l4 5 3.5-6.5L28 21" fill="none" stroke="#ffffff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+				<defs>
+					<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+						<stop offset="0" stop-color="#1e6a9e" />
+						<stop offset="1" stop-color="#0e9488" />
+					</linearGradient>
+				</defs>
+			</svg>
+			<h1>You&rsquo;re offline</h1>
+			<p>Explore &amp; Earn can&rsquo;t reach the network right now. Check your connection and try again &mdash; your place is saved.</p>
+			<button type="button" onclick="location.reload()">Try again</button>
+		</main>
+	</body>
+</html>

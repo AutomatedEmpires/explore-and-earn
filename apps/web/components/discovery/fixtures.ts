@@ -23,7 +23,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     begins: "Aug 12, 2026",
     ends: "Oct 28, 2026",
     status: "live",
-    host: { name: "Cascade Bloom Orchards", verified: true, tagline: "Family orchards in the Wenatchee valley. Harvest season with bunkhouse and farm-fresh meals." },
+    host: { name: "Cascade Bloom Orchards", verified: true, tier: "professional", tagline: "Family orchards in the Wenatchee valley. Harvest season with bunkhouse and farm-fresh meals." },
     benefits: {
       housing: { provision: "provided", summary: "Shared bunkhouse" },
       meals: { provision: "partial", summary: "Lunch on shift" },
@@ -63,7 +63,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     begins: "Jun 3, 2026",
     ends: "Aug 29, 2026",
     status: "live",
-    host: { name: "North Pacific Fisheries Co-op", verified: true, tagline: "Commercial salmon fishing on the Alaskan coast. Big seas, full board, bigger pay." },
+    host: { name: "North Pacific Fisheries Co-op", verified: true, tier: "enterprise", tagline: "Commercial salmon fishing on the Alaskan coast. Big seas, full board, bigger pay." },
     benefits: {
       housing: { provision: "provided", summary: "Cabin berth aboard" },
       meals: { provision: "provided", summary: "All meals aboard" },
@@ -102,7 +102,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     opportunityWindow: "Year-round",
     begins: "Rolling",
     status: "live",
-    host: { name: "Driftwork Collective", verified: false, tagline: "Fully remote operations. Build community from anywhere — no office, no commute." },
+    host: { name: "Driftwork Collective", verified: false, tier: "none", tagline: "Fully remote operations. Build community from anywhere — no office, no commute." },
     benefits: {
       housing: { provision: "not_provided", summary: "Not included" },
       meals: { provision: "not_provided", summary: "Not included" },
@@ -142,7 +142,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     begins: "Nov 14, 2026",
     ends: "Apr 18, 2027",
     status: "live",
-    host: { name: "Summit Pass Hospitality", verified: true, tagline: "Mountain resort operations in the Colorado Rockies. Ski season with dorm housing and cafeteria." },
+    host: { name: "Summit Pass Hospitality", verified: true, tier: "professional", tagline: "Mountain resort operations in the Colorado Rockies. Ski season with dorm housing and cafeteria." },
     benefits: {
       housing: { provision: "provided", summary: "Staff dorm room" },
       meals: { provision: "partial", summary: "Staff cafeteria" },
@@ -181,7 +181,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     opportunityWindow: "Flexible · 3+ months",
     begins: "Flexible",
     status: "live",
-    host: { name: "Tejo Green House", verified: true, tagline: "Lisbon eco-hostel life. Communal dinners, vibrant guests, private room included." },
+    host: { name: "Tejo Green House", verified: true, tier: "starter", tagline: "Lisbon eco-hostel life. Communal dinners, vibrant guests, private room included." },
     benefits: {
       housing: { provision: "provided", summary: "Private room" },
       meals: { provision: "provided", summary: "Communal dinner daily" },
@@ -218,7 +218,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     begins: "Sep 8, 2026",
     ends: "Nov 21, 2026",
     status: "live",
-    host: { name: "Stone Hollow Vineyard", verified: false, tagline: "Boutique vineyard in Napa wine country. Harvest season under California sun." },
+    host: { name: "Stone Hollow Vineyard", verified: false, tier: "none", tagline: "Boutique vineyard in Napa wine country. Harvest season under California sun." },
     benefits: {
       housing: { provision: "partial", summary: "Tent platform site" },
       meals: { provision: "not_provided", summary: "Not included" },
@@ -233,5 +233,40 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       note: "Strong hourly pay, but food and full housing are not included.",
     },
     coverImageUrl: cloudinaryPhoto("farm", "tim-hufner-6-ktk6b8mq8", "hero"),
+  },
+  {
+    // A SOURCED fixture (dev/preview only) so the sourced-card journey renders
+    // without a backend: no host, source attribution, meals NOT STATED.
+    id: "lst_sourced_kelp_farm",
+    title: "Kelp Farm Field Technician",
+    category: "maritime",
+    location: "Kodiak, Alaska",
+    coordinates: { lat: 57.79, lon: -152.407 },
+    opportunityWindow: "May–Aug 2026",
+    begins: "May 4, 2026",
+    ends: "Aug 29, 2026",
+    status: "live",
+    // Sourced listings carry no host id, are never verified, and rank at "none".
+    host: { name: "Kodiak Kelp Co.", verified: false, tier: "none" },
+    benefits: {
+      housing: { provision: "provided", summary: "Bunkhouse berth" },
+      // Meals were NOT stated by the source — never shown as "not provided".
+      meals: { provision: "not_provided", summary: "Not stated" },
+      pay: { provision: "provided", summary: "$21/hr" },
+    },
+    coverImageUrl: cloudinaryPhoto("maritime", "joseph-barrientos-8mdls-a3o8q", "hero"),
+    provenanceInfo: {
+      provenance: "sourced",
+      claimStatus: "unclaimed",
+      benefitEvidence: { housing: "stated", meals: "not_stated", pay: "stated" },
+      source: {
+        sourceName: "CoastWork",
+        sourceUrl: "https://example.com/coastwork/kelp-tech-2026",
+        sourcePostingId: "cw-kelp-2026",
+        publishedAt: "2026-04-10T00:00:00Z",
+        retrievedAt: "2026-07-12T00:00:00Z",
+        employerName: "Kodiak Kelp Co.",
+      },
+    },
   },
 ];

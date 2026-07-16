@@ -4,23 +4,27 @@ import { auth } from "@clerk/nextjs/server"
 import {
 	getSeekerInvites,
 	respondToInvite,
-	createInvite,
+	createInviteWithEntitlement,
 	getHostListings,
 	getHostProfile,
 	getHostClerkIdByProfileId,
-	getNotificationPrefs,
-	getSeekerClerkIdByProfileId,
+	isEmailSuppressed,
+	recordEvent,
+	restoreInviteCreditForInvite,
 	searchSeekersForInvite,
 	withdrawInvite,
 	type InviteResponse,
 	type InviteWithListing,
 	type SeekerSearchResult,
 } from "@explore-and-earn/db"
+import { MONTHLY_INVITE_QUOTA } from "@explore-and-earn/contracts"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 
+import { triggerDispatch } from "../../services/notifications/dispatcher"
 import { getClerkContact } from "../../lib/clerkUser"
 import { absoluteUrl, sendEmail } from "../../lib/email"
-import { inviteAcceptedEmail, inviteEmail } from "../../lib/emails"
+import { inviteAcceptedEmail } from "../../lib/emails"
 import { checkRateLimit } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
@@ -65,8 +69,18 @@ export async function withdrawInviteAction(
 		const token = await getToken()
 		if (!token) return { ok: false, error: "Your session has expired — sign in again." }
 
+		// Only a never-delivered invite ('created') hands its credit back.
+		// wasUndelivered comes from the withdraw UPDATE itself (atomic — see
+		// withdrawInvite), so a seeker responding concurrently can never cause
+		// a restore for an invite that was actually delivered.
 		const result = await withdrawInvite(token, userId, inviteId)
-		if (result.ok) revalidatePath("/host/invites")
+		if (result.ok) {
+			if (result.wasUndelivered) {
+				// Idempotent (one restore per invite, enforced in SQL); false pre-061.
+				await restoreInviteCreditForInvite(inviteId)
+			}
+			revalidatePath("/host/invites")
+		}
 		return result
 	} catch (error) {
 		reportError(error, { action: "withdrawInviteAction" })
@@ -132,7 +146,10 @@ async function respondToInviteActionImpl(
 						getClerkContact(hostClerkUserId),
 						getClerkContact(userId),
 					])
-					if (host.email) {
+					// Suppression-list integrity: this is the one remaining inline
+					// email path (invite acceptance sits outside the engine's
+					// taxonomy) — it must still honor hard bounces/complaints.
+					if (host.email && !(await isEmailSuppressed(host.email))) {
 						const seekerName = seeker.name ?? "A seeker"
 						const listingTitle = match.listing?.title || "your listing"
 						await sendEmail({
@@ -225,67 +242,46 @@ async function createInviteForCurrentHost(
 		return { ok: false, error: "forbidden" }
 	}
 
-	// Insert the invite (deduplication enforced by DB UNIQUE constraint).
-	const result = await createInvite(token, {
-		hostProfileId: hostProfile.id,
-		seekerProfileId,
-		listingId,
-		message,
-		invitedByUserId: userId,
-	})
+	// Insert the invite with SERVER-ENFORCED entitlement: the monthly allowance
+	// comes from the host's real subscription tier (never a client value), and
+	// the SQL function consumes the credit atomically with the insert — a
+	// concurrent double-send can never overspend, and a duplicate
+	// (listing, seeker) pair spends nothing. 'invite_credits_required' is the
+	// blocked-upsell state (buy a pack or upgrade the plan).
+	const monthlyAllowance = MONTHLY_INVITE_QUOTA[hostProfile.subscriptionTier]
+	const result = await createInviteWithEntitlement(
+		token,
+		{
+			hostProfileId: hostProfile.id,
+			seekerProfileId,
+			listingId,
+			message,
+			invitedByUserId: userId,
+		},
+		monthlyAllowance,
+	)
 	if (!result.ok) {
 		return { ok: false, error: result.error }
 	}
 
 	revalidatePath("/host/invites")
 
-	// Best-effort email notification — gated on the seeker's emailOnInvite pref;
-	// errors are caught and never rethrown.
-	try {
-		const seekerClerkUserId = await getSeekerClerkIdByProfileId(
-			token,
-			seekerProfileId,
-		).catch(() => null)
-
-		if (seekerClerkUserId) {
-			// Cross-user prefs read (host token, seeker userId) may fail under RLS;
-			// degrade to sending rather than dropping the invite notification.
-			let prefs = null
-			try {
-				prefs = await getNotificationPrefs(token, seekerClerkUserId)
-			} catch {
-				// Cross-user read failed; skip the notification prefs check.
-			}
-
-			if (prefs === null || prefs.emailOnInvite) {
-				const contact = await getClerkContact(seekerClerkUserId)
-				if (contact.email) {
-					const hostName = hostProfile.companyName || "A host"
-					const listingTitle = ownedListing.title
-					const listingLocation =
-						ownedListing.location_display ?? "Location not specified"
-					const html = inviteEmail({
-						hostName,
-						listingTitle,
-						listingLocation,
-						message: message ?? null,
-						inviteUrl: absoluteUrl("/invites"),
-					})
-					await sendEmail({
-						to: contact.email,
-						subject: `${hostName} invited you to apply to ${listingTitle}`,
-						html,
-						template: "inviteEmail",
-						idempotencyKey: result.inviteId
-							? `inviteEmail:${result.inviteId}`
-							: undefined,
-					})
-				}
-			}
-		}
-	} catch (err) {
-		console.error("[createInviteForCurrentHost] email error (non-fatal):", err)
-	}
+	// Persist the real invite event: the notification engine derives the
+	// seeker's in-app/email/push notification from it (localized, deduped per
+	// invite, preference-/quiet-hours-/unsubscribe-aware — replaces the inline
+	// email; the seeker's legacy email_on_invite opt-out keeps holding via the
+	// engine's legacy-boolean overlay).
+	await recordEvent({
+		eventType: "invite_created",
+		actorScope: "host",
+		subjectType: "invite",
+		subjectId: result.inviteId,
+		listingId,
+		hostProfileId: hostProfile.id,
+		seekerProfileId,
+		sourceSurface: "invite_action",
+	})
+	after(triggerDispatch)
 
 	return { ok: true }
 }

@@ -1,0 +1,14 @@
+.body {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+.body p {
+  margin: 0 0 var(--space-12);
+}
+
+.body p:last-child {
+  margin-bottom: 0;
+}

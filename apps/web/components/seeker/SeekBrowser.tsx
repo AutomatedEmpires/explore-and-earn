@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type {
 	CompensationUnit,
@@ -300,10 +299,17 @@ export function SeekBrowser({
 		else next.delete("visa");
 		if (value.startRangeMonths) next.set("start_range", String(value.startRangeMonths));
 		else next.delete("start_range");
-		if (value.payMin && value.payMin > 0) next.set("pay_min", String(value.payMin));
-		else next.delete("pay_min");
-		if (value.payUnit) next.set("pay_unit", value.payUnit);
-		else next.delete("pay_unit");
+		// pay_unit only rides along with an active pay floor — a unit on its own
+		// would filter listings by rate unit with no minimum, which seek/page reads
+		// (parsePayUnit) and applies. Keep the two params coupled.
+		if (value.payMin && value.payMin > 0) {
+			next.set("pay_min", String(value.payMin));
+			if (value.payUnit) next.set("pay_unit", value.payUnit);
+			else next.delete("pay_unit");
+		} else {
+			next.delete("pay_min");
+			next.delete("pay_unit");
+		}
 		const queryString = next.toString();
 		router.push(queryString ? `${pathname}?${queryString}` : pathname);
 		setFilterOpen(false);
@@ -444,25 +450,82 @@ export function SeekBrowser({
 					<p className={styles.count} role="status" aria-live="polite">
 						{countLabel}
 					</p>
-					{results.length === 0 ? (
-						<div className={styles.emptyWrap}>
-							<EmptyState
-								title={
-									query
-										? `No listings match \u201c${query}\u201d`
-										: "No matches with those filters"
-								}
-								message={
-									query
-										? "Try a different search term or clear your filters to see more opportunities."
-										: "Try removing a filter to see more opportunities."
-								}
-							/>
-							<Link className={styles.clearLink} href="/seek">
-								Clear filters
-							</Link>
-						</div>
-					) : (
+					{results.length === 0 ? (() => {
+						// Recovery surface: every chip is a plain link that drops ONE
+						// filter param (no client state), so the dead end names what
+						// screened everything out and offers the way back.
+						const removeHref = (...keys: readonly string[]) => {
+							const next = new URLSearchParams(searchParams.toString());
+							for (const key of keys) next.delete(key);
+							const queryString = next.toString();
+							return queryString ? `${pathname}?${queryString}` : pathname;
+						};
+						const removeChips: { label: string; href: string; icon?: IconKey }[] = [];
+						if (query) {
+							removeChips.push({ label: `\u201c${query}\u201d`, href: removeHref("q"), icon: "action.search" });
+						}
+						if (category) {
+							removeChips.push({
+								label: CATEGORY_LABEL[category as OpportunityCategory],
+								href: removeHref("category"),
+								icon: CATEGORY_ICON[category as OpportunityCategory],
+							});
+						}
+						if (housing) {
+							removeChips.push({ label: "Housing", href: removeHref("housing"), icon: "benefit.housing" });
+						}
+						if (meals) {
+							removeChips.push({ label: "Meals", href: removeHref("meals"), icon: "benefit.meals" });
+						}
+						if (visaSupport) {
+							removeChips.push({ label: "Visa support", href: removeHref("visa"), icon: "system.info" });
+						}
+						if (startRangeMonths) {
+							removeChips.push({
+								label: `Starts within ${startRangeMonths} mo`,
+								href: removeHref("start_range"),
+								icon: "status.begins",
+							});
+						}
+						if (payMin != null && payMin > 0) {
+							removeChips.push({
+								label: `$${payMin}${payUnit ? `/${payUnit}` : ""}+`,
+								href: removeHref("pay_min", "pay_unit"),
+								icon: "benefit.pay",
+							});
+						}
+						if (location) {
+							removeChips.push({ label: location, href: removeHref("location"), icon: "nav.map" });
+						}
+						const lanes = (["farm", "maritime", "remote", "seasonal"] as const).map((lane) => ({
+							label: CATEGORY_LABEL[lane],
+							href: `/seek?category=${lane}`,
+							icon: CATEGORY_ICON[lane],
+						}));
+						const filterNoun = removeChips.length === 1 ? "filter" : "filters";
+						return (
+							<div className={styles.emptyWrap}>
+								<EmptyState
+									title={
+										query
+											? `No matches for \u201c${query}\u201d`
+											: "These filters came up empty"
+									}
+									message={
+										removeChips.length > 0
+											? `Every open opportunity is being screened out by your ${removeChips.length} active ${filterNoun}. Drop one below and the trail usually reopens.`
+											: "Every open opportunity is being screened out by the current view. Loosen it below and the trail usually reopens."
+									}
+									filterChipsLabel="Remove a filter"
+									filterChips={removeChips}
+									suggestionsLabel="Or scout a lane"
+									suggestions={lanes}
+									actionLabel="Clear all filters"
+									actionHref="/seek"
+								/>
+							</div>
+						);
+					})() : (
 						<div className={styles.grid}>
 							{results.map((listing, index) => (
 								<DiscoveryCard

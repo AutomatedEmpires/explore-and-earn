@@ -1,9 +1,11 @@
 import type { CSSProperties, ReactNode } from "react"
 
 import type {
+	BenefitEvidenceStatus,
 	BenefitProvision,
 	DiscoveryCardConditionalBadge,
 	DiscoveryCardSurface,
+	ListingProvenance,
 	MarketplaceCategory,
 	OpportunityTriad,
 } from "@explore-and-earn/contracts"
@@ -29,6 +31,9 @@ import styles from "./DiscoveryCard.module.css"
  *   Top-CENTER — featured stamp OR action-state stamp (applied/schedule); never both; max 1
  *   Hero-bar   — fill-quality bar when no center badge and fillPercent is set
  *   Max 3 badges total on image. "seasonal" is a category, never a conditional badge.
+ *
+ * All styling lives in DiscoveryCard.module.css (token classes). The only
+ * dynamic style is the --dc-bar-pct custom property feeding the hero bar.
  */
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -55,6 +60,20 @@ export interface DiscoveryCardData {
 		readonly pay: BenefitProvision
 	}
 	readonly housingOccupancy?: "solo" | "shared"
+	/**
+	 * Listing provenance (contracts/provenance.ts). Absent/"verified" = a
+	 * host-confirmed listing (all existing behavior). "sourced" = a real,
+	 * attributable public posting Explore & Earn has NOT confirmed: the card
+	 * renders the sourced disclosure, labels the badge "SOURCE" not a verified
+	 * host, and shows benefits by their evidence (not_stated ≠ not provided).
+	 */
+	readonly provenance?: ListingProvenance
+	/** Per-benefit evidence; drives not_stated vs not-provided rendering. */
+	readonly benefitEvidence?: {
+		readonly housing: BenefitEvidenceStatus
+		readonly meals: BenefitEvidenceStatus
+		readonly pay: BenefitEvidenceStatus
+	}
 	readonly fillPercent?: number
 	/** Top skills shown in place of H/M/P on host_applicant_review surface (max 3) */
 	readonly skills?: readonly string[]
@@ -84,6 +103,12 @@ export interface DiscoveryCardProps {
 	readonly onRemove?: (id: string) => void
 	readonly actions?: ReactNode
 	/**
+	 * Seeker previously skipped this listing. Skipped listings are demoted-but-
+	 * visible everywhere except the swipe deck (founder decision) — when true the
+	 * card renders a subtle bottom-left "Previously skipped" photo marker.
+	 */
+	readonly previouslySkipped?: boolean
+	/**
 	 * Above-the-fold cards should pass "eager": the cover then loads with
 	 * fetchpriority=high (LCP + deterministic screenshots). Default "lazy" —
 	 * feeds keep below-fold covers off the critical path.
@@ -96,16 +121,7 @@ export interface DiscoveryCardProps {
 		| "invited" | "reported"
 }
 
-// ─── Palette ─────────────────────────────────────────────────────────────────
-
-// V2 "Golden Hour Hybrid" — warm ink + warm surface, via tokens (no raw hex).
-const INK       = "var(--palette-ink)"
-const INK_SOFT  = "var(--palette-ink-muted)"
-const PAPER     = "var(--palette-surface)"
-
-// Pay accent (deep gold) — still used by the applicant-review Schedule action.
-const P_INK = "color-mix(in srgb, var(--palette-amber) 52%, var(--palette-ink))"
-
+// ─── Category maps ────────────────────────────────────────────────────────────
 
 const CAT_LABEL: Record<MarketplaceCategory, string> = {
 	farm: "Farm", maritime: "Maritime", remote: "Remote", seasonal: "Seasonal", mix: "Mix",
@@ -121,7 +137,7 @@ const MAPPIN: Record<MarketplaceCategory, IconKey> = {
 	seasonal: "mappin.seasonal", mix: "mappin.mix",
 }
 
-// Housing/Meals/Pay cell styling now lives in DiscoveryCard.module.css
+// Housing/Meals/Pay cell styling lives in DiscoveryCard.module.css
 // (.triad / .benefit* classes) — glance-readable green ✓ / red ✕ / gold, so
 // the triad reads as the card's dominant module. See BenefitTriadCell below.
 
@@ -134,74 +150,46 @@ function fillCopy(pct: number): string {
 	return "Open spots"
 }
 
-// ─── Type fonts ───────────────────────────────────────────────────────────────
-
-const DISPLAY_FONT = "var(--font-display)"
-const UI_FONT      = "var(--font-ui)"
-
-// ─── Static styles ────────────────────────────────────────────────────────────
-
-/** Parchment stamp — base for all overlay badges. No border — shadow provides definition. */
-const STAMP: CSSProperties = {
-	display: "inline-flex", alignItems: "center", gap: "5px",
-	padding: "5px 11px", borderRadius: "8px",
-	fontFamily: DISPLAY_FONT,
-	fontSize: "11px", fontWeight: 700,
-	letterSpacing: "0.08em", textTransform: "uppercase",
-	background: "color-mix(in srgb, var(--palette-paper) 88%, var(--palette-amber))",
-	backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)",
-	boxShadow: "var(--elevation-card), 0 1px 0 rgba(255,255,255,0.55) inset",
-	whiteSpace: "nowrap",
+function clampPct(pct: number): number {
+	return Math.min(100, Math.max(0, pct))
 }
 
-/** Info row cell (name / job / location) — clean warm tray, V2 soft depth */
-const ROW_CELL: CSSProperties = {
-	display: "flex", alignItems: "center", justifyContent: "center",
-	gap: "6px", padding: "10px 14px",
-	background: PAPER, border: "1px solid var(--palette-line)",
-	borderRadius: "12px", textAlign: "center",
-	boxShadow: "var(--elevation-card)",
+/**
+ * Match score is shown as the centered pill on ANY surface whenever the stored
+ * `data.matchScore` reaches this threshold (founder decision 2026-07-14 — a
+ * strong match is a product selling point, not a per-surface allowlist). Stored
+ * scores are read as-is; the card never recomputes. Listings below this simply
+ * show no match pill.
+ */
+export const MATCH_SHOW_THRESHOLD = 75
+
+/** Match-quality band → class. Colour-codes "how well" (founder direction). */
+function matchBandClass(pct: number): string {
+	return pct >= 85 ? styles.matchStrong
+		: pct >= 70 ? styles.matchGood
+			: pct >= 55 ? styles.matchFair
+				: styles.matchLow
 }
 
-/** Strip cell — stacked (begins/ends columns) — clean warm tray */
-const STRIP_CELL: CSSProperties = {
-	display: "flex", flexDirection: "column",
-	alignItems: "center", justifyContent: "center",
-	gap: "3px", padding: "9px 6px",
-	background: PAPER, border: "1px solid var(--palette-line)",
-	borderRadius: "12px", textAlign: "center",
-	boxShadow: "var(--elevation-card)",
+// ─── Badge tone → class maps (badge LOGIC below is locked; only styling maps) ─
+
+type CenterTone = "paper" | "success" | "error" | "boosted"
+
+const CENTER_TONE_CLASS: Record<CenterTone, string> = {
+	paper: "",
+	success: styles.stampSuccess,
+	error: styles.stampError,
+	boosted: styles.stampBoosted,
 }
 
-/* Hierarchy: the ROLE is the card's primary object; the host is trust
-   context. Title outranks host name (it was inverted before). */
-const hostNameText: CSSProperties = {
-	fontFamily: UI_FONT, fontSize: "clamp(11px, 2.9vw, 13px)",
-	fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em",
-	lineHeight: 1.2, color: INK_SOFT, textAlign: "center",
-}
+type SecondaryTone = "success" | "match" | "warning" | "muted" | "error"
 
-const jobTitleText: CSSProperties = {
-	fontFamily: DISPLAY_FONT, fontSize: "clamp(16px, 4.4vw, 19px)",
-	fontWeight: 700, letterSpacing: "0.02em",
-	lineHeight: 1.15, color: INK, textAlign: "center",
-}
-
-const locationText: CSSProperties = {
-	fontFamily: UI_FONT, fontSize: "clamp(12px, 2.8vw, 14px)",
-	fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
-	color: INK, textAlign: "center",
-}
-
-const stripLabel: CSSProperties = {
-	fontFamily: DISPLAY_FONT, fontSize: "clamp(10px, 2.2vw, 12px)",
-	fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase",
-	lineHeight: 1, color: INK,
-}
-
-const stripValue: CSSProperties = {
-	fontFamily: UI_FONT, fontSize: "clamp(10px, 2.2vw, 12px)",
-	fontWeight: 600, color: INK, textAlign: "center", lineHeight: 1.2,
+const SECONDARY_TONE_CLASS: Record<SecondaryTone, string> = {
+	success: styles.toneSuccess,
+	match: styles.toneMatch,
+	warning: styles.toneWarning,
+	muted: styles.toneMuted,
+	error: styles.toneError,
 }
 
 // ─── Benefit triad cell (housing / meals / pay) ────────────────────────────
@@ -212,41 +200,43 @@ const stripValue: CSSProperties = {
 function BenefitTriadCell({
 	kind,
 	provided,
+	notStated,
 	value,
 	onClick,
 }: {
 	readonly kind: "housing" | "meals" | "pay"
 	readonly provided?: boolean
+	/**
+	 * The source did not state this benefit (sourced listings only). Renders a
+	 * NEUTRAL "Not stated" cell — never the red "not included" tone. Absence of
+	 * information is not evidence the benefit is unavailable (product law).
+	 */
+	readonly notStated?: boolean
 	readonly value: string
 	readonly onClick?: () => void
 }) {
 	const isPay = kind === "pay"
 	const stateClass = isPay
 		? styles.benefitPay
-		: provided
-			? styles.benefitProvided
-			: styles.benefitNot
+		: notStated
+			? styles.benefitNotStated
+			: provided
+				? styles.benefitProvided
+				: styles.benefitNot
 	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
-	const icon: IconKey =
-		kind === "housing" ? "benefit.housing" : kind === "meals" ? "benefit.meals" : "benefit.pay"
-	const stateText = isPay ? "" : provided ? "offered" : "not offered"
-	const aria = `${label}${stateText ? `: ${stateText}` : ""}${value ? ` — ${value}` : ""}`
+	// Housing/Meals carry NO icon and NO checkmark on the card — just the label on
+	// a COLOR-CODED cell (green = included, red = not, neutral = not stated); the
+	// detail lives in the popup. Pay shows the rate. aria still states the state.
+	const stateText = isPay ? "" : notStated ? "not stated" : provided ? "included" : "not included"
+	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
 
-	const inner = (
+	const inner = isPay ? (
 		<>
-			<span className={styles.benefitHead}>
-				<Icon name={icon} size={14} aria-hidden />
-				<span>{label}</span>
-				{!isPay ? (
-					<span className={styles.benefitState}>
-						<Icon name={provided ? "system.success" : "system.error"} size={13} aria-hidden />
-					</span>
-				) : null}
-			</span>
-			<span className={`${styles.benefitValue}${isPay ? ` ${styles.benefitPayValue}` : ""}`}>
-				{value}
-			</span>
+			<span className={styles.benefitHead}>{label}</span>
+			<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{value}</span>
 		</>
+	) : (
+		<span className={styles.benefitLabel}>{notStated ? "Not stated" : label}</span>
 	)
 
 	return onClick ? (
@@ -282,6 +272,7 @@ export function DiscoveryCard({
 	onWarn,
 	onRemove,
 	actions,
+	previouslySkipped,
 	imageLoading = "lazy",
 }: DiscoveryCardProps) {
 	const cat      = data.category
@@ -292,16 +283,17 @@ export function DiscoveryCard({
 	// a row of em-dashes).
 	const hasLocation = Boolean(data.location) && data.location !== "Location not specified"
 	const hasDates    = Boolean(data.begins || data.ends)
-	const cellBg          = "var(--cat-cell)"
-	const ROW_CELL_CAT:   CSSProperties = { ...ROW_CELL,   background: cellBg }
-	const STRIP_CELL_CAT: CSSProperties = { ...STRIP_CELL, background: cellBg }
-	const verified = data.verifiedHost === true
+	// A sourced listing is real-but-unconfirmed inventory: NEVER verified, the
+	// circle reads SOURCE (not a host), and the sourced disclosure always shows.
+	const isSourced = data.provenance === "sourced"
+	const verified = !isSourced && data.verifiedHost === true
+	const ev = data.benefitEvidence
 	const isDisabled            = variant === "disabled"
 	const isApplicantReview     = surface === "host_applicant_review"
 	const isAdminReview         = surface === "admin_review"
 	const isDiscoveryFeed       = surface === "discovery_feed"
 	const isSeekerSurface       = isApplicantReview  // alias kept for CTA compat
-	const circleLabel           = isApplicantReview ? "SEEKER" : "HOST"
+	const circleLabel           = isApplicantReview ? "SEEKER" : isSourced ? "SOURCE" : "HOST"
 
 	const hp = data.benefitProvision?.housing
 	const mp = data.benefitProvision?.meals
@@ -339,43 +331,58 @@ export function DiscoveryCard({
 	const isInvited     = cardState === "invited"
 	const isReported    = cardState === "reported"
 
-	// Center-top slot: action states > boosted > fill bar
-	// Priority: applied > scheduled > draft > filled > boosted (with ⚡ icon, amber gradient)
-	type CenterBadge = { label: string; color: string; bg?: string; icon?: IconKey; decoration: boolean }
+	// Founder badge rule (2026-07-13): a match score always claims the top-CENTER
+	// slot on seeker browse/decision surfaces; a boosted listing then drops to
+	// the right slot UNDER the category badge. Boosted only takes center when
+	// there is no match score to show.
+	type CenterBadge = { label: string; tone: CenterTone; icon?: IconKey; decoration: boolean }
+	// Data-driven (not a surface allowlist): show the centered match pill wherever
+	// the stored score is meaningful — saved/applied/offered/invites included.
+	const matchCenterEligible =
+		typeof data.matchScore === "number" && data.matchScore >= MATCH_SHOW_THRESHOLD
+
 	const centerBadge: CenterBadge | null =
-		isApplied    ? { label: "Applied",  color: INK,    decoration: false }
-		: isScheduled ? { label: "Schedule", color: INK,    decoration: true  }
-		: isDraft     ? { label: "Draft",    color: INK,    decoration: false }
-		: isFilled    ? { label: "Filled",   color: "var(--palette-paper)", bg: "var(--status-success-fg)", decoration: false }
-		: isReported  ? { label: data.reportCount ? `${data.reportCount} Reports` : "Reported", color: "var(--palette-paper)", bg: "var(--status-error-fg)", decoration: false }
-		: isBoosted   ? { label: "Boosted",  color: "var(--palette-paper)", bg: "var(--palette-amber)", icon: "status.boosted" as IconKey, decoration: false }
+		isApplied    ? { label: "Applied",  tone: "paper",   decoration: false }
+		: isScheduled ? { label: "Schedule", tone: "paper",   decoration: true  }
+		: isDraft     ? { label: "Draft",    tone: "paper",   decoration: false }
+		: isFilled    ? { label: "Filled",   tone: "success", decoration: false }
+		: isReported  ? { label: data.reportCount ? `${data.reportCount} Reports` : "Reported", tone: "error", decoration: false }
+		: (isBoosted && !matchCenterEligible) ? { label: "Boosted", tone: "boosted", icon: "status.boosted" as IconKey, decoration: false }
 		: null
 
-	// R1 right secondary: passive state badges only (boosted moved to center)
-	// When boosted+matched conflict: boosted takes center, match score surfaces here as "92% Match"
-	type SecondaryBadge = { label: string; ink: string }
-	const matchBadgeLabel = typeof data.matchScore === "number" ? `${data.matchScore}% Match` : "Matched"
+	const showMatchCenter = !centerBadge && matchCenterEligible
+	// Founder rule: a boosted listing ALWAYS carries its boosted marker somewhere.
+	// It sits in the CENTER only when boosted is the sole signal (no match %, no
+	// lifecycle/action badge) — i.e. when the resolved center badge IS the boosted
+	// stamp. Whenever anything else occupies the center (a match % OR any lifecycle/
+	// action stamp: Applied/Draft/Filled/Reported/Schedule), the boosted marker
+	// drops to the right slot (gold, under the category badge). Never double-rendered.
+	const boostedInCenter  = centerBadge?.tone === "boosted"
+	const boostedSecondary = isBoosted && !boostedInCenter
+
+	// R1 right secondary: passive state badges (match now shows centered).
+	type SecondaryBadge = { label: string; tone: SecondaryTone }
 	const secondaryBadge: SecondaryBadge | null =
-		isSaved       ? { label: "Saved",          ink: "var(--status-success-fg)" }
-		: isOffered   ? { label: "Offered",         ink: "var(--status-success-fg)" }
-		: isAccepted  ? { label: "Accepted",        ink: "var(--status-success-fg)" }
-		: isMatched   ? { label: matchBadgeLabel,   ink: "var(--palette-teal)" }
-		: isInvited   ? { label: "Invited",         ink: "var(--status-warning-fg)" }
-		: isNotSelected ? { label: "Passed",        ink: INK_SOFT  }
-		: isWithdrawn ? { label: "Withdrawn",       ink: INK_SOFT  }
-		: isPaused    ? { label: "Paused",          ink: "var(--status-warning-fg)" }
-		: isExpired   ? { label: "Expired",         ink: INK_SOFT  }
-		: isReported && data.reportCategory ? { label: data.reportCategory, ink: "var(--status-error-fg)" }
+		isSaved       ? { label: "Saved",          tone: "success" }
+		: isOffered   ? { label: "Offered",         tone: "success" }
+		: isAccepted  ? { label: "Accepted",        tone: "success" }
+		: isInvited   ? { label: "Invited",         tone: "warning" }
+		: isNotSelected ? { label: "Passed",        tone: "muted"   }
+		: isWithdrawn ? { label: "Withdrawn",       tone: "muted"   }
+		: isPaused    ? { label: "Paused",          tone: "warning" }
+		: isExpired   ? { label: "Expired",         tone: "muted"   }
+		: isReported && data.reportCategory ? { label: data.reportCategory, tone: "error" }
 		: null
 
-	// Match bar: always-on for host_applicant_review (boosted doesn't apply to seeker cards);
-	// on the discovery feed, whenever a seeker fit score is present (the ADR-040
-	// signal at browse time); on other surfaces, only when matched + no center
-	// badge (boosted wins center, score falls to R1)
-	const showMatchBar = isApplicantReview
-		? typeof data.matchScore === "number"
-		: (isDiscoveryFeed || isMatched) && !centerBadge && typeof data.matchScore === "number"
-	const showHeroBar  = !centerBadge && !showMatchBar && typeof data.fillPercent === "number"
+	const showHeroBar  = !centerBadge && !showMatchCenter && typeof data.fillPercent === "number"
+
+	// Seeker decision bar (Skip · Apply · Save) is the default CTA on browse
+	// surfaces; resolved lifecycle states keep their single state CTA. Skip only
+	// appears when a handler exists (e.g. a deck); the grid shows Apply · Save.
+	const showDecisionBar =
+		(isDiscoveryFeed || surface === "map" || isMatched)
+		&& !isApplied && !isReported && !isDisabled
+		&& Boolean(onApply || onOpen)
 
 	// ── CTA resolution ────────────────────────────────────────────────────────
 	const ctaLabel =
@@ -417,65 +424,25 @@ export function DiscoveryCard({
 	const titleHandler = onHostClick ? () => onHostClick(data.id)
 		: onOpen ? () => onOpen(data.id) : undefined
 
-	// ── Dynamic card styles ───────────────────────────────────────────────────
-
-	const cardStyle: CSSProperties = {
-		position: "relative",
-		display: "flex", flexDirection: "column",
-		width: "min(100%, 360px)",
-		overflow: "hidden",
-		background: "var(--cat-body)",
-		border: `1px solid var(--palette-line)`,
-		borderTop: `3px solid var(--cat-accent)`,
-		borderRadius: "20px",
-		color: INK,
-		opacity: isDisabled ? 0.6 : 1,
-		boxShadow: [
-			"inset 0 1px 0 rgba(255,255,255,0.55)",        /* top catch-light */
-			`inset 0 -44px 56px var(--cat-glow)`,         /* category ambient from below */
-			"var(--elevation-card)",                        /* V2 soft depth */
-		].join(", "),
-	}
-
-	const heroStyle: CSSProperties = {
-		position: "relative", width: "100%", aspectRatio: "16 / 10",
-		overflow: "hidden", flexShrink: 0,
-		background: "var(--cat-cover)",
-		borderBottom: `1px solid var(--palette-line)`,
-	}
-
-	const hostCircle: CSSProperties = {
-		width: "var(--dc-host-size, 74px)", height: "var(--dc-host-size, 74px)",
-		borderRadius: "50%",
-		border: "3px solid rgba(255,248,225,0.95)",
-		// dark ring + category-colored glow ring + deep shadow
-		boxShadow: `0 0 0 2.5px ${INK}, 0 0 0 5px var(--cat-accent), 0 6px 20px rgba(26,43,60,0.40)`,
-		background: data.hostAvatarUrl ? "transparent" : "rgba(255,248,225,0.22)",
-		backdropFilter: data.hostAvatarUrl ? "none" : "blur(4px)",
-		WebkitBackdropFilter: data.hostAvatarUrl ? "none" : "blur(4px)",
-		display: "flex", alignItems: "center", justifyContent: "center",
-		overflow: "hidden", cursor: onHostClick ? "pointer" : "default", padding: 0,
-		color: PAPER, flexShrink: 0,
-	}
-
 	const isPassiveCta = isApplied || isNotSelected || isReported || isDisabled
-	const ctaBg        = isPassiveCta ? "transparent" : INK
-	const ctaColor     = isPassiveCta ? INK_SOFT      : PAPER
-	const ctaBorderVal = isPassiveCta ? `1.5px solid rgba(26,43,60,0.22)` : `2.5px solid ${INK}`
-	const ctaShadow    = isPassiveCta ? "none"
-		: `4px 5px 0 rgba(26,43,60,0.36), inset 0 2px 0 rgba(255,255,255,0.22), inset 0 -2px 0 rgba(0,0,0,0.12)`
+	const ctaClass = `${styles.cta}${isPassiveCta ? ` ${styles.ctaPassive}` : ""}`
+
+	const hostCircleClass = [
+		styles.hostCircle,
+		onHostClick ? styles.hostCircleClickable : "",
+		data.hostAvatarUrl ? styles.hostCircleHasAvatar : "",
+	].filter(Boolean).join(" ")
 
 	return (
 		<article
 			className={`ui-card--discovery ${styles.card}`}
-			style={cardStyle}
 			data-category={cat}
 			data-surface={surface}
 			data-variant={variant}
 			data-state={cardState ?? "default"}
 		>
 			{/* ── 1. IMAGE / COVER AREA ── */}
-			<div style={heroStyle}>
+			<div className={styles.hero}>
 				{data.coverImageUrl ? (
 					<img
 						src={data.coverImageUrl}
@@ -483,43 +450,24 @@ export function DiscoveryCard({
 						loading={imageLoading}
 						fetchPriority={imageLoading === "eager" ? "high" : undefined}
 						decoding="async"
-						style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+						className={styles.heroImg}
 					/>
 				) : (
 					/* No cover yet — a large category watermark so the frame reads as
 					   intentional, not empty (placeholder, not a filter on a photo). */
-					<span
-						aria-hidden
-						style={{
-							position: "absolute", inset: 0,
-							display: "flex", alignItems: "center", justifyContent: "center",
-							color: "rgba(255,255,255,0.40)",
-							transform: "scale(2.7)",
-							filter: "drop-shadow(0 2px 6px rgba(23,19,13,0.18))",
-						}}
-					>
+					<span aria-hidden className={styles.heroWatermark}>
 						<Icon name={CAT_ICON[cat]} size={24} />
 					</span>
 				)}
 
-				{/* Gradient scrim — top shadow for badges, bottom shadow, warm golden side wash */}
-				<div
-					style={{
-						position: "absolute", inset: 0, pointerEvents: "none",
-						background: [
-							"linear-gradient(180deg, rgba(23,19,13,0.50) 0%, transparent 32%)",
-							"linear-gradient(0deg, rgba(23,19,13,0.28) 0%, transparent 28%)",
-							`linear-gradient(105deg, rgba(201,139,27,0.18) 0%, transparent 55%)`,
-						].join(", "),
-					}}
-					aria-hidden
-				/>
+				{/* Legibility scrim — the one sanctioned photo overlay */}
+				<div className={styles.heroScrim} aria-hidden />
 
 				{/* ── HOST BADGE (top-left) ── */}
-				<div style={{ position: "absolute", top: "12px", left: "12px", zIndex: 3, display: "inline-block" }}>
+				<div className={styles.hostSlot}>
 					<button
 						type="button"
-						style={hostCircle}
+						className={hostCircleClass}
 						onClick={onHostClick ? () => onHostClick(data.id) : undefined}
 						aria-label={verified ? `${data.hostName} — Verified Host` : data.hostName}
 					>
@@ -529,34 +477,20 @@ export function DiscoveryCard({
 								alt={`${data.hostName} host avatar`}
 								loading="lazy"
 								decoding="async"
-								style={{ width: "100%", height: "100%", objectFit: "cover" }}
+								className={styles.hostAvatarImg}
 							/>
 						) : (
-							<span style={{
-								fontFamily: DISPLAY_FONT, fontSize: "clamp(10px, 2.6vw, 13px)",
-								fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase",
-								color: PAPER, textShadow: "0 1px 3px rgba(23,19,13,0.4)",
-								lineHeight: 1, userSelect: "none",
-							}}>
+							<span className={styles.hostCircleLabel}>
 								{circleLabel}
 							</span>
 						)}
 					</button>
 
-					{/* Verified check — listing surfaces only; not shown on applicant review */}
-					{verified && !isApplicantReview ? (
-						<span
-							style={{
-								position: "absolute", bottom: "-4px", right: "-4px", zIndex: 4,
-								width: "18px", height: "18px", borderRadius: "50%",
-								background: "var(--palette-teal)",
-								border: "2px solid var(--palette-surface)",
-								boxShadow: `0 0 0 1px ${INK}, 0 2px 6px rgba(0,0,0,0.32)`,
-								display: "flex", alignItems: "center", justifyContent: "center",
-								color: "var(--palette-paper)", flexShrink: 0,
-							}}
-							aria-label="Verified Host"
-						>
+					{/* Verified check — host listing surfaces only. NEVER on a seeker
+					    applicant card, and NEVER on a sourced listing (unconfirmed
+					    inventory must not present as Explore & Earn-verified). */}
+					{!isApplicantReview && !isSourced ? (
+						<span className={styles.verifiedDot} aria-label="Verified Host">
 							<Icon name="trust.verified_host" size={16} aria-hidden />
 						</span>
 					) : null}
@@ -566,144 +500,81 @@ export function DiscoveryCard({
 
 				{centerBadge ? (
 					/* Action / boosted stamp — top-center */
-					<div style={{
-						position: "absolute", top: "12px", left: "50%", transform: "translateX(-50%)",
-						zIndex: 3, display: "inline-flex", alignItems: "center",
-					}}>
-						<span style={{
-							...STAMP,
-							color: centerBadge.color,
-							...(centerBadge.bg ? {
-								background: centerBadge.bg,
-								boxShadow: "0 3px 14px rgba(23,19,13,0.34), 0 1px 0 rgba(255,255,255,0.25) inset",
-							} : {}),
-						}}>
+					<div className={styles.centerSlot}>
+						<span className={`${styles.stamp}${CENTER_TONE_CLASS[centerBadge.tone] ? ` ${CENTER_TONE_CLASS[centerBadge.tone]}` : ""}`}>
 							{centerBadge.icon && <Icon name={centerBadge.icon} size={16} aria-hidden />}
-							{centerBadge.decoration && (
-								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
-							)}
+							{centerBadge.decoration && <span aria-hidden className={styles.stampRule} />}
 							{centerBadge.label}
-							{centerBadge.decoration && (
-								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
-							)}
+							{centerBadge.decoration && <span aria-hidden className={styles.stampRule} />}
 						</span>
 					</div>
-				) : showMatchBar && data.matchScore !== undefined ? (
-					/* Match score bar — same slot as fill bar; pointer shows your fit */
-					<div style={{
-						position: "absolute", top: "16px",
-						left: "calc(var(--dc-host-size, 74px) + 22px)",
-						right: "92px",
-						zIndex: 3,
-						display: "flex", flexDirection: "column", alignItems: "stretch", gap: "3px",
-					}}>
-						<div style={{ position: "relative", height: "8px" }}>
-							<div style={{
-								position: "absolute",
-								left: `${Math.min(96, Math.max(4, data.matchScore))}%`,
-								transform: "translateX(-50%)",
-								width: 0, height: 0,
-								borderLeft: "5px solid transparent",
-								borderRight: "5px solid transparent",
-								borderTop: `7px solid ${INK}`,
-							}} />
-						</div>
-						<div style={{
-							height: "9px", borderRadius: "5px",
-							border: "1.5px solid rgba(23,19,13,0.30)",
-							background: "linear-gradient(90deg, var(--status-error-fg) 0%, var(--palette-amber) 48%, var(--status-success-fg) 100%)",
-							boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
-						}} />
-						<div style={{
-							textAlign: "center",
-							fontFamily: UI_FONT, fontSize: "9px", fontWeight: 700,
-							letterSpacing: "0.06em", textTransform: "uppercase",
-							color: PAPER, textShadow: "0 1px 2px rgba(23,19,13,0.5)",
-							lineHeight: 1,
-						}}>
-							{data.matchScore}% Match
-						</div>
-					</div>
+				) : showMatchCenter && data.matchScore !== undefined ? (
+					/* Match score — centered pill, colour-coded by band with a mini
+					   fill bar (how well it fits), keeping the % text. */
+					<span
+						className={`${styles.matchPill} ${matchBandClass(data.matchScore)}`}
+						style={{ "--dc-bar-pct": `${clampPct(data.matchScore)}%` } as CSSProperties}
+						aria-label={`Match ${data.matchScore} percent`}
+					>
+						<span className={styles.matchPillNum}>{data.matchScore}%</span>
+						<span className={styles.matchPillLabel}>Match</span>
+						<span className={styles.matchPillTrack} aria-hidden>
+							<span className={styles.matchPillFill} />
+						</span>
+					</span>
 				) : showHeroBar && data.fillPercent !== undefined ? (
 					/* Fill-quality bar — listing scarcity signal */
-					<div style={{
-						position: "absolute", top: "16px",
-						left: "calc(var(--dc-host-size, 74px) + 22px)",
-						right: "92px",
-						zIndex: 3,
-						display: "flex", flexDirection: "column", alignItems: "stretch", gap: "3px",
-					}}>
-						<div style={{ position: "relative", height: "8px" }}>
-							<div style={{
-								position: "absolute",
-								left: `${Math.min(96, Math.max(4, data.fillPercent))}%`,
-								transform: "translateX(-50%)",
-								width: 0, height: 0,
-								borderLeft: "5px solid transparent",
-								borderRight: "5px solid transparent",
-								borderTop: `7px solid ${INK}`,
-							}} />
+					<div
+						className={styles.heroBar}
+						style={{ "--dc-bar-pct": `${clampPct(data.fillPercent)}%` } as CSSProperties}
+					>
+						<div className={styles.heroBarTrack}>
+							<div className={`${styles.heroBarFill} ${styles.heroBarFillQuantity}`} />
 						</div>
-						<div style={{
-							height: "9px", borderRadius: "5px",
-							border: "1.5px solid rgba(23,19,13,0.30)",
-							background: "linear-gradient(90deg, var(--status-error-fg) 0%, var(--palette-amber) 48%, var(--status-success-fg) 100%)",
-							boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
-						}} />
-						<div style={{
-							textAlign: "center",
-							fontFamily: UI_FONT, fontSize: "9px", fontWeight: 700,
-							letterSpacing: "0.06em", textTransform: "uppercase",
-							color: PAPER, textShadow: "0 1px 2px rgba(23,19,13,0.5)",
-							lineHeight: 1,
-						}}>
+						<span className={`${styles.heroBarLabel} ${styles.heroBarLabelPaper}`}>
 							{fillCopy(data.fillPercent)}
-						</div>
+						</span>
 					</div>
 				) : null}
 
 				{/* ── TOP-RIGHT SLOT: category + optional secondary ── */}
-				<div style={{
-					position: "absolute", top: "12px", right: "12px", zIndex: 3,
-					display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end",
-				}}>
-					{/* Category stamp — always ONE, always here; colored fill = instant recognition */}
-					<span style={{
-						...STAMP,
-						background: "var(--cat-accent)",
-						color: "var(--palette-paper)",
-						boxShadow: `0 3px 12px rgba(23,19,13,0.32), 0 1px 0 rgba(255,255,255,0.22) inset`,
-					}}>
-						<Icon name={CAT_ICON[cat]} size={16} aria-hidden />
+				<div className={styles.rightSlot}>
+					{/* Category stamp — always ONE, always here; ink label + category icon/ring */}
+					<span className={`${styles.stamp} ${styles.stampCategory}`}>
+						<span className={styles.stampCategoryIcon}>
+							<Icon name={CAT_ICON[cat]} size={16} aria-hidden />
+						</span>
 						{CAT_LABEL[cat]}
 					</span>
 
-					{/* Secondary badge — state indicator (max 1); clean ink-colored ring */}
-					{secondaryBadge ? (
-						<span style={{
-							...STAMP,
-							color: secondaryBadge.ink,
-							border: `1px solid color-mix(in srgb, ${secondaryBadge.ink} 32%, transparent)`,
-						}}>
+					{/* Secondary badge — boosted (gold, when match took center) wins;
+					    otherwise one toned state stamp. */}
+					{boostedSecondary ? (
+						<span className={`${styles.stamp} ${styles.stampBoostedSecondary}`}>
+							<Icon name="status.boosted" size={14} aria-hidden />
+							Boosted
+						</span>
+					) : secondaryBadge ? (
+						<span className={`${styles.stamp} ${styles.stampOutline} ${SECONDARY_TONE_CLASS[secondaryBadge.tone]}`}>
 							{secondaryBadge.label}
 						</span>
 					) : null}
 				</div>
 
+				{/* Previously skipped — subtle bottom-left photo marker (demoted-but-
+				    visible; the swipe deck excludes skipped so never renders this). */}
+				{previouslySkipped ? (
+					<span className={styles.skippedMarker}>
+						<Icon name="action.close" size={14} aria-hidden />
+						Previously skipped
+					</span>
+				) : null}
+
 				{/* Report flag — bottom-right */}
 				{onReport ? (
 					<button
 						type="button"
-						style={{
-							position: "absolute", right: "12px", bottom: "12px", zIndex: 3,
-							width: "34px", height: "34px", borderRadius: "50%",
-							background: "rgba(255,244,215,0.88)",
-							backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-							border: `1.5px solid ${INK_SOFT}`,
-							boxShadow: "0 0 0 1px rgba(23,19,13,0.12), 0 2px 8px rgba(0,0,0,0.18)",
-							display: "flex", alignItems: "center", justifyContent: "center",
-							padding: 0, cursor: "pointer", color: INK_SOFT,
-						}}
+						className={styles.reportBtn}
 						onClick={() => onReport(data.id)}
 						aria-label="Report listing"
 					>
@@ -713,88 +584,99 @@ export function DiscoveryCard({
 			</div>
 
 			{/* ── INFO ROWS ── */}
-			<div style={{
-				display: "flex", flexDirection: "column",
-				gap: "var(--dc-gap, 8px)", padding: "var(--dc-padding, 12px)",
-			}}>
+			<div className={styles.body}>
 
-				{/* 2. HOST NAME */}
-				{titleHandler ? (
-					<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={titleHandler}>
-						<span style={hostNameText}>{data.hostName}</span>
-					</button>
-				) : (
-					<div style={ROW_CELL_CAT}>
-						<span style={hostNameText}>{data.hostName}</span>
+				{/* Sourced disclosure — the FIRST thing in the body, full-width and
+				    unmissable. Never softened: this listing is real and attributable
+				    but NOT confirmed by Explore & Earn (no host, no verified badge). */}
+				{isSourced ? (
+					<div className={styles.sourcedRibbon}>
+						<Icon name="system.info" size={14} aria-hidden />
+						<span>Sourced · not yet confirmed by Explore &amp; Earn</span>
 					</div>
-				)}
+				) : null}
 
-				{/* 3. JOB TITLE */}
+				{/* 2. HOST NAME — icon + name (icon in every field) */}
+				{(() => {
+					// Sourced listings carry NO verified-host glyph on the name row —
+					// the employer name is source-stated, not a verified host.
+					const hostIcon = isApplicantReview
+						? "nav.profile"
+						: isSourced
+							? "nav.hosts"
+							: "trust.verified_host"
+					return titleHandler ? (
+						<button type="button" className={`${styles.metaRow} ${styles.hostRow}`} onClick={titleHandler}>
+							<Icon name={hostIcon} size={18} aria-hidden />
+							<span className={styles.hostName}>{data.hostName}</span>
+						</button>
+					) : (
+						<div className={`${styles.metaRow} ${styles.hostRow}`}>
+							<Icon name={hostIcon} size={18} aria-hidden />
+							<span className={styles.hostName}>{data.hostName}</span>
+						</div>
+					)
+				})()}
+
+				{/* 3. JOB TITLE — the card's single dominant text element */}
 				{onOpen ? (
-					<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={() => onOpen(data.id)}>
+					<button type="button" className={`${styles.metaRow} ${styles.titleRow}`} onClick={() => onOpen(data.id)}>
 						<Icon name={CAT_ICON[cat]} size={20} aria-hidden />
-						<span style={jobTitleText}>{roleText}</span>
+						<span className={styles.title}>{roleText}</span>
 					</button>
 				) : (
-					<div style={ROW_CELL_CAT}>
+					<div className={`${styles.metaRow} ${styles.titleRow}`}>
 						<Icon name={CAT_ICON[cat]} size={20} aria-hidden />
-						<span style={jobTitleText}>{roleText}</span>
+						<span className={styles.title}>{roleText}</span>
 					</div>
 				)}
 
 				{/* 4. LOCATION — only when a real place is known */}
 				{hasLocation ? (
 					onLocationClick ? (
-						<button type="button" style={{ ...ROW_CELL_CAT, width: "100%", cursor: "pointer" }} onClick={() => onLocationClick(data.id)}>
+						<button type="button" className={`${styles.metaRow} ${styles.locationRow}`} onClick={() => onLocationClick(data.id)}>
 							<Icon name={MAPPIN[cat]} size={20} aria-hidden />
-							<span style={locationText}>{data.location}</span>
+							<span className={styles.location}>{data.location}</span>
 						</button>
 					) : (
-						<div style={ROW_CELL_CAT}>
+						<div className={`${styles.metaRow} ${styles.locationRow}`}>
 							<Icon name={MAPPIN[cat]} size={20} aria-hidden />
-							<span style={locationText}>{data.location}</span>
+							<span className={styles.location}>{data.location}</span>
 						</div>
 					)
 				) : null}
 
 				{/* 5. TIMING — concrete BEGINS | ENDS when known, else the opportunity window */}
 				{hasDates ? (
-					<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
-						<div style={STRIP_CELL_CAT}>
-							<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+					<div className={styles.datesRow}>
+						<div className={styles.dateCell}>
+							<span className={styles.dateLabel}>
 								<Icon name="status.begins" size={16} aria-hidden />
-								<span style={stripLabel}>Begins</span>
+								Begins
 							</span>
-							<span style={stripValue}>{data.begins ?? "Flexible"}</span>
+							<span className={styles.dateValue}>{data.begins ?? "Flexible"}</span>
 						</div>
-						<div style={STRIP_CELL_CAT}>
-							<span style={{ display: "flex", alignItems: "center", gap: "3px" }}>
+						<div className={styles.dateCell}>
+							<span className={styles.dateLabel}>
 								<Icon name="status.ends" size={16} aria-hidden />
-								<span style={stripLabel}>Ends</span>
+								Ends
 							</span>
-							<span style={stripValue}>{data.ends ?? "Flexible"}</span>
+							<span className={styles.dateValue}>{data.ends ?? "Flexible"}</span>
 						</div>
 					</div>
 				) : (
-					<div style={{ ...STRIP_CELL_CAT, flexDirection: "row", gap: "7px", padding: "9px 14px" }}>
+					<div className={styles.windowRow}>
 						<Icon name="status.begins" size={16} aria-hidden />
-						<span style={locationText}>{data.opportunityWindow || "Open timing"}</span>
+						<span className={styles.dateValue}>{data.opportunityWindow || "Open timing"}</span>
 					</div>
 				)}
 
 				{/* 6. SKILLS (applicant review) or HOUSING | MEALS | PAY */}
 				{isApplicantReview && data.skills && data.skills.length > 0 ? (
 					/* Top skills in place of H/M/P on applicant card */
-					<div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+					<div className={styles.skills}>
 						{data.skills.slice(0, 3).map((skill) => (
-							<span key={skill} style={{
-								fontFamily: UI_FONT, fontSize: "10px", fontWeight: 700,
-								letterSpacing: "0.05em", textTransform: "uppercase",
-								color: INK, background: PAPER,
-								border: `1.5px solid ${INK}`,
-								borderRadius: "6px", padding: "3px 8px",
-								lineHeight: 1.2,
-							}}>
+							<span key={skill} className={styles.skill}>
 								{skill}
 							</span>
 						))}
@@ -807,12 +689,14 @@ export function DiscoveryCard({
 						<BenefitTriadCell
 							kind="housing"
 							provided={hp !== "not_provided"}
+							notStated={ev?.housing === "not_stated"}
 							value={data.triad.housing}
 							onClick={canOpenHousing ? () => onHousingClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="meals"
 							provided={mp !== "not_provided"}
+							notStated={ev?.meals === "not_stated"}
 							value={data.triad.meals}
 							onClick={canOpenMeals ? () => onMealsClick!(data.id) : undefined}
 						/>
@@ -834,136 +718,97 @@ export function DiscoveryCard({
 				{/* 7. CTA — admin_review: Approve/Warn/Remove strip; host_applicant_review: Skip/Save/Schedule strip; all other surfaces: single stamp button */}
 				{actions ?? (
 					isAdminReview ? (
-						<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
+						<div className={styles.actionStrip}>
 							<button
 								type="button"
+								className={`${styles.actionBtn} ${styles.actionApprove}`}
 								onClick={onApprove ? () => onApprove(data.id) : undefined}
-								style={{
-									background: "var(--status-success-fg)", color: "var(--palette-paper)",
-									border: "3px solid var(--status-success-fg)", borderRadius: "10px",
-									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-									padding: "12px 6px",
-									display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
-									cursor: onApprove ? "pointer" : "default",
-									boxShadow: "3px 3px 0 rgba(23,19,13,0.30)",
-								}}
 							>
 								<Icon name="system.success" size={16} aria-hidden />
 								Approve
 							</button>
 							<button
 								type="button"
+								className={`${styles.actionBtn} ${styles.actionWarn}`}
 								onClick={onWarn ? () => onWarn(data.id) : undefined}
-								style={{
-									background: "transparent", color: "var(--status-warning-fg)",
-									border: "2px dashed var(--status-warning-fg)", borderRadius: "10px",
-									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-									padding: "12px 6px",
-									display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
-									cursor: onWarn ? "pointer" : "default",
-								}}
 							>
 								<Icon name="system.info" size={16} aria-hidden />
 								Warn
 							</button>
 							<button
 								type="button"
+								className={`${styles.actionBtn} ${styles.actionRemove}`}
 								onClick={onRemove ? () => onRemove(data.id) : undefined}
-								style={{
-									background: "transparent", color: "var(--status-error-fg)",
-									border: "2px dashed var(--status-error-fg)", borderRadius: "10px",
-									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-									padding: "12px 6px",
-									display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
-									cursor: onRemove ? "pointer" : "default",
-								}}
 							>
 								<Icon name="action.close" size={16} aria-hidden />
 								Remove
 							</button>
 						</div>
 					) : isApplicantReview ? (
-						<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--dc-gap, 8px)" }}>
+						<div className={styles.actionStrip}>
 							{/* SKIP — active dark stamp */}
 							<button
 								type="button"
+								className={`${styles.actionBtn} ${styles.actionSkip}`}
 								onClick={onSkip ? () => onSkip(data.id) : undefined}
-								style={{
-									background: INK, color: PAPER,
-									border: `3px solid ${INK}`, borderRadius: "10px",
-									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-									padding: "12px 6px",
-									display: "flex", alignItems: "center", justifyContent: "center", gap: "5px",
-									cursor: onSkip ? "pointer" : "default",
-									boxShadow: "3px 3px 0 rgba(23,19,13,0.30)",
-								}}
 							>
-								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
+								<span aria-hidden className={styles.stampRule} />
 								Skip
-								<span aria-hidden style={{ display: "inline-block", width: "12px", height: "1px", background: "currentColor", opacity: 0.4 }} />
+								<span aria-hidden className={styles.stampRule} />
 							</button>
 
 							{/* SAVE — neutral bordered */}
 							<button
 								type="button"
+								className={`${styles.actionBtn} ${styles.actionSave}`}
 								onClick={onSave ? () => onSave!(data.id) : undefined}
-								style={{
-									background: "transparent", color: INK,
-									border: `2px dashed ${INK_SOFT}`, borderRadius: "10px",
-									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-									padding: "12px 6px",
-									display: "flex", alignItems: "center", justifyContent: "center",
-									cursor: onSave ? "pointer" : "default",
-								}}
 							>
 								Save
 							</button>
 
-							{/* SCHEDULE — blue bordered */}
+							{/* SCHEDULE — gold bordered */}
 							<button
 								type="button"
+								className={`${styles.actionBtn} ${styles.actionSchedule}`}
 								onClick={onSchedule ? () => onSchedule!(data.id) : onOpen ? () => onOpen(data.id) : undefined}
-								style={{
-									background: "transparent", color: P_INK,
-									border: `2px dashed ${P_INK}`, borderRadius: "10px",
-									fontFamily: DISPLAY_FONT, fontSize: "clamp(11px, 2.8vw, 14px)",
-									fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase",
-									padding: "12px 6px",
-									display: "flex", alignItems: "center", justifyContent: "center",
-									cursor: "pointer",
-								}}
 							>
 								Schedule
+							</button>
+						</div>
+					) : showDecisionBar ? (
+						/* Seeker decision bar — ALWAYS Skip · Apply · Save at 20/60/20. */
+						<div className={styles.ctaRow}>
+							<button
+								type="button"
+								className={`${styles.ctaBtn} ${styles.ctaSkip} ui-pressable`}
+								onClick={onSkip ? () => onSkip(data.id) : undefined}
+								aria-label="Skip this opportunity"
+							>
+								<Icon name="action.close" size={18} aria-hidden />
+							</button>
+							<button
+								type="button"
+								className={`${styles.ctaBtn} ${styles.ctaApply} ui-pressable`}
+								onClick={onApply ? () => onApply(data.id) : onOpen ? () => onOpen(data.id) : undefined}
+							>
+								Apply
+								<Icon name="action.forward" size={16} aria-hidden />
+							</button>
+							<button
+								type="button"
+								className={`${styles.ctaBtn} ${styles.ctaSave} ui-pressable`}
+								onClick={onSave ? () => onSave(data.id) : undefined}
+								aria-label="Save this opportunity"
+							>
+								<Icon name="nav.saved" size={18} aria-hidden />
 							</button>
 						</div>
 					) : (
 						<button
 							type="button"
+							className={ctaClass}
 							disabled={ctaDisabled}
 							onClick={ctaHandler}
-							style={{
-								width: "100%",
-								background: ctaBg,
-								color: ctaColor,
-								border: ctaBorderVal,
-								borderRadius: "10px",
-								fontFamily: DISPLAY_FONT,
-								fontSize: "clamp(14px, 3.5vw, 17px)",
-								fontWeight: 700,
-								letterSpacing: "0.10em",
-								textTransform: "uppercase",
-								padding: "11px 16px",
-								display: "flex", alignItems: "center",
-								justifyContent: "center", gap: "14px",
-								cursor: ctaDisabled ? "not-allowed" : "pointer",
-								opacity: ctaDisabled ? 0.60 : 1,
-								boxShadow: ctaShadow,
-							}}
 						>
 							{!isPassiveCta && <Icon name="action.apply" size={16} aria-hidden />}
 							{ctaLabel}

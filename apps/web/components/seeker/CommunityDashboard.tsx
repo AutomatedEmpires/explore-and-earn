@@ -25,6 +25,7 @@ import {
   uploadCommunityPhotoAction,
 } from "../../app/actions/community";
 import { getEditorialPosts, type EditorialPost } from "../../lib/editorial";
+import { byMonetization, STRONG_MATCH_THRESHOLD } from "../../lib/ranking";
 import styles from "./CommunityDashboard.module.css";
 
 // ─── Feed item types ──────────────────────────────────────────────────────────
@@ -124,28 +125,47 @@ const CATEGORY_ABBR: Record<OpportunityCategory, string> = {
 
 /** Preferred cadence — a communal rhythm, never a spammy dump. The ranker honours
  *  this order where supply exists, and the "no more than 2 of one type in a row"
- *  rule below guarantees variety regardless of what's actually available. */
+ *  rule below guarantees variety regardless of what's actually available. Photos
+ *  (seeker) lead so the wall reads as the seekers' community first. */
 const FEED_TYPE_RHYTHM: readonly FeedSlotType[] = [
   "seeker",
   "seeker",
   "announcement",
   "listing",
+  "seeker",
   "editorial",
   "seeker",
   "employer",
-  "announcement",
   "seeker",
+  "announcement",
 ];
+
+/** Feed regulation (founder direction 2026-07-13): the community wall must never
+ *  feel oversaturated. Over every rolling window of FEED_WINDOW posts the three
+ *  high-volume / promotional streams are capped — at most 6 photos, 2 job-share
+ *  listings, and 2 host announcements per 10 posts. Employer + editorial cards
+ *  are scarce by supply (≤2 each) and act as organic filler between them. The cap
+ *  only shapes ORDER; a fallback still emits any remaining content so nothing real
+ *  is ever dropped. Promoted listing slots are pre-ranked by monetization
+ *  (byMonetization) upstream in buildListingFeedCards. */
+const FEED_WINDOW = 10;
+const WINDOW_CAP: Partial<Record<FeedSlotType, number>> = {
+  seeker: 6,
+  listing: 2,
+  announcement: 2,
+};
 
 // ─── Tab navigation ───────────────────────────────────────────────────────────
 
+// Order is founder-locked: Photos | Feed | Announcements (L→R). COMMUNITY_TABS
+// (render order) and TAB_ORDER (arrow-key index math) must stay in lockstep.
 const COMMUNITY_TABS = [
-  { id: "feed" as const, label: "Feed", icon: "nav.feed" as const },
   { id: "photos" as const, label: "Photos", icon: "nav.photos" as const },
+  { id: "feed" as const, label: "Feed", icon: "nav.feed" as const },
   { id: "announcements" as const, label: "Announcements", icon: "nav.announcements" as const },
 ] as const;
 
-const TAB_ORDER: readonly CommunityTab[] = ["feed", "photos", "announcements"];
+const TAB_ORDER: readonly CommunityTab[] = ["photos", "feed", "announcements"];
 
 /**
  * True ARIA tablist: role=tablist/tab with roving tabindex, arrow-key + Home/End
@@ -240,15 +260,28 @@ function benefitLabel(provision: string, summary?: string): string {
   return "Own arrange.";
 }
 
-/** Boosted / strongly-matched listings — real discovery data, surfaced as feed cards. */
+/**
+ * Promoted job-share cards for the feed. Only "pay more / fit more" listings earn
+ * a promotional slot: boosted, or a strong match (≥90%). Within that eligible set
+ * they are ordered by the shared monetization ranker (Boosted > Enterprise >
+ * Matched≥90 …), with match score breaking ties. This never HIDES a listing from
+ * the rest of the app — it only decides which few surface on the communal wall.
+ */
 function buildListingFeedCards(listings: readonly DiscoveryListing[]): BoostedListing[] {
   return [...listings]
     .filter(l =>
       l.conditionalBadges?.includes("boosted") ||
-      (l.matchScore !== undefined && l.matchScore >= 60),
+      (l.matchScore !== undefined && l.matchScore >= STRONG_MATCH_THRESHOLD),
     )
+    // Match score first, then a STABLE monetization sort so equal-rank items keep
+    // their match order (Array.prototype.sort is stable in modern engines).
     .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
-    .slice(0, 3)
+    .sort(byMonetization<DiscoveryListing>(l => ({
+      boosted: l.conditionalBadges?.includes("boosted"),
+      hostTier: l.host?.tier,
+      matchScore: l.matchScore,
+    })))
+    .slice(0, 4)
     .map((l): BoostedListing => ({
       kind: "listing",
       id: `listing-card-${l.id}`,
@@ -280,11 +313,18 @@ function buildEditorialFeedCards(): EditorialCard[] {
 
 /**
  * Ranked, communal interleaver. Inputs are REAL content buckets (seeker photos,
- * host announcements, boosted listings, featured employers). It favours the
- * preferred rhythm + recency, but enforces the anti-spam invariant: never more
- * than two of the same content type in a row. Buckets are consumed front-to-back
- * (callers pre-sort seeker/announcement buckets newest-first), so recency is
- * preserved within a type while variety is preserved across types.
+ * host announcements, promoted listings, featured employers, field guides). It
+ * favours the preferred rhythm + recency, but enforces two anti-saturation
+ * invariants:
+ *   1. never more than two of the same content type in a row, and
+ *   2. a per-window density cap (WINDOW_CAP over FEED_WINDOW posts): at most 6
+ *      photos, 2 listing-shares, and 2 announcements per 10 posts, so the wall
+ *      can't be flooded by any one stream.
+ * Buckets are consumed front-to-back (callers pre-sort seeker/announcement
+ * buckets newest-first; listings arrive monetization-ranked), so priority is
+ * preserved within a type while variety is preserved across types. A final
+ * fallback still emits any remaining content so nothing real is ever dropped —
+ * the caps only shape ordering, never inclusion.
  */
 function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[] {
   const queues: Record<FeedSlotType, FeedItem[]> = {
@@ -309,13 +349,29 @@ function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[
     return run;
   };
 
+  // How many of `type` sit inside the CURRENT window of FEED_WINDOW posts. The
+  // window advances every FEED_WINDOW emitted items, so caps read as "per 10".
+  const windowCount = (type: FeedSlotType): number => {
+    const start = result.length - (result.length % FEED_WINDOW);
+    let n = 0;
+    for (let i = start; i < result.length; i++) {
+      if (result[i]!.kind === type) n++;
+    }
+    return n;
+  };
+  const withinWindowCap = (type: FeedSlotType): boolean => {
+    const cap = WINDOW_CAP[type];
+    return cap === undefined || windowCount(type) < cap;
+  };
+
   // Try the preferred rhythm first; on each step pick the best eligible type.
   let rhythmIdx = 0;
   while (remaining() > 0) {
     const preferred = FEED_TYPE_RHYTHM[rhythmIdx % FEED_TYPE_RHYTHM.length]!;
     rhythmIdx++;
 
-    // Eligible = has supply AND wouldn't create a 3-in-a-row of its type.
+    // Eligible = has supply, wouldn't create a 3-in-a-row, AND is within its
+    // per-window density cap.
     const order: FeedSlotType[] = [
       preferred,
       "seeker", "announcement", "listing", "employer", "editorial",
@@ -324,13 +380,16 @@ function rankCommunityFeed(buckets: Record<FeedSlotType, FeedItem[]>): FeedItem[
     for (const type of order) {
       if (queues[type].length === 0) continue;
       if (runOf(type) >= 2) continue;
+      if (!withinWindowCap(type)) continue;
       chosen = type;
       break;
     }
-    // Fallback: nothing satisfies the anti-spam rule (e.g. only one type left) —
-    // take whatever remains so we never drop real content.
+    // Fallback: nothing satisfies the cap/anti-spam rules (e.g. only capped
+    // content is left in this window) — relax the window cap but keep the run
+    // rule where possible, then take whatever remains, so nothing real is dropped.
     if (!chosen) {
       chosen =
+        order.find(t => queues[t].length > 0 && runOf(t) < 2) ??
         (["seeker", "announcement", "listing", "employer", "editorial"] as FeedSlotType[])
           .find(t => queues[t].length > 0) ?? null;
     }
@@ -697,6 +756,63 @@ function PostMenu({
   );
 }
 
+// ─── Photo caption (clamp ~80 chars, single line, "read more") ────────────────
+
+/** Photo captions stay glanceable: clamped to ~80 chars on one row, with an
+ *  inline "read more" toggle when the full caption runs longer. */
+const CAPTION_CLAMP = 80;
+/** Photo posts carry at most this many tag chips. */
+const MAX_PHOTO_TAGS = 3;
+
+function PhotoCaption({ text }: { readonly text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!text) return null;
+  const needsClamp = text.length > CAPTION_CLAMP;
+  if (!needsClamp) {
+    return <p className={styles.cardCaption}>{text}</p>;
+  }
+  return (
+    <p className={styles.cardCaption}>
+      {expanded ? text : `${text.slice(0, CAPTION_CLAMP).trimEnd()}… `}
+      <button
+        type="button"
+        className={styles.captionMore}
+        aria-expanded={expanded}
+        onClick={() => setExpanded(prev => !prev)}
+      >
+        {expanded ? "Show less" : "read more"}
+      </button>
+    </p>
+  );
+}
+
+// ─── Announcement text (host-authored, with interactive links) ────────────────
+
+/** Splits an announcement body on http(s) URLs and renders each as a real link.
+ *  Announcements are host-authored only, so this is safe host-supplied content. */
+function AnnouncementText({ text }: { readonly text: string }) {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g);
+  return (
+    <p className={styles.announcementText}>
+      {parts.map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a
+            key={`${part}-${i}`}
+            href={part}
+            className={styles.announcementLink}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={`t-${i}`}>{part}</span>
+        ),
+      )}
+    </p>
+  );
+}
+
 // ─── Seeker post card ─────────────────────────────────────────────────────────
 
 interface SeekerCardProps {
@@ -744,8 +860,8 @@ function SeekerCard({ post, onHide, onToast }: SeekerCardProps) {
           ) : null}
         </div>
       </div>
-      <p className={styles.cardCaption}>{post.caption}</p>
-      <HashtagChips tags={post.tags} />
+      <PhotoCaption text={post.caption} />
+      <HashtagChips tags={post.tags.slice(0, MAX_PHOTO_TAGS)} />
       {post.coverUrl ? (
         <div className={styles.cardImageWrap}>
           <div className={styles.cardImageMat}>
@@ -801,7 +917,7 @@ function AnnouncementCard({ post }: { readonly post: HostAnnouncement }) {
         <span className={styles.megaphone} aria-hidden>
           <Icon name="nav.announcements" size={20} aria-hidden />
         </span>
-        <p className={styles.announcementText}>{post.text}</p>
+        <AnnouncementText text={post.text} />
       </div>
       {post.coverUrls.length > 0 ? (
         <div className={styles.photoGrid}>
@@ -837,6 +953,28 @@ function SeekerAnnouncementsIntro() {
         <p className={styles.annIntroSub}>
           Seasonal openings, housing updates, and hiring calls — posted by hosts, read free by every
           seeker. Built by seekers, for seekers.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Hosts on the Photos surface (read-only) ──────────────────────────────────
+
+/** Photos are a seekers-only space. Hosts can browse the wall but never get the
+ *  upload affordance here — their broadcast channel is Announcements. This is a
+ *  presentation gate; the real upload authorization lives in the server action. */
+function HostPhotosNotice() {
+  return (
+    <div className={styles.annIntro}>
+      <span className={styles.annIntroIcon} aria-hidden>
+        <Icon name="nav.photos" size={24} aria-hidden />
+      </span>
+      <div className={styles.annIntroText}>
+        <p className={styles.annIntroTitle}>The photo wall is a seekers-only space</p>
+        <p className={styles.annIntroSub}>
+          Seekers share moments from the field here. As a host, you can browse every photo —
+          to reach the community, post an update from the Announcements tab.
         </p>
       </div>
     </div>
@@ -1219,120 +1357,6 @@ function PhotoMasonryGrid({ photos }: { readonly photos: SeekerPost[] }) {
 
 // ─── Sidebar components ───────────────────────────────────────────────────────
 
-const SECTION_META: Record<"feed" | "photos" | "announcements", { eyebrow: string; blurb: string; icon: "nav.feed" | "nav.photos" | "nav.announcements" }> = {
-  feed: {
-    eyebrow: "Community Feed",
-    blurb: "Stories, photos, and announcements from seekers and hosts out on the trail.",
-    icon: "nav.feed",
-  },
-  photos: {
-    eyebrow: "Community Photos",
-    blurb: "Real moments from farms, boats, lodges, and the open road — shared by the crew.",
-    icon: "nav.photos",
-  },
-  announcements: {
-    eyebrow: "Announcements",
-    blurb: "Seasonal openings and hiring news from verified Explore & Earn hosts.",
-    icon: "nav.announcements",
-  },
-};
-
-function WelcomeBar({ status, tab }: { readonly status: SeekerStatusSummary; readonly tab: "feed" | "photos" | "announcements" }) {
-  const level = Math.max(1, Math.ceil(status.resumeCompletion / 20));
-  const xp = status.resumeCompletion * 10;
-  const xpMax = 1000;
-  const fillPct = status.resumeCompletion;
-  const section = SECTION_META[tab];
-  return (
-    <div className={styles.welcomeBar}>
-      <div className={styles.mastheadTop}>
-        <span className={styles.mastheadEyebrow}>
-          <Icon name={section.icon} size={16} aria-hidden />
-          Explore &amp; Earn Community
-        </span>
-        <h1 className={styles.mastheadTitle}>{section.eyebrow}</h1>
-        <p className={styles.mastheadBlurb}>{section.blurb}</p>
-        <div className={styles.mastheadTaglines}>
-          <span className={styles.mastheadTagline}>
-            <Icon name="trust.verified_host" size={16} aria-hidden />
-            Built by seekers, for seekers
-          </span>
-          <span className={styles.mastheadTaglineDot} aria-hidden />
-          <span className={styles.mastheadTagline}>
-            <Icon name="system.success" size={16} aria-hidden />
-            Seekers are free forever
-          </span>
-        </div>
-      </div>
-      <div className={styles.welcomeBarInner}>
-        <div className={styles.welcomeAvatar} aria-hidden>
-          {status.seekerName.charAt(0).toUpperCase() || "S"}
-        </div>
-        <div className={styles.welcomeTextGroup}>
-          <p className={styles.welcomeGreeting}>
-            Welcome back, <strong>{status.seekerName || "adventurer"}</strong>
-          </p>
-          <p className={styles.welcomeTagline}>Explorer · Level {level}</p>
-        </div>
-        <div className={styles.xpGroup}>
-          <div className={styles.xpLevelBadge} aria-hidden>
-            <span className={styles.xpLevelNum}>{level}</span>
-            <span className={styles.xpLevelWord}>LVL</span>
-          </div>
-          <div className={styles.xpDetails}>
-            <div
-              className={styles.xpTrack}
-              role="progressbar"
-              aria-valuenow={xp}
-              aria-valuemax={xpMax}
-              aria-label={`${xp} of ${xpMax} XP`}
-            >
-              <div className={styles.xpFill} style={{ width: `${fillPct}%` }} />
-            </div>
-            <span className={styles.xpCount}>{xp.toLocaleString()} / {xpMax.toLocaleString()} XP</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MobileProfileStrip({ status, listings }: {
-  readonly status: SeekerStatusSummary;
-  readonly listings: readonly DiscoveryListing[];
-}) {
-  const level = Math.max(1, Math.ceil(status.resumeCompletion / 20));
-  return (
-    <div className={styles.mobileStrip}>
-      <div className={styles.mobileStripProfile}>
-        <div className={styles.mobileStripAvatar} aria-hidden>
-          {status.seekerName.charAt(0).toUpperCase() || "S"}
-        </div>
-        <div className={styles.mobileStripMeta}>
-          <span className={styles.mobileStripName}>{status.seekerName || "Adventurer"}</span>
-          <span className={styles.mobileStripLevel}>Level {level} Explorer</span>
-        </div>
-        <Link href="/profile" className={styles.mobileStripEdit}>
-          Edit profile
-        </Link>
-      </div>
-      {listings.length > 0 ? (
-        <div className={styles.mobileStripListings}>
-          {listings.slice(0, 3).map(l => (
-            <Link key={l.id} href={`/listing/${l.id}`} className={styles.mobileStripListing}>
-              <span className={styles.mobileStripListingTitle}>{l.host.name}</span>
-              <span className={styles.mobileStripListingLoc}>
-                <Icon name="mappin.location" size={16} aria-hidden />
-                {l.location.split(",")[0]}
-              </span>
-            </Link>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function PopularTagsWidget() {
   return (
     <section className={styles.widget}>
@@ -1498,9 +1522,9 @@ export function CommunityDashboard({
 
   return (
     <div className={styles.dashboard}>
-      <WelcomeBar status={status} tab={activeTab} />
+      {/* Immersive, Facebook-style landing: no explanatory hero or welcome banner
+          — the tab bar IS the header and you drop straight into the feed. */}
       <CommunityTabNav activeTab={activeTab} onSelect={selectTab} />
-      <MobileProfileStrip status={status} listings={listings} />
 
       <div className={styles.layout}>
         <div className={styles.mainCol}>
@@ -1508,7 +1532,9 @@ export function CommunityDashboard({
           <div {...panelProps("feed")} className={styles.tabPanel}>
             {activeTab === "feed" ? (
               <>
-                <ShareComposer seekerInitial={seekerInitial} />
+                {/* Photo-sharing is seekers-only, so the "share a photo" composer
+                    CTA is hidden from hosts (their channel is Announcements). */}
+                {!isHost ? <ShareComposer seekerInitial={seekerInitial} /> : null}
                 {visibleFeed.length === 0 ? (
                   <CommunityEmptyState
                     icon="nav.feed"
@@ -1554,11 +1580,18 @@ export function CommunityDashboard({
           <div {...panelProps("photos")} className={styles.tabPanel}>
             {activeTab === "photos" ? (
               <>
-                <PhotoUploadForm
-                  completionScore={completionScore}
-                  onSuccess={() => { router.refresh(); }}
-                  onToast={addToast}
-                />
+                {/* GATE: photos are seekers-only. Hosts get a read-only notice
+                    (never the uploader); the uploader's own completion gate and
+                    the server action guard the seeker path. */}
+                {isHost ? (
+                  <HostPhotosNotice />
+                ) : (
+                  <PhotoUploadForm
+                    completionScore={completionScore}
+                    onSuccess={() => { router.refresh(); }}
+                    onToast={addToast}
+                  />
+                )}
                 <PhotoMasonryGrid photos={photoItems} />
               </>
             ) : null}
@@ -1568,6 +1601,10 @@ export function CommunityDashboard({
           <div {...panelProps("announcements")} className={styles.tabPanel}>
             {activeTab === "announcements" ? (
               <>
+                {/* GATE: posting is host-only (hosts + admin/E&E). Seekers can read
+                    every announcement but never see a compose affordance — they get
+                    the read-only intro. The composer + server action enforce the
+                    real authorization; this only decides which affordance shows. */}
                 {isHost ? (
                   <HostAnnouncementComposer
                     subscriptionTier={hostTier}
@@ -1605,44 +1642,6 @@ export function CommunityDashboard({
         </div>
 
         <aside className={styles.aside}>
-          <section className={`${styles.widget} ${styles.welcomeWidgetSection}`}>
-            <div className={styles.welcomeWidget}>
-              <div className={styles.welcomeWidgetAvatar} aria-hidden>
-                {seekerInitial}
-              </div>
-              <div>
-                <p className={styles.welcomeWidgetName}>Welcome back, {status.seekerName || "adventurer"}!</p>
-                <p className={styles.welcomeWidgetSub}>Keep exploring, connecting, and earning together.</p>
-              </div>
-            </div>
-            <div className={styles.widgetMeter}>
-              <div className={styles.widgetMeterRow}>
-                <span className={styles.widgetMeterIcon} aria-hidden>
-                  <Icon name="category.farm" size={16} aria-hidden />
-                </span>
-                <span className={styles.widgetMeterLabel}>
-                  Level {Math.max(1, Math.ceil(status.resumeCompletion / 20))} Explorer
-                </span>
-              </div>
-              <div
-                className={styles.xpTrack}
-                role="progressbar"
-                aria-valuenow={status.resumeCompletion * 10}
-                aria-valuemax={1000}
-                aria-valuemin={0}
-                aria-label="XP progress"
-              >
-                <div
-                  className={styles.xpFill}
-                  style={{ width: `${status.resumeCompletion}%` }}
-                />
-              </div>
-              <span className={styles.widgetMeterSub}>
-                {(status.resumeCompletion * 10).toLocaleString()} / 1,000 XP
-              </span>
-            </div>
-          </section>
-
           <PopularTagsWidget />
           <UpcomingListingsWidget listings={listings} />
 

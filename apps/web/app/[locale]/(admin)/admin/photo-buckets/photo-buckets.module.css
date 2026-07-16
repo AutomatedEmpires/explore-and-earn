@@ -1,0 +1,306 @@
+/*
+ * Photo buckets manager — read-through view of the nine app photo buckets
+ * inside the .admin-os scope. Token-only: no raw hex (except neutral overlays),
+ * no ad-hoc radii. Correct in both light + night admin themes.
+ */
+
+.page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-24);
+}
+
+/* ── Header ──────────────────────────────────────────────────────── */
+.head {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: var(--space-32);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: radial-gradient(
+			120% 140% at 88% -10%,
+			color-mix(in srgb, var(--color-cta) 22%, transparent) 0%,
+			transparent 58%
+		),
+		var(--color-surface-raised);
+}
+
+.kicker {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	align-self: flex-start;
+	padding: 0.35rem 0.7rem;
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--color-cta) 38%, transparent);
+	background: color-mix(in srgb, var(--color-cta) 14%, transparent);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--color-cta);
+}
+
+.title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: clamp(2rem, 4.8vw, 3rem);
+	line-height: 1.04;
+	letter-spacing: -0.01em;
+	color: var(--text-primary);
+}
+
+.sub {
+	margin: 0;
+	max-width: 68ch;
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.code {
+	font-family: var(--font-mono, monospace);
+	font-size: 0.9em;
+	padding: 0.1em 0.35em;
+	border-radius: var(--radius-small);
+	background: color-mix(in srgb, var(--palette-ink) 12%, transparent);
+	color: var(--text-primary);
+}
+
+.conventionCard {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+	margin-top: var(--space-8);
+	padding: var(--space-12) var(--space-16);
+	border-radius: var(--radius-medium);
+	border: 1px solid var(--border-soft);
+	background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+}
+
+.conventionLabel {
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.conventionCode {
+	font-family: var(--font-mono, monospace);
+	font-size: var(--type-meta-size);
+	color: var(--color-cta);
+	overflow-x: auto;
+	white-space: nowrap;
+}
+
+.conventionMuted {
+	color: var(--text-muted);
+}
+
+/* ── Bucket list ─────────────────────────────────────────────────── */
+.buckets {
+	display: grid;
+	gap: var(--space-16);
+}
+
+.bucket {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: var(--space-20);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface-raised);
+}
+
+.bucketHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-12);
+	flex-wrap: wrap;
+}
+
+.bucketHeadMain {
+	display: flex;
+	align-items: baseline;
+	gap: var(--space-8);
+	flex-wrap: wrap;
+}
+
+.bucketTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-h3-size, 1.25rem);
+	color: var(--text-primary);
+}
+
+.bucketId {
+	font-family: var(--font-mono, monospace);
+	font-size: var(--type-meta-size);
+	color: var(--text-muted);
+}
+
+.fill {
+	flex: none;
+	padding: 0.2rem 0.6rem;
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--color-cta) 34%, transparent);
+	background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta);
+}
+
+.fill[data-empty="true"] {
+	border-color: var(--border-soft);
+	background: color-mix(in srgb, var(--palette-ink) 8%, transparent);
+	color: var(--text-muted);
+}
+
+.bucketDesc {
+	margin: 0;
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+/* ── Section ─────────────────────────────────────────────────────── */
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding-top: var(--space-8);
+	border-top: 1px solid color-mix(in srgb, var(--border-soft) 60%, transparent);
+}
+
+.sectionHead {
+	display: flex;
+	align-items: center;
+	gap: var(--space-12);
+	flex-wrap: wrap;
+}
+
+.sectionLabel {
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-primary);
+}
+
+.folder {
+	font-family: var(--font-mono, monospace);
+	font-size: var(--type-meta-size);
+	color: var(--text-muted);
+}
+
+.entries {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: var(--space-12);
+}
+
+.entry {
+	display: flex;
+	align-items: center;
+	gap: var(--space-12);
+	padding: var(--space-8);
+	border-radius: var(--radius-medium);
+	border: 1px solid color-mix(in srgb, var(--border-soft) 70%, transparent);
+	background: color-mix(in srgb, var(--color-surface) 60%, transparent);
+}
+
+.thumb {
+	position: relative;
+	flex: none;
+	width: 64px;
+	height: 48px;
+	overflow: hidden;
+	border-radius: var(--radius-small);
+	background: var(--color-paper);
+	border: 1px solid var(--border-soft);
+}
+
+.thumbImg {
+	object-fit: cover;
+}
+
+.thumbEmpty {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	background: repeating-linear-gradient(
+		45deg,
+		color-mix(in srgb, var(--palette-ink) 6%, transparent),
+		color-mix(in srgb, var(--palette-ink) 6%, transparent) 6px,
+		transparent 6px,
+		transparent 12px
+	);
+}
+
+.entryMeta {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.entryLabel {
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-medium);
+	color: var(--text-primary);
+}
+
+.entryId {
+	font-family: var(--font-mono, monospace);
+	font-size: var(--type-label-size);
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.entryTodo {
+	font-size: var(--type-label-size);
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────── */
+.footRow {
+	display: flex;
+	gap: var(--space-12);
+}
+
+.foot {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-12) var(--space-16);
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	font-weight: var(--font-weight-medium);
+	text-decoration: none;
+}
+
+.foot:hover {
+	border-color: var(--color-cta);
+	color: var(--color-cta);
+}

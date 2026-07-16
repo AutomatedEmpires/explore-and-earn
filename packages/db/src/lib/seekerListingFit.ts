@@ -1,8 +1,9 @@
-import type { MatchResult } from "@explore-and-earn/contracts";
+import type { MatchResult, MatchTrace } from "@explore-and-earn/contracts";
 
 import type { ListingRow, PublicListingDetail } from "../queries/listings";
 import type { SeekerProfileRecord } from "../queries/seekerProfiles";
 import { computeMatch, type MatchListingInput, type MatchSeekerInput } from "./matchEngine";
+import { buildMatchTrace } from "./matchTrace";
 
 /**
  * Seeker-facing fit computation for one listing.
@@ -20,6 +21,8 @@ import { computeMatch, type MatchListingInput, type MatchSeekerInput } from "./m
  * the seeker profile record / the public SELECT), matching the assistant.
  */
 
+type FitEvidence = "not_stated" | "stated" | "confirmed";
+
 /** The listing fields the seeker-facing fit reads — source-shape-agnostic. */
 interface FitListingFields {
   readonly category: string | null;
@@ -31,6 +34,10 @@ interface FitListingFields {
   readonly beginsAt: string | null;
   readonly endsAt: string | null;
   readonly status: string | null;
+  /** Per-benefit evidence (sourced listings) — a not_stated benefit is
+      scored as UNKNOWN, never as provided. Omitted → confirmed. */
+  readonly housingEvidence?: FitEvidence;
+  readonly mealsEvidence?: FitEvidence;
 }
 
 /** The single listing→engine mapping every surface shares (no drift possible). */
@@ -39,6 +46,8 @@ function fitFieldsToMatchInput(fields: FitListingFields): MatchListingInput {
     category: fields.category,
     housingIncluded: fields.housingIncluded,
     mealsIncluded: fields.mealsIncluded,
+    housingEvidence: fields.housingEvidence ?? null,
+    mealsEvidence: fields.mealsEvidence ?? null,
     compensationMinCents: fields.compensationMinCents,
     compensationMaxCents: fields.compensationMaxCents,
     isRemote: fields.category === "remote",
@@ -68,6 +77,8 @@ export function toPublicListingMatchInput(listing: PublicListingDetail): MatchLi
     category: listing.category,
     housingIncluded: listing.housingIncluded,
     mealsIncluded: listing.mealsIncluded,
+    housingEvidence: listing.provenanceInfo?.benefitEvidence.housing,
+    mealsEvidence: listing.provenanceInfo?.benefitEvidence.meals,
     compensationMinCents: listing.compensationMinCents,
     compensationMaxCents: listing.compensationMaxCents,
     locationDisplay: listing.locationDisplay,
@@ -83,6 +94,13 @@ export function toListingRowMatchInput(row: ListingRow): MatchListingInput {
     category: row.category,
     housingIncluded: row.housing_included,
     mealsIncluded: row.meals_included,
+    // Evidence rides the row for EVERY provenance: verified-native rows are
+    // 'confirmed' (a no-op for the engine), sourced rows carry stated/
+    // not_stated, and a CONVERTED listing whose employer never addressed a
+    // benefit legitimately keeps 'not_stated' — gating on provenance here
+    // would silently turn that unknown back into a hard "not included".
+    housingEvidence: row.housing_evidence,
+    mealsEvidence: row.meals_evidence,
     compensationMinCents: row.compensation_min_cents,
     compensationMaxCents: row.compensation_max_cents,
     locationDisplay: row.location_display,
@@ -115,6 +133,24 @@ export function computeSeekerListingFit(
   nowMs?: number,
 ): MatchResult {
   return computeMatch(
+    toSeekerMatchInput(profile),
+    toPublicListingMatchInput(listing),
+    nowMs !== undefined ? { nowMs } : {},
+  );
+}
+
+/**
+ * Fit + structured explanation trace for one listing (the "Why this fits"
+ * surface). Same inputs and mapping as {@link computeSeekerListingFit}, so the
+ * explanation can never disagree with the score shown anywhere else. Render
+ * copy with renderMatchTrace()/renderMatchSignal() from contracts (G34).
+ */
+export function computeSeekerListingFitTrace(
+  profile: SeekerProfileRecord,
+  listing: PublicListingDetail,
+  nowMs?: number,
+): MatchTrace {
+  return buildMatchTrace(
     toSeekerMatchInput(profile),
     toPublicListingMatchInput(listing),
     nowMs !== undefined ? { nowMs } : {},

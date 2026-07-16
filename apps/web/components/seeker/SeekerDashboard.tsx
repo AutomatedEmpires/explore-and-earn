@@ -1,20 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useOptimistic, useState, useTransition } from "react";
+import { useCallback, useMemo, useOptimistic, useTransition } from "react";
 
 import { Icon } from "@explore-and-earn/ui";
 import type { SeekerProfileRecord } from "@explore-and-earn/db";
 import { saveReadinessAction } from "../../app/actions/seekerProfile";
+import { byMonetization } from "../../lib/ranking";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import type { DiscoveryListing } from "../discovery";
 import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
 import { JourneyPipeline } from "./JourneyPipeline";
 import { MatchCardRail } from "./MatchCardRail";
-import { QuickStats } from "./QuickStats";
-import { SeekerHero } from "./SeekerHero";
+import { ReadinessSlider } from "./ReadinessSlider";
 import styles from "./SeekerDashboard.module.css";
-import type { SeekerStatusSummary } from "./models";
+import { RESUME_APPLY_THRESHOLD, type SeekerStatusSummary } from "./models";
 
 export interface SeekerDashboardProps {
   readonly profile: SeekerProfileRecord | null;
@@ -24,7 +24,133 @@ export interface SeekerDashboardProps {
   readonly seekerName: string;
 }
 
-/* ─── Resume completion callout ─── */
+/* ─── Monetization helpers (shared "pay more, show more" util) ─── */
+
+/** Map a listing onto the shared MonetizationInputs the ranking util consumes. */
+function monetizationInputs(listing: DiscoveryListing) {
+  return {
+    boosted: listing.conditionalBadges?.includes("boosted") ?? false,
+    hostTier: listing.host.tier,
+    matchScore: listing.matchScore,
+  };
+}
+
+/** A listing is "promoted" when it is boosted or from a paid-tier host. */
+function isPromoted(listing: DiscoveryListing): boolean {
+  return (
+    (listing.conditionalBadges?.includes("boosted") ?? false) ||
+    (listing.host.tier != null && listing.host.tier !== "none")
+  );
+}
+
+/* ─── Next action ─── */
+
+type ActionTone = "offer" | "invite" | "accepted" | "resume" | "match" | "explore";
+
+interface NextAction {
+  readonly tone: ActionTone;
+  readonly headline: string;
+  readonly ctaLabel: string;
+  readonly href: string;
+}
+
+/**
+ * The ONE thing this seeker should do next — presentation prioritization only,
+ * derived entirely from their real status counts (never a fabricated score).
+ * Priority mirrors the Seeker Home spec: offer → invite → accepted → résumé →
+ * fresh matches → explore.
+ */
+function resolveNextAction(
+  status: SeekerStatusSummary,
+  hasMatches: boolean,
+): NextAction {
+  const plural = (n: number) => (n > 1 ? "s" : "");
+
+  if (status.offersCount > 0) {
+    return {
+      tone: "offer",
+      headline: `You have ${status.offersCount} offer${plural(status.offersCount)} to review`,
+      ctaLabel: "Review offers",
+      href: "/offered",
+    };
+  }
+  if (status.invitesCount > 0) {
+    return {
+      tone: "invite",
+      headline: `${status.invitesCount} host${plural(status.invitesCount)} invited you to apply`,
+      ctaLabel: "See invites",
+      href: "/invites",
+    };
+  }
+  if (status.acceptedUpcoming) {
+    return {
+      tone: "accepted",
+      headline: `You're headed to ${status.acceptedUpcoming}`,
+      ctaLabel: "View details",
+      href: "/accepted",
+    };
+  }
+  if (status.resumeCompletion < RESUME_APPLY_THRESHOLD) {
+    return {
+      tone: "resume",
+      headline: "Finish your résumé to start applying",
+      ctaLabel: "Complete résumé",
+      href: "/resume",
+    };
+  }
+  if (hasMatches) {
+    return {
+      tone: "match",
+      headline: "Fresh opportunities match your profile",
+      ctaLabel: "See your matches",
+      href: "/seek",
+    };
+  }
+  return {
+    tone: "explore",
+    headline: "Ready to find your next adventure?",
+    ctaLabel: "Start swiping",
+    href: "/swipe",
+  };
+}
+
+const TONE_ICON = {
+  offer: "status.offered",
+  invite: "status.match",
+  accepted: "status.accepted",
+  resume: "action.edit",
+  match: "nav.seek",
+  explore: "nav.swipe",
+} as const;
+
+function NextActionBanner({
+  seekerName,
+  action,
+}: {
+  readonly seekerName: string;
+  readonly action: NextAction;
+}) {
+  const firstName = seekerName.trim().split(/\s+/)[0] || "there";
+  return (
+    <section
+      className={styles.hero}
+      data-tone={action.tone}
+      aria-labelledby="seeker-next-action"
+    >
+      <p className={styles.greeting}>Welcome back, {firstName}</p>
+      <h1 id="seeker-next-action" className={styles.headline}>
+        {action.headline}
+      </h1>
+      <Link href={action.href} className={styles.heroCta}>
+        <Icon name={TONE_ICON[action.tone]} size={18} aria-hidden />
+        {action.ctaLabel}
+        <span aria-hidden="true">→</span>
+      </Link>
+    </section>
+  );
+}
+
+/* ─── Resume completion callout (soft nudge, 70–79%) ─── */
 function ResumeCallout({ pct }: { pct: number }) {
   const r = 14;
   const circ = 2 * Math.PI * r;
@@ -35,7 +161,7 @@ function ResumeCallout({ pct }: { pct: number }) {
     <Link
       href="/resume"
       className={styles.resumeCallout}
-      aria-label={`Complete your resume — ${pct}% done`}
+      aria-label={`Complete your résumé — ${pct}% done`}
     >
       <div className={styles.calloutRing}>
         <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
@@ -53,62 +179,11 @@ function ResumeCallout({ pct }: { pct: number }) {
         </svg>
       </div>
       <div className={styles.calloutText}>
-        <p className={styles.calloutTitle}>Finish your resume</p>
+        <p className={styles.calloutTitle}>Finish your résumé</p>
         <p className={styles.calloutSub}>A complete profile gets 3× more invites</p>
       </div>
       <span className={styles.calloutCta} aria-hidden="true">Go →</span>
     </Link>
-  );
-}
-
-/* ─── Lifecycle destination cards (3-up grid) ─── */
-function LifecycleTeasers({ status }: { status: SeekerStatusSummary }) {
-  const items = [
-    {
-      href: "/invites",
-      label: "Invites",
-      icon: "action.message" as const,
-      count: status.invitesCount,
-      highlight: status.invitesCount > 0,
-    },
-    {
-      href: "/offered",
-      label: "Offers",
-      icon: "action.forward" as const,
-      count: status.offersCount,
-      highlight: status.offersCount > 0,
-    },
-    {
-      href: "/accepted",
-      label: "Accepted",
-      icon: "action.apply" as const,
-      count: undefined,
-      highlight: Boolean(status.acceptedUpcoming),
-    },
-  ];
-
-  return (
-    <div className={styles.teaserRow} role="list" aria-label="Application lifecycle">
-      {items.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={`${styles.teaserCard} ${item.highlight ? styles.teaserHighlight : ""}`}
-          role="listitem"
-          aria-label={item.count != null && item.count > 0 ? `${item.label}: ${item.count}` : item.label}
-        >
-          <div className={styles.teaserIcon}>
-            <Icon name={item.icon as Parameters<typeof Icon>[0]["name"]} size={20} />
-          </div>
-          <div className={styles.teaserInfo}>
-            {item.count != null && item.count > 0 && (
-              <span className={styles.teaserCount}>{item.count}</span>
-            )}
-            <span className={styles.teaserLabel}>{item.label}</span>
-          </div>
-        </Link>
-      ))}
-    </div>
   );
 }
 
@@ -120,11 +195,7 @@ export function SeekerDashboard({
   featuredEmployers,
   seekerName,
 }: SeekerDashboardProps) {
-  const [heroCoverUrl, setHeroCoverUrl] = useState<string | null>(
-    profile?.heroCoverUrl ?? null,
-  );
   const [isPending, startTransition] = useTransition();
-
   const [optimisticTimeline, setOptimisticTimeline] = useOptimistic<string | null>(
     profile?.seekingTimeline ?? null,
   );
@@ -139,65 +210,78 @@ export function SeekerDashboard({
     [setOptimisticTimeline],
   );
 
-  const handleHeroCoverChange = useCallback((url: string | null) => {
-    setHeroCoverUrl(url);
-  }, []);
+  // Order both rails by the shared "pay more, show more" util (boosted >
+  // enterprise > strong match > professional > starter); ties keep the incoming
+  // best-match-first order (stable sort). The rails are then partitioned so a
+  // listing never appears in both.
+  const { matchedOnly, promoted } = useMemo(() => {
+    const ranked = [...matchedListings].sort(byMonetization(monetizationInputs));
+    const promotedList = ranked.filter(isPromoted).slice(0, 8);
+    const promotedIds = new Set(promotedList.map((l) => l.id));
+    return {
+      promoted: promotedList,
+      matchedOnly: ranked.filter((l) => !promotedIds.has(l.id)).slice(0, 12),
+    };
+  }, [matchedListings]);
 
-  const initials =
-    seekerName
-      .split(" ")
-      .map((n) => n[0] ?? "")
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "SE";
+  const hasMatches = matchedListings.length > 0;
+  const action = resolveNextAction(status, hasMatches);
 
-  // The Seeker OS shell (.seekeros-side) owns the persistent sidebar now, so the
-  // dashboard renders a single full-width content column — no second sidebar.
+  // The next-action banner already surfaces an incomplete résumé (<70%) and any
+  // pending offer, so only show the softer résumé nudge for the 70–79% band.
+  const showResumeCallout =
+    action.tone !== "resume" && status.resumeCompletion < 80;
+
   return (
     <div className={styles.main}>
-        {/* Hero + readiness strip */}
-        <SeekerHero
-          seekerName={seekerName}
-          initials={initials}
-          bio={profile?.shortBio ?? null}
-          avatarUrl={profile?.profilePhotoUrl ?? null}
-          heroCoverUrl={heroCoverUrl}
-          seekingTimeline={optimisticTimeline}
-          preferredCategories={profile?.desiredCategories ?? []}
-          seekerProfileId={profile?.id ?? null}
-          onReadinessChange={handleReadinessChange}
-          onHeroCoverChange={handleHeroCoverChange}
-          readinessSaving={isPending}
-        />
+      {/* Lead: welcome + the ONE next action. */}
+      <NextActionBanner seekerName={seekerName} action={action} />
 
-        {/* Journey pipeline — visual 5-step progress flow */}
+      {/* Availability — a small personalization control ("it knows my season"). */}
+      <ReadinessSlider
+        value={optimisticTimeline}
+        onChange={handleReadinessChange}
+        saving={isPending}
+      />
+
+      {/* Clickable pipeline — each stage routes to its own view. */}
+      <section className={styles.pipelineSection} aria-labelledby="pipeline-heading">
+        <div className={styles.pipelineHeader}>
+          <h2 id="pipeline-heading" className={styles.pipelineHeading}>Your pipeline</h2>
+          <Link href="/applied" className={styles.pipelineLink}>
+            All applications <span aria-hidden="true">→</span>
+          </Link>
+        </div>
         <JourneyPipeline
           matchedCount={matchedListings.length}
           savedCount={status.savedCount}
           appliedCount={status.appliedCount}
           offersCount={status.offersCount}
+          acceptedCount={status.acceptedCount}
           acceptedUpcoming={status.acceptedUpcoming}
         />
+      </section>
 
-        {/* Quick stats chips */}
-        <QuickStats status={status} />
+      {/* Résumé readiness (soft nudge). */}
+      {showResumeCallout && <ResumeCallout pct={status.resumeCompletion} />}
 
-        {/* Resume nudge */}
-        {status.resumeCompletion < 80 && (
-          <ResumeCallout pct={status.resumeCompletion} />
-        )}
+      {/* Their matched opportunities. When there are no matches at all, the rail
+          renders its own honest empty state prompting résumé completion. */}
+      {hasMatches ? (
+        matchedOnly.length > 0 && (
+          <MatchCardRail listings={matchedOnly} title="Matched for you" />
+        )
+      ) : (
+        <MatchCardRail listings={[]} title="Matched for you" />
+      )}
 
-        {/* Matched opportunities */}
-        <MatchCardRail listings={matchedListings} />
+      {/* Boosted picks — promoted inventory only, ordered by monetization. */}
+      {promoted.length > 0 && (
+        <MatchCardRail listings={promoted} title="Boosted picks" />
+      )}
 
-        {/* Featured employers */}
-        <FeaturedEmployerStrip employers={featuredEmployers} />
-
-        {/* Lifecycle status cards */}
-        <section className={styles.lifecycleSection} aria-label="Your applications">
-          <h2 className={styles.sectionHeading}>Your Applications</h2>
-          <LifecycleTeasers status={status} />
-        </section>
+      {/* Featured employers. */}
+      <FeaturedEmployerStrip employers={featuredEmployers} />
     </div>
   );
 }

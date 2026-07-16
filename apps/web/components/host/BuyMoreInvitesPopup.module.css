@@ -1,0 +1,72 @@
+/* Buy-more invite packs — Glacier semantic tokens only. */
+
+.packs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pack {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-14) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.packText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.packCredits {
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.packPrice {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  margin: var(--space-14) 0 0;
+  padding: var(--space-12) var(--space-14);
+  border-radius: var(--radius-cell);
+  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-cta) 24%, transparent);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.notice svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-cta);
+}
+
+.finePrint {
+  margin: var(--space-12) 0 0;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+}

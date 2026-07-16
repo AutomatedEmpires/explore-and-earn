@@ -16,11 +16,11 @@
 
 .sectionTitle {
   font-family: var(--font-display);
-  font-size: clamp(1.1875rem, 5vw, 1.5rem);
-  font-weight: 700;
+  font-size: var(--type-section-size);
+  font-weight: var(--font-weight-regular);
   color: var(--text-primary);
   margin: 0;
-  line-height: 1.1;
+  line-height: var(--type-section-lh);
 }
 
 .seeAll {

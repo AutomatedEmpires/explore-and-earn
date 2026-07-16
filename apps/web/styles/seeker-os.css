@@ -1,37 +1,34 @@
 /**
- * Seeker OS — warm "Adventure Paper & Sky" command surface for the (seeker) scope.
+ * Seeker OS — the (seeker) scope command surface.
  *
- * Part of the SINGLE, flowing design system (founder mandate 2026-06-24): the
- * dashboards speak the same warm paper + ink + framed-photo language as the
- * marketing and discovery surfaces, so a seeker flows from the public site into
- * their command center with no theme switch. The token-cascade strategy is
- * unchanged — seeker surfaces read SEMANTIC tokens, so the scope keeps the warm
- * root tokens (paper/ink/sky) and only sets the locked --seekeros-* chrome set
- * (panels / lines / accent / sizes) + the shell chrome. Role identity is carried
- * by the SKY accent + the brand/identity card, not by a separate palette.
- * Host = gold ownership; Seeker = sky exploration; Admin = sky + warm danger.
+ * Nav model (founder canon 2026-07-13): the secondary / scope navigation is
+ * TUCKED into the shared <ScopeShellNav> (a persistent LEFT RAIL at ≥1024px and
+ * a HAMBURGER drawer below it), so this sheet no longer owns a bespoke sidebar.
+ * What lives here is the SCOPE CHROME the shell still paints itself: the content
+ * column (offset by the rail on desktop), the minimal top bar (search + bell +
+ * avatar), the founder-locked mobile bottom dock (Swipe · Map · Seek · Profile),
+ * and the small rail brand/avatar nodes handed to ScopeShellNav.
  *
- * The one intentionally photographic element is the identity card: a framed
- * photo with an ink scrim and bone text (brand's #1 lever), the same treatment
- * the DiscoveryCard uses. Everything else is paper, ink hairlines, whisper lifts.
+ * Semantic Glacier tokens only — the rail itself reads --color-surface /
+ * --color-cta / --border-ink from the shared ScopeShellNav sheet, so the scope
+ * chrome here stays consistent with it (no separate palette).
  */
 .seeker-os {
-  /* ---- locked Seeker OS chrome set (warm) ---- */
-  --seekeros-panel:    var(--color-surface);        /* #FFFCF5 warm card surface */
-  --seekeros-panel-2:  var(--color-parchment);      /* #F0EAE0 warm panel */
-  --seekeros-panel-3:  var(--color-paper);          /* page paper */
-  --seekeros-line:     var(--border-soft);          /* #DDE2E3 chrome hairline */
-  --seekeros-line-2:   var(--border-soft);
-  --seekeros-ink-line: var(--border-ink);           /* ink hairline for emphasis */
-  --seekeros-accent:   var(--color-cta);            /* sky #2F667A — the brand action */
-  --seekeros-accent-deep: var(--palette-sky-dark);  /* deep sky for text-on-soft */
-  --seekeros-accent-soft: var(--color-action-soft); /* sky 12% on white */
-  --seekeros-ready:    var(--state-ready-fg);       /* pine — ready/explore */
-  --seekeros-on-accent: var(--color-cta-text);      /* white on sky */
-  --seekeros-grad:     var(--gradient-sky);         /* sky→teal for meter + active fills */
+  /* Width of the shared left rail (SCOPE_RAIL_WIDTH in ScopeShellNav.tsx). */
+  --seekeros-rail:     240px;
+  --seekeros-accent:   var(--color-cta);
+  --seekeros-accent-deep: var(--palette-sky-dark);
+  --seekeros-accent-soft: var(--color-action-soft);
+  --seekeros-on-accent: var(--color-cta-text);
+  --seekeros-grad:     var(--gradient-action);
+  --seekeros-line:     var(--border-soft);
+  --seekeros-panel:    var(--color-surface);
   --seekeros-control:  46px;
-  --seekeros-avatar:   42px;
-  --seekeros-side:     286px;
+  /* Vertical-center the shared fixed hamburger (<1024px). .seekeros-top renders
+     72px content + 12px x2 padding + 1px border = 97px (content-box), so the
+     shared top:12px button read ~14px high. Center = pad-top + (headerH - button)/2.
+     Inherits to the ScopeShellNav <button> via the .seeker-os wrapper. */
+  --scope-nav-top: calc(var(--space-12) + (72px - 44px) / 2);
 
   color: var(--text-primary);
   background:
@@ -41,286 +38,64 @@
   min-height: 100svh;
 }
 
-/* ── Shell grid ─────────────────────────────────────────────── */
+/* ── Shell + content column ─────────────────────────────────────
+   The rail is position:fixed inside ScopeShellNav, so the content column is
+   simply offset by the rail width at ≥1024px; below that the rail is hidden and
+   the hamburger + bottom dock take over (full-width content). */
 .seekeros-shell {
   position: relative;
   z-index: 2;
-  display: grid;
-  grid-template-columns: var(--seekeros-side) 1fr;
   min-height: 100svh;
 }
 
-/* ── Paper sidebar ──────────────────────────────────────────── */
-.seekeros-side {
-  position: sticky;
-  top: 0;
-  height: 100svh;
-  padding: 18px 14px;
-  border-right: 1px solid var(--seekeros-line);
-  background: var(--color-parchment);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow: hidden;
-}
-
-.seekeros-brand {
-  min-height: 60px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 24px;
-  background: var(--seekeros-panel);
-  border: 1px solid var(--seekeros-line);
-}
-
-.seekeros-mark {
-  width: var(--seekeros-avatar);
-  height: var(--seekeros-avatar);
-  flex: 0 0 auto;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  color: var(--seekeros-on-accent);
-  font-weight: 700;
-  background:
-    radial-gradient(circle at 33% 24%, rgba(255, 255, 255, 0.85) 0 8%, transparent 9%),
-    var(--gradient-sky);
-  box-shadow: var(--elevation-card);
-}
-
-.seekeros-brand b {
-  display: block;
-  letter-spacing: -0.05em;
-  font-size: 1.08rem;
-  line-height: 0.95;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.seekeros-brand i {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  margin-top: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 700;
-  font-style: normal;
-}
-
-.seekeros-livedot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--seekeros-ready);
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--seekeros-ready) 55%, transparent);
-  animation: seekeros-pulse 1.9s infinite;
-}
-
-@keyframes seekeros-pulse {
-  70% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--seekeros-ready) 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--seekeros-ready) 0%, transparent); }
-}
-
-/* Seeker identity card — framed photo + ink scrim + bone text (brand #1 lever).
-   The one intentionally photographic surface; everything else is paper. */
-.seekeros-card {
-  position: relative;
-  padding: 14px;
-  border-radius: 26px;
-  overflow: hidden;
-  border: 1px solid var(--seekeros-ink-line);
-  background:
-    var(--gradient-hero-scrim),
-    var(--gradient-cover-mountain);
-  min-height: 132px;
-  display: flex;
-  align-items: flex-end;
-  box-shadow: var(--elevation-card);
-}
-
-.seekeros-card .seekeros-avatarimg {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.seekeros-avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  color: var(--seekeros-on-accent);
-  background: var(--gradient-sky);
-  flex: 0 0 auto;
-  box-shadow: var(--elevation-pin);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  overflow: hidden;
-}
-
-/* Text sits over the photo scrim → bone, not ink. */
-.seekeros-card b {
-  display: block;
-  letter-spacing: -0.04em;
-  line-height: 0.95;
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #FBF7EE;
-}
-
-.seekeros-card span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: rgba(251, 247, 238, 0.85);
-  font-size: 0.74rem;
-  font-weight: 700;
-  margin-top: 4px;
-}
-
-/* Profile readiness meter */
-.seekeros-score {
-  padding: 12px;
-  border-radius: 22px;
-  background: var(--seekeros-panel);
-  border: 1px solid var(--seekeros-line);
-}
-
-.seekeros-score-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 700;
-  color: var(--text-muted);
-  margin-bottom: 9px;
-}
-
-.seekeros-meter {
-  height: 9px;
-  border-radius: 999px;
-  background: var(--palette-steel);
-  overflow: hidden;
-}
-
-.seekeros-meter > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--seekeros-grad);
-}
-
-/* Nav */
-.seekeros-navlabel {
-  margin: 4px 10px 6px;
-  color: var(--text-muted);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  font-weight: 700;
-}
-
-.seekeros-nav {
-  display: grid;
-  gap: 6px;
-}
-
-.seekeros-nav:last-of-type {
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-.seekeros-nav::-webkit-scrollbar { display: none; }
-
-.seekeros-navitem {
-  width: 100%;
-  border: 1px solid transparent;
-  color: var(--text-secondary);
-  background: transparent;
-  min-height: 46px;
-  display: grid;
-  grid-template-columns: 34px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: 17px;
-  text-align: left;
-  text-decoration: none;
-  transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease;
-}
-
-.seekeros-navitem .i {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  color: var(--text-secondary);
-  background: var(--seekeros-panel);
-  border: 1px solid var(--seekeros-line);
-}
-
-.seekeros-navitem b {
-  display: block;
-  color: inherit;
-  font-size: 0.92rem;
-  letter-spacing: -0.02em;
-  font-weight: 700;
-}
-
-.seekeros-navitem s {
-  display: block;
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  text-decoration: none;
-}
-
-.seekeros-bdg {
-  min-width: 24px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  color: var(--text-secondary);
-  background: var(--seekeros-panel);
-  border: 1px solid var(--seekeros-line);
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.seekeros-navitem:hover {
-  background: var(--seekeros-accent-soft);
-  color: var(--seekeros-accent-deep);
-  transform: translateX(2px);
-}
-
-.seekeros-navitem[aria-current="page"] {
-  background: var(--seekeros-accent-soft);
-  border-color: color-mix(in srgb, var(--seekeros-accent) 38%, transparent);
-  color: var(--seekeros-accent-deep);
-  box-shadow: var(--elevation-card);
-}
-
-.seekeros-navitem[aria-current="page"] .i {
-  background: var(--seekeros-grad);
-  color: var(--seekeros-on-accent);
-  border-color: transparent;
-}
-
-/* ── Main + topbar ──────────────────────────────────────────── */
 .seekeros-main {
   min-width: 0;
   position: relative;
 }
 
+@media (min-width: 1024px) {
+  .seekeros-main {
+    margin-inline-start: var(--seekeros-rail);
+  }
+}
+
+/* ── Rail brand + avatar (nodes passed into ScopeShellNav) ─────── */
+.seekeros-railbrand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  letter-spacing: -0.03em;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.seekeros-railbrand:hover {
+  color: var(--color-cta);
+}
+
+.seekeros-railmark {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--seekeros-on-accent);
+  background: var(--seekeros-grad);
+  box-shadow: var(--elevation-card);
+}
+
+.seekeros-railava {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--color-cta);
+}
+
+/* ── Main + topbar ──────────────────────────────────────────── */
 .seekeros-top {
   position: sticky;
   top: 0;
@@ -368,7 +143,10 @@
   color: var(--text-primary);
   font-weight: 700;
   text-decoration: none;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
   position: relative;
 }
 
@@ -428,15 +206,18 @@
   margin: 0 auto;
 }
 
-/* ── Mobile (≤1023px): hide sidebar, floating bottom nav ───────── */
+/* ── Mobile (≤1023px): full-width content, floating bottom dock ───────── */
 .seekeros-mnav, .seekeros-mtop { display: none; }
 
 @media (max-width: 1023px) {
-  .seekeros-shell { grid-template-columns: 1fr; }
-  .seekeros-side { display: none; }
   .seekeros-contentwrap { padding: 16px 14px calc(var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom, 0px)); }
-  .seekeros-top { padding: 12px 14px; }
-  .seekeros-tlabel { display: none; }
+
+  /* Clear the fixed ScopeShellNav hamburger (top-left, 44px) so the search
+     field never sits beneath it. */
+  .seekeros-top {
+    padding: 12px 14px;
+    padding-inline-start: calc(44px + var(--space-12) + max(var(--space-12), env(safe-area-inset-left)));
+  }
 
   /* Pinned full-bleed dock — flat to the bottom edge, edge-to-edge, no float. */
   .seekeros-mnav {
@@ -456,23 +237,26 @@
   }
 
   .seekeros-mtab {
-    border: 0;
+    border: 1px solid transparent;
     background: transparent;
     color: var(--text-muted);
-    border-radius: 16px;
-    padding: 7px 4px;
-    min-height: 44px;
+    border-radius: var(--radius-cell);
+    padding: var(--space-6) var(--space-4);
+    min-height: var(--tap-min);
     display: grid;
     place-items: center;
-    gap: 3px;
-    font-size: 10px;
+    gap: var(--space-3);
+    font-size: var(--type-caption-size);
+    line-height: var(--type-label-lh);
     font-weight: 700;
     text-decoration: none;
   }
 
+  /* Active tab — quiet soft-sky fill + deep-sky glyph (no heavy gradient pill). */
   .seekeros-mtab[aria-current="page"] {
-    color: var(--seekeros-on-accent);
-    background: var(--seekeros-grad);
+    color: var(--seekeros-accent-deep);
+    background: var(--seekeros-accent-soft);
+    border-color: color-mix(in srgb, var(--seekeros-accent) 38%, transparent);
   }
 }
 
@@ -531,22 +315,32 @@
 }
 
 /* ── Keyboard focus rings (sky, legible on paper) + tactile press ── */
-.seekeros-navitem:focus-visible,
 .seekeros-tact:focus-visible,
 .seekeros-account:focus-visible,
 .seekeros-mtab:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--seekeros-accent);
 }
-.seekeros-navitem:active { transform: translateX(2px) scale(0.985); }
+/* Press state for the dock tabs + header quick buttons (they also carry
+   .ui-pressable for the shared transition). Declared here too so the press
+   transform wins over the :hover lift in this later-loaded sheet. */
 .seekeros-tact:active,
 .seekeros-account:active,
-.seekeros-mtab:active { transform: translateY(1px) scale(0.98); }
+.seekeros-mtab:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .seeker-os *, .seeker-os *::before, .seeker-os *::after {
     animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+  .seekeros-tact:active,
+  .seekeros-account:active,
+  .seekeros-mtab:active {
+    transform: none;
+    opacity: 1;
   }
 }

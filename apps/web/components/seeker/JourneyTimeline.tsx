@@ -1,9 +1,9 @@
+import type { CSSProperties } from "react";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
-import { EmptyState } from "../discovery";
-import { CardStatus } from "./CardStatus";
+import { CATEGORY_ICON, EmptyState } from "../discovery";
+import { CardStatus, type CardStatusTone } from "./CardStatus";
 import { JOURNEY_STATUS_LABEL, type JourneyStatus, type JourneyStop } from "./journey";
-import { MAPPIN_ICON } from "./mappin";
 import styles from "./JourneyTimeline.module.css";
 
 const STATUS_ICON: Record<JourneyStatus, IconKey> = {
@@ -12,11 +12,28 @@ const STATUS_ICON: Record<JourneyStatus, IconKey> = {
 	upcoming: "system.info",
 };
 
+const STATUS_TONE: Record<JourneyStatus, CardStatusTone> = {
+	completed: "ready",
+	in_progress: "soon",
+	upcoming: "info",
+};
+
+const STATUS_CLASS: Record<JourneyStatus, string> = {
+	completed: styles.completed,
+	in_progress: styles.inProgress,
+	upcoming: styles.upcoming,
+};
+
 export interface JourneyTimelineProps {
 	readonly stops: readonly JourneyStop[];
 }
 
-/** Chronological "where I've been / where I'm going" timeline. */
+/**
+ * Chronological "where I've been / where I'm going" trail — a vertical spine of
+ * category-colored nodes. The in-progress stop is the one dominant "you are
+ * here" node; completed vs upcoming read by node fill, status icon, and colour
+ * (never colour alone). Warm register, borders-first, motion via tokens only.
+ */
 export function JourneyTimeline({ stops }: JourneyTimelineProps) {
 	if (stops.length === 0) {
 		return (
@@ -31,14 +48,28 @@ export function JourneyTimeline({ stops }: JourneyTimelineProps) {
 
 	return (
 		<ol className={styles.timeline}>
-			{stops.map((stop) => (
-				<li key={stop.id} className={styles.stop}>
-					<span className={styles.marker} aria-hidden>
-						<Icon name={MAPPIN_ICON[stop.category]} size={20} aria-hidden />
-					</span>
+			{stops.map((stop, index) => (
+				<li
+					key={stop.id}
+					className={`${styles.stop} ${STATUS_CLASS[stop.status]}`}
+					data-category={stop.category}
+					style={{ "--i": index } as CSSProperties}
+					aria-current={stop.status === "in_progress" ? "step" : undefined}
+				>
+					<div className={styles.rail} aria-hidden>
+						<span className={styles.marker}>
+							<Icon name={CATEGORY_ICON[stop.category]} size={20} aria-hidden />
+							{stop.status === "in_progress" ? (
+								<span className={styles.live} />
+							) : null}
+						</span>
+					</div>
 					<div className={styles.content}>
 						<div className={styles.head}>
 							<div className={styles.text}>
+								{stop.status === "in_progress" ? (
+									<span className={styles.hereTag}>You are here</span>
+								) : null}
 								<span className={styles.title}>{stop.title}</span>
 								<span className={styles.meta}>
 									{stop.location} · {stop.dateRange}
@@ -47,6 +78,7 @@ export function JourneyTimeline({ stops }: JourneyTimelineProps) {
 							<CardStatus
 								icon={STATUS_ICON[stop.status]}
 								label={JOURNEY_STATUS_LABEL[stop.status]}
+								tone={STATUS_TONE[stop.status]}
 							/>
 						</div>
 						{stop.summary ? <p className={styles.summary}>{stop.summary}</p> : null}

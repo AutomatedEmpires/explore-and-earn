@@ -28,6 +28,7 @@ import {
   deleteCertificationAction,
 } from "../../app/actions/resumeBuilder";
 import { SeekerResumeCard } from "./SeekerResumeCard";
+import { ResumeImport } from "./ResumeImport";
 import styles from "./ResumeBuilder.module.css";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -1627,6 +1628,9 @@ export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
 
   return (
     <div className={styles.builder}>
+      {/* Fast start: import an existing résumé, review, then save into the steps */}
+      <ResumeImport resume={resume} />
+
       {/* Progress + step rail */}
       <div
         role="progressbar"

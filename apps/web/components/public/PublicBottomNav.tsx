@@ -4,11 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
-import styles from "../navigation/BottomNav.module.css";
+import styles from "./PublicBottomNav.module.css";
 
-// The user-scope dock (logged-out / public). Same floating-capsule design as the
-// seeker OS dock so the bottom bar never shifts as a visitor crosses into the
-// seeker scope. Tabs: Seek · Swipe · Map · Profile · Community.
+// The user-scope dock (logged-out / public). Same pinned full-bleed design as
+// the seeker OS dock so the bottom bar never shifts as a visitor crosses into
+// the seeker scope. Mirrors the founder-locked four-tab discovery set
+// (Seek · Swipe · Map · Profile) so five tabs never overflow the bar at 360px;
+// Community stays reachable from the global header, not the dock.
 const TABS: ReadonlyArray<{
 	href: string;
 	label: string;
@@ -18,7 +20,6 @@ const TABS: ReadonlyArray<{
 	{ href: "/swipe", label: "Swipe", icon: "nav.swipe" },
 	{ href: "/map", label: "Map", icon: "nav.map" },
 	{ href: "/profile", label: "Profile", icon: "nav.profile" },
-	{ href: "/community", label: "Community", icon: "nav.feed" },
 ];
 
 export function PublicBottomNav() {
@@ -34,7 +35,11 @@ export function PublicBottomNav() {
 					return (
 						<li key={tab.href} className={styles.item}>
 							<Link
-								className={active ? `${styles.tab} ${styles.active}` : styles.tab}
+								className={
+									active
+										? `${styles.tab} ${styles.active} ui-pressable`
+										: `${styles.tab} ui-pressable`
+								}
 								href={tab.href}
 								aria-current={active ? "page" : undefined}
 							>

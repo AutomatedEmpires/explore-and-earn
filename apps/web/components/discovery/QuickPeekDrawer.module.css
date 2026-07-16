@@ -90,6 +90,39 @@
 	box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.82), 0 3px 8px rgba(24,72,120,0.16);
 }
 
+/* Not stated (sourced) — NEUTRAL, never the red "not included" tone. Tokens. */
+.chipNeutral {
+	background: var(--palette-surface);
+	border: 1.5px solid var(--palette-line);
+	color: var(--text-secondary);
+}
+
+/* Sourced disclosure + attribution block — honest, unmissable, token-driven. */
+.sourcedNote {
+	display: flex;
+	gap: var(--space-8);
+	padding: var(--space-10) var(--space-12);
+	border-radius: var(--radius-card);
+	border: 1px solid color-mix(in srgb, var(--palette-sky) 32%, var(--palette-line));
+	background: color-mix(in srgb, var(--palette-sky-light) 50%, var(--palette-surface));
+	color: var(--text-secondary);
+	font-size: var(--type-meta-size);
+	line-height: 1.35;
+}
+.sourcedNote > svg { color: var(--palette-sky); flex-shrink: 0; margin-top: 2px; }
+.sourcedNote strong { display: block; color: var(--text-primary); font-weight: var(--font-weight-bold); }
+.sourceLine { display: block; margin-top: var(--space-2); }
+.sourceLink {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-3);
+	margin-top: var(--space-4);
+	color: var(--palette-sky-dark, var(--palette-sky));
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+}
+.sourceLink:hover { text-decoration: underline; }
+
 .chipLabel {
 	font-family: var(--font-ui);
 	font-size: var(--type-label-size);

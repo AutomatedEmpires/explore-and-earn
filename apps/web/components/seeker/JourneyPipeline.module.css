@@ -177,3 +177,34 @@
     animation: none;
   }
 }
+
+/* ─── Desktop (≥1024px): a contained, centered card — NOT a full-bleed band ───
+   Mobile keeps the edge-to-edge divider band above. At desktop the strip reads
+   as a bordered card, inset to line up with the dashboard header padding, with
+   the step cluster centered and the connectors capped so stages sit close
+   together instead of stretching across the whole column.
+   Declared last so these overrides win over the base .unit/.connector rules
+   (a media query adds no specificity — only source order). */
+@media (min-width: 1024px) {
+  .pipeline {
+    justify-content: center;
+    /* Line the card up with the header's 16px inline padding (no full bleed). */
+    margin-inline: var(--space-16);
+    padding: var(--space-16) var(--space-20);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-card);
+    overflow-x: visible;
+  }
+
+  /* Units size to their content so the whole row centers as one cluster. */
+  .unit {
+    flex: 0 0 auto;
+  }
+
+  /* Cap the connector so stages cluster centrally instead of spreading wide. */
+  .connector {
+    flex: 0 0 auto;
+    width: clamp(28px, 4vw, 72px);
+    min-width: 0;
+  }
+}

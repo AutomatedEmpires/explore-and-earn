@@ -1,3 +1,93 @@
+/* ─── Composer layout: form + live preview ──────────────────────────────────
+   Mobile-first single column with the live preview surfaced FIRST (order:-1)
+   so the host watches the card come alive as they scroll the wizard. At the
+   wide breakpoint it becomes a two-column layout with a sticky preview rail. */
+.composer {
+  display: grid;
+  gap: var(--space-16);
+  align-items: start;
+}
+
+@media (min-width: 60rem) {
+  .composer {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+  }
+}
+
+/* ─── Live preview pane ──────────────────────────────────────────────────── */
+.previewPane {
+  order: -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+}
+
+@media (min-width: 60rem) {
+  .previewPane {
+    order: 0;
+    position: sticky;
+    top: var(--space-16);
+  }
+}
+
+.previewHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.previewTitle {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.previewDot {
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--state-live-dot);
+}
+
+/* The preview is a faithful, NON-interactive render of the seeker card. */
+.previewCardWrap {
+  pointer-events: none;
+}
+
+.previewCaption {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.previewMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--border-soft);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.previewMetaValue {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+/* ─── Form shell ─────────────────────────────────────────────────────────── */
 .form {
   display: flex;
   flex-direction: column;
@@ -8,17 +98,363 @@
   border-radius: var(--radius-card);
 }
 
+/* ─── Stepper ────────────────────────────────────────────────────────────── */
+.stepper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.stepStatus {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.progressTrack {
+  height: var(--space-6);
+  border-radius: var(--radius-pill);
+  background: var(--field-border);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-progress);
+  transition: width var(--motion-base) var(--ease-standard);
+}
+
+.stepChips {
+  display: flex;
+  gap: var(--space-6);
+  overflow-x: auto;
+  padding-bottom: var(--space-4);
+  scrollbar-width: thin;
+}
+
+.stepChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex: 0 0 auto;
+  min-height: var(--tap-min);
+  padding: var(--space-6) var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.stepChip:hover {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.stepChipActive {
+  border-color: var(--border-ink);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+}
+
+.stepChipDone {
+  color: var(--text-primary);
+}
+
+.stepChipDone .stepChipIndex {
+  background: var(--status-success-bg);
+  color: var(--status-success-fg);
+  border-color: transparent;
+}
+
+.stepChipIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-20);
+  height: var(--space-20);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-label-size);
+}
+
+.stepChip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+/* ─── Step panel ─────────────────────────────────────────────────────────── */
+.stepPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.stepHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.stepHeadTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.stepTitle {
+  font-family: var(--font-ui);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.reqTag {
+  margin-left: auto;
+  padding: 2px var(--space-8);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.reqTagRequired {
+  background: var(--status-warning-bg);
+  color: var(--status-warning-fg);
+}
+
+.reqTagOptional {
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+}
+
+.stepDesc {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* ─── Fields ─────────────────────────────────────────────────────────────── */
 .row {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--space-12);
 }
 
-/* Mobile-first: stack paired fields (dates, pay) into one column. */
-@media (max-width: 639px) {
-  .row {
+.rowThree {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-12);
+}
+
+@media (max-width: 39.9375rem) {
+  .row,
+  .rowThree {
     grid-template-columns: 1fr;
   }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.optionalHint {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+.input,
+.textarea {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-12);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-primary);
+  background: var(--field-bg);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-input);
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--field-placeholder);
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--field-border-focus);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.inputError,
+.inputError:focus-visible {
+  border-color: var(--field-border-error);
+}
+
+.hint {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.fieldError {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--status-error-fg);
+}
+
+/* ─── Lane picker (multi-select) ─────────────────────────────────────────── */
+.laneGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-8);
+}
+
+@media (min-width: 30rem) {
+  .laneGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.laneChip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--tap-min);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+  background: var(--color-surface);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.laneChip:hover {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.laneChipActive {
+  border-color: var(--border-ink);
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+}
+
+.laneChipActive .laneCheck {
+  opacity: 1;
+}
+
+.laneCheck {
+  margin-left: auto;
+  opacity: 0;
+  color: var(--status-success-fg);
+}
+
+.laneChip:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.laneMixNote {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ─── Triad fieldset ─────────────────────────────────────────────────────── */
+.fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin: 0;
+  padding: var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-cell);
+}
+
+.legend {
+  padding: 0 var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.fieldsetNote {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+  color: var(--text-secondary);
 }
 
 /* Link from a free-text benefit field into the structured photo/amenity editor. */
@@ -27,7 +463,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
-  margin-top: var(--space-6);
+  min-height: var(--tap-min);
   padding: var(--space-6) 0;
   border: none;
   background: transparent;
@@ -50,148 +486,103 @@
   border-radius: var(--radius-cell);
 }
 
-.field {
+/* Reference to the reusable host-profile photo buckets (upload once, reused). */
+.bucketNote {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.label {
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-lh);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--type-label-tracking);
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.input {
-  width: 100%;
-  padding: var(--space-8) var(--space-12);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-lh);
-  color: var(--text-primary);
-  background: var(--color-surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-cell);
-}
-
-.input:focus-visible {
-  outline: none;
-  border-color: var(--text-primary);
-  box-shadow: var(--ui-focus-ring);
-}
-
-.textarea {
-  width: 100%;
-  padding: var(--space-8) var(--space-12);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  line-height: var(--type-meta-lh);
-  color: var(--text-primary);
-  background: var(--color-surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-cell);
-  resize: vertical;
-}
-
-.textarea:focus-visible {
-  outline: none;
-  border-color: var(--text-primary);
-  box-shadow: var(--ui-focus-ring);
-}
-
-.fieldset {
-  display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-8);
-  margin: 0;
   padding: var(--space-12);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-cell);
+  background: color-mix(in srgb, var(--color-surface-raised) 80%, var(--color-surface) 20%);
 }
 
-.legend {
-  padding: 0 var(--space-4);
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-lh);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--type-label-tracking);
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.fieldsetNote {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-lh);
-  color: var(--text-secondary);
-}
-
-/* Inline coaching under a field (e.g. what each category lane means). */
-.hint {
-  margin: var(--space-6) 0 0;
+.bucketNoteBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: 1.45;
   color: var(--text-secondary);
 }
 
-.benefit {
+.bucketNoteLink {
+  align-self: flex-start;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  text-decoration: none;
+}
+
+.bucketNoteLink:hover {
+  text-decoration: underline;
+}
+
+.bucketNoteIcon {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+}
+
+/* ─── Review recap ───────────────────────────────────────────────────────── */
+.reviewList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
-}
-
-.benefitRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: var(--space-12);
-}
-
-.toggle {
-  display: inline-flex;
   gap: var(--space-4);
-  padding: var(--space-4);
-  width: fit-content;
-  background: var(--color-surface);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-pill);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.toggleButton {
-  padding: var(--space-4) var(--space-12);
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: transparent;
+.reviewItem {
+  display: grid;
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  gap: var(--space-12);
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.reviewKey {
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
   color: var(--text-secondary);
-  cursor: pointer;
-  transition: border-color var(--motion-fast) var(--ease-standard);
 }
 
-.toggleButton:focus-visible {
-  outline: none;
-  box-shadow: var(--ui-focus-ring);
-}
-
-.toggleButtonActive {
-  border-color: var(--border-ink);
-  background: var(--color-surface-raised);
+.reviewVal {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
   color: var(--text-primary);
+  word-break: break-word;
 }
 
-.actions {
+.reviewMissing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--text-muted);
+}
+
+/* ─── Nav / actions ──────────────────────────────────────────────────────── */
+.navRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--border-soft);
+}
+
+.navRight {
   display: flex;
   align-items: center;
   gap: var(--space-12);
+  margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .cancel {
@@ -218,14 +609,17 @@
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
-  color: var(--text-primary);
-  background: var(--color-surface);
-  border: 1px solid var(--border-ink);
+  color: var(--status-error-fg);
+  background: var(--status-error-bg);
+  border: 1px solid var(--field-border-error);
   border-radius: var(--radius-cell);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toggleButton {
+  .progressFill,
+  .stepChip,
+  .laneChip,
+  .benefitLink {
     transition: none;
   }
 }

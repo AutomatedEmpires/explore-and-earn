@@ -1,5 +1,4 @@
-import { readFileSync, existsSync, readdirSync, statSync } from "node:fs"
-import { join } from "node:path"
+import { readFileSync, existsSync } from "node:fs"
 
 /*
  * Canon-contract guardrail.
@@ -82,30 +81,11 @@ if (existsSync(CARD)) {
 	)
 }
 
-// 3) Repo-wide: "Perks" must never be used as a triad property label in source.
-const SKIP_DIRS = new Set([
-	"node_modules",
-	".next",
-	"dist",
-	".turbo",
-	".git",
-	"__type-tests__",
-])
-const SRC_PATTERN = /\.(ts|tsx)$/
-const SELF = "tools/scripts/check-canon-contracts.mjs"
-
-for (const root of ["apps", "packages"]) {
-	if (!existsSync(root)) continue
-	for (const file of walk(root)) {
-		if (file.endsWith(SELF)) continue
-		const content = readFileSync(file, "utf8")
-		if (/\bperks\s*[:?]/i.test(content)) {
-			errors.push(
-				`G-TRIAD: forbidden "perks" property label in ${file} — the value triad is Housing/Meals/Pay, never "Perks".`,
-			)
-		}
-	}
-}
+// 3) [Scoped 2026-07-15, founder decision] The previous repo-wide ban on any
+// "perks" property label is removed: "Perks & benefits" is a legitimate listing/
+// host section distinct from the value triad. The triad stays locked to
+// Housing/Meals/Pay by check 2b above (OpportunityTriad must never include a
+// "perks" key).
 
 function extractTuple(src, name) {
 	const match = src.match(new RegExp(`${name}\\s*=\\s*\\[([\\s\\S]*?)\\]`))
@@ -117,20 +97,6 @@ function extractRecordKeys(src, name) {
 	const match = src.match(new RegExp(`${name}[^=]*=\\s*\\{([\\s\\S]*?)\\}`))
 	if (!match) return []
 	return [...match[1].matchAll(/(\w+)\s*:/g)].map((entry) => entry[1])
-}
-
-function walk(directory, files = []) {
-	for (const entry of readdirSync(directory)) {
-		if (SKIP_DIRS.has(entry)) continue
-		const fullPath = join(directory, entry)
-		const stats = statSync(fullPath)
-		if (stats.isDirectory()) {
-			walk(fullPath, files)
-			continue
-		}
-		if (SRC_PATTERN.test(fullPath)) files.push(fullPath)
-	}
-	return files
 }
 
 for (const note of notices) console.log(`note: ${note}`)

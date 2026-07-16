@@ -1,98 +1,167 @@
+/*
+ * DiscoveryCardSkeleton — mirrors DiscoveryCard's frame and row heights
+ * (packages/ui/src/DiscoveryCard.module.css) for zero layout shift:
+ * 16:10 cover, 74px avatar top-left, quiet meta lines, begins|ends strip,
+ * 72px triad cells, 44px CTA. Placeholder fill is a warm paper shimmer
+ * (background-position sweep over --gradient-paper-warm tones), degrading
+ * to a static parchment tint under prefers-reduced-motion.
+ */
+
 .card {
+	position: relative;
 	display: flex;
 	flex-direction: column;
-	gap: var(--space-12);
-}
-
-/* Cover photo — 4:3 aspect ratio matches DiscoveryCard cover (DiscoveryCard.tsx) */
-.cover {
-	width: 100%;
-	aspect-ratio: 4 / 3;
+	width: min(100%, 360px);
 	overflow: hidden;
-	border-radius: var(--radius-image);
+	background: var(--gradient-paper-warm);
+	border: 1px solid var(--border-soft);
+	border-top: 3px solid var(--border-soft);
+	border-radius: var(--radius-card);
 }
 
-.cover :global(.ui-skeleton) {
+/* Warm paper shimmer — overrides the primitive's flat grey pulse */
+.card :global(.ui-skeleton) {
+	background: linear-gradient(
+		100deg,
+		var(--color-parchment) 35%,
+		var(--color-surface-raised) 50%,
+		var(--color-parchment) 65%
+	);
+	background-size: 250% 100%;
+	background-position: 130% 0;
+	animation: paper-sweep 1.6s var(--ease-standard) infinite;
+}
+
+@keyframes paper-sweep {
+	from { background-position: 130% 0; }
+	to { background-position: -30% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.card :global(.ui-skeleton) {
+		animation: none;
+		background: var(--color-parchment);
+	}
+}
+
+/* 1. Cover photo — 16:10 matches DiscoveryCard .hero */
+.cover {
+	position: relative;
+	width: 100%;
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+	flex-shrink: 0;
+	border-bottom: 1px solid var(--border-soft);
+}
+
+.cover > :global(.ui-skeleton) {
 	width: 100%;
 	height: 100%;
 	border-radius: 0;
 }
 
-/* Host row — avatar + name line */
-.hostRow {
-	display: flex;
-	align-items: center;
-	gap: var(--space-10);
+/* Host avatar — overlaps the cover top-left like the live card */
+.avatar {
+	position: absolute;
+	top: var(--space-12);
+	left: var(--space-12);
 }
 
 .avatar :global(.ui-skeleton) {
-	width: 2.25rem;
-	height: 2.25rem;
+	width: var(--dc-host-size, 74px);
+	height: var(--dc-host-size, 74px);
 	border-radius: var(--radius-pill);
+	border: 3px solid var(--color-surface);
 }
 
+/* Body — matches DiscoveryCard .body rhythm */
+.body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--dc-gap, var(--space-8));
+	padding: var(--dc-padding, var(--space-12));
+}
+
+/* 2. Host name — quiet caption line */
 .hostName {
-	width: min(9rem, 55%);
+	width: min(8rem, 45%);
+	padding: var(--space-4) var(--space-2);
 }
 
 .hostName :global(.ui-skeleton) {
 	display: block;
 	width: 100%;
-	height: calc(var(--type-body-size) * 1.25);
+	height: var(--type-caption-size);
 	border-radius: var(--radius-input);
 }
 
-/* Title */
+/* 3. Title — the dominant line */
 .title {
 	width: 82%;
+	padding: var(--space-2);
 }
 
 .title :global(.ui-skeleton) {
 	display: block;
 	width: 100%;
-	height: calc(var(--type-body-size) * 1.5);
+	height: calc(var(--type-section-size) * var(--type-section-lh));
 	border-radius: var(--radius-input);
 }
 
-/* Meta (location + window) */
+/* 4. Location line */
 .meta {
 	width: 55%;
+	padding: var(--space-2);
 }
 
 .meta :global(.ui-skeleton) {
 	display: block;
 	width: 100%;
-	height: calc(var(--type-meta-size) * 1.45);
+	height: calc(var(--type-meta-size) * var(--type-meta-lh));
 	border-radius: var(--radius-input);
 }
 
-/* Benefit triad */
-.triad {
-	display: flex;
-	gap: var(--space-8);
+/* 5. Begins | Ends strip */
+.dates {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	padding-top: var(--space-8);
+	border-top: 1px solid var(--border-soft);
 }
 
-.chip {
-	flex: 1;
+.dateCell {
+	padding: var(--space-2) var(--space-10);
+}
+
+.dateCell :global(.ui-skeleton) {
+	display: block;
+	width: 80%;
+	height: var(--space-32);
+	border-radius: var(--radius-input);
+}
+
+/* 6. Benefit triad — 72px cells match .benefit min-height */
+.triad {
+	display: grid;
+	grid-template-columns: 1fr 1fr 1fr;
+	gap: var(--dc-gap, var(--space-8));
 }
 
 .chip :global(.ui-skeleton) {
 	display: block;
 	width: 100%;
-	height: calc(var(--type-label-size) + var(--space-16));
-	border-radius: var(--radius-cell);
+	height: 72px;
+	border-radius: var(--radius-input);
 }
 
-/* CTA button */
+/* 7. CTA button */
 .cta {
 	width: 100%;
-	overflow: hidden;
-	border-radius: var(--radius-button);
 }
 
 .cta :global(.ui-skeleton) {
 	display: block;
 	width: 100%;
-	height: 2.75rem;
-	border-radius: 0;
+	height: var(--tap-min);
+	border-radius: var(--radius-button);
 }

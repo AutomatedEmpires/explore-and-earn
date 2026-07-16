@@ -1,0 +1,149 @@
+/* ─── Immersive full-bleed photo hero ─────────────────────────────────────── */
+
+.hero {
+  position: relative;
+  width: 100%;
+  /* Tall, immersive on phones; never so tall it buries the content below. */
+  min-height: 62vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  /* Category atmosphere as the photo fallback (and the base the image sits on). */
+  background-image: var(--gradient-category-default);
+  background-size: cover;
+  background-position: center;
+  isolation: isolate;
+}
+
+.hero[data-category="farm"] { background-image: var(--gradient-category-farm); }
+.hero[data-category="maritime"] { background-image: var(--gradient-category-maritime); }
+.hero[data-category="remote"] { background-image: var(--gradient-category-remote); }
+.hero[data-category="seasonal"] { background-image: var(--gradient-category-seasonal); }
+.hero[data-category="mix"] { background-image: var(--gradient-category-mix); }
+
+@media (min-width: 64rem) {
+  .hero {
+    min-height: 68vh;
+    max-height: 640px;
+  }
+}
+
+.image {
+  object-fit: cover;
+  z-index: -2;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--gradient-hero-scrim);
+}
+
+/* ─── Top bar (back control) ──────────────────────────────────────────────── */
+
+.topBar {
+  position: absolute;
+  top: var(--space-16);
+  left: var(--space-gutter);
+  z-index: 1;
+}
+
+/* ─── Overlaid title block ────────────────────────────────────────────────── */
+
+.overlay {
+  padding: var(--space-24) var(--space-gutter) var(--space-24);
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+  color: var(--color-cta-text);
+}
+
+.badgeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.dateChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  background-color: color-mix(in srgb, var(--palette-ink) 42%, transparent);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  backdrop-filter: blur(4px);
+}
+
+.dateChip svg {
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0 0 var(--space-12);
+  font-family: var(--font-display);
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-lh);
+  color: var(--color-cta-text);
+  text-wrap: balance;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-16);
+}
+
+.location {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--color-cta-text);
+}
+
+.location svg {
+  flex-shrink: 0;
+}
+
+.host {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.hostAvatar {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-image);
+  overflow: hidden;
+  border: 2px solid var(--color-surface-raised);
+  background-color: var(--color-surface);
+}
+
+.hostAvatarImg {
+  object-fit: cover;
+}
+
+.hostName {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta-text);
+  text-decoration: none;
+}
+
+.hostName:hover {
+  text-decoration: underline;
+}

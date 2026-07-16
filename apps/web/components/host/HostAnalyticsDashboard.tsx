@@ -1,7 +1,6 @@
 import type { HostAnalytics, HostPerListingStats } from "@explore-and-earn/db";
 import { Icon, MetricCard, MetricGrid, type IconKey } from "@explore-and-earn/ui";
 
-import { sparkFromCount } from "../../lib/sparkline";
 import styles from "./HostAnalyticsDashboard.module.css";
 
 export interface HostAnalyticsDashboardProps {
@@ -146,7 +145,7 @@ function ListingDiagnosis({ stat }: { stat: HostPerListingStats }) {
   return (
     <article className={styles.diag}>
       <div className={`${styles.diagCover} ${styles[`cover_${status}`] ?? ""}`} aria-hidden>
-        <Icon name="category.farm" size={24} />
+        <Icon name="nav.dashboard" size={24} />
       </div>
       <div className={styles.diagBody}>
         <div className={styles.diagTop}>
@@ -165,7 +164,6 @@ function ListingDiagnosis({ stat }: { stat: HostPerListingStats }) {
         </div>
       </div>
       <div className={styles.diagAction}>
-        <span className={styles.diagState}>Optimizable</span>
         <a
           className={styles.improveBtn}
           href={`/host/listings/${stat.listingId}`}
@@ -205,28 +203,24 @@ export function HostAnalyticsDashboard({
             value={String(totalApps)}
             trend={totalApps > 0 ? "All time" : "Awaiting"}
             trendTone="neutral"
-            spark={sparkFromCount(totalApps)}
           />
           <MetricCard
             label="In review"
             value={String(reviewingApps)}
             trend={reviewingApps > 0 ? "Needs action" : "Clear"}
             trendTone={reviewingApps > 0 ? "neutral" : "down"}
-            spark={sparkFromCount(reviewingApps)}
           />
           <MetricCard
             label="Active listings"
             value={String(activeListingCount)}
             trend={activeListingCount > 0 ? "Live" : "None live"}
             trendTone={activeListingCount > 0 ? "up" : "down"}
-            spark={sparkFromCount(activeListingCount)}
           />
           <MetricCard
             label="Invite acceptance"
             value={formatRate(inviteAcceptanceRate)}
             trend={inviteAcceptanceRate >= 0.5 ? "Strong" : "Build pool"}
             trendTone={inviteAcceptanceRate >= 0.5 ? "up" : "neutral"}
-            spark={sparkFromCount(Math.round(inviteAcceptanceRate * 100))}
           />
         </MetricGrid>
       </section>

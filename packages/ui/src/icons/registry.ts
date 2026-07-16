@@ -49,6 +49,7 @@ import {
 	CirclesThree,
 	Coffee,
 	Compass,
+	Confetti,
 	CookingPot,
 	Crown,
 	CurrencyDollar,
@@ -56,12 +57,14 @@ import {
 	DownloadSimple,
 	Eye,
 	Flag,
+	Footprints,
 	ForkKnife,
 	Funnel,
 	FunnelSimple,
 	Gauge,
 	GearSix,
 	Handshake,
+	Heart,
 	Horse,
 	House,
 	Image,
@@ -93,6 +96,7 @@ import {
 	Star,
 	Storefront,
 	Sun,
+	ThumbsUp,
 	Trash,
 	TreeStructure,
 	TrendUp,
@@ -214,6 +218,12 @@ export type CanonicalIconKey =
 	| "analytics.trend"
 	| "analytics.donut"
 	| "analytics.source"
+	// reaction -- community post reactions (keys mirror contracts' ReactionKey)
+	| "reaction.smile"
+	| "reaction.heart"
+	| "reaction.hundred"
+	| "reaction.clap"
+	| "reaction.sparkle"
 	// system -- inline feedback / state
 	| "system.info"
 	| "system.success"
@@ -358,6 +368,13 @@ export const ICON_REGISTRY: Record<IconKey, IconEntry> = {
 	"analytics.trend": { key: "analytics.trend", icon: TrendUp, label: "Trend" },
 	"analytics.donut": { key: "analytics.donut", icon: ChartDonut, label: "Donut chart" },
 	"analytics.source": { key: "analytics.source", icon: TreeStructure, label: "Source" },
+
+	// ---- reaction (community post reactions; keys mirror contracts' ReactionKey) ----
+	"reaction.smile": { key: "reaction.smile", icon: ThumbsUp, label: "Like" },
+	"reaction.heart": { key: "reaction.heart", icon: Heart, label: "Love" },
+	"reaction.hundred": { key: "reaction.hundred", icon: Footprints, label: "Been there" },
+	"reaction.clap": { key: "reaction.clap", icon: Confetti, label: "Congrats" },
+	"reaction.sparkle": { key: "reaction.sparkle", icon: Sparkle, label: "Inspiring" },
 
 	// ---- system ----
 	"system.info": { key: "system.info", icon: Info, label: "Info" },

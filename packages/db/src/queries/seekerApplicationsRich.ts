@@ -7,10 +7,17 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
-import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  formatCompensation,
+  formatOpportunityWindow,
+  hasVerifiedHostSubscription,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 import type { SeekerApplicationListing } from "./applications";
+import { getActiveBoostedListingIds } from "./idReaders";
+import { MEANINGFUL_MATCH_SCORE_THRESHOLD } from "./listings";
+import { getMatchScoresForSeeker } from "./matchScores";
 
 /*
  * Seeker self-service dashboard data (Agent 2 / PR 2).
@@ -47,44 +54,32 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+// Compensation summary via the shared, locale-ready formatter (default currency
+// applied in the formatter) — no inline currency/date formatting in the DB
+// layer. See @explore-and-earn/contracts format.ts.
 function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    return row.compensation_summary;
-  }
-  const minCents =
-    typeof row.compensation_min_cents === "number"
-      ? row.compensation_min_cents
-      : null;
-  if (minCents != null) {
-    const unit =
-      typeof row.compensation_unit === "string"
-        ? row.compensation_unit
-        : "other";
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(minCents);
-    const maxCents =
+  return formatCompensation({
+    summary:
+      typeof row.compensation_summary === "string"
+        ? row.compensation_summary
+        : null,
+    minCents:
+      typeof row.compensation_min_cents === "number"
+        ? row.compensation_min_cents
+        : null,
+    maxCents:
       typeof row.compensation_max_cents === "number"
         ? row.compensation_max_cents
-        : null;
-    const max = maxCents != null ? fmt(maxCents) : null;
-    const range = max && max !== min ? `${min}–${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
+        : null,
+    unit:
+      typeof row.compensation_unit === "string" ? row.compensation_unit : null,
+  });
 }
 
 function rowToSeekerApplicationListing(
   value: unknown,
+  boostedListingIds?: ReadonlySet<string>,
+  matchScores?: ReadonlyMap<string, number>,
 ): SeekerApplicationListing | null {
   const row = firstOf(value);
   if (!row) return null;
@@ -125,11 +120,10 @@ function rowToSeekerApplicationListing(
       row.location_display.length > 0
         ? row.location_display
         : "Location not specified",
-    opportunityWindow:
-      typeof row.timeline_summary === "string" &&
-      row.timeline_summary.length > 0
-        ? row.timeline_summary
-        : "Open",
+    opportunityWindow: formatOpportunityWindow({
+      timelineSummary:
+        typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+    }),
     status: (typeof row.status === "string"
       ? row.status
       : "live") as ListingStatus,
@@ -139,6 +133,14 @@ function rowToSeekerApplicationListing(
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
     beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
     endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
+    conditionalBadges:
+      boostedListingIds?.has(String(row.id)) ? (["boosted"] as const) : undefined,
+    matchScore: (() => {
+      const stored = matchScores?.get(String(row.id));
+      return typeof stored === "number" && stored >= MEANINGFUL_MATCH_SCORE_THRESHOLD
+        ? stored
+        : undefined;
+    })(),
   };
 }
 
@@ -178,11 +180,15 @@ export async function getSeekerApplicationsRich(
   if (!seekerProfileId) return [];
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data, error } = await untyped
-    .from("applications")
-    .select(RICH_SEEKER_APPLICATION_SELECT)
-    .eq("seeker_profile_id", seekerProfileId)
-    .order("submitted_at", { ascending: false });
+  const [{ data, error }, boostedListingIds, matchScores] = await Promise.all([
+    untyped
+      .from("applications")
+      .select(RICH_SEEKER_APPLICATION_SELECT)
+      .eq("seeker_profile_id", seekerProfileId)
+      .order("submitted_at", { ascending: false }),
+    getActiveBoostedListingIds(clerkToken),
+    getMatchScoresForSeeker(clerkToken, clerkUserId),
+  ]);
 
   if (error) {
     throw new Error(`getSeekerApplicationsRich: ${error.message}`);
@@ -199,7 +205,11 @@ export async function getSeekerApplicationsRich(
       decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
       coverMessage:
         typeof r.cover_message === "string" ? r.cover_message : null,
-      listing: rowToSeekerApplicationListing(r.listings),
+      listing: rowToSeekerApplicationListing(
+        r.listings,
+        boostedListingIds,
+        matchScores,
+      ),
     } satisfies RichSeekerApplication;
   });
 }
@@ -220,12 +230,16 @@ export async function getSeekerApplicationRichById(
   if (!seekerProfileId) return null;
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data, error } = await untyped
-    .from("applications")
-    .select(RICH_SEEKER_APPLICATION_SELECT)
-    .eq("id", applicationId)
-    .eq("seeker_profile_id", seekerProfileId)
-    .maybeSingle();
+  const [{ data, error }, boostedListingIds, matchScores] = await Promise.all([
+    untyped
+      .from("applications")
+      .select(RICH_SEEKER_APPLICATION_SELECT)
+      .eq("id", applicationId)
+      .eq("seeker_profile_id", seekerProfileId)
+      .maybeSingle(),
+    getActiveBoostedListingIds(clerkToken),
+    getMatchScoresForSeeker(clerkToken, clerkUserId),
+  ]);
 
   if (error) {
     throw new Error(`getSeekerApplicationRichById: ${error.message}`);
@@ -242,7 +256,11 @@ export async function getSeekerApplicationRichById(
     decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
     coverMessage:
       typeof r.cover_message === "string" ? r.cover_message : null,
-    listing: rowToSeekerApplicationListing(r.listings),
+    listing: rowToSeekerApplicationListing(
+      r.listings,
+      boostedListingIds,
+      matchScores,
+    ),
   } satisfies RichSeekerApplication;
 }
 

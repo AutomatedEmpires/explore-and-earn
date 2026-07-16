@@ -1,0 +1,169 @@
+/* ══════════════════════════════════════════════════════════════════
+   WeatherWidget — 10-day forecast shell for a host's location.
+   Honest placeholder: real calendar columns, empty hi/lo + condition
+   slots, "connects at launch" note. Glacier tokens. Borders-first.
+   ══════════════════════════════════════════════════════════════════ */
+
+.panel {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  padding: var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.titleIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--palette-sky) 12%, transparent);
+  color: var(--palette-sky-dark);
+  flex-shrink: 0;
+}
+
+.locationLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.pendingTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Day track — horizontal scroll on mobile, wraps to fit wider ── */
+
+.track {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track::-webkit-scrollbar { display: none; }
+
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  flex: 1 0 auto;
+  min-width: 60px;
+  padding: var(--space-12) var(--space-8);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+}
+
+.day[data-today] {
+  border-color: color-mix(in srgb, var(--palette-sky) 45%, transparent);
+  background: color-mix(in srgb, var(--palette-sky) 7%, var(--color-surface));
+}
+
+.dayName {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.dayNum {
+  font-family: var(--font-display);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+/* Condition slot — dashed placeholder glyph (no fabricated weather) */
+.condition {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.temps {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.tempHi {
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+.tempLo {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: 1;
+  color: var(--text-muted);
+}
+
+/* ── Foot note ──────────────────────────────────────────────────── */
+
+.foot {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin: 0;
+}

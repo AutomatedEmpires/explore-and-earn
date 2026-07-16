@@ -3,15 +3,24 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type {
+  BenefitEvidenceStatus,
   BenefitProvision,
   CompensationUnit,
+  DiscoveryCardConditionalBadge,
+  ListingClaimSummary,
+  ListingProvenanceInfo,
   ListingStatus,
   OpportunityCategory,
   OpportunityListing,
 } from "@explore-and-earn/contracts";
-import { MARKETPLACE_CATEGORIES, hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  MARKETPLACE_CATEGORIES,
+  formatCompensation,
+  formatOpportunityWindow,
+  hasVerifiedHostSubscription,
+} from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
-import { getSeekerApplicationIds } from "./applications";
+import { getActiveBoostedListingIds, getSeekerApplicationIds } from "./idReaders";
 import { getPassedListingIds } from "./passedListings";
 
 export interface ListingRow {
@@ -44,6 +53,23 @@ export interface ListingRow {
     company_name: string;
     subscription_tier: string | null;
   } | null;
+  /* ── Provenance (migration 064) ──
+     'verified' = host-authored/claimed; 'sourced' = real attributable public
+     posting, NOT employer-confirmed. Evidence columns carry the epistemic
+     status per triad benefit ('not_stated' means the boolean value columns are
+     MEANINGLESS for that benefit — render/rank as missing, never as "no"). */
+  provenance: "verified" | "sourced";
+  source_name: string | null;
+  source_url: string | null;
+  source_external_id: string | null;
+  source_employer_name: string | null;
+  source_published_at: string | null;
+  source_last_seen_at: string | null;
+  source_status: string;
+  claim_summary: string;
+  housing_evidence: BenefitEvidenceStatus;
+  meals_evidence: BenefitEvidenceStatus;
+  pay_evidence: BenefitEvidenceStatus;
 }
 
 type RawListingRow = {
@@ -73,18 +99,32 @@ type RawListingRow = {
   cover_photo_url: string | null;
   gallery_photo_urls: string[] | null;
   host_profiles: { company_name: string; subscription_tier: string | null } | null;
+  provenance: string;
+  source_name: string | null;
+  source_url: string | null;
+  source_external_id: string | null;
+  source_employer_name: string | null;
+  source_published_at: string | null;
+  source_last_seen_at: string | null;
+  source_status: string;
+  claim_summary: string;
+  housing_evidence: string;
+  meals_evidence: string;
+  pay_evidence: string;
 };
 
-function formatOpportunityWindow(
+// Display strings (opportunity window + compensation summary) are formatted via
+// the shared, locale-ready chokepoint in @explore-and-earn/contracts \u2014 the DB
+// layer no longer builds currency/date strings inline (no locale or currency
+// literals here). These thin adapters feed raw row columns to the formatters.
+function buildOpportunityWindow(
   row: Pick<ListingRow, "begins_at" | "ends_at" | "timeline_summary">,
 ): string {
-  if (row.timeline_summary) return row.timeline_summary;
-  if (row.begins_at && row.ends_at) {
-    const fmt = (d: string) =>
-      new Date(d).toLocaleDateString("en-US", { month: "short", year: "numeric" });
-    return `${fmt(row.begins_at)}\u2013${fmt(row.ends_at)}`;
-  }
-  return "Open";
+  return formatOpportunityWindow({
+    timelineSummary: row.timeline_summary,
+    begins: row.begins_at,
+    ends: row.ends_at,
+  });
 }
 
 function buildCompensationSummary(
@@ -97,52 +137,203 @@ function buildCompensationSummary(
     | "compensation_currency"
   >,
 ): string {
-  if (row.compensation_summary) return row.compensation_summary;
-  const unit = row.compensation_unit ?? "other";
-  const currency = row.compensation_currency;
-  if (row.compensation_min_cents != null) {
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(row.compensation_min_cents);
-    const max = row.compensation_max_cents != null ? fmt(row.compensation_max_cents) : null;
-    const range = max && max !== min ? `${min}\u2013${max}` : min;
-    return unit === "other" || unit === "exchange" || unit === "stipend"
-      ? range
-      : `${range}/${unit}`;
-  }
-  return "Negotiable";
+  return formatCompensation({
+    summary: row.compensation_summary,
+    minCents: row.compensation_min_cents,
+    maxCents: row.compensation_max_cents,
+    unit: row.compensation_unit,
+    currency: row.compensation_currency,
+  });
 }
 
+const asEvidence = (value: string | null | undefined): BenefitEvidenceStatus =>
+  value === "not_stated" || value === "stated" ? value : "confirmed";
+
 function toListingRow(raw: RawListingRow): ListingRow {
-  return { ...raw, category: raw.category as OpportunityCategory };
+  return {
+    ...raw,
+    category: raw.category as OpportunityCategory,
+    provenance: raw.provenance === "sourced" ? "sourced" : "verified",
+    housing_evidence: asEvidence(raw.housing_evidence),
+    meals_evidence: asEvidence(raw.meals_evidence),
+    pay_evidence: asEvidence(raw.pay_evidence),
+  };
+}
+
+/**
+ * Build the contract provenance block for a row. Returns undefined for
+ * verified-NATIVE rows (legacy behavior, zero new payload) and a full block —
+ * attribution, claim summary, per-benefit evidence — for sourced rows and for
+ * converted rows (which stay 'verified' but preserve their source lineage).
+ */
+export function rowProvenanceInfo(
+  row: Pick<
+    ListingRow,
+    | "provenance"
+    | "source_name"
+    | "source_url"
+    | "source_external_id"
+    | "source_employer_name"
+    | "source_published_at"
+    | "source_last_seen_at"
+    | "claim_summary"
+    | "housing_evidence"
+    | "meals_evidence"
+    | "pay_evidence"
+  >,
+): ListingProvenanceInfo | undefined {
+  const converted = row.provenance === "verified" && row.claim_summary === "converted";
+  if (row.provenance !== "sourced" && !converted) return undefined;
+
+  const claimStatus: ListingClaimSummary =
+    row.claim_summary === "claim_pending" || row.claim_summary === "converted"
+      ? row.claim_summary
+      : row.provenance === "sourced"
+        ? "unclaimed"
+        : "not_applicable";
+
+  return {
+    provenance: row.provenance,
+    // Attribution only travels on SOURCED (unconfirmed) listings; a converted
+    // listing keeps its lineage in the DB but presents as its host's own.
+    ...(row.provenance === "sourced" && row.source_name
+      ? {
+          source: {
+            sourceName: row.source_name,
+            sourceUrl: row.source_url,
+            sourcePostingId: row.source_external_id,
+            publishedAt: row.source_published_at,
+            retrievedAt: row.source_last_seen_at,
+            employerName: row.source_employer_name,
+          },
+        }
+      : {}),
+    claimStatus,
+    // ALWAYS the real columns: verified-native rows are 'confirmed' by
+    // migration default, sourced rows carry stated/not_stated, and a converted
+    // row keeps 'not_stated' for any benefit the employer never explicitly
+    // addressed — the constant would fabricate a confirmation there.
+    benefitEvidence: {
+      housing: row.housing_evidence,
+      meals: row.meals_evidence,
+      pay: row.pay_evidence,
+    },
+  };
+}
+
+/**
+ * The stored match score a listing must reach before its numeric % is shown on
+ * a card (founder decision, MATCH SCORE). Below this the card shows no match
+ * pill. Read-only: scores are never recomputed here, only the stored value is
+ * gated. Mirror of MEANINGFUL_MATCH_SCORE_THRESHOLD in apps/web/lib/ranking.ts
+ * (packages can't share a runtime const without a common non-server dep).
+ */
+export const MEANINGFUL_MATCH_SCORE_THRESHOLD = 75;
+
+/**
+ * Per-render enrichment for {@link rowToDiscoveryFields}. Every field is
+ * optional and self-omitting — the shared mapper is used by anon, host, and
+ * seeker surfaces, and only the seeker surfaces resolve these sets. Resolve them
+ * ONCE per request (see {@link resolveSeekerDiscoveryScope} /
+ * {@link getActiveBoostedListingIds}) and thread the same object to every row.
+ */
+export interface DiscoveryEnrichment {
+  /** Listing ids with an active boost campaign — stamped as the "boosted" badge. */
+  readonly boostedListingIds?: ReadonlySet<string>;
+  /**
+   * Listing ids the seeker previously skipped (listing_passes). Off the swipe
+   * deck these stay VISIBLE but are flagged (previouslySkipped) + demoted in
+   * rank (see rankForSeeker); the swipe deck excludes them entirely.
+   */
+  readonly previouslySkippedIds?: ReadonlySet<string>;
+  /**
+   * Stored ADR-040 match scores by listing id (read-only cache). A score is
+   * surfaced as `matchScore` only when it clears
+   * {@link MEANINGFUL_MATCH_SCORE_THRESHOLD}; lower/absent scores show no pill.
+   */
+  readonly matchScores?: ReadonlyMap<string, number>;
+}
+
+/**
+ * The shared discovery view-model — {@link OpportunityListing} plus the
+ * per-seeker `previouslySkipped` flag stamped by {@link rowToDiscoveryFields}.
+ * Assignable anywhere an OpportunityListing is expected (the extra field is
+ * optional); the web `DiscoveryListing` alias re-exposes it to surfaces.
+ */
+export interface DiscoveryFields extends OpportunityListing {
+  /**
+   * Seeker previously skipped this listing (demote-but-visible surfaces). The
+   * card renders a subtle "Previously skipped" photo marker; ranking demotes it.
+   */
+  readonly previouslySkipped?: boolean;
 }
 
 /** Maps a ListingRow to the DiscoveryListing view-model fields. */
-export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
-  const hostName = row.host_profiles?.company_name ?? "Unknown Host";
-  const verified = hasVerifiedHostSubscription(row.host_profiles?.subscription_tier);
+export function rowToDiscoveryFields(
+  row: ListingRow,
+  enrich?: DiscoveryEnrichment,
+): DiscoveryFields {
+  const isSourced = row.provenance === "sourced";
+  // A sourced listing has NO host: the "host" slot carries the employer name
+  // AS STATED BY THE SOURCE (falling back to the source's own name), display-
+  // only — never verified, never linked to a host profile, never tiered.
+  const hostName = isSourced
+    ? row.source_employer_name ?? row.source_name ?? "Employer not stated"
+    : row.host_profiles?.company_name ?? "Unknown Host";
+  const verified =
+    !isSourced && hasVerifiedHostSubscription(row.host_profiles?.subscription_tier);
 
   const housingProvision: BenefitProvision = row.housing_included ? "provided" : "not_provided";
   const mealsProvision: BenefitProvision = row.meals_included ? "provided" : "not_provided";
+
+  // Boosted marker travels on EVERY card, not just the homepage (founder
+  // decision). Stamped from the shared active-boost set when provided.
+  const conditionalBadges: readonly DiscoveryCardConditionalBadge[] | undefined =
+    enrich?.boostedListingIds?.has(row.id) ? (["boosted"] as const) : undefined;
+
+  // Read-only stored match score, gated to the meaningful threshold. Never
+  // recomputed here — a listing with no stored score simply shows none.
+  const storedScore = enrich?.matchScores?.get(row.id);
+  const matchScore =
+    typeof storedScore === "number" && storedScore >= MEANINGFUL_MATCH_SCORE_THRESHOLD
+      ? storedScore
+      : undefined;
+
+  const previouslySkipped = enrich?.previouslySkippedIds?.has(row.id) ? true : undefined;
 
   return {
     id: row.id,
     title: row.title,
     category: row.category,
     location: row.location_display ?? "Location not specified",
-    opportunityWindow: formatOpportunityWindow(row),
+    opportunityWindow: buildOpportunityWindow(row),
     begins: row.begins_at ?? undefined,
     ends: row.ends_at ?? undefined,
     status: row.status as ListingStatus,
+    conditionalBadges,
+    matchScore,
+    previouslySkipped,
     host: {
-      id: row.host_profile_id ?? undefined,
+      // Sourced listings expose NO host id — there is no host profile to
+      // open, review, or navigate to (structural, not cosmetic).
+      id: isSourced ? undefined : row.host_profile_id ?? undefined,
       name: hostName,
       verified,
+      // Monetization ranking ("pay more, show more"): expose the host's real
+      // active subscription tier so Enterprise > Professional > Starter is
+      // honored. Never fabricated — anything other than a known paid tier
+      // (incl. null/free/unknown) maps to "none" (ranks last, never hidden).
+      // Sourced inventory is always "none": unconfirmed listings never carry
+      // monetization rank.
+      tier:
+        !isSourced &&
+        (row.host_profiles?.subscription_tier === "starter" ||
+          row.host_profiles?.subscription_tier === "professional" ||
+          row.host_profiles?.subscription_tier === "enterprise")
+          ? row.host_profiles!.subscription_tier as "starter" | "professional" | "enterprise"
+          : "none",
     },
+    provenanceInfo: rowProvenanceInfo(row),
     benefits: {
       housing: {
         provision: housingProvision,
@@ -175,8 +366,68 @@ export function rowToDiscoveryFields(row: ListingRow): OpportunityListing {
   };
 }
 
+/**
+ * The per-seeker discovery scope, resolved ONCE and threaded through the shared
+ * filter + mapper + ranking on a seeker surface:
+ *   - `appliedIds`  — non-withdrawn applications; HARD-hidden everywhere (never
+ *     reshow an applied listing as applyable).
+ *   - `skippedIds`  — listing_passes; excluded from the swipe deck, elsewhere
+ *     demoted + flagged (previouslySkipped).
+ *   - `boostedIds`  — active boost campaigns; stamped as the boosted badge.
+ *
+ * Every read is best-effort/independent (Promise.allSettled) so one failing
+ * axis (e.g. pre-057 passes, pre-029 boosts) degrades that axis to empty rather
+ * than breaking the whole surface. `clerkUserId` MUST come from auth().userId.
+ */
+export interface SeekerDiscoveryScope {
+  readonly appliedIds: Set<string>;
+  readonly skippedIds: Set<string>;
+  readonly boostedIds: Set<string>;
+}
+
+export async function resolveSeekerDiscoveryScope(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<SeekerDiscoveryScope> {
+  const [applied, skipped, boosted] = await Promise.allSettled([
+    getSeekerApplicationIds(clerkToken, clerkUserId),
+    getPassedListingIds(clerkToken, clerkUserId),
+    getActiveBoostedListingIds(clerkToken),
+  ]);
+  return {
+    appliedIds: new Set(applied.status === "fulfilled" ? applied.value : []),
+    skippedIds: new Set(skipped.status === "fulfilled" ? skipped.value : []),
+    boostedIds:
+      boosted.status === "fulfilled" ? boosted.value : new Set<string>(),
+  };
+}
+
+/**
+ * Build a {@link DiscoveryEnrichment} from a resolved {@link SeekerDiscoveryScope}
+ * (+ optional stored match scores). The one place surfaces turn the scope into
+ * the object threaded to {@link rowToDiscoveryFields} for every row.
+ */
+export function enrichmentFromScope(
+  scope: SeekerDiscoveryScope,
+  matchScores?: ReadonlyMap<string, number>,
+): DiscoveryEnrichment {
+  return {
+    boostedListingIds: scope.boostedIds,
+    previouslySkippedIds: scope.skippedIds,
+    matchScores,
+  };
+}
+
+/** Provenance columns (migration 064) shared by BOTH column constants below. */
+const PROVENANCE_COLUMNS =
+  "provenance,source_name,source_url,source_external_id,source_employer_name," +
+  "source_published_at,source_last_seen_at,source_status,claim_summary," +
+  "housing_evidence,meals_evidence,pay_evidence";
+
 const LISTING_COLUMNS =
-  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profiles(company_name,subscription_tier)";
+  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls," +
+  PROVENANCE_COLUMNS +
+  ",host_profiles(company_name,subscription_tier)";
 
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;
@@ -303,15 +554,36 @@ export async function getSwipeBatch(
  */
 export async function getLiveListingsWithCoords(
   clerkToken?: string,
+  clerkUserId?: string,
 ): Promise<ListingRow[]> {
   const db = clerkToken ? authedClient(clerkToken) : anonClient();
-  const { data, error } = await db
+
+  // Applied HARD-exclusion (shared filter): when a seeker is signed in, drop the
+  // listings they've already applied to (non-withdrawn) so an applied listing is
+  // never reshown as applyable — on the map as everywhere. Withdrawn rows are NOT
+  // excluded (getSeekerApplicationIds skips them), keeping re-apply possible.
+  // Best-effort: a failed lookup degrades to no exclusion, never a broken map.
+  let appliedIds: string[] = [];
+  if (clerkToken && clerkUserId) {
+    appliedIds = await getSeekerApplicationIds(clerkToken, clerkUserId).catch(
+      () => [] as string[],
+    );
+  }
+
+  let builder = db
     .from("listings")
     .select(LISTING_COLUMNS)
     .eq("status", "live")
     .not("latitude", "is", null)
-    .not("longitude", "is", null)
-    .order("published_at", { ascending: false });
+    .not("longitude", "is", null);
+
+  if (appliedIds.length > 0) {
+    builder = builder.not("id", "in", `(${appliedIds.join(",")})`);
+  }
+
+  const { data, error } = await builder.order("published_at", {
+    ascending: false,
+  });
 
   if (error) throw new Error(`getLiveListingsWithCoords: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
@@ -338,6 +610,13 @@ export interface SearchFilters {
   location?: string;
   startDateAfter?: string;
   startDateBefore?: string;
+  /**
+   * Geographic bounding box (validated upstream via isValidGeoBounds).
+   * Restricts results to listings WITH coordinates inside the box — listings
+   * without coordinates are excluded by definition of a geographic query.
+   * Shared by /map, the public API, and MCP (one geo path, no duplicates).
+   */
+  bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number };
   limit?: number;
   offset?: number;
 }
@@ -371,11 +650,40 @@ export function buildSearchTermFilter(term: string): string {
   ].join(",");
 }
 
-export async function searchListings(filters: SearchFilters): Promise<ListingRow[]> {
+/**
+ * Signed-in seeker scope for surfaces that need per-seeker filtering. When
+ * present, {@link searchListings} HARD-excludes the seeker's applied listings.
+ * `clerkUserId` MUST come from auth().userId — never decoded from the token.
+ */
+export interface SeekerScope {
+  readonly clerkToken: string;
+  readonly clerkUserId: string;
+}
+
+export async function searchListings(
+  filters: SearchFilters,
+  seeker?: SeekerScope,
+): Promise<ListingRow[]> {
+  // Applied HARD-exclusion (shared filter): /search had NONE — an already-applied
+  // listing kept surfacing as applyable. Resolve the seeker's non-withdrawn
+  // applications server-side (never trust a client set) and drop them below.
+  // Best-effort so a lookup fault degrades to an unfiltered search, not a crash.
+  let appliedIds: string[] = [];
+  if (seeker) {
+    appliedIds = await getSeekerApplicationIds(
+      seeker.clerkToken,
+      seeker.clerkUserId,
+    ).catch(() => [] as string[]);
+  }
+
   let builder = anonClient()
     .from("listings")
     .select(LISTING_COLUMNS)
     .eq("status", "live");
+
+  if (appliedIds.length > 0) {
+    builder = builder.not("id", "in", `(${appliedIds.join(",")})`);
+  }
 
   const term = filters.query ? sanitizeSearchTerm(filters.query) : "";
   if (term) {
@@ -425,6 +733,17 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
     builder = builder.lte("begins_at", filters.startDateBefore);
   }
 
+  if (filters.bounds) {
+    const { minLat, maxLat, minLng, maxLng } = filters.bounds;
+    builder = builder
+      .not("latitude", "is", null)
+      .not("longitude", "is", null)
+      .gte("latitude", minLat)
+      .lte("latitude", maxLat)
+      .gte("longitude", minLng)
+      .lte("longitude", maxLng);
+  }
+
   const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;
   const ordered = builder.order("published_at", { ascending: false });
   const hasOffset =
@@ -437,6 +756,47 @@ export async function searchListings(filters: SearchFilters): Promise<ListingRow
 
   if (error) throw new Error(`searchListings: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
+}
+
+/** Match-critical requirement fields promoted by migration 051. */
+export interface ListingMatchRequirements {
+  requiredSkillTags: string[];
+  requiredCertifications: string[];
+  experienceLevelRequired: string | null;
+}
+
+/**
+ * Requirement fields for ONE live listing. Defensive by design: these columns
+ * (051) may lack anon column grants in some environments, so any read fault
+ * degrades to null — callers treat that as "requirements unknown" (honest
+ * missing data), never as "no requirements".
+ */
+export async function getListingMatchRequirements(
+  listingId: string,
+): Promise<ListingMatchRequirements | null> {
+  try {
+    const untyped = anonClient() as unknown as SupabaseClient;
+    const { data, error } = await untyped
+      .from("listings")
+      .select("required_skill_tags, required_certifications, experience_level_required")
+      .eq("id", listingId)
+      .eq("status", "live")
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as Record<string, unknown>;
+    const asStrings = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+    return {
+      requiredSkillTags: asStrings(row.required_skill_tags),
+      requiredCertifications: asStrings(row.required_certifications),
+      experienceLevelRequired:
+        typeof row.experience_level_required === "string"
+          ? row.experience_level_required
+          : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function resolveHostProfileId(
@@ -685,20 +1045,103 @@ export interface PublicListingDetail {
   galleryPhotoUrls: string[];
   hostProfileId: string | null;
   host: PublicListingDetailHost | null;
+
+  /* ── Immersive listing-detail fields (migration 060 + host narrative 059) ──
+     Every field below is OPTIONAL and self-omitting: absent/empty data maps to
+     undefined (arrays) or null (descriptions) so the immersive page renders the
+     corresponding section only when there is honest content to show. */
+
+  /** "What you'll do" — role responsibilities (listings.responsibilities jsonb). */
+  responsibilities?: string[];
+  /** "What we're looking for" — role requirements (listings.requirements jsonb). */
+  requirements?: string[];
+  /** "Perks & benefits" at the LISTING level (listings.perks jsonb). */
+  perks?: string[];
+  /** Free-text housing descriptor (listings.housing_description; migration 040). */
+  housingDescription?: string | null;
+  /** Free-text meals descriptor (listings.meals_description; migration 040). */
+  mealsDescription?: string | null;
+
+  /* ── Host-narrative-derived (host_profiles.narrative jsonb; migration 059) ── */
+  /** "Why work with us" recruiting pitch. */
+  whyWorkForUs?: string | null;
+  /** "Meet the team" members; photoUrl may be null (framed placeholder). */
+  team?: { name: string; role: string; photoUrl?: string | null }[];
+  /** "Life here" / off-the-clock activities. */
+  activities?: string[];
+  /** Host-level perks from the narrative (distinct from listing-level `perks`). */
+  hostPerks?: string[];
+
+  /* ── Provenance (migration 064) ──
+     Absent for verified-native listings (legacy behavior). Present for
+     sourced listings (attribution + per-benefit evidence — the detail page
+     MUST render the sourced disclosure, suppress every host block, and show
+     'not_stated' benefits as missing information) and for converted listings
+     (lineage retained, presents as the host's own). */
+  provenanceInfo?: ListingProvenanceInfo;
 }
 
 const LISTING_DETAIL_COLUMNS =
   "id,title,category,description,location_display,latitude,longitude,status," +
-  "housing_included,meals_included,compensation_summary,compensation_min_cents," +
+  "housing_included,meals_included,housing_description,meals_description," +
+  "responsibilities,requirements,perks," +
+  "compensation_summary,compensation_min_cents," +
   "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
   "begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profile_id," +
-  "host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier)";
+  PROVENANCE_COLUMNS +
+  ",host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier,narrative)";
 
 function firstEmbed(value: unknown): Record<string, unknown> | null {
   const candidate = Array.isArray(value) ? value[0] : value;
   return candidate && typeof candidate === "object"
     ? (candidate as Record<string, unknown>)
     : null;
+}
+
+/**
+ * Parse a jsonb/text[] column into a clean, order-preserving list of non-empty
+ * strings. Tolerates null/non-array/mixed content (defaults to []). Used for the
+ * immersive listing arrays (responsibilities/requirements/perks) and the host
+ * narrative activities/perks — never fabricates, only keeps real strings.
+ */
+function toDetailStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+/**
+ * Trim a value to a non-empty string, or null. Keeps free-text descriptors
+ * (housing/meals, whyWorkForUs) honest: blank/whitespace/non-string → null.
+ */
+function toDetailText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Parse host_profiles.narrative team[] (migration 059 shape:
+ * { name, role, photoUrl? }) into validated members. Skips entries with neither
+ * a name nor a role; normalizes a missing/blank photoUrl to null so the UI can
+ * render a framed placeholder. Tolerant of missing/partial jsonb.
+ */
+function toDetailTeam(
+  value: unknown,
+): { name: string; role: string; photoUrl?: string | null }[] {
+  if (!Array.isArray(value)) return [];
+  const members: { name: string; role: string; photoUrl?: string | null }[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") continue;
+    const rec = entry as Record<string, unknown>;
+    const name = typeof rec.name === "string" ? rec.name.trim() : "";
+    const role = typeof rec.role === "string" ? rec.role.trim() : "";
+    if (name === "" && role === "") continue;
+    members.push({ name, role, photoUrl: toDetailText(rec.photoUrl) });
+  }
+  return members;
 }
 
 /**
@@ -719,7 +1162,11 @@ export async function getListingDetailPublic(
   if (!data) return null;
 
   const row = data as unknown as Record<string, unknown>;
-  const hostRow = firstEmbed(row.host_profiles);
+  const isSourced = row.provenance === "sourced";
+  // STRUCTURAL suppression: a sourced listing exposes NO host object at all —
+  // the page cannot render a host block, reviews, or a verified badge for it
+  // even by accident, because there is nothing to render from.
+  const hostRow = isSourced ? null : firstEmbed(row.host_profiles);
 
   const host: PublicListingDetailHost | null = hostRow
     ? {
@@ -736,6 +1183,22 @@ export async function getListingDetailPublic(
         verified: hasVerifiedHostSubscription(hostRow.subscription_tier),
       }
     : null;
+
+  // Immersive listing arrays/descriptors (migration 060 + 040) — parsed
+  // defensively; empty → undefined so each page section self-omits.
+  const responsibilities = toDetailStringArray(row.responsibilities);
+  const requirements = toDetailStringArray(row.requirements);
+  const perks = toDetailStringArray(row.perks);
+
+  // Host showcase narrative (host_profiles.narrative jsonb; migration 059).
+  // Tolerates a missing/partial/empty jsonb block.
+  const narrative =
+    hostRow && hostRow.narrative && typeof hostRow.narrative === "object"
+      ? (hostRow.narrative as Record<string, unknown>)
+      : {};
+  const team = toDetailTeam(narrative.team);
+  const activities = toDetailStringArray(narrative.activities);
+  const hostPerks = toDetailStringArray(narrative.perks);
 
   return {
     id: String(row.id),
@@ -788,6 +1251,32 @@ export async function getListingDetailPublic(
     hostProfileId:
       typeof row.host_profile_id === "string" ? row.host_profile_id : null,
     host,
+    provenanceInfo: rowProvenanceInfo({
+      provenance: isSourced ? "sourced" : "verified",
+      source_name: toDetailText(row.source_name),
+      source_url: toDetailText(row.source_url),
+      source_external_id: toDetailText(row.source_external_id),
+      source_employer_name: toDetailText(row.source_employer_name),
+      source_published_at:
+        typeof row.source_published_at === "string" ? row.source_published_at : null,
+      source_last_seen_at:
+        typeof row.source_last_seen_at === "string" ? row.source_last_seen_at : null,
+      claim_summary: typeof row.claim_summary === "string" ? row.claim_summary : "not_applicable",
+      housing_evidence: asEvidence(row.housing_evidence as string | null),
+      meals_evidence: asEvidence(row.meals_evidence as string | null),
+      pay_evidence: asEvidence(row.pay_evidence as string | null),
+    }),
+
+    // Immersive fields — undefined-when-empty so the page omits empty sections.
+    responsibilities: responsibilities.length > 0 ? responsibilities : undefined,
+    requirements: requirements.length > 0 ? requirements : undefined,
+    perks: perks.length > 0 ? perks : undefined,
+    housingDescription: toDetailText(row.housing_description),
+    mealsDescription: toDetailText(row.meals_description),
+    whyWorkForUs: toDetailText(narrative.whyWorkForUs),
+    team: team.length > 0 ? team : undefined,
+    activities: activities.length > 0 ? activities : undefined,
+    hostPerks: hostPerks.length > 0 ? hostPerks : undefined,
   };
 }
 

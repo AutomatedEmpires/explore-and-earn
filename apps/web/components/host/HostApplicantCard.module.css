@@ -87,6 +87,48 @@
   color: var(--text-secondary);
 }
 
+/* Real ADR-040 match chip — rendered only by the "Matched seekers" bucket
+   (HostApplicantCard showMatch) and ONLY when a real score exists on the item.
+   Never a fabricated signal. status.match tokens keep it on the match palette;
+   borders-first so it reads as data, not decoration. Not interactive, so the
+   28px min-height (below the 44px tap target) is intentional. */
+.match {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-6);
+  max-width: 100%;
+  min-height: 28px;
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--status-match-fg) 30%, transparent);
+  background: var(--status-match-bg);
+  color: var(--status-match-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.2;
+}
+
+.matchLabel {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.matchScore {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  padding-left: var(--space-6);
+  border-left: 1px solid color-mix(in srgb, var(--status-match-fg) 30%, transparent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.matchScoreUnit {
+  font-weight: 600;
+  opacity: 0.7;
+}
+
 .note {
   margin: 0;
   font-family: var(--font-ui);

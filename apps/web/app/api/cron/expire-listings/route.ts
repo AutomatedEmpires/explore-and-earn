@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
 
-import { expireListings } from "@explore-and-earn/db";
+import { expireListings, sweepStaleSourcedListings } from "@explore-and-earn/db";
 
 // Listing expiry sweep must always run fresh (never statically cached).
 export const dynamic = "force-dynamic";
@@ -27,5 +27,18 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, archived: result.archived });
+  // Also reconcile stale sourced inventory (never presents a weeks-old sourced
+  // posting as current). Best-effort — a sourcing-sweep fault must not fail the
+  // primary expiry sweep; it degrades to closed:0 (e.g. pre-064).
+  const sourced = await sweepStaleSourcedListings().catch(() => ({
+    ok: false as const,
+    closed: 0,
+    ids: [] as string[],
+  }));
+
+  return NextResponse.json({
+    ok: true,
+    archived: result.archived,
+    sourcedClosed: sourced.closed,
+  });
 }

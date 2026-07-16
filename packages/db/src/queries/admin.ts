@@ -6,7 +6,11 @@ import type {
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
-import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  formatCompensation,
+  formatOpportunityWindow,
+  hasVerifiedHostSubscription,
+} from "@explore-and-earn/contracts";
 
 import { adminClient } from "../adminClient";
 import type { SeekerApplicationListing } from "./applications";
@@ -474,37 +478,41 @@ export async function getAdminListingDetail(
   const mealsProvision: BenefitProvision =
     row.meals_included === true ? "provided" : "not_provided";
 
-  let paySummary: string;
-  if (
-    typeof row.compensation_summary === "string" &&
-    row.compensation_summary.length > 0
-  ) {
-    paySummary = row.compensation_summary;
-  } else if (typeof row.compensation_min_cents === "number") {
-    const fmt = (cents: number) =>
-      new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }).format(cents / 100);
-    const min = fmt(row.compensation_min_cents);
-    const maxCents =
-      typeof row.compensation_max_cents === "number"
-        ? row.compensation_max_cents
-        : null;
-    const range = maxCents != null ? `${min}–${fmt(maxCents)}` : `From ${min}`;
-    const unit =
-      typeof row.compensation_unit === "string" ? row.compensation_unit : null;
-    paySummary = unit ? `${range}/${unit}` : range;
-  } else {
-    paySummary = "Unpaid / exchange";
-  }
+  // Admin summary variant: always append the /unit suffix (no exchange-aware
+  // drop), never collapse an equal-value range, prefix a lone amount with
+  // "From ", and fall back to "Unpaid / exchange". Currency is left to the
+  // formatter default (USD). See @explore-and-earn/contracts formatCompensation.
+  const paySummary = formatCompensation(
+    {
+      summary:
+        typeof row.compensation_summary === "string"
+          ? row.compensation_summary
+          : null,
+      minCents:
+        typeof row.compensation_min_cents === "number"
+          ? row.compensation_min_cents
+          : null,
+      maxCents:
+        typeof row.compensation_max_cents === "number"
+          ? row.compensation_max_cents
+          : null,
+      unit:
+        typeof row.compensation_unit === "string"
+          ? row.compensation_unit
+          : null,
+    },
+    {
+      fallback: "Unpaid / exchange",
+      singleValuePrefix: "From ",
+      suffixMode: "always",
+      collapseEqualRange: false,
+    },
+  );
 
-  const opportunityWindow =
-    typeof row.timeline_summary === "string" &&
-    row.timeline_summary.length > 0
-      ? row.timeline_summary
-      : "Open";
+  const opportunityWindow = formatOpportunityWindow({
+    timelineSummary:
+      typeof row.timeline_summary === "string" ? row.timeline_summary : null,
+  });
 
   return {
     id: String(row.id),

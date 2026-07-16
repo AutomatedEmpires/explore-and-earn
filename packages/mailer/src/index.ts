@@ -34,6 +34,13 @@ export interface SendMailOptions {
   readonly from?: string;
   readonly subject: string;
   readonly html: string;
+  /** Optional plain-text alternative part (multipart/alternative). */
+  readonly text?: string;
+  /**
+   * Extra SMTP headers (e.g. List-Unsubscribe / List-Unsubscribe-Post for
+   * one-click unsubscribe). Passed through to the provider verbatim.
+   */
+  readonly headers?: Readonly<Record<string, string>>;
   /**
    * When set, duplicate sends within the 5-minute TTL window are silently
    * dropped. Use a string that uniquely identifies the send event, e.g.
@@ -47,6 +54,10 @@ export interface SendMailResult {
   readonly error?: string;
   /** True when the send was skipped because an identical send was already recorded within the TTL. */
   readonly isDuplicate?: boolean;
+  /** Provider HTTP status when the provider responded (success or failure). */
+  readonly status?: number;
+  /** Provider message id on success (Resend `id`), when available. */
+  readonly providerMessageId?: string;
 }
 
 function resolveFrom(override?: string): string {
@@ -81,18 +92,23 @@ function resolveFrom(override?: string): string {
  * // r.ok === false; r.error contains the reason
  */
 export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
-  const { to, subject, html, idempotencyKey } = opts;
+  const { to, subject, html, text, headers, idempotencyKey } = opts;
   const from = resolveFrom(opts.from);
 
-  // Guard: skip if we already sent this within the dedup window.
+  // Guard: skip if this key was already claimed within the dedup window.
+  // CLAIM-then-send (not send-then-record): two concurrent calls with the
+  // same key would otherwise both pass a read-only check before either
+  // recorded it. The claim is rolled back on failure so retries still work.
   if (idempotencyKey) {
     const lastSent = _sentKeys.get(idempotencyKey);
     if (lastSent !== undefined && Date.now() - lastSent < IDEMPOTENCY_TTL_MS) {
       return { ok: true, isDuplicate: true };
     }
+    _sentKeys.set(idempotencyKey, Date.now());
   }
 
   if (!to || to.trim().length === 0) {
+    if (idempotencyKey) _sentKeys.delete(idempotencyKey);
     return { ok: false, error: "recipient address is empty" };
   }
 
@@ -104,9 +120,9 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
       console.info(
         `[mailer:dev] would send\n  to: ${to}\n  subject: ${subject}\n  idempotencyKey: ${idempotencyKey ?? "(none)"}`,
       );
-      if (idempotencyKey) _sentKeys.set(idempotencyKey, Date.now());
       return { ok: true };
     }
+    if (idempotencyKey) _sentKeys.delete(idempotencyKey);
     const error = "RESEND_API_KEY is not set";
     console.error(`[mailer] ${error}`);
     return { ok: false, error };
@@ -125,20 +141,31 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
         to: [to],
         subject,
         html,
+        ...(text ? { text } : {}),
+        ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
         ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });
 
     if (!response.ok) {
+      if (idempotencyKey) _sentKeys.delete(idempotencyKey);
       const detail = await response.text().catch(() => "");
       const error = `Resend ${response.status}: ${detail.slice(0, 300)}`;
       console.error(`[mailer] send failed: ${error}`);
-      return { ok: false, error };
+      return { ok: false, error, status: response.status };
     }
 
-    if (idempotencyKey) _sentKeys.set(idempotencyKey, Date.now());
-    return { ok: true };
+    let providerMessageId: string | undefined;
+    try {
+      const payload = (await response.json()) as { id?: unknown };
+      if (typeof payload.id === "string") providerMessageId = payload.id;
+    } catch {
+      // Body is informational only — a success without a parsable id is fine.
+    }
+
+    return { ok: true, status: response.status, providerMessageId };
   } catch (err) {
+    if (idempotencyKey) _sentKeys.delete(idempotencyKey);
     const error = err instanceof Error ? err.message : "unknown";
     console.error("[mailer] send threw:", err);
     return { ok: false, error };

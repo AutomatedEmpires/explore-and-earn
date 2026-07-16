@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
 
 import { runNewMatchAlerts } from "../../../../services/matching/newMatchAlerts";
+import { runDispatchOnce } from "../../../../services/notifications/dispatcher";
 
 // Alert sweep must always run fresh (never statically cached).
 export const dynamic = "force-dynamic";
@@ -25,7 +26,10 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   try {
     const result = await runNewMatchAlerts();
-    return NextResponse.json({ ok: true, ...result });
+    // The sweep records match_generated events; expand + deliver them through
+    // the notification engine in the same run.
+    const dispatch = await runDispatchOnce();
+    return NextResponse.json({ ok: true, ...result, dispatch });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

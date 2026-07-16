@@ -1,7 +1,58 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import createIntlMiddleware from "next-intl/middleware";
+import { NextResponse, type NextRequest } from "next/server";
 
+import { routing } from "./i18n/routing";
 import { DEV_ROLE_COOKIE, isDevBenchEnabled } from "./lib/devBench";
+
+// next-intl locale middleware. Handles locale negotiation + the "as-needed"
+// prefix scheme: unprefixed English paths pass through untouched, a stray
+// /en/… redirects to the canonical unprefixed URL, and additional locales get
+// their prefix. Run ONLY for localizable page routes (see shouldLocalize) — API
+// routes and metadata files must never be rewritten into a /[locale]/ path.
+const intlMiddleware = createIntlMiddleware(routing);
+
+// Paths that are NOT under app/[locale] and therefore must bypass locale
+// rewriting: API handlers, the Sentry tunnel, and the root-level metadata routes
+// (sitemap/robots/llms/opengraph/icon/manifest/favicon). Clerk still runs on
+// these (the matcher includes /api) — only the intl rewrite is skipped.
+const NON_LOCALIZED_EXACT = new Set([
+  "/sitemap.xml",
+  "/robots.txt",
+  "/llms.txt",
+  "/favicon.ico",
+  "/manifest.webmanifest",
+]);
+const NON_LOCALIZED_PREFIXES = ["/api", "/trpc", "/monitoring"];
+const NON_LOCALIZED_STARTSWITH = ["/opengraph-image", "/icon", "/apple-icon"];
+
+function shouldLocalize(pathname: string): boolean {
+  if (NON_LOCALIZED_EXACT.has(pathname)) return false;
+  if (
+    NON_LOCALIZED_PREFIXES.some(
+      (p) => pathname === p || pathname.startsWith(`${p}/`),
+    )
+  ) {
+    return false;
+  }
+  if (NON_LOCALIZED_STARTSWITH.some((p) => pathname.startsWith(p))) return false;
+  return true;
+}
+
+// "as-needed": the DEFAULT locale is unprefixed, so a stray "/en/…" is
+// non-canonical and must 308 to the unprefixed URL. Do this BEFORE auth so a
+// public page (e.g. /en/seek) isn't auth-walled purely by the prefix — and so
+// that when non-default locales are added, only the default prefix is stripped
+// ("/es/seek" passes through to normal localized handling). Returns a redirect
+// response, or null when there's nothing to strip.
+function redirectDefaultLocalePrefix(request: NextRequest): NextResponse | null {
+  const prefix = `/${routing.defaultLocale}`;
+  const { pathname } = request.nextUrl;
+  if (pathname !== prefix && !pathname.startsWith(`${prefix}/`)) return null;
+  const url = request.nextUrl.clone();
+  url.pathname = pathname.slice(prefix.length) || "/";
+  return NextResponse.redirect(url);
+}
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -35,6 +86,11 @@ const isPublicRoute = createRouteMatcher([
   // handler, which validates the cron secret itself. Without this, the daily
   // expire-listings job is rejected before its own auth check ever runs.
   "/api/cron/(.*)",
+  // Public agent surfaces (RFC 2026-07-14 §1): the versioned read-only REST
+  // API and MCP server serve anonymous external agents by design. They carry
+  // their own per-IP rate limits and expose only live public inventory — the
+  // privacy boundary is the DTO layer, not a login.
+  "/api/public/(.*)",
   "/terms",
   "/privacy",
   "/cookies",
@@ -70,41 +126,54 @@ if (process.env.NODE_ENV === "production" && !hasClerkMiddlewareConfig) {
 
 export default hasClerkMiddlewareConfig
   ? clerkMiddleware(async (auth, request) => {
+      const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
+      if (defaultLocaleRedirect) return defaultLocaleRedirect;
+      const localize = shouldLocalize(request.nextUrl.pathname);
       // DEV MOCK BENCH (review tooling only): when impersonating a role locally,
       // skip Clerk protection so every surface is reachable without a login.
-      // isDevBenchEnabled() is false in production/preview, so this never opens
-      // a deployed environment. See lib/devBench.
+      // The bypass ONLY renders role shells — the session's getToken() hands back
+      // the inert sentinel token (not the real service-role key) and the admin
+      // grant stays off unless isDevBenchPrivileged() (explicit NEXT_PUBLIC_DEV_BENCH=1
+      // + non-prod Supabase URL). So a stray `next dev` against prod env renders
+      // empty shells with NO real data or admin — never bundled in a prod build
+      // (NODE_ENV gate). See lib/devBench.
       if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
-        return;
+        // Still run the locale middleware so the bench resolves the right
+        // /[locale]/ route (just without the Clerk gate).
+        return localize ? intlMiddleware(request) : undefined;
       }
       if (!isPublicRoute(request)) {
         await auth.protect();
       }
+      // After auth, hand localizable page routes to next-intl. API + metadata
+      // routes fall through untouched (Clerk has already run on them).
+      return localize ? intlMiddleware(request) : undefined;
     })
-  : function authFallbackMiddleware(request: Request) {
+  : function authFallbackMiddleware(request: NextRequest) {
       // DEV MOCK BENCH: same impersonation bypass the Clerk branch has, so
       // keyless local QA (and the keyless Playwright harness) can traverse
-      // role shells with the ee_dev_role cookie. isDevBenchEnabled() is
-      // compile-time false in production builds — this can never open a
-      // deployed environment.
-      if (
-        isDevBenchEnabled() &&
-        (request as { cookies?: { get(name: string): unknown } }).cookies?.get(
-          DEV_ROLE_COOKIE,
-        )
-      ) {
-        return NextResponse.next();
+      // role SHELLS with the ee_dev_role cookie. Gated by isDevBenchEnabled()
+      // (NODE_ENV — never in a prod build); the privileged grants (real
+      // service-role key + admin) stay behind isDevBenchPrivileged() in
+      // lib/devBench + lib/admin, so this only ever opens inert shells.
+      const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
+      if (defaultLocaleRedirect) return defaultLocaleRedirect;
+      const localize = shouldLocalize(request.nextUrl.pathname);
+      if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
+        return localize ? intlMiddleware(request) : NextResponse.next();
       }
       // Fail closed: when Clerk is not configured (local/dev only, since
       // production and preview throw above), protected routes are denied
       // rather than silently opened.
-      if (!isPublicRoute(request as Parameters<typeof isPublicRoute>[0])) {
+      if (!isPublicRoute(request)) {
         return new NextResponse("Unauthorized — Clerk not configured", {
           status: 401,
         });
       }
 
-      return NextResponse.next();
+      // Public route: still run locale negotiation for page routes so keyless
+      // local QA / Playwright get the same /[locale]/ resolution as production.
+      return localize ? intlMiddleware(request) : NextResponse.next();
     };
 
 export const config = {
