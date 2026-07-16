@@ -235,9 +235,12 @@ export async function getClaimConfirmationFields(
     compensationSummary: text("compensation_summary"),
     beginsAt: text("begins_at"),
     endsAt: text("ends_at"),
-    housingEvidence: String(row.housing_evidence ?? "confirmed"),
-    mealsEvidence: String(row.meals_evidence ?? "confirmed"),
-    payEvidence: String(row.pay_evidence ?? "confirmed"),
+    // Missing/corrupt evidence must resolve to the most CONSERVATIVE state —
+    // defaulting to 'confirmed' would fabricate an employer confirmation the
+    // provenance contract forbids.
+    housingEvidence: String(row.housing_evidence ?? "not_stated"),
+    mealsEvidence: String(row.meals_evidence ?? "not_stated"),
+    payEvidence: String(row.pay_evidence ?? "not_stated"),
   };
 }
 

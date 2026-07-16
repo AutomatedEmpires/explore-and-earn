@@ -452,14 +452,15 @@ export async function expandEvent(
 			const adminClerk = (process.env.ADMIN_CLERK_USER_ID ?? "").trim()
 			if (!adminClerk) return []
 			const claimId = event.subject_type === "listing_claim" ? event.subject_id : null
-			if (!claimId || !event.listing_id) return []
-			const [claim, listing] = await Promise.all([
-				resolveClaimContext(resolvers, claimId),
-				resolvers.listingContext(event.listing_id),
-			])
+			if (!claimId) return []
+			const claim = await resolveClaimContext(resolvers, claimId)
 			// Self-action guard: an admin claiming a listing themself gets no
 			// "review this" alert about their own submission.
 			if (!claim || claim.claimantClerkUserId === adminClerk) return []
+			// Same listing-id fallback as the decision events below: the claim
+			// context is authoritative when a recorder omits event.listing_id.
+			const listingId = event.listing_id ?? claim.listingId
+			const listing = listingId ? await resolvers.listingContext(listingId) : null
 			return [
 				makeIntent({
 					event,

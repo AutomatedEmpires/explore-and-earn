@@ -136,10 +136,20 @@ export function ClaimConfirmationForm({
     };
     if (description.trim()) confirmed.description = description.trim();
     if (locationDisplay.trim()) confirmed.locationDisplay = locationDisplay.trim();
-    if (housing !== "not_stated") confirmed.housingIncluded = housing === "yes";
-    if (housingDescription.trim()) confirmed.housingDescription = housingDescription.trim();
-    if (meals !== "not_stated") confirmed.mealsIncluded = meals === "yes";
-    if (mealsDescription.trim()) confirmed.mealsDescription = mealsDescription.trim();
+    // A description may only ride along with an explicit yes/no selection:
+    // convert_claimed_listing flips evidence to 'confirmed' only when the
+    // included flag is present, so a description on a not_stated benefit
+    // would update copy while the evidence honestly stayed not_stated — an
+    // inconsistent half-confirmation. Leaving the choice unconfirmed drops
+    // the description too.
+    if (housing !== "not_stated") {
+      confirmed.housingIncluded = housing === "yes";
+      if (housingDescription.trim()) confirmed.housingDescription = housingDescription.trim();
+    }
+    if (meals !== "not_stated") {
+      confirmed.mealsIncluded = meals === "yes";
+      if (mealsDescription.trim()) confirmed.mealsDescription = mealsDescription.trim();
+    }
     if (minCents !== null) confirmed.compensationMinCents = minCents;
     if (maxCents !== null) confirmed.compensationMaxCents = maxCents;
     if (payUnit.trim()) confirmed.compensationUnit = payUnit.trim();
