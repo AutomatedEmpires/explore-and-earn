@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
-import type { ListingProvenanceInfo } from "@explore-and-earn/contracts";
+import {
+  SOURCED_DISCLOSURE_LABEL,
+  type ListingProvenanceInfo,
+} from "@explore-and-earn/contracts";
 
 import styles from "./SourcedNotice.module.css";
 
@@ -35,7 +38,7 @@ export function SourcedNotice({
       <div className={styles.headline}>
         <Icon name="system.info" size={20} aria-hidden />
         <div>
-          <h2 className={styles.title}>Sourced · not yet confirmed by Explore &amp; Earn</h2>
+          <h2 className={styles.title}>{SOURCED_DISCLOSURE_LABEL}</h2>
           <p className={styles.body}>
             We found this opportunity from a public posting. Explore &amp; Earn has not
             confirmed the employer or these details. Anything the posting didn&apos;t
