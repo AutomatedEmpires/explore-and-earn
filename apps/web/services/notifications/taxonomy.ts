@@ -105,6 +105,13 @@ function makeIntent(args: {
 	readonly destinationPath: string
 	readonly values: Readonly<Record<string, string | number>>
 	readonly variant?: string
+	/**
+	 * Message keys for a variant whose copy differs materially from the type's
+	 * default (e.g. "they accepted your invite" vs "someone applied"). A variant
+	 * that reuses the default copy would be a distinction the recipient cannot
+	 * see — if you set one, give it real copy.
+	 */
+	readonly keys?: { readonly titleKey: string; readonly bodyKey: string }
 	readonly entity?: { readonly type: string; readonly id: string }
 	readonly collapseKey?: string
 	readonly expiresAt?: string
@@ -117,7 +124,7 @@ function makeIntent(args: {
 		type: args.type,
 		variant: args.variant ?? "default",
 		destinationPath: args.destinationPath,
-		...keysFor(args.type),
+		...(args.keys ?? keysFor(args.type)),
 		values: args.values,
 		...(args.entity ? { entity: args.entity } : {}),
 		...(args.collapseKey ? { collapseKey: args.collapseKey } : {}),
@@ -203,10 +210,23 @@ export async function expandEvent(
 			const ctx = await applicationParties(event, resolvers)
 			// Host is notified someone applied; never the applicant themself.
 			if (!ctx?.hostClerk || ctx.hostClerk === ctx.seekerClerk) return []
+			// An application created by ACCEPTING the host's own invite is a
+			// materially different message ("they accepted your invite") than a
+			// cold application — same event, honest variant-specific copy.
+			const fromInvite = prop(event, "source") === "invite"
 			return [
 				makeIntent({
 					event,
 					type: "application_received",
+					variant: fromInvite ? "invite_accepted" : "default",
+					...(fromInvite
+						? {
+								keys: {
+									titleKey: "Notifications.types.application_received.invite_accepted.title",
+									bodyKey: "Notifications.types.application_received.invite_accepted.body",
+								},
+							}
+						: {}),
 					recipientClerkUserId: ctx.hostClerk,
 					destinationPath: ctx.applicationId
 						? `/host/applicants/${ctx.applicationId}`

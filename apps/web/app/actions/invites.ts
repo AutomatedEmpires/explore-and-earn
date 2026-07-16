@@ -7,8 +7,6 @@ import {
 	createInviteWithEntitlement,
 	getHostListings,
 	getHostProfile,
-	getHostClerkIdByProfileId,
-	isEmailSuppressed,
 	recordEvent,
 	restoreInviteCreditForInvite,
 	searchSeekersForInvite,
@@ -22,9 +20,6 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 
 import { triggerDispatch } from "../../services/notifications/dispatcher"
-import { getClerkContact } from "../../lib/clerkUser"
-import { absoluteUrl, sendEmail } from "../../lib/email"
-import { inviteAcceptedEmail } from "../../lib/emails"
 import { checkRateLimit } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
@@ -130,48 +125,30 @@ async function respondToInviteActionImpl(
 
 	revalidatePath("/invites")
 
-	if (response === "accepted") {
-		try {
-			const invites = await getSeekerInvites(token, userId).catch(
-				() => [] as InviteWithListing[],
-			)
-			const match = invites.find((entry) => entry.invite.id === inviteId)
-			if (match) {
-				const hostClerkUserId = await getHostClerkIdByProfileId(
-					token,
-					match.invite.hostProfileId,
-				)
-				if (hostClerkUserId) {
-					const [host, seeker] = await Promise.all([
-						getClerkContact(hostClerkUserId),
-						getClerkContact(userId),
-					])
-					// Suppression-list integrity: this is the one remaining inline
-					// email path (invite acceptance sits outside the engine's
-					// taxonomy) — it must still honor hard bounces/complaints.
-					if (host.email && !(await isEmailSuppressed(host.email))) {
-						const seekerName = seeker.name ?? "A seeker"
-						const listingTitle = match.listing?.title || "your listing"
-						await sendEmail({
-							to: host.email,
-							subject: `${seekerName} accepted your invite to ${listingTitle}`,
-							html: inviteAcceptedEmail({
-								seekerName,
-								listingTitle,
-								applicantsUrl: absoluteUrl("/host/applicants"),
-							}),
-							template: "inviteAccepted",
-							idempotencyKey: `inviteAccepted:${inviteId}`,
-						})
-					}
-				}
-			}
-		} catch (err) {
-			console.error(
-				"[respondToInviteAction] accept email error (non-fatal):",
-				err,
-			)
-		}
+	if (response === "accepted" && result.applicationId) {
+		// Accepting an invite now produces a REAL application, so the host is
+		// notified through the canonical application_submitted path — the same
+		// event a direct apply emits, pointing at an applicant that actually
+		// exists in /host/applicants.
+		//
+		// This REPLACES a bespoke inline "accepted your invite" email that could
+		// never fire: it looked the invite up via getSeekerInvites AFTER the
+		// status became 'applied', and that query excludes applied invites, so
+		// the lookup always missed and the host was told nothing at all.
+		//
+		// properties.source lets the taxonomy render invite-aware copy while
+		// staying one event type (no parallel notification path).
+		await recordEvent({
+			eventType: "application_submitted",
+			actorScope: "seeker",
+			subjectType: "application",
+			subjectId: result.applicationId,
+			...(result.listingId ? { listingId: result.listingId } : {}),
+			sourceSurface: "invite_accept_action",
+			properties: { source: "invite", inviteId },
+		})
+		after(triggerDispatch)
+		revalidatePath("/applied")
 	}
 
 	return result
