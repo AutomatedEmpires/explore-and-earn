@@ -112,6 +112,17 @@ describe("sanitizeConnectivity — absence is 'not stated'", () => {
     expect(out?.locations).toEqual(["housing", "worksite"]);
   });
 
+  it("canonicalises location order, so a reordering is not a new answer", () => {
+    // Same facts, stated in either order, must sanitise identically. A caller
+    // comparing stored facts to decide whether the host RE-CONFIRMED them
+    // would otherwise read a reordering as a change and stamp a fresh
+    // reportedAt — claiming a confirmation that never happened.
+    const a = sanitizeConnectivity({ available: true, locations: ["worksite", "housing"] });
+    const b = sanitizeConnectivity({ available: true, locations: ["housing", "worksite"] });
+    expect(a?.locations).toEqual(["housing", "worksite"]);
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+  });
+
   it("a date with no stated facts is not a report", () => {
     expect(sanitizeConnectivity({ reportedAt: daysAgo(1) })).toBeUndefined();
   });

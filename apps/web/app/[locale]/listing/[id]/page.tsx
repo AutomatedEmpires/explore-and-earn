@@ -10,7 +10,7 @@ import {
   recordEvent,
   seekerHasMatchInputs,
 } from "@explore-and-earn/db";
-import { hasLogistics, type ConnectivityInfo } from "@explore-and-earn/contracts";
+import { hasLogistics } from "@explore-and-earn/contracts";
 import {
   cachedHostProfile,
   cachedSeekerProfile,
@@ -183,8 +183,12 @@ export default async function ListingDetailPage({ params }: Props) {
   const hasCoords = listing.latitude != null && listing.longitude != null;
   // hasLogistics() is the gate, not a truthiness check: a connectivity object
   // carrying only a reportedAt date states nothing, and a section that renders
-  // for it would be an empty claim.
-  const hasConnectivity = hasLogistics(listing.logistics);
+  // for it would be an empty claim. Binding the value here rather than
+  // asserting it at the call site keeps that gate honest if hasLogistics ever
+  // widens — the section stops rendering, instead of rendering undefined.
+  const connectivity = hasLogistics(listing.logistics)
+    ? listing.logistics.connectivity
+    : undefined;
   const weather = hasCoords
     ? await fetchWeather(listing.latitude as number, listing.longitude as number)
     : null;
@@ -395,9 +399,7 @@ export default async function ListingDetailPage({ params }: Props) {
               something, so a seeker never reads a wall of "Not stated" cells.
               Sits beside Weather/Location as part of "what is this place
               really like", not as a benefit (the triad stays three keys). */}
-          {hasConnectivity ? (
-            <ConnectivityFacts connectivity={listing.logistics.connectivity as ConnectivityInfo} />
-          ) : null}
+          {connectivity ? <ConnectivityFacts connectivity={connectivity} /> : null}
 
           {/* 11. Weather (honest shell when the fetch fails) */}
           {hasCoords ? (

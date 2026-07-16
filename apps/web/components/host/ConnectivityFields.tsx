@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import {
 	CONNECTION_TYPES,
 	CONNECTIVITY_ACCESS,
@@ -61,12 +63,30 @@ const RELIABILITY_LABEL: Record<ConnectivityReliability, string> = {
 /** The select value meaning "the host has not answered" — never persisted. */
 const UNSET = "";
 
+/** Seed a speed input from a stored number; unstated shows an empty box. */
+function speedText(stored: number | undefined): string {
+	return stored === undefined ? "" : String(stored);
+}
+
 export interface ConnectivityFieldsProps {
 	readonly value: ConnectivityInfo;
 	readonly onChange: (next: ConnectivityInfo) => void;
 }
 
 export function ConnectivityFields({ value, onChange }: ConnectivityFieldsProps) {
+	/**
+	 * The speed inputs keep their own text while the host types.
+	 *
+	 * Only a positive number is ever a stated speed, so "0" alone stores
+	 * nothing — but it is also the first keystroke of "0.5", and a rendered
+	 * value fed back from the stored number would erase it before the "." was
+	 * typed. Sub-1 Mbps upload is the real case here (satellite, a vessel, a
+	 * hilltop barn), so it has to be typeable. The text is what the host sees;
+	 * the parent still only ever receives a valid number or nothing at all.
+	 */
+	const [downloadText, setDownloadText] = useState(() => speedText(value.downloadMbps));
+	const [uploadText, setUploadText] = useState(() => speedText(value.uploadMbps));
+
 	/** Set one key, or REMOVE it entirely when the host clears the control. */
 	function patch<K extends keyof ConnectivityInfo>(
 		key: K,
@@ -290,8 +310,11 @@ export function ConnectivityFields({ value, onChange }: ConnectivityFieldsProps)
 								min="0"
 								step="0.1"
 								inputMode="decimal"
-								value={value.downloadMbps ?? ""}
-								onChange={(event) => patch("downloadMbps", numberOrUnset(event.target.value))}
+								value={downloadText}
+								onChange={(event) => {
+									setDownloadText(event.target.value);
+									patch("downloadMbps", numberOrUnset(event.target.value));
+								}}
 							/>
 						</div>
 						<div className={styles.field}>
@@ -307,8 +330,11 @@ export function ConnectivityFields({ value, onChange }: ConnectivityFieldsProps)
 								min="0"
 								step="0.1"
 								inputMode="decimal"
-								value={value.uploadMbps ?? ""}
-								onChange={(event) => patch("uploadMbps", numberOrUnset(event.target.value))}
+								value={uploadText}
+								onChange={(event) => {
+									setUploadText(event.target.value);
+									patch("uploadMbps", numberOrUnset(event.target.value));
+								}}
 							/>
 						</div>
 					</div>

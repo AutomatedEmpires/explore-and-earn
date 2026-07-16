@@ -184,10 +184,14 @@ export function sanitizeConnectivity(value: unknown): ConnectivityInfo | undefin
 	if (typeof value !== "object" || value === null) return undefined;
 	const v = value as Record<string, unknown>;
 
-	const locations = Array.isArray(v.locations)
-		? [...new Set(v.locations)].filter((l): l is ConnectivityLocation =>
-				(CONNECTIVITY_LOCATIONS as readonly unknown[]).includes(l),
-			)
+	// Canonical order, not input order: ["worksite","housing"] and
+	// ["housing","worksite"] are the same answer, and a caller comparing stored
+	// facts to decide whether the host re-confirmed them must not read a
+	// reordering as a change — that would stamp a fresh reportedAt and claim a
+	// confirmation that never happened.
+	const rawLocations = Array.isArray(v.locations) ? (v.locations as unknown[]) : undefined;
+	const locations = rawLocations
+		? CONNECTIVITY_LOCATIONS.filter((known) => rawLocations.includes(known))
 		: undefined;
 
 	const out: Record<string, unknown> = {};
