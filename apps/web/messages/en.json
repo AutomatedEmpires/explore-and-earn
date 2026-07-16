@@ -99,6 +99,14 @@
 				"title": "Your offer expires soon",
 				"body": "Your offer for {listingTitle} expires within {hoursLeft, plural, one {# hour} other {# hours}}. Respond before it lapses."
 			},
+			"offer_accepted": {
+				"title": "Your offer was accepted",
+				"body": "The applicant accepted your offer for {listingTitle}."
+			},
+			"offer_declined": {
+				"title": "Your offer was declined",
+				"body": "The applicant declined your offer for {listingTitle}."
+			},
 			"message_received": {
 				"title": "New message",
 				"body": "You have a new message waiting on Explore & Earn."
@@ -123,6 +131,8 @@
 				"application_offered": "View offer",
 				"offer_received": "View offer",
 				"offer_expiring": "Respond to offer",
+				"offer_accepted": "View applicant",
+				"offer_declined": "Review applicants",
 				"invite_received": "View invite",
 				"message_received": "Open conversation",
 				"new_strong_match": "View listing",

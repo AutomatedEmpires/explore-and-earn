@@ -51,7 +51,9 @@ describe("withdrawApplication", () => {
       const appRead = makeChain({
         data: { id: "app-1", seeker_profile_id: "seeker-1", status },
       });
-      const update = makeChain({ error: null });
+      // The UPDATE now chains .select("id").maybeSingle() — a matched row must
+      // come back for the affected-row assertion.
+      const update = makeChain({ data: { id: "app-1" }, error: null });
       queueFromResults(makeChain(SEEKER_PROFILE), appRead, update);
 
       const result = await withdrawApplication("token", "user_1", "app-1");
@@ -63,6 +65,19 @@ describe("withdrawApplication", () => {
       });
     });
   }
+
+  it("returns conflict when the UPDATE matches no row (race or RLS filter)", async () => {
+    const appRead = makeChain({
+      data: { id: "app-1", seeker_profile_id: "seeker-1", status: "applied" },
+    });
+    // Pre-checks passed, but the UPDATE's .select().maybeSingle() returns no
+    // row — the withdraw must NOT be reported as a success.
+    queueFromResults(makeChain(SEEKER_PROFILE), appRead, makeChain({ data: null }));
+
+    const result = await withdrawApplication("token", "user_1", "app-1");
+
+    expect(result).toEqual({ ok: false, error: "conflict" });
+  });
 
   it("refuses to withdraw from 'offered' — the offer accept/decline path owns that state", async () => {
     const appRead = makeChain({

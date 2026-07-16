@@ -264,13 +264,21 @@ export async function respondToInvite(
   }
 
   for (const next of path) {
-    const { error: updateError } = await untyped
+    const { data: updated, error: updateError } = await untyped
       .from("invites")
       .update({ status: next })
       .eq("id", inviteId)
-      .eq("seeker_profile_id", seekerProfileId);
+      .eq("seeker_profile_id", seekerProfileId)
+      .select("id")
+      .maybeSingle();
     if (updateError) {
       return { ok: false, error: updateError.message };
+    }
+    // Affected-row assertion: a zero-row UPDATE (concurrent response/withdraw
+    // or an RLS filter — the write policy ships in migration 066) must never
+    // report a response the database did not record.
+    if (!updated) {
+      return { ok: false, error: "conflict" };
     }
   }
 
