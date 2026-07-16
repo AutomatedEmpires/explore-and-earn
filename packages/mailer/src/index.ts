@@ -16,9 +16,16 @@
  *   RESEND_REPLY_TO_EMAIL — optional Reply-To address
  */
 
+import { createHash } from "node:crypto";
+
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const DEFAULT_FROM = "Explore & Earn <notifications@exploreandearn.com>";
 const IDEMPOTENCY_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Deterministic ASCII form of a caller idempotency key for the HTTP header. */
+export function hashIdempotencyKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex");
+}
 
 /** In-process dedup store: idempotencyKey → timestamp of last successful send. */
 const _sentKeys = new Map<string, number>();
@@ -135,6 +142,15 @@ export async function sendMail(opts: SendMailOptions): Promise<SendMailResult> {
       headers: {
         Authorization: "Bearer " + apiKey,
         "Content-Type": "application/json",
+        // Provider-side idempotency: the in-memory map above only protects a
+        // single process; a worker that crashes after Resend accepts but
+        // before the delivery ledger settles gets reclaimed by ANOTHER
+        // instance, which would re-send. Resend dedupes on this header for
+        // 24h. Hashed: keys can contain non-Latin-1 separators (the engine's
+        // dedup_key uses U+241F), which HTTP header values cannot carry.
+        ...(idempotencyKey
+          ? { "Idempotency-Key": hashIdempotencyKey(idempotencyKey) }
+          : {}),
       },
       body: JSON.stringify({
         from,

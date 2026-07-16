@@ -139,17 +139,24 @@ export async function applyToListing(
     };
     if (coverMessage !== undefined) reactivatePatch.cover_message = coverMessage;
 
-    const { error: reactivateError } = await authed
+    const { data: reactivated, error: reactivateError } = await authed
       .from("applications")
       .update(reactivatePatch)
       .eq("id", existingRow.id)
-      .eq("seeker_profile_id", seekerProfileId);
+      .eq("seeker_profile_id", seekerProfileId)
+      .select("id")
+      .maybeSingle();
 
     if (reactivateError) {
       if (reactivateError.code === UNIQUE_VIOLATION) {
         return { ok: false, error: "already_applied" };
       }
       return { ok: false, error: reactivateError.message };
+    }
+    // Affected-row assertion: a filtered/raced UPDATE must never report a
+    // successful re-apply the database did not perform.
+    if (!reactivated) {
+      return { ok: false, error: "conflict" };
     }
     return {
       ok: true,
@@ -501,10 +508,12 @@ export async function updateApplicationStatus(
     }
   }
 
-  const { error: updateError } = await untyped
+  const { data: updated, error: updateError } = await untyped
     .from("applications")
     .update({ status: newStatus })
-    .eq("id", applicationId);
+    .eq("id", applicationId)
+    .select("id")
+    .maybeSingle();
   if (updateError) {
     // 23514 = check_violation. Two sources are possible:
     //   a) enforce_lifecycle_transition() BEFORE trigger rejected the edge;
@@ -523,6 +532,11 @@ export async function updateApplicationStatus(
       };
     }
     return { ok: false, error: msg || updateError.message };
+  }
+  // Affected-row assertion: the ownership pre-checks above make a zero-row
+  // match a race (or an RLS filter) — surface it instead of reporting ok.
+  if (!updated) {
+    return { ok: false, error: "conflict" };
   }
 
   return { ok: true };
@@ -656,9 +670,18 @@ export async function getSeekerApplicationsWithListings(
 /**
  * Statuses the SEEKER may set from their own /applied dashboard.
  * Only accept/decline a live offer. Host-settable statuses live above.
+ *
+ * Decline maps to 'withdrawn' (offered -> withdrawn IS a seeded lifecycle
+ * edge; offered -> not_selected never was — the previous 'not_selected'
+ * value here was rejected by trg_applications_lifecycle on every decline).
+ * withdrawn_reason='seeker_declined_offer' distinguishes a declined offer
+ * from an ordinary withdrawal; not_selected stays host-only vocabulary.
  */
-const SEEKER_SETTABLE_STATUSES = ["accepted", "not_selected"] as const;
+const SEEKER_SETTABLE_STATUSES = ["accepted", "withdrawn"] as const;
 export type SeekerSettableStatus = (typeof SEEKER_SETTABLE_STATUSES)[number];
+
+/** Stamped on offered -> withdrawn so a declined offer is distinguishable. */
+export const SEEKER_DECLINED_OFFER_REASON = "seeker_declined_offer";
 
 /**
  * Richer listing view-model for /applied + offer detail, including the host
@@ -914,11 +937,18 @@ export async function updateApplicationStatusBySeeker(
     }
   }
 
-  const { error: updateError } = await untyped
+  const patch: Record<string, unknown> =
+    newStatus === "withdrawn"
+      ? { status: newStatus, withdrawn_reason: SEEKER_DECLINED_OFFER_REASON }
+      : { status: newStatus };
+
+  const { data: updated, error: updateError } = await untyped
     .from("applications")
-    .update({ status: newStatus })
+    .update(patch)
     .eq("id", applicationId)
-    .eq("seeker_profile_id", seekerProfileId);
+    .eq("seeker_profile_id", seekerProfileId)
+    .select("id")
+    .maybeSingle();
 
   if (updateError) {
     // 23514 = check_violation. Distinguish lifecycle guard (message starts with
@@ -929,6 +959,12 @@ export async function updateApplicationStatusBySeeker(
       return { ok: false, error: "listing_full" };
     }
     return { ok: false, error: msg || updateError.message };
+  }
+  // Affected-row assertion: an UPDATE that matched nothing (concurrent status
+  // change, or an RLS policy filtering the row) must surface as an error —
+  // never as a silent ok:true that leaves the UI lying about state.
+  if (!updated) {
+    return { ok: false, error: "conflict" };
   }
   return { ok: true };
 }

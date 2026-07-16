@@ -15,6 +15,8 @@
  *   RESEND_FROM_EMAIL     — optional From header override
  *   RESEND_REPLY_TO_EMAIL — optional Reply-To address
  */
+/** Deterministic ASCII form of a caller idempotency key for the HTTP header. */
+export declare function hashIdempotencyKey(key: string): string;
 /** Exposed for testing only — resets the in-memory dedup store between tests. */
 export declare function _resetDedup(): void;
 export interface SendMailOptions {

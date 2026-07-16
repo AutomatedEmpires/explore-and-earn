@@ -69,7 +69,9 @@ describe("applyToListing — withdrawn re-apply reactivation (063)", () => {
     const existing = makeChain({
       data: { id: "app-1", status: "withdrawn" },
     });
-    const update = makeChain({ error: null });
+    // The revive UPDATE chains .select("id").maybeSingle() — a matched row
+    // must come back for the affected-row assertion.
+    const update = makeChain({ data: { id: "app-1" }, error: null });
     queueFromResults(
       makeChain(SEEKER_PROFILE), // resolveSeekerProfileId
       makeChain(NOT_OWN_LISTING), // self-application guard
@@ -94,7 +96,7 @@ describe("applyToListing — withdrawn re-apply reactivation (063)", () => {
 
   it("stamps status='applied' + reactivated_at (the host 'applied before' flag) and clears withdrawn_reason", async () => {
     const existing = makeChain({ data: { id: "app-1", status: "withdrawn" } });
-    const update = makeChain({ error: null });
+    const update = makeChain({ data: { id: "app-1" }, error: null });
     queueFromResults(
       makeChain(SEEKER_PROFILE),
       makeChain(NOT_OWN_LISTING),
@@ -162,5 +164,22 @@ describe("applyToListing — withdrawn re-apply reactivation (063)", () => {
     const result = await applyToListing("token", "user_1", "listing-1");
 
     expect(result).toEqual({ ok: false, error: "already_applied" });
+  });
+
+  it("returns conflict when the revive UPDATE matches no row (race or RLS filter)", async () => {
+    const existing = makeChain({ data: { id: "app-1", status: "withdrawn" } });
+    // .select("id").maybeSingle() on the UPDATE returns no row — the re-apply
+    // must NOT be reported as a success the database did not perform.
+    const update = makeChain({ data: null, error: null });
+    queueFromResults(
+      makeChain(SEEKER_PROFILE),
+      makeChain(NOT_OWN_LISTING),
+      existing,
+      update,
+    );
+
+    const result = await applyToListing("token", "user_1", "listing-1");
+
+    expect(result).toEqual({ ok: false, error: "conflict" });
   });
 });
