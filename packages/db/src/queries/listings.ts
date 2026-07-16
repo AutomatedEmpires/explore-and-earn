@@ -7,6 +7,7 @@ import type {
   BenefitProvision,
   CompensationUnit,
   DiscoveryCardConditionalBadge,
+  ListingCategoryDepth,
   ListingClaimSummary,
   ListingLogistics,
   ListingProvenanceInfo,
@@ -19,6 +20,7 @@ import {
   formatCompensation,
   formatOpportunityWindow,
   hasVerifiedHostSubscription,
+  sanitizeCategoryDepth,
   sanitizeLogistics,
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
@@ -80,6 +82,14 @@ export interface ListingRow {
    * documents for housing/meals/gallery).
    */
   logistics: ListingLogistics;
+  /**
+   * Host-stated category-scoped depth (069), sanitized. Carried on the HOST row
+   * for the same hydration reason as logistics — and note it is carried
+   * REGARDLESS of the listing's current category, so a host who re-lanes a
+   * listing can still see and clear facts they stated earlier rather than
+   * leaving them stranded and uneditable.
+   */
+  category_depth: ListingCategoryDepth;
 }
 
 type RawListingRow = {
@@ -122,6 +132,7 @@ type RawListingRow = {
   meals_evidence: string;
   pay_evidence: string;
   logistics: unknown;
+  category_depth: unknown;
 };
 
 // Display strings (opportunity window + compensation summary) are formatted via
@@ -172,6 +183,7 @@ function toListingRow(raw: RawListingRow): ListingRow {
     // allowed could have been written, and an unvouchable value must read as
     // "Not stated" rather than as something the host said.
     logistics: sanitizeLogistics(raw.logistics),
+    category_depth: sanitizeCategoryDepth(raw.category_depth),
   };
 }
 
@@ -440,7 +452,7 @@ const PROVENANCE_COLUMNS =
   "housing_evidence,meals_evidence,pay_evidence";
 
 const LISTING_COLUMNS =
-  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,logistics," +
+  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,logistics,category_depth," +
   PROVENANCE_COLUMNS +
   ",host_profiles(company_name,subscription_tier)";
 
@@ -985,6 +997,21 @@ export interface ListingWriteFields {
    * merge — a partial writer would otherwise silently drop its siblings.
    */
   logistics?: ListingLogistics;
+  /**
+   * Category-scoped depth (069). Whole-object and REPLACES the column, exactly
+   * like logistics — and the same warning above applies if it ever gains an
+   * isolated editor.
+   *
+   * This is a SEPARATE column from logistics rather than a key inside it, and
+   * that is the point: each group carries its own host-reported date, stamped
+   * only when its own facts change. Sharing one object would make an edit to
+   * the vessel length look like a change to the connectivity report, and stamp
+   * a fresh date claiming the host re-confirmed an internet speed they never
+   * touched.
+   *
+   * undefined = not submitted, leave the column untouched.
+   */
+  categoryDepth?: ListingCategoryDepth;
 }
 
 type ListingColumnPatch = {
@@ -1005,6 +1032,7 @@ type ListingColumnPatch = {
   cover_photo_url?: string | null;
   gallery_photo_urls?: string[];
   logistics?: ListingLogistics;
+  category_depth?: ListingCategoryDepth;
 };
 
 function toCentsOrNull(amount: number | null | undefined): number | null {
@@ -1073,6 +1101,11 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
     // vouch for must never be persisted as though they stated it. sanitize*
     // drops those keys, and an absent key is "Not stated".
     patch.logistics = sanitizeLogistics(fields.logistics);
+  }
+  if (fields.categoryDepth !== undefined) {
+    // Same rule as logistics: sanitized on the way in, so a value we cannot
+    // vouch for is never persisted as though the host stated it.
+    patch.category_depth = sanitizeCategoryDepth(fields.categoryDepth);
   }
 
   return patch;
@@ -1232,6 +1265,16 @@ export interface PublicListingDetail {
      defaulted. Always present as an object ({} when nothing was stated), so
      callers gate on hasLogistics() rather than null-checking. */
   logistics: ListingLogistics;
+
+  /* ── Category depth (listings.category_depth jsonb; migration 069) ──
+     The facts that only matter for one lane (maritime: the vessel, and whether
+     you sleep on it). Same honesty rule as logistics — absent means the host
+     never stated it, never that the answer is no. Always present as an object
+     ({} when nothing was stated); gate on hasCategoryDepth().
+
+     Separate from `logistics` on purpose: the two carry independent
+     host-reported dates and must never stamp each other's. */
+  categoryDepth: ListingCategoryDepth;
 }
 
 const LISTING_DETAIL_COLUMNS =
@@ -1241,7 +1284,7 @@ const LISTING_DETAIL_COLUMNS =
   "compensation_summary,compensation_min_cents," +
   "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
   "begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profile_id," +
-  "logistics," +
+  "logistics,category_depth," +
   PROVENANCE_COLUMNS +
   ",host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier,narrative)";
 
@@ -1427,6 +1470,9 @@ export async function getListingDetailPublic(
     // value we cannot vouch for must degrade to "Not stated" — never render as
     // if the host had stated it.
     logistics: sanitizeLogistics(row.logistics),
+
+    // Category depth (069). Re-sanitized on READ for the same reason.
+    categoryDepth: sanitizeCategoryDepth(row.category_depth),
 
     // Immersive fields — undefined-when-empty so the page omits empty sections.
     responsibilities: responsibilities.length > 0 ? responsibilities : undefined,

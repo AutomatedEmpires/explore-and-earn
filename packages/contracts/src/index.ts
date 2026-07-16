@@ -4,10 +4,15 @@ export * from "./benefits"
 export * from "./community"
 export * from "./card"
 export * from "./categories"
+export * from "./categoryDepth"
 export * from "./enums"
 export * from "./events"
 export * from "./format"
 export * from "./geo"
+// A NAMED re-export, not a star: `statedFactsKey` is the writer-side half of
+// the host-report honesty rule and every fact group's form needs it, but the
+// coercion helpers beside it are package internals and stay unexported.
+export { statedFactsKey } from "./hostReport"
 export * from "./lifecycles"
 export * from "./listing"
 export * from "./logistics"

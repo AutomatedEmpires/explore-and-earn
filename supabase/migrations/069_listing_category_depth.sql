@@ -1,0 +1,78 @@
+-- 069_listing_category_depth.sql
+--
+-- CATEGORY-SCOPED LISTING DEPTH — the facts that only matter for one lane.
+--
+-- Connectivity (068) is row-level: a farm, a vessel, a lodge and a remote gig
+-- all have internet-or-not. But "how long is the boat, and do you sleep on it?"
+-- is meaningless on a farm listing. That is category depth, and it has had no
+-- home. This is it:
+--
+--   { maritime?: { vesselType, lengthFeet, berthAboard, berthType, crewSize,
+--                  reportedAt } }
+--
+-- keyed by the listing's category, typed by packages/contracts/src/categoryDepth.ts.
+--
+-- KEY ABSENCE IS 'not_stated' — inherited from 068 and 064, and the reason no
+-- sentinel value exists anywhere in this shape: a written sentinel is
+-- indistinguishable from a real answer once it is in the column. A host who
+-- never answered has no key. `berthAboard: false` is a REAL answer ("you do not
+-- sleep aboard") and is not the same fact as silence.
+--
+-- WHY A SECOND COLUMN RATHER THAN A KEY ON `logistics`
+-- Both groups carry their own host-reported date, and 068's writer stamps a
+-- fresh `reportedAt` only when the stated facts change — precisely so a listing
+-- never claims "the host confirmed this today" because they edited their pay.
+-- Fold category depth into the same object and that diff sees one blob: editing
+-- the vessel length would stamp a fresh CONNECTIVITY date, claiming the host
+-- re-confirmed an internet speed they never touched. Two columns, two writers,
+-- two dates, zero interference. (queries/listings.ts warns the next group about
+-- exactly this class of bug by name — whole-object replace, not merge.)
+--
+-- WHY ON `listings` AND NOT `listing_relevance_extensions`
+-- 006 named that table as the home for category depth (G7: "ONE listing object
+-- across categories; no per-category tables"). G7's rule is honored here — a
+-- column on `listings` IS one listing object. The table is rejected on its
+-- merits, and NOT on the 040 precedent (040 rejected it because housing/meals
+-- belong to the row rather than to a category; that reasoning does not transfer
+-- to genuinely category-scoped data — it inverts). The real reasons:
+--
+--   1. It cannot hold the launch inventory. Its only write policy (015) is
+--      `listing_id in (select public.current_host_listing_ids())`. 064 dropped
+--      listings.host_profile_id NOT NULL so a sourced listing has NO host, so
+--      that policy can never match one — and the write would affect zero rows
+--      SILENTLY rather than erroring. Sourced is the inventory we launch with.
+--   2. Its defaults are the anti-pattern this product is built against. 006
+--      gives it `completion_score int not null default 0`, `display_enabled
+--      bool not null default true`, `matching_enabled bool not null default
+--      true`. A bare INSERT asserts four things the host never said. Absence
+--      still works INSIDE the blob, but the row's existence and its sibling
+--      columns are themselves written sentinels that key-absence cannot rescue
+--      — and un-defaulting them means `drop default`/`drop not null`, which is
+--      not additive.
+--   3. A listing has exactly ONE category (006: scalar text + CHECK). Its
+--      `unique (listing_id, type)` row-per-category shape solves a problem the
+--      schema forbids from existing — and nothing ties `extension.type` to
+--      `listings.category` (no FK, no trigger, no CHECK), so a farm listing
+--      could hold a maritime row.
+--   4. `display_enabled = true AND listing.status = 'live'` (015) is a second
+--      silent blanking gate on top of the listings gate we already understand.
+--
+-- The table is left ALONE — inert, RLS'd, costs nothing, and `drop table` is
+-- neither additive nor reversible.
+--
+-- NOT FILTERABLE, AND THAT IS THE LINE. This column is exactly as unfilterable
+-- as listing_relevance_extensions.structured_data was, and 051 exists because
+-- match-critical facts were promoted OUT of that blob into typed, indexed
+-- columns so they could actually be computed and filtered. That rule stands: a
+-- category fact that must be matched, filtered, or ranked graduates to a typed
+-- column. Nothing in this shape feeds matching, by construction.
+--
+-- Additive-only: no existing data is touched, no column is dropped or rewritten.
+-- Every existing row reads '{}' — which states nothing, which is the truth.
+-- No grants needed: this rides the same listings SELECT/UPDATE surface as 068.
+
+alter table public.listings
+  add column if not exists category_depth jsonb not null default '{}'::jsonb;
+
+comment on column public.listings.category_depth is
+  'Category-scoped host-stated facts, keyed by category (maritime first). Typed by packages/contracts/src/categoryDepth.ts. Key absence IS "not stated" — never inferred, never defaulted. Separate from listings.logistics so the two groups keep independent host-reported dates. Not filterable: a fact that must be matched graduates to a typed column (the 051 rule).';

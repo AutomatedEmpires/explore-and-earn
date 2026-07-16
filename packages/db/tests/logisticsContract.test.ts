@@ -104,6 +104,20 @@ describe("sanitizeConnectivity — absence is 'not stated'", () => {
     expect(sanitizeConnectivity({ available: true, downloadMbps: 23.456 })?.downloadMbps).toBe(23.5);
   });
 
+  it("never OUTPUTS a zero speed, even when rounding would produce one", () => {
+    // 0.04 is positive, so it passes the input guard; only rounding makes it 0.
+    // A stored 0 is a KEY, not absence, so it renders "0 down" as the host's
+    // stated speed rather than "Not stated". The earlier test asserts 0 drops
+    // as INPUT — which is a different claim, and why this went unnoticed.
+    for (const downloadMbps of [0.04, 0.049, 0.001]) {
+      expect(sanitizeConnectivity({ available: true, downloadMbps })).not.toHaveProperty(
+        "downloadMbps",
+      );
+    }
+    // A genuinely slow-but-real satellite uplink still survives.
+    expect(sanitizeConnectivity({ available: true, uploadMbps: 0.5 })?.uploadMbps).toBe(0.5);
+  });
+
   it("dedupes locations and drops unknown ones", () => {
     const out = sanitizeConnectivity({
       available: true,

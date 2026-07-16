@@ -67,6 +67,11 @@ export default async function HostListingEditPage({
     // un-hydrated connectivity group would re-save empty and silently erase
     // what the host already told seekers about getting online here.
     connectivity: listing.logistics.connectivity,
+    // …and the same for the vessel group (069). Hydrated for EVERY listing, not
+    // just maritime ones: the form submits categoryDepth unconditionally, so a
+    // re-laned listing whose state was left empty would wipe facts the host
+    // stated and never revisited.
+    maritime: listing.category_depth.maritime,
   };
 
   return (

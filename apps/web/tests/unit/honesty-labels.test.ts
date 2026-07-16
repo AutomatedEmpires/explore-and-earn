@@ -40,6 +40,11 @@ const GUARDED_SITES = [
   "apps/web/components/listing/SourcedNotice.tsx",
   "apps/web/components/discovery/QuickPeekDrawer.tsx",
   "packages/ui/src/DiscoveryCard.tsx",
+  // Host authoring surfaces: these promise the host that an unanswered field
+  // shows as "Not stated". If that copy drifts from what the seeker actually
+  // sees, the promise silently stops being true.
+  "apps/web/components/host/ConnectivityFields.tsx",
+  "apps/web/components/host/MaritimeDepthFields.tsx",
 ] as const;
 
 /** Strip block/line comments — docstrings legitimately quote the copy. */
