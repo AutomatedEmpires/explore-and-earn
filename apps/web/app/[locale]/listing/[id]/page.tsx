@@ -10,6 +10,7 @@ import {
   recordEvent,
   seekerHasMatchInputs,
 } from "@explore-and-earn/db";
+import { hasLogistics } from "@explore-and-earn/contracts";
 import {
   cachedHostProfile,
   cachedSeekerProfile,
@@ -28,6 +29,7 @@ import { DealUpfront } from "../../../../components/listing/DealUpfront";
 import { DetailList } from "../../../../components/listing/DetailList";
 import { ProseSection } from "../../../../components/listing/ProseSection";
 import { WeatherWidget } from "../../../../components/listing/WeatherWidget";
+import { ConnectivityFacts } from "../../../../components/listing/ConnectivityFacts";
 import { LocationContext } from "../../../../components/listing/LocationContext";
 import { TeamGrid } from "../../../../components/listing/TeamGrid";
 import { WhyWorkForUs } from "../../../../components/listing/WhyWorkForUs";
@@ -179,6 +181,14 @@ export default async function ListingDetailPage({ params }: Props) {
   // carries real coordinates. fetchWeather never throws (null on any failure),
   // and the widget renders an honest shell for a null outlook.
   const hasCoords = listing.latitude != null && listing.longitude != null;
+  // hasLogistics() is the gate, not a truthiness check: a connectivity object
+  // carrying only a reportedAt date states nothing, and a section that renders
+  // for it would be an empty claim. Binding the value here rather than
+  // asserting it at the call site keeps that gate honest if hasLogistics ever
+  // widens — the section stops rendering, instead of rendering undefined.
+  const connectivity = hasLogistics(listing.logistics)
+    ? listing.logistics.connectivity
+    : undefined;
   const weather = hasCoords
     ? await fetchWeather(listing.latitude as number, listing.longitude as number)
     : null;
@@ -384,6 +394,12 @@ export default async function ListingDetailPage({ params }: Props) {
             variant="chips"
             items={listing.activities ?? []}
           />
+
+          {/* 10b. Getting online — rendered ONLY when the host actually stated
+              something, so a seeker never reads a wall of "Not stated" cells.
+              Sits beside Weather/Location as part of "what is this place
+              really like", not as a benefit (the triad stays three keys). */}
+          {connectivity ? <ConnectivityFacts connectivity={connectivity} /> : null}
 
           {/* 11. Weather (honest shell when the fetch fails) */}
           {hasCoords ? (

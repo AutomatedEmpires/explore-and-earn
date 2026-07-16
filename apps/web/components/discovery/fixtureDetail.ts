@@ -275,6 +275,11 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 	// getListingDetailPublic behavior so the preview journey matches production.
 	const isSourced = f.provenanceInfo?.provenance === "sourced";
 	return {
+		// Fixtures state no logistics: the dev bench must show exactly what a
+		// listing whose host answered nothing looks like ("Not stated"), not an
+		// invented best case. Real fixtures get real facts only once a host form
+		// can produce them.
+		logistics: {},
 		id: f.id,
 		title: f.title,
 		category: f.category,
