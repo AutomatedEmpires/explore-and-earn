@@ -63,6 +63,10 @@ export default async function HostListingEditPage({
     endDate: listing.ends_at ? listing.ends_at.slice(0, 10) : undefined,
     coverPhotoUrl: listing.cover_photo_url ?? undefined,
     galleryUrls: listing.gallery_photo_urls ?? undefined,
+    // Same rule as above: the form submits the whole logistics object, so an
+    // un-hydrated connectivity group would re-save empty and silently erase
+    // what the host already told seekers about getting online here.
+    connectivity: listing.logistics.connectivity,
   };
 
   return (

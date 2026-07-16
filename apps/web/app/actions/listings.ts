@@ -14,6 +14,7 @@ import {
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
+  sanitizeLogistics,
   type CompensationUnit,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
@@ -171,6 +172,23 @@ function readListingFields(formData: FormData): ListingWriteFields {
         }
       } catch {
         // Malformed JSON — ignore and leave galleryUrls unset.
+      }
+    }
+  }
+
+  // Relocation logistics (068) — submitted as one JSON blob, mirroring the
+  // galleryUrls convention above. sanitizeLogistics is the gate: it DROPS any
+  // value it cannot vouch for, so a malformed field becomes absence ("Not
+  // stated") rather than a persisted guess. Malformed JSON leaves the column
+  // untouched entirely — a broken submit must never silently wipe a host's
+  // existing answers.
+  if (formData.has("logistics")) {
+    const raw = formData.get("logistics");
+    if (typeof raw === "string") {
+      try {
+        fields.logistics = sanitizeLogistics(JSON.parse(raw) as unknown);
+      } catch {
+        // Malformed JSON — leave logistics unset (column untouched).
       }
     }
   }

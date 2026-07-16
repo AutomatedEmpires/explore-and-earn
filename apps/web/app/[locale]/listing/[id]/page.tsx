@@ -10,6 +10,7 @@ import {
   recordEvent,
   seekerHasMatchInputs,
 } from "@explore-and-earn/db";
+import { hasLogistics, type ConnectivityInfo } from "@explore-and-earn/contracts";
 import {
   cachedHostProfile,
   cachedSeekerProfile,
@@ -28,6 +29,7 @@ import { DealUpfront } from "../../../../components/listing/DealUpfront";
 import { DetailList } from "../../../../components/listing/DetailList";
 import { ProseSection } from "../../../../components/listing/ProseSection";
 import { WeatherWidget } from "../../../../components/listing/WeatherWidget";
+import { ConnectivityFacts } from "../../../../components/listing/ConnectivityFacts";
 import { LocationContext } from "../../../../components/listing/LocationContext";
 import { TeamGrid } from "../../../../components/listing/TeamGrid";
 import { WhyWorkForUs } from "../../../../components/listing/WhyWorkForUs";
@@ -179,6 +181,10 @@ export default async function ListingDetailPage({ params }: Props) {
   // carries real coordinates. fetchWeather never throws (null on any failure),
   // and the widget renders an honest shell for a null outlook.
   const hasCoords = listing.latitude != null && listing.longitude != null;
+  // hasLogistics() is the gate, not a truthiness check: a connectivity object
+  // carrying only a reportedAt date states nothing, and a section that renders
+  // for it would be an empty claim.
+  const hasConnectivity = hasLogistics(listing.logistics);
   const weather = hasCoords
     ? await fetchWeather(listing.latitude as number, listing.longitude as number)
     : null;
@@ -384,6 +390,14 @@ export default async function ListingDetailPage({ params }: Props) {
             variant="chips"
             items={listing.activities ?? []}
           />
+
+          {/* 10b. Getting online — rendered ONLY when the host actually stated
+              something, so a seeker never reads a wall of "Not stated" cells.
+              Sits beside Weather/Location as part of "what is this place
+              really like", not as a benefit (the triad stays three keys). */}
+          {hasConnectivity ? (
+            <ConnectivityFacts connectivity={listing.logistics.connectivity as ConnectivityInfo} />
+          ) : null}
 
           {/* 11. Weather (honest shell when the fetch fails) */}
           {hasCoords ? (

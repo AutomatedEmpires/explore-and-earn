@@ -73,6 +73,13 @@ export interface ListingRow {
   housing_evidence: BenefitEvidenceStatus;
   meals_evidence: BenefitEvidenceStatus;
   pay_evidence: BenefitEvidenceStatus;
+  /**
+   * Host-stated relocation logistics (068), sanitized. Carried on the HOST row
+   * so the edit form can hydrate it — an un-hydrated field re-saves empty and
+   * wipes the host's own answers (the trap this file's edit page already
+   * documents for housing/meals/gallery).
+   */
+  logistics: ListingLogistics;
 }
 
 type RawListingRow = {
@@ -114,6 +121,7 @@ type RawListingRow = {
   housing_evidence: string;
   meals_evidence: string;
   pay_evidence: string;
+  logistics: unknown;
 };
 
 // Display strings (opportunity window + compensation summary) are formatted via
@@ -160,6 +168,10 @@ function toListingRow(raw: RawListingRow): ListingRow {
     housing_evidence: asEvidence(raw.housing_evidence),
     meals_evidence: asEvidence(raw.meals_evidence),
     pay_evidence: asEvidence(raw.pay_evidence),
+    // Sanitized on read: the jsonb is the one place a shape the contract never
+    // allowed could have been written, and an unvouchable value must read as
+    // "Not stated" rather than as something the host said.
+    logistics: sanitizeLogistics(raw.logistics),
   };
 }
 
@@ -428,7 +440,7 @@ const PROVENANCE_COLUMNS =
   "housing_evidence,meals_evidence,pay_evidence";
 
 const LISTING_COLUMNS =
-  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls," +
+  "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,logistics," +
   PROVENANCE_COLUMNS +
   ",host_profiles(company_name,subscription_tier)";
 
@@ -960,6 +972,19 @@ export interface ListingWriteFields {
   endDate?: string | null;
   coverPhotoUrl?: string | null;
   galleryUrls?: string[] | null;
+  /**
+   * Relocation logistics (068). Whole-object, like galleryUrls: the writer
+   * submits every group it knows about and this REPLACES the column, so a
+   * group the host cleared is genuinely cleared rather than lingering.
+   *
+   * undefined = not submitted, leave the column untouched.
+   *
+   * NOTE for the next group (transport, pets, …): if a group ever gains its
+   * own editor that submits in isolation (the way benefit_details does via
+   * BenefitTrustModal), this must become a read-merge-write or a jsonb `||`
+   * merge — a partial writer would otherwise silently drop its siblings.
+   */
+  logistics?: ListingLogistics;
 }
 
 type ListingColumnPatch = {
@@ -979,6 +1004,7 @@ type ListingColumnPatch = {
   meals_description?: string | null;
   cover_photo_url?: string | null;
   gallery_photo_urls?: string[];
+  logistics?: ListingLogistics;
 };
 
 function toCentsOrNull(amount: number | null | undefined): number | null {
@@ -1040,6 +1066,13 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
   }
   if (fields.galleryUrls !== undefined) {
     patch.gallery_photo_urls = fields.galleryUrls ?? [];
+  }
+  if (fields.logistics !== undefined) {
+    // Sanitized on the way IN as well as on the way out: this is the host's
+    // own claim about a place a seeker may move to, so a value we cannot
+    // vouch for must never be persisted as though they stated it. sanitize*
+    // drops those keys, and an absent key is "Not stated".
+    patch.logistics = sanitizeLogistics(fields.logistics);
   }
 
   return patch;

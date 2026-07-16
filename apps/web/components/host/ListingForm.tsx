@@ -14,12 +14,15 @@ import {
 import {
   COMPENSATION_UNIT,
   hasVerifiedHostSubscription,
+  sanitizeConnectivity,
   type CompensationUnit,
+  type ConnectivityInfo,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
 import { ImageUpload } from "../ImageUpload";
 import { BenefitTrustModal, type BenefitKind } from "../discovery";
+import { ConnectivityFields } from "./ConnectivityFields";
 import { MediaGalleryUpload, type GalleryItem } from "./MediaGalleryUpload";
 import { createListingAction, updateListingAction } from "../../app/actions/listings";
 import { monetizationRank, type HostTier } from "../../lib/ranking";
@@ -48,6 +51,8 @@ export interface ListingFormInitialValues {
   readonly endDate?: string;
   readonly coverPhotoUrl?: string;
   readonly galleryUrls?: ReadonlyArray<string>;
+  /** Host-stated connectivity (listings.logistics.connectivity; migration 068). */
+  readonly connectivity?: ConnectivityInfo;
 }
 
 export interface ListingFormProps {
@@ -211,6 +216,9 @@ export function ListingForm({
     lanesFromCategory(initial?.category),
   );
   const [locationName, setLocationName] = useState(initial?.locationName ?? "");
+  const [connectivity, setConnectivity] = useState<ConnectivityInfo>(
+    initial?.connectivity ?? {},
+  );
   const [housingDescription, setHousingDescription] = useState(
     initial?.housingDescription ?? "",
   );
@@ -351,6 +359,41 @@ export function ListingForm({
     }
   }
 
+  /**
+   * The logistics payload, with an HONEST report date.
+   *
+   * `reportedAt` is only stamped when the host actually CHANGED a connectivity
+   * answer. Re-stamping it on every save would claim "the host confirmed this
+   * today" every time they edited an unrelated field like pay — turning the
+   * freshness signal into a lie, and a stale-but-dated report is exactly what
+   * that signal exists to expose. Unchanged answers keep their original date;
+   * a report the host never dated stays undated (freshness reads null =
+   * unknown age, which is not the same as fresh).
+   */
+  function buildLogisticsPayload() {
+    // sanitize on the client too, so what we stamp is what will persist.
+    const next = sanitizeConnectivity(connectivity);
+    if (!next) return {};
+
+    const previous = sanitizeConnectivity(initial?.connectivity);
+    /** The stated facts, ignoring the date — that's what "changed" means here. */
+    const stated = (info: ConnectivityInfo | undefined) =>
+      JSON.stringify(
+        Object.entries(info ?? {})
+          .filter(([key]) => key !== "reportedAt")
+          .sort(([a], [b]) => a.localeCompare(b)),
+      );
+    const changed = stated(next) !== stated(previous);
+
+    const reportedAt = changed
+      ? new Date().toISOString()
+      : previous?.reportedAt;
+
+    return {
+      connectivity: reportedAt ? { ...next, reportedAt } : next,
+    };
+  }
+
   // ── Submit (create draft / save changes) ───────────────────────────────────
   function submitForm() {
     setError(null);
@@ -377,6 +420,7 @@ export function ListingForm({
     formData.set("endDate", endDate.trim());
     formData.set("coverPhotoUrl", coverPhotoUrl);
     formData.set("galleryUrls", JSON.stringify(galleryImages.map((img) => img.url)));
+    formData.set("logistics", JSON.stringify(buildLogisticsPayload()));
 
     startTransition(async () => {
       if (mode === "edit" && listingId) {
@@ -644,6 +688,10 @@ export function ListingForm({
                   listing.
                 </p>
               </div>
+
+              {/* Connectivity — a property of the PLACE, and often the fact that
+                  decides whether someone can take the role at all. */}
+              <ConnectivityFields value={connectivity} onChange={setConnectivity} />
             </div>
           ) : null}
 
