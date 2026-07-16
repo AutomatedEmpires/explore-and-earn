@@ -55,8 +55,10 @@ vi.mock("../src/client", () => ({
 }));
 
 import {
+  adminClaimContext,
   beginClaimConfirmation,
   confirmAndConvertClaim,
+  getClaimConfirmationFields,
   initiateListingClaim,
   transitionListingClaim,
 } from "../src/queries/listingClaims";
@@ -251,5 +253,87 @@ describe("SQL-function wrappers surface typed refusals", () => {
     rpcMock.mockResolvedValue({ data: { ok: false, error: "not_claimant" }, error: null });
     const result = await confirmAndConvertClaim("user_EVIL", "c1", "h1", {});
     expect(result).toEqual({ ok: false, error: "not_claimant" });
+  });
+});
+
+/* ------------------------------------------------------------ context reads */
+
+describe("adminClaimContext — server-side claim context", () => {
+  it("maps the claim row (claimant clerk id stays server-side by contract)", async () => {
+    tables.set("listing_claims", {
+      maybeSingleResult: {
+        data: {
+          claimant_clerk_user_id: "user_A",
+          listing_id: "l1",
+          host_profile_id: "h1",
+          status: "approved",
+        },
+        error: null,
+      },
+    });
+    const ctx = await adminClaimContext("c1");
+    expect(ctx).toEqual({
+      claimantClerkUserId: "user_A",
+      listingId: "l1",
+      hostProfileId: "h1",
+      status: "approved",
+    });
+  });
+
+  it("returns null for an unknown claim (caller drops, never guesses)", async () => {
+    tables.set("listing_claims", { maybeSingleResult: { data: null, error: null } });
+    expect(await adminClaimContext("c-unknown")).toBeNull();
+  });
+});
+
+describe("getClaimConfirmationFields — the field-review read", () => {
+  it("maps every confirmable field and carries triad evidence for honest rendering", async () => {
+    tables.set("listings", {
+      maybeSingleResult: {
+        data: {
+          title: "Salmon Season Deckhand",
+          description: "Work the nets.",
+          location_display: "Kodiak, AK",
+          housing_included: false,
+          housing_description: null,
+          meals_included: true,
+          meals_description: "Three meals aboard",
+          compensation_min_cents: 180000,
+          compensation_max_cents: null,
+          compensation_unit: "month",
+          compensation_summary: "$1,800/mo",
+          begins_at: "2026-08-01T00:00:00.000Z",
+          ends_at: null,
+          housing_evidence: "not_stated",
+          meals_evidence: "stated",
+          pay_evidence: "stated",
+        },
+        error: null,
+      },
+    });
+    const fields = await getClaimConfirmationFields("l1");
+    expect(fields).toEqual({
+      title: "Salmon Season Deckhand",
+      description: "Work the nets.",
+      locationDisplay: "Kodiak, AK",
+      housingIncluded: false,
+      housingDescription: null,
+      mealsIncluded: true,
+      mealsDescription: "Three meals aboard",
+      compensationMinCents: 180000,
+      compensationMaxCents: null,
+      compensationUnit: "month",
+      compensationSummary: "$1,800/mo",
+      beginsAt: "2026-08-01T00:00:00.000Z",
+      endsAt: null,
+      housingEvidence: "not_stated",
+      mealsEvidence: "stated",
+      payEvidence: "stated",
+    });
+  });
+
+  it("returns null for an unknown listing", async () => {
+    tables.set("listings", { maybeSingleResult: { data: null, error: null } });
+    expect(await getClaimConfirmationFields("l-unknown")).toBeNull();
   });
 });

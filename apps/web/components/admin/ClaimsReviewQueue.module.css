@@ -1,0 +1,317 @@
+/*
+ * Admin Claims Review — the decision surface that closes the claim-to-verify
+ * loop, inside the admin dark-glass OS. Token-driven only: every color/space/
+ * radius resolves through the .admin-os scope cascade. Mirrors RefundQueue's
+ * structure (stat grid, card grid, two-step confirm) so the admin queues feel
+ * like one system.
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.metrics {
+  margin: 0;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-10) var(--space-14);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--status-error-fg);
+  color: var(--status-error-fg);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.errorIcon {
+  flex: none;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-40) var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--border-soft);
+  text-align: center;
+}
+
+.emptyIcon {
+  display: inline-grid;
+  place-items: center;
+  width: var(--space-48);
+  height: var(--space-48);
+  border-radius: var(--radius-pill);
+  background: var(--status-success-bg);
+  color: var(--status-success-fg);
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-title-size);
+  color: var(--text-primary);
+}
+
+.emptySub {
+  margin: 0;
+  max-width: 44ch;
+  font-size: var(--type-body-size);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ── Pending claim cards ──────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+  gap: var(--space-16);
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-20);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: var(--gradient-chrome);
+  box-shadow: var(--elevation-card);
+  overflow: hidden;
+}
+
+.edge {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--palette-sky);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.listingLink {
+  font-family: var(--font-display);
+  font-size: var(--type-title-size);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.listingLink:hover,
+.listingLink:focus-visible {
+  text-decoration: underline;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.identityRow {
+  display: flex;
+  gap: var(--space-8);
+  align-items: baseline;
+}
+
+.identityLabel {
+  flex: none;
+  min-width: 6.5rem;
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.identityValue {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.statement {
+  margin: 0;
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--radius-input);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  font-size: var(--type-meta-size);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.statementEmpty {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.cardFootMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.age {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--type-label-size);
+  color: var(--text-muted);
+}
+
+.date {
+  color: var(--text-muted);
+}
+
+.noteField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.noteLabel {
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-muted);
+}
+
+.noteInput {
+  width: 100%;
+  padding: var(--space-8) var(--space-10);
+  border-radius: var(--radius-input);
+  border: 1.5px solid var(--palette-line);
+  background: var(--palette-surface);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  resize: vertical;
+}
+.noteInput:focus-visible {
+  outline: none;
+  border-color: var(--palette-sky);
+  box-shadow: var(--ui-focus-ring, 0 0 0 3px color-mix(in srgb, var(--palette-sky) 40%, transparent));
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-8);
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding: var(--space-12);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--palette-sky) 8%, transparent);
+}
+
+.confirmText {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ── Recently decided rail ────────────────────────────────────────────────── */
+.decided {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.decidedTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-title-size);
+  color: var(--text-primary);
+}
+
+.decidedEmpty {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  color: var(--text-muted);
+}
+
+.decidedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.decidedRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+}
+
+.decidedMain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  flex-wrap: wrap;
+}
+
+.decidedListing {
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.decidedListing:hover,
+.decidedListing:focus-visible {
+  text-decoration: underline;
+}
+
+.decidedMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-size: var(--type-label-size);
+  color: var(--text-muted);
+}
+
+.metaDot {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+}
+
+.decidedNote {
+  margin: 0;
+  font-size: var(--type-label-size);
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.decidedActions {
+  display: flex;
+  justify-content: flex-end;
+}
