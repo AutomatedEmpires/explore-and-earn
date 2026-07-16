@@ -87,10 +87,36 @@ create trigger trg_applications_offer_expiry
   when (new.status = 'offered' and old.status is distinct from new.status)
   execute function public.set_offer_expiry();
 
+-- Reactivation (063: withdrawn -> applied) restarts the 30-day application
+-- clock. Without this the revived row keeps its ORIGINAL expires_at — usually
+-- already in the past — and the sweep would expire a just-re-applied
+-- application on its next pass.
+create or replace function public.set_reactivation_expiry()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  new.expires_at := now() + interval '30 days';
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_applications_reactivation_expiry on public.applications;
+create trigger trg_applications_reactivation_expiry
+  before update on public.applications
+  for each row
+  when (old.status = 'withdrawn' and new.status = 'applied')
+  execute function public.set_reactivation_expiry();
+
 -- 3. Backfill (no-op on empty tables) --------------------------------------
 
+-- Anchor to the LATEST lifecycle start: a 063-reactivated application's true
+-- clock is its revive time (reactivated_at), not its ancient original
+-- submission — anchoring to submitted_at alone would instantly expire it.
 update public.applications
-   set expires_at = submitted_at + interval '30 days'
+   set expires_at = greatest(submitted_at, coalesce(reactivated_at, submitted_at))
+                    + interval '30 days'
  where expires_at is null
    and status in ('applied', 'reviewing', 'saved_by_host');
 

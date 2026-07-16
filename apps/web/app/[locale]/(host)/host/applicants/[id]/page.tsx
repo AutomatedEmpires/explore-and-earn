@@ -92,7 +92,7 @@ export default async function HostApplicantDetailPage({
         threadId={applicantWithName.threadId}
       />
       <HostApplicantDetail applicant={applicantWithName} resume={resume} />
-      <StatusActions applicationId={application.id} />
+      <StatusActions applicationId={application.id} status={application.status} />
       <div className={detailStyles.messageLink}>
         <Link
           href={`/host/messages?seekerProfileId=${application.seekerProfileId}`}

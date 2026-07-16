@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@explore-and-earn/ui";
 
@@ -34,6 +34,14 @@ export function HostApplicantCardActions({
 	const [error, setError] = useState<string | null>(null);
 	const [optimisticStage, setOptimisticStage] = useState<ApplicantStage | null>(null);
 
+	// A successful action refreshes the route; when the fresh status prop
+	// arrives, drop the optimistic overlay and re-enable the (newly legal)
+	// buttons. Until then ALL buttons stay disabled — a rapid second press
+	// must never fire against a stale status.
+	useEffect(() => {
+		setOptimisticStage(null);
+	}, [status]);
+
 	// Only edges that are legal from the CURRENT status render at all —
 	// APPLICATION_TRANSITIONS is the single truth (an accepted or closed
 	// application shows no buttons instead of four that would all bounce).
@@ -44,24 +52,32 @@ export function HostApplicantCardActions({
 		setError(null);
 		setOptimisticStage(action.targetStage);
 		startTransition(async () => {
-			const result = await updateApplicationStatusAction(applicantId, action.status);
-			if (result.ok) {
-				router.refresh();
-				return;
+			try {
+				const result = await updateApplicationStatusAction(applicantId, action.status);
+				if (result.ok) {
+					router.refresh();
+					return; // optimistic overlay clears when the fresh status lands
+				}
+				setOptimisticStage(null);
+				setError(
+					(result.error ? ERROR_TEXT[result.error] : undefined) ??
+						result.error ??
+						"Could not update this application.",
+				);
+			} catch {
+				// The action rethrows after Sentry reporting — never leave the row
+				// stuck on an optimistic stage with no explanation.
+				setOptimisticStage(null);
+				setError("Could not update this application. Try again.");
 			}
-			setOptimisticStage(null);
-			setError(
-				(result.error ? ERROR_TEXT[result.error] : undefined) ??
-					result.error ??
-					"Could not update this application.",
-			);
 		});
 	}
 
+	const busy = isPending || optimisticStage !== null;
 	const shownStage = optimisticStage ?? initialStage;
 
 	return (
-		<div className={styles.actionRow} aria-busy={isPending}>
+		<div className={styles.actionRow} aria-busy={busy}>
 			{actions.map((action) => {
 				const active = shownStage === action.targetStage;
 				return (
@@ -69,7 +85,7 @@ export function HostApplicantCardActions({
 						key={action.label}
 						variant={action.variant}
 						onClick={() => handleAction(action)}
-						disabled={isPending || active}
+						disabled={busy || active}
 					>
 						{active ? action.doneLabel : action.label}
 					</Button>
