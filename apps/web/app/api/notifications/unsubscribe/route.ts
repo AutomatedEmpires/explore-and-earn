@@ -31,7 +31,12 @@ async function handleUnsubscribe(
 
 function htmlPage(title: string, body: string, lang: string): NextResponse {
 	const escape = (value: string) =>
-		value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+		value
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&#39;");
 	return new NextResponse(
 		`<!DOCTYPE html><html lang="${escape(lang)}"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex" /><title>${escape(title)}</title></head><body style="margin:0;padding:48px 16px;background:#F6F3EC;font-family:Inter,system-ui,sans-serif;"><div style="max-width:480px;margin:0 auto;background:#FFFFFF;border:1px solid #E7E1D3;border-radius:24px;padding:32px 28px;"><h1 style="margin:0 0 12px;font-size:20px;color:#24221E;">${escape(title)}</h1><p style="margin:0;font-size:15px;line-height:1.5;color:#24221E;">${escape(body)}</p></div></body></html>`,
 		{ status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } },
