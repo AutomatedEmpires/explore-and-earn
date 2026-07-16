@@ -1,3 +1,28 @@
+<!-- ae-control-plane v1 (2026-07-16). Machine operating contract; product docs follow below. -->
+# Operating contract — Automated Empires control plane
+
+- **Canonical clone (the ONLY writable copy):** WSL `Ubuntu-24.04-Recovered` → `/home/jackson/automatedempires/ventures/explore-and-earn`.
+  Never clone this repository anywhere else on the machine. Parallel work uses controlled
+  worktrees: `ae start explore-and-earn -t <task> -a <agent> --worktree`.
+- **Sessions:** acquire the single-writer lease first (`ae start explore-and-earn -t <task> -a <agent>`);
+  end with `ae finish explore-and-earn`. Work counts as done ONLY when pushed and remote-SHA-verified.
+- **Deploys:** merging `main` auto-deploys production via Vercel.
+- **Validate before merge:** `pnpm typecheck && pnpm guardrails` (CI must be green; squash merges).
+- **Providers (fixed — never swap or cross-wire):** db=supabase, auth=clerk, email=resend (+ webhooks: bounces/complaints -> suppressions), payments=stripe, storage=cloudinary (9-bucket photo system), ai=anthropic (Guide/assistant surfaces), analytics=posthog (project exploreandearn / 291166).
+- **LOCKED:** MARKETPLACE_CATEGORIES locked: farm|maritime|remote|seasonal (+mix); MIX_DOMAIN is DR-B6 LOCKED
+- **LOCKED:** Value triad is Housing/Meals/Pay — OpportunityTriad must never gain a 'perks' key (guardrail 2b). 'Perks & benefits' is allowed only as a SEPARATE section (founder, 2026-07-15)
+- **LOCKED:** Design ratchets are law: raw-color (G50), tokenization (G51), locale-literal (G52) baselines only tighten
+- **LOCKED:** Invite quotas: enterprise 20 / pro 10 / starter 3
+- **LOCKED:** Verified-Host badge is subscription-gated (G22)
+- **LOCKED:** Dark theme is the default entry
+- **Warn before:** applying migrations 058-065 (additive, NOT yet applied — founder pipeline)
+- **Warn before:** activating listing-source ingestion (each source needs complianceStatus approval)
+- **Warn before:** enabling notification sends (needs founder env)
+- **Warn before:** charging payments
+- Full policy: `github.com/AutomatedEmpires/ae-control` → `POLICY.md`. Briefing: `ae info explore-and-earn`.
+
+---
+
 # AGENTS.md — Explore&Earn
 
 > A README **for coding agents**. If you are Copilot, Codex, Cursor, Claude, or any automation working in this repo, read this file before doing anything. It follows the [agents.md](https://agents.md) open standard.
