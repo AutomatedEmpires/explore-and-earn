@@ -118,7 +118,7 @@ export interface DiscoveryCardProps {
 		| "saved" | "applied" | "offered" | "scheduled"
 		| "accepted" | "matched" | "not_selected" | "withdrawn"
 		| "draft" | "paused" | "expired" | "filled"
-		| "invited" | "reported"
+		| "invited" | "reported" | "unavailable"
 }
 
 // ─── Category maps ────────────────────────────────────────────────────────────
@@ -330,6 +330,9 @@ export function DiscoveryCard({
 	const isFilled      = cardState === "filled"
 	const isInvited     = cardState === "invited"
 	const isReported    = cardState === "reported"
+	// A listing the seeker kept (saved) that is no longer live — muted, honest,
+	// non-actionable (pair with variant="disabled" for the dimmed treatment).
+	const isUnavailable = cardState === "unavailable"
 
 	// Founder badge rule (2026-07-13): a match score always claims the top-CENTER
 	// slot on seeker browse/decision surfaces; a boosted listing then drops to
@@ -369,6 +372,7 @@ export function DiscoveryCard({
 		: isInvited   ? { label: "Invited",         tone: "warning" }
 		: isNotSelected ? { label: "Passed",        tone: "muted"   }
 		: isWithdrawn ? { label: "Withdrawn",       tone: "muted"   }
+		: isUnavailable ? { label: "No longer available", tone: "muted" }
 		: isPaused    ? { label: "Paused",          tone: "warning" }
 		: isExpired   ? { label: "Expired",         tone: "muted"   }
 		: isReported && data.reportCategory ? { label: data.reportCategory, tone: "error" }
@@ -381,7 +385,7 @@ export function DiscoveryCard({
 	// appears when a handler exists (e.g. a deck); the grid shows Apply · Save.
 	const showDecisionBar =
 		(isDiscoveryFeed || surface === "map" || isMatched)
-		&& !isApplied && !isReported && !isDisabled
+		&& !isApplied && !isReported && !isUnavailable && !isDisabled
 		&& Boolean(onApply || onOpen)
 
 	// ── CTA resolution ────────────────────────────────────────────────────────
@@ -399,12 +403,13 @@ export function DiscoveryCard({
 		: isPaused    ? "Resume"
 		: isExpired   ? "Renew"
 		: isFilled    ? "Close"
+		: isUnavailable ? "No longer available"
 		: isSaved     ? "Quick Apply"
 		: isSeekerSurface ? "View Seeker"
 		: onApply     ? "Quick Apply"
 		:               "Open Role"
 
-	const ctaDisabled = isApplied || isNotSelected || isReported || isDisabled
+	const ctaDisabled = isApplied || isNotSelected || isReported || isUnavailable || isDisabled
 	const ctaHandler  = ctaDisabled ? undefined
 		: isSeekerSurface ? (onOpen ? () => onOpen(data.id) : undefined)
 		: isScheduled ? (onOpen  ? () => onOpen(data.id)  : undefined)
@@ -424,7 +429,7 @@ export function DiscoveryCard({
 	const titleHandler = onHostClick ? () => onHostClick(data.id)
 		: onOpen ? () => onOpen(data.id) : undefined
 
-	const isPassiveCta = isApplied || isNotSelected || isReported || isDisabled
+	const isPassiveCta = isApplied || isNotSelected || isReported || isUnavailable || isDisabled
 	const ctaClass = `${styles.cta}${isPassiveCta ? ` ${styles.ctaPassive}` : ""}`
 
 	const hostCircleClass = [

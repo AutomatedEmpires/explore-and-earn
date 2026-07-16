@@ -10,6 +10,7 @@ import {
   type NotificationPrefsPatch,
 } from "@explore-and-earn/db";
 
+import { queueSeekerMatchRecompute } from "../../lib/matchRecompute";
 import { reportError } from "../../lib/sentry";
 
 export interface SettingsActionResult {
@@ -155,6 +156,8 @@ async function updateScheduleActionImpl(
   if (result.ok) {
     revalidatePath("/schedule");
     revalidatePath("/home");
+    // Availability is an ADR-040 engine input — refresh the stored scores.
+    queueSeekerMatchRecompute(userId);
   }
   return result;
 }
@@ -196,6 +199,8 @@ async function updateTravelActionImpl(
   if (result.ok) {
     revalidatePath("/travel");
     revalidatePath("/home");
+    // Travel readiness / location pref are ADR-040 engine inputs — rescore.
+    queueSeekerMatchRecompute(userId);
   }
   return result;
 }
