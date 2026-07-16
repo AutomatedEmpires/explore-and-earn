@@ -38,11 +38,16 @@ export async function saveSearchAction(
   if (typeof label !== "string" || label.length > MAX_LABEL_CHARS) {
     return { ok: false, error: "invalid_input" };
   }
-  if (
-    !filters ||
-    typeof filters !== "object" ||
-    JSON.stringify(filters).length > MAX_FILTERS_JSON_BYTES
-  ) {
+  if (!filters || typeof filters !== "object") {
+    return { ok: false, error: "invalid_input" };
+  }
+  // ACTUAL bytes (UTF-8), not UTF-16 code units — and a filters object that
+  // cannot serialize at all (cycles, BigInt) is invalid input, never a 500.
+  try {
+    if (new TextEncoder().encode(JSON.stringify(filters)).length > MAX_FILTERS_JSON_BYTES) {
+      return { ok: false, error: "invalid_input" };
+    }
+  } catch {
     return { ok: false, error: "invalid_input" };
   }
 

@@ -10,9 +10,14 @@
 /**
  * Read a request body with a HARD byte cap enforced on the actual bytes read —
  * NOT on the client-supplied Content-Length header (which is trivially spoofed
- * or omitted with chunked transfer encoding). Aborts as soon as the accumulated
- * chunks exceed `maxBytes`, so an attacker can never stream an unbounded body
- * into memory. Returns null when the cap is exceeded or the body can't be read.
+ * or omitted with chunked transfer encoding).
+ *
+ * Streaming path (the normal case): aborts as soon as the accumulated chunks
+ * exceed `maxBytes`, so an oversized body is never fully buffered. The rare
+ * no-stream fallback (`req.body` absent on some runtimes) has to read the body
+ * via text() BEFORE it can measure it — the cap still rejects the payload, but
+ * the transient buffering there is bounded only by the runtime itself.
+ * Returns null when the cap is exceeded or the body can't be read.
  */
 export async function readCappedBodyText(
   req: Request,
