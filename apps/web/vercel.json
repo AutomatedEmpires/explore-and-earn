@@ -6,6 +6,10 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/cron/expire-lifecycle",
+      "schedule": "15 * * * *"
+    },
+    {
       "path": "/api/cron/new-match-alerts",
       "schedule": "0 8 * * *"
     },

@@ -18,10 +18,18 @@ function statusToStage(status: string): ApplicantStage {
       return "saved_by_host";
     case "offered":
       return "offered";
+    // Engagement states: an accepted applicant must never reappear as "New".
+    case "accepted":
+    case "active":
+    case "completed":
+      return "accepted";
+    // Terminal-negative bucket (labelled "Closed"): host pass, seeker
+    // withdrawal/decline, and lifecycle expiry all end the candidacy.
     case "declined":
     case "not_selected":
     case "rejected":
     case "withdrawn":
+    case "expired":
       return "declined";
     case "applied":
     case "new":
@@ -96,6 +104,7 @@ export function toApplicantItem(
     applicantName: displayNames?.get(application.seekerProfileId) ?? applicantLabel(application),
     listing: listingsById.get(application.listingId) ?? minimalListing(application),
     stage: statusToStage(application.status),
+    status: application.status,
     appliedOn: formatAppliedOn(application.submittedAt),
     ...(application.coverMessage ? { note: application.coverMessage } : {}),
     ...(threadId ? { threadId } : {}),

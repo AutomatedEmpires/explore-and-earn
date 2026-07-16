@@ -1,4 +1,9 @@
-import type { MatchBand } from "@explore-and-earn/contracts";
+import {
+  APPLICATION_TRANSITIONS,
+  canTransition,
+  type ApplicationStatus,
+  type MatchBand,
+} from "@explore-and-earn/contracts";
 import type { IconKey } from "@explore-and-earn/ui";
 
 import type { DiscoveryListing } from "../discovery";
@@ -121,6 +126,7 @@ export type ApplicantStage =
   | "reviewing"
   | "saved_by_host"
   | "offered"
+  | "accepted"
   | "declined";
 
 export const APPLICANT_STAGE_LABEL: Record<ApplicantStage, string> = {
@@ -128,7 +134,11 @@ export const APPLICANT_STAGE_LABEL: Record<ApplicantStage, string> = {
   reviewing: "Reviewing",
   saved_by_host: "Saved",
   offered: "Offered",
-  declined: "Declined",
+  accepted: "Accepted",
+  // The terminal-negative bucket holds not_selected AND seeker withdrawals AND
+  // expiries — "Closed" is the honest umbrella ("Declined" claimed the host
+  // declined every one of them).
+  declined: "Closed",
 };
 
 /**
@@ -141,6 +151,7 @@ export const APPLICANT_STAGE_ICON: Record<ApplicantStage, IconKey> = {
   reviewing: "status.partially_filled",
   saved_by_host: "action.save",
   offered: "status.boosted",
+  accepted: "status.accepted",
   declined: "action.close",
 };
 
@@ -153,6 +164,7 @@ export const APPLICANT_STAGE_ORDER: readonly ApplicantStage[] = [
   "reviewing",
   "saved_by_host",
   "offered",
+  "accepted",
   "declined",
 ];
 
@@ -162,6 +174,12 @@ export interface HostApplicantItem {
   /** The listing they applied to (reused Discovery view-model). */
   readonly listing: DiscoveryListing;
   readonly stage: ApplicantStage;
+  /**
+   * The RAW applications.status (stage is a lossy display grouping — e.g.
+   * accepted/active/completed all render as 'accepted'). Action legality is
+   * computed from THIS via APPLICATION_TRANSITIONS, never from the stage.
+   */
+  readonly status: string;
   readonly appliedOn: string;
   /** Short note/snippet from the applicant. */
   readonly note?: string;
@@ -197,6 +215,40 @@ export interface HostMessageThread {
  * — NOT a matching/scoring algorithm (match isolation is enforced by
  * guardrails). Unit-testable without a backend.
  */
+/** A host card action: the button label + the DB status it would set. */
+export interface ApplicantCardAction {
+  readonly label: string;
+  /** Button copy once the optimistic transition has applied. */
+  readonly doneLabel: string;
+  readonly variant: "secondary" | "ghost";
+  readonly targetStage: ApplicantStage;
+  readonly status: "reviewing" | "saved_by_host" | "offered" | "not_selected" | "accepted";
+}
+
+const ALL_CARD_ACTIONS: readonly ApplicantCardAction[] = [
+  { label: "Skip", doneLabel: "Skipped", variant: "ghost", targetStage: "declined", status: "not_selected" },
+  { label: "Save", doneLabel: "Saved", variant: "secondary", targetStage: "saved_by_host", status: "saved_by_host" },
+  { label: "Offer", doneLabel: "Offered", variant: "secondary", targetStage: "offered", status: "offered" },
+  { label: "Accept", doneLabel: "Accepted", variant: "secondary", targetStage: "accepted", status: "accepted" },
+];
+
+/**
+ * The card actions that are LEGAL from the application's current DB status,
+ * per the canonical APPLICATION_TRANSITIONS map. Buttons for illegal edges
+ * are never rendered — previously every button rendered regardless of state
+ * and invalid presses round-tripped to the server just to bounce off the
+ * lifecycle trigger with a raw error code.
+ */
+export function legalCardActions(status: string): readonly ApplicantCardAction[] {
+  return ALL_CARD_ACTIONS.filter((action) =>
+    canTransition(
+      APPLICATION_TRANSITIONS,
+      status as ApplicationStatus,
+      action.status as ApplicationStatus,
+    ),
+  );
+}
+
 export function countByStage(
   applicants: readonly HostApplicantItem[],
 ): Record<ApplicantStage, number> {
@@ -205,6 +257,7 @@ export function countByStage(
     reviewing: 0,
     saved_by_host: 0,
     offered: 0,
+    accepted: 0,
     declined: 0,
   };
   for (const applicant of applicants) {

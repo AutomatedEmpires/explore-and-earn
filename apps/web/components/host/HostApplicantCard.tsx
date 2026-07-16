@@ -97,6 +97,7 @@ export function HostApplicantCard({ applicant, showMatch = false }: HostApplican
           <HostApplicantCardActions
             applicantId={applicant.id}
             initialStage={applicant.stage}
+            status={applicant.status}
           />
         }
       />

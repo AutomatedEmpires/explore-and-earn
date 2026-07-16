@@ -139,8 +139,17 @@
 
 .actionRow {
 	display: grid;
-	grid-template-columns: repeat(3, minmax(0, 1fr));
+	/* Auto-fit: the action set is status-dependent now (1-3 legal edges), so
+	   a lone "Accept" fills the row instead of hugging a third of it. */
+	grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
 	gap: var(--space-8);
+}
+
+.actionError {
+	grid-column: 1 / -1;
+	margin: 0;
+	font-size: 0.8125rem;
+	color: var(--status-error-fg);
 }
 
 /* Optimistic feedback: while an action is in flight the row dims so the host
