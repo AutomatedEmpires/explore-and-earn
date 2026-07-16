@@ -31,6 +31,7 @@ const STAGE_FLOW: readonly ApplicantStage[] = [
   "reviewing",
   "saved_by_host",
   "offered",
+  "accepted",
 ];
 
 /**

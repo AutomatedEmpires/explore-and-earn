@@ -35,6 +35,33 @@ Invoke on a daily schedule with the secret header (Vercel Cron or any external s
 - `SUPABASE_SERVICE_ROLE_KEY` — service-role key used by `adminClient()` (server-only secret, never `NEXT_PUBLIC_`).
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL.
 
+## expire-lifecycle
+
+Enforces the application/invite/offer lifecycle windows (`LIFECYCLE_EXPIRY_DAYS`:
+application 30d, invite 14d, offer 7d).
+
+- **Endpoint:** `GET /api/cron/expire-lifecycle`
+- **Handler:** `apps/web/app/api/cron/expire-lifecycle/route.ts`
+- **Auth:** `Authorization: Bearer ${CRON_SECRET}` header. Missing/incorrect -> `401`.
+- **Action:** calls `sweepExpiredLifecycles()` from `packages/db/src/queries/lifecycleExpiry.ts`:
+  1. `applications` in `applied/reviewing/saved_by_host` with `expires_at < now()` -> `expired`.
+  2. `applications` in `offered` past their 7-day response window -> `expired`.
+  3. `invites` in `created/delivered/viewed` past their 14-day window -> `expired`.
+  4. Rows with `expires_at IS NULL` are never touched — running before migration
+     067 is applied is a safe no-op, not a guess. The 001 lifecycle triggers
+     remain the authoritative edge guard under every UPDATE.
+- **Response:** `{ ok, applicationsExpired, offersExpired, invitesExpired }`.
+- **Schedule:** hourly at :15 (`15 * * * *`, `apps/web/vercel.json`).
+
+### Expiry seeding
+
+`expires_at` defaults are stamped by `supabase/migrations/067_lifecycle_expiry.sql`
+(BEFORE INSERT on applications/invites; BEFORE UPDATE on entering `offered`),
+with an anchored backfill for pre-existing rows. Until 067 is applied through
+the founder-gated pipeline, every window is null and this sweep no-ops.
+
+Same required environment as `expire-listings` above.
+
 ## saved-search-alerts
 
 Notifies seekers when new live listings match a saved search — the re-engagement flywheel.

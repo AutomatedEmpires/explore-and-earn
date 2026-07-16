@@ -111,6 +111,7 @@ export default async function HostListingDetailPage({
     applicantName: displayNames.get(app.seekerProfileId) ?? "Seeker",
     listing: listingFields,
     stage: applicationStageFromStatus(app.status),
+    status: app.status,
     appliedOn: formatAppliedOn(app.submittedAt),
     note: app.coverMessage ?? undefined,
   }));
