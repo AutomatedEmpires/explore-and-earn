@@ -78,3 +78,38 @@ create policy invites_update_host on public.invites
     host_profile_id in (select public.current_host_profile_ids())
     and status = 'withdrawn'
   );
+
+-- ---------------------------------------------------------------------------
+-- Column-level UPDATE grants (the 050/054 direct-PostgREST hardening pattern).
+-- RLS decides WHICH ROWS an actor may update; it cannot decide WHICH COLUMNS.
+-- Supabase's default table grants give authenticated full-column UPDATE, so
+-- without this a seeker could rewrite unrelated columns on their own rows
+-- (applications.listing_id, submitted_at; invites.message, …) straight
+-- through PostgREST. Pin the grant to exactly the columns the application
+-- writes under a user token:
+--   applications — status (all transitions), withdrawn_reason (withdraw /
+--     decline), reactivated_at + cover_message (063 re-apply revive);
+--   invites      — status (respond / withdraw).
+-- Service-role writers are unaffected (service_role keeps its own grants).
+-- ---------------------------------------------------------------------------
+revoke update on public.applications from authenticated;
+grant update (status, withdrawn_reason, reactivated_at, cover_message)
+  on public.applications to authenticated;
+
+revoke update on public.invites from authenticated;
+grant update (status) on public.invites to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Role-count maintenance must survive SEEKER-driven transitions.
+-- trg_applications_role_counts (024) updates listings.accepted_count /
+-- remaining_role_count when an application enters or leaves 'accepted'. The
+-- function runs with the INVOKER's privileges, and a seeker has no UPDATE
+-- policy on listings — so a seeker accepting an offer (newly possible via
+-- applications_update_seeker above) would flip the application while the
+-- listing counters silently stayed put, breaking the capacity guard.
+-- SECURITY DEFINER makes the counter maintenance actor-independent; the
+-- function already pins search_path (024), and as a trigger function it is
+-- not directly callable, but EXECUTE is revoked anyway per the 016 pattern.
+-- ---------------------------------------------------------------------------
+alter function public.maintain_listing_role_counts() security definer;
+revoke execute on function public.maintain_listing_role_counts() from public, anon, authenticated;
