@@ -282,11 +282,14 @@ const WITHDRAWABLE_STATUSES = new Set(["applied", "reviewing", "saved_by_host"])
 /**
  * Withdraw the authed seeker's own application.
  *
- * App-level guards (RLS is gated to a separate change):
+ * App-level guards (the RLS write policy ships in migration 066 —
+ * applications_update_seeker):
  * - profile_not_found — no seeker_profiles row
  * - not_found         — application id does not exist (or not visible)
  * - forbidden         — application belongs to a different seeker
  * - invalid_status    — only applied/reviewing/saved_by_host may be withdrawn
+ * - conflict          — the UPDATE matched no row (concurrent change or RLS
+ *                       filter); never reported as success
  *
  * Every one of those source statuses -> withdrawn is a permitted lifecycle
  * transition, so the DB-side lifecycle trigger accepts the update.
@@ -322,13 +325,20 @@ export async function withdrawApplication(
     return { ok: false, error: "invalid_status" };
   }
 
-  const { error: updateError } = await untyped
+  const { data: updated, error: updateError } = await untyped
     .from("applications")
     .update({ status: "withdrawn", withdrawn_reason: "seeker_withdrew" })
     .eq("id", applicationId)
-    .eq("seeker_profile_id", seekerProfileId);
+    .eq("seeker_profile_id", seekerProfileId)
+    .select("id")
+    .maybeSingle();
   if (updateError) {
     return { ok: false, error: updateError.message };
+  }
+  // Affected-row assertion: a zero-row UPDATE (raced status change or an RLS
+  // filter) must never report a withdrawal the database did not perform.
+  if (!updated) {
+    return { ok: false, error: "conflict" };
   }
 
   return { ok: true };

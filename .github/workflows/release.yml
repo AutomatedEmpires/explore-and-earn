@@ -7,5 +7,14 @@ on:
 
 jobs:
   release:
+    # The called reusable workflow declares `contents: write` +
+    # `pull-requests: write` at its job level, but a caller can only DOWNGRADE
+    # the workflow token — never elevate it. This repo's default workflow token
+    # permission is read-only, so without an explicit grant here GitHub refuses
+    # to compile the run (startup_failure, zero jobs — every main push since
+    # #244). codeql.yml grants its caller-side permissions the same way.
+    permissions:
+      contents: write
+      pull-requests: write
     uses: AutomatedEmpires/.github/.github/workflows/reusable-release.yml@main
     secrets: inherit

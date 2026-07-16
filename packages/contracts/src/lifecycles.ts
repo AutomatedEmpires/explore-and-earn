@@ -65,9 +65,15 @@ export const APPLICATION_TRANSITIONS = {
   applied: ["reviewing", "saved_by_host", "offered", "not_selected", "withdrawn", "expired"],
   reviewing: ["saved_by_host", "offered", "not_selected", "withdrawn", "expired"],
   saved_by_host: ["offered", "not_selected", "withdrawn", "expired"],
+  // A seeker declines an offer via offered -> withdrawn (stamped
+  // withdrawn_reason='seeker_declined_offer'); not_selected stays host-only.
   offered: ["accepted", "withdrawn", "expired"],
   accepted: ["active"],
   active: ["completed"],
+  // Migration 063: a withdrawn application may be revived by a re-apply
+  // (applyToListing reactivation). This mirror was missing until the seed
+  // parity test (packages/db/tests/lifecycleSeedParity.test.ts) was added.
+  withdrawn: ["applied"],
 } as const satisfies TransitionMap<ApplicationStatus>
 
 /* ----------------------------------------------------------- Invite */

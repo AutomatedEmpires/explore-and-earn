@@ -134,6 +134,52 @@ describe("expandEvent — direction and recipients", () => {
 		}
 	});
 
+	it("seeker-actor accepted notifies the HOST as offer_accepted", async () => {
+		const intents = await expandEvent(
+			{
+				...BASE_EVENT,
+				event_type: "application_status_changed",
+				properties: { status: "accepted", actor: "seeker" },
+			},
+			makeResolvers(),
+		);
+		expect(intents).toHaveLength(1);
+		expect(intents[0].type).toBe("offer_accepted");
+		expect(intents[0].category).toBe("offers_invites");
+		expect(intents[0].recipientClerkUserId).toBe("clerk_host");
+		expect(intents[0].destinationPath).toBe("/host/applicants/app-1");
+	});
+
+	it("seeker-actor status other than accepted expands to NOTHING (decline travels as withdrawn)", async () => {
+		for (const status of ["offered", "withdrawn", "not_selected", "garbage"]) {
+			const intents = await expandEvent(
+				{
+					...BASE_EVENT,
+					event_type: "application_status_changed",
+					properties: { status, actor: "seeker" },
+				},
+				makeResolvers(),
+			);
+			expect(intents).toEqual([]);
+		}
+	});
+
+	it("application_withdrawn with seeker_declined_offer reason notifies the HOST as offer_declined", async () => {
+		const intents = await expandEvent(
+			{
+				...BASE_EVENT,
+				event_type: "application_withdrawn",
+				properties: { reason: "seeker_declined_offer" },
+			},
+			makeResolvers(),
+		);
+		expect(intents).toHaveLength(1);
+		expect(intents[0].type).toBe("offer_declined");
+		expect(intents[0].category).toBe("offers_invites");
+		expect(intents[0].recipientClerkUserId).toBe("clerk_host");
+		expect(intents[0].destinationPath).toBe("/host/applicants/app-1");
+	});
+
 	it("invite_created notifies the SEEKER and collapses created/sent duplicates", async () => {
 		const intents = await expandEvent(
 			{

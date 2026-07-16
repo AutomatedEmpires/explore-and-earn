@@ -55,6 +55,8 @@ export const NOTIFICATION_TYPES = [
 	"invite_received", // seeker
 	"offer_received", // seeker
 	"offer_expiring", // seeker: REAL expiry on a still-actionable offer
+	"offer_accepted", // host: seeker accepted their offer
+	"offer_declined", // host: seeker declined their offer (truthful, neutral copy)
 	// Messaging
 	"message_received", // counterparty only, thread-collapsed
 	// Sourced / host lifecycle
@@ -80,6 +82,8 @@ export const NOTIFICATION_TYPE_CATEGORY: Record<NotificationType, EngagementCate
 	invite_received: "offers_invites",
 	offer_received: "offers_invites",
 	offer_expiring: "offers_invites",
+	offer_accepted: "offers_invites",
+	offer_declined: "offers_invites",
 	message_received: "messages",
 	sourced_listing_claim_submitted: "listing_lifecycle",
 	listing_claim_approved: "listing_lifecycle",
@@ -108,6 +112,8 @@ export const NOTIFICATION_TYPE_INAPP_CATEGORY: Record<NotificationType, InAppNot
 	invite_received: "invites",
 	offer_received: "offers",
 	offer_expiring: "offers",
+	offer_accepted: "offers",
+	offer_declined: "offers",
 	message_received: "messages",
 	sourced_listing_claim_submitted: "verification",
 	listing_claim_approved: "verification",
