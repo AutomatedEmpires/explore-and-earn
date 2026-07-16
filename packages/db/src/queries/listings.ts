@@ -8,6 +8,7 @@ import type {
   CompensationUnit,
   DiscoveryCardConditionalBadge,
   ListingClaimSummary,
+  ListingLogistics,
   ListingProvenanceInfo,
   ListingStatus,
   OpportunityCategory,
@@ -18,6 +19,7 @@ import {
   formatCompensation,
   formatOpportunityWindow,
   hasVerifiedHostSubscription,
+  sanitizeLogistics,
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { anonClient, authedClient } from "../client";
@@ -1190,6 +1192,13 @@ export interface PublicListingDetail {
      'not_stated' benefits as missing information) and for converted listings
      (lineage retained, presents as the host's own). */
   provenanceInfo?: ListingProvenanceInfo;
+
+  /* ── Relocation logistics (listings.logistics jsonb; migration 068) ──
+     Only the facts the host actually STATED. A key the host never answered is
+     ABSENT, so the page renders "Not stated" — it is never inferred or
+     defaulted. Always present as an object ({} when nothing was stated), so
+     callers gate on hasLogistics() rather than null-checking. */
+  logistics: ListingLogistics;
 }
 
 const LISTING_DETAIL_COLUMNS =
@@ -1199,6 +1208,7 @@ const LISTING_DETAIL_COLUMNS =
   "compensation_summary,compensation_min_cents," +
   "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
   "begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,host_profile_id," +
+  "logistics," +
   PROVENANCE_COLUMNS +
   ",host_profiles(id,company_name,photo_url,about,primary_location_name,subscription_tier,narrative)";
 
@@ -1377,6 +1387,13 @@ export async function getListingDetailPublic(
       meals_evidence: asEvidence(row.meals_evidence as string | null),
       pay_evidence: asEvidence(row.pay_evidence as string | null),
     }),
+
+    // Relocation logistics (068). Re-sanitized on READ, not trusted from the
+    // jsonb: the column is the only place a hand-written SQL update or an
+    // older writer could have left a shape the contract never allowed, and a
+    // value we cannot vouch for must degrade to "Not stated" — never render as
+    // if the host had stated it.
+    logistics: sanitizeLogistics(row.logistics),
 
     // Immersive fields — undefined-when-empty so the page omits empty sections.
     responsibilities: responsibilities.length > 0 ? responsibilities : undefined,
