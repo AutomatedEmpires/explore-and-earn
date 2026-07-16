@@ -1,5 +1,6 @@
 import {
   type DiscoveryEnrichment,
+  encodeSwipeCursor,
   enrichmentFromScope,
   getLiveListingsWithCoords,
   getMatchScoresForSeeker,
@@ -183,8 +184,9 @@ export function warnIfDiscoveryDataMissingInProduction(context: string) {
 
 /**
  * A page of swipe-deck listings plus the cursor for the next page.
- * `nextCursor` is the published_at of the last row, or null when the deck is
- * exhausted (the final page returned fewer than SWIPE_BATCH_SIZE rows).
+ * `nextCursor` is the composite (published_at, id) keyset of the last row (see
+ * encodeSwipeCursor — complete under tied timestamps), or null when the deck
+ * is exhausted (the final page returned fewer than SWIPE_BATCH_SIZE rows).
  */
 export interface SwipeBatch {
   readonly listings: DiscoveryListing[];
@@ -209,11 +211,12 @@ export async function getSwipeListings(
   }
   const rows = await getSwipeBatch(clerkToken, clerkUserId, excludeIds, cursor);
   // The cursor pages chronologically underneath (no repeats, stable paging);
-  // the cursor must be taken from the FETCH order before any re-ranking.
+  // the cursor must be taken from the FETCH order before any re-ranking. The
+  // composite (published_at, id) keyset keeps rows sharing the boundary
+  // timestamp from being skipped across page breaks.
+  const lastRow = rows[rows.length - 1];
   const nextCursor =
-    rows.length === SWIPE_BATCH_SIZE
-      ? rows[rows.length - 1]?.published_at ?? null
-      : null;
+    rows.length === SWIPE_BATCH_SIZE && lastRow ? encodeSwipeCursor(lastRow) : null;
 
   // Enrich with the SAME stored signals every other seeker surface uses: the
   // boosted marker + the persisted match % (read from the match_scores cache and

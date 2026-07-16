@@ -13,6 +13,7 @@ import {
 } from "@explore-and-earn/db";
 
 import { isAdminUserId } from "../../lib/admin";
+import { checkRateLimit } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 import { issueRefund } from "../../services/stripe";
 
@@ -94,6 +95,16 @@ async function requestRefundImpl(
 ): Promise<ActionResult> {
   const { userId, getToken } = await auth();
   if (!userId) return { ok: false, error: "unauthenticated" };
+
+  // Rate limit: 3 refund requests per day per host. A real host files at most a
+  // couple; each request is money-adjacent admin-queue work, so throttle hard.
+  const { allowed } = checkRateLimit(`refund-request:${userId}`, 3, 24 * 60 * 60 * 1000);
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "You've filed several refund requests recently. Please try again tomorrow.",
+    };
+  }
 
   const token = await getToken();
   if (!token) return { ok: false, error: "expired_session" };

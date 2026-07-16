@@ -6,6 +6,7 @@ import {
   enqueueScheduledReminders,
   runDigests,
 } from "../../../../services/notifications/digests";
+import { resolveEngineStage } from "../../../../services/notifications/stage";
 
 // Digest windows depend on the current wall clock — never statically cached.
 export const dynamic = "force-dynamic";
@@ -31,12 +32,18 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   try {
+    const stage = resolveEngineStage();
+    if (stage === "disabled") {
+      // Clean, observable no-op — the engine is off (and its tables may not
+      // exist yet); a disabled engine must never 500 the cron.
+      return NextResponse.json({ ok: true, stage, skipped: true });
+    }
     const nowMs = Date.now();
     const reminders = await enqueueScheduledReminders(nowMs);
     const daily = await runDigests("daily", nowMs);
     const weekly = await runDigests("weekly", nowMs);
     const delivery = await drainDueDeliveries(nowMs);
-    return NextResponse.json({ ok: true, reminders, daily, weekly, delivery });
+    return NextResponse.json({ ok: true, stage, reminders, daily, weekly, delivery });
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

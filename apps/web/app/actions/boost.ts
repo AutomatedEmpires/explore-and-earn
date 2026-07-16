@@ -12,6 +12,7 @@ import {
   getOwnedListingForBoost,
 } from "@explore-and-earn/db";
 
+import { checkRateLimit } from "../../lib/rateLimit";
 import {
   createBoostCheckoutSession,
   hasStripeServerConfig,
@@ -33,6 +34,7 @@ export type BoostCheckoutResult =
         | "not_live"
         | "invalid_duration"
         | "no_stripe_config"
+        | "rate_limited"
         | "checkout_failed";
     };
 
@@ -68,6 +70,11 @@ export async function createBoostCheckoutAction(
 
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
+
+  // Rate limit: 10 checkout sessions per hour per host. Each call creates a
+  // real Stripe Checkout session; a legitimate host needs a handful at most.
+  const { allowed } = checkRateLimit(`boost-checkout:${session.userId}`, 10, 60 * 60 * 1000);
+  if (!allowed) return { ok: false, reason: "rate_limited" };
 
   const host = await getHostTierAndProfile(session.token, session.userId);
   if (!host) return { ok: false, reason: "not_host" };

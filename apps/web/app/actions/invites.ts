@@ -224,6 +224,12 @@ async function createInviteForCurrentHost(
 		return { ok: false, error: "rate_limit_exceeded" }
 	}
 
+	// Action-boundary cap matching the compose textarea's maxLength (500) — only
+	// a scripted caller can exceed it.
+	if (typeof message === "string" && message.length > 500) {
+		return { ok: false, error: "message_too_long" }
+	}
+
 	const token = await getToken()
 	if (!token) {
 		return { ok: false, error: "unauthenticated" }
@@ -337,6 +343,14 @@ async function searchSeekersActionImpl(
 ): Promise<SeekerSearchResult[]> {
 	const { userId, getToken } = await auth()
 	if (!userId) {
+		return []
+	}
+
+	// Rate limit: 30 searches per hour per user. This action reads seeker names
+	// and bios, so a scripted caller must not be able to enumerate profiles at
+	// speed (the db layer additionally requires a host profile and caps results).
+	const { allowed } = checkRateLimit(`seeker-search:${userId}`, 30, 60 * 60 * 1000)
+	if (!allowed) {
 		return []
 	}
 

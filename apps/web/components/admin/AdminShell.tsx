@@ -43,6 +43,7 @@ const SECTIONS: readonly AdminNavDef[] = [
   { href: "/admin/reports", label: "Reports", icon: "action.report" },
   { href: "/admin/claims", label: "Claims", icon: "profile.verification" },
   { href: "/admin/refunds", label: "Refunds", icon: "benefit.pay" },
+  { href: "/admin/notifications", label: "Notifications", icon: "nav.notifications" },
 ];
 
 // Reference-y tools, TUCKED into the pinned rail footer (settings-shaped).

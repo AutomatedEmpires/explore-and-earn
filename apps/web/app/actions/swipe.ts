@@ -135,8 +135,8 @@ export async function unpassListingAction(listingId: string): Promise<{ ok: bool
  * Next page of the swipe deck. `excludeIds` is sanitized to UUIDs (anything
  * else is dropped); listings the seeker has applied to are excluded inside
  * getSwipeBatch. Returns the mapped DiscoveryListings plus the next cursor
- * (published_at of the last row, or null when exhausted). Returns an empty
- * page when signed out.
+ * (the composite published_at|id keyset of the last row, or null when
+ * exhausted). Returns an empty page when signed out.
  */
 async function getSwipeBatchActionImpl(
 	excludeIds: string[],

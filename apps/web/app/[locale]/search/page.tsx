@@ -2,20 +2,21 @@ import type { Metadata } from "next";
 
 import { optionalAuth } from "../../../lib/optionalAuth";
 
-import type { ListingRow, SearchFilters } from "@explore-and-earn/db";
-import {
-	rowToDiscoveryFields,
-	scoreSeekerListingRow,
-	searchListings,
-	seekerHasMatchInputs,
-} from "@explore-and-earn/db";
+import type { SearchFilters } from "@explore-and-earn/db";
 import type { CompensationUnit, MarketplaceCategory } from "@explore-and-earn/contracts";
-import { MARKETPLACE_CATEGORIES, matchBandFor } from "@explore-and-earn/contracts";
+import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
 
-import type { SearchListing } from "../../../components/search/listing";
-import { SEARCH_FIXTURES } from "../../../components/search/fixtures";
+import {
+	DISCOVERY_FIXTURES,
+	type DiscoveryListing,
+} from "../../../components/discovery";
+import {
+	canUseDiscoveryFixtureFallback,
+	hasDiscoveryPublicDataConfig,
+} from "../../../components/discovery/data";
+import { getSearchDiscoveryListings } from "../../../components/search/data";
 import { SearchView } from "../../../components/search/SearchView";
-import { cachedSeekerProfile, getSupabaseToken } from "../../../lib/serverCache";
+import { getSupabaseToken } from "../../../lib/serverCache";
 
 export const dynamic = "force-dynamic";
 
@@ -27,18 +28,6 @@ export const metadata: Metadata = {
 	alternates: { canonical: "/search" },
 	robots: { index: true, follow: true },
 };
-
-// ─── env check (same pattern as discovery/data.ts) ──────────────────────────
-const hasPublicDataConfig =
-	Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-	Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-
-// Fixtures are a DEV/PREVIEW convenience only. In production (NODE_ENV==="production",
-// which covers Vercel prod AND preview builds) the fixture fallback is OFF, so an
-// unconfigured prod never renders invented listings — it shows an honest empty
-// state instead. Mirrors `allowFixtureFallback` in components/discovery/data.ts and
-// the sibling seeker/home seams.
-const allowFixtureFallback = process.env.NODE_ENV !== "production";
 
 // ─── URL param parsers ───────────────────────────────────────────────────────
 
@@ -81,58 +70,14 @@ function parseDate(value: string | string[] | undefined): string | undefined {
 	return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
 }
 
-// ─── ListingRow → SearchListing adapter ─────────────────────────────────────
-// Maps the DB projection (via rowToDiscoveryFields) into the Search lane's
-// view-model. Housing and meals provision come from the boolean DB columns;
-// summaries are generated because the DB projection does not carry them.
-
-const HOUSING_SUMMARIES = {
-	provided: "Housing included",
-	partial: "Housing (partial)",
-	not_provided: "No housing",
-} as const;
-
-const MEALS_SUMMARIES = {
-	provided: "Meals included",
-	partial: "Meals (partial)",
-	not_provided: "No meals",
-} as const;
-
-function rowToSearchListing(row: ListingRow): SearchListing {
-	const fields = rowToDiscoveryFields(row);
-	const { housing, meals, pay } = fields.benefits;
-	return {
-		id: fields.id,
-		title: fields.title,
-		hostName: fields.host.name,
-		category: fields.category,
-		location: fields.location,
-		opportunityWindow: fields.opportunityWindow,
-		benefits: {
-			housing: {
-				provision: housing.provision,
-				summary: HOUSING_SUMMARIES[housing.provision],
-			},
-			meals: {
-				provision: meals.provision,
-				summary: MEALS_SUMMARIES[meals.provision],
-			},
-			pay: {
-				provision: pay.provision,
-				summary: pay.summary ?? "",
-			},
-		},
-		verifiedHost: fields.host.verified,
-	};
-}
-
 // ─── Fixture fallback filtering (dev / preview) ──────────────────────────────
-// Applies the same semantic filters as searchListings() but over the local
-// SEARCH_FIXTURES. startDate filters are omitted because fixtures lack real
-// dates; payUnit filtering is skipped because fixtures don't carry that field.
+// Applies the same semantic filters as searchListings() but over the shared
+// DISCOVERY_FIXTURES (the fixture set every other discovery surface uses).
+// startDate filters are omitted because fixtures lack real dates; payUnit
+// filtering is skipped because fixtures don't carry that field reliably.
 
 function applyLocalFilters(
-	fixtures: readonly SearchListing[],
+	fixtures: readonly DiscoveryListing[],
 	opts: {
 		query?: string;
 		category?: MarketplaceCategory;
@@ -141,14 +86,14 @@ function applyLocalFilters(
 		payMin?: number;
 		location?: string;
 	},
-): readonly SearchListing[] {
+): readonly DiscoveryListing[] {
 	const query = opts.query?.trim().toLowerCase() ?? "";
 	const location = opts.location?.trim().toLowerCase() ?? "";
 
 	return fixtures.filter((listing) => {
 		if (query) {
 			const haystack =
-				`${listing.title} ${listing.hostName} ${listing.location}`.toLowerCase();
+				`${listing.title} ${listing.host.name} ${listing.location}`.toLowerCase();
 			if (!haystack.includes(query)) return false;
 		}
 
@@ -192,12 +137,9 @@ export default async function SearchPage({
 	const startAfter = parseDate(params.start_after);
 	const startBefore = parseDate(params.start_before);
 
-	let listings: readonly SearchListing[];
-	// Raw rows kept alongside `listings` (same order) to score a signed-in
-	// seeker's fit per card below. Empty on the fixture path.
-	let scorableRows: ListingRow[] = [];
+	let listings: readonly DiscoveryListing[];
 
-	if (hasPublicDataConfig) {
+	if (hasDiscoveryPublicDataConfig()) {
 		// Server-side DB query — uses the search_vector GIN index (migration 022)
 		// for the text path and indexed boolean/numeric columns for the rest.
 		const filters: SearchFilters = {
@@ -212,14 +154,21 @@ export default async function SearchPage({
 			startDateBefore: startBefore,
 			limit: 48,
 		};
-		const rows = await searchListings(filters);
-		scorableRows = rows;
-		listings = rows.map(rowToSearchListing);
-	} else if (allowFixtureFallback) {
-		// Dev / preview only: filter the typed fixture set locally. Never in prod
-		// (see `allowFixtureFallback`) — the else branch renders an honest empty
-		// state rather than passing off invented listings as real.
-		listings = applyLocalFilters(SEARCH_FIXTURES, {
+		// Signed-in seekers get the SAME per-seeker truth as /seek — applied
+		// HARD-exclusion, stored match pills (>=75), boosted/skipped enrichment,
+		// and rankForSeeker ordering — via the shared assembly. Anonymous
+		// visitors (or a failed auth read) keep the plain anon path, unchanged.
+		const { userId } = await optionalAuth();
+		const token = userId ? await getSupabaseToken() : null;
+		listings = await getSearchDiscoveryListings(
+			filters,
+			userId && token ? { clerkToken: token, clerkUserId: userId } : undefined,
+		);
+	} else if (canUseDiscoveryFixtureFallback()) {
+		// Dev / preview only: filter the shared discovery fixture set locally.
+		// Never in prod — the else branch renders an honest empty state rather
+		// than passing off invented listings as real.
+		listings = applyLocalFilters(DISCOVERY_FIXTURES, {
 			query,
 			category,
 			housing,
@@ -230,30 +179,6 @@ export default async function SearchPage({
 	} else {
 		// Production with no public data config → honest empty state, no fixtures.
 		listings = [];
-	}
-
-	// Stamp each result with the signed-in seeker's ADR-040 fit — the SAME score
-	// the listing detail shows. Only developing+ bands are surfaced. Anonymous
-	// visitors (and thin profiles) see the plain results, unchanged.
-	const { userId } = await optionalAuth();
-	if (userId && scorableRows.length === listings.length) {
-		const token = await getSupabaseToken();
-		const profile = token ? await cachedSeekerProfile(token, userId) : null;
-		if (profile && seekerHasMatchInputs(profile)) {
-			listings = listings.map((listing, index) => {
-				const score = scoreSeekerListingRow(profile, scorableRows[index]);
-				return matchBandFor(score) === "needs_attention"
-					? listing
-					: { ...listing, matchScore: score };
-			});
-			// Browsing (no text query): lead with the best fits — same rule as
-			// /seek, so the two discovery doors rank identically.
-			if (!query) {
-				listings = [...listings].sort(
-					(a, b) => (b.matchScore ?? -1) - (a.matchScore ?? -1),
-				);
-			}
-		}
 	}
 
 	return (

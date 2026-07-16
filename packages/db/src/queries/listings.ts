@@ -19,6 +19,7 @@ import {
   formatOpportunityWindow,
   hasVerifiedHostSubscription,
 } from "@explore-and-earn/contracts";
+import { adminClient } from "../adminClient";
 import { anonClient, authedClient } from "../client";
 import { getActiveBoostedListingIds, getSeekerApplicationIds } from "./idReaders";
 import { getPassedListingIds } from "./passedListings";
@@ -488,6 +489,94 @@ export async function getPublicListingsByIds(ids: string[]): Promise<ListingRow[
 }
 
 /**
+ * NON-live listings the seeker has SAVED — the /saved honesty read.
+ *
+ * RLS (listings_select_public) hides non-live rows from seekers, so a saved
+ * listing that closed/paused/archived silently VANISHES from the saved bucket.
+ * This renders an honest muted "no longer available" card instead of nothing.
+ *
+ * SECURITY: the id set is derived INSIDE this function from the caller's own
+ * saved rows (getSavedListingIds under their own token) — the service-role
+ * read that follows can only ever surface listings this seeker saved while
+ * they were live, no matter how a future call site invokes it. The safe path
+ * is the only path; there is no raw-ids variant.
+ *
+ * Best-effort by design: environments without a service-role key, or any read
+ * fault, degrade to [] (the listing stays hidden — the pre-existing behavior).
+ */
+export async function getNonLiveSavedListings(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<ListingRow[]> {
+  try {
+    // Lazy import: savedListings.ts statically imports from THIS module, so a
+    // static back-import would create a cycle (the same class idReaders.ts
+    // exists to break). Call-time resolution keeps the modules acyclic.
+    const { getSavedListingIds } = await import("./savedListings");
+    const savedIds = await getSavedListingIds(clerkToken, clerkUserId);
+    if (savedIds.length === 0) return [];
+    const { data, error } = await (adminClient() as unknown as SupabaseClient)
+      .from("listings")
+      .select(LISTING_COLUMNS)
+      .in("id", savedIds)
+      .neq("status", "live");
+    if (error) return [];
+    return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Composite swipe cursor: `"<published_at>|<id>"` of the last row on a page.
+ *
+ * The deck orders (published_at DESC, id DESC), so a published_at-only cursor
+ * SKIPS every remaining row that shares the boundary timestamp \u2014 the id half
+ * makes the keyset complete. Returns null when the row has no published_at
+ * (the deck is exhausted / unpageable past it).
+ */
+export function encodeSwipeCursor(
+  row: Pick<ListingRow, "published_at" | "id">,
+): string | null {
+  return row.published_at ? `${row.published_at}|${row.id}` : null;
+}
+
+/** ISO timestamp shape published_at values take (strict \u2014 gates or() interpolation). */
+const SWIPE_CURSOR_TIMESTAMP_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:?\d{2}|Z)?$/;
+/** Canonical RFC-4122 UUID shape (mirrors the action-layer sanitizer). */
+const SWIPE_CURSOR_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Parse a swipe cursor, tolerating BOTH formats in flight:
+ *   - composite `"<published_at>|<id>"` (current, complete keyset),
+ *   - legacy bare published_at (clients holding a cursor from before the
+ *     composite format shipped \u2014 degrades to the old timestamp-only page),
+ *   - anything else \u2192 null: the cursor is IGNORED (first page) rather than
+ *     handed to PostgREST, where an invalid timestamp fails the whole request.
+ *
+ * The composite path is taken only when both halves pass their strict shape
+ * checks \u2014 they are interpolated into a PostgREST or() group. The legacy path
+ * also requires a valid timestamp shape: paging is best-effort, and a
+ * malformed/hostile cursor must degrade, never 400.
+ */
+function parseSwipeCursor(
+  cursor: string,
+): { publishedAt: string; id: string } | { publishedAt: string; id?: undefined } | null {
+  const sep = cursor.indexOf("|");
+  if (sep !== -1) {
+    const publishedAt = cursor.slice(0, sep);
+    const id = cursor.slice(sep + 1);
+    if (SWIPE_CURSOR_TIMESTAMP_RE.test(publishedAt) && SWIPE_CURSOR_UUID_RE.test(id)) {
+      return { publishedAt, id };
+    }
+    return null;
+  }
+  return SWIPE_CURSOR_TIMESTAMP_RE.test(cursor) ? { publishedAt: cursor } : null;
+}
+
+/**
  * Swipe-deck batch for the authenticated seeker (/swipe surface).
  *
  * Returns up to SWIPE_BATCH_SIZE live listings, newest-first with a stable
@@ -499,8 +588,10 @@ export async function getPublicListingsByIds(ids: string[]): Promise<ListingRow[
  *     getSeekerApplicationIds \u2014 never trust a client-supplied applied set).
  *
  * `clerkUserId` MUST come from auth().userId \u2014 never decoded from the token.
- * `cursor` is the published_at of the last row from the previous page; when
- * present we fetch strictly older rows via .lt("published_at", cursor).
+ * `cursor` is the {@link encodeSwipeCursor} value of the last row from the
+ * previous page: a composite (published_at, id) keyset so rows sharing the
+ * boundary timestamp are never skipped. Legacy bare-timestamp cursors from
+ * in-flight clients still page (timestamp-only, the old behavior).
  *
  * Best-effort on the applied filter: a seeker with no profile resolves to [] so
  * nothing is excluded on that axis.
@@ -526,7 +617,22 @@ export async function getSwipeBatch(
     .eq("status", "live");
 
   if (cursor) {
-    builder = builder.lt("published_at", cursor);
+    const parsed = parseSwipeCursor(cursor);
+    if (parsed?.id) {
+      // Complete (published_at, id) keyset: strictly-older timestamps PLUS the
+      // rest of the boundary timestamp's rows (id DESC below the cursor id).
+      // Both halves are shape-validated above, so the or() string is inert;
+      // the timestamp is double-quoted for its `:` / `+` characters.
+      builder = builder.or(
+        `published_at.lt."${parsed.publishedAt}",` +
+          `and(published_at.eq."${parsed.publishedAt}",id.lt.${parsed.id})`,
+      );
+    } else if (parsed) {
+      // Legacy bare-timestamp cursor: the old timestamp-only page.
+      builder = builder.lt("published_at", parsed.publishedAt);
+    }
+    // parsed === null: malformed/hostile cursor — ignored (first page) rather
+    // than sent to PostgREST, where an invalid timestamp 400s the request.
   }
   if (exclude.length > 0) {
     // PostgREST not-in group: values are UUIDs (validated at the action layer),
@@ -745,7 +851,12 @@ export async function searchListings(
   }
 
   const limit = filters.limit ?? DEFAULT_SEARCH_LIMIT;
-  const ordered = builder.order("published_at", { ascending: false });
+  // id DESC tiebreak: .range() pagination over equal published_at values is
+  // otherwise non-deterministic (rows dup/skip across page boundaries on /seek
+  // and the public API's offset cursor).
+  const ordered = builder
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false });
   const hasOffset =
     filters.offset != null && Number.isFinite(filters.offset) && filters.offset >= 0;
   const paginated = hasOffset
