@@ -3,7 +3,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Icon, type IconKey } from "@explore-and-earn/ui";
-import type { BenefitProvision } from "@explore-and-earn/contracts";
+import {
+	NOT_STATED_LABEL,
+	SOURCED_DISCLOSURE_LABEL,
+	type BenefitProvision,
+} from "@explore-and-earn/contracts";
 import { saveListingAction } from "../../app/actions/swipe";
 import { recordSourceClickAction } from "../../app/actions/sourcedAnalytics";
 import { PopupShell } from "../overlay/PopupShell";
@@ -38,7 +42,7 @@ function BenefitChip({ icon, label, value, provision, notStated }: BenefitChipPr
 		<div className={`${styles.chip} ${cls}`}>
 			<Icon name={icon} size={16} aria-hidden />
 			<span className={styles.chipLabel}>{label}</span>
-			<span className={styles.chipValue}>{notStated ? "Not stated" : value}</span>
+			<span className={styles.chipValue}>{notStated ? NOT_STATED_LABEL : value}</span>
 		</div>
 	);
 }
@@ -116,7 +120,7 @@ export function QuickPeekDrawer({ listing, onClose }: QuickPeekDrawerProps) {
 				<div className={styles.sourcedNote}>
 					<Icon name="system.info" size={16} aria-hidden />
 					<div>
-						<strong>Sourced · not yet confirmed by Explore &amp; Earn</strong>
+						<strong>{SOURCED_DISCLOSURE_LABEL}</strong>
 						{provenance?.source?.sourceName ? (
 							<span className={styles.sourceLine}>
 								From {provenance.source.sourceName}

@@ -1,13 +1,15 @@
 import type { CSSProperties, ReactNode } from "react"
 
-import type {
-	BenefitEvidenceStatus,
-	BenefitProvision,
-	DiscoveryCardConditionalBadge,
-	DiscoveryCardSurface,
-	ListingProvenance,
-	MarketplaceCategory,
-	OpportunityTriad,
+import {
+	NOT_STATED_LABEL,
+	SOURCED_DISCLOSURE_LABEL,
+	type BenefitEvidenceStatus,
+	type BenefitProvision,
+	type DiscoveryCardConditionalBadge,
+	type DiscoveryCardSurface,
+	type ListingProvenance,
+	type MarketplaceCategory,
+	type OpportunityTriad,
 } from "@explore-and-earn/contracts"
 
 import { Meter } from "./Meter"
@@ -236,7 +238,7 @@ function BenefitTriadCell({
 			<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{value}</span>
 		</>
 	) : (
-		<span className={styles.benefitLabel}>{notStated ? "Not stated" : label}</span>
+		<span className={styles.benefitLabel}>{notStated ? NOT_STATED_LABEL : label}</span>
 	)
 
 	return onClick ? (
@@ -597,7 +599,7 @@ export function DiscoveryCard({
 				{isSourced ? (
 					<div className={styles.sourcedRibbon}>
 						<Icon name="system.info" size={14} aria-hidden />
-						<span>Sourced · not yet confirmed by Explore &amp; Earn</span>
+						<span>{SOURCED_DISCLOSURE_LABEL}</span>
 					</div>
 				) : null}
 

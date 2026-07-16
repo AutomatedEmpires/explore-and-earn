@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Icon } from "@explore-and-earn/ui";
-import type { BenefitEvidenceStatus } from "@explore-and-earn/contracts";
+import { NOT_STATED_LABEL, type BenefitEvidenceStatus } from "@explore-and-earn/contracts";
 
 import { ListingSection } from "./ListingSection";
 import styles from "./DealUpfront.module.css";
@@ -30,7 +30,7 @@ export interface DealUpfrontProps {
 }
 
 function benefitCellValue(included: boolean, evidence: BenefitEvidenceStatus | undefined): string {
-  if (evidence === "not_stated") return "Not stated";
+  if (evidence === "not_stated") return NOT_STATED_LABEL;
   return included ? "Included" : "Not included";
 }
 
@@ -89,7 +89,7 @@ export function DealUpfront({
             <Icon name="benefit.pay" size={16} aria-hidden />
             <span className={styles.cellLabel}>Pay</span>
           </div>
-          <div className={styles.cellValue}>{payNotStated ? "Not stated" : paySummary}</div>
+          <div className={styles.cellValue}>{payNotStated ? NOT_STATED_LABEL : paySummary}</div>
         </div>
       </div>
 
