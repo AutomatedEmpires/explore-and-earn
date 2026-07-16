@@ -55,6 +55,40 @@ export interface TaxonomyResolvers {
 		readonly seekerProfileId: string | null
 		readonly listingId: string | null
 	} | null>
+	/**
+	 * Claim context for the claim-to-verify lifecycle (claim id → claimant +
+	 * listing). OPTIONAL so existing resolver constructions keep compiling;
+	 * when absent the taxonomy falls back to the service-role read in
+	 * @explore-and-earn/db (see {@link resolveClaimContext}).
+	 */
+	claimContext?(claimId: string): Promise<ClaimTaxonomyContext | null>
+}
+
+export interface ClaimTaxonomyContext {
+	readonly claimantClerkUserId: string
+	readonly listingId: string
+	readonly hostProfileId: string | null
+}
+
+/**
+ * Claim lookups go through the injected resolver when provided (tests), and
+ * otherwise fall back to the real service-role read. The import is dynamic so
+ * this module stays importable in pure unit tests (no "server-only" pull-in).
+ */
+async function resolveClaimContext(
+	resolvers: TaxonomyResolvers,
+	claimId: string,
+): Promise<ClaimTaxonomyContext | null> {
+	if (resolvers.claimContext) return resolvers.claimContext(claimId)
+	const { adminClaimContext } = await import("@explore-and-earn/db")
+	const ctx = await adminClaimContext(claimId)
+	return ctx
+		? {
+				claimantClerkUserId: ctx.claimantClerkUserId,
+				listingId: ctx.listingId,
+				hostProfileId: ctx.hostProfileId,
+			}
+		: null
 }
 
 function keysFor(type: NotificationType): { titleKey: string; bodyKey: string } {
@@ -410,24 +444,82 @@ export async function expandEvent(
 			]
 		}
 
-		/* -------------------------------------------- sourced / host lifecycle */
+		/* -------------------------------------------- sourced claim lifecycle */
 		case "listing_claim_initiated": {
-			// Copy is explicit that the claim is RECEIVED and PENDING — it never
-			// implies approval (see the message catalog).
-			if (!event.host_profile_id || !event.listing_id) return []
-			const [hostClerk, listing] = await Promise.all([
-				resolvers.hostClerkId(event.host_profile_id),
-				resolvers.listingContext(event.listing_id),
-			])
-			if (!hostClerk) return []
+			// A SOURCED listing has NO host — the review alert goes to the
+			// founder/admin (the same allow-list identity the admin gate uses).
+			// No admin configured → no intent, never a misaddressed one.
+			const adminClerk = (process.env.ADMIN_CLERK_USER_ID ?? "").trim()
+			if (!adminClerk) return []
+			const claimId = event.subject_type === "listing_claim" ? event.subject_id : null
+			if (!claimId) return []
+			const claim = await resolveClaimContext(resolvers, claimId)
+			// Self-action guard: an admin claiming a listing themself gets no
+			// "review this" alert about their own submission.
+			if (!claim || claim.claimantClerkUserId === adminClerk) return []
+			// Same listing-id fallback as the decision events below: the claim
+			// context is authoritative when a recorder omits event.listing_id.
+			const listingId = event.listing_id ?? claim.listingId
+			const listing = listingId ? await resolvers.listingContext(listingId) : null
 			return [
 				makeIntent({
 					event,
 					type: "sourced_listing_claim_submitted",
-					recipientClerkUserId: hostClerk,
-					destinationPath: `/claim/${event.listing_id}`,
+					recipientClerkUserId: adminClerk,
+					destinationPath: "/admin/claims",
 					values: { listingTitle: listing?.title ?? "" },
-					entity: { type: "listing", id: event.listing_id },
+					entity: { type: "listing_claim", id: claimId },
+				}),
+			]
+		}
+		case "listing_claim_approved":
+		case "listing_claim_rejected": {
+			// Founder decided — tell the CLAIMANT (the counterparty of the admin
+			// action). The copy states the decision plainly; approval never claims
+			// the listing changed (confirmation is still ahead).
+			const claimId = event.subject_type === "listing_claim" ? event.subject_id : null
+			if (!claimId) return []
+			const claim = await resolveClaimContext(resolvers, claimId)
+			if (!claim) return []
+			const listingId = event.listing_id ?? claim.listingId
+			const listing = listingId ? await resolvers.listingContext(listingId) : null
+			return [
+				makeIntent({
+					event,
+					type:
+						event.event_type === "listing_claim_approved"
+							? "listing_claim_approved"
+							: "listing_claim_rejected",
+					recipientClerkUserId: claim.claimantClerkUserId,
+					destinationPath: listingId ? `/claim/${listingId}` : "/",
+					values: { listingTitle: listing?.title ?? "" },
+					entity: { type: "listing_claim", id: claimId },
+					// One claim gets exactly one decision; a re-dispatched event
+					// collapses instead of stacking.
+					collapseKey: `claim_decision:${claimId}`,
+				}),
+			]
+		}
+		case "listing_claim_converted": {
+			// Deliberate RECEIPT to the claimant (they performed the conversion):
+			// the sourced→verified switch is consequential and async surfaces
+			// (email) confirm it landed. This is the one intent where recipient ==
+			// actor by design.
+			const claimId = event.subject_type === "listing_claim" ? event.subject_id : null
+			if (!claimId) return []
+			const claim = await resolveClaimContext(resolvers, claimId)
+			if (!claim) return []
+			const listingId = event.listing_id ?? claim.listingId
+			const listing = listingId ? await resolvers.listingContext(listingId) : null
+			return [
+				makeIntent({
+					event,
+					type: "listing_claim_converted",
+					recipientClerkUserId: claim.claimantClerkUserId,
+					destinationPath: "/host/listings",
+					values: { listingTitle: listing?.title ?? "" },
+					entity: { type: "listing_claim", id: claimId },
+					collapseKey: `claim_converted:${claimId}`,
 				}),
 			]
 		}

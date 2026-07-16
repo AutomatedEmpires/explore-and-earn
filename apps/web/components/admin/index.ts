@@ -11,6 +11,8 @@ export type {
 } from "./ModerationWorkbench";
 export { RefundQueue } from "./RefundQueue";
 export type { RefundQueueRowView, RefundStatsView } from "./RefundQueue";
+export { ClaimsReviewQueue } from "./ClaimsReviewQueue";
+export type { ClaimReviewRowView, ClaimStatsView } from "./ClaimsReviewQueue";
 export { NotificationOps } from "./NotificationOps";
 export type {
   NotificationOpsProps,
