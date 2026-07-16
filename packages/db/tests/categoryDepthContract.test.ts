@@ -108,6 +108,25 @@ describe("sanitizeMaritimeDepth — absence is the only 'not stated'", () => {
     expect(sanitizeMaritimeDepth({ lengthFeet: 41.678 })?.lengthFeet).toBe(41.7);
   });
 
+  it("never OUTPUTS a zero length, even when rounding would produce one", () => {
+    // The input guard is not enough: 0.04 is a positive number, so it passes
+    // "is this positive?", and only ROUNDING turns it into 0. A stored 0 is a
+    // KEY, not absence — so it can never render "Not stated"; it renders
+    // "Approx. length — 0 ft" as the host's own stated figure for a zero-foot
+    // vessel. Asserting on the INPUT misses this entirely, which is exactly how
+    // it survived the first round of tests: the invariant lives on the OUTPUT.
+    //
+    // Paired with a surviving fact on purpose, so this proves the length alone
+    // drops rather than the whole report collapsing for some other reason.
+    for (const lengthFeet of [0.04, 0.049, 0.001]) {
+      expect(sanitizeMaritimeDepth({ lengthFeet, vesselType: "workboat" })).toEqual({
+        vesselType: "workboat",
+      });
+    }
+    // …and a value that legitimately rounds to a positive figure still survives.
+    expect(sanitizeMaritimeDepth({ lengthFeet: 0.05 })?.lengthFeet).toBe(0.1);
+  });
+
   it("a date with no stated facts is not a report", () => {
     expect(sanitizeMaritimeDepth({ reportedAt: daysAgo(1) })).toBeUndefined();
   });

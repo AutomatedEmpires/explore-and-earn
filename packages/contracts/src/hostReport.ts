@@ -38,6 +38,14 @@ export function optionalIsoDate(value: unknown): string | undefined {
  * Out-of-range values DROP rather than clamp: clamping would invent a number
  * the host never said and present it as their answer. Zero and negatives are
  * not measurements — a host meaning "none" has an explicit way to say so.
+ *
+ * The positivity check runs AGAIN after rounding, and that is the whole point:
+ * rounding can move a tiny value down to zero (0.04 at one decimal → 0), and a
+ * stored zero is not absence — it is a KEY, so it renders "0 ft" as the host's
+ * stated figure instead of "Not stated". Checking only the raw input would let
+ * this function fabricate the exact claim its first paragraph promises it never
+ * makes. The `max` check stays on the raw value: rounding never pushes a value
+ * above max, and an over-max input must drop rather than round into range.
  */
 export function optionalPositiveNumber(
 	value: unknown,
@@ -47,7 +55,8 @@ export function optionalPositiveNumber(
 	if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
 	if (value <= 0 || value > max) return undefined;
 	const factor = 10 ** decimals;
-	return Math.round(value * factor) / factor;
+	const rounded = Math.round(value * factor) / factor;
+	return rounded > 0 ? rounded : undefined;
 }
 
 /** A whole count (crew, berths). Fractional input is not a count — it drops. */
