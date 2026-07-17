@@ -16,8 +16,10 @@ import type {
   OpportunityListing,
 } from "@explore-and-earn/contracts";
 import {
+  HOST_CHOICE_EVIDENCE,
   MARKETPLACE_CATEGORIES,
   formatCompensation,
+  hostBenefitDecision,
   formatOpportunityWindow,
   hasVerifiedHostSubscription,
   sanitizeCategoryDepth,
@@ -168,8 +170,18 @@ function buildCompensationSummary(
   });
 }
 
+/**
+ * Coerce a stored evidence string, falling back to the WEAKEST claim.
+ *
+ * The fallback used to be "confirmed" — so an unrecognised or NULL value became
+ * the strongest possible assertion (an authenticated employer confirmed this).
+ * A value we cannot vouch for must degrade to "nobody stated it", never to
+ * "someone confirmed it": the whole point of the evidence model is that silence
+ * is visible. This mirrors listingClaims.ts, which already coerces to
+ * not_stated, and the sanitize-on-read rule the jsonb contracts follow.
+ */
 const asEvidence = (value: string | null | undefined): BenefitEvidenceStatus =>
-  value === "not_stated" || value === "stated" ? value : "confirmed";
+  value === "stated" || value === "confirmed" ? value : "not_stated";
 
 function toListingRow(raw: RawListingRow): ListingRow {
   return {
@@ -210,7 +222,27 @@ export function rowProvenanceInfo(
   >,
 ): ListingProvenanceInfo | undefined {
   const converted = row.provenance === "verified" && row.claim_summary === "converted";
-  if (row.provenance !== "sourced" && !converted) return undefined;
+  // A host-authored listing carries no SOURCING story, but it does carry
+  // evidence — and returning undefined here is why that evidence never reached
+  // the screen. Every `evidence?.housing === "not_stated"` guard in
+  // DealUpfront / DiscoveryCard / QuickPeekDrawer was dead code for host rows,
+  // so the triad silently fell through to `included ? "Included" : "Not
+  // included"` no matter what the column said. Writing honest evidence without
+  // fixing this would change the database and change nothing a seeker sees.
+  //
+  // The sourcing fields stay absent for host rows (there is no source to
+  // disclose); only the evidence is carried.
+  if (row.provenance !== "sourced" && !converted) {
+    return {
+      provenance: "verified",
+      claimStatus: "not_applicable",
+      benefitEvidence: {
+        housing: asEvidence(row.housing_evidence),
+        meals: asEvidence(row.meals_evidence),
+        pay: asEvidence(row.pay_evidence),
+      },
+    };
+  }
 
   const claimStatus: ListingClaimSummary =
     row.claim_summary === "claim_pending" || row.claim_summary === "converted"
@@ -1033,6 +1065,12 @@ type ListingColumnPatch = {
   gallery_photo_urls?: string[];
   logistics?: ListingLogistics;
   category_depth?: ListingCategoryDepth;
+  // Evidence travels with its value — see benefitDecision. Before 070 no host
+  // path wrote these at all, so every host listing silently inherited 064's
+  // `default 'confirmed'`.
+  housing_evidence?: BenefitEvidenceStatus;
+  meals_evidence?: BenefitEvidenceStatus;
+  pay_evidence?: BenefitEvidenceStatus;
 };
 
 function toCentsOrNull(amount: number | null | undefined): number | null {
@@ -1040,13 +1078,30 @@ function toCentsOrNull(amount: number | null | undefined): number | null {
   return Math.round(amount * 100);
 }
 
-function benefitIncluded(
-  provision: BenefitProvision | undefined,
-  description: string | null | undefined,
-): boolean {
-  if (provision !== undefined) return provision !== "not_provided";
-  return typeof description === "string" && description.trim().length > 0;
-}
+/**
+ * What the host actually SAID about a benefit — value and evidence together.
+ *
+ * The description fallback that used to live here ("a non-empty description
+ * means it's included") was the bug: the action layer never supplied a
+ * provision, so EVERY host save took the fallback, and a blank housing box
+ * became `housing_included = false`. Paired with 064's `default 'confirmed'`
+ * that shipped listings affirmatively telling seekers "Housing: Not included"
+ * — carrying an employer confirmation — for a question the host never
+ * answered. A description is prose ABOUT a benefit; it was never a decision,
+ * and inferring one from its emptiness is exactly the guess this product
+ * forbids.
+ *
+ * Now nothing is inferred. No provision means the host has not chosen, which
+ * is `not_stated`: the column stays false (the value is unknown, and false is
+ * the only honest boolean for "no one said yes") and the EVIDENCE carries the
+ * truth that nobody spoke. Migration 070 refuses to publish such a row.
+ *
+ * The rule itself lives in contracts/listingPublication.ts (hostBenefitDecision)
+ * so that it is pure and TESTED. It used to be a private helper right here, and
+ * that is precisely how its inverse reached production unnoticed — a rule
+ * nothing can test is a rule that rots quietly.
+ */
+const benefitDecision = hostBenefitDecision;
 
 function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch {
   const patch: ListingColumnPatch = {};
@@ -1082,11 +1137,31 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
     const trimmed = fields.mealsDescription?.trim() ?? "";
     patch.meals_description = trimmed.length > 0 ? trimmed : null;
   }
-  if (fields.housingProvision !== undefined || fields.housingDescription !== undefined) {
-    patch.housing_included = benefitIncluded(fields.housingProvision, fields.housingDescription);
+  // The DECISION is driven by the host's explicit choice and nothing else.
+  //
+  // Note this deliberately no longer fires when only the DESCRIPTION changed:
+  // editing the housing blurb is not answering the housing question, and the
+  // old `provision !== undefined || description !== undefined` condition is
+  // precisely how a blank box became a confirmed "Not included". Value and
+  // evidence move together — writing one without the other is what let the two
+  // drift into a lie.
+  if (fields.housingProvision !== undefined) {
+    const decision = benefitDecision(fields.housingProvision);
+    patch.housing_included = decision.included;
+    patch.housing_evidence = decision.evidence;
   }
-  if (fields.mealsProvision !== undefined || fields.mealsDescription !== undefined) {
-    patch.meals_included = benefitIncluded(fields.mealsProvision, fields.mealsDescription);
+  if (fields.mealsProvision !== undefined) {
+    const decision = benefitDecision(fields.mealsProvision);
+    patch.meals_included = decision.included;
+    patch.meals_evidence = decision.evidence;
+  }
+  // Pay has no boolean — the figures ARE the value — so its evidence is stamped
+  // from whether the host actually gave a figure.
+  if (fields.payMin !== undefined || fields.payMax !== undefined) {
+    const stated =
+      (typeof patch.compensation_min_cents === "number" && patch.compensation_min_cents > 0) ||
+      (typeof patch.compensation_max_cents === "number" && patch.compensation_max_cents > 0);
+    patch.pay_evidence = stated ? HOST_CHOICE_EVIDENCE : "not_stated";
   }
   if (fields.coverPhotoUrl !== undefined) {
     const trimmed = fields.coverPhotoUrl?.trim() ?? "";

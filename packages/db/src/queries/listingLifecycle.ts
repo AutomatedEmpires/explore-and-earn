@@ -2,9 +2,25 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { PLAN_ENTITLEMENTS, type ListingStatus, type PlanTier } from "@explore-and-earn/contracts";
+import {
+  PLAN_ENTITLEMENTS,
+  validateListingForPublication,
+  type BenefitEvidenceStatus,
+  type ListingStatus,
+  type PlanTier,
+  type PublicationBlocker,
+} from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
+
+/**
+ * Read an evidence column, degrading anything unrecognised to the WEAKEST
+ * claim. An unreadable value must never be treated as though someone confirmed
+ * it — here that would let an unanswered listing publish.
+ */
+function asPublicationEvidence(value: unknown): BenefitEvidenceStatus {
+  return value === "stated" || value === "confirmed" ? value : "not_stated";
+}
 
 /**
  * Host-initiated listing status transitions (Agent 3 / PR 1).
@@ -67,6 +83,13 @@ export type UpdateListingStatusResult = {
   ok: boolean;
   status?: ListingStatus;
   error?: string;
+  /**
+   * Present with error === "incomplete_listing": exactly which benefits the
+   * host still has to answer. A single `error: string` has no channel for
+   * "three fields are unanswered", and a host told only "something went wrong"
+   * would have to guess which — so the field-keyed detail rides alongside.
+   */
+  blockers?: readonly PublicationBlocker[];
 };
 
 /**
@@ -91,7 +114,10 @@ export async function updateListingStatus(
 
   const { data: existing, error: readError } = await db
     .from("listings")
-    .select("id,status")
+    .select(
+      "id,status,provenance,housing_evidence,meals_evidence,pay_evidence," +
+        "compensation_min_cents,compensation_max_cents",
+    )
     .eq("id", listingId)
     .eq("host_profile_id", hostProfileId)
     .maybeSingle();
@@ -100,10 +126,40 @@ export async function updateListingStatus(
     return { ok: false, error: "Listing not found or you do not have access to it." };
   }
 
-  const current = (existing as { status: string }).status as ListingStatus;
+  const row = existing as unknown as Record<string, unknown>;
+  const current = row.status as ListingStatus;
   if (current === newStatus) return { ok: true, status: newStatus };
   if (!canTransitionListing(current, newStatus)) {
     return { ok: false, error: "invalid_transition" };
+  }
+
+  // ── The publication gate (founder, 2026-07-17) ──────────────────────────────
+  // A host-controlled listing may not face seekers while Housing, Meals or Pay
+  // is unanswered. Checked on the transitions that PUBLISH — draft->under_review
+  // and paused->live — never on the ones that retreat, so a host can always pull
+  // a listing down and a draft can always stay half-finished.
+  //
+  // This is not the enforcement; migration 070's listings_publication_triad_chk
+  // is (PostgREST hands `authenticated` full-column UPDATE on listings, so a
+  // determined client never runs this code). This exists so the host is told
+  // WHICH fields are missing, in their own words, instead of meeting a raw
+  // 23514 constraint violation.
+  if (newStatus === "under_review" || newStatus === "live") {
+    const verdict = validateListingForPublication({
+      provenance: row.provenance === "sourced" ? "sourced" : "verified",
+      housingEvidence: asPublicationEvidence(row.housing_evidence),
+      mealsEvidence: asPublicationEvidence(row.meals_evidence),
+      payEvidence: asPublicationEvidence(row.pay_evidence),
+      payMinCents: typeof row.compensation_min_cents === "number" ? row.compensation_min_cents : null,
+      payMaxCents: typeof row.compensation_max_cents === "number" ? row.compensation_max_cents : null,
+    });
+    if (!verdict.ok) {
+      return {
+        ok: false,
+        error: "incomplete_listing",
+        blockers: verdict.blockers,
+      };
+    }
   }
 
   // Enforce PLAN_ENTITLEMENTS.listings at the one host-initiated transition

@@ -18,6 +18,10 @@ const PROVISION_LABEL: Record<BenefitProvision, string> = {
 	provided:     "Included",
 	partial:      "Partial",
 	not_provided: "Not included",
+	// Nobody answered. Distinct from "Not included" on purpose — this is the
+	// whole point of the tri-state, and rendering the two the same is the bug
+	// the type checker just forced us to confront here.
+	not_stated:   NOT_STATED_LABEL,
 };
 
 interface BenefitChipProps {

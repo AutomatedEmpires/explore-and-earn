@@ -1,3 +1,4 @@
+import { NOT_STATED_LABEL } from "@explore-and-earn/contracts";
 import type {
   BenefitProvision,
   ImageSelection,
@@ -75,6 +76,7 @@ const PROVISION_LABEL: Record<BenefitProvision, string> = {
   provided: "Provided",
   partial: "Partial",
   not_provided: "Not provided",
+  not_stated: NOT_STATED_LABEL,
 };
 
 /** Collapse a single benefit into the card's display string. */

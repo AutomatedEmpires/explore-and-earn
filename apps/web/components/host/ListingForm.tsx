@@ -13,12 +13,15 @@ import {
 } from "@explore-and-earn/db/client";
 import {
   COMPENSATION_UNIT,
+  NOT_STATED_LABEL,
   hasVerifiedHostSubscription,
   sanitizeConnectivity,
   sanitizeMaritimeDepth,
   statedFactsKey,
+  type BenefitEvidenceStatus,
   type CompensationUnit,
   type ConnectivityInfo,
+  type HostBenefitChoice,
   type MarketplaceCategory,
   type MaritimeDepth,
 } from "@explore-and-earn/contracts";
@@ -47,6 +50,11 @@ export interface ListingFormInitialValues {
   readonly locationName?: string;
   readonly housingDescription?: string;
   readonly mealsDescription?: string;
+  /** Stored evidence + value, so an edit hydrates the host's real answer. */
+  readonly housingEvidence?: BenefitEvidenceStatus;
+  readonly housingIncluded?: boolean;
+  readonly mealsEvidence?: BenefitEvidenceStatus;
+  readonly mealsIncluded?: boolean;
   readonly payMin?: string;
   readonly payMax?: string;
   readonly payPeriod?: CompensationUnit;
@@ -130,6 +138,38 @@ const STEPS: ReadonlyArray<StepDef> = [
   { id: "story", name: "Story", icon: "action.edit", required: false },
   { id: "review", name: "Review", icon: "action.view", required: false },
 ];
+
+/** The select's value: a host choice, or "" for the honest unanswered state. */
+const UNCHOSEN = "";
+type BenefitChoiceValue = HostBenefitChoice | typeof UNCHOSEN;
+
+/**
+ * The triad cell a seeker will read, given what the host has actually said.
+ *
+ * The description is only ever a flourish ON an answer — it is never the answer
+ * itself, which is the distinction the old preview collapsed.
+ */
+function triadPreview(choice: BenefitChoiceValue, description: string): string {
+  if (choice === UNCHOSEN) return NOT_STATED_LABEL;
+  if (choice === "not_provided") return "Not included";
+  return description.trim() || "Included";
+}
+
+/**
+ * Seed a benefit select from what is STORED.
+ *
+ * Only a `confirmed` evidence means the host actually chose — `stated` is a
+ * source's claim and `not_stated` is silence, and neither may be presented back
+ * to the host as though they had answered. Anything else opens unanswered,
+ * which is the truth and which publication will then require them to resolve.
+ */
+function choiceFromInitial(
+  evidence: BenefitEvidenceStatus | undefined,
+  included: boolean | undefined,
+): BenefitChoiceValue {
+  if (evidence !== "confirmed") return UNCHOSEN;
+  return included ? "provided" : "not_provided";
+}
 
 /** Seed the lane multi-select from a single stored category (lossless for edit). */
 function lanesFromCategory(category: MarketplaceCategory | undefined): MarketplaceCategory[] {
@@ -232,6 +272,18 @@ export function ListingForm({
   // never touched. (See the render gate below — they stay editable too, so the
   // facts are never stranded.)
   const [maritime, setMaritime] = useState<MaritimeDepth>(initial?.maritime ?? {});
+  // The host's explicit benefit decisions. UNCHOSEN ("") is a real state — the
+  // host has the control in front of them and has not answered — and it must
+  // survive all the way to the writer as `not_stated` rather than being
+  // collapsed into a no. An edit hydrates from the stored evidence: only a
+  // confirmed choice seeds a selection, so a listing that was never answered
+  // opens unanswered rather than pre-filled with a guess.
+  const [housingProvision, setHousingProvision] = useState<BenefitChoiceValue>(
+    () => choiceFromInitial(initial?.housingEvidence, initial?.housingIncluded),
+  );
+  const [mealsProvision, setMealsProvision] = useState<BenefitChoiceValue>(
+    () => choiceFromInitial(initial?.mealsEvidence, initial?.mealsIncluded),
+  );
   const [housingDescription, setHousingDescription] = useState(
     initial?.housingDescription ?? "",
   );
@@ -456,6 +508,11 @@ export function ListingForm({
     formData.set("locationName", locationName.trim());
     formData.set("housingDescription", housingDescription.trim());
     formData.set("mealsDescription", mealsDescription.trim());
+    // Always submitted, INCLUDING the empty unanswered state — that is a fact
+    // about the listing ("nobody has answered yet"), not a missing field, and
+    // the writer must record it rather than leave a stale value in place.
+    formData.set("housingProvision", housingProvision);
+    formData.set("mealsProvision", mealsProvision);
     formData.set("payMin", payMin.trim());
     formData.set("payMax", payMax.trim());
     formData.set("payPeriod", payPeriod);
@@ -520,15 +577,21 @@ export function ListingForm({
       coverImageUrl: coverPhotoUrl || galleryImages[0]?.url || undefined,
       hostAvatarUrl: hostAvatarUrl || undefined,
       verifiedHost: hasVerifiedHostSubscription(hostSubscriptionTier),
+      // The preview must show what a SEEKER will see. It used to reproduce the
+      // very bug it was meant to expose — a blank description previewed as "Not
+      // included", so the host saw their listing confidently answering a
+      // question they had skipped, and had no reason to think anything was
+      // wrong. An unanswered benefit now previews as "Not stated", which is
+      // both the truth and the prompt to go answer it.
       triad: {
-        housing: housingDescription.trim() || "Not included",
-        meals: mealsDescription.trim() || "Not included",
+        housing: triadPreview(housingProvision, housingDescription),
+        meals: triadPreview(mealsProvision, mealsDescription),
         pay: formatPayDisplay(payMin, payMax, payPeriod),
       },
       benefitProvision: {
-        housing: housingDescription.trim() ? "provided" : "not_provided",
-        meals: mealsDescription.trim() ? "provided" : "not_provided",
-        pay: "provided",
+        housing: housingProvision === UNCHOSEN ? "not_stated" : housingProvision,
+        meals: mealsProvision === UNCHOSEN ? "not_stated" : mealsProvision,
+        pay: toNumber(payMin) || toNumber(payMax) ? "provided" : "not_stated",
       },
     };
   }, [
@@ -821,12 +884,44 @@ export function ListingForm({
               <fieldset className={styles.fieldset}>
                 <legend className={styles.legend}>The offer</legend>
 
+                {/* The housing DECISION — explicit, and required to publish.
+                    This select used to not exist: the hint here said "Leave
+                    blank if not provided", and the writer inferred the answer
+                    from whether the textarea had text. So a host who simply had
+                    nothing to write shipped a listing telling seekers "Housing:
+                    Not included" — an answer they never gave. A description is
+                    prose about housing; it was never a decision. */}
+                <div className={styles.field}>
+                  <div className={styles.labelRow}>
+                    <label className={styles.label} htmlFor="listing-housing-provision">
+                      Is housing included?
+                    </label>
+                    <span className={styles.optionalHint}>Required to publish</span>
+                  </div>
+                  <select
+                    className={styles.input}
+                    id="listing-housing-provision"
+                    value={housingProvision}
+                    onChange={(event) => setHousingProvision(event.target.value as BenefitChoiceValue)}
+                  >
+                    <option value={UNCHOSEN}>{NOT_STATED_LABEL} — pick one to publish</option>
+                    <option value="provided">Yes — housing is included</option>
+                    <option value="not_provided">No — housing is not included</option>
+                  </select>
+                  {housingProvision === UNCHOSEN ? (
+                    <p className={styles.hint}>
+                      Until you answer, seekers are told nobody stated it — never that it&rsquo;s a
+                      no. You can save a draft either way.
+                    </p>
+                  ) : null}
+                </div>
+
                 <div className={styles.field}>
                   <div className={styles.labelRow}>
                     <label className={styles.label} htmlFor="listing-housing">
-                      Housing
+                      Housing details
                     </label>
-                    <span className={styles.optionalHint}>Leave blank if not provided</span>
+                    <span className={styles.optionalHint}>Optional</span>
                   </div>
                   <textarea
                     className={styles.textarea}
@@ -851,10 +946,29 @@ export function ListingForm({
 
                 <div className={styles.field}>
                   <div className={styles.labelRow}>
-                    <label className={styles.label} htmlFor="listing-meals">
-                      Meals
+                    <label className={styles.label} htmlFor="listing-meals-provision">
+                      Are meals included?
                     </label>
-                    <span className={styles.optionalHint}>Leave blank if not provided</span>
+                    <span className={styles.optionalHint}>Required to publish</span>
+                  </div>
+                  <select
+                    className={styles.input}
+                    id="listing-meals-provision"
+                    value={mealsProvision}
+                    onChange={(event) => setMealsProvision(event.target.value as BenefitChoiceValue)}
+                  >
+                    <option value={UNCHOSEN}>{NOT_STATED_LABEL} — pick one to publish</option>
+                    <option value="provided">Yes — meals are included</option>
+                    <option value="not_provided">No — meals are not included</option>
+                  </select>
+                </div>
+
+                <div className={styles.field}>
+                  <div className={styles.labelRow}>
+                    <label className={styles.label} htmlFor="listing-meals">
+                      Meal details
+                    </label>
+                    <span className={styles.optionalHint}>Optional</span>
                   </div>
                   <textarea
                     className={styles.textarea}

@@ -14,8 +14,10 @@ import {
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
+  HOST_BENEFIT_CHOICES,
   sanitizeCategoryDepth,
   sanitizeLogistics,
+  type BenefitProvision,
   type CompensationUnit,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
@@ -64,6 +66,29 @@ function optionalString(raw: FormDataEntryValue | null): string | undefined {
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * A host's benefit decision, as a TRUE tri-state.
+ *
+ * Absent key      -> undefined, and the writer leaves the column alone (the
+ *                    convention every other field here follows: not submitted
+ *                    is not the same as cleared).
+ * Present, ""     -> "not_stated". The host saw the control and did not answer.
+ *                    This MUST survive to the writer: it is the state migration
+ *                    070 refuses to publish, and collapsing it to undefined
+ *                    would silently re-open the hole this whole change closes.
+ * Present, valid  -> their choice.
+ * Present, junk   -> "not_stated". We never guess a decision on a host's behalf.
+ */
+function benefitChoice(formData: FormData, key: string): BenefitProvision | undefined {
+  if (!formData.has(key)) return undefined;
+  const raw = formData.get(key);
+  if (typeof raw !== "string") return "not_stated";
+  const trimmed = raw.trim();
+  return (HOST_BENEFIT_CHOICES as readonly string[]).includes(trimmed)
+    ? (trimmed as BenefitProvision)
+    : "not_stated";
 }
 
 /**
@@ -141,6 +166,18 @@ function readListingFields(formData: FormData): ListingWriteFields {
   if (formData.has("mealsDescription")) {
     fields.mealsDescription = optionalString(formData.get("mealsDescription")) ?? null;
   }
+
+  // The host's EXPLICIT housing/meals decision — the field this layer never
+  // read, which is the whole reason a blank description used to decide it.
+  //
+  // Deliberately NOT optionalString(): that collapses "" to undefined, and ""
+  // is meaningful here — it is the host having the control in front of them and
+  // not answering. It must reach the writer as `not_stated`, not vanish and
+  // leave the column untouched.
+  const housingProvision = benefitChoice(formData, "housingProvision");
+  if (housingProvision !== undefined) fields.housingProvision = housingProvision;
+  const mealsProvision = benefitChoice(formData, "mealsProvision");
+  if (mealsProvision !== undefined) fields.mealsProvision = mealsProvision;
 
   const payMin = parseAmount(formData.get("payMin"));
   if (payMin !== undefined) fields.payMin = payMin;
