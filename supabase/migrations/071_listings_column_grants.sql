@@ -69,12 +69,19 @@ begin
   -- Only on a real transition. A no-op UPDATE must not re-stamp anything, and
   -- re-publishing (paused -> live) refreshing published_at is the behaviour the
   -- app already had.
+  --
+  -- And only when the WRITER did not supply the value themselves. A host cannot
+  -- (they hold no grant on these columns — that is the point), so an explicit
+  -- value can only come from service_role: the expiry sweep archiving with the
+  -- same `nowIso` it filtered on, a moderation action, a backfill. Clobbering a
+  -- deliberate timestamp with now() would silently rewrite their history. The
+  -- trigger fills a gap; it does not overrule a decision.
   if new.status is distinct from old.status then
-    if new.status = 'live' then
+    if new.status = 'live' and new.published_at is not distinct from old.published_at then
       new.published_at := now();
-    elsif new.status = 'paused' then
+    elsif new.status = 'paused' and new.paused_at is not distinct from old.paused_at then
       new.paused_at := now();
-    elsif new.status = 'archived' then
+    elsif new.status = 'archived' and new.archived_at is not distinct from old.archived_at then
       new.archived_at := now();
     end if;
   end if;
@@ -129,4 +136,66 @@ grant update (
   status
 ) on public.listings to authenticated;
 
--- anon keeps SELECT only; it never had UPDATE and must not gain it here.
+-- ── 3. The same door, the other verb: INSERT. ───────────────────────────────
+-- Narrowing UPDATE alone leaves the hole wide open. listings_insert_own (013)
+-- plus the table-level INSERT grant lets a host create a listing directly:
+--
+--   POST /listings
+--   { "host_profile_id": "<own>", "provenance": "sourced", "status": "live", … }
+--
+-- 064's check (`provenance = 'sourced' or host_profile_id is not null`) does NOT
+-- stop this — it only requires a host for VERIFIED rows; a sourced row may have
+-- one. So the row inserts as fake-sourced, 070's gate exempts it, and it goes
+-- live with nothing answered. Exactly the bypass, one verb over.
+--
+-- Host insert paths and everything they write:
+--   createListing    (queries/listings.ts)        ListingColumnPatch + title
+--                                                 + host_profile_id + status
+--   duplicateListing (queries/listingLifecycle.ts) COPYABLE_LISTING_COLUMNS
+--                                                 + host_profile_id + title + status
+--
+-- COPYABLE carries four columns the editor's patch does not — latitude,
+-- longitude, compensation_summary, timeline_summary — so they are granted here
+-- and NOT on UPDATE, which is the honest reflection of what each path writes.
+--
+-- `status` is granted (both paths set 'draft'), and a host inserting
+-- status='live' outright is already refused by listings_publication_triad_chk:
+-- provenance is NOT grantable, so it defaults to verified, and the gate then
+-- demands confirmed evidence. The two migrations cover each other.
+revoke insert on public.listings from authenticated;
+
+grant insert (
+  -- createListing / duplicateListing both set these
+  host_profile_id,
+  status,
+  -- ListingColumnPatch
+  title,
+  category,
+  description,
+  location_display,
+  begins_at,
+  ends_at,
+  compensation_min_cents,
+  compensation_max_cents,
+  compensation_currency,
+  compensation_unit,
+  housing_included,
+  meals_included,
+  housing_description,
+  meals_description,
+  housing_evidence,
+  meals_evidence,
+  pay_evidence,
+  cover_photo_url,
+  gallery_photo_urls,
+  logistics,
+  category_depth,
+  benefit_details,
+  -- duplicateListing only (COPYABLE_LISTING_COLUMNS)
+  latitude,
+  longitude,
+  compensation_summary,
+  timeline_summary
+) on public.listings to authenticated;
+
+-- anon keeps SELECT only; it never had INSERT or UPDATE and must not gain either.
