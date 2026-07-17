@@ -1156,8 +1156,14 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
     patch.meals_evidence = decision.evidence;
   }
   // Pay has no boolean — the figures ARE the value — so its evidence is stamped
-  // from whether the host actually gave a figure.
-  if (fields.payMin !== undefined || fields.payMax !== undefined) {
+  // from whether the host actually gave one.
+  //
+  // BOTH bounds must be submitted together for this to be sound. The form always
+  // sends both, so a submit is a complete replacement of the range; a partial
+  // writer that sent only payMin would look like "the range is now just this",
+  // and computing evidence from half a range would unset pay on a listing whose
+  // other bound is still a real number. Guarded, not assumed.
+  if (fields.payMin !== undefined && fields.payMax !== undefined) {
     const stated =
       (typeof patch.compensation_min_cents === "number" && patch.compensation_min_cents > 0) ||
       (typeof patch.compensation_max_cents === "number" && patch.compensation_max_cents > 0);

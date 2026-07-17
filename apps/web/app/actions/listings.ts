@@ -14,7 +14,7 @@ import {
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
-  HOST_BENEFIT_CHOICES,
+  readBenefitChoice,
   sanitizeCategoryDepth,
   sanitizeLogistics,
   type BenefitProvision,
@@ -69,26 +69,13 @@ function optionalString(raw: FormDataEntryValue | null): string | undefined {
 }
 
 /**
- * A host's benefit decision, as a TRUE tri-state.
- *
- * Absent key      -> undefined, and the writer leaves the column alone (the
- *                    convention every other field here follows: not submitted
- *                    is not the same as cleared).
- * Present, ""     -> "not_stated". The host saw the control and did not answer.
- *                    This MUST survive to the writer: it is the state migration
- *                    070 refuses to publish, and collapsing it to undefined
- *                    would silently re-open the hole this whole change closes.
- * Present, valid  -> their choice.
- * Present, junk   -> "not_stated". We never guess a decision on a host's behalf.
+ * A host's benefit decision from the form. The tri-state rule itself is
+ * readBenefitChoice() in contracts — shared with its tests, so a test cannot
+ * stay green while this parser drifts.
  */
 function benefitChoice(formData: FormData, key: string): BenefitProvision | undefined {
   if (!formData.has(key)) return undefined;
-  const raw = formData.get(key);
-  if (typeof raw !== "string") return "not_stated";
-  const trimmed = raw.trim();
-  return (HOST_BENEFIT_CHOICES as readonly string[]).includes(trimmed)
-    ? (trimmed as BenefitProvision)
-    : "not_stated";
+  return readBenefitChoice(formData.get(key));
 }
 
 /**

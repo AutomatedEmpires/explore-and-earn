@@ -23,7 +23,7 @@
 // and so the server can refuse with the same words rather than surfacing a
 // raw 23514.
 
-import type { BenefitProvision } from "./benefits";
+import { HOST_BENEFIT_CHOICES, type BenefitProvision } from "./benefits";
 import type { BenefitEvidenceStatus } from "./provenance";
 
 /** A benefit the host has not answered yet. Ordered as the host meets them. */
@@ -55,7 +55,20 @@ export type PublicationVerdict =
 	| { readonly ok: true }
 	| { readonly ok: false; readonly blockers: readonly PublicationBlocker[] };
 
-const UNANSWERED: BenefitEvidenceStatus = "not_stated";
+/**
+ * Has a HOST decided this, for a host-controlled listing?
+ *
+ * Only `confirmed` counts. `not_stated` is obviously silence — but `stated` is
+ * a SOURCE's claim, and on a listing that now has a host it is still not the
+ * host's answer. This is the claim seam: a sourced listing converts to
+ * host-controlled while already live, and if `stated` satisfied the gate, a
+ * claimed listing could stay published forever on an answer its new host never
+ * gave. Founder decision 4 protects sourced listings until they are claimed —
+ * it does not survive the claim.
+ */
+function hostDecided(evidence: BenefitEvidenceStatus | undefined): boolean {
+	return evidence === HOST_CHOICE_EVIDENCE;
+}
 
 /**
  * Is this listing honest enough to face seekers?
@@ -74,13 +87,13 @@ export function validateListingForPublication(
 
 	const blockers: PublicationBlocker[] = [];
 
-	if ((candidate.housingEvidence ?? UNANSWERED) === UNANSWERED) {
+	if (!hostDecided(candidate.housingEvidence)) {
 		blockers.push({
 			field: "housing",
 			reason: "Say whether housing is included. Leaving it blank isn’t a “no” — seekers are told nobody answered.",
 		});
 	}
-	if ((candidate.mealsEvidence ?? UNANSWERED) === UNANSWERED) {
+	if (!hostDecided(candidate.mealsEvidence)) {
 		blockers.push({
 			field: "meals",
 			reason: "Say whether meals are included. Leaving it blank isn’t a “no”.",
@@ -89,7 +102,7 @@ export function validateListingForPublication(
 
 	// Pay is different in kind: "pay exists" is not an answer a seeker can use.
 	// The decision AND the figure are both required.
-	if ((candidate.payEvidence ?? UNANSWERED) === UNANSWERED) {
+	if (!hostDecided(candidate.payEvidence)) {
 		blockers.push({ field: "pay", reason: "Add what this role pays." });
 	} else if (!hasPayFigure(candidate)) {
 		blockers.push({
@@ -109,6 +122,31 @@ function hasPayFigure(candidate: PublicationCandidate): boolean {
 
 /** The evidence a host's explicit choice records: they said it themselves. */
 export const HOST_CHOICE_EVIDENCE: BenefitEvidenceStatus = "confirmed";
+
+/**
+ * Read a host's submitted benefit choice, as a TRUE tri-state.
+ *
+ * Absent     -> undefined; the writer leaves the column alone (the convention
+ *               every other listing field follows: not submitted ≠ cleared).
+ * ""         -> not_stated. The host saw the control and did not answer. This
+ *               MUST survive to the writer — it is the state 070 refuses to
+ *               publish, and collapsing it to undefined silently re-opens the
+ *               hole this whole change closes.
+ * A choice   -> theirs.
+ * Anything else -> not_stated. We never guess a decision on a host's behalf.
+ *
+ * Lives here rather than in the action so the action and its tests exercise the
+ * SAME function — a test that re-implements the parser stays green while the
+ * parser rots.
+ */
+export function readBenefitChoice(raw: unknown): BenefitProvision | undefined {
+	if (raw === undefined || raw === null) return undefined;
+	if (typeof raw !== "string") return "not_stated";
+	const trimmed = raw.trim();
+	return (HOST_BENEFIT_CHOICES as readonly string[]).includes(trimmed)
+		? (trimmed as BenefitProvision)
+		: "not_stated";
+}
 
 /** How a benefit must READ on a card: offered, refused, or unanswered. */
 export type BenefitCardState = "provided" | "not_provided" | "not_stated";
@@ -136,11 +174,18 @@ export function benefitCardState(
 ): BenefitCardState {
 	// Either witness saying "nobody stated this" is decisive — a card must never
 	// out-claim its own evidence.
+	// Either witness saying "nobody stated this" is decisive — a card must never
+	// out-claim its own evidence.
 	if (provision === undefined || provision === "not_stated" || evidence === "not_stated") {
 		return "not_stated";
 	}
 	if (provision === "provided" || provision === "partial") return "provided";
-	return "not_provided";
+	if (provision === "not_provided") return "not_provided";
+	// A value outside the vocabulary — dirty data, an unsafe cast, a member added
+	// later. It is not a host decision, so it cannot become one in either
+	// direction: falling through to "not_provided" would invent a NO exactly the
+	// way the old code invented a YES.
+	return "not_stated";
 }
 
 /**
@@ -164,10 +209,19 @@ export function hostBenefitDecision(provision: BenefitProvision | undefined): {
 	// stays false because false is the only honest boolean when nobody has said
 	// yes — but the evidence carries the truth that nobody spoke at all, and
 	// that is what every surface renders from.
-	if (provision === undefined || provision === "not_stated") {
-		return { included: false, evidence: "not_stated" };
-	}
 	// An explicit "not included" is every bit as much a host decision as a yes,
 	// and is recorded as confirmed — they told us themselves.
-	return { included: provision !== "not_provided", evidence: HOST_CHOICE_EVIDENCE };
+	if (provision === "not_provided") {
+		return { included: false, evidence: HOST_CHOICE_EVIDENCE };
+	}
+	if (provision === "provided" || provision === "partial") {
+		return { included: true, evidence: HOST_CHOICE_EVIDENCE };
+	}
+	// Everything else — undefined, not_stated, or a value outside the vocabulary
+	// — is the host not having chosen. An ALLOW-LIST, not `!== "not_provided"`:
+	// that test recorded any unexpected value as a CONFIRMED YES, which is the
+	// original bug wearing a different hat. The column stays false because false
+	// is the only honest boolean when nobody said yes; the evidence carries the
+	// truth that nobody spoke. Migration 070 refuses to publish such a row.
+	return { included: false, evidence: "not_stated" };
 }

@@ -217,9 +217,20 @@ export type DuplicateListingResult = {
   error?: string;
 };
 
+// housing_evidence/meals_evidence/pay_evidence travel WITH their values. They
+// are not decoration: a duplicate that copied `housing_included = true` and let
+// the evidence fall back to the 070 default would assert a benefit that nobody
+// stated — and violate listings_housing_included_evidence_chk on insert. The
+// host said this about the original; the copy is the same listing.
+//
+// The descriptions come too, for the same reason 070 exists: copying the
+// decision while dropping the prose leaves a listing claiming "Housing:
+// Included" with nothing behind it.
 const COPYABLE_LISTING_COLUMNS =
   "title,category,description,location_display,latitude,longitude," +
-  "housing_included,meals_included,compensation_summary,compensation_min_cents," +
+  "housing_included,meals_included,housing_description,meals_description," +
+  "housing_evidence,meals_evidence,pay_evidence," +
+  "compensation_summary,compensation_min_cents," +
   "compensation_max_cents,compensation_unit,compensation_currency,timeline_summary," +
   "begins_at,ends_at,cover_photo_url";
 

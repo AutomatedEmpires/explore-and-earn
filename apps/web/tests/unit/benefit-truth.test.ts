@@ -17,25 +17,21 @@
 
 import { describe, expect, it } from "vitest";
 
-import { HOST_BENEFIT_CHOICES, type BenefitProvision } from "@explore-and-earn/contracts";
+import { HOST_BENEFIT_CHOICES, readBenefitChoice } from "@explore-and-earn/contracts";
 
 /**
- * Mirrors benefitChoice() in apps/web/app/actions/listings.ts.
+ * The PRODUCTION parser, not a copy of it.
  *
- * The action module is "server-only" and pulls in Clerk + the whole db package,
- * so it cannot be imported here (apps/web vitest is environment: node). This
- * suite pins the RULE; the shape is small enough to state exactly, and the
- * contract it depends on (HOST_BENEFIT_CHOICES) is imported for real — so if
- * the vocabulary changes underneath, this fails.
+ * This test used to re-implement benefitChoice() because the action module is
+ * "server-only" and drags in Clerk + the whole db package. But a copied
+ * implementation is a test that stays green while the real parser rots — which
+ * is the same failure that let the original bug ship. The rule now lives in
+ * contracts as readBenefitChoice() and both the action and this file import it.
+ * The `formData.has()` wrapper below is all the action adds.
  */
-function benefitChoice(formData: FormData, key: string): BenefitProvision | undefined {
+function benefitChoice(formData: FormData, key: string) {
   if (!formData.has(key)) return undefined;
-  const raw = formData.get(key);
-  if (typeof raw !== "string") return "not_stated";
-  const trimmed = raw.trim();
-  return (HOST_BENEFIT_CHOICES as readonly string[]).includes(trimmed)
-    ? (trimmed as BenefitProvision)
-    : "not_stated";
+  return readBenefitChoice(formData.get(key));
 }
 
 const fd = (entries: Record<string, string>) => {

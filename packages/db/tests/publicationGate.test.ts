@@ -81,6 +81,41 @@ describe("a host-controlled listing must answer the triad to publish", () => {
   });
 });
 
+describe("only a HOST decision publishes a host-controlled listing", () => {
+  // The claim seam. A sourced listing converts to host-controlled while it is
+  // already live, so if a source's `stated` satisfied the gate, a claimed
+  // listing could stay published forever on an answer its new host never gave.
+  // Founder decision 4 protects sourced inventory UNTIL it is claimed — it does
+  // not survive the claim.
+
+  it("BLOCKS a verified listing carrying only a SOURCE's 'stated' evidence", () => {
+    const v = validateListingForPublication({ ...complete, housingEvidence: "stated" });
+    expect(v.ok).toBe(false);
+    expect(fieldsOf(v)).toEqual(["housing"]);
+  });
+
+  it("blocks every benefit that is merely source-stated", () => {
+    const v = validateListingForPublication({
+      provenance: "verified",
+      housingEvidence: "stated",
+      mealsEvidence: "stated",
+      payEvidence: "stated",
+      payMinCents: 30_000,
+    });
+    expect(fieldsOf(v)).toEqual(["housing", "meals", "pay"]);
+  });
+
+  it("…but the same evidence is fine while the listing is still sourced", () => {
+    expect(
+      validateListingForPublication({
+        provenance: "sourced",
+        housingEvidence: "stated",
+        mealsEvidence: "not_stated",
+      }),
+    ).toEqual({ ok: true });
+  });
+});
+
 describe("pay needs a figure, not merely a decision", () => {
   it("BLOCKS pay that was answered but carries no number", () => {
     const v = validateListingForPublication({
@@ -135,6 +170,18 @@ describe("hostBenefitDecision — what gets WRITTEN, value and evidence together
   it("treats 'partial' as included", () => {
     expect(hostBenefitDecision("partial")).toEqual({ included: true, evidence: "confirmed" });
   });
+
+  it("degrades an UNRECOGNISED value to not_stated, never to a confirmed yes", () => {
+    // The old shape was `included: provision !== "not_provided"`, so dirty data
+    // or an unsafe cast was recorded as a CONFIRMED YES — the original bug
+    // wearing a different hat. An allow-list can't do that.
+    for (const junk of ["yes", "PROVIDED", "", "unknown_future_member"]) {
+      expect(hostBenefitDecision(junk as never)).toEqual({
+        included: false,
+        evidence: "not_stated",
+      });
+    }
+  });
 });
 
 describe("benefitCardState — what the CARD may claim", () => {
@@ -169,6 +216,15 @@ describe("benefitCardState — what the CARD may claim", () => {
   it("keeps a confirmed/stated evidence out of the way", () => {
     expect(benefitCardState("provided", "confirmed")).toBe("provided");
     expect(benefitCardState("not_provided", "stated")).toBe("not_provided");
+  });
+
+  it("degrades an UNRECOGNISED value to not_stated — in BOTH directions", () => {
+    // The docstring promised an allow-list, but the code fell through to
+    // "not_provided" — inventing a NO exactly the way the original bug invented
+    // a YES. Unknown is not a decision, so it cannot become one either way.
+    for (const junk of ["yes", "PROVIDED", "", "unknown_future_member"]) {
+      expect(benefitCardState(junk as never)).toBe("not_stated");
+    }
   });
 });
 

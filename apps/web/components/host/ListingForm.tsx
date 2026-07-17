@@ -608,6 +608,12 @@ export function ListingForm({
     galleryImages,
     housingDescription,
     mealsDescription,
+    // The preview reads these now, so it must recompute when they change —
+    // otherwise the host flips "Is housing included?" and the card they are
+    // watching says nothing changed, which is precisely the false reassurance
+    // this whole change exists to remove.
+    housingProvision,
+    mealsProvision,
     payMin,
     payMax,
     payPeriod,

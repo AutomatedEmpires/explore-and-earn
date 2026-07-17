@@ -102,15 +102,29 @@ alter table public.listings add  constraint listings_meals_included_evidence_chk
 -- A host-controlled listing may not be under_review or live while any of the
 -- three benefits is unanswered. Drafts, paused and archived rows are free to be
 -- incomplete — that is the founder's "drafts may remain incomplete" rule.
+-- `= 'confirmed'`, not `<> 'not_stated'`: `stated` is a SOURCE's claim, and on a
+-- listing that now has a host it is still not the host's answer. Accepting it
+-- would let a claimed listing stay live forever on an answer its new host never
+-- gave — the exact seam founder decision 4 stops protecting once a listing is
+-- claimed.
+--
+-- Pay additionally needs a FIGURE. Evidence alone says someone answered; it does
+-- not say what the job pays, and "pay exists" is not something a seeker can act
+-- on. Without this a direct writer could set pay_evidence='confirmed' with both
+-- compensation columns null and publish.
 alter table public.listings drop constraint if exists listings_publication_triad_chk;
 alter table public.listings add  constraint listings_publication_triad_chk
   check (
     provenance = 'sourced'
     or status not in ('under_review', 'live')
     or (
-      housing_evidence <> 'not_stated'
-      and meals_evidence <> 'not_stated'
-      and pay_evidence <> 'not_stated'
+      housing_evidence = 'confirmed'
+      and meals_evidence = 'confirmed'
+      and pay_evidence = 'confirmed'
+      and (
+        coalesce(compensation_min_cents, 0) > 0
+        or coalesce(compensation_max_cents, 0) > 0
+      )
     )
   ) not valid;
 
