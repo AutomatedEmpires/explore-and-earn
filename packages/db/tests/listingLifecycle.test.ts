@@ -238,11 +238,16 @@ describe("updateListingStatus", () => {
     // profile read + listing read + update — NO tier read, NO count query.
     expect(mockFrom).toHaveBeenCalledTimes(3);
     const patch = (update.update as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(patch.status).toBe("paused");
-    expect(typeof patch.paused_at).toBe("string");
+    expect(patch).toEqual({ status: "paused" }); // paused_at is the trigger's (071)
   });
 
-  it("stamps archived_at when archiving", async () => {
+  it("sends ONLY status — the timestamps are the database's job now (071)", async () => {
+    // published_at/paused_at/archived_at moved to trg_listings_status_timestamps.
+    // This is not cosmetic: 071 revokes the blanket UPDATE grant that let a host
+    // PATCH `provenance` around 070's publication gate, and those three columns
+    // are deliberately NOT re-granted — a host must not be able to forge when
+    // their listing went live. Sending them from here would now fail with
+    // "permission denied for column", so this asserts we don't.
     const read = makeChain({ data: { id: "l1", status: "paused" } });
     const update = makeChain({ data: { id: "l1" } });
     queueFromResults(HOST_PROFILE, read, update);
@@ -251,7 +256,10 @@ describe("updateListingStatus", () => {
 
     expect(result.ok).toBe(true);
     const patch = (update.update as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(typeof patch.archived_at).toBe("string");
+    expect(patch).toEqual({ status: "archived" });
+    for (const forged of ["archived_at", "published_at", "paused_at"]) {
+      expect(patch).not.toHaveProperty(forged);
+    }
   });
 
   it("returns invalid_transition for a forbidden edge (under_review -> live)", async () => {
