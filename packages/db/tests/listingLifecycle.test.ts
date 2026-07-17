@@ -99,9 +99,28 @@ describe("canTransitionListing", () => {
 
 // ── updateListingStatus ────────────────────────────────────────────────────
 
+/**
+ * A draft whose host HAS answered the triad.
+ *
+ * Publishing now requires an explicit Housing/Meals/Pay decision (founder,
+ * 2026-07-17), so every fixture that expects to reach under_review must state
+ * one. A bare `{ id, status }` row is an unanswered listing, and the gate is
+ * supposed to stop it — see the "blocks publication" tests below.
+ */
+const ANSWERED_DRAFT = {
+  id: "l1",
+  status: "draft",
+  provenance: "verified",
+  housing_evidence: "confirmed",
+  meals_evidence: "confirmed",
+  pay_evidence: "confirmed",
+  compensation_min_cents: 22_000,
+  compensation_max_cents: null,
+} as const;
+
 describe("updateListingStatus", () => {
   it("submits a draft for review when under the plan cap", async () => {
-    const read = makeChain({ data: { id: "l1", status: "draft" } });
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
     const tierRead = makeChain({ data: { subscription_tier: "starter" } });
     const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings - 1 });
     const update = makeChain({ data: { id: "l1" } });
@@ -114,7 +133,7 @@ describe("updateListingStatus", () => {
   });
 
   it("returns listing_cap_reached when active listings are at the tier cap", async () => {
-    const read = makeChain({ data: { id: "l1", status: "draft" } });
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
     const tierRead = makeChain({ data: { subscription_tier: "starter" } });
     const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
     queueFromResults(HOST_PROFILE, read, tierRead, capCount);
@@ -125,7 +144,7 @@ describe("updateListingStatus", () => {
   });
 
   it("floors a host with no subscription (tier null -> 'none') at the starter cap", async () => {
-    const read = makeChain({ data: { id: "l1", status: "draft" } });
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
     const tierRead = makeChain({ data: { subscription_tier: null } });
     const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
     queueFromResults(HOST_PROFILE, read, tierRead, capCount);
@@ -133,6 +152,79 @@ describe("updateListingStatus", () => {
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
 
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  // ── The publication gate (founder, 2026-07-17) ───────────────────────────
+  // A host-controlled listing may not face seekers with an unanswered benefit.
+  // These pin the gate at the SERVER, where a host who bypasses the form still
+  // meets it. (The DB constraint in 070 is the backstop for PostgREST.)
+
+  it("BLOCKS submitting a draft whose Housing was never answered", async () => {
+    const read = makeChain({
+      data: { ...ANSWERED_DRAFT, housing_evidence: "not_stated" },
+    });
+    queueFromResults(HOST_PROFILE, read);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("incomplete_listing");
+    expect(result.blockers?.map((b) => b.field)).toEqual(["housing"]);
+  });
+
+  it("BLOCKS an unanswered Meals, and names every blocker at once", async () => {
+    const read = makeChain({
+      data: { ...ANSWERED_DRAFT, meals_evidence: "not_stated", pay_evidence: "not_stated" },
+    });
+    queueFromResults(HOST_PROFILE, read);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result.blockers?.map((b) => b.field)).toEqual(["meals", "pay"]);
+  });
+
+  it("BLOCKS before spending a plan slot — the cap check never runs", async () => {
+    // Ordering matters: an incomplete listing must not consume the host's cap
+    // read, and must fail for the honest reason rather than 'listing_cap_reached'.
+    const read = makeChain({ data: { ...ANSWERED_DRAFT, housing_evidence: "not_stated" } });
+    queueFromResults(HOST_PROFILE, read);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result.error).toBe("incomplete_listing");
+  });
+
+  it("does NOT block pulling a listing DOWN — drafts may stay incomplete", async () => {
+    // The rule is about facing seekers. A host must always be able to retreat,
+    // even from a listing that could no longer be published.
+    const read = makeChain({ data: { id: "l1", status: "live", housing_evidence: "not_stated" } });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "paused");
+
+    expect(result).toEqual({ ok: true, status: "paused" });
+  });
+
+  it("does NOT force a decision on a SOURCED listing (founder decision 4)", async () => {
+    // No host exists to make it. Sourced inventory keeps showing "Not stated"
+    // until someone claims and confirms it.
+    const read = makeChain({
+      data: {
+        id: "l1",
+        status: "paused",
+        provenance: "sourced",
+        housing_evidence: "not_stated",
+        meals_evidence: "not_stated",
+        pay_evidence: "not_stated",
+      },
+    });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: true, status: "live" });
   });
 
   it("skips the cap check for live -> paused (already counted as active)", async () => {

@@ -66,6 +66,15 @@ export default async function HostListingEditPage({
     // Same rule as above: the form submits the whole logistics object, so an
     // un-hydrated connectivity group would re-save empty and silently erase
     // what the host already told seekers about getting online here.
+    // The host's benefit DECISIONS. The form submits these on every save, so an
+    // un-hydrated select would seed "unanswered" and overwrite a confirmed
+    // Included/Not-included back to not_stated — silently un-answering a
+    // question the host already answered, and un-publishing their listing.
+    // Exactly the trap this file's own comment warns about for housing/meals.
+    housingEvidence: listing.housing_evidence,
+    housingIncluded: listing.housing_included,
+    mealsEvidence: listing.meals_evidence,
+    mealsIncluded: listing.meals_included,
     connectivity: listing.logistics.connectivity,
     // …and the same for the vessel group (069). Hydrated for EVERY listing, not
     // just maritime ones: the form submits categoryDepth unconditionally, so a

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Button, Icon } from "@explore-and-earn/ui";
 import {
+	NOT_STATED_LABEL,
 	UPLOAD_ALLOWED_MIME_TYPES,
 	type BenefitProvision,
 } from "@explore-and-earn/contracts";
@@ -244,12 +245,16 @@ const PROVISION_LABEL: Record<BenefitProvision, string> = {
 	provided: "Provided",
 	partial: "Partial",
 	not_provided: "Not provided",
+	not_stated: NOT_STATED_LABEL,
 };
 
 const PROVISION_CLASS: Record<BenefitProvision, string> = {
 	provided: styles.provided ?? "",
 	partial: styles.partial ?? "",
 	not_provided: styles.not_provided ?? "",
+	// No styling of its own: an unanswered benefit must not be dressed up as a
+	// negative answer (which is what reusing .not_provided here would do).
+	not_stated: "",
 };
 
 // ── State init ─────────────────────────────────────────────────────────────────

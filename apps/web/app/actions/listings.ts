@@ -14,8 +14,10 @@ import {
 import {
   COMPENSATION_UNIT,
   MARKETPLACE_CATEGORIES,
+  readBenefitChoice,
   sanitizeCategoryDepth,
   sanitizeLogistics,
+  type BenefitProvision,
   type CompensationUnit,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
@@ -64,6 +66,16 @@ function optionalString(raw: FormDataEntryValue | null): string | undefined {
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+/**
+ * A host's benefit decision from the form. The tri-state rule itself is
+ * readBenefitChoice() in contracts — shared with its tests, so a test cannot
+ * stay green while this parser drifts.
+ */
+function benefitChoice(formData: FormData, key: string): BenefitProvision | undefined {
+  if (!formData.has(key)) return undefined;
+  return readBenefitChoice(formData.get(key));
 }
 
 /**
@@ -141,6 +153,18 @@ function readListingFields(formData: FormData): ListingWriteFields {
   if (formData.has("mealsDescription")) {
     fields.mealsDescription = optionalString(formData.get("mealsDescription")) ?? null;
   }
+
+  // The host's EXPLICIT housing/meals decision — the field this layer never
+  // read, which is the whole reason a blank description used to decide it.
+  //
+  // Deliberately NOT optionalString(): that collapses "" to undefined, and ""
+  // is meaningful here — it is the host having the control in front of them and
+  // not answering. It must reach the writer as `not_stated`, not vanish and
+  // leave the column untouched.
+  const housingProvision = benefitChoice(formData, "housingProvision");
+  if (housingProvision !== undefined) fields.housingProvision = housingProvision;
+  const mealsProvision = benefitChoice(formData, "mealsProvision");
+  if (mealsProvision !== undefined) fields.mealsProvision = mealsProvision;
 
   const payMin = parseAmount(formData.get("payMin"));
   if (payMin !== undefined) fields.payMin = payMin;

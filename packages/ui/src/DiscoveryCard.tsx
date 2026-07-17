@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react"
 import {
 	NOT_STATED_LABEL,
 	SOURCED_DISCLOSURE_LABEL,
+	benefitCardState,
 	type BenefitEvidenceStatus,
 	type BenefitProvision,
 	type DiscoveryCardConditionalBadge,
@@ -194,10 +195,23 @@ const SECONDARY_TONE_CLASS: Record<SecondaryTone, string> = {
 	error: styles.toneError,
 }
 
+// The card's benefit state is decided by benefitCardState() in contracts —
+// pure, tested, and shared, because the private version of this inference is
+// what let the card announce "Housing: included" for a listing nobody had
+// answered.
+const benefitNotStated = (
+	provision: BenefitProvision | undefined,
+	evidence: BenefitEvidenceStatus | undefined,
+): boolean => benefitCardState(provision, evidence) === "not_stated"
+
+const benefitProvided = (provision: BenefitProvision | undefined): boolean =>
+	benefitCardState(provision) === "provided"
+
 // ─── Benefit triad cell (housing / meals / pay) ────────────────────────────
 //
 // The card's dominant module. Housing & Meals read OFFERED (green ✓) / NOT
-// OFFERED (red ✕) via icon AND colour; Pay is always gold and carries the rate.
+// OFFERED (red ✕) / NOT STATED (neutral) via icon AND colour; Pay is always
+// gold and carries the rate.
 // A clickable cell (photo bucket / pay scale) renders as a <button>.
 function BenefitTriadCell({
 	kind,
@@ -695,15 +709,15 @@ export function DiscoveryCard({
 					<div className={styles.triad}>
 						<BenefitTriadCell
 							kind="housing"
-							provided={hp !== "not_provided"}
-							notStated={ev?.housing === "not_stated"}
+							provided={benefitProvided(hp)}
+							notStated={benefitNotStated(hp, ev?.housing)}
 							value={data.triad.housing}
 							onClick={canOpenHousing ? () => onHousingClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="meals"
-							provided={mp !== "not_provided"}
-							notStated={ev?.meals === "not_stated"}
+							provided={benefitProvided(mp)}
+							notStated={benefitNotStated(mp, ev?.meals)}
 							value={data.triad.meals}
 							onClick={canOpenMeals ? () => onMealsClick!(data.id) : undefined}
 						/>

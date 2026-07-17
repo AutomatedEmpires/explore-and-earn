@@ -11,13 +11,36 @@
 export const BENEFIT_KINDS = ["housing", "meals", "pay"] as const;
 export type BenefitKind = (typeof BENEFIT_KINDS)[number];
 
-/** Whether / how a benefit is provided. */
+/**
+ * Whether / how a benefit is provided — and, first of all, whether ANYONE said.
+ *
+ * `not_stated` is not a fourth flavour of provision; it is the absence of one,
+ * made explicit so it cannot be silently collapsed into "no". A host who never
+ * answered and a host who answered "not included" are materially different
+ * facts to a seeker deciding whether they can afford to take the job, and the
+ * product may never render the first as the second (founder, 2026-07-17).
+ *
+ * It is a member of this union rather than `BenefitProvision | undefined` on
+ * purpose: `undefined` is what every existing consumer already ignores. Adding
+ * a MEMBER turns every non-exhaustive switch and every `provision !==
+ * "not_provided"` test into a compile error, so the type checker — not review —
+ * is what proves every surface agrees, and keeps proving it.
+ */
 export const BENEFIT_PROVISION = [
 	"provided",
 	"partial",
 	"not_provided",
+	"not_stated",
 ] as const;
 export type BenefitProvision = (typeof BENEFIT_PROVISION)[number];
+
+/**
+ * The provisions a HOST may choose. `not_stated` is deliberately absent: it is
+ * a state a listing can be IN (a draft nobody has finished), never a state a
+ * host can pick. Publication requires one of these.
+ */
+export const HOST_BENEFIT_CHOICES = ["provided", "not_provided"] as const;
+export type HostBenefitChoice = (typeof HOST_BENEFIT_CHOICES)[number];
 
 export interface HousingInfo {
 	readonly provision: BenefitProvision;

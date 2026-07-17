@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react"
 import { Icon, type IconKey } from "@explore-and-earn/ui"
+import { NOT_STATED_LABEL } from "@explore-and-earn/contracts"
 import type { BenefitProvision, BenefitTriad } from "@explore-and-earn/contracts"
 
 type BenefitSlot = "housing" | "meals" | "pay"
@@ -32,6 +33,7 @@ const PROVISION_LABEL: Record<BenefitProvision, string> = {
 	provided: "Provided",
 	partial: "Partial",
 	not_provided: "Not provided",
+	not_stated: NOT_STATED_LABEL,
 }
 
 const SLOT_ORDER: ReadonlyArray<BenefitSlot> = ["housing", "meals", "pay"]

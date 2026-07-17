@@ -6,7 +6,7 @@ import {
 	Icon,
 	type IconKey,
 } from "@explore-and-earn/ui";
-import type { BenefitProvision } from "@explore-and-earn/contracts";
+import { NOT_STATED_LABEL, type BenefitProvision } from "@explore-and-earn/contracts";
 import { PopupShell } from "../overlay/PopupShell";
 
 import { type DiscoveryListing } from "./listing";
@@ -39,6 +39,7 @@ const PROVISION_LABEL: Record<BenefitProvision, string> = {
 	provided: "Provided",
 	partial: "Partial",
 	not_provided: "Not provided",
+	not_stated: NOT_STATED_LABEL,
 };
 
 export interface BenefitBucketDrawerProps {
