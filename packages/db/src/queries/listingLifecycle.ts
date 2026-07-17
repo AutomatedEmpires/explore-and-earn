@@ -190,15 +190,18 @@ export async function updateListingStatus(
     }
   }
 
-  const nowIso = new Date().toISOString();
-  const patch: Record<string, unknown> = { status: newStatus };
-  if (newStatus === "live") patch.published_at = nowIso;
-  else if (newStatus === "paused") patch.paused_at = nowIso;
-  else if (newStatus === "archived") patch.archived_at = nowIso;
-
+  // Status ONLY. published_at/paused_at/archived_at are stamped by
+  // trg_listings_status_timestamps (071) from the transition itself.
+  //
+  // This is not a tidy-up — it is required. 071 revokes the blanket UPDATE grant
+  // that let a host PATCH `provenance` and walk out of 070's publication gate,
+  // and re-grants only the columns hosts legitimately write. Those three
+  // timestamps are deliberately NOT in that list (a host must not be able to
+  // forge when their listing went live), so sending them here would now fail
+  // with "permission denied for column". Same pairing as 067's expires_at.
   const { data: updated, error: updateError } = await db
     .from("listings")
-    .update(patch)
+    .update({ status: newStatus })
     .eq("id", listingId)
     .eq("host_profile_id", hostProfileId)
     .select("id")
