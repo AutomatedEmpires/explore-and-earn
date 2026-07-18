@@ -1,8 +1,21 @@
 # Explore & Earn — agent handoff, 2026-07-18
 
-Written for the next agent (Codex or otherwise) picking up this work. Everything
-below was verified against the live system, not inferred. Where I was wrong
-earlier in the session, I say so — those corrections are the most useful part.
+Written for the next agent (Codex or otherwise) picking up this work.
+
+**How to read this.** Sections 2–6 are **verified state** — checked against the
+live database, the deployed app, GitHub, and the repo, not inferred; if something
+there is wrong, treat it as a bug in this document. Sections 7–8 are **plans,
+founder requirements and workflow guidance** — scoped and evidenced, but not
+facts you can go and confirm. Where I was wrong earlier in the session, I say so;
+those corrections are the most useful part of this file.
+
+**Sourcing.** Founder requirements (the four housing-photo roles, the explicit
+Housing/Meals decision, the Mapbox permanent-storage condition, the FCC
+rejection) came from founder directives in the working session that produced this
+work — they are product law, not my conclusions. The engineering decisions are
+mine and are argued from the code and migrations cited inline. `AGENTS.md` and
+`\\wsl.localhost\...\automatedempires\control\POLICY.md` remain authoritative for
+anything that conflicts.
 
 ---
 
@@ -53,6 +66,14 @@ is a resource: schema-shaped fixes that would need a backfill later are free now
 ## 3. What shipped, and why it mattered
 
 Five PRs, all merged, all applied to production.
+
+**#261 — single-source the evidence-honesty copy.** Four render sites had
+re-typed `NOT_STATED_LABEL` / `SOURCED_DISCLOSURE_LABEL` as raw string literals,
+which made the exported constants decorative — the copy could drift per surface
+with nothing to catch it. `apps/web/tests/unit/honesty-labels.test.ts` is now the
+ratchet. It asserts the **bare** copy, not a quoted needle: the first version
+only matched `"Not stated"` and missed single quotes, backticks and bare JSX text
+nodes. Verify a ratchet bites by deliberately regressing the file it guards.
 
 **#262 / #263 — listing relocation intelligence, slices 1 & 2.** Host-reported
 connectivity (`listings.logistics`, migration 068) and maritime vessel depth
@@ -160,12 +181,19 @@ production, while local points at the local Supabase stack. Pull surgically.
 
 ## 6. Environment facts you will need
 
-- **Dev server:** `pnpm --dir apps/web exec next dev -p 3100` from the repo root.
-  Start it via PowerShell background, not `nohup` inside a one-shot `wsl` call —
-  that gets torn down when the call returns.
+- **Dev server — use the WEBPACK path, this matters:**
+  `pnpm --dir apps/web dev:webpack -- -p 3100`.
+  The default `pnpm dev` is `next dev --turbopack`, and `apps/web/next.config.ts`
+  (see the comment at ~line 127) installs the dev-bench Clerk shim through a
+  **webpack alias** — Turbopack does not run it, so the bench silently does not
+  work. I got the right behaviour by accident (calling `next dev` directly
+  bypasses the `--turbopack` flag); don't rely on that.
+  Start it as a PowerShell background task, not `nohup` inside a one-shot `wsl`
+  call — that gets torn down when the call returns.
 - **Visual testing without auth:** set cookie `ee_dev_role=host` (also `seeker`,
-  `admin`). See `apps/web/lib/devBench/` and `tests/e2e/smoke.spec.ts`. This is
-  the sanctioned dev-bench path, gated to non-prod.
+  `admin`). See `apps/web/lib/devBench/` and `apps/web/tests/e2e/smoke.spec.ts`.
+  This is the sanctioned dev-bench path, gated to non-prod, and it depends on the
+  webpack dev server above.
 - **Selects cannot be driven programmatically** in this app — synthetic `change`
   events and the browser tool's `form_input` both fail to reach React's handler.
   Read the rendered state instead of trying to script the interaction.
@@ -267,9 +295,15 @@ coordinates. The 6 markers visible locally are `PREVIEW_MAP_FIXTURES`.
 ## 8. Ground rules for this repo
 
 1. **One canonical clone.** Never create another. `ae path explore-and-earn`.
-2. **Lease before writing:** `ae start explore-and-earn -t <task> -a <agent>`;
-   release when done. Set `AE_AGENT` before `git push` or the hook rejects it.
-3. **Pushed or it didn't happen.** No dirty trees, no local-only commits.
+2. **Lease before writing:** `ae start explore-and-earn -t <task> -a <agent>`.
+   Set `AE_AGENT=<agent>` before `git push` or the hook rejects it.
+3. **End with `ae finish explore-and-earn -a <agent>`** — not a bare release. It
+   refuses to end on a dirty tree, runs the repo's registered validation,
+   secret-scans, pushes, and **verifies the remote SHA**. Interrupted?
+   `ae finish <repo> --wip`. Never report "committed" or "done" without also
+   reporting **pushed + remote SHA verified**. (Note `ae finish` refuses to close
+   while you are on `main` because merging deploys production — do the merge,
+   then release.)
 4. **Merging `main` auto-deploys to production** via Vercel.
 5. **Founder locks:** the four categories (farm|maritime|remote|seasonal + mix)
    and MIX_DOMAIN are locked; the Housing/Meals/Pay triad must never gain a
