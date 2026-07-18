@@ -182,7 +182,9 @@ production, while local points at the local Supabase stack. Pull surgically.
 ## 6. Environment facts you will need
 
 - **Dev server — use the WEBPACK path, this matters:**
-  `pnpm --dir apps/web dev:webpack -- -p 3100`.
+  `pnpm --dir apps/web dev:webpack -p 3100` (verified working; note **no** `--`
+  separator — pnpm forwards it to `next` as a directory argument and it dies with
+  *"Invalid project directory provided"*).
   The default `pnpm dev` is `next dev --turbopack`, and `apps/web/next.config.ts`
   (see the comment at ~line 127) installs the dev-bench Clerk shim through a
   **webpack alias** — Turbopack does not run it, so the bench silently does not
@@ -192,8 +194,17 @@ production, while local points at the local Supabase stack. Pull surgically.
   call — that gets torn down when the call returns.
 - **Visual testing without auth:** set cookie `ee_dev_role=host` (also `seeker`,
   `admin`). See `apps/web/lib/devBench/` and `apps/web/tests/e2e/smoke.spec.ts`.
-  This is the sanctioned dev-bench path, gated to non-prod, and it depends on the
-  webpack dev server above.
+  Sanctioned, and structurally impossible in production — `isDevBenchEnabled()`
+  is false under `NODE_ENV=production`, which both prod and Vercel preview build
+  with, so the shim is not even bundled there.
+  **Measured, so you don't chase it:** on this local setup protected routes serve
+  200 *without* any cookie, because `middleware.ts` (~line 133) skips Clerk
+  protection when Clerk is not configured for the local runtime. Set the cookie
+  anyway — it is what gives you a *host-shaped* session (the page renders as
+  "New listing · Host") rather than merely reachable markup.
+  Also: `curl -L` will follow a redirect to `/sign-in`, which itself returns 200,
+  so **check the unfollowed status** or you will read a redirect as success. I
+  made exactly that mistake here.
 - **Selects cannot be driven programmatically** in this app — synthetic `change`
   events and the browser tool's `form_input` both fail to reach React's handler.
   Read the rendered state instead of trying to script the interaction.
