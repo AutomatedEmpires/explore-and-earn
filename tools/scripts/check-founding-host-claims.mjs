@@ -1,8 +1,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { extname, join, relative } from "node:path";
 
-const roots = ["apps/web/app", "apps/web/components"];
-const sourceExtensions = new Set([".ts", ".tsx"]);
+const roots = ["apps/web/app", "apps/web/components", "apps/web/messages"];
+const sourceExtensions = new Set([".json", ".ts", ".tsx"]);
 const ignoredDirectories = new Set([".next", "dist", "node_modules"]);
 
 const forbiddenPatterns = [
