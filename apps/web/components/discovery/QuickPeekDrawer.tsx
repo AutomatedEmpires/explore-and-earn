@@ -63,7 +63,6 @@ export function QuickPeekDrawer({ listing, onClose }: QuickPeekDrawerProps) {
 
 	const signals = useMemo(
 		() => [
-			listing?.founding ? "Founding program" : null,
 			listing?.visaSupport ? "Visa support" : null,
 		].filter((v): v is string => v !== null),
 		[listing],
