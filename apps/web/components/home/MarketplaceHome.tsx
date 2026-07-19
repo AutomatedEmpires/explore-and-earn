@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
-import { FOUNDING_SEAT_CAP } from "@explore-and-earn/contracts";
 
 import {
   ListingCard,
@@ -364,7 +363,7 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
         <div className={styles.emptyPanel}>
           <Icon name="status.open" size={24} aria-hidden />
           <p className={styles.emptyTitle}>The first season is being staffed.</p>
-          <p className={styles.emptySub}>Founding hosts are onboarding now. Be first in line when roles open.</p>
+          <p className={styles.emptySub}>Hosts are onboarding now. Be first in line when roles open.</p>
           <Link className={styles.heroPrimary} href="/seek">
             Explore the marketplace
             <Icon name="action.forward" size={16} aria-hidden />
@@ -639,7 +638,7 @@ function FreeForeverBand() {
   );
 }
 
-// ─── Host pitch (founding-first + tiers) ───────────────────────────────────
+// ─── Host pitch + tiers ────────────────────────────────────────────────────
 
 const HOST_FEATURES: ReadonlyArray<{ label: string; icon: IconKey }> = [
   { label: "Boosted listings", icon: "status.boosted" },
@@ -662,19 +661,6 @@ function HostPitch() {
         </p>
       </div>
 
-      <div className={styles.foundingBand}>
-        <span className={styles.foundingMedal} aria-hidden="true">
-          <Icon name="trust.founding_host" size={24} aria-hidden />
-        </span>
-        <div className={styles.foundingText}>
-          <p className={styles.foundingTitle}>Founding Host Program</p>
-          <p className={styles.foundingCopy}>
-            First {FOUNDING_SEAT_CAP} hosts lock this rate for life. It survives tier changes —
-            and it&rsquo;s only given up if you ever cancel.
-          </p>
-        </div>
-      </div>
-
       <ul className={styles.hostFeatures} aria-label="What hosts get">
         {HOST_FEATURES.map((f) => (
           <li key={f.label} className={styles.hostFeature}>
@@ -690,16 +676,8 @@ function HostPitch() {
             {p.featured ? <span className={styles.planRibbon}>Most popular</span> : null}
             <p className={styles.planName}>{p.name}</p>
             <p className={styles.planPrice}>
-              <strong>{formatUsd(p.foundingMonthlyCents)}</strong>
+              <strong>{formatUsd(p.priceMonthlyCents)}</strong>
               <span>/mo</span>
-              <s className={styles.planStd}>
-                <span className={styles.srOnly}>Standard price </span>
-                {formatUsd(p.priceMonthlyCents)}/mo
-              </s>
-            </p>
-            <p className={styles.planSeat}>
-              <Icon name="trust.founding_host" size={16} aria-hidden />
-              Founding rate — locked for life
             </p>
             <p className={styles.planBlurb}>{p.blurb}</p>
             <ul className={styles.planFeatures} role="list">
