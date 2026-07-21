@@ -70,6 +70,42 @@ export async function uploadTrustedListingMedia(
   return client.storage.from(LISTING_MEDIA_BUCKET).getPublicUrl(upload.path).data.publicUrl;
 }
 
+/**
+ * Replace one mutable, deterministic listing-media object.
+ *
+ * Meals keeps its historical one-object-per-slot model. Callers still perform
+ * auth, ownership, slot validation, and server-side WebP normalization before
+ * reaching this service-role boundary; the stable path bounds abandoned files
+ * without racing destructive cleanup against a concurrent database save.
+ */
+export async function replaceTrustedListingMedia(
+  upload: TrustedListingMediaUpload,
+): Promise<string> {
+  assertSafeObjectPath(upload.path);
+  if (upload.contentType !== TRUSTED_IMAGE_CONTENT_TYPE) {
+    throw new Error("Trusted listing-media uploads must be WebP images.");
+  }
+  if (upload.bytes.byteLength === 0 || upload.bytes.byteLength > UPLOAD_MAX_FILE_BYTES) {
+    throw new Error("Trusted listing-media upload exceeds the allowed size.");
+  }
+
+  const client = adminClient();
+  const { error } = await client.storage
+    .from(LISTING_MEDIA_BUCKET)
+    .upload(upload.path, upload.bytes, {
+      upsert: true,
+      cacheControl: "3600",
+      contentType: upload.contentType,
+    });
+  if (error) {
+    throw new Error(
+      `replaceTrustedListingMedia(${LISTING_MEDIA_BUCKET}/${upload.path}): ${error.message}`,
+    );
+  }
+
+  return client.storage.from(LISTING_MEDIA_BUCKET).getPublicUrl(upload.path).data.publicUrl;
+}
+
 /** Delete an unreferenced trusted listing-media object by its exact path. */
 export async function deleteTrustedListingMedia(path: string): Promise<void> {
   assertSafeObjectPath(path);

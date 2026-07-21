@@ -14,6 +14,7 @@ const dbMocks = vi.hoisted(() => ({
   deleteTrustedListingMedia: vi.fn(),
   getBenefitDetailsContext: vi.fn(),
   getPublicBenefitDetails: vi.fn(),
+  replaceTrustedListingMedia: vi.fn(),
   resolveOwnedListingHost: vi.fn(),
   saveBenefitDetails: vi.fn(),
   uploadTrustedListingMedia: vi.fn(),
@@ -42,13 +43,19 @@ const ROOT =
   "https://project-ref.supabase.co/storage/v1/object/public/listing-media";
 const benefitUrl = (slot: string, filename: string, host = "host-1") =>
   `${ROOT}/${host}/benefit/listing-1/meals/${slot}/${filename}`;
+const housingUrl = (slot: string, filename: string, host = "host-1") =>
+  `${ROOT}/${host}/benefit/listing-1/housing/${slot}/${filename}`;
 
 const OLD_KITCHEN = benefitUrl("kitchen", "old.webp");
 const NEW_KITCHEN = benefitUrl("kitchen", "new.webp");
-const UNCHANGED_DINING = benefitUrl("dining", "same.webp");
-const REMOVED_MISC = benefitUrl("misc", "removed.webp");
 const SESSION_FILENAME = "123e4567-e89b-42d3-a456-426614174000.webp";
 const SESSION_KITCHEN = benefitUrl("kitchen", SESSION_FILENAME);
+const SESSION_HOUSING = housingUrl("sleeping_area", SESSION_FILENAME);
+const STABLE_MEALS_KITCHEN = `${ROOT}/host-1/benefit/listing-1/meals/kitchen`;
+const OLD_HOUSING_KITCHEN = housingUrl("kitchen", "old.webp");
+const NEW_HOUSING_KITCHEN = housingUrl("kitchen", "new.webp");
+const UNCHANGED_BATHROOM = housingUrl("bathroom", "same.webp");
+const REMOVED_DINING_COMMON = housingUrl("dining_common", "removed.webp");
 
 function authAs(userId: string | null, token: string | null = "session-token") {
   authMock.mockResolvedValueOnce({
@@ -57,10 +64,13 @@ function authAs(userId: string | null, token: string | null = "session-token") {
   });
 }
 
-function contextWithPhotos(photos: Record<string, string>) {
+function contextWithPhotos(
+  photos: Record<string, string>,
+  kind: "housing" | "meals" = "meals",
+) {
   return {
     details: {
-      meals: { fields: {}, toggles: {}, photos },
+      [kind]: { fields: {}, toggles: {}, photos },
     },
     benefitLibrary: {},
     housingPhotoLibraryAvailable: true,
@@ -77,6 +87,7 @@ beforeEach(() => {
   dbMocks.getBenefitDetailsContext.mockResolvedValue(contextWithPhotos({}));
   dbMocks.saveBenefitDetails.mockResolvedValue({ ok: true });
   dbMocks.deleteTrustedListingMedia.mockResolvedValue(undefined);
+  dbMocks.replaceTrustedListingMedia.mockResolvedValue(STABLE_MEALS_KITCHEN);
   uploadGuardMocks.hasTrustedUploadBudget.mockResolvedValue(true);
   uploadGuardMocks.guardTrustedUploadSlot.mockResolvedValue({ ok: true });
 });
@@ -91,8 +102,8 @@ describe("uploadBenefitPhotoAction abuse bounds", () => {
 
     const result = await uploadBenefitPhotoAction(
       "listing-1",
-      "meals",
-      "kitchen",
+      "housing",
+      "sleeping_area",
       formData,
     );
 
@@ -115,14 +126,14 @@ describe("uploadBenefitPhotoAction abuse bounds", () => {
 
     const result = await uploadBenefitPhotoAction(
       "listing-1",
-      "meals",
-      "kitchen",
+      "housing",
+      "sleeping_area",
       formData,
     );
 
     expect(result).toEqual({ ok: false, error: "slot_full" });
     expect(uploadGuardMocks.guardTrustedUploadSlot).toHaveBeenCalledWith({
-      prefix: "host-1/benefit/listing-1/meals/kitchen",
+      prefix: "host-1/benefit/listing-1/housing/sleeping_area",
       referencedPaths: new Set(),
     });
     expect(prepareUploadImageMock).not.toHaveBeenCalled();
@@ -140,6 +151,29 @@ describe("uploadBenefitPhotoAction abuse bounds", () => {
     expect(result).toEqual({ ok: false, error: "Unknown meals photo slot." });
     expect(authMock).not.toHaveBeenCalled();
   });
+
+  it("normalizes and overwrites one deterministic Meals object without destructive cleanup", async () => {
+    const bytes = new Uint8Array([82, 73, 70, 70]);
+    prepareUploadImageMock.mockResolvedValueOnce({
+      ok: true,
+      image: { bytes, contentType: "image/webp" },
+    });
+    const formData = new FormData();
+    formData.set("file", new File([new Uint8Array([1])], "meal.jpg", {
+      type: "image/jpeg",
+    }));
+
+    await expect(
+      uploadBenefitPhotoAction("listing-1", "meals", "kitchen", formData),
+    ).resolves.toEqual({ ok: true, url: STABLE_MEALS_KITCHEN });
+    expect(dbMocks.replaceTrustedListingMedia).toHaveBeenCalledWith({
+      path: "host-1/benefit/listing-1/meals/kitchen",
+      bytes,
+      contentType: "image/webp",
+    });
+    expect(uploadGuardMocks.guardTrustedUploadSlot).not.toHaveBeenCalled();
+    expect(dbMocks.uploadTrustedListingMedia).not.toHaveBeenCalled();
+  });
 });
 
 describe("saveBenefitDetailsAction photo cleanup", () => {
@@ -150,22 +184,22 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
         fields: {},
         toggles: {},
         photos: {
-        kitchen: OLD_KITCHEN,
-        dining: UNCHANGED_DINING,
-        misc: REMOVED_MISC,
-        adjacent: benefitUrl("adjacent", "nested/escape.webp"),
-        foreign: benefitUrl("foreign", "other.webp", "host-2"),
-        queried: `${benefitUrl("queried", "old.webp")}?download=1`,
+          kitchen: OLD_HOUSING_KITCHEN,
+          bathroom: UNCHANGED_BATHROOM,
+          dining_common: REMOVED_DINING_COMMON,
+          adjacent: housingUrl("adjacent", "nested/escape.webp"),
+          foreign: housingUrl("foreign", "other.webp", "host-2"),
+          queried: `${housingUrl("queried", "old.webp")}?download=1`,
         },
       },
     });
 
-    const result = await saveBenefitDetailsAction("listing-1", "meals", {
+    const result = await saveBenefitDetailsAction("listing-1", "housing", {
       fields: {},
       toggles: {},
       photos: {
-        kitchen: NEW_KITCHEN,
-        dining: UNCHANGED_DINING,
+        kitchen: NEW_HOUSING_KITCHEN,
+        bathroom: UNCHANGED_BATHROOM,
       },
     });
 
@@ -174,19 +208,19 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
       "session-token",
       "user-1",
       "listing-1",
-      "meals",
+      "housing",
       {
         fields: {},
         toggles: {},
         photos: {
-          kitchen: NEW_KITCHEN,
-          dining: UNCHANGED_DINING,
+          kitchen: NEW_HOUSING_KITCHEN,
+          bathroom: UNCHANGED_BATHROOM,
         },
       },
     );
     expect(dbMocks.deleteTrustedListingMedia.mock.calls).toEqual([
-      ["host-1/benefit/listing-1/meals/kitchen/old.webp"],
-      ["host-1/benefit/listing-1/meals/misc/removed.webp"],
+      ["host-1/benefit/listing-1/housing/kitchen/old.webp"],
+      ["host-1/benefit/listing-1/housing/dining_common/removed.webp"],
     ]);
     expect(
       dbMocks.saveBenefitDetails.mock.invocationCallOrder[0],
@@ -205,10 +239,10 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
       error: "write_failed",
     });
 
-    const result = await saveBenefitDetailsAction("listing-1", "meals", {
+    const result = await saveBenefitDetailsAction("listing-1", "housing", {
       fields: {},
       toggles: {},
-      photos: { kitchen: NEW_KITCHEN },
+      photos: { kitchen: NEW_HOUSING_KITCHEN },
     });
 
     expect(result).toEqual({ ok: false, error: "write_failed" });
@@ -223,12 +257,12 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
       previous: {
         fields: {},
         toggles: {},
-        photos: { kitchen: OLD_KITCHEN },
+        photos: { kitchen: OLD_HOUSING_KITCHEN },
       },
     });
     dbMocks.deleteTrustedListingMedia.mockRejectedValueOnce(cleanupError);
 
-    const result = await saveBenefitDetailsAction("listing-1", "meals", {
+    const result = await saveBenefitDetailsAction("listing-1", "housing", {
       fields: {},
       toggles: {},
       photos: {},
@@ -243,6 +277,14 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
   });
 
   it("uses the write result instead of a race-prone cleanup snapshot read", async () => {
+    dbMocks.saveBenefitDetails.mockResolvedValueOnce({
+      ok: true,
+      previous: {
+        fields: {},
+        toggles: {},
+        photos: { kitchen: OLD_KITCHEN },
+      },
+    });
     const result = await saveBenefitDetailsAction("listing-1", "meals", {
       fields: {},
       toggles: {},
@@ -252,6 +294,8 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
     expect(result).toEqual({ ok: true });
     expect(dbMocks.saveBenefitDetails).toHaveBeenCalled();
     expect(dbMocks.getBenefitDetailsContext).not.toHaveBeenCalled();
+    // Meals uses stable in-place objects and never races a destructive delete
+    // against another save.
     expect(dbMocks.deleteTrustedListingMedia).not.toHaveBeenCalled();
   });
 });
@@ -272,12 +316,12 @@ describe("discardBenefitPhotoAction", () => {
     expect(dbMocks.deleteTrustedListingMedia).not.toHaveBeenCalled();
   });
 
-  it("deletes an unreferenced object from the caller's exact benefit slot", async () => {
+  it("retains a deterministic Meals object when an unsaved edit is discarded", async () => {
     const result = await discardBenefitPhotoAction(
       "listing-1",
       "meals",
       "kitchen",
-      SESSION_KITCHEN,
+      STABLE_MEALS_KITCHEN,
     );
 
     expect(result).toEqual({ ok: true });
@@ -286,22 +330,35 @@ describe("discardBenefitPhotoAction", () => {
       "user-1",
       "listing-1",
     );
+    expect(dbMocks.getBenefitDetailsContext).not.toHaveBeenCalled();
+    expect(dbMocks.deleteTrustedListingMedia).not.toHaveBeenCalled();
+  });
+
+  it("deletes an unreferenced Housing object from the caller's exact role", async () => {
+    const result = await discardBenefitPhotoAction(
+      "listing-1",
+      "housing",
+      "sleeping_area",
+      SESSION_HOUSING,
+    );
+
+    expect(result).toEqual({ ok: true });
     expect(dbMocks.deleteTrustedListingMedia).toHaveBeenCalledWith(
-      `host-1/benefit/listing-1/meals/kitchen/${SESSION_FILENAME}`,
+      `host-1/benefit/listing-1/housing/sleeping_area/${SESSION_FILENAME}`,
     );
   });
 
   it.each([
-    ["foreign host", benefitUrl("kitchen", "new.webp", "host-2")],
-    ["adjacent slot", benefitUrl("kitchen-other", "new.webp")],
-    ["nested path", benefitUrl("kitchen", "nested/new.webp")],
-    ["query suffix", `${NEW_KITCHEN}?download=1`],
-    ["non-session filename", NEW_KITCHEN],
+    ["foreign host", housingUrl("sleeping_area", SESSION_FILENAME, "host-2")],
+    ["adjacent slot", housingUrl("sleeping_area-other", SESSION_FILENAME)],
+    ["nested path", housingUrl("sleeping_area", `nested/${SESSION_FILENAME}`)],
+    ["query suffix", `${SESSION_HOUSING}?download=1`],
+    ["non-session filename", housingUrl("sleeping_area", "old.webp")],
   ])("rejects a %s URL without deleting it", async (_label, url) => {
     const result = await discardBenefitPhotoAction(
       "listing-1",
-      "meals",
-      "kitchen",
+      "housing",
+      "sleeping_area",
       url,
     );
 
@@ -314,14 +371,14 @@ describe("discardBenefitPhotoAction", () => {
 
   it("refuses to discard an object that the listing still references", async () => {
     dbMocks.getBenefitDetailsContext.mockResolvedValueOnce(
-      contextWithPhotos({ kitchen: SESSION_KITCHEN }),
+      contextWithPhotos({ sleeping_area: SESSION_HOUSING }, "housing"),
     );
 
     const result = await discardBenefitPhotoAction(
       "listing-1",
-      "meals",
-      "kitchen",
-      SESSION_KITCHEN,
+      "housing",
+      "sleeping_area",
+      SESSION_HOUSING,
     );
 
     expect(result).toEqual({
@@ -337,9 +394,9 @@ describe("discardBenefitPhotoAction", () => {
 
     const result = await discardBenefitPhotoAction(
       "listing-1",
-      "meals",
-      "kitchen",
-      SESSION_KITCHEN,
+      "housing",
+      "sleeping_area",
+      SESSION_HOUSING,
     );
 
     expect(result).toEqual({

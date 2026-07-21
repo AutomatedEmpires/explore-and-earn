@@ -19,6 +19,7 @@ vi.mock("../src/adminClient", () => ({
 import {
   deleteTrustedListingMedia,
   listTrustedListingMedia,
+  replaceTrustedListingMedia,
   uploadTrustedListingMedia,
 } from "../src/trustedStorage";
 
@@ -126,6 +127,26 @@ describe("uploadTrustedListingMedia", () => {
     const uploadCall = storageMocks.upload.mock.calls[0];
     expect(uploadCall?.[0]).toBe(VALID_PATH);
     expect(uploadCall?.[1]).toBe(normalizedOutput);
+  });
+});
+
+describe("replaceTrustedListingMedia", () => {
+  it("overwrites a deterministic normalized Meals slot with short-lived caching", async () => {
+    const path = "host-id/benefit/listing-id/meals/kitchen";
+    const bytes = new Uint8Array([82, 73, 70, 70]);
+
+    await replaceTrustedListingMedia({
+      path,
+      bytes,
+      contentType: "image/webp",
+    });
+
+    expect(storageMocks.upload).toHaveBeenCalledWith(path, bytes, {
+      upsert: true,
+      cacheControl: "3600",
+      contentType: "image/webp",
+    });
+    expect(storageMocks.getPublicUrl).toHaveBeenCalledWith(path);
   });
 });
 

@@ -7,6 +7,7 @@ import {
   deleteTrustedListingMedia,
   getBenefitDetailsContext,
   getPublicBenefitDetails,
+  replaceTrustedListingMedia,
   saveBenefitDetails,
   resolveOwnedListingHost,
   uploadTrustedListingMedia,
@@ -299,14 +300,19 @@ export async function saveBenefitDetailsAction(
   );
   if (!result.ok) return result;
 
-  await cleanupReplacedBenefitPhotos(
-    result.previous,
-    clean,
-    owned.hostProfileId,
-    listingId,
-    kind,
-    authResult.auth.userId,
-  );
+  // Only Housing has database object-reference protection. Meals retains its
+  // historical deterministic one-object-per-slot storage model, so it never
+  // performs destructive post-save cleanup that could race a concurrent bind.
+  if (kind === "housing") {
+    await cleanupReplacedBenefitPhotos(
+      result.previous,
+      clean,
+      owned.hostProfileId,
+      listingId,
+      kind,
+      authResult.auth.userId,
+    );
+  }
 
   revalidatePath("/host/listings");
   revalidatePath(`/host/listings/${listingId}`);
@@ -349,44 +355,46 @@ export async function uploadBenefitPhotoAction(
   if (!owned) {
     return { ok: false, error: "Listing not found or you do not have access to it." };
   }
-  const context = await getBenefitDetailsContext(
-    authResult.auth.token,
-    authResult.auth.userId,
-    listingId,
-  );
-  if (kind === "housing" && !context.housingPhotoLibraryAvailable) {
-    return { ok: false, error: "Housing photos are not available yet. Reload and try again." };
-  }
-
   const prefix =
     `${owned.hostProfileId}/benefit/${listingId}/${kind}/${slotId}`;
-  const referencedPaths = new Set<string>();
-  for (const url of Object.values(context.details[kind]?.photos ?? {})) {
-    if (typeof url !== "string") continue;
-    const path = ownedBenefitPhotoObjectPath(
-      url,
-      owned.hostProfileId,
+  if (kind === "housing") {
+    const context = await getBenefitDetailsContext(
+      authResult.auth.token,
+      authResult.auth.userId,
       listingId,
-      kind,
-      slotId,
     );
-    if (path?.startsWith(`${prefix}/`)) referencedPaths.add(path);
-  }
-  try {
-    const slotGuard = await guardTrustedUploadSlot({
-      prefix,
-      referencedPaths,
-    });
-    if (!slotGuard.ok) return slotGuard;
-  } catch (cause) {
-    reportError(cause, {
-      action: "guardBenefitPhotoUpload",
-      userId: authResult.auth.userId,
-    });
-    return {
-      ok: false,
-      error: "Photo uploads are temporarily unavailable. Please try again.",
-    };
+    if (!context.housingPhotoLibraryAvailable) {
+      return { ok: false, error: "Housing photos are not available yet. Reload and try again." };
+    }
+
+    const referencedPaths = new Set<string>();
+    for (const url of Object.values(context.details.housing?.photos ?? {})) {
+      if (typeof url !== "string") continue;
+      const path = ownedBenefitPhotoObjectPath(
+        url,
+        owned.hostProfileId,
+        listingId,
+        kind,
+        slotId,
+      );
+      if (path?.startsWith(`${prefix}/`)) referencedPaths.add(path);
+    }
+    try {
+      const slotGuard = await guardTrustedUploadSlot({
+        prefix,
+        referencedPaths,
+      });
+      if (!slotGuard.ok) return slotGuard;
+    } catch (cause) {
+      reportError(cause, {
+        action: "guardBenefitPhotoUpload",
+        userId: authResult.auth.userId,
+      });
+      return {
+        ok: false,
+        error: "Photo uploads are temporarily unavailable. Please try again.",
+      };
+    }
   }
 
   const file = formData.get("file");
@@ -394,13 +402,15 @@ export async function uploadBenefitPhotoAction(
   if (!prepared.ok) return { ok: false, error: prepared.error };
 
   try {
-    const objectId = crypto.randomUUID();
-    const path = `${prefix}/${objectId}.webp`;
-    const url = await uploadTrustedListingMedia({
-      path,
+    const versionedHousingPath = `${prefix}/${crypto.randomUUID()}.webp`;
+    const upload = {
+      path: kind === "housing" ? versionedHousingPath : prefix,
       bytes: prepared.image.bytes,
       contentType: prepared.image.contentType,
-    });
+    };
+    const url = kind === "housing"
+      ? await uploadTrustedListingMedia(upload)
+      : await replaceTrustedListingMedia(upload);
     return { ok: true, url };
   } catch (cause) {
     return {
@@ -446,6 +456,12 @@ export async function discardBenefitPhotoAction(
     validSlot.slot,
   );
   if (!path) return { ok: false, error: "Photo does not belong to this benefit slot." };
+  if (kind === "meals") {
+    // A stable Meals slot is overwritten in place and intentionally retained
+    // when an edit is discarded. This bounds storage without a delete/rebind
+    // race because Meals references are not covered by Housing's DB trigger.
+    return { ok: true };
+  }
   const filename = path.slice(path.lastIndexOf("/") + 1);
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.webp$/.test(
