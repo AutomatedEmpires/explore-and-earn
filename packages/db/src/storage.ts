@@ -66,7 +66,24 @@ export async function uploadBenefitPhoto(
   slot: string,
   file: File,
 ): Promise<string> {
-  const path = `${hostProfileId}/benefit/${listingId}/${kind}/${slot}`;
+  const objectId = globalThis.crypto.randomUUID();
+  const path = `${hostProfileId}/benefit/${listingId}/${kind}/${slot}/${objectId}`;
+  return uploadToBucket(token, LISTING_MEDIA_BUCKET, path, file);
+}
+
+/**
+ * Upload one reusable host-level Housing evidence role. Versioned object names
+ * make replacement atomic: the profile JSON switches only after upload success,
+ * while a still-referenced old object remains protected by migration 072.
+ */
+export async function uploadHousingLibraryPhoto(
+  token: string,
+  hostProfileId: string,
+  role: string,
+  file: File,
+): Promise<string> {
+  const objectId = globalThis.crypto.randomUUID();
+  const path = `${hostProfileId}/library/housing/${role}/${objectId}`;
   return uploadToBucket(token, LISTING_MEDIA_BUCKET, path, file);
 }
 

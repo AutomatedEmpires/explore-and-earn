@@ -129,6 +129,64 @@ if (!securityMigration) {
   }
 }
 
+// Housing evidence is a cross-row invariant: every mutation/ownership trigger,
+// owner-only column grants, and the effective public RPC must travel with 072.
+const housingMigration = migrationFiles.find((f) => /^072_.*\.sql$/.test(f))
+if (!housingMigration) {
+  hasFailure = true
+  console.error("G-HOUSING-PHOTOS: expected migration 072 to be present.")
+} else {
+  const sql = fileContents.get(housingMigration).toLowerCase().replace(/\s+/g, " ")
+  const required = [
+    "grant update (benefit_library) on public.host_profiles to authenticated;",
+    "revoke select on table public.host_profiles from authenticated;",
+    "revoke select (benefit_library) on public.host_profiles from anon, authenticated;",
+    "revoke select on table public.listings from anon, authenticated;",
+    "revoke select (benefit_details) on public.listings from anon, authenticated;",
+    "create or replace function public.get_public_housing_photos",
+    "grant execute on function public.get_public_housing_photos(uuid) to anon, authenticated, service_role;",
+    "create or replace function public.get_public_benefit_details",
+    "create or replace function public.get_owned_benefit_context",
+    "create or replace function public.get_my_host_benefit_library",
+    "lock table public.host_profiles in share row exclusive mode;",
+    "lock table public.listings in share row exclusive mode;",
+    "lock table storage.objects in share row exclusive mode;",
+    "file_size_limit = 5242880",
+    "create or replace function private.stored_housing_photo_object_name",
+    "create or replace function private.housing_photo_metadata_is_valid",
+    "and private.housing_photo_metadata_is_valid(o.metadata)",
+    "housing_photo_migration_paused_listings=%",
+    "set status = 'paused'",
+    "create or replace function private.preserve_claim_benefit_details",
+    "create trigger trg_listings_claim_benefit_ownership",
+    "'benefit_details', coalesce(old.benefit_details, '{}'::jsonb)",
+    "new.benefit_details := '{}'::jsonb",
+    "create trigger trg_listings_housing_photos",
+    "create trigger trg_host_profiles_housing_library",
+    "create trigger trg_storage_housing_photo_references",
+    "before delete or update on storage.objects",
+    "from storage.objects o",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(`G-HOUSING-PHOTOS: ${housingMigration} is missing ${needle}`)
+    }
+  }
+  if (
+    sql.includes("grant update on public.host_profiles to authenticated")
+    || sql.includes("grant select on public.host_profiles to anon")
+    || sql.includes("grant select (benefit_library) on public.host_profiles to anon")
+    || sql.includes("grant select (benefit_library) on public.host_profiles to authenticated")
+    || sql.includes("grant select (benefit_details) on public.listings to anon")
+    || sql.includes("if tg_op = 'update' and old.bucket_id = new.bucket_id and old.name = new.name")
+    || sql.includes("listing_media_overrides")
+  ) {
+    hasFailure = true
+    console.error(`G-HOUSING-PHOTOS: ${housingMigration} broadens privileges or revives rejected storage.`)
+  }
+}
+
 if (hasFailure) {
   process.exit(1)
 }

@@ -8,6 +8,7 @@
 //
 // Usage:
 //   DATABASE_URL=postgres://... node ./assert-grants.mjs
+//   # or standard PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE variables
 //
 // Requires `psql` on PATH. No npm dependencies (keeps the lockfile untouched).
 
@@ -17,28 +18,37 @@ import { dirname, join } from "node:path"
 import { existsSync } from "node:fs"
 
 const here = dirname(fileURLToPath(import.meta.url))
-const sqlFile = join(here, "sql", "assert_rpc_grants.sql")
+const sqlFiles = [
+  join(here, "sql", "assert_rpc_grants.sql"),
+  join(here, "sql", "assert_housing_photo_library.sql"),
+]
 
 const dbUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL
-if (!dbUrl) {
+const hasLibpqEnvironment = Boolean(process.env.PGHOST && process.env.PGUSER)
+if (!dbUrl && !hasLibpqEnvironment) {
   console.error(
-    "assert-grants: set DATABASE_URL (or SUPABASE_DB_URL) to a Postgres connection string.",
+    "assert-grants: set DATABASE_URL, SUPABASE_DB_URL, or standard libpq PG* variables.",
   )
   process.exit(2)
 }
-if (!existsSync(sqlFile)) {
-  console.error(`assert-grants: missing SQL file at ${sqlFile}`)
-  process.exit(2)
+const connectionArgs = dbUrl ? [dbUrl] : []
+for (const sqlFile of sqlFiles) {
+  if (!existsSync(sqlFile)) {
+    console.error(`assert-grants: missing SQL file at ${sqlFile}`)
+    process.exit(2)
+  }
 }
 
-const result = spawnSync(
-  "psql",
-  [dbUrl, "-v", "ON_ERROR_STOP=1", "-f", sqlFile],
-  { stdio: "inherit", encoding: "utf8" },
-)
+for (const sqlFile of sqlFiles) {
+  const result = spawnSync(
+    "psql",
+    [...connectionArgs, "-v", "ON_ERROR_STOP=1", "-f", sqlFile],
+    { stdio: "inherit", encoding: "utf8" },
+  )
 
-if (result.error) {
-  console.error(`assert-grants: failed to run psql - ${result.error.message}`)
-  process.exit(2)
+  if (result.error) {
+    console.error(`assert-grants: failed to run psql - ${result.error.message}`)
+    process.exit(2)
+  }
+  if (result.status !== 0) process.exit(result.status === null ? 1 : result.status)
 }
-process.exit(result.status === null ? 1 : result.status)

@@ -31,6 +31,7 @@ export * from "./queries/messages";
 export * from "./queries/emailContext";
 export * from "./queries/notificationPrefs";
 export * from "./storage";
+export * from "./trustedStorage";
 export * from "./adminClient";
 export * from "./queries/admin";
 export * from "./lib/matchScore";

@@ -187,14 +187,14 @@
 		box-shadow var(--motion-fast) var(--ease-standard);
 }
 
-.closeButton:hover {
+.closeButton:hover:not(:disabled) {
 	background: color-mix(in srgb, var(--palette-parchment) 40%, var(--color-surface-raised));
 	border-color: color-mix(in srgb, var(--border-ink) 92%, var(--text-primary) 8%);
 	box-shadow: 0 2px 8px color-mix(in srgb, var(--color-ink) 10%, transparent);
 	transform: scale(1.06);
 }
 
-.closeButton:active {
+.closeButton:active:not(:disabled) {
 	transform: scale(0.94);
 	box-shadow: none;
 }
@@ -202,6 +202,11 @@
 .closeButton:focus-visible {
 	outline: 2px solid var(--color-cta);
 	outline-offset: 2px;
+}
+
+.closeButton:disabled {
+	cursor: wait;
+	opacity: 0.5;
 }
 
 .heroWrap {

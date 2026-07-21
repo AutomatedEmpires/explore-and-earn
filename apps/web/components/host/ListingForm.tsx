@@ -1070,8 +1070,8 @@ export function ListingForm({
                   <Icon name="nav.photos" size={20} aria-hidden />
                 </span>
                 <span className={styles.bucketNoteBody}>
-                  Housing and meal photo buckets live on your host profile — upload them once and
-                  they&apos;re reused across every listing.
+                  Housing photo defaults live on your host profile. Each listing can override any
+                  role that differs. Meal photos remain listing-specific.
                   <Link className={styles.bucketNoteLink} href="/host/profile/edit">
                     Manage photo buckets
                   </Link>
@@ -1310,6 +1310,7 @@ export function ListingForm({
           kind={benefitKind ?? "housing"}
           onClose={() => setBenefitKind(null)}
           listingId={listingId}
+          category={derivedCategory}
         />
       ) : null}
     </>

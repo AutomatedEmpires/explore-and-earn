@@ -143,6 +143,8 @@ export function devHostProfile(): HostProfile {
     housingOfferedGenerally: true,
     mealsOfferedGenerally: true,
     subscriptionTier: "professional",
+    benefitLibraryAvailable: true,
+    benefitLibrary: {},
   };
 }
 

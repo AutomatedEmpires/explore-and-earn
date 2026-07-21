@@ -16,7 +16,7 @@ import { expect, test, type Page } from "playwright/test";
  */
 
 const DEV_ROLE_COOKIE = "ee_dev_role";
-const BASE = "http://127.0.0.1:3100";
+const BASE = "http://localhost:3100";
 
 test.use({ viewport: { width: 390, height: 844 } });
 

@@ -139,6 +139,205 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Guardrail 4: reusable housing evidence keeps narrow grants and every
+-- mutation boundary that preserves already-published claims.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_trigger_count integer;
+  v_private_count integer;
+  v_private_exec integer;
+  v_storage_trigger_def text;
+begin
+  if not exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public'
+       and table_name = 'host_profiles'
+       and column_name = 'benefit_library'
+       and data_type = 'jsonb'
+       and is_nullable = 'NO'
+  ) then
+    raise exception 'db-assert: host_profiles.benefit_library is missing or nullable';
+  end if;
+
+  if not has_column_privilege('authenticated', 'public.host_profiles', 'benefit_library', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.host_profiles', 'UPDATE') then
+    raise exception 'db-assert: authenticated benefit_library UPDATE is not column-narrow';
+  end if;
+  if has_column_privilege('authenticated', 'public.host_profiles', 'benefit_library', 'SELECT')
+     or has_column_privilege('anon', 'public.host_profiles', 'benefit_library', 'SELECT')
+     or has_table_privilege('authenticated', 'public.host_profiles', 'SELECT')
+     or has_column_privilege('anon', 'public.listings', 'benefit_details', 'SELECT')
+     or has_column_privilege('authenticated', 'public.listings', 'benefit_details', 'SELECT')
+     or has_table_privilege('anon', 'public.listings', 'SELECT')
+     or has_table_privilege('authenticated', 'public.listings', 'SELECT')
+     or exists (
+       select 1 from pg_policies
+        where schemaname = 'public'
+          and tablename = 'host_profiles'
+          and cmd in ('UPDATE', 'ALL')
+          and (roles && array['anon']::name[] or roles = array['public']::name[])
+     ) then
+    raise exception 'db-assert: raw housing evidence columns remain directly readable';
+  end if;
+  if not has_function_privilege('anon', 'public.get_public_housing_photos(uuid)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.get_public_housing_photos(uuid)', 'EXECUTE')
+     or exists (
+       select 1
+         from pg_proc p
+         join pg_namespace n on n.oid = p.pronamespace
+         cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+        where n.nspname = 'public'
+          and p.proname = 'get_public_housing_photos'
+          and a.grantee = 0
+          and a.privilege_type = 'EXECUTE'
+     ) then
+    raise exception 'db-assert: effective housing-photo RPC grants are incorrect';
+  end if;
+  if not has_function_privilege('anon', 'public.get_public_benefit_details(uuid)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.get_public_benefit_details(uuid)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.get_owned_benefit_context(uuid)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.get_owned_benefit_context(uuid)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.get_my_host_benefit_library()', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.get_my_host_benefit_library()', 'EXECUTE')
+     or has_function_privilege('anon', 'public.save_owned_benefit_detail(uuid,text,jsonb)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.save_owned_benefit_detail(uuid,text,jsonb)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.set_my_housing_library_photo(text,text)', 'EXECUTE')
+     or not has_function_privilege('authenticated', 'public.set_my_housing_library_photo(text,text)', 'EXECUTE') then
+    raise exception 'db-assert: public/owner housing-detail RPC grants are incorrect';
+  end if;
+  if exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+     where n.nspname = 'public'
+       and p.proname in (
+         'get_public_benefit_details',
+         'get_owned_benefit_context',
+         'get_my_host_benefit_library',
+         'save_owned_benefit_detail',
+         'set_my_housing_library_photo'
+       )
+       and a.grantee = 0
+       and a.privilege_type = 'EXECUTE'
+  ) then
+    raise exception 'db-assert: housing-detail RPC exposed to PUBLIC';
+  end if;
+
+  select count(*) into v_trigger_count
+    from pg_trigger t
+    join pg_class c on c.oid = t.tgrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where not t.tgisinternal
+      and (n.nspname, c.relname, t.tgname) in (
+        ('public', 'listings', 'trg_listings_claim_benefit_ownership'),
+        ('public', 'listings', 'trg_listings_housing_photos'),
+        ('public', 'host_profiles', 'trg_host_profiles_housing_library'),
+        ('storage', 'objects', 'trg_storage_housing_photo_references')
+      );
+  if v_trigger_count <> 4 then
+    raise exception 'db-assert: expected 4 housing evidence triggers, found %', v_trigger_count;
+  end if;
+
+  select lower(pg_get_triggerdef(t.oid)) into v_storage_trigger_def
+    from pg_trigger t
+    join pg_class c on c.oid = t.tgrelid
+    join pg_namespace n on n.oid = c.relnamespace
+   where not t.tgisinternal
+     and n.nspname = 'storage'
+     and c.relname = 'objects'
+     and t.tgname = 'trg_storage_housing_photo_references';
+  if v_storage_trigger_def not like '%before delete or update on storage.objects%'
+     or v_storage_trigger_def like '%update of%' then
+    raise exception 'db-assert: storage reference trigger does not guard every UPDATE';
+  end if;
+
+  if not exists (
+    select 1
+      from storage.buckets b
+     where b.id = 'listing-media'
+       and b.file_size_limit = 5242880
+       and b.allowed_mime_types @> array[
+         'image/jpeg', 'image/png', 'image/webp', 'image/heic'
+       ]::text[]
+       and cardinality(b.allowed_mime_types) = 4
+  ) then
+    raise exception 'db-assert: listing-media upload limits or MIME allow-list drifted';
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+     where schemaname = 'storage'
+       and tablename = 'objects'
+       and policyname = 'listing_media_insert_own_folder'
+       and cmd = 'INSERT'
+       and coalesce(with_check, '') like '%split_part(name, ''/''::text, 2) = ''library''::text%'
+       and coalesce(with_check, '') like '%split_part(name, ''/''::text, 4) = ''housing''::text%'
+  ) or not exists (
+    select 1 from pg_policies
+     where schemaname = 'storage'
+       and tablename = 'objects'
+       and policyname = 'listing_media_update_own_folder'
+       and cmd = 'UPDATE'
+       and coalesce(qual, '') like '%split_part(name, ''/''::text, 2) = ''library''::text%'
+       and coalesce(with_check, '') like '%split_part(name, ''/''::text, 4) = ''housing''::text%'
+  ) then
+    raise exception 'db-assert: authenticated Housing storage path reservation drifted';
+  end if;
+
+  select count(*) into v_private_count
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'private'
+     and p.proname in (
+       'stored_housing_photo_object_name',
+       'housing_photo_metadata_is_valid',
+        'housing_photo_object_name',
+        'housing_photo_url_is_valid',
+        'missing_housing_photo_roles',
+        'preserve_claim_benefit_details',
+        'enforce_listing_housing_photos',
+        'protect_host_housing_photo_library',
+        'protect_referenced_housing_photo_object'
+      );
+  if v_private_count <> 9 then
+    raise exception 'db-assert: expected 9 private housing functions, found %', v_private_count;
+  end if;
+
+  select count(*) into v_private_exec
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'private'
+      and p.proname in (
+        'stored_housing_photo_object_name',
+        'housing_photo_metadata_is_valid',
+       'housing_photo_object_name',
+       'housing_photo_url_is_valid',
+       'missing_housing_photo_roles',
+       'preserve_claim_benefit_details',
+       'enforce_listing_housing_photos',
+       'protect_host_housing_photo_library',
+       'protect_referenced_housing_photo_object'
+     )
+     and (
+       has_function_privilege('anon', p.oid, 'EXECUTE')
+       or has_function_privilege('authenticated', p.oid, 'EXECUTE')
+       or exists (
+         select 1
+           from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+          where a.grantee = 0 and a.privilege_type = 'EXECUTE'
+       )
+     );
+  if v_private_exec <> 0 then
+    raise exception 'db-assert: housing evidence private functions expose EXECUTE';
+  end if;
+
+  raise notice 'db-assert: housing evidence grants/triggers PASSED';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Evidence table (printed for PR / audit artifacts).
 -- ---------------------------------------------------------------------------
 select p.proname as function_name,
@@ -155,6 +354,9 @@ where n.nspname = 'public'
   and p.proname in (
     'set_host_attestation', 'get_clerk_user_id', 'current_seeker_profile_ids',
     'current_host_profile_ids', 'current_host_listing_ids', 'current_conversation_ids',
-    'enforce_listing_cover_asset', 'enforce_listing_media_override'
+    'enforce_listing_cover_asset', 'enforce_listing_media_override',
+    'get_public_housing_photos', 'get_public_benefit_details',
+    'get_owned_benefit_context', 'get_my_host_benefit_library',
+    'save_owned_benefit_detail', 'set_my_housing_library_photo'
   )
 order by p.proname;

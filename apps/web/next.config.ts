@@ -73,6 +73,12 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ["@explore-and-earn/ui", "@explore-and-earn/contracts", "@explore-and-earn/db"],
   experimental: {
+    // Raw images are capped at 4 MiB; this leaves framing room under Vercel's
+    // non-configurable 4.5 MB Function request-body limit. The action then
+    // validates, decodes, and re-encodes before persistence.
+    serverActions: {
+      bodySizeLimit: "4.2mb",
+    },
     // Tree-shake barrel imports so only the referenced symbols ship. Critical
     // for @phosphor-icons/react (importing ~100 icons from its index must not
     // pull the full ~9,000-icon set) and for the @explore-and-earn/ui barrel.

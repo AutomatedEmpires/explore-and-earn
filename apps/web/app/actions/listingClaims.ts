@@ -1,11 +1,13 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { missingHousingPhotoRoles } from "@explore-and-earn/contracts"
 import {
 	adminClaimContext,
 	beginClaimConfirmation,
 	confirmAndConvertClaim,
+	getHostProfile,
 	getClaimableListing,
 	getClaimsAwaitingReview,
 	getMyListingClaims,
@@ -19,6 +21,7 @@ import {
 
 import { isCurrentUserAdmin } from "../../lib/admin"
 import { checkRateLimit } from "../../lib/rateLimit"
+import { LISTINGS_CACHE_TAG } from "../../lib/serverCache"
 import { reportError } from "../../lib/sentry"
 
 /**
@@ -168,6 +171,10 @@ function sanitizeConfirmed(input: unknown): ClaimConfirmedFields | null {
 		}
 		out[key] = value
 	}
+	// The confirmation UI always requires an explicit Housing answer. Keep the
+	// server boundary equally strict: omission could otherwise preserve a
+	// sourced `housing_included = true` value and bypass the rollout gate below.
+	if (typeof out.housingIncluded !== "boolean") return null
 	return out as ClaimConfirmedFields
 }
 
@@ -182,11 +189,32 @@ export async function confirmClaimListingAction(
 	confirmedFields: ClaimConfirmedFields,
 ): Promise<{ ok: boolean; error?: string; listingId?: string }> {
 	try {
-		const { userId } = await auth()
+		const { userId, getToken } = await auth()
 		if (!userId) return { ok: false, error: "unauthenticated" }
 
 		const confirmed = sanitizeConfirmed(confirmedFields)
 		if (confirmed === null) return { ok: false, error: "invalid_confirmed_fields" }
+
+		if (confirmed.housingIncluded === true) {
+			const token = await getToken()
+			if (!token) return { ok: false, error: "unauthenticated" }
+
+			// App code can reach production before migration 072. Its owner-only
+			// library RPC is the capability signal for the ownership-transfer and
+			// photo-enforcement triggers installed by that migration. Never convert
+			// Housing Included on the legacy schema: it would retain source/prior-host
+			// benefit details under the newly verified host.
+			const profile = await getHostProfile(token, userId)
+			if (!profile || profile.id !== hostProfileId) {
+				return { ok: false, error: "host_profile_mismatch" }
+			}
+			if (!profile.benefitLibraryAvailable) {
+				return { ok: false, error: "housing_library_unavailable" }
+			}
+			if (missingHousingPhotoRoles(profile.benefitLibrary.housing?.photos).length > 0) {
+				return { ok: false, error: "housing_photos_incomplete" }
+			}
+		}
 
 		const result = await confirmAndConvertClaim(userId, claimId, hostProfileId, confirmed)
 		if (result.ok && result.listingId) {
@@ -200,6 +228,7 @@ export async function confirmClaimListingAction(
 			})
 			revalidatePath(`/listing/${result.listingId}`)
 			revalidatePath("/host/listings")
+			revalidateTag(LISTINGS_CACHE_TAG)
 		}
 		return result
 	} catch (error) {
@@ -278,6 +307,7 @@ export async function revokeClaimAction(
 		const result = await transitionListingClaim(claimId, "revoked", userId, notes)
 		if (result.ok) {
 			revalidatePath("/admin/claims")
+			revalidateTag(LISTINGS_CACHE_TAG)
 			// The listing may have just reverted verified → sourced.
 			const claim = await adminClaimContext(claimId).catch(() => null)
 			if (claim) {

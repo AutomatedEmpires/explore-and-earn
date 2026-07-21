@@ -7,6 +7,7 @@ import type {
   BenefitProvision,
   CompensationUnit,
   DiscoveryCardConditionalBadge,
+  EffectiveHousingPhoto,
   ListingCategoryDepth,
   ListingClaimSummary,
   ListingLogistics,
@@ -27,6 +28,7 @@ import {
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { anonClient, authedClient } from "../client";
+import { getPublicHousingPhotos } from "./benefitDetails";
 import { getActiveBoostedListingIds, getSeekerApplicationIds } from "./idReaders";
 import { getPassedListingIds } from "./passedListings";
 
@@ -1321,6 +1323,8 @@ export interface PublicListingDetail {
   housingDescription?: string | null;
   /** Free-text meals descriptor (listings.meals_description; migration 040). */
   mealsDescription?: string | null;
+  /** Exact housing evidence shown to seekers, with inherited/override source. */
+  housingPhotos?: readonly EffectiveHousingPhoto[];
 
   /* ── Host-narrative-derived (host_profiles.narrative jsonb; migration 059) ── */
   /** "Why work with us" recruiting pitch. */
@@ -1477,6 +1481,7 @@ export async function getListingDetailPublic(
   const team = toDetailTeam(narrative.team);
   const activities = toDetailStringArray(narrative.activities);
   const hostPerks = toDetailStringArray(narrative.perks);
+  const housingPhotos = await getPublicHousingPhotos(listingId, db);
 
   return {
     id: String(row.id),
@@ -1561,6 +1566,7 @@ export async function getListingDetailPublic(
     perks: perks.length > 0 ? perks : undefined,
     housingDescription: toDetailText(row.housing_description),
     mealsDescription: toDetailText(row.meals_description),
+    housingPhotos: housingPhotos.length > 0 ? housingPhotos : undefined,
     whyWorkForUs: toDetailText(narrative.whyWorkForUs),
     team: team.length > 0 ? team : undefined,
     activities: activities.length > 0 ? activities : undefined,

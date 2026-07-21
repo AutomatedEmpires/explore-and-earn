@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getClaimConfirmationFields } from "@explore-and-earn/db";
+import {
+  getClaimConfirmationFields,
+  getHostProfile,
+} from "@explore-and-earn/db";
 
 import { getClaimContextAction } from "../../../actions/listingClaims";
 import { optionalAuth } from "../../../../lib/optionalAuth";
@@ -32,7 +35,7 @@ export default async function ClaimListingPage({ params }: Props) {
   const { id } = await params;
   if (!isUuid(id)) notFound();
 
-  const { userId } = await optionalAuth();
+  const { userId, getToken } = await optionalAuth();
   if (!userId) {
     redirect(`/sign-in?redirect_url=/claim/${id}`);
   }
@@ -49,6 +52,18 @@ export default async function ClaimListingPage({ params }: Props) {
   // Only the claimant of a CONFIRMING claim ever receives this payload.
   const confirmationPrefill =
     myClaim?.status === "confirming" ? await getClaimConfirmationFields(id) : null;
+  const confirmationHostProfile =
+    myClaim?.status === "confirming" && myClaim.hostProfileId && getToken
+      ? await getToken()
+          .then((token) =>
+            token ? getHostProfile(token, userId).catch(() => null) : null,
+          )
+          .catch(() => null)
+      : null;
+  const confirmationBenefitLibrary =
+    confirmationHostProfile && confirmationHostProfile.id === myClaim?.hostProfileId
+      ? confirmationHostProfile.benefitLibrary
+      : null;
 
   return (
     <PublicShell>
@@ -60,6 +75,10 @@ export default async function ClaimListingPage({ params }: Props) {
           employerName={listing.sourceEmployerName}
           existingClaim={myClaim}
           confirmationPrefill={confirmationPrefill}
+          confirmationBenefitLibrary={confirmationBenefitLibrary}
+          confirmationBenefitLibraryAvailable={
+            confirmationHostProfile?.benefitLibraryAvailable === true
+          }
         />
       </div>
     </PublicShell>

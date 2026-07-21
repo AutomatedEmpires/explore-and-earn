@@ -2,7 +2,13 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { MARKETPLACE_CATEGORIES, hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
+import {
+  MARKETPLACE_CATEGORIES,
+  hasVerifiedHostSubscription,
+  sanitizeHostBenefitLibrary,
+  type HostBenefitLibrary,
+  type HousingPhotoRole,
+} from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 
 /**
@@ -52,6 +58,8 @@ export interface HostProfileDetailsInput {
   mealsOfferedGenerally?: boolean;
   /** Marketplace categories this host operates in (subset of MARKETPLACE_CATEGORIES). */
   categoryScopes?: string[];
+  /** Reusable host-level Housing evidence (migration 072). */
+  benefitLibrary?: HostBenefitLibrary;
 }
 
 function normalizeOptional(value: string | null | undefined): string | null | undefined {
@@ -74,12 +82,27 @@ export interface HostProfile {
   housingOfferedGenerally: boolean;
   mealsOfferedGenerally: boolean;
   subscriptionTier: "none" | "starter" | "professional" | "enterprise";
+  /** False while migration 072 has not reached the connected database. */
+  benefitLibraryAvailable: boolean;
+  benefitLibrary: HostBenefitLibrary;
 }
 
 const HOST_PROFILE_SELECT =
   "id,company_name,host_name,tagline,about,primary_location_name,photo_url," +
   "website_url,social_links,category_scopes,housing_offered_generally," +
   "meals_offered_generally,subscription_tier";
+
+function isMissingBenefitLibraryRpc(error: { code?: string; message?: string }): boolean {
+  const message = error.message?.toLowerCase() ?? "";
+  const namesExpectedRpc = message.includes("get_my_host_benefit_library");
+  return (
+    error.code === "PGRST202" ||
+    (namesExpectedRpc &&
+      (error.code === "42883" ||
+        message.includes("could not find the function") ||
+        message.includes("does not exist")))
+  );
+}
 
 function rowToHostProfile(row: Record<string, unknown>): HostProfile {
   const raw = row.social_links as Record<string, unknown> | null;
@@ -107,6 +130,8 @@ function rowToHostProfile(row: Record<string, unknown>): HostProfile {
     )
       ? row.subscription_tier
       : "none") as HostProfile["subscriptionTier"],
+    benefitLibraryAvailable: row.benefit_library_available === true,
+    benefitLibrary: sanitizeHostBenefitLibrary(row.benefit_library),
   };
 }
 
@@ -122,7 +147,25 @@ export async function getHostProfile(
     .maybeSingle();
   if (error) throw new Error(`getHostProfile: ${error.message}`);
   if (!data) return null;
-  return rowToHostProfile(data as unknown as Record<string, unknown>);
+  let benefitLibrary: unknown = {};
+  let benefitLibraryAvailable = false;
+  if (typeof db.rpc === "function") {
+    const { data: library, error: libraryError } = await db.rpc(
+      "get_my_host_benefit_library",
+    );
+    if (libraryError && !isMissingBenefitLibraryRpc(libraryError)) {
+      throw new Error(`getHostProfile: ${libraryError.message}`);
+    }
+    if (!libraryError) {
+      benefitLibrary = library;
+      benefitLibraryAvailable = true;
+    }
+  }
+  return rowToHostProfile({
+    ...(data as unknown as Record<string, unknown>),
+    benefit_library: benefitLibrary,
+    benefit_library_available: benefitLibraryAvailable,
+  });
 }
 
 export type HostSubscriptionTier =
@@ -195,6 +238,9 @@ export async function updateHostProfileDetails(
       new Set(fields.categoryScopes.filter((c) => allowed.includes(c))),
     );
   }
+  if (fields.benefitLibrary !== undefined) {
+    patch.benefit_library = sanitizeHostBenefitLibrary(fields.benefitLibrary);
+  }
 
   if (Object.keys(patch).length === 0) return { ok: true };
 
@@ -209,6 +255,50 @@ export async function updateHostProfileDetails(
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "update_failed";
     return { ok: false, error: message };
+  }
+}
+
+/**
+ * Atomically replace one reusable Housing role for the current host. Migration
+ * 072 locks the profile row, preserves every other role, and returns the exact
+ * displaced URL so trusted Storage cleanup cannot race another tab.
+ */
+export async function setMyHousingLibraryPhoto(
+  clerkToken: string,
+  role: HousingPhotoRole,
+  url: string,
+): Promise<{
+  ok: boolean;
+  error?: string;
+  hostProfileId?: string;
+  previousUrl?: string;
+  benefitLibrary?: HostBenefitLibrary;
+}> {
+  try {
+    const db = untypedClient(clerkToken);
+    const { data, error } = await db.rpc("set_my_housing_library_photo", {
+      p_role: role,
+      p_url: url,
+    });
+    if (error) return { ok: false, error: error.message };
+    const row = Array.isArray(data) ? data[0] : null;
+    if (!row || typeof row !== "object") {
+      return { ok: false, error: "update_failed" };
+    }
+    const result = row as Record<string, unknown>;
+    return {
+      ok: true,
+      hostProfileId:
+        typeof result.host_profile_id === "string" ? result.host_profile_id : undefined,
+      previousUrl:
+        typeof result.previous_url === "string" ? result.previous_url : undefined,
+      benefitLibrary: sanitizeHostBenefitLibrary(result.benefit_library),
+    };
+  } catch (cause) {
+    return {
+      ok: false,
+      error: cause instanceof Error ? cause.message : "update_failed",
+    };
   }
 }
 

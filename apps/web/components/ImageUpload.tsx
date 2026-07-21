@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
 import { Icon, Skeleton } from "@explore-and-earn/ui";
 import {
   UPLOAD_ALLOWED_MIME_TYPES,
   UPLOAD_MAX_FILE_BYTES,
 } from "@explore-and-earn/contracts";
+import { isLocalStorageUrl } from "../lib/storageUrl";
 
 import styles from "./ImageUpload.module.css";
 
@@ -29,6 +30,8 @@ export interface ImageUploadProps {
   readonly label?: string;
   readonly currentUrl?: string;
   readonly disabled?: boolean;
+  /** Input ceiling; server-routed uploads use 4 MiB under Vercel's body cap. */
+  readonly maxFileBytes?: number;
 }
 
 /**
@@ -44,12 +47,21 @@ export function ImageUpload({
   label = "Upload image",
   currentUrl,
   disabled = false,
+  maxFileBytes = UPLOAD_MAX_FILE_BYTES,
 }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<UploadState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(currentUrl);
   const [isDragging, setIsDragging] = useState(false);
+
+  // The parent owns the persisted URL. Keep the preview aligned when it clears
+  // or replaces that value (for example, "Remove default" in the host library).
+  useEffect(() => {
+    setPreviewUrl(currentUrl);
+    setState("idle");
+    setError(null);
+  }, [currentUrl]);
 
   const busy = state === "uploading" || disabled;
 
@@ -62,9 +74,9 @@ export function ImageUpload({
       setError("Please choose a JPEG, PNG, WebP, or HEIC image.");
       return;
     }
-    if (file.size > UPLOAD_MAX_FILE_BYTES) {
+    if (file.size > maxFileBytes) {
       setState("error");
-      setError("Images must be 5 MB or smaller.");
+      setError(`Images must be ${Math.floor(maxFileBytes / 1024 / 1024)} MB or smaller.`);
       return;
     }
 
@@ -90,7 +102,8 @@ export function ImageUpload({
   }
 
   function onInputChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
     if (file) void handleFile(file);
   }
 
@@ -136,7 +149,7 @@ export function ImageUpload({
               fill
               sizes="320px"
               className={styles.previewImage}
-              unoptimized={previewUrl.startsWith("blob:")}
+              unoptimized={previewUrl.startsWith("blob:") || isLocalStorageUrl(previewUrl)}
             />
           </span>
         ) : (
@@ -144,7 +157,8 @@ export function ImageUpload({
             <Icon name="action.share" size={24} aria-hidden />
             <span className={styles.placeholderLabel}>{label}</span>
             <span className={styles.hint}>
-              Drag &amp; drop or click to browse · Images up to 5 MB
+              Drag &amp; drop or click to browse · Images up to{" "}
+              {Math.floor(maxFileBytes / 1024 / 1024)} MB
             </span>
           </span>
         )}

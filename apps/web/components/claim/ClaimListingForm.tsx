@@ -4,7 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Icon } from "@explore-and-earn/ui";
-import type { ListingClaimStatus } from "@explore-and-earn/contracts";
+import type {
+  HostBenefitLibrary,
+  ListingClaimStatus,
+} from "@explore-and-earn/contracts";
 
 import {
   beginClaimConfirmationAction,
@@ -47,6 +50,8 @@ export function ClaimListingForm({
   employerName,
   existingClaim,
   confirmationPrefill,
+  confirmationBenefitLibrary,
+  confirmationBenefitLibraryAvailable,
 }: {
   readonly listingId: string;
   readonly listingTitle: string;
@@ -55,6 +60,10 @@ export function ClaimListingForm({
   readonly existingClaim: ExistingClaim | null;
   /** Current sourced values, provided by the page ONLY while status === 'confirming'. */
   readonly confirmationPrefill: ConfirmationPrefill | null;
+  /** Own host defaults, loaded fail-closed for the confirmation photo gate. */
+  readonly confirmationBenefitLibrary: HostBenefitLibrary | null;
+  /** Rollout capability: false until migration 072 is available. */
+  readonly confirmationBenefitLibraryAvailable: boolean;
 }) {
   const router = useRouter();
   const [workEmail, setWorkEmail] = useState("");
@@ -131,7 +140,11 @@ export function ClaimListingForm({
 
   /* ── Confirming: field-by-field review ────────────────────────────────── */
   if (status === "confirming" && existingClaim) {
-    if (!confirmationPrefill || !existingClaim.hostProfileId) {
+    if (
+      !confirmationPrefill ||
+      !existingClaim.hostProfileId ||
+      !confirmationBenefitLibrary
+    ) {
       return (
         <div className={styles.card}>
           <h1 className={styles.title}>Confirmation unavailable</h1>
@@ -151,6 +164,8 @@ export function ClaimListingForm({
         hostProfileId={existingClaim.hostProfileId}
         listingId={listingId}
         prefill={confirmationPrefill}
+        benefitLibrary={confirmationBenefitLibrary}
+        benefitLibraryAvailable={confirmationBenefitLibraryAvailable}
       />
     );
   }

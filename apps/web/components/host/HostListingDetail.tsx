@@ -148,6 +148,7 @@ export function HostListingDetail({
           kind={editBenefit ?? "housing"}
           onClose={() => setEditBenefit(null)}
           listingId={listing.id}
+          category={listing.category}
         />
       </section>
 

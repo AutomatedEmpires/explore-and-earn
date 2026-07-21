@@ -341,6 +341,8 @@ export default async function ListingDetailPage({ params }: Props) {
             housingDescription={listing.housingDescription ?? null}
             mealsDescription={listing.mealsDescription ?? null}
             paySummary={paySummary}
+            category={listing.category}
+            housingPhotos={isSourced ? undefined : listing.housingPhotos}
             evidence={listing.provenanceInfo?.benefitEvidence}
           >
             {/* TrueValue's "what you'll save" math only makes sense for

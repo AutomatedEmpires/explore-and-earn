@@ -366,6 +366,8 @@ export async function updateListingStatusAction(
         ? "That status change isn't allowed from the listing's current state."
         : result.error === "listing_cap_reached"
           ? "You've reached your plan's active listing limit. Pause or close another listing, or upgrade your plan, to publish this one."
+          : result.error === "incomplete_listing" && result.blockers?.length
+            ? result.blockers.map((blocker) => blocker.reason).join(" ")
           : result.error;
     return { ok: false, error };
   }

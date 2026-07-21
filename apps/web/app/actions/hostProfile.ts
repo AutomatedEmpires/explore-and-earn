@@ -1,11 +1,34 @@
 "use server"
 
+import { randomUUID } from "node:crypto"
 import { auth } from "@clerk/nextjs/server"
-import { createHostProfile, updateHostProfileDetails, type SocialLinks } from "@explore-and-earn/db"
+import {
+	createHostProfile,
+	deleteTrustedListingMedia,
+	getHostProfile,
+	updateHostProfileDetails,
+	uploadTrustedListingMedia,
+	type SocialLinks,
+} from "@explore-and-earn/db"
+import {
+	HOUSING_PHOTO_ROLES,
+	sanitizeHostBenefitLibrary,
+	type HostBenefitLibrary,
+	type HousingPhotoRole,
+} from "@explore-and-earn/contracts"
 import { revalidatePath, revalidateTag } from "next/cache"
 
-import { HOST_PROFILES_CACHE_TAG } from "../../lib/serverCache"
+import {
+	HOST_PROFILES_CACHE_TAG,
+	LISTINGS_CACHE_TAG,
+} from "../../lib/serverCache"
 import { reportError } from "../../lib/sentry"
+import { isAllowedStorageUrl } from "../../lib/storageUrl"
+import { prepareUploadImage } from "../../services/media"
+import {
+	guardTrustedUploadSlot,
+	hasTrustedUploadBudget,
+} from "../../services/media/trustedUploadGuard"
 
 /** Best-effort current Clerk user id for error attribution (catch paths only). */
 async function currentUserId(): Promise<string | undefined> {
@@ -16,17 +39,69 @@ async function currentUserId(): Promise<string | undefined> {
 	}
 }
 
-function isAllowedStorageUrl(url: string | undefined | null): boolean {
-	if (!url) return true;
+function isOwnedHousingLibrary(
+	library: HostBenefitLibrary,
+	hostProfileId: string,
+): boolean {
+	const photos = library.housing?.photos ?? {};
+	for (const role of HOUSING_PHOTO_ROLES) {
+		const url = photos[role];
+		if (!url) continue;
+		if (!isAllowedStorageUrl(url)) return false;
+		try {
+			const marker = "/storage/v1/object/public/listing-media/";
+			const path = new URL(url).pathname.split(marker)[1];
+			if (!path?.startsWith(`${hostProfileId}/library/housing/${role}/`)) {
+				return false;
+			}
+		} catch {
+			return false;
+		}
+	}
+	return true;
+}
+
+function ownedHousingLibraryObjectPath(
+	url: string | undefined,
+	hostProfileId: string,
+	role: HousingPhotoRole,
+): string | null {
+	if (!url || !isAllowedStorageUrl(url)) return null
 	try {
-		const { protocol, hostname, pathname } = new URL(url);
-		return (
-			protocol === "https:" &&
-			hostname.endsWith(".supabase.co") &&
-			pathname.startsWith("/storage/v1/object/")
-		);
+		const marker = "/storage/v1/object/public/listing-media/"
+		const encodedPath = new URL(url).pathname.split(marker)[1]
+		if (!encodedPath) return null
+		const path = decodeURIComponent(encodedPath)
+		const prefix = `${hostProfileId}/library/housing/${role}/`
+		const filename = path.slice(prefix.length)
+		if (!path.startsWith(prefix) || !/^[A-Za-z0-9._-]+$/.test(filename)) {
+			return null
+		}
+		return path
 	} catch {
-		return false;
+		return null
+	}
+}
+
+async function cleanupReplacedHousingPhotos(
+	previous: HostBenefitLibrary,
+	next: HostBenefitLibrary,
+	hostProfileId: string,
+	userId: string,
+): Promise<void> {
+	for (const role of HOUSING_PHOTO_ROLES) {
+		const previousUrl = previous.housing?.photos?.[role]
+		if (!previousUrl || previousUrl === next.housing?.photos?.[role]) continue
+		const path = ownedHousingLibraryObjectPath(previousUrl, hostProfileId, role)
+		if (!path) continue
+		try {
+			await deleteTrustedListingMedia(path)
+		} catch (error) {
+			reportError(error, {
+				action: `cleanupReplacedHousingPhoto:${role}`,
+				userId,
+			})
+		}
 	}
 }
 
@@ -91,6 +166,7 @@ export interface UpdateHostProfileInput {
 	housingOfferedGenerally?: boolean
 	mealsOfferedGenerally?: boolean
 	categoryScopes?: string[]
+	benefitLibrary?: HostBenefitLibrary
 }
 
 /**
@@ -118,16 +194,160 @@ async function updateHostProfileActionImpl(
 		return { ok: false, error: "invalid_photo_url" }
 	}
 
-	const result = await updateHostProfileDetails(token, userId, fields)
+	let cleanBenefitLibrary: HostBenefitLibrary | undefined;
+	let previousBenefitLibrary: HostBenefitLibrary | undefined;
+	let hostProfileId: string | undefined;
+	if (fields.benefitLibrary !== undefined) {
+		const profile = await getHostProfile(token, userId);
+		if (!profile) return { ok: false, error: "update_failed" };
+		if (!profile.benefitLibraryAvailable) {
+			return { ok: false, error: "housing_library_unavailable" };
+		}
+		hostProfileId = profile.id;
+		previousBenefitLibrary = profile.benefitLibrary;
+		cleanBenefitLibrary = sanitizeHostBenefitLibrary(fields.benefitLibrary);
+		if (!isOwnedHousingLibrary(cleanBenefitLibrary, profile.id)) {
+			return { ok: false, error: "invalid_housing_photo" };
+		}
+	}
+
+	const result = await updateHostProfileDetails(token, userId, {
+		...fields,
+		...(cleanBenefitLibrary !== undefined
+			? { benefitLibrary: cleanBenefitLibrary }
+			: {}),
+	})
 	if (!result.ok) {
-		return { ok: false, error: result.error ?? "update_failed" }
+		return {
+			ok: false,
+			error: result.error?.includes("housing_photo_roles_in_use")
+				? "housing_photo_in_use"
+				: result.error ?? "update_failed",
+		}
 	}
 
 	revalidatePath("/host/profile")
 	revalidatePath("/host/profile/edit")
 	// Bust the cached public host profile (/host/[id]) so edits show immediately.
 	revalidateTag(HOST_PROFILES_CACHE_TAG)
+	// Housing defaults feed every public listing detail that inherits them.
+	revalidateTag(LISTINGS_CACHE_TAG)
+	if (cleanBenefitLibrary && previousBenefitLibrary && hostProfileId) {
+		await cleanupReplacedHousingPhotos(
+			previousBenefitLibrary,
+			cleanBenefitLibrary,
+			hostProfileId,
+			userId,
+		)
+	}
 	return { ok: true }
+}
+
+/**
+ * Normalize an untrusted Housing upload on the server, store it on the trusted
+ * path, and bind it to the caller's reusable library before returning. Binding
+ * immediately means Cancel/navigation cannot leave an orphaned evidence file.
+ */
+export async function uploadHousingLibraryPhotoAction(
+	role: string,
+	formData: FormData,
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+	try {
+		if (!(HOUSING_PHOTO_ROLES as readonly string[]).includes(role)) {
+			return { ok: false, error: "invalid_housing_photo_role" }
+		}
+		const housingRole = role as HousingPhotoRole
+		const { userId, getToken } = await auth()
+		if (!userId) return { ok: false, error: "unauthenticated" }
+		const token = await getToken()
+		if (!token) return { ok: false, error: "unauthenticated" }
+		if (!(await hasTrustedUploadBudget(userId))) {
+			return { ok: false, error: "rate_limit_exceeded" }
+		}
+
+		const profile = await getHostProfile(token, userId)
+		if (!profile) return { ok: false, error: "update_failed" }
+		if (!profile.benefitLibraryAvailable) {
+			return { ok: false, error: "housing_library_unavailable" }
+		}
+
+		const prefix = `${profile.id}/library/housing/${housingRole}`
+		const referencedPaths = new Set<string>()
+		const referencedPath = ownedHousingLibraryObjectPath(
+			profile.benefitLibrary.housing?.photos?.[housingRole],
+			profile.id,
+			housingRole,
+		)
+		if (referencedPath) referencedPaths.add(referencedPath)
+		try {
+			const slotGuard = await guardTrustedUploadSlot({
+				prefix,
+				referencedPaths,
+			})
+			if (!slotGuard.ok) return slotGuard
+		} catch (error) {
+			reportError(error, {
+				action: `guardHousingLibraryUpload:${housingRole}`,
+				userId,
+			})
+			return { ok: false, error: "upload_temporarily_unavailable" }
+		}
+
+		const file = formData.get("file")
+		const prepared = await prepareUploadImage(file instanceof File ? file : null)
+		if (!prepared.ok) return prepared
+
+		const path = `${prefix}/${randomUUID()}.webp`
+		let uploadedUrl: string
+		try {
+			uploadedUrl = await uploadTrustedListingMedia({
+				path,
+				bytes: prepared.image.bytes,
+				contentType: prepared.image.contentType,
+			})
+		} catch (error) {
+			return {
+				ok: false,
+				error: error instanceof Error ? error.message : "upload_failed",
+			}
+		}
+
+		const nextLibrary = sanitizeHostBenefitLibrary({
+			...profile.benefitLibrary,
+			housing: {
+				...profile.benefitLibrary.housing,
+				photos: {
+					...profile.benefitLibrary.housing?.photos,
+					[housingRole]: uploadedUrl,
+				},
+			},
+		})
+		const result = await updateHostProfileDetails(token, userId, {
+			benefitLibrary: nextLibrary,
+		})
+		if (!result.ok) {
+			await deleteTrustedListingMedia(path).catch(() => undefined)
+			return { ok: false, error: result.error ?? "update_failed" }
+		}
+
+		await cleanupReplacedHousingPhotos(
+			profile.benefitLibrary,
+			nextLibrary,
+			profile.id,
+			userId,
+		)
+		revalidatePath("/host/profile")
+		revalidatePath("/host/profile/edit")
+		revalidateTag(HOST_PROFILES_CACHE_TAG)
+		revalidateTag(LISTINGS_CACHE_TAG)
+		return { ok: true, url: uploadedUrl }
+	} catch (error) {
+		reportError(error, {
+			action: "uploadHousingLibraryPhotoAction",
+			userId: await currentUserId(),
+		})
+		return { ok: false, error: "upload_failed" }
+	}
 }
 
 export async function updateHostProfileAction(

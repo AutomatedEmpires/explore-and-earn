@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
+const revalidateTagMock = vi.hoisted(() => vi.fn());
 const isCurrentUserAdminMock = vi.hoisted(() => vi.fn());
 const checkRateLimitMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
@@ -27,6 +28,7 @@ const dbMocks = vi.hoisted(() => ({
   confirmAndConvertClaim: vi.fn(),
   getClaimableListing: vi.fn(),
   getClaimsAwaitingReview: vi.fn(),
+  getHostProfile: vi.fn(),
   getMyListingClaims: vi.fn(),
   initiateListingClaim: vi.fn(),
   recordEvent: vi.fn(),
@@ -34,10 +36,14 @@ const dbMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
-vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
+vi.mock("next/cache", () => ({
+  revalidatePath: revalidatePathMock,
+  revalidateTag: revalidateTagMock,
+}));
 vi.mock("@explore-and-earn/db", () => dbMocks);
 vi.mock("../../lib/admin", () => ({ isCurrentUserAdmin: isCurrentUserAdminMock }));
 vi.mock("../../lib/rateLimit", () => ({ checkRateLimit: checkRateLimitMock }));
+vi.mock("../../lib/serverCache", () => ({ LISTINGS_CACHE_TAG: "public-listings" }));
 vi.mock("../../lib/sentry", () => ({ reportError: reportErrorMock }));
 
 import {
@@ -162,6 +168,7 @@ describe("confirmClaimListingAction — invalid confirmed fields", () => {
     ["non-integer cents", { compensationMinCents: 18.5 }],
     ["title over 200 chars", { title: "a".repeat(201) }],
     ["housingIncluded as a string", { housingIncluded: "yes" }],
+    ["missing housingIncluded", { title: "A valid title" }],
   ])("%s → invalid_confirmed_fields, conversion never called", async (_label, fields) => {
     authAs("user_A");
     const result = await confirmClaimListingAction("claim-1", "host-1", fields as never);
@@ -175,6 +182,20 @@ describe("confirmClaimListingAction — invalid confirmed fields", () => {
 describe("confirmClaimListingAction — happy path", () => {
   it("calls confirmAndConvertClaim with auth()-derived userId + sanitized fields, records event, revalidates", async () => {
     authAs("user_auth_456");
+    dbMocks.getHostProfile.mockResolvedValueOnce({
+      id: "host-2",
+      benefitLibraryAvailable: true,
+      benefitLibrary: {
+        housing: {
+          photos: {
+            sleeping_area: "https://example.com/sleep.webp",
+            bathroom: "https://example.com/bath.webp",
+            kitchen: "https://example.com/kitchen.webp",
+            dining_common: "https://example.com/common.webp",
+          },
+        },
+      },
+    });
     dbMocks.confirmAndConvertClaim.mockResolvedValueOnce({ ok: true, listingId: "listing-99" });
 
     const rawFields = {
@@ -186,6 +207,10 @@ describe("confirmClaimListingAction — happy path", () => {
     const result = await confirmClaimListingAction("claim-2", "host-2", rawFields as never);
 
     expect(result).toEqual({ ok: true, listingId: "listing-99" });
+    expect(dbMocks.getHostProfile).toHaveBeenCalledWith(
+      "session-token",
+      "user_auth_456",
+    );
     expect(dbMocks.confirmAndConvertClaim).toHaveBeenCalledWith("user_auth_456", "claim-2", "host-2", {
       title: "Sunny Farm Stay",
       compensationMinCents: 500,
@@ -203,6 +228,74 @@ describe("confirmClaimListingAction — happy path", () => {
     );
     expect(revalidatePathMock).toHaveBeenCalledWith("/listing/listing-99");
     expect(revalidatePathMock).toHaveBeenCalledWith("/host/listings");
+    expect(revalidateTagMock).toHaveBeenCalledWith("public-listings");
+  });
+});
+
+describe("confirmClaimListingAction — Housing photo rollout gate", () => {
+  it("fails closed before conversion when migration 072's library RPC is unavailable", async () => {
+    authAs("user_A");
+    dbMocks.getHostProfile.mockResolvedValueOnce({
+      id: "host-1",
+      benefitLibraryAvailable: false,
+      benefitLibrary: {},
+    });
+
+    const result = await confirmClaimListingAction("claim-1", "host-1", {
+      title: "Housing role",
+      housingIncluded: true,
+    });
+
+    expect(result).toEqual({ ok: false, error: "housing_library_unavailable" });
+    expect(dbMocks.confirmAndConvertClaim).not.toHaveBeenCalled();
+    expect(dbMocks.recordEvent).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(revalidateTagMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed before conversion when the host library is incomplete", async () => {
+    authAs("user_A");
+    dbMocks.getHostProfile.mockResolvedValueOnce({
+      id: "host-1",
+      benefitLibraryAvailable: true,
+      benefitLibrary: {
+        housing: {
+          photos: {
+            sleeping_area: "https://example.com/sleep.webp",
+          },
+        },
+      },
+    });
+
+    const result = await confirmClaimListingAction("claim-1", "host-1", {
+      title: "Housing role",
+      housingIncluded: true,
+    });
+
+    expect(result).toEqual({ ok: false, error: "housing_photos_incomplete" });
+    expect(dbMocks.confirmAndConvertClaim).not.toHaveBeenCalled();
+  });
+
+  it("allows an explicit Housing Not Included conversion without the rollout RPC", async () => {
+    authAs("user_A");
+    dbMocks.confirmAndConvertClaim.mockResolvedValueOnce({
+      ok: true,
+      listingId: "listing-2",
+    });
+
+    const result = await confirmClaimListingAction("claim-2", "host-1", {
+      title: "No housing role",
+      housingIncluded: false,
+    });
+
+    expect(result).toEqual({ ok: true, listingId: "listing-2" });
+    expect(dbMocks.getHostProfile).not.toHaveBeenCalled();
+    expect(dbMocks.confirmAndConvertClaim).toHaveBeenCalledWith(
+      "user_A",
+      "claim-2",
+      "host-1",
+      { title: "No housing role", housingIncluded: false },
+    );
   });
 });
 
@@ -305,6 +398,7 @@ describe("revokeClaimAction — admin gate + transition", () => {
     // rather than a mislabeled event.
     expect(dbMocks.recordEvent).not.toHaveBeenCalled();
     expect(revalidatePathMock).toHaveBeenCalledWith("/listing/listing-88");
+    expect(revalidateTagMock).toHaveBeenCalledWith("public-listings");
   });
 
   it("surfaces an illegal-transition error from the SQL wrapper unchanged", async () => {

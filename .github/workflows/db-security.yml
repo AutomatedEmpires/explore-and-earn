@@ -1,0 +1,51 @@
+name: Database Security
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "tools/db-assert/**"
+      - ".github/workflows/db-security.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase/migrations/**"
+      - "tools/db-assert/**"
+      - ".github/workflows/db-security.yml"
+  workflow_dispatch:
+
+jobs:
+  verify-local-database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.102.0
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+
+      - name: Start and rebuild local database
+        run: |
+          supabase start
+          supabase db reset --local
+
+      - name: Verify database security contracts
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: node tools/db-assert/assert-grants.mjs
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
