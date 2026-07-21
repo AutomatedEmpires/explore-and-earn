@@ -3,11 +3,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
-  MARKETPLACE_CATEGORIES,
+  MARKETPLACE_LANES,
   hasVerifiedHostSubscription,
   sanitizeHostBenefitLibrary,
   type HostBenefitLibrary,
   type HousingPhotoRole,
+  type MarketplaceLane,
 } from "@explore-and-earn/contracts";
 import { anonClient, authedClient } from "../client";
 
@@ -43,8 +44,8 @@ export interface HostProfileDetailsInput {
   housingOfferedGenerally?: boolean;
   /** Host-level "we generally provide meals" positioning (public profile). */
   mealsOfferedGenerally?: boolean;
-  /** Marketplace categories this host operates in (subset of MARKETPLACE_CATEGORIES). */
-  categoryScopes?: string[];
+  /** Concrete marketplace lanes this host operates in (`mix` is derived). */
+  categoryScopes?: MarketplaceLane[];
   /** Reusable host-level Housing evidence (migration 072). */
   benefitLibrary?: HostBenefitLibrary;
 }
@@ -221,7 +222,7 @@ export async function updateHostProfileDetails(
   if (fields.mealsOfferedGenerally !== undefined)
     patch.meals_offered_generally = fields.mealsOfferedGenerally;
   if (fields.categoryScopes !== undefined) {
-    const allowed = MARKETPLACE_CATEGORIES as readonly string[];
+    const allowed = MARKETPLACE_LANES as readonly string[];
     patch.category_scopes = Array.from(
       new Set(fields.categoryScopes.filter((c) => allowed.includes(c))),
     );
@@ -292,7 +293,7 @@ export async function setMyHousingLibraryPhoto(
 
 export interface CreateHostProfileInput {
   readonly companyName: string;
-  readonly categoryScopes: readonly string[];
+  readonly categoryScopes: readonly MarketplaceLane[];
   readonly primaryLocationName: string | null;
 }
 

@@ -133,6 +133,15 @@ begin
   if v_first is null or v_second is distinct from v_first then
     raise exception 'profile-onboarding: host creation is not idempotent';
   end if;
+
+  begin
+    update public.host_profiles
+       set category_scopes = array['mix']
+     where id = v_first;
+    raise exception 'profile-onboarding: raw host update persisted derived mix';
+  exception when check_violation then
+    null;
+  end;
 end;
 $$;
 reset role;
@@ -322,6 +331,15 @@ begin
   begin
     perform public.create_my_host_profile('Invalid Lane', array['not-a-lane'], null);
     raise exception 'profile-onboarding: invalid category was accepted';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'host_category_scope_invalid' then
+      raise;
+    end if;
+  end;
+
+  begin
+    perform public.create_my_host_profile('Derived Mix', array['mix'], null);
+    raise exception 'profile-onboarding: derived mix category was accepted';
   exception when invalid_parameter_value then
     if sqlerrm <> 'host_category_scope_invalid' then
       raise;

@@ -9,12 +9,13 @@ import {
 } from "@explore-and-earn/db/client";
 import {
   HOUSING_PHOTO_ROLES,
-  MARKETPLACE_CATEGORIES,
+  MARKETPLACE_LANES,
   SERVER_IMAGE_UPLOAD_MAX_FILE_BYTES,
   housingPhotoLabel,
   type HostBenefitLibrary,
   type HousingPhotoMap,
   type HousingPhotoRole,
+  type MarketplaceLane,
 } from "@explore-and-earn/contracts";
 
 import { ImageUpload } from "../ImageUpload";
@@ -50,6 +51,10 @@ function categoryLabel(category: string): string {
   return category.charAt(0).toUpperCase() + category.slice(1);
 }
 
+function isMarketplaceLane(category: string): category is MarketplaceLane {
+  return (MARKETPLACE_LANES as readonly string[]).includes(category);
+}
+
 export function HostProfileForm({
   profile,
   hostProfileId,
@@ -74,15 +79,15 @@ export function HostProfileForm({
   const [mealsOffered, setMealsOffered] = useState(
     profile.mealsOfferedGenerally ?? false,
   );
-  const [categoryScopes, setCategoryScopes] = useState<string[]>(() => [
-    ...(profile.categoryScopes ?? []),
-  ]);
+  const [categoryScopes, setCategoryScopes] = useState<MarketplaceLane[]>(() =>
+    Array.from(new Set((profile.categoryScopes ?? []).filter(isMarketplaceLane))),
+  );
   const [message, setMessage] = useState<{
     readonly ok: boolean;
     readonly text: string;
   } | null>(null);
 
-  function toggleCategory(cat: string) {
+  function toggleCategory(cat: MarketplaceLane) {
     setCategoryScopes((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
     );
@@ -260,7 +265,7 @@ export function HostProfileForm({
         <div className={styles.field}>
           <span className={styles.label}>Categories you operate in</span>
           <div className={styles.chips} role="group" aria-label="Marketplace categories">
-            {MARKETPLACE_CATEGORIES.map((cat) => {
+            {MARKETPLACE_LANES.map((cat) => {
               const active = categoryScopes.includes(cat);
               return (
                 <button

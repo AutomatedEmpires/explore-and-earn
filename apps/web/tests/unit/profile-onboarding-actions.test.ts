@@ -82,6 +82,18 @@ describe("createHostProfileAction", () => {
     expect(dbMocks.createHostProfile).not.toHaveBeenCalled();
   });
 
+  it("rejects the derived mix category before auth or database work", async () => {
+    const result = await createHostProfileAction({
+      companyName: "Glacier Orchard",
+      categoryScopes: ["mix" as never],
+      primaryLocationName: null,
+    });
+
+    expect(result).toEqual({ ok: false, error: "lanes_required" });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(dbMocks.createHostProfile).not.toHaveBeenCalled();
+  });
+
   it("maps a soft-deleted identity to a stable account error", async () => {
     authAs("user-host");
     dbMocks.createHostProfile.mockResolvedValueOnce({

@@ -7,7 +7,10 @@ import {
 	type DiscoveryCardData,
 	type IconKey,
 } from "@explore-and-earn/ui"
-import type { MarketplaceCategory } from "@explore-and-earn/contracts"
+import type {
+	MarketplaceCategory,
+	MarketplaceLane,
+} from "@explore-and-earn/contracts"
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition, type FormEvent } from "react"
 import { createHostProfileAction } from "../../../../actions/hostProfile"
@@ -17,7 +20,7 @@ type Step = "welcome" | "essentials" | "preview"
 type FormState = { status: "idle" } | { status: "error"; message: string }
 
 /** The four hiring lanes a host can hire in (a host may span several). */
-type Lane = Exclude<MarketplaceCategory, "mix">
+type Lane = MarketplaceLane
 
 const LANES: ReadonlyArray<{ id: Lane; label: string; icon: IconKey; blurb: string }> = [
 	{ id: "farm", label: "Farm", icon: "category.farm", blurb: "Harvest, ranch & land work" },

@@ -13,11 +13,11 @@ import {
 } from "@explore-and-earn/db"
 import {
 	HOUSING_PHOTO_ROLES,
-	MARKETPLACE_CATEGORIES,
+	MARKETPLACE_LANES,
 	sanitizeHostBenefitLibrary,
 	type HostBenefitLibrary,
 	type HousingPhotoRole,
-	type MarketplaceCategory,
+	type MarketplaceLane,
 } from "@explore-and-earn/contracts"
 import { revalidatePath, revalidateTag } from "next/cache"
 
@@ -118,7 +118,7 @@ async function cleanupReplacedHousingPhotos(
  */
 export interface CreateHostProfileActionInput {
 	readonly companyName: string
-	readonly categoryScopes: readonly MarketplaceCategory[]
+	readonly categoryScopes: readonly MarketplaceLane[]
 	readonly primaryLocationName?: string | null
 }
 
@@ -137,11 +137,11 @@ async function createHostProfileActionImpl(
 		return { ok: false, error: "name_too_long" }
 	}
 
-	const allowedCategories = new Set<string>(MARKETPLACE_CATEGORIES)
+	const allowedCategories = new Set<string>(MARKETPLACE_LANES)
 	const categoryScopes = Array.from(
 		new Set(
 			(Array.isArray(input?.categoryScopes) ? input.categoryScopes : []).filter(
-				(value): value is MarketplaceCategory =>
+				(value): value is MarketplaceLane =>
 					typeof value === "string" && allowedCategories.has(value),
 			),
 		),
@@ -215,7 +215,7 @@ export interface UpdateHostProfileInput {
 	socialLinks?: SocialLinks
 	housingOfferedGenerally?: boolean
 	mealsOfferedGenerally?: boolean
-	categoryScopes?: string[]
+	categoryScopes?: MarketplaceLane[]
 	benefitLibrary?: HostBenefitLibrary
 }
 

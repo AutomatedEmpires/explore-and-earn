@@ -125,6 +125,11 @@ export type ListingCategory = MarketplaceCategory
 export const MIX_DOMAIN = ["farm", "maritime", "remote", "seasonal"] as const
 export type MixDomain = (typeof MIX_DOMAIN)[number]
 
+// The concrete marketplace lanes a host can operate in. `mix` is a derived
+// listing presentation for multi-lane work, never a host-selectable lane.
+export const MARKETPLACE_LANES = MIX_DOMAIN
+export type MarketplaceLane = MixDomain
+
 export const COMPENSATION_UNIT = [
   "hour",
   "day",

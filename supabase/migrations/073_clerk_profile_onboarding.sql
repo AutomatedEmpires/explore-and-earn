@@ -29,6 +29,28 @@ $$;
 alter table public.host_profiles
   alter column owner_user_id drop not null;
 
+-- A host selects one or more concrete lanes. `mix` is derived for listings
+-- spanning multiple lanes and must never be persisted as a host scope. Add the
+-- replacement without validating under the strong ALTER lock, validate it
+-- separately, then preserve the canonical constraint name.
+alter table public.host_profiles
+  add constraint host_profiles_category_scopes_lane_check
+  check (
+    cardinality(category_scopes) <= 4
+    and category_scopes <@ array['farm', 'maritime', 'remote', 'seasonal']::text[]
+    and array_position(category_scopes, null) is null
+  ) not valid;
+
+alter table public.host_profiles
+  validate constraint host_profiles_category_scopes_lane_check;
+
+alter table public.host_profiles
+  drop constraint host_profiles_category_scopes_check;
+
+alter table public.host_profiles
+  rename constraint host_profiles_category_scopes_lane_check
+  to host_profiles_category_scopes_check;
+
 comment on column public.host_profiles.owner_user_id is
   'Legacy Supabase Auth owner UUID. Nullable for Clerk-native profiles; clerk_user_id is the canonical application identity.';
 
@@ -91,7 +113,7 @@ begin
       errcode = '22023',
       message = 'host_category_scopes_required';
   end if;
-  if cardinality(p_category_scopes) > 5 then
+  if cardinality(p_category_scopes) > 4 then
     raise exception using
       errcode = '22023',
       message = 'host_category_scope_invalid';
@@ -100,7 +122,7 @@ begin
     select 1
       from unnest(p_category_scopes) as scope(value)
      where scope.value is null
-        or scope.value <> all(array['farm', 'maritime', 'remote', 'seasonal', 'mix']::text[])
+        or scope.value <> all(array['farm', 'maritime', 'remote', 'seasonal']::text[])
   ) then
     raise exception using
       errcode = '22023',

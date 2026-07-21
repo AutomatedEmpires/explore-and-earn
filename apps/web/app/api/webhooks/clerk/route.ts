@@ -20,6 +20,10 @@
  * svix-signature headers. Writes use the Supabase service-role key
  * (server-side only) and therefore bypass RLS.
  */
+import type {
+	ClerkUserPayload,
+	ClerkWebhookEvent,
+} from "@explore-and-earn/contracts"
 import { createClient } from "@supabase/supabase-js"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
@@ -30,27 +34,7 @@ import { welcomeHostEmail, welcomeSeekerEmail } from "../../../../lib/emails"
 
 export const runtime = "nodejs"
 
-type ClerkWebhookEventType = "user.created" | "user.updated" | "user.deleted"
 const UNIQUE_VIOLATION = "23505"
-
-interface ClerkEmailAddress {
-	readonly id: string
-	readonly email_address: string
-}
-
-interface ClerkUserPayload {
-	readonly id?: string
-	readonly created_at?: number
-	readonly email_addresses?: ReadonlyArray<ClerkEmailAddress>
-	readonly primary_email_address_id?: string | null
-	readonly first_name?: string | null
-	readonly public_metadata?: { readonly role?: string | null } | null
-}
-
-interface ClerkWebhookEvent {
-	readonly type: ClerkWebhookEventType | string
-	readonly data: ClerkUserPayload
-}
 
 function getSupabaseServiceRoleClient() {
 	const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
