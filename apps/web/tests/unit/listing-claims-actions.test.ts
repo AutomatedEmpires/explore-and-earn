@@ -60,6 +60,12 @@ const VALID_EVIDENCE = {
   statement: "This is a legitimate statement of authority over ten chars.",
 };
 
+const VALID_CONFIRMED_TRIAD = {
+  housingIncluded: false,
+  mealsIncluded: false,
+  compensationMinCents: 500,
+} as const;
+
 function authAs(userId: string | null, token: string | null = "session-token") {
   authMock.mockResolvedValueOnce({
     userId,
@@ -164,11 +170,14 @@ describe("initiateClaimAction — competing claim guard", () => {
 
 describe("confirmClaimListingAction — invalid confirmed fields", () => {
   it.each([
-    ["negative compensationMinCents", { compensationMinCents: -100 }],
-    ["non-integer cents", { compensationMinCents: 18.5 }],
-    ["title over 200 chars", { title: "a".repeat(201) }],
-    ["housingIncluded as a string", { housingIncluded: "yes" }],
-    ["missing housingIncluded", { title: "A valid title" }],
+    ["negative compensationMinCents", { ...VALID_CONFIRMED_TRIAD, compensationMinCents: -100 }],
+    ["non-integer cents", { ...VALID_CONFIRMED_TRIAD, compensationMinCents: 18.5 }],
+    ["title over 200 chars", { ...VALID_CONFIRMED_TRIAD, title: "a".repeat(201) }],
+    ["housingIncluded as a string", { ...VALID_CONFIRMED_TRIAD, housingIncluded: "yes" }],
+    ["missing housingIncluded", { mealsIncluded: false, compensationMinCents: 500 }],
+    ["missing mealsIncluded", { housingIncluded: false, compensationMinCents: 500 }],
+    ["missing pay amount", { housingIncluded: false, mealsIncluded: false }],
+    ["zero pay amount", { ...VALID_CONFIRMED_TRIAD, compensationMinCents: 0 }],
   ])("%s → invalid_confirmed_fields, conversion never called", async (_label, fields) => {
     authAs("user_A");
     const result = await confirmClaimListingAction("claim-1", "host-1", fields as never);
@@ -202,6 +211,7 @@ describe("confirmClaimListingAction — happy path", () => {
       title: "  Sunny Farm Stay  ",
       compensationMinCents: 500,
       housingIncluded: true,
+      mealsIncluded: true,
     };
 
     const result = await confirmClaimListingAction("claim-2", "host-2", rawFields as never);
@@ -215,6 +225,7 @@ describe("confirmClaimListingAction — happy path", () => {
       title: "Sunny Farm Stay",
       compensationMinCents: 500,
       housingIncluded: true,
+      mealsIncluded: true,
     });
     expect(dbMocks.recordEvent).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -244,6 +255,8 @@ describe("confirmClaimListingAction — Housing photo rollout gate", () => {
     const result = await confirmClaimListingAction("claim-1", "host-1", {
       title: "Housing role",
       housingIncluded: true,
+      mealsIncluded: false,
+      compensationMinCents: 500,
     });
 
     expect(result).toEqual({ ok: false, error: "housing_library_unavailable" });
@@ -270,6 +283,8 @@ describe("confirmClaimListingAction — Housing photo rollout gate", () => {
     const result = await confirmClaimListingAction("claim-1", "host-1", {
       title: "Housing role",
       housingIncluded: true,
+      mealsIncluded: false,
+      compensationMinCents: 500,
     });
 
     expect(result).toEqual({ ok: false, error: "housing_photos_incomplete" });
@@ -286,6 +301,8 @@ describe("confirmClaimListingAction — Housing photo rollout gate", () => {
     const result = await confirmClaimListingAction("claim-2", "host-1", {
       title: "No housing role",
       housingIncluded: false,
+      mealsIncluded: false,
+      compensationMinCents: 500,
     });
 
     expect(result).toEqual({ ok: true, listingId: "listing-2" });
@@ -294,7 +311,12 @@ describe("confirmClaimListingAction — Housing photo rollout gate", () => {
       "user_A",
       "claim-2",
       "host-1",
-      { title: "No housing role", housingIncluded: false },
+      {
+        title: "No housing role",
+        housingIncluded: false,
+        mealsIncluded: false,
+        compensationMinCents: 500,
+      },
     );
   });
 });

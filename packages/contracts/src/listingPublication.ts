@@ -98,7 +98,7 @@ export function validateListingForPublication(
 	const blockers: PublicationBlocker[] = [];
 
 	const housingDecided = hostDecided(candidate.housingEvidence);
-	if (!housingDecided) {
+	if (!housingDecided || typeof candidate.housingIncluded !== "boolean") {
 		blockers.push({
 			field: "housing",
 			reason: "Say whether housing is included. Leaving it blank isn’t a “no” — seekers are told nobody answered.",

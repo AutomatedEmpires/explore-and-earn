@@ -179,7 +179,8 @@ export async function updateListingStatus(
     const verdict = validateListingForPublication({
       provenance: row.provenance === "sourced" ? "sourced" : "verified",
       housingEvidence: asPublicationEvidence(row.housing_evidence),
-      housingIncluded: row.housing_included === true,
+      housingIncluded:
+        typeof row.housing_included === "boolean" ? row.housing_included : undefined,
       housingPhotos: effectiveHousingPhotoMap(
         sanitizeHostBenefitLibrary(hostProfile?.benefit_library),
         sanitizeHousingPhotoMap(housingDetail.photos),

@@ -112,6 +112,7 @@ const ANSWERED_DRAFT = {
   status: "draft",
   provenance: "verified",
   housing_evidence: "confirmed",
+  housing_included: false,
   meals_evidence: "confirmed",
   pay_evidence: "confirmed",
   compensation_min_cents: 22_000,
@@ -163,6 +164,17 @@ describe("updateListingStatus", () => {
     const read = makeChain({
       data: { ...ANSWERED_DRAFT, housing_evidence: "not_stated" },
     });
+    queueFromResults(HOST_PROFILE, read);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("incomplete_listing");
+    expect(result.blockers?.map((b) => b.field)).toEqual(["housing"]);
+  });
+
+  it("BLOCKS confirmed Housing evidence without an explicit yes/no value", async () => {
+    const read = makeChain({ data: { ...ANSWERED_DRAFT, housing_included: null } });
     queueFromResults(HOST_PROFILE, read);
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");

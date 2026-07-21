@@ -171,10 +171,15 @@ function sanitizeConfirmed(input: unknown): ClaimConfirmedFields | null {
 		}
 		out[key] = value
 	}
-	// The confirmation UI always requires an explicit Housing answer. Keep the
-	// server boundary equally strict: omission could otherwise preserve a
-	// sourced `housing_included = true` value and bypass the rollout gate below.
+	// Conversion publishes immediately, so the server boundary must require the
+	// same explicit Housing/Meals/Pay triad as the confirmation UI. Omitting a
+	// field could otherwise preserve a source-stated value and mark it confirmed
+	// without the claimant ever answering it.
 	if (typeof out.housingIncluded !== "boolean") return null
+	if (typeof out.mealsIncluded !== "boolean") return null
+	const minPay = typeof out.compensationMinCents === "number" ? out.compensationMinCents : 0
+	const maxPay = typeof out.compensationMaxCents === "number" ? out.compensationMaxCents : 0
+	if (Math.max(minPay, maxPay) <= 0) return null
 	return out as ClaimConfirmedFields
 }
 
