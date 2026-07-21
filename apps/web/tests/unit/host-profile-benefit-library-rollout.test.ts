@@ -20,6 +20,10 @@ const pageSource = readFileSync(
   new URL("../../app/[locale]/(host)/host/profile/edit/page.tsx", import.meta.url),
   "utf8",
 );
+const benefitTrustModalSource = readFileSync(
+  new URL("../../components/discovery/BenefitTrustModal.tsx", import.meta.url),
+  "utf8",
+);
 
 describe("host benefit-library rollout gate", () => {
   it("hides management and omits the patch while migration 072 is unavailable", () => {
@@ -66,5 +70,29 @@ describe("host benefit-library rollout gate", () => {
     );
     expect(formSource).toContain("Remove when saved");
     expect(formSource).toContain("Discard unsaved changes");
+  });
+
+  it("explains when Housing photos are unavailable during the rollout", () => {
+    expect(benefitTrustModalSource).toContain(
+      'housingPhotoLibraryAvailable === false',
+    );
+    expect(benefitTrustModalSource).toContain(
+      "Housing photos are not available yet. Reload and try again.",
+    );
+    expect(benefitTrustModalSource).toContain(
+      "{housingPhotoLibraryUnavailable ? (",
+    );
+    expect(benefitTrustModalSource).toMatch(
+      /housingPhotoLibraryUnavailable =[\s\S]*Boolean\(listingId\)[\s\S]*!hydrating[\s\S]*housingPhotoLibraryAvailable === false/,
+    );
+    expect(benefitTrustModalSource).toMatch(
+      /const configuredSlots =[\s\S]*Boolean\(listingId\)[\s\S]*housingPhotoLibraryAvailable === false[\s\S]*housingPhotoSlots\(category\)/,
+    );
+    expect(benefitTrustModalSource).toContain(
+      "Save the listing before adding photos",
+    );
+    expect(benefitTrustModalSource).toContain(
+      "disabled={!canUpload || editorLocked}",
+    );
   });
 });

@@ -239,6 +239,9 @@ const MEALS_SLOT_CLASSES: Record<string, string> = {
 	misc: styles.mealsMisc ?? "",
 };
 
+const HOUSING_PHOTO_LIBRARY_UNAVAILABLE =
+	"Housing photos are not available yet. Reload and try again.";
+
 function slotClass(kind: BenefitKind, slotId: string): string {
 	const map = kind === "housing" ? HOUSING_SLOT_CLASSES : MEALS_SLOT_CLASSES;
 	return map[slotId] ?? "";
@@ -324,7 +327,9 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	);
 	const [photos, setPhotos] = useState<Record<string, string>>({});
 	const [profileHousingPhotos, setProfileHousingPhotos] = useState<HousingPhotoMap>({});
-	const [housingPhotoLibraryAvailable, setHousingPhotoLibraryAvailable] = useState(false);
+	const [housingPhotoLibraryAvailable, setHousingPhotoLibraryAvailable] = useState<
+		boolean | null
+	>(null);
 	const [customChips, setCustomChips] = useState<
 		Record<string, { id: string; label: string }[]>
 	>({});
@@ -364,9 +369,12 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		});
 		setPhotos({});
 		setProfileHousingPhotos({});
-		setHousingPhotoLibraryAvailable(false);
+		setHousingPhotoLibraryAvailable(null);
 		setCustomChips({});
-		if (!listingId) return;
+		if (!listingId) {
+			setHydrating(false);
+			return;
+		}
 
 		let cancelled = false;
 		setHydrating(true);
@@ -432,7 +440,9 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	const canUpload = Boolean(listingId);
 	const configuredSlots =
 		kind === "housing"
-			? isEdit && !housingPhotoLibraryAvailable
+			? isEdit &&
+				Boolean(listingId) &&
+				housingPhotoLibraryAvailable === false
 				? []
 				: housingPhotoSlots(category)
 			: cfg.slots;
@@ -447,6 +457,12 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	const slotsToShow = isEdit
 		? configuredSlots
 		: configuredSlots.filter((s) => displayPhotos[s.id]);
+	const housingPhotoLibraryUnavailable =
+		kind === "housing" &&
+		isEdit &&
+		Boolean(listingId) &&
+		!hydrating &&
+		housingPhotoLibraryAvailable === false;
 	// Saved single-select facts (housing type, meal style…) for the read-only view.
 	const viewFacts = isEdit
 		? []
@@ -665,6 +681,11 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			{/* ── Photo grid (edit: all slots; view: only the ones filled) ── */}
 			{isEdit || slotsToShow.length > 0 ? (
 			<section className={styles.photoSection} aria-label={cfg.photoLabel}>
+				{housingPhotoLibraryUnavailable ? (
+					<p className={styles.photoUnavailable} role="status">
+						{HOUSING_PHOTO_LIBRARY_UNAVAILABLE}
+					</p>
+				) : (
 				<div className={styles.photoGrid}>
 					{slotsToShow.map((slot) => {
 						const photoUrl = displayPhotos[slot.id];
@@ -752,6 +773,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 						);
 					})}
 				</div>
+				)}
 			</section>
 			) : null}
 

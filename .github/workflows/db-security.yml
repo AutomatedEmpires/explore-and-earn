@@ -15,6 +15,9 @@ on:
       - ".github/workflows/db-security.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   verify-local-database:
     runs-on: ubuntu-latest
@@ -23,6 +26,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1

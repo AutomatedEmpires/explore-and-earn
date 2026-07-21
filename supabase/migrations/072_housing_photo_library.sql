@@ -657,46 +657,45 @@ as $$
       from eligible e
       cross join roles r
   ),
-  effective as (
+  selected as (
     select c.role,
            c.ordinal,
            case
-             when c.override_url is not null
-              and private.housing_photo_url_is_valid(
-                c.override_url,
-                c.host_profile_id::text || '/benefit/' || c.listing_id::text || '/housing/' || c.role
-              )
-               then c.override_url
-             when c.override_url is null
-              and private.housing_photo_url_is_valid(
-                c.library_url,
-                c.host_profile_id::text || '/library/housing/' || c.role
-              )
-               then c.library_url
-             else null
+             when c.override_url is not null then c.override_url
+             else c.library_url
            end as url,
            case
+             when c.override_url is not null then 'listing'
+             else 'profile'
+           end as source,
+           case
              when c.override_url is not null
-              and private.housing_photo_url_is_valid(
-                c.override_url,
-                c.host_profile_id::text || '/benefit/' || c.listing_id::text || '/housing/' || c.role
-              )
-               then 'listing'
-             when c.override_url is null
-              and private.housing_photo_url_is_valid(
-                c.library_url,
-                c.host_profile_id::text || '/library/housing/' || c.role
-              )
-               then 'profile'
-             else null
-           end as source
+               then c.host_profile_id::text || '/benefit/' || c.listing_id::text || '/housing/' || c.role
+             else c.host_profile_id::text || '/library/housing/' || c.role
+           end as expected_prefix
       from candidates c
+  ),
+  validated as materialized (
+    select s.role,
+           s.ordinal,
+           s.url,
+           s.source,
+           private.housing_photo_url_is_valid(s.url, s.expected_prefix) as is_valid
+      from selected s
+  ),
+  complete as (
+    select v.role,
+           v.ordinal,
+           v.url,
+           v.source,
+           count(*) over () as valid_count
+      from validated v
+     where v.is_valid
   )
-  select e.role, e.url, e.source
-    from effective e
-   where e.url is not null
-     and (select count(*) from effective complete where complete.url is not null) = 4
-   order by e.ordinal
+  select c.role, c.url, c.source
+    from complete c
+   where c.valid_count = 4
+   order by c.ordinal
 $$;
 
 -- Owner-only raw benefit context. Public RLS policies cannot provide column

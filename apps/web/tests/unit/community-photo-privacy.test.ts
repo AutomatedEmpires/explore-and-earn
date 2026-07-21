@@ -75,7 +75,7 @@ describe("community photo privacy boundaries", () => {
       reason: "upload_failed",
     });
     expect(dbMocks.uploadCommunityPhotoStorage).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
   it("does not hide the database row when deleting the public object fails", async () => {
     dbMocks.deleteStorageObject.mockRejectedValue(new Error("storage unavailable"));

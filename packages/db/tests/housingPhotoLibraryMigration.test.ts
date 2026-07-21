@@ -109,6 +109,24 @@ describe("housing photo library migration", () => {
     expect(source).toContain("v_current #>> array['housing', 'photos', p_role]");
   });
 
+  it("validates one listing-over-profile candidate per public role", () => {
+    const functionStart = source.indexOf(
+      "create or replace function public.get_public_housing_photos",
+    );
+    const functionEnd = source.indexOf("-- owner-only raw benefit context", functionStart);
+    const publicPhotoRpc = source.slice(functionStart, functionEnd);
+
+    expect(publicPhotoRpc).toContain("validated as materialized");
+    expect(publicPhotoRpc).toContain(
+      "when c.override_url is not null then c.override_url else c.library_url",
+    );
+    expect(publicPhotoRpc).toContain(
+      "when c.override_url is not null then 'listing' else 'profile'",
+    );
+    expect(publicPhotoRpc.match(/private\.housing_photo_url_is_valid\(/g) ?? []).toHaveLength(1);
+    expect(publicPhotoRpc).toContain("order by c.ordinal");
+  });
+
   it("protects referenced objects independently of the Storage request origin", () => {
     expect(source).toContain("create or replace function private.stored_housing_photo_object_name");
     expect(source).toContain(

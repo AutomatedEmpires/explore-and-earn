@@ -47,6 +47,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
@@ -63,11 +65,14 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 210); do
-            deployments="$(gh api "repos/${GITHUB_REPOSITORY}/deployments" \
+            if ! deployments="$(gh api "repos/${GITHUB_REPOSITORY}/deployments" \
               --method GET \
               -f sha="$GITHUB_SHA" \
               -f environment=Production \
-              -f per_page=100)"
+              -f per_page=100)"; then
+              echo "GitHub deployments API request failed on attempt ${attempt}; treating as transient and waiting." >&2
+              deployments='[]'
+            fi
             deployment_id="$(jq -r --arg sha "$GITHUB_SHA" '
               [.[] | select(
                 .sha == $sha and
@@ -77,8 +82,11 @@ jobs:
             ' <<<"$deployments")"
 
             if [[ -n "$deployment_id" ]]; then
-              statuses="$(gh api \
-                "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses")"
+              if ! statuses="$(gh api \
+                "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses")"; then
+                echo "GitHub deployment statuses API request failed for ${deployment_id} on attempt ${attempt}; treating as transient and waiting." >&2
+                statuses='[]'
+              fi
               # A successful deployment may later become "inactive" when a
               # newer main commit reaches Production. It still proves this
               # compatible application SHA landed before its migration.
