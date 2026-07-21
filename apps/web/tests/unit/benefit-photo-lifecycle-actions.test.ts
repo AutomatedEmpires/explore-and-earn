@@ -144,16 +144,21 @@ describe("uploadBenefitPhotoAction abuse bounds", () => {
 
 describe("saveBenefitDetailsAction photo cleanup", () => {
   it("deletes replaced and removed exact owned objects only after a successful save", async () => {
-    dbMocks.getBenefitDetailsContext.mockResolvedValueOnce(
-      contextWithPhotos({
+    dbMocks.saveBenefitDetails.mockResolvedValueOnce({
+      ok: true,
+      previous: {
+        fields: {},
+        toggles: {},
+        photos: {
         kitchen: OLD_KITCHEN,
         dining: UNCHANGED_DINING,
         misc: REMOVED_MISC,
         adjacent: benefitUrl("adjacent", "nested/escape.webp"),
         foreign: benefitUrl("foreign", "other.webp", "host-2"),
         queried: `${benefitUrl("queried", "old.webp")}?download=1`,
-      }),
-    );
+        },
+      },
+    });
 
     const result = await saveBenefitDetailsAction("listing-1", "meals", {
       fields: {},
@@ -195,9 +200,6 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
   });
 
   it("never deletes prior objects when the database save fails", async () => {
-    dbMocks.getBenefitDetailsContext.mockResolvedValueOnce(
-      contextWithPhotos({ kitchen: OLD_KITCHEN }),
-    );
     dbMocks.saveBenefitDetails.mockResolvedValueOnce({
       ok: false,
       error: "write_failed",
@@ -216,9 +218,14 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
 
   it("reports cleanup failures without changing the successful save result", async () => {
     const cleanupError = new Error("storage unavailable");
-    dbMocks.getBenefitDetailsContext.mockResolvedValueOnce(
-      contextWithPhotos({ kitchen: OLD_KITCHEN }),
-    );
+    dbMocks.saveBenefitDetails.mockResolvedValueOnce({
+      ok: true,
+      previous: {
+        fields: {},
+        toggles: {},
+        photos: { kitchen: OLD_KITCHEN },
+      },
+    });
     dbMocks.deleteTrustedListingMedia.mockRejectedValueOnce(cleanupError);
 
     const result = await saveBenefitDetailsAction("listing-1", "meals", {
@@ -235,10 +242,7 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
     expect(revalidateTagMock).toHaveBeenCalledWith("public-listings");
   });
 
-  it("still saves when the best-effort cleanup snapshot cannot be loaded", async () => {
-    const readError = new Error("read unavailable");
-    dbMocks.getBenefitDetailsContext.mockRejectedValueOnce(readError);
-
+  it("uses the write result instead of a race-prone cleanup snapshot read", async () => {
     const result = await saveBenefitDetailsAction("listing-1", "meals", {
       fields: {},
       toggles: {},
@@ -247,11 +251,8 @@ describe("saveBenefitDetailsAction photo cleanup", () => {
 
     expect(result).toEqual({ ok: true });
     expect(dbMocks.saveBenefitDetails).toHaveBeenCalled();
+    expect(dbMocks.getBenefitDetailsContext).not.toHaveBeenCalled();
     expect(dbMocks.deleteTrustedListingMedia).not.toHaveBeenCalled();
-    expect(reportErrorMock).toHaveBeenCalledWith(readError, {
-      action: "loadPreviousBenefitPhotosForCleanup",
-      userId: "user-1",
-    });
   });
 });
 

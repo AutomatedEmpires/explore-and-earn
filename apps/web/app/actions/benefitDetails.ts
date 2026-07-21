@@ -290,23 +290,6 @@ export async function saveBenefitDetailsAction(
     owned.hostProfileId,
     listingId,
   );
-  let previous: BenefitDetail | undefined;
-  try {
-    previous = (
-      await getBenefitDetailsContext(
-        authResult.auth.token,
-        authResult.auth.userId,
-        listingId,
-      )
-    ).details[kind];
-  } catch (cause) {
-    // Saving still has its own authoritative read/ownership checks. A failed
-    // cleanup snapshot should degrade to skipped cleanup, not block the edit.
-    reportError(cause, {
-      action: "loadPreviousBenefitPhotosForCleanup",
-      userId: authResult.auth.userId,
-    });
-  }
   const result = await saveBenefitDetails(
     authResult.auth.token,
     authResult.auth.userId,
@@ -317,7 +300,7 @@ export async function saveBenefitDetailsAction(
   if (!result.ok) return result;
 
   await cleanupReplacedBenefitPhotos(
-    previous,
+    result.previous,
     clean,
     owned.hostProfileId,
     listingId,

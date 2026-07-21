@@ -14,6 +14,7 @@ const dbMocks = vi.hoisted(() => ({
   createHostProfile: vi.fn(),
   deleteTrustedListingMedia: vi.fn(),
   getHostProfile: vi.fn(),
+  setMyHousingLibraryPhoto: vi.fn(),
   updateHostProfileDetails: vi.fn(),
   uploadTrustedListingMedia: vi.fn(),
 }));
@@ -89,6 +90,19 @@ beforeEach(() => {
   });
   dbMocks.deleteTrustedListingMedia.mockResolvedValue(undefined);
   dbMocks.getHostProfile.mockResolvedValue(availableProfile());
+  dbMocks.setMyHousingLibraryPhoto.mockResolvedValue({
+    ok: true,
+    hostProfileId: "host-1",
+    previousUrl: OLD_SLEEPING_URL,
+    benefitLibrary: {
+      housing: {
+        photos: {
+          sleeping_area: NEW_SLEEPING_URL,
+          bathroom: OLD_BATHROOM_URL,
+        },
+      },
+    },
+  });
   dbMocks.updateHostProfileDetails.mockResolvedValue({ ok: true });
   dbMocks.uploadTrustedListingMedia.mockResolvedValue(NEW_SLEEPING_URL);
   prepareUploadImageMock.mockResolvedValue({
@@ -188,7 +202,7 @@ describe("uploadHousingLibraryPhotoAction persistence", () => {
     });
     expect(prepareUploadImageMock).toHaveBeenCalledWith(formData.get("file"));
     expect(dbMocks.uploadTrustedListingMedia).not.toHaveBeenCalled();
-    expect(dbMocks.updateHostProfileDetails).not.toHaveBeenCalled();
+    expect(dbMocks.setMyHousingLibraryPhoto).not.toHaveBeenCalled();
   });
 
   it("uploads through trusted storage, binds immediately, cleans the replacement, and revalidates consumers", async () => {
@@ -207,19 +221,10 @@ describe("uploadHousingLibraryPhotoAction persistence", () => {
       bytes: PREPARED_BYTES,
       contentType: "image/webp",
     });
-    expect(dbMocks.updateHostProfileDetails).toHaveBeenCalledWith(
+    expect(dbMocks.setMyHousingLibraryPhoto).toHaveBeenCalledWith(
       "session-token",
-      "user-1",
-      {
-        benefitLibrary: {
-          housing: {
-            photos: {
-              sleeping_area: NEW_SLEEPING_URL,
-              bathroom: OLD_BATHROOM_URL,
-            },
-          },
-        },
-      },
+      "sleeping_area",
+      NEW_SLEEPING_URL,
     );
     expect(dbMocks.deleteTrustedListingMedia).toHaveBeenCalledTimes(1);
     expect(dbMocks.deleteTrustedListingMedia).toHaveBeenCalledWith(
@@ -227,9 +232,9 @@ describe("uploadHousingLibraryPhotoAction persistence", () => {
     );
     expect(
       dbMocks.uploadTrustedListingMedia.mock.invocationCallOrder[0],
-    ).toBeLessThan(dbMocks.updateHostProfileDetails.mock.invocationCallOrder[0]);
+    ).toBeLessThan(dbMocks.setMyHousingLibraryPhoto.mock.invocationCallOrder[0]);
     expect(
-      dbMocks.updateHostProfileDetails.mock.invocationCallOrder[0],
+      dbMocks.setMyHousingLibraryPhoto.mock.invocationCallOrder[0],
     ).toBeLessThan(dbMocks.deleteTrustedListingMedia.mock.invocationCallOrder[0]);
     expect(revalidatePathMock.mock.calls).toEqual([
       ["/host/profile"],
@@ -243,7 +248,7 @@ describe("uploadHousingLibraryPhotoAction persistence", () => {
 
   it("rolls back the newly uploaded object when immediate profile binding fails", async () => {
     authAs("user-1");
-    dbMocks.updateHostProfileDetails.mockResolvedValueOnce({
+    dbMocks.setMyHousingLibraryPhoto.mockResolvedValueOnce({
       ok: false,
       error: "database_unavailable",
     });

@@ -6,6 +6,7 @@ import {
 	createHostProfile,
 	deleteTrustedListingMedia,
 	getHostProfile,
+	setMyHousingLibraryPhoto,
 	updateHostProfileDetails,
 	uploadTrustedListingMedia,
 	type SocialLinks,
@@ -322,17 +323,21 @@ export async function uploadHousingLibraryPhotoAction(
 				},
 			},
 		})
-		const result = await updateHostProfileDetails(token, userId, {
-			benefitLibrary: nextLibrary,
-		})
+		const result = await setMyHousingLibraryPhoto(token, housingRole, uploadedUrl)
 		if (!result.ok) {
 			await deleteTrustedListingMedia(path).catch(() => undefined)
 			return { ok: false, error: result.error ?? "update_failed" }
 		}
 
+		const committedLibrary = result.benefitLibrary ?? nextLibrary
+		const displacedLibrary = result.previousUrl
+			? sanitizeHostBenefitLibrary({
+					housing: { photos: { [housingRole]: result.previousUrl } },
+				})
+			: {}
 		await cleanupReplacedHousingPhotos(
-			profile.benefitLibrary,
-			nextLibrary,
+			displacedLibrary,
+			committedLibrary,
 			profile.id,
 			userId,
 		)
