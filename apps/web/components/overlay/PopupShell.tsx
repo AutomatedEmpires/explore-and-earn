@@ -24,6 +24,8 @@ export interface PopupShellProps {
 	readonly footer?: ReactNode;
 	readonly size?: "compact" | "standard" | "wide";
 	readonly closeLabel?: string;
+	/** Prevent dismissal while an in-flight operation must finish atomically. */
+	readonly closeDisabled?: boolean;
 }
 
 export function PopupShell({
@@ -41,10 +43,15 @@ export function PopupShell({
 	footer,
 	size = "standard",
 	closeLabel = "Close",
+	closeDisabled = false,
 }: PopupShellProps) {
 	const titleId = useId();
 	const panelRef = useRef<HTMLDivElement>(null);
 	const restoreFocusRef = useRef<HTMLElement | null>(null);
+	const onCloseRef = useRef(onClose);
+	const closeDisabledRef = useRef(closeDisabled);
+	onCloseRef.current = onClose;
+	closeDisabledRef.current = closeDisabled;
 	const [mounted, setMounted] = useState(false);
 	// `present` keeps the portal in the DOM through the exit animation after
 	// `open` flips to false, so the mirrored close transition can play. The
@@ -102,8 +109,10 @@ export function PopupShell({
 
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
-				event.preventDefault();
-				onClose();
+				if (!closeDisabledRef.current) {
+					event.preventDefault();
+					onCloseRef.current();
+				}
 				return;
 			}
 			if (event.key !== "Tab") {
@@ -146,7 +155,7 @@ export function PopupShell({
 				el.removeAttribute("aria-hidden");
 			}
 		};
-	}, [open, onClose, mounted]);
+	}, [open, mounted]);
 
 	if (!mounted || !present) {
 		return null;
@@ -166,8 +175,12 @@ export function PopupShell({
 			className={`${styles.scrim}${closing ? ` ${styles.closing}` : ""}`}
 			aria-hidden={closing || undefined}
 			onClick={(event) => {
-				if (!closing && event.target === event.currentTarget) {
-					onClose();
+				if (
+					!closing &&
+					!closeDisabled &&
+					event.target === event.currentTarget
+				) {
+					onCloseRef.current();
 				}
 			}}
 		>
@@ -204,6 +217,7 @@ export function PopupShell({
 								className={styles.closeButton}
 								onClick={onClose}
 								aria-label={closeLabel}
+								disabled={closeDisabled}
 							>
 								<Icon name="action.close" size={20} aria-hidden />
 							</button>

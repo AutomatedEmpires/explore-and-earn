@@ -25,6 +25,10 @@ on:
       - ".github/workflows/db-migrate.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  deployments: read
+
 # Never let two migration pushes race against the same database.
 concurrency:
   group: db-migrate-production
@@ -43,11 +47,75 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.102.0
+
+      # Vercel and GitHub Actions begin independently after a main push. The
+      # application release must land first because migration 072 contracts
+      # raw JSON access after the compatible RPC-backed UI is deployed.
+      - name: Wait for this commit's Vercel production deployment
+        timeout-minutes: 40
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 210); do
+            if ! deployments="$(gh api "repos/${GITHUB_REPOSITORY}/deployments" \
+              --method GET \
+              -f sha="$GITHUB_SHA" \
+              -f environment=Production \
+              -f per_page=100)"; then
+              echo "GitHub deployments API request failed on attempt ${attempt}; treating as transient and waiting." >&2
+              deployments='[]'
+            fi
+            deployment_id="$(jq -r --arg sha "$GITHUB_SHA" '
+              [.[] | select(
+                .sha == $sha and
+                .environment == "Production" and
+                .creator.login == "vercel[bot]"
+              )] | sort_by(.created_at) | last | .id // empty
+            ' <<<"$deployments")"
+
+            if [[ -n "$deployment_id" ]]; then
+              if ! statuses="$(gh api \
+                "repos/${GITHUB_REPOSITORY}/deployments/${deployment_id}/statuses")"; then
+                echo "GitHub deployment statuses API request failed for ${deployment_id} on attempt ${attempt}; treating as transient and waiting." >&2
+                statuses='[]'
+              fi
+              # A successful deployment may later become "inactive" when a
+              # newer main commit reaches Production. It still proves this
+              # compatible application SHA landed before its migration.
+              if jq -e 'any(.[]; .state == "success")' <<<"$statuses" >/dev/null; then
+                state=success
+              else
+                state="$(jq -r '.[0].state // "pending"' <<<"$statuses")"
+              fi
+              case "$state" in
+                success)
+                  echo "Vercel production deployment ${deployment_id} succeeded."
+                  break
+                  ;;
+                failure|error)
+                  echo "Vercel production deployment ${deployment_id} ended in ${state}." >&2
+                  exit 1
+                  ;;
+              esac
+              echo "Vercel production deployment ${deployment_id} is ${state}; waiting."
+            else
+              echo "No matching Vercel production deployment yet; waiting."
+            fi
+
+            if [[ "$attempt" -eq 210 ]]; then
+              echo "Timed out waiting for Vercel production deployment of ${GITHUB_SHA}." >&2
+              exit 1
+            fi
+            sleep 10
+          done
 
       - name: Link the production project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"

@@ -1,7 +1,11 @@
-import type { OpportunityCategory } from "@explore-and-earn/contracts";
+import type {
+	EffectiveHousingPhoto,
+	OpportunityCategory,
+} from "@explore-and-earn/contracts";
 import type { PublicListingDetail } from "@explore-and-earn/db";
 import { cloudinaryPhoto } from "@explore-and-earn/ui";
 
+import { bucketPhotoUrl } from "../../lib/photoBuckets";
 import type { DiscoveryListing } from "./listing";
 import { DISCOVERY_FIXTURES } from "./fixtures";
 
@@ -55,6 +59,65 @@ const GALLERY_BY_CATEGORY: Record<OpportunityCategory, readonly string[]> = {
 		cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"),
 		cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"),
 	],
+};
+
+const FARM_HOUSING_PHOTOS: readonly EffectiveHousingPhoto[] = [
+	{
+		role: "sleeping_area",
+		url: bucketPhotoUrl("ee/buckets/housing/bedrooms/marcus-loke-WQJvWU_HZFo"),
+		source: "listing",
+	},
+	{
+		role: "bathroom",
+		url: bucketPhotoUrl("ee/buckets/housing/bathrooms/carlos-masias-yg8zkwBS30Q"),
+		source: "listing",
+	},
+	{
+		role: "kitchen",
+		url: bucketPhotoUrl("ee/buckets/meals/kitchens/luk-parni-an-HZgSvndfakc"),
+		source: "listing",
+	},
+	{
+		role: "dining_common",
+		url: bucketPhotoUrl("ee/buckets/meals/dining/bruno-ngarukiye-OqFZPMeufYQ"),
+		source: "listing",
+	},
+];
+
+const MARITIME_HOUSING_PHOTOS: readonly EffectiveHousingPhoto[] = [
+	{
+		role: "sleeping_area",
+		url: bucketPhotoUrl("ee/buckets/housing/bedrooms/zoshua-colah-TzMGehZmocI"),
+		source: "listing",
+	},
+	{
+		role: "bathroom",
+		url: bucketPhotoUrl("ee/buckets/housing/bathrooms/steven-ungermann-Aac7IlKnYX8"),
+		source: "listing",
+	},
+	{
+		role: "kitchen",
+		url: bucketPhotoUrl("ee/buckets/meals/kitchens/zhang-ziyu-2VX0f47Z5NA"),
+		source: "listing",
+	},
+	{
+		role: "dining_common",
+		url: bucketPhotoUrl("ee/buckets/meals/dining/bruno-ngarukiye-OqFZPMeufYQ"),
+		source: "listing",
+	},
+];
+
+/**
+ * Detail-only evidence fixtures. The negative cases intentionally carry
+ * "poison" photos so E2E proves the public visibility gates suppress them.
+ */
+const HOUSING_PHOTOS_BY_LISTING: Readonly<
+	Partial<Record<string, readonly EffectiveHousingPhoto[]>>
+> = {
+	lst_orchard_wenatchee: FARM_HOUSING_PHOTOS,
+	lst_deckhand_sitka: MARITIME_HOUSING_PHOTOS,
+	lst_remote_community: FARM_HOUSING_PHOTOS,
+	lst_sourced_kelp_farm: MARITIME_HOUSING_PHOTOS,
 };
 
 /** Immersive-detail sample content for the dev fixtures, by category. */
@@ -333,6 +396,7 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 			housingIncluded && enrich
 				? f.benefits.housing.summary ?? enrich.housingDescription
 				: undefined,
+		housingPhotos: HOUSING_PHOTOS_BY_LISTING[f.id],
 		mealsDescription:
 			mealsIncluded && enrich
 				? f.benefits.meals.summary ?? enrich.mealsDescription

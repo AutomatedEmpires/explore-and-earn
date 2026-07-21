@@ -22,6 +22,7 @@ import {
 const complete = {
   provenance: "verified",
   housingEvidence: "confirmed",
+  housingIncluded: false,
   mealsEvidence: "confirmed",
   payEvidence: "confirmed",
   payMinCents: 22_000,
@@ -39,6 +40,18 @@ describe("a host-controlled listing must answer the triad to publish", () => {
     // The old code read a blank housing box as "Not included" + confirmed.
     // Now it blocks instead, and says so.
     const v = validateListingForPublication({ ...complete, housingEvidence: "not_stated" });
+    expect(v.ok).toBe(false);
+    expect(fieldsOf(v)).toEqual(["housing"]);
+  });
+
+  it("BLOCKS confirmed Housing evidence without an explicit yes/no value", () => {
+    const v = validateListingForPublication({
+      provenance: "verified",
+      housingEvidence: "confirmed",
+      mealsEvidence: "confirmed",
+      payEvidence: "confirmed",
+      payMinCents: 22_000,
+    });
     expect(v.ok).toBe(false);
     expect(fieldsOf(v)).toEqual(["housing"]);
   });

@@ -14,6 +14,11 @@ import {
   HostSectionHeading,
 } from "../../../../../../components/host";
 import type { HostProfileSummary } from "../../../../../../components/host";
+import {
+  devHostProfile,
+  isDevBenchEnabled,
+} from "../../../../../../lib/devBench";
+import { readDevRole } from "../../../../../../lib/devBench/server";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Edit profile" };
@@ -31,10 +36,17 @@ export default async function HostProfileEditPage() {
     redirect("/sign-in");
   }
 
-  const [hostProfile, listingRows] = await Promise.all([
-    getHostProfile(token, userId),
-    getHostListings(token, userId).catch(() => []),
-  ]);
+  const useDevFixture =
+    isDevBenchEnabled() && (await readDevRole()) === "host";
+  const [hostProfile, listingRows]: [
+    Awaited<ReturnType<typeof getHostProfile>>,
+    Awaited<ReturnType<typeof getHostListings>>,
+  ] = useDevFixture
+    ? [devHostProfile(), []]
+    : await Promise.all([
+        getHostProfile(token, userId),
+        getHostListings(token, userId).catch(() => []),
+      ]);
 
   const realHost = listingRows
     .map((row) => rowToDiscoveryFields(row).host)
@@ -67,6 +79,8 @@ export default async function HostProfileEditPage() {
         profile={profile}
         hostProfileId={hostProfile?.id}
         photoUrl={hostProfile?.photoUrl ?? undefined}
+        benefitLibraryAvailable={hostProfile?.benefitLibraryAvailable ?? false}
+        benefitLibrary={hostProfile?.benefitLibrary}
       />
     </section>
   );

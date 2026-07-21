@@ -24,6 +24,12 @@
 // raw 23514.
 
 import { HOST_BENEFIT_CHOICES, type BenefitProvision } from "./benefits";
+import {
+	missingHousingPhotoRoles,
+	housingPhotoLabel,
+	type HousingPhotoMap,
+	type HousingPhotoRole,
+} from "./housingPhotos";
 import type { BenefitEvidenceStatus } from "./provenance";
 
 /** A benefit the host has not answered yet. Ordered as the host meets them. */
@@ -38,6 +44,9 @@ export interface PublicationCandidate {
 	 */
 	readonly provenance?: "verified" | "sourced";
 	readonly housingEvidence?: BenefitEvidenceStatus;
+	readonly housingIncluded?: boolean;
+	/** Effective inherited-plus-overridden housing evidence. */
+	readonly housingPhotos?: HousingPhotoMap;
 	readonly mealsEvidence?: BenefitEvidenceStatus;
 	readonly payEvidence?: BenefitEvidenceStatus;
 	/** Pay needs a structured figure, not merely a decision that it exists. */
@@ -49,6 +58,7 @@ export interface PublicationBlocker {
 	readonly field: PublicationField;
 	/** Why it blocks — the host-facing sentence. */
 	readonly reason: string;
+	readonly missingPhotoRoles?: readonly HousingPhotoRole[];
 }
 
 export type PublicationVerdict =
@@ -87,11 +97,21 @@ export function validateListingForPublication(
 
 	const blockers: PublicationBlocker[] = [];
 
-	if (!hostDecided(candidate.housingEvidence)) {
+	const housingDecided = hostDecided(candidate.housingEvidence);
+	if (!housingDecided || typeof candidate.housingIncluded !== "boolean") {
 		blockers.push({
 			field: "housing",
 			reason: "Say whether housing is included. Leaving it blank isn’t a “no” — seekers are told nobody answered.",
 		});
+	} else if (candidate.housingIncluded) {
+		const missingPhotoRoles = missingHousingPhotoRoles(candidate.housingPhotos);
+		if (missingPhotoRoles.length > 0) {
+			blockers.push({
+				field: "housing",
+				reason: `Add housing evidence photos for: ${missingPhotoRoles.map((role) => housingPhotoLabel(role, undefined)).join(", ")}.`,
+				missingPhotoRoles,
+			});
+		}
 	}
 	if (!hostDecided(candidate.mealsEvidence)) {
 		blockers.push({

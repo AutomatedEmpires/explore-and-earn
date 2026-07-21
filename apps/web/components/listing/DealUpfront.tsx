@@ -1,9 +1,16 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 
 import { Icon } from "@explore-and-earn/ui";
-import { NOT_STATED_LABEL, type BenefitEvidenceStatus } from "@explore-and-earn/contracts";
+import {
+  housingPhotoLabel,
+  NOT_STATED_LABEL,
+  type BenefitEvidenceStatus,
+  type EffectiveHousingPhoto,
+} from "@explore-and-earn/contracts";
 
 import { ListingSection } from "./ListingSection";
+import { isLocalStorageUrl } from "../../lib/storageUrl";
 import styles from "./DealUpfront.module.css";
 
 export interface DealUpfrontProps {
@@ -15,6 +22,8 @@ export interface DealUpfrontProps {
   readonly mealsDescription: string | null;
   /** Already-formatted pay summary, e.g. "$18/hr" or "See listing". */
   readonly paySummary: string;
+  readonly category?: string;
+  readonly housingPhotos?: readonly EffectiveHousingPhoto[];
   /**
    * Per-benefit evidence (sourced listings). When a benefit is 'not_stated'
    * the cell reads "Not stated" — the source didn't say, so we never present
@@ -46,6 +55,8 @@ export function DealUpfront({
   housingDescription,
   mealsDescription,
   paySummary,
+  category,
+  housingPhotos = [],
   evidence,
   children,
 }: DealUpfrontProps) {
@@ -92,6 +103,37 @@ export function DealUpfront({
           <div className={styles.cellValue}>{payNotStated ? NOT_STATED_LABEL : paySummary}</div>
         </div>
       </div>
+
+      {housingIncluded && housingPhotos.length > 0 ? (
+        <section className={styles.housingEvidence} aria-labelledby="housing-evidence-title">
+          <div className={styles.evidenceHead}>
+            <Icon name="nav.photos" size={18} aria-hidden />
+            <h3 className={styles.evidenceTitle} id="housing-evidence-title">
+              Housing evidence
+            </h3>
+          </div>
+          <div className={styles.evidenceGrid}>
+            {housingPhotos.map((photo) => {
+              const label = housingPhotoLabel(photo.role, category);
+              return (
+                <figure className={styles.evidencePhoto} key={photo.role}>
+                  <div className={styles.evidenceImage}>
+                    <Image
+                      src={photo.url}
+                      alt={`${label} provided by the host`}
+                      fill
+                      sizes="(max-width: 639px) 50vw, 320px"
+                      className={styles.evidenceImg}
+                      unoptimized={isLocalStorageUrl(photo.url)}
+                    />
+                  </div>
+                  <figcaption className={styles.evidenceLabel}>{label}</figcaption>
+                </figure>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {children}
     </ListingSection>

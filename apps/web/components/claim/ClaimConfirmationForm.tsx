@@ -3,9 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Icon } from "@explore-and-earn/ui";
-import { NOT_STATED_LABEL } from "@explore-and-earn/contracts";
+import {
+  HOUSING_PHOTO_ROLES,
+  NOT_STATED_LABEL,
+  SERVER_IMAGE_UPLOAD_MAX_FILE_BYTES,
+  housingPhotoLabel,
+  sanitizeHousingPhotoMap,
+  type HostBenefitLibrary,
+  type HousingPhotoMap,
+  type HousingPhotoRole,
+} from "@explore-and-earn/contracts";
 
+import { uploadHousingLibraryPhotoAction } from "../../app/actions/hostProfile";
 import { confirmClaimListingAction } from "../../app/actions/listingClaims";
+import { ImageUpload } from "../ImageUpload";
+import {
+  claimBenefitTruthError,
+  claimHousingPhotoError,
+  type ClaimBenefitChoice,
+} from "./claimHousingPhotos";
 import styles from "./ClaimConfirmationForm.module.css";
 
 /**
@@ -15,6 +31,7 @@ import styles from "./ClaimConfirmationForm.module.css";
  */
 export interface ConfirmationPrefill {
   readonly title: string;
+  readonly category: string;
   readonly description: string | null;
   readonly locationDisplay: string | null;
   readonly housingIncluded: boolean;
@@ -33,9 +50,7 @@ export interface ConfirmationPrefill {
 }
 
 /** Tri-state benefit choice: leave-not-stated stays honestly unconfirmed. */
-type BenefitChoice = "not_stated" | "yes" | "no";
-
-function initialBenefitChoice(evidence: string, value: boolean): BenefitChoice {
+function initialBenefitChoice(evidence: string, value: boolean): ClaimBenefitChoice {
   if (evidence === "not_stated") return "not_stated";
   return value ? "yes" : "no";
 }
@@ -76,23 +91,27 @@ export function ClaimConfirmationForm({
   hostProfileId,
   listingId,
   prefill,
+  benefitLibrary,
+  benefitLibraryAvailable,
 }: {
   readonly claimId: string;
   readonly hostProfileId: string;
   readonly listingId: string;
   readonly prefill: ConfirmationPrefill;
+  readonly benefitLibrary: HostBenefitLibrary;
+  readonly benefitLibraryAvailable: boolean;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(prefill.title);
   const [description, setDescription] = useState(prefill.description ?? "");
   const [locationDisplay, setLocationDisplay] = useState(prefill.locationDisplay ?? "");
-  const [housing, setHousing] = useState<BenefitChoice>(
+  const [housing, setHousing] = useState<ClaimBenefitChoice>(
     initialBenefitChoice(prefill.housingEvidence, prefill.housingIncluded),
   );
   const [housingDescription, setHousingDescription] = useState(
     prefill.housingDescription ?? "",
   );
-  const [meals, setMeals] = useState<BenefitChoice>(
+  const [meals, setMeals] = useState<ClaimBenefitChoice>(
     initialBenefitChoice(prefill.mealsEvidence, prefill.mealsIncluded),
   );
   const [mealsDescription, setMealsDescription] = useState(prefill.mealsDescription ?? "");
@@ -102,8 +121,30 @@ export function ClaimConfirmationForm({
   const [paySummary, setPaySummary] = useState(prefill.compensationSummary ?? "");
   const [beginsAt, setBeginsAt] = useState(toDateInput(prefill.beginsAt));
   const [endsAt, setEndsAt] = useState(toDateInput(prefill.endsAt));
+  const [housingPhotos, setHousingPhotos] = useState<HousingPhotoMap>(() =>
+    sanitizeHousingPhotoMap(benefitLibrary.housing?.photos),
+  );
+  const [uploadingRoles, setUploadingRoles] = useState<readonly HousingPhotoRole[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  async function uploadHousingPhoto(
+    role: HousingPhotoRole,
+    file: File,
+  ): Promise<string> {
+    setUploadingRoles((current) => [...current, role]);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const result = await uploadHousingLibraryPhotoAction(role, formData);
+      if (!result.ok || !result.url) {
+        throw new Error(result.error ?? "Upload failed. Please try again.");
+      }
+      return result.url;
+    } finally {
+      setUploadingRoles((current) => current.filter((item) => item !== role));
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -111,6 +152,25 @@ export function ClaimConfirmationForm({
 
     if (!title.trim()) {
       setError("A listing title is required.");
+      return;
+    }
+    if (uploadingRoles.length > 0) {
+      setError("Wait for every housing photo to finish uploading.");
+      return;
+    }
+    if (housing === "yes" && !benefitLibraryAvailable) {
+      setError(
+        "Housing evidence is temporarily unavailable. Please try again after the database upgrade finishes.",
+      );
+      return;
+    }
+    const photoError = claimHousingPhotoError(
+      housing,
+      housingPhotos,
+      prefill.category,
+    );
+    if (photoError) {
+      setError(photoError);
       return;
     }
     const minCents = parseDollarsToCents(payMin);
@@ -123,14 +183,23 @@ export function ClaimConfirmationForm({
       setError("Maximum pay must be a valid amount.");
       return;
     }
+    const benefitError = claimBenefitTruthError(
+      housing,
+      meals,
+      minCents,
+      maxCents,
+    );
+    if (benefitError) {
+      setError(benefitError);
+      return;
+    }
     if (minCents !== null && maxCents !== null && minCents > maxCents) {
       setError("Minimum pay can't exceed maximum pay.");
       return;
     }
 
-    // Only present keys are applied; a blank optional field means "leave the
-    // sourced value as it is" and a not_stated benefit left untouched stays
-    // honestly unconfirmed.
+    // Only present optional fields are applied. The Housing/Meals/Pay triad is
+    // always explicit because conversion publishes a verified live listing.
     const confirmed: Record<string, string | number | boolean> = {
       title: title.trim(),
     };
@@ -163,10 +232,10 @@ export function ClaimConfirmationForm({
       hostProfileId,
       confirmed as never,
     ).catch(() => ({ ok: false as const, error: "network" }));
-    setSubmitting(false);
     if (result.ok) {
       router.refresh();
     } else {
+      setSubmitting(false);
       setError(confirmErrorCopy(result.error));
     }
   }
@@ -181,7 +250,7 @@ export function ClaimConfirmationForm({
         the listing under your host profile.
       </p>
 
-      <form className={styles.form} onSubmit={handleSubmit}>
+      <form className={styles.form} onSubmit={handleSubmit} aria-busy={submitting}>
         <label className={styles.field}>
           <span className={styles.label}>Title</span>
           <input
@@ -191,6 +260,7 @@ export function ClaimConfirmationForm({
             maxLength={200}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            disabled={submitting}
           />
         </label>
 
@@ -205,6 +275,7 @@ export function ClaimConfirmationForm({
             maxLength={10000}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            disabled={submitting}
           />
         </label>
 
@@ -219,21 +290,22 @@ export function ClaimConfirmationForm({
             maxLength={200}
             value={locationDisplay}
             onChange={(e) => setLocationDisplay(e.target.value)}
+            disabled={submitting}
             placeholder="e.g. Wenatchee, WA"
           />
         </label>
 
-        <fieldset className={styles.fieldset}>
+        <fieldset className={styles.fieldset} disabled={submitting}>
           <legend className={styles.legend}>Housing</legend>
           <label className={styles.field}>
             <span className={styles.label}>Is housing included?</span>
             <select
               className={styles.input}
               value={housing}
-              onChange={(e) => setHousing(e.target.value as BenefitChoice)}
+              onChange={(e) => setHousing(e.target.value as ClaimBenefitChoice)}
             >
               {prefill.housingEvidence === "not_stated" ? (
-                <option value="not_stated">{NOT_STATED_LABEL} — leave unconfirmed</option>
+                <option value="not_stated" disabled>{NOT_STATED_LABEL} — choose an answer</option>
               ) : null}
               <option value="yes">Included</option>
               <option value="no">Not included</option>
@@ -250,19 +322,60 @@ export function ClaimConfirmationForm({
               placeholder="e.g. Shared on-site cabin, utilities covered"
             />
           </label>
+          {housing === "yes" && benefitLibraryAvailable ? (
+            <section className={styles.photoGate} aria-labelledby="claim-housing-photos">
+              <div className={styles.photoGateHeader}>
+                <div>
+                  <h2 id="claim-housing-photos" className={styles.photoGateTitle}>
+                    Show the real housing
+                  </h2>
+                  <p className={styles.photoGateNote}>
+                    Housing Included needs all four views before this listing can publish.
+                    These become reusable defaults for your other listings.
+                  </p>
+                </div>
+                <span className={styles.photoCount}>
+                  {HOUSING_PHOTO_ROLES.filter((role) => housingPhotos[role]).length}/4
+                </span>
+              </div>
+              <div className={styles.photoGrid}>
+                {HOUSING_PHOTO_ROLES.map((role) => {
+                  const label = housingPhotoLabel(role, prefill.category);
+                  return (
+                    <div key={role} className={styles.photoSlot}>
+                      <span className={styles.label}>{label}</span>
+                      <ImageUpload
+                        label={`Upload ${label.toLowerCase()}`}
+                        currentUrl={housingPhotos[role]}
+                        uploader={(file) => uploadHousingPhoto(role, file)}
+                        onUpload={(url) => {
+                          setHousingPhotos((current) => ({
+                            ...current,
+                            [role]: url,
+                          }));
+                        }}
+                        disabled={submitting || uploadingRoles.length > 0}
+                        maxFileBytes={SERVER_IMAGE_UPLOAD_MAX_FILE_BYTES}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
         </fieldset>
 
-        <fieldset className={styles.fieldset}>
+        <fieldset className={styles.fieldset} disabled={submitting}>
           <legend className={styles.legend}>Meals</legend>
           <label className={styles.field}>
             <span className={styles.label}>Are meals included?</span>
             <select
               className={styles.input}
               value={meals}
-              onChange={(e) => setMeals(e.target.value as BenefitChoice)}
+              onChange={(e) => setMeals(e.target.value as ClaimBenefitChoice)}
             >
               {prefill.mealsEvidence === "not_stated" ? (
-                <option value="not_stated">{NOT_STATED_LABEL} — leave unconfirmed</option>
+                <option value="not_stated" disabled>{NOT_STATED_LABEL} — choose an answer</option>
               ) : null}
               <option value="yes">Included</option>
               <option value="no">Not included</option>
@@ -281,7 +394,7 @@ export function ClaimConfirmationForm({
           </label>
         </fieldset>
 
-        <fieldset className={styles.fieldset}>
+        <fieldset className={styles.fieldset} disabled={submitting}>
           <legend className={styles.legend}>Pay</legend>
           {prefill.payEvidence === "not_stated" ? (
             <p className={styles.notStated}>
@@ -342,7 +455,7 @@ export function ClaimConfirmationForm({
           </div>
         </fieldset>
 
-        <fieldset className={styles.fieldset}>
+        <fieldset className={styles.fieldset} disabled={submitting}>
           <legend className={styles.legend}>Timeline</legend>
           <div className={styles.rowPair}>
             <label className={styles.field}>
@@ -379,19 +492,26 @@ export function ClaimConfirmationForm({
           </p>
         ) : null}
 
-        <Button type="submit" variant="primary" disabled={submitting}>
-          {submitting ? "Publishing…" : "Confirm and publish as my listing"}
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={submitting || uploadingRoles.length > 0}
+        >
+          {submitting
+            ? "Publishing…"
+            : uploadingRoles.length > 0
+              ? "Uploading housing photos…"
+              : "Confirm and publish as my listing"}
         </Button>
         <p className={styles.disclaimer}>
           By confirming, you state these details are accurate. The listing
-          becomes your verified listing; fields you left as &quot;
-          {NOT_STATED_LABEL}&quot; stay marked that way rather than pretending
-          you confirmed them.
+          becomes your verified listing and publishes with explicit Housing,
+          Meals, and Pay answers.
         </p>
         <Button
           type="button"
           variant="ghost"
-          disabled={submitting}
+          disabled={submitting || uploadingRoles.length > 0}
           onClick={() => router.push(`/listing/${listingId}`)}
         >
           Cancel for now
@@ -411,6 +531,10 @@ function confirmErrorCopy(code: string | undefined): string {
       return "Only the person who submitted this claim can confirm it.";
     case "host_profile_mismatch":
       return "Your host profile doesn't match this claim — refresh the page and try again.";
+    case "housing_library_unavailable":
+      return "Housing evidence is temporarily unavailable. Please try again after the database upgrade finishes.";
+    case "housing_photos_incomplete":
+      return "Add all four required housing photos before publishing this listing.";
     case "unauthenticated":
       return "Please sign in to continue.";
     default:

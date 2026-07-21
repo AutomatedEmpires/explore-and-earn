@@ -17,6 +17,7 @@ export {
   LISTING_MEDIA_BUCKET,
   PROFILE_PHOTOS_BUCKET,
   uploadListingMedia,
+  uploadHousingLibraryPhoto,
   uploadProfilePhoto,
   deleteStorageObject,
   deleteListingMedia,

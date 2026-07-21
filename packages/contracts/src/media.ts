@@ -66,8 +66,15 @@ export const UPLOAD_ALLOWED_MIME_TYPES = [
 ] as const;
 export type UploadAllowedMimeType = (typeof UPLOAD_ALLOWED_MIME_TYPES)[number];
 
-/** Maximum size in bytes for a single uploaded file (5 MB). */
+/** Maximum persisted size for a single normalized Storage object (5 MiB). */
 export const UPLOAD_MAX_FILE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Maximum raw image accepted by a Vercel-backed Server Action (4 MiB).
+ * Multipart framing must stay below Vercel's separate 4.5 MB function-body
+ * ceiling; normalized output may still use the 5 MiB Storage allowance above.
+ */
+export const SERVER_IMAGE_UPLOAD_MAX_FILE_BYTES = 4 * 1024 * 1024;
 
 /** Maximum number of gallery images (non-cover) a host may upload per listing. */
 export const GALLERY_MAX_IMAGES = 10;

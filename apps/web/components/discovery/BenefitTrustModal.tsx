@@ -1,21 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Button, Icon } from "@explore-and-earn/ui";
 import {
+	effectiveHousingPhotoMap,
+	housingPhotoSlots,
 	NOT_STATED_LABEL,
+	sanitizeHousingPhotoMap,
+	SERVER_IMAGE_UPLOAD_MAX_FILE_BYTES,
 	UPLOAD_ALLOWED_MIME_TYPES,
 	type BenefitProvision,
+	type HousingPhotoMap,
+	type HousingPhotoRole,
 } from "@explore-and-earn/contracts";
 import {
+	discardBenefitPhotoAction,
 	getBenefitDetailsAction,
 	getPublicBenefitDetailsAction,
 	saveBenefitDetailsAction,
 	uploadBenefitPhotoAction,
 } from "../../app/actions/benefitDetails";
 import { PopupShell } from "../overlay/PopupShell";
+import { isLocalStorageUrl } from "../../lib/storageUrl";
 import type { DiscoveryListing } from "./listing";
+import {
+	BenefitPhotoSessionLedger,
+	type TrackedBenefitPhotoUpload,
+} from "./benefitPhotoSession";
 import styles from "./BenefitTrustModal.module.css";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -50,13 +62,6 @@ type PhotoSlot = {
 };
 
 // ── Housing config ─────────────────────────────────────────────────────────────
-
-const HOUSING_SLOTS: readonly PhotoSlot[] = [
-	{ id: "outside", label: "Outside" },
-	{ id: "inside", label: "Inside" },
-	{ id: "bathroom", label: "Bathroom" },
-	{ id: "misc", label: "Misc" },
-];
 
 const HOUSING_FIELDS: readonly FieldDef[] = [
 	{
@@ -198,8 +203,8 @@ const KIND_CONFIG: Record<BenefitKind, KindConfig> = {
 		icon: "benefit.housing",
 		photoLabel: "Housing photos",
 		saveLabel: "Save housing",
-		trustNote: "Detailed housing info helps seekers feel confident.",
-		slots: HOUSING_SLOTS,
+		trustNote: "Profile defaults are inherited here. Add a listing-specific photo only when this opportunity differs.",
+		slots: [],
 		fields: HOUSING_FIELDS,
 		chipSections: HOUSING_CHIP_SECTIONS,
 	},
@@ -221,10 +226,10 @@ const KIND_CONFIG: Record<BenefitKind, KindConfig> = {
 // ── Slot CSS class lookup (avoids dynamic CSS module access) ───────────────────
 
 const HOUSING_SLOT_CLASSES: Record<string, string> = {
-	outside: styles.outside ?? "",
-	inside: styles.inside ?? "",
+	sleeping_area: styles.inside ?? "",
 	bathroom: styles.bathroom ?? "",
-	misc: styles.housingMisc ?? "",
+	kitchen: styles.kitchen ?? "",
+	dining_common: styles.housingMisc ?? "",
 };
 
 const MEALS_SLOT_CLASSES: Record<string, string> = {
@@ -233,6 +238,9 @@ const MEALS_SLOT_CLASSES: Record<string, string> = {
 	dining: styles.dining ?? "",
 	misc: styles.mealsMisc ?? "",
 };
+
+const HOUSING_PHOTO_LIBRARY_UNAVAILABLE =
+	"Housing photos are not available yet. Reload and try again.";
 
 function slotClass(kind: BenefitKind, slotId: string): string {
 	const map = kind === "housing" ? HOUSING_SLOT_CLASSES : MEALS_SLOT_CLASSES;
@@ -275,6 +283,7 @@ export interface BenefitTrustModalEditProps {
 	readonly kind: BenefitKind;
 	readonly onClose: () => void;
 	readonly listingId?: string;
+	readonly category?: string;
 }
 
 export interface BenefitTrustModalViewProps {
@@ -308,21 +317,38 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	const listingId = isEdit
 		? (props as BenefitTrustModalEditProps).listingId
 		: (props as BenefitTrustModalViewProps).listing?.id;
+	const category = isEdit
+		? (props as BenefitTrustModalEditProps).category
+		: (props as BenefitTrustModalViewProps).listing?.category;
 
 	const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
 	const [toggles, setToggles] = useState<Record<string, Set<string>>>(() =>
 		cfg ? initToggles(cfg.chipSections) : {},
 	);
 	const [photos, setPhotos] = useState<Record<string, string>>({});
+	const [profileHousingPhotos, setProfileHousingPhotos] = useState<HousingPhotoMap>({});
+	const [housingPhotoLibraryAvailable, setHousingPhotoLibraryAvailable] = useState<
+		boolean | null
+	>(null);
 	const [customChips, setCustomChips] = useState<
 		Record<string, { id: string; label: string }[]>
 	>({});
 	const [hydrating, setHydrating] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
+	const [uploadingSlots, setUploadingSlots] = useState<ReadonlySet<string>>(
+		() => new Set(),
+	);
+	const [cleaningUploads, setCleaningUploads] = useState(false);
+	const sessionUploads = useRef(new BenefitPhotoSessionLedger());
 	const [addingTo, setAddingTo] = useState<string | null>(null);
 	const [draftChip, setDraftChip] = useState("");
+	const editorLocked =
+		hydrating || saving || cleaningUploads || uploadingSlots.size > 0;
+	// Hydration is cancellable (the effect cleanup ignores late results), so the
+	// dialog can still close while saved details are loading. Only operations
+	// that mutate or clean up storage must hold the user in the dialog.
+	const closeLocked = saving || cleaningUploads || uploadingSlots.size > 0;
 
 	// Hydrate from saved detail whenever the modal opens (or the kind switches
 	// while open). EDIT pulls the host-scoped detail; VIEW pulls the public
@@ -342,20 +368,39 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			return next;
 		});
 		setPhotos({});
+		setProfileHousingPhotos({});
+		setHousingPhotoLibraryAvailable(null);
 		setCustomChips({});
-		if (!listingId) return;
+		if (!listingId) {
+			setHydrating(false);
+			return;
+		}
 
 		let cancelled = false;
 		setHydrating(true);
 		const load = isEdit
 			? getBenefitDetailsAction(listingId).then((res) => {
 					if (!res.ok) throw new Error(res.error ?? "load_failed");
-					return res.details?.[kind];
+					return {
+						detail: res.details?.[kind],
+						benefitLibrary: res.benefitLibrary,
+						housingPhotoLibraryAvailable:
+							res.housingPhotoLibraryAvailable === true,
+					};
 				})
-			: getPublicBenefitDetailsAction(listingId).then((map) => map?.[kind]);
+			: getPublicBenefitDetailsAction(listingId).then((map) => ({
+					detail: map?.[kind],
+					benefitLibrary: undefined,
+					housingPhotoLibraryAvailable: false,
+				}));
 		load
-			.then((detail) => {
-				if (cancelled || !detail) return;
+			.then(({ detail, benefitLibrary, housingPhotoLibraryAvailable: available }) => {
+				if (cancelled) return;
+				setHousingPhotoLibraryAvailable(available);
+				setProfileHousingPhotos(
+					sanitizeHousingPhotoMap(benefitLibrary?.housing?.photos),
+				);
+				if (!detail) return;
 				setFieldValues({ ...detail.fields });
 				setPhotos({ ...detail.photos });
 				setCustomChips(
@@ -393,8 +438,31 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		: null;
 	const benefitInfo = viewListing ? viewListing.benefits[kind] : null;
 	const canUpload = Boolean(listingId);
+	const configuredSlots =
+		kind === "housing"
+			? isEdit &&
+				Boolean(listingId) &&
+				housingPhotoLibraryAvailable === false
+				? []
+				: housingPhotoSlots(category)
+			: cfg.slots;
+	const displayPhotos: Record<string, string | undefined> =
+		kind === "housing" && isEdit
+			? { ...effectiveHousingPhotoMap(
+					{ housing: { photos: profileHousingPhotos } },
+					sanitizeHousingPhotoMap(photos),
+				) }
+			: photos;
 	// Edit shows all slots (to upload into); view shows only slots the host filled.
-	const slotsToShow = isEdit ? cfg.slots : cfg.slots.filter((s) => photos[s.id]);
+	const slotsToShow = isEdit
+		? configuredSlots
+		: configuredSlots.filter((s) => displayPhotos[s.id]);
+	const housingPhotoLibraryUnavailable =
+		kind === "housing" &&
+		isEdit &&
+		Boolean(listingId) &&
+		!hydrating &&
+		housingPhotoLibraryAvailable === false;
 	// Saved single-select facts (housing type, meal style…) for the read-only view.
 	const viewFacts = isEdit
 		? []
@@ -403,6 +471,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				.filter((f): f is { label: string; value: string } => Boolean(f.value));
 
 	function toggleOption(sectionId: string, optId: string) {
+		if (editorLocked) return;
 		setToggles((prev) => {
 			const cur = new Set(prev[sectionId] ?? []);
 			if (cur.has(optId)) cur.delete(optId);
@@ -411,34 +480,105 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		});
 	}
 
+	async function discardSessionUploads(
+		uploads: readonly TrackedBenefitPhotoUpload[],
+	): Promise<boolean> {
+		if (uploads.length === 0) return true;
+		setCleaningUploads(true);
+		let failure: string | null = null;
+		try {
+			await Promise.all(
+				uploads.map(async (upload) => {
+					try {
+						const result = await discardBenefitPhotoAction(
+							upload.listingId,
+							upload.kind,
+							upload.slot,
+							upload.url,
+						);
+						if (result.ok) {
+							sessionUploads.current.forget(upload.url);
+						} else {
+							failure ??= result.error ?? "Could not discard an unused photo.";
+						}
+					} catch {
+						failure ??= "Could not discard an unused photo. Check your connection and try again.";
+					}
+				}),
+			);
+		} finally {
+			setCleaningUploads(false);
+		}
+		if (failure) {
+			setError(failure);
+			return false;
+		}
+		return true;
+	}
+
 	async function handleSlotFile(slotId: string, file: File) {
-		if (!listingId || !kind) return;
+		if (!listingId || !kind || editorLocked) return;
 		setError(null);
-		setUploadingSlot(slotId);
+		if (file.size > SERVER_IMAGE_UPLOAD_MAX_FILE_BYTES) {
+			setError("Images must be 4 MB or smaller.");
+			return;
+		}
+		setUploadingSlots((current) => new Set(current).add(slotId));
 		try {
 			const fd = new FormData();
 			fd.append("file", file);
 			const res = await uploadBenefitPhotoAction(listingId, kind, slotId, fd);
 			if (res.ok && res.url) {
 				const url = res.url;
+				const replaced = sessionUploads.current.track({
+					listingId,
+					kind,
+					slot: slotId,
+					url,
+				});
 				setPhotos((prev) => ({ ...prev, [slotId]: url }));
+				if (replaced) await discardSessionUploads([replaced]);
 			} else {
 				setError(res.error ?? "Upload failed. Please try again.");
 			}
+		} catch {
+			setError("Upload failed. Check your connection and try again.");
 		} finally {
-			setUploadingSlot(null);
+			setUploadingSlots((current) => {
+				const next = new Set(current);
+				next.delete(slotId);
+				return next;
+			});
 		}
 	}
 
-	function removePhoto(slotId: string) {
+	async function removePhoto(slotId: string) {
+		if (editorLocked || !kind) return;
+		const tracked = listingId
+			? sessionUploads.current.removeCurrent(listingId, kind, slotId)
+			: undefined;
 		setPhotos((prev) => {
 			const next = { ...prev };
 			delete next[slotId];
 			return next;
 		});
+		if (tracked) await discardSessionUploads([tracked]);
+	}
+
+	async function handleClose() {
+		if (!isEdit) {
+			props.onClose();
+			return;
+		}
+		if (closeLocked) return;
+		setError(null);
+		if (await discardSessionUploads(sessionUploads.current.all())) {
+			props.onClose();
+		}
 	}
 
 	function addCustomChip(sectionId: string) {
+		if (editorLocked) return;
 		const label = draftChip.trim();
 		if (!label) {
 			setAddingTo(null);
@@ -468,6 +608,11 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			setError("Save the listing first, then add benefit details.");
 			return;
 		}
+		if (editorLocked) {
+			setError("Wait for every photo to finish uploading.");
+			return;
+		}
+		if (!(await discardSessionUploads(sessionUploads.current.stale()))) return;
 		setSaving(true);
 		setError(null);
 		try {
@@ -480,8 +625,13 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				customChips,
 			};
 			const res = await saveBenefitDetailsAction(listingId, kind, detail);
-			if (res.ok) props.onClose();
+			if (res.ok) {
+				sessionUploads.current.clear();
+				props.onClose();
+			}
 			else setError(res.error ?? "Could not save. Please try again.");
+		} catch {
+			setError("Could not save. Check your connection and try again.");
 		} finally {
 			setSaving(false);
 		}
@@ -489,16 +639,24 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 
 	const footer = isEdit ? (
 		<div className={styles.footerRow}>
-			<Button variant="secondary" onClick={props.onClose} disabled={saving}>
+			<Button
+				variant="secondary"
+				onClick={handleClose}
+				disabled={closeLocked}
+			>
 				Cancel
 			</Button>
 			<Button
 				variant="primary"
 				className={styles.saveBtn}
 				onClick={handleSave}
-				disabled={saving || hydrating}
+				disabled={editorLocked}
 			>
-				{saving ? "Saving…" : cfg.saveLabel}
+				{saving
+					? "Saving…"
+					: uploadingSlots.size > 0
+						? "Uploading photos…"
+						: cfg.saveLabel}
 			</Button>
 		</div>
 	) : (
@@ -510,7 +668,8 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	return (
 		<PopupShell
 			open={open}
-			onClose={props.onClose}
+			onClose={isEdit ? handleClose : props.onClose}
+			closeDisabled={closeLocked}
 			title={cfg.title}
 			headerIcon={<Icon name={cfg.icon} size={24} aria-hidden />}
 			footer={footer}
@@ -522,36 +681,33 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			{/* ── Photo grid (edit: all slots; view: only the ones filled) ── */}
 			{isEdit || slotsToShow.length > 0 ? (
 			<section className={styles.photoSection} aria-label={cfg.photoLabel}>
+				{housingPhotoLibraryUnavailable ? (
+					<p className={styles.photoUnavailable} role="status">
+						{HOUSING_PHOTO_LIBRARY_UNAVAILABLE}
+					</p>
+				) : (
 				<div className={styles.photoGrid}>
-					{slotsToShow.map((slot) => (
-						<div
-							key={slot.id}
-							className={`${styles.photoSlot} ${slotClass(kind, slot.id)}`}
-						>
-							<div className={styles.photoArea}>
-								{photos[slot.id] ? (
-									<>
+					{slotsToShow.map((slot) => {
+						const photoUrl = displayPhotos[slot.id];
+						const listingOverride = Boolean(photos[slot.id]);
+						const inherited = kind === "housing" && isEdit && photoUrl && !listingOverride;
+						return (
+							<div
+								key={slot.id}
+								className={`${styles.photoSlot} ${slotClass(kind, slot.id)}`}
+							>
+								<div className={styles.photoArea}>
+									{photoUrl ? (
 										<Image
-											src={photos[slot.id]}
+											src={photoUrl}
 											alt={`${slot.label} photo`}
 											fill
 											sizes="(max-width: 639px) 45vw, 240px"
 											className={styles.photoImg}
-											unoptimized
+											unoptimized={isLocalStorageUrl(photoUrl)}
 										/>
-										{isEdit ? (
-											<button
-												type="button"
-												className={styles.removePhoto}
-												onClick={() => removePhoto(slot.id)}
-												aria-label={`Remove ${slot.label} photo`}
-											>
-												<Icon name="action.close" size={16} aria-hidden />
-											</button>
-										) : null}
-									</>
-								) : isEdit ? (
-									uploadingSlot === slot.id ? (
+									) : null}
+								{isEdit && uploadingSlots.has(slot.id) ? (
 										<span
 											className={styles.cameraButton}
 											role="status"
@@ -559,14 +715,33 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 										>
 											<span className={styles.spinner} aria-hidden />
 										</span>
-									) : (
+									) : isEdit && listingOverride ? (
+										<button
+											type="button"
+											className={styles.removePhoto}
+											onClick={() => removePhoto(slot.id)}
+										disabled={editorLocked}
+											aria-label={
+								profileHousingPhotos[slot.id as HousingPhotoRole]
+													? `Use profile default for ${slot.label}`
+													: `Remove ${slot.label} photo`
+											}
+										>
+											<Icon name="action.close" size={16} aria-hidden />
+										</button>
+									) : isEdit ? (
 										<>
 											<input
 												id={`bp-${kind}-${slot.id}`}
 												type="file"
-												accept={UPLOAD_ALLOWED_MIME_TYPES.join(",")}
-												className={styles.fileInput}
-												disabled={!canUpload}
+											accept={UPLOAD_ALLOWED_MIME_TYPES.join(",")}
+											className={styles.fileInput}
+											disabled={!canUpload || editorLocked}
+											aria-label={
+												canUpload
+													? `${inherited ? "Override" : "Upload"} ${slot.label} photo`
+													: "Save the listing before adding photos"
+											}
 												onChange={(e) => {
 													const file = e.target.files?.[0];
 													if (file) void handleSlotFile(slot.id, file);
@@ -578,23 +753,27 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 												className={styles.cameraButton}
 												aria-label={
 													canUpload
-														? `Upload ${slot.label} photo`
+														? `${inherited ? "Override" : "Upload"} ${slot.label} photo`
 														: "Save the listing before adding photos"
 												}
-												aria-disabled={!canUpload}
+											aria-disabled={!canUpload || editorLocked}
 											>
 												<Icon name="nav.photos" size={16} aria-hidden />
 											</label>
 										</>
-									)
-								) : null}
+									) : null}
+									{kind === "housing" && isEdit && photoUrl ? (
+										<span className={styles.photoSource}>
+											{inherited ? "Profile default" : "Listing-specific"}
+										</span>
+									) : null}
+								</div>
+								<span className={styles.slotLabel}>{slot.label.toUpperCase()}</span>
 							</div>
-							<span className={styles.slotLabel}>
-								{slot.label.toUpperCase()}
-							</span>
-						</div>
-					))}
+						);
+					})}
 				</div>
+				)}
 			</section>
 			) : null}
 
@@ -611,6 +790,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 									id={f.id}
 									className={styles.select}
 									value={fieldValues[f.id] ?? ""}
+									disabled={editorLocked}
 									onChange={(e) =>
 										setFieldValues((prev) => ({
 											...prev,
@@ -655,8 +835,9 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 													? `${styles.chip} ${styles.chipActive}`
 													: styles.chip
 											}
-											onClick={() => toggleOption(section.id, opt.id)}
-											aria-pressed={selected}
+										onClick={() => toggleOption(section.id, opt.id)}
+										aria-pressed={selected}
+										disabled={editorLocked}
 										>
 											{optIcon ? (
 												<Icon name={optIcon} size={16} aria-hidden />
@@ -674,7 +855,8 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 												autoFocus
 												maxLength={24}
 												placeholder={section.addLabel}
-												aria-label={section.addLabel}
+											aria-label={section.addLabel}
+											disabled={editorLocked}
 												onChange={(e) => setDraftChip(e.target.value)}
 												onKeyDown={(e) => {
 													if (e.key === "Enter") {
@@ -689,7 +871,8 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 											<button
 												type="button"
 												className={styles.addChipConfirm}
-												onClick={() => addCustomChip(section.id)}
+											onClick={() => addCustomChip(section.id)}
+											disabled={editorLocked}
 											>
 												Add
 											</button>
@@ -702,6 +885,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 												setDraftChip("");
 												setAddingTo(section.id);
 											}}
+											disabled={editorLocked}
 										>
 											+ {section.addLabel.toUpperCase()}
 										</button>

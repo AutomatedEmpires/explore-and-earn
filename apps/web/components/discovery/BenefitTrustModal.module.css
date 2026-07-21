@@ -22,6 +22,19 @@
 	gap: var(--space-10);
 }
 
+.photoUnavailable {
+	margin: 0;
+	padding: var(--space-12) var(--space-14);
+	border: 1.5px solid color-mix(in srgb, var(--status-warning-fg) 38%, transparent);
+	border-left: 3.5px solid color-mix(in srgb, var(--status-warning-fg) 68%, var(--border-ink) 32%);
+	border-radius: var(--radius-card);
+	background: color-mix(in srgb, var(--status-warning-bg) 72%, var(--color-surface));
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
 .photoSlot {
 	display: flex;
 	flex-direction: column;
@@ -574,6 +587,21 @@
 	z-index: 0;
 }
 
+.photoSource {
+	position: absolute;
+	left: var(--space-6);
+	bottom: var(--space-6);
+	z-index: 2;
+	padding: var(--space-2) var(--space-6);
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--color-surface-raised) 92%, transparent);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	box-shadow: 0 1px 4px color-mix(in srgb, var(--palette-ink) 18%, transparent);
+}
+
 .removePhoto {
 	position: absolute;
 	top: var(--space-8);
@@ -617,6 +645,11 @@
 	clip: rect(0 0 0 0);
 	white-space: nowrap;
 	border: 0;
+}
+
+.fileInput:focus-visible + .cameraButton {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
 }
 
 /* Upload spinner, shown in place of the camera icon while a slot uploads */

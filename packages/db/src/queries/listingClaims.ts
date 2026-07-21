@@ -179,6 +179,7 @@ export async function adminClaimContext(claimId: string): Promise<{
  */
 export interface ClaimConfirmationFields {
   readonly title: string;
+  readonly category: string;
   readonly description: string | null;
   readonly locationDisplay: string | null;
   readonly housingIncluded: boolean;
@@ -208,7 +209,7 @@ export async function getClaimConfirmationFields(
   const { data, error } = await db()
     .from("listings")
     .select(
-      "title, description, location_display, housing_included, housing_description, meals_included, meals_description, compensation_min_cents, compensation_max_cents, compensation_unit, compensation_summary, begins_at, ends_at, housing_evidence, meals_evidence, pay_evidence",
+      "title, category, description, location_display, housing_included, housing_description, meals_included, meals_description, compensation_min_cents, compensation_max_cents, compensation_unit, compensation_summary, begins_at, ends_at, housing_evidence, meals_evidence, pay_evidence",
     )
     .eq("id", listingId)
     .maybeSingle();
@@ -223,6 +224,7 @@ export async function getClaimConfirmationFields(
       : null;
   return {
     title: String(row.title ?? ""),
+    category: String(row.category ?? "mix"),
     description: text("description"),
     locationDisplay: text("location_display"),
     housingIncluded: row.housing_included === true,

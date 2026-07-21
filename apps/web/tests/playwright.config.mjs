@@ -41,7 +41,7 @@ export default defineConfig({
   // default navigation budget.
   expect: { timeout: 15000 },
   use: {
-    baseURL: `http://127.0.0.1:${PORT}`,
+    baseURL: `http://localhost:${PORT}`,
     navigationTimeout: 180000,
     trace: "on-first-retry"
   },
@@ -57,14 +57,14 @@ export default defineConfig({
     // protected routes 401 (asserted as a security property in smoke.spec) —
     // and authed shells are traversed via the dev-bench ee_dev_role cookie,
     // exactly like local QA.
-    command: `corepack pnpm exec next dev --hostname 127.0.0.1 --port ${PORT}`,
+    command: `corepack pnpm exec next dev --hostname localhost --port ${PORT}`,
     cwd: webRoot,
     reuseExistingServer: Boolean(process.env.PW_REUSE_SERVER),
     // next dev cold-compiles the first request; on this WSL2 box a COLD
     // webpack compile of the homepage tree alone measured 205s, so the budget
     // must comfortably exceed it (warm .next cache runs are far faster).
     timeout: 480000,
-    url: `http://127.0.0.1:${PORT}`,
+    url: `http://localhost:${PORT}`,
     stdout: "pipe",
     stderr: "pipe",
     env: {

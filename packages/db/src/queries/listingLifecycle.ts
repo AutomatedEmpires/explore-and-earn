@@ -3,7 +3,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  effectiveHousingPhotoMap,
   PLAN_ENTITLEMENTS,
+  sanitizeHostBenefitLibrary,
+  sanitizeHousingPhotoMap,
   validateListingForPublication,
   type BenefitEvidenceStatus,
   type ListingStatus,
@@ -12,6 +15,7 @@ import {
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
+import { getBenefitDetailsContext } from "./benefitDetails";
 
 /**
  * Read an evidence column, degrading anything unrecognised to the WEAKEST
@@ -116,7 +120,7 @@ export async function updateListingStatus(
     .from("listings")
     .select(
       "id,status,provenance,housing_evidence,meals_evidence,pay_evidence," +
-        "compensation_min_cents,compensation_max_cents",
+        "housing_included,compensation_min_cents,compensation_max_cents",
     )
     .eq("id", listingId)
     .eq("host_profile_id", hostProfileId)
@@ -133,6 +137,29 @@ export async function updateListingStatus(
     return { ok: false, error: "invalid_transition" };
   }
 
+  let hostProfile: Record<string, unknown> | null = null;
+  let benefitDetails: Record<string, unknown> = {};
+  if (
+    (newStatus === "under_review" || newStatus === "live") &&
+    row.provenance !== "sourced" &&
+    row.housing_included === true
+  ) {
+    try {
+      const context = await getBenefitDetailsContext(
+        clerkToken,
+        clerkUserId,
+        listingId,
+      );
+      benefitDetails = context.details as Record<string, unknown>;
+      hostProfile = { benefit_library: context.benefitLibrary };
+    } catch (cause) {
+      return {
+        ok: false,
+        error: cause instanceof Error ? cause.message : "benefit_context_unavailable",
+      };
+    }
+  }
+
   // ── The publication gate (founder, 2026-07-17) ──────────────────────────────
   // A host-controlled listing may not face seekers while Housing, Meals or Pay
   // is unanswered. Checked on the transitions that PUBLISH — draft->under_review
@@ -145,9 +172,19 @@ export async function updateListingStatus(
   // WHICH fields are missing, in their own words, instead of meeting a raw
   // 23514 constraint violation.
   if (newStatus === "under_review" || newStatus === "live") {
+    const housingDetail =
+      benefitDetails.housing && typeof benefitDetails.housing === "object"
+        ? (benefitDetails.housing as Record<string, unknown>)
+        : {};
     const verdict = validateListingForPublication({
       provenance: row.provenance === "sourced" ? "sourced" : "verified",
       housingEvidence: asPublicationEvidence(row.housing_evidence),
+      housingIncluded:
+        typeof row.housing_included === "boolean" ? row.housing_included : undefined,
+      housingPhotos: effectiveHousingPhotoMap(
+        sanitizeHostBenefitLibrary(hostProfile?.benefit_library),
+        sanitizeHousingPhotoMap(housingDetail.photos),
+      ),
       mealsEvidence: asPublicationEvidence(row.meals_evidence),
       payEvidence: asPublicationEvidence(row.pay_evidence),
       payMinCents: typeof row.compensation_min_cents === "number" ? row.compensation_min_cents : null,
@@ -167,15 +204,19 @@ export async function updateListingStatus(
   // don't need this check — both already count as "active" per
   // CAP_COUNTED_STATUSES, so pausing/resuming never changes the count.)
   if (newStatus === "under_review") {
-    const { data: hostProfile, error: tierError } = await db
-      .from("host_profiles")
-      .select("subscription_tier")
-      .eq("id", hostProfileId)
-      .maybeSingle();
-    if (tierError) return { ok: false, error: tierError.message };
-
-    const tier = ((hostProfile as { subscription_tier: string | null } | null)
-      ?.subscription_tier ?? "none") as PlanTier;
+    if (!hostProfile || typeof hostProfile.subscription_tier !== "string") {
+      const { data, error } = await db
+        .from("host_profiles")
+        .select("subscription_tier")
+        .eq("id", hostProfileId)
+        .maybeSingle();
+      if (error) return { ok: false, error: error.message };
+      hostProfile = {
+        ...(hostProfile ?? {}),
+        ...((data as Record<string, unknown> | null) ?? {}),
+      };
+    }
+    const tier = (hostProfile?.subscription_tier ?? "none") as PlanTier;
     const cap = listingCapFor(tier);
 
     const { count: activeCount, error: countError } = await db

@@ -292,6 +292,7 @@ describe("getClaimConfirmationFields — the field-review read", () => {
       maybeSingleResult: {
         data: {
           title: "Salmon Season Deckhand",
+          category: "maritime",
           description: "Work the nets.",
           location_display: "Kodiak, AK",
           housing_included: false,
@@ -314,6 +315,7 @@ describe("getClaimConfirmationFields — the field-review read", () => {
     const fields = await getClaimConfirmationFields("l1");
     expect(fields).toEqual({
       title: "Salmon Season Deckhand",
+      category: "maritime",
       description: "Work the nets.",
       locationDisplay: "Kodiak, AK",
       housingIncluded: false,

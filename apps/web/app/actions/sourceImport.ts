@@ -24,7 +24,8 @@ import { reportError } from "../../lib/sentry"
  * those are derived inside the engine from the source's own statements.
  */
 
-const PAYLOAD_MAX_BYTES = 5 * 1024 * 1024 // 5 MB founder-supplied payload cap
+// Keep the serialized Server Action request below Vercel's 4.5 MB hard cap.
+const PAYLOAD_MAX_BYTES = 3 * 1024 * 1024
 
 async function requireAdmin(): Promise<{ ok: true } | { ok: false; error: string }> {
 	const { userId } = await auth()
