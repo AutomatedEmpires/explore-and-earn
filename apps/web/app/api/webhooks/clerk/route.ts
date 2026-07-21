@@ -11,7 +11,7 @@
  * in Vercel's Production environment.
  *
  * Handled Clerk events:
- *   - user.created  -> inserts rows into users_profile_shadow + seeker_profiles,
+ *   - user.created  -> ensures rows in users_profile_shadow + seeker_profiles,
  *                      then sends a best-effort welcome email (seeker or host)
  *   - user.updated  -> updates the cached email on users_profile_shadow
  *   - user.deleted  -> soft-deletes (sets deleted_at) on users_profile_shadow
@@ -31,6 +31,7 @@ import { welcomeHostEmail, welcomeSeekerEmail } from "../../../../lib/emails"
 export const runtime = "nodejs"
 
 type ClerkWebhookEventType = "user.created" | "user.updated" | "user.deleted"
+const UNIQUE_VIOLATION = "23505"
 
 interface ClerkEmailAddress {
 	readonly id: string
@@ -126,7 +127,7 @@ async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
 	})
 }
 
-async function syncUserCreated(user: ClerkUserPayload): Promise<void> {
+async function syncUserCreated(user: ClerkUserPayload): Promise<boolean> {
 	if (!user.id) {
 		throw new Error("Clerk user.created payload is missing data.id.")
 	}
@@ -140,17 +141,23 @@ async function syncUserCreated(user: ClerkUserPayload): Promise<void> {
 			created_at: createdAtForUser(user),
 		})
 
-	if (shadowError) {
+	if (shadowError && shadowError.code !== UNIQUE_VIOLATION) {
 		throw shadowError
 	}
+	const shadowCreated = shadowError === null
 
 	const { error: seekerError } = await supabase.from("seeker_profiles").insert({
 		clerk_user_id: user.id,
 	})
 
-	if (seekerError) {
+	if (seekerError && seekerError.code !== UNIQUE_VIOLATION) {
 		throw seekerError
 	}
+
+	// Svix retries and concurrent deliveries are normal. A duplicate in one
+	// table must not prevent repairing a missing row in the other. Only the
+	// delivery that inserted at least one row owns the best-effort welcome send.
+	return shadowCreated || seekerError === null
 }
 
 async function syncUserUpdated(user: ClerkUserPayload): Promise<void> {
@@ -201,14 +208,15 @@ export async function POST(request: Request) {
 	try {
 		switch (event.type) {
 			case "user.created":
-				await syncUserCreated(event.data)
-				try {
-					await sendWelcomeEmail(event.data)
-				} catch (welcomeError) {
-					console.error(
-						"Clerk welcome email failed (non-fatal)",
-						welcomeError,
-					)
+				if (await syncUserCreated(event.data)) {
+					try {
+						await sendWelcomeEmail(event.data)
+					} catch (welcomeError) {
+						console.error(
+							"Clerk welcome email failed (non-fatal)",
+							welcomeError,
+						)
+					}
 				}
 				break
 			case "user.updated":

@@ -41,13 +41,12 @@ for (const file of migrationFiles) {
 
 // ---------------------------------------------------------------------------
 // G-SEC-RPC - Lane A static guardrail for SECURITY DEFINER RPC execute grants.
-// The 8 SECURITY DEFINER functions in `public` must never be granted EXECUTE to
-// the anon role in any migration, and the final 023 migration must explicitly
-// revoke the default-privilege re-arm and the per-function grants. This catches
-// regressions in source before they reach a database; the authoritative live
-// check is the DB-connected assert-grants.mjs / sql/assert_rpc_grants.sql.
+// Every identity-sensitive function in `public` must never be granted EXECUTE
+// to anon/PUBLIC. The original 8 functions must also remain explicitly revoked
+// by historical migration 023. Newer functions own their grants in their own
+// migrations and are covered by the source-wide grant scan below.
 // ---------------------------------------------------------------------------
-const LOCKED_FUNCTIONS = [
+const HISTORICAL_LOCKED_FUNCTIONS = [
   "set_host_attestation",
   "get_clerk_user_id",
   "current_seeker_profile_ids",
@@ -56,6 +55,11 @@ const LOCKED_FUNCTIONS = [
   "current_conversation_ids",
   "enforce_listing_cover_asset",
   "enforce_listing_media_override",
+]
+const LOCKED_FUNCTIONS = [
+  ...HISTORICAL_LOCKED_FUNCTIONS,
+  "create_my_host_profile",
+  "ensure_my_seeker_profile",
 ]
 
 for (const [file, content] of fileContents) {
@@ -105,7 +109,7 @@ if (!securityMigration) {
       `G-SEC-RPC: ${securityMigration} must revoke default EXECUTE on functions from anon, authenticated, and public.`,
     )
   }
-  for (const fn of LOCKED_FUNCTIONS) {
+  for (const fn of HISTORICAL_LOCKED_FUNCTIONS) {
     const revokeRe = new RegExp(
       `revoke\\s+execute\\s+on\\s+function\\s+(?:public\\.)?${fn}\\s*\\([^)]*\\)\\s+from\\s+([^;]*);`,
       "i",
@@ -126,6 +130,52 @@ if (!securityMigration) {
         `G-SEC-RPC: ${securityMigration} REVOKE on ${fn} must include anon, authenticated, and public.`,
       )
     }
+  }
+}
+
+// Clerk-native onboarding must stay behind narrow, JWT-derived functions. A
+// direct profile-table INSERT grant would re-open identity/trust-field choice.
+const profileOnboardingMigration = migrationFiles.find((f) => /^073_.*\.sql$/.test(f))
+if (!profileOnboardingMigration) {
+  hasFailure = true
+  console.error("G-PROFILE-ONBOARDING: expected migration 073 to be present.")
+} else {
+  const sql = fileContents
+    .get(profileOnboardingMigration)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "create or replace function public.get_clerk_user_id()",
+    "when (auth.jwt() ->> 'sub') ~ '^user_[a-za-z0-9_-]+$'",
+    "alter table public.host_profiles alter column owner_user_id drop not null;",
+    "revoke insert on table public.host_profiles from anon, authenticated;",
+    "revoke insert on table public.seeker_profiles from anon, authenticated;",
+    "create or replace function public.create_my_host_profile",
+    "create or replace function public.ensure_my_seeker_profile",
+    "security definer",
+    "set search_path = ''",
+    "public.get_clerk_user_id()",
+    "message = 'profile_identity_required'",
+    "message = 'profile_identity_disabled'",
+    "v_slug := v_slug_base || '-' || v_profile_id::text",
+    "grant execute on function public.create_my_host_profile(text, text[], text) to authenticated, service_role;",
+    "grant execute on function public.ensure_my_seeker_profile() to authenticated, service_role;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-PROFILE-ONBOARDING: ${profileOnboardingMigration} is missing ${needle}`,
+      )
+    }
+  }
+  if (
+    /grant\s+insert[\s\S]*public\.(?:host_profiles|seeker_profiles)[\s\S]*authenticated/.test(sql)
+  ) {
+    hasFailure = true
+    console.error(
+      `G-PROFILE-ONBOARDING: ${profileOnboardingMigration} grants direct profile INSERT.`,
+    )
   }
 }
 

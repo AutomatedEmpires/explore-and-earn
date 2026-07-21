@@ -35,6 +35,7 @@ export default function OnboardingSkillsPage() {
   const [selected, setSelected] = useState<MarketplaceCategory[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function toggleCategory(category: MarketplaceCategory) {
@@ -70,8 +71,21 @@ export default function OnboardingSkillsPage() {
     startTransition(async () => {
       // Pass complete: true here so onboarding_complete is set server-side
       // on the server action, not in a useEffect on the done page.
-      await saveOnboardingStep({ categories: selected, freeformSkills: tags, complete: true });
-      router.push("/onboarding/done");
+      setSaveError(null);
+      try {
+        const result = await saveOnboardingStep({
+          categories: selected,
+          freeformSkills: tags,
+          complete: true,
+        });
+        if (!result.ok) {
+          setSaveError("We couldn’t finish your profile. Please try again.");
+          return;
+        }
+        router.push("/onboarding/done");
+      } catch {
+        setSaveError("We couldn’t finish your profile. Please try again.");
+      }
     });
   }
 
@@ -82,8 +96,17 @@ export default function OnboardingSkillsPage() {
       // "You're all set!" page while onboarding_complete stays false, and the
       // (seeker) layout's gate bounces them straight back to /onboarding on
       // their next visit.
-      await saveOnboardingStep({ complete: true });
-      router.push("/onboarding/done");
+      setSaveError(null);
+      try {
+        const result = await saveOnboardingStep({ complete: true });
+        if (!result.ok) {
+          setSaveError("We couldn’t finish your profile. Please try again.");
+          return;
+        }
+        router.push("/onboarding/done");
+      } catch {
+        setSaveError("We couldn’t finish your profile. Please try again.");
+      }
     });
   }
 
@@ -116,6 +139,7 @@ export default function OnboardingSkillsPage() {
                 }
                 aria-pressed={selected.includes(category)}
                 onClick={() => toggleCategory(category)}
+                disabled={pending}
               >
                 <Icon name={CATEGORY_ICON[category]} size={16} aria-hidden />
                 {CATEGORY_LABEL[category]}
@@ -141,13 +165,13 @@ export default function OnboardingSkillsPage() {
                   addTag();
                 }
               }}
-              disabled={tags.length >= MAX_TAGS}
+              disabled={pending || tags.length >= MAX_TAGS}
             />
             <button
               type="button"
               className={styles.primaryButton}
               onClick={addTag}
-              disabled={tags.length >= MAX_TAGS || draft.trim().length === 0}
+              disabled={pending || tags.length >= MAX_TAGS || draft.trim().length === 0}
             >
               Add
             </button>
@@ -161,6 +185,7 @@ export default function OnboardingSkillsPage() {
                   className={styles.tagSelected}
                   onClick={() => removeTag(tag)}
                   aria-label={`Remove ${tag}`}
+                  disabled={pending}
                 >
                   {tag} ✕
                 </button>
@@ -169,6 +194,11 @@ export default function OnboardingSkillsPage() {
           ) : null}
         </div>
       </div>
+      {saveError ? (
+        <p className={styles.error} role="alert">
+          {saveError}
+        </p>
+      ) : null}
       <footer className={styles.footer}>
         <button
           type="button"

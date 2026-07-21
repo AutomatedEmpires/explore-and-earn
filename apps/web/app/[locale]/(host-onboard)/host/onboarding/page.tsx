@@ -86,9 +86,9 @@ export default function HostOnboardingPage() {
 			category: previewCategory,
 			location: location.trim(),
 			opportunityWindow: "Dates you choose",
-			verifiedHost: true,
+			verifiedHost: false,
 			triad: { housing: "You choose", meals: "You choose", pay: "You set the rate" },
-			benefitProvision: { housing: "provided", meals: "provided", pay: "provided" },
+			benefitProvision: { housing: "not_stated", meals: "not_stated", pay: "not_stated" },
 		}),
 		[trimmedName, previewCategory, location],
 	)
@@ -96,18 +96,38 @@ export default function HostOnboardingPage() {
 	function handleCreate(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault()
 		startTransition(async () => {
-			const result = await createHostProfileAction(trimmedName)
-			if (result.ok) {
-				router.push("/host")
-				return
+			setState({ status: "idle" })
+			try {
+				const result = await createHostProfileAction({
+					companyName: trimmedName,
+					categoryScopes: lanes,
+					primaryLocationName: location,
+				})
+				if (result.ok) {
+					router.push("/host")
+					return
+				}
+				const message =
+					result.error === "name_required"
+						? "Please enter your company or farm name."
+						: result.error === "lanes_required"
+							? "Choose at least one hiring lane."
+							: result.error === "name_too_long"
+								? "Keep your organization name under 160 characters."
+								: result.error === "location_too_long"
+									? "Keep your primary location under 200 characters."
+									: result.error === "unauthenticated"
+										? "Please sign in to continue."
+										: result.error === "account_unavailable"
+											? "This account cannot create a host profile. Contact support if this looks wrong."
+											: "Something went wrong. Please try again."
+				setState({ status: "error", message })
+			} catch {
+				setState({
+					status: "error",
+					message: "Something went wrong. Please try again.",
+				})
 			}
-			const message =
-				result.error === "name_required"
-					? "Please enter your company or farm name."
-					: result.error === "unauthenticated"
-						? "Please sign in to continue."
-						: "Something went wrong. Please try again."
-			setState({ status: "error", message })
 		})
 	}
 
@@ -192,6 +212,7 @@ export default function HostOnboardingPage() {
 								onChange={(event) => setCompanyName(event.target.value)}
 								placeholder="e.g. Sunrise Valley Collective"
 								autoComplete="organization"
+								maxLength={160}
 								disabled={isPending}
 							/>
 							<p className={styles.hint}>This is the name seekers apply to.</p>
@@ -211,6 +232,7 @@ export default function HostOnboardingPage() {
 											data-selected={selected ? "true" : undefined}
 											aria-pressed={selected}
 											onClick={() => toggleLane(lane.id)}
+											disabled={isPending}
 										>
 											<span className={styles.laneIcon} aria-hidden>
 												<Icon name={lane.icon} size={20} />
@@ -241,6 +263,7 @@ export default function HostOnboardingPage() {
 								onChange={(event) => setLocation(event.target.value)}
 								placeholder="e.g. Wenatchee, Washington"
 								autoComplete="address-level2"
+								maxLength={200}
 								disabled={isPending}
 							/>
 							<p className={styles.hint}>Where most of your roles are based.</p>

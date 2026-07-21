@@ -28,6 +28,7 @@ on:
 permissions:
   contents: read
   deployments: read
+  statuses: read
 
 # Never let two migration pushes race against the same database.
 concurrency:
@@ -65,10 +66,35 @@ jobs:
         run: |
           set -euo pipefail
           for attempt in $(seq 1 210); do
+            # Vercel's GitHub integration currently reports the deployment as
+            # an exact-SHA commit status (context "Vercel"). It does not
+            # consistently create a vercel[bot]-owned GitHub Deployment, so
+            # relying on the Deployments API alone can wait until timeout even
+            # after Production is Ready. Prefer the exact commit status and
+            # retain the deployment lookup as a compatibility fallback.
+            if ! combined_status="$(gh api \
+              "repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/status")"; then
+              echo "GitHub commit status request failed on attempt ${attempt}; treating as transient and waiting." >&2
+              combined_status='{"statuses":[]}'
+            fi
+            vercel_state="$(jq -r '
+              [.statuses[] | select((.context | ascii_downcase) == "vercel")]
+              | sort_by(.updated_at) | last | .state // "pending"
+            ' <<<"$combined_status")"
+            case "$vercel_state" in
+              success)
+                echo "Vercel production commit status succeeded for ${GITHUB_SHA}."
+                break
+                ;;
+              failure|error)
+                echo "Vercel production commit status ended in ${vercel_state}." >&2
+                exit 1
+                ;;
+            esac
+
             if ! deployments="$(gh api "repos/${GITHUB_REPOSITORY}/deployments" \
               --method GET \
               -f sha="$GITHUB_SHA" \
-              -f environment=Production \
               -f per_page=100)"; then
               echo "GitHub deployments API request failed on attempt ${attempt}; treating as transient and waiting." >&2
               deployments='[]'
@@ -76,7 +102,7 @@ jobs:
             deployment_id="$(jq -r --arg sha "$GITHUB_SHA" '
               [.[] | select(
                 .sha == $sha and
-                .environment == "Production" and
+                (.environment | ascii_downcase) == "production" and
                 .creator.login == "vercel[bot]"
               )] | sort_by(.created_at) | last | .id // empty
             ' <<<"$deployments")"

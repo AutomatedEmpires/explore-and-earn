@@ -20,6 +20,7 @@ import { existsSync } from "node:fs"
 const here = dirname(fileURLToPath(import.meta.url))
 const sqlFiles = [
   join(here, "sql", "assert_rpc_grants.sql"),
+  join(here, "sql", "assert_profile_onboarding.sql"),
   join(here, "sql", "assert_housing_photo_library.sql"),
 ]
 

@@ -18,18 +18,34 @@ function assertExactProductionDeploymentGate(source: string): void {
   };
 
   const waitStep = locate("- name: Wait for this commit's Vercel production deployment");
-  const shaQuery = locate('-f sha="$GITHUB_SHA"', waitStep);
-  const exactShaCheck = locate(".sha == $sha", shaQuery);
-  const productionCheck = locate('.environment == "Production"', exactShaCheck);
-  const vercelCheck = locate('.creator.login == "vercel[bot]"', productionCheck);
-  const statusLookup = locate("deployments/${deployment_id}/statuses", vercelCheck);
-  const successBranch = locate("success)", statusLookup);
+  const statusLookup = locate(
+    '"repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/status"',
+    waitStep,
+  );
+  const vercelContext = locate(
+    '(.context | ascii_downcase) == "vercel"',
+    statusLookup,
+  );
+  const vercelState = locate('vercel_state="$(jq -r', statusLookup);
+  const successBranch = locate("success)", vercelState);
   const successBreak = locate("break", successBranch);
+  // Retain the GitHub Deployments lookup as a backwards-compatible fallback,
+  // but the exact-SHA Vercel commit status is the current production signal.
+  const shaQuery = locate('-f sha="$GITHUB_SHA"', successBreak);
+  const exactShaCheck = locate(".sha == $sha", shaQuery);
+  const productionCheck = locate(
+    '(.environment | ascii_downcase) == "production"',
+    exactShaCheck,
+  );
+  const vercelCheck = locate('.creator.login == "vercel[bot]"', productionCheck);
+  locate("deployments/${deployment_id}/statuses", vercelCheck);
   const pushStep = locate("- name: Push migrations", successBreak);
   const dbPush = locate("run: supabase db push", pushStep);
 
   expect(source.indexOf("run: supabase db push")).toBe(dbPush);
   expect(source).toContain("deployments: read");
+  expect(source).toContain("statuses: read");
+  expect(vercelContext).toBeGreaterThan(statusLookup);
   expect(source.slice(waitStep, dbPush)).toContain("failure|error)");
   expect(source.slice(waitStep, dbPush)).toContain("exit 1");
   expect(source.slice(waitStep, dbPush)).toContain(
@@ -45,7 +61,10 @@ describe("housing-photo migration deploy ordering", () => {
   it("rejects a branch-only deployment gate", () => {
     expect(() =>
       assertExactProductionDeploymentGate(
-        workflow.replace(".sha == $sha", '.ref == "main"'),
+        workflow.replace(
+          '"repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/status"',
+          '"repos/${GITHUB_REPOSITORY}/commits/main/status"',
+        ),
       ),
     ).toThrow();
   });
@@ -63,6 +82,11 @@ describe("housing-photo migration deploy ordering", () => {
     const pushStep = workflow.indexOf("- name: Push migrations", waitStep);
     const gate = workflow.slice(waitStep, pushStep);
 
+    expect(gate).toContain('if ! combined_status="$(gh api');
+    expect(gate).toContain(
+      "GitHub commit status request failed on attempt ${attempt}; treating as transient and waiting.",
+    );
+    expect(gate).toContain('combined_status=\'{"statuses":[]}\'');
     expect(gate).toContain('if ! deployments="$(gh api');
     expect(gate).toContain(
       "GitHub deployments API request failed on attempt ${attempt}; treating as transient and waiting.",

@@ -223,6 +223,18 @@
 	padding-top: var(--space-12);
 }
 
+.error {
+	margin: 0;
+	padding: var(--space-12);
+	border: 1px solid var(--status-error-fg);
+	border-radius: var(--radius-input);
+	background: var(--status-error-bg);
+	color: var(--status-error-fg);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+}
+
 .primaryButton {
 	font-family: var(--font-ui);
 	font-size: var(--type-button-size);

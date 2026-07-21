@@ -2,7 +2,7 @@
 -- Lane A - DB-connected security guardrail. Run against a live/local database:
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/assert_rpc_grants.sql
 --
--- Fails (raises) if any of the 8 SECURITY DEFINER functions are executable by
+-- Fails (raises) if any identity-sensitive SECURITY DEFINER function is executable by
 -- anon, by PUBLIC, or by authenticated where forbidden (the two trigger fns);
 -- if a server-only table is missing RLS or exposes a client policy; or if the
 -- storage buckets still allow anon enumeration. Emits an evidence table at the
@@ -11,7 +11,7 @@
 \set ON_ERROR_STOP on
 
 -- ---------------------------------------------------------------------------
--- Guardrail 1: RPC execute grants on the 8 functions.
+-- Guardrail 1: RPC execute grants on the identity-sensitive functions.
 -- ---------------------------------------------------------------------------
 do $$
 declare
@@ -26,7 +26,9 @@ declare
     'current_host_listing_ids',
     'current_conversation_ids',
     'enforce_listing_cover_asset',
-    'enforce_listing_media_override'
+    'enforce_listing_media_override',
+    'create_my_host_profile',
+    'ensure_my_seeker_profile'
   ];
   trigger_fns text[] := array[
     'enforce_listing_cover_asset',
@@ -70,7 +72,8 @@ begin
   if v_fail then
     raise exception 'db-assert: RPC execute-grant guardrail FAILED (see warnings)';
   end if;
-  raise notice 'db-assert: RPC execute-grant guardrail PASSED for all 8 functions';
+  raise notice 'db-assert: RPC execute-grant guardrail PASSED for all % functions',
+    array_length(fn_names, 1);
 end;
 $$;
 
@@ -355,6 +358,7 @@ where n.nspname = 'public'
     'set_host_attestation', 'get_clerk_user_id', 'current_seeker_profile_ids',
     'current_host_profile_ids', 'current_host_listing_ids', 'current_conversation_ids',
     'enforce_listing_cover_asset', 'enforce_listing_media_override',
+    'create_my_host_profile', 'ensure_my_seeker_profile',
     'get_public_housing_photos', 'get_public_benefit_details',
     'get_owned_benefit_context', 'get_my_host_benefit_library',
     'save_owned_benefit_detail', 'set_my_housing_library_photo'

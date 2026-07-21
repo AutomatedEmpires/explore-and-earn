@@ -10,12 +10,22 @@ export default function OnboardingStartPage() {
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function goNext() {
     startTransition(async () => {
-      await saveOnboardingStep({ displayName, bio });
-      router.push("/onboarding/prefs");
+      setSaveError(null);
+      try {
+        const result = await saveOnboardingStep({ displayName, bio });
+        if (!result.ok) {
+          setSaveError("We couldn’t save your profile. Please try again.");
+          return;
+        }
+        router.push("/onboarding/prefs");
+      } catch {
+        setSaveError("We couldn’t save your profile. Please try again.");
+      }
     });
   }
 
@@ -45,6 +55,7 @@ export default function OnboardingStartPage() {
             onChange={(event) => setDisplayName(event.target.value)}
             placeholder="How should hosts address you?"
             autoComplete="name"
+            disabled={pending}
           />
         </label>
         <label className={styles.field}>
@@ -55,9 +66,15 @@ export default function OnboardingStartPage() {
             onChange={(event) => setBio(event.target.value)}
             placeholder="A sentence or two about what you're looking for."
             rows={4}
+            disabled={pending}
           />
         </label>
       </div>
+      {saveError ? (
+        <p className={styles.error} role="alert">
+          {saveError}
+        </p>
+      ) : null}
       <footer className={styles.footer}>
         <button
           type="button"

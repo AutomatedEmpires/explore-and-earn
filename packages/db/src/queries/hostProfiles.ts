@@ -14,24 +14,11 @@ import { anonClient, authedClient } from "../client";
 /**
  * Host-profile data access for the host onboarding / management experience.
  *
- * SECURITY: Row Level Security is NOT yet enabled on `host_profiles`, and
- * `authedClient()` talks to PostgREST with the anon key plus the caller's Clerk
- * JWT (the `anon` role, which performs no row-level enforcement). Every query in
- * this module is therefore scoped in application code by the caller-supplied,
- * already-verified `clerkUserId` (from `auth().userId`) \u2014 never decode it from
- * the token. Keep these manual scoping filters even once RLS lands; they are
- * defense in depth.
+ * SECURITY: migration 013 enables owner-scoped RLS using the Clerk `sub` in the
+ * Supabase JWT. Reads and updates also retain explicit clerk_user_id filters as
+ * defense in depth. Creation is narrower still: migration 073 exposes a single
+ * JWT-derived RPC so callers can never choose identity/trust/lifecycle fields.
  */
-
-// The initial attestation state MUST be a value the 003 CHECK constraint
-// permits: ('not_attested','attested','attested_stale','withdrawn'). The
-// previous literal "pending" was outside that set — a fresh INSERT would
-// violate the constraint (23514) and surface as an opaque create failure on
-// the exact path host onboarding AND the claim-to-verify flow depend on.
-const PENDING_ATTESTATION = "not_attested" as const;
-
-/** Postgres unique_violation SQLSTATE (host_profiles.clerk_user_id is UNIQUE). */
-const UNIQUE_VIOLATION = "23505";
 
 /** Untyped Supabase handle (see TYPES note above). */
 function untypedClient(clerkToken: string): SupabaseClient {
@@ -144,6 +131,7 @@ export async function getHostProfile(
     .from("host_profiles")
     .select(HOST_PROFILE_SELECT)
     .eq("clerk_user_id", clerkUserId)
+    .is("deleted_at", null)
     .maybeSingle();
   if (error) throw new Error(`getHostProfile: ${error.message}`);
   if (!data) return null;
@@ -302,31 +290,34 @@ export async function setMyHousingLibraryPhoto(
   }
 }
 
+export interface CreateHostProfileInput {
+  readonly companyName: string;
+  readonly categoryScopes: readonly string[];
+  readonly primaryLocationName: string | null;
+}
+
 export async function createHostProfile(
   clerkToken: string,
-  clerkUserId: string,
-  companyName: string,
-): Promise<{ ok: boolean; id?: string }> {
-  const db = untypedClient(clerkToken);
-  const { data, error } = await db
-    .from("host_profiles")
-    .insert({
-      clerk_user_id: clerkUserId,
-      company_name: companyName,
-      attestation_status: PENDING_ATTESTATION,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    if (error.code === UNIQUE_VIOLATION) {
-      const existing = await getHostProfile(clerkToken, clerkUserId);
-      return existing ? { ok: true, id: existing.id } : { ok: false };
+  input: CreateHostProfileInput,
+): Promise<{ ok: boolean; id?: string; error?: string }> {
+  try {
+    const db = untypedClient(clerkToken);
+    const { data, error } = await db.rpc("create_my_host_profile", {
+      p_company_name: input.companyName,
+      p_category_scopes: [...input.categoryScopes],
+      p_primary_location_name: input.primaryLocationName,
+    });
+    if (error) return { ok: false, error: error.message };
+    if (typeof data !== "string" || data.length === 0) {
+      return { ok: false, error: "host_profile_create_failed" };
     }
-    return { ok: false };
+    return { ok: true, id: data };
+  } catch (cause) {
+    return {
+      ok: false,
+      error: cause instanceof Error ? cause.message : "host_profile_create_failed",
+    };
   }
-
-  return { ok: true, id: (data as { id: string }).id };
 }
 
 /* ========================================================================== */
