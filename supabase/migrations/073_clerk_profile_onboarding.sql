@@ -147,7 +147,7 @@ begin
   -- reads and returns it. A full UUID suffix also makes slug collisions no more
   -- likely than primary-key collisions while retaining a human-readable base.
   for v_attempt in 1..3 loop
-    v_profile_id := gen_random_uuid();
+    v_profile_id := pg_catalog.gen_random_uuid();
     v_slug := v_slug_base || '-' || v_profile_id::text;
 
     insert into public.host_profiles (

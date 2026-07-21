@@ -86,6 +86,41 @@ describe("Clerk user.created retry handling", () => {
       "seeker_profiles",
     ]);
     expect(sendEmailMock).toHaveBeenCalledOnce();
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: "clerk:user.created:user_webhook_retry:welcome",
+      }),
+    );
+  });
+
+  it("uses one provider idempotency key when concurrent deliveries split the inserts", async () => {
+    const attempts = new Map<string, number>();
+    const from = vi.fn((table: string) => ({
+      insert: vi.fn().mockImplementation(async () => {
+        const attempt = attempts.get(table) ?? 0;
+        attempts.set(table, attempt + 1);
+        if (table === "users_profile_shadow") {
+          return attempt === 0
+            ? { error: null }
+            : { error: { code: "23505", message: "duplicate shadow" } };
+        }
+        return attempt === 0
+          ? { error: { code: "23505", message: "duplicate seeker" } }
+          : { error: null };
+      }),
+    }));
+    createClientMock.mockReturnValue({ from });
+
+    expect((await POST(request())).status).toBe(200);
+    expect((await POST(request())).status).toBe(200);
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+    expect(
+      sendEmailMock.mock.calls.map(([options]) => options.idempotencyKey),
+    ).toEqual([
+      "clerk:user.created:user_webhook_retry:welcome",
+      "clerk:user.created:user_webhook_retry:welcome",
+    ]);
   });
 
   it("acknowledges a fully duplicated retry without sending another welcome", async () => {

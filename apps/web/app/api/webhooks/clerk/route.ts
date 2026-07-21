@@ -93,6 +93,10 @@ function createdAtForUser(user: ClerkUserPayload): string {
 async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
 	const email = primaryEmailForUser(user)
 	if (!email) return
+	// Two concurrent Svix deliveries can each win one of the two profile
+	// inserts. Use one stable provider-side key so Resend accepts at most one
+	// welcome across workers even when both deliveries reach this function.
+	const idempotencyKey = `clerk:user.created:${user.id}:welcome`
 
 	const role =
 		typeof user.public_metadata?.role === "string"
@@ -112,6 +116,7 @@ async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
 				createListingUrl: absoluteUrl("/host"),
 			}),
 			template: "welcomeHost",
+			idempotencyKey,
 		})
 		return
 	}
@@ -124,6 +129,7 @@ async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
 			exploreUrl: absoluteUrl("/swipe"),
 		}),
 		template: "welcomeSeeker",
+		idempotencyKey,
 	})
 }
 
