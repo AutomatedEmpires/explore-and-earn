@@ -112,7 +112,11 @@ import {
   startHostBillingPortalAction,
   startHostCheckoutAction,
 } from "../../app/actions/hostBilling";
-import { createListingAction, duplicateListingAction } from "../../app/actions/listings";
+import {
+  createListingAction,
+  duplicateListingAction,
+  updateListingAction,
+} from "../../app/actions/listings";
 import { searchSeekersAction, sendInviteAction } from "../../app/actions/invites";
 import { updateApplicationStatusAction } from "../../app/actions/applicationStatus";
 import { applyToListingAction } from "../../app/actions/applications";
@@ -383,6 +387,44 @@ describe("createListingAction", () => {
     expect(result.ok).toBe(false);
     expect(result.error).toMatch(/summary is too long/i);
     expect(dbMocks.createListing).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateListingAction pay truth", () => {
+  it("passes explicit blank pay bounds through as null so stale pay is cleared", async () => {
+    dbMocks.updateListing.mockResolvedValueOnce({ ok: true });
+    const formData = new FormData();
+    formData.set("payMin", "");
+    formData.set("payMax", "   ");
+
+    await expect(updateListingAction("listing-1", formData)).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(dbMocks.updateListing).toHaveBeenCalledWith(
+      "tok-default",
+      "user_default",
+      "listing-1",
+      { payMin: null, payMax: null },
+    );
+  });
+
+  it("preserves a stated lower bound while explicitly clearing the upper bound", async () => {
+    dbMocks.updateListing.mockResolvedValueOnce({ ok: true });
+    const formData = new FormData();
+    formData.set("payMin", "18");
+    formData.set("payMax", "");
+
+    await expect(updateListingAction("listing-1", formData)).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(dbMocks.updateListing).toHaveBeenCalledWith(
+      "tok-default",
+      "user_default",
+      "listing-1",
+      { payMin: 18, payMax: null },
+    );
   });
 });
 

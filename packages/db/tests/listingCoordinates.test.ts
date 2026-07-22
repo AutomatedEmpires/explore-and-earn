@@ -133,3 +133,33 @@ describe("listing coordinate writes", () => {
     expect(database.fromCalls).toEqual([]);
   });
 });
+
+describe("listing compensation writes", () => {
+  it("clears both bounds and marks pay not stated", async () => {
+    const result = await updateListing("token", "user-1", "listing-1", {
+      payMin: null,
+      payMax: null,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(database.updates[0]).toMatchObject({
+      compensation_min_cents: null,
+      compensation_max_cents: null,
+      pay_evidence: "not_stated",
+    });
+  });
+
+  it("clears one bound while keeping stated pay evidence", async () => {
+    const result = await updateListing("token", "user-1", "listing-1", {
+      payMin: 18,
+      payMax: null,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(database.updates[0]).toMatchObject({
+      compensation_min_cents: 1_800,
+      compensation_max_cents: null,
+      pay_evidence: "confirmed",
+    });
+  });
+});

@@ -124,7 +124,11 @@ function resolvePayPeriod(raw: FormDataEntryValue | null): CompensationUnit | un
 function parseAmount(raw: FormDataEntryValue | null): number | null | undefined {
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
+  // Missing means "this caller did not edit pay"; a present blank means the
+  // host explicitly cleared that bound. ListingForm always submits both
+  // inputs, so preserving null here lets the writer replace stale public pay
+  // and recompute pay evidence from the complete range.
+  if (trimmed.length === 0) return null;
   const value = Number(trimmed);
   return Number.isFinite(value) ? value : null;
 }
