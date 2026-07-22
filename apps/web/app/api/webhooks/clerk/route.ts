@@ -11,15 +11,19 @@
  * in Vercel's Production environment.
  *
  * Handled Clerk events:
- *   - user.created  -> inserts rows into users_profile_shadow + seeker_profiles,
+ *   - user.created  -> ensures rows in users_profile_shadow + seeker_profiles,
  *                      then sends a best-effort welcome email (seeker or host)
- *   - user.updated  -> updates the cached email on users_profile_shadow
+ *   - user.updated  -> repairs missing profile rows, then updates cached email
  *   - user.deleted  -> soft-deletes (sets deleted_at) on users_profile_shadow
  *
  * Requests are verified with Svix using the svix-id / svix-timestamp /
  * svix-signature headers. Writes use the Supabase service-role key
  * (server-side only) and therefore bypass RLS.
  */
+import type {
+	ClerkUserPayload,
+	ClerkWebhookEvent,
+} from "@explore-and-earn/contracts"
 import { createClient } from "@supabase/supabase-js"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
@@ -30,26 +34,7 @@ import { welcomeHostEmail, welcomeSeekerEmail } from "../../../../lib/emails"
 
 export const runtime = "nodejs"
 
-type ClerkWebhookEventType = "user.created" | "user.updated" | "user.deleted"
-
-interface ClerkEmailAddress {
-	readonly id: string
-	readonly email_address: string
-}
-
-interface ClerkUserPayload {
-	readonly id?: string
-	readonly created_at?: number
-	readonly email_addresses?: ReadonlyArray<ClerkEmailAddress>
-	readonly primary_email_address_id?: string | null
-	readonly first_name?: string | null
-	readonly public_metadata?: { readonly role?: string | null } | null
-}
-
-interface ClerkWebhookEvent {
-	readonly type: ClerkWebhookEventType | string
-	readonly data: ClerkUserPayload
-}
+const UNIQUE_VIOLATION = "23505"
 
 function getSupabaseServiceRoleClient() {
 	const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -92,6 +77,10 @@ function createdAtForUser(user: ClerkUserPayload): string {
 async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
 	const email = primaryEmailForUser(user)
 	if (!email) return
+	// Two concurrent Svix deliveries can each win one of the two profile
+	// inserts. Use one stable provider-side key so Resend accepts at most one
+	// welcome across workers even when both deliveries reach this function.
+	const idempotencyKey = `clerk:user.created:${user.id}:welcome`
 
 	const role =
 		typeof user.public_metadata?.role === "string"
@@ -111,6 +100,7 @@ async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
 				createListingUrl: absoluteUrl("/host"),
 			}),
 			template: "welcomeHost",
+			idempotencyKey,
 		})
 		return
 	}
@@ -123,10 +113,11 @@ async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
 			exploreUrl: absoluteUrl("/swipe"),
 		}),
 		template: "welcomeSeeker",
+		idempotencyKey,
 	})
 }
 
-async function syncUserCreated(user: ClerkUserPayload): Promise<void> {
+async function ensureUserRows(user: ClerkUserPayload): Promise<boolean> {
 	if (!user.id) {
 		throw new Error("Clerk user.created payload is missing data.id.")
 	}
@@ -140,23 +131,34 @@ async function syncUserCreated(user: ClerkUserPayload): Promise<void> {
 			created_at: createdAtForUser(user),
 		})
 
-	if (shadowError) {
+	if (shadowError && shadowError.code !== UNIQUE_VIOLATION) {
 		throw shadowError
 	}
+	const shadowCreated = shadowError === null
 
 	const { error: seekerError } = await supabase.from("seeker_profiles").insert({
 		clerk_user_id: user.id,
 	})
 
-	if (seekerError) {
+	if (seekerError && seekerError.code !== UNIQUE_VIOLATION) {
 		throw seekerError
 	}
+
+	// Svix retries and concurrent deliveries are normal. A duplicate in one
+	// table must not prevent repairing a missing row in the other. Only the
+	// delivery that inserted at least one row owns the best-effort welcome send.
+	return shadowCreated || seekerError === null
 }
 
 async function syncUserUpdated(user: ClerkUserPayload): Promise<void> {
 	if (!user.id) {
 		throw new Error("Clerk user.updated payload is missing data.id.")
 	}
+
+	// An older or out-of-order delivery can leave Clerk authoritative while one
+	// or both database rows are absent. Repair the same idempotent pair as
+	// user.created, but never send a welcome from an update event.
+	await ensureUserRows(user)
 
 	const supabase = getSupabaseServiceRoleClient()
 	const { error } = await supabase
@@ -201,14 +203,15 @@ export async function POST(request: Request) {
 	try {
 		switch (event.type) {
 			case "user.created":
-				await syncUserCreated(event.data)
-				try {
-					await sendWelcomeEmail(event.data)
-				} catch (welcomeError) {
-					console.error(
-						"Clerk welcome email failed (non-fatal)",
-						welcomeError,
-					)
+				if (await ensureUserRows(event.data)) {
+					try {
+						await sendWelcomeEmail(event.data)
+					} catch (welcomeError) {
+						console.error(
+							"Clerk welcome email failed (non-fatal)",
+							welcomeError,
+						)
+					}
 				}
 				break
 			case "user.updated":

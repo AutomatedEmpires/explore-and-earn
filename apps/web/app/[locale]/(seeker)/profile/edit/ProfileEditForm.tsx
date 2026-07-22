@@ -113,6 +113,7 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
   const [tags, setTags] = useState<string[]>(initial.freeformSkills);
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   async function uploadPhoto(file: File): Promise<string> {
@@ -124,7 +125,10 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
       throw new Error("Your session has expired — sign in again.");
     }
     const url = await uploadProfilePhoto(token, initial.seekerProfileId, file, "seeker");
-    await saveProfilePhotoAction(url);
+    const result = await saveProfilePhotoAction(url);
+    if (!result.ok) {
+      throw new Error("Your photo uploaded, but we couldn’t save it to your profile. Try again.");
+    }
     return url;
   }
 
@@ -162,24 +166,34 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
 
   function save() {
     startTransition(async () => {
+      setSaved(false);
+      setSaveError(null);
       const minCents = payMin.trim() ? Math.round(Number(payMin) * 100) : undefined;
       const maxCents = payMax.trim() ? Math.round(Number(payMax) * 100) : undefined;
-      await saveOnboardingStep({
-        displayName,
-        bio,
-        openToStatement: openToStatement.trim() || null,
-        locationPref,
-        housingPref,
-        mealsPref,
-        payExpectationMinCents: Number.isFinite(minCents) ? minCents : null,
-        payExpectationMaxCents: Number.isFinite(maxCents) ? maxCents : null,
-        payExpectationUnit: payUnit,
-        payFlexible,
-        categories: selected,
-        freeformSkills: tags,
-      });
-      setSaved(true);
-      router.refresh();
+      try {
+        const result = await saveOnboardingStep({
+          displayName,
+          bio,
+          openToStatement: openToStatement.trim() || null,
+          locationPref,
+          housingPref,
+          mealsPref,
+          payExpectationMinCents: Number.isFinite(minCents) ? minCents : null,
+          payExpectationMaxCents: Number.isFinite(maxCents) ? maxCents : null,
+          payExpectationUnit: payUnit,
+          payFlexible,
+          categories: selected,
+          freeformSkills: tags,
+        });
+        if (!result.ok) {
+          setSaveError("We couldn’t save your changes. Please try again.");
+          return;
+        }
+        setSaved(true);
+        router.refresh();
+      } catch {
+        setSaveError("We couldn’t save your changes. Please try again.");
+      }
     });
   }
 
@@ -429,6 +443,12 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
           ) : null}
         </div>
       </div>
+
+      {saveError ? (
+        <p className={styles.error} role="alert">
+          {saveError}
+        </p>
+      ) : null}
 
       <footer className={styles.footer}>
         <button

@@ -30,6 +30,10 @@ import {
   type InventoryIndex,
   type SourceFieldMapping,
 } from "../src/lib/sourceIngestion";
+import {
+  insertColumns,
+  plannedToListingColumns,
+} from "../src/queries/sourcedListings";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -175,13 +179,46 @@ describe("normalizeRecord — stated facts only", () => {
     expect(result.record.endsAt).toBeNull();
   });
 
-  it("ignores out-of-range coordinates rather than shipping bad geo", () => {
-    const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
-    const result = normalizeRecord({ ...baseRaw, lat: "95.2", lng: "-121.5" }, withGeo);
-    if (!result.ok) throw new Error("expected ok");
-    expect(result.record.latitude).toBeNull();
-    expect(result.record.longitude).toBe(-121.5);
-  });
+	it("drops the whole point when either coordinate is invalid", () => {
+		const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
+		const result = normalizeRecord({ ...baseRaw, lat: "95.2", lng: "-121.5" }, withGeo);
+		if (!result.ok) throw new Error("expected ok");
+		expect(result.record.latitude).toBeNull();
+		expect(result.record.longitude).toBeNull();
+	});
+
+	it("drops a bounded pair when no display location was stated", () => {
+		const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
+		const result = normalizeRecord(
+			{ ...baseRaw, place: "", lat: "47.4", lng: "-121.5" },
+			withGeo,
+		);
+		if (!result.ok) throw new Error("expected ok");
+		expect(result.record.latitude).toBeNull();
+		expect(result.record.longitude).toBeNull();
+	});
+
+	it("never converts blank source coordinates into a fabricated zero point", () => {
+		const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
+		const result = normalizeRecord(
+			{ ...baseRaw, lat: "  ", lng: "\t" },
+			withGeo,
+		);
+		if (!result.ok) throw new Error("expected ok");
+		expect(result.record.latitude).toBeNull();
+		expect(result.record.longitude).toBeNull();
+	});
+
+	it("keeps a genuinely stated zero point", () => {
+		const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
+		const result = normalizeRecord(
+			{ ...baseRaw, lat: "0", lng: "0" },
+			withGeo,
+		);
+		if (!result.ok) throw new Error("expected ok");
+		expect(result.record.latitude).toBe(0);
+		expect(result.record.longitude).toBe(0);
+	});
 });
 
 describe("parseStatedBenefit — absence is never evidence", () => {
@@ -429,10 +466,7 @@ describe("validateSourceConfig", () => {
 /* --------------------------------------------------- update-column safety */
 
 describe("import column sets — updates never touch ownership/claim state", () => {
-  it("update columns exclude provenance/host/claim; insert columns include them", async () => {
-    const { plannedToListingColumns, insertColumns } = await import(
-      "../src/queries/sourcedListings"
-    );
+  it("update columns exclude provenance/host/claim; insert columns include them", () => {
     const normalizedResult = normalizeRecord(baseRaw, MAPPING);
     if (!normalizedResult.ok) throw new Error("normalize failed");
     const entry = {

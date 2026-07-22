@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
 
 import { auth } from "@clerk/nextjs/server";
-import {
-	getConversations,
-	getLastMessagesForConversations,
-	getPublicListingsByIds,
-	rowToDiscoveryFields,
-} from "@explore-and-earn/db";
+import { getConversations } from "@explore-and-earn/db";
 
 import { devFallback } from "../../../../lib/devBench/fallback";
+import { loadMessageListData } from "../../../../lib/messageListData";
 import { EmptyState } from "../../../../components/discovery";
 import {
 	BucketPage,
@@ -85,30 +81,25 @@ export default async function MessagesPage() {
 		);
 	}
 
-	// Batch-fetch every conversation's listing and last message in two queries
-	// (replaces the previous per-conversation getMessages N+1).
-	const listingIds = conversations
-		.map((conversation) => conversation.listingId)
-		.filter((id): id is string => id !== null);
+	// Batch-fetch stable participant-only context and last messages. Unlike the
+	// public listing query, this preserves labels after a listing closes.
 	const conversationIds = conversations.map((c) => c.id);
 
-	const [listingRows, lastMessageMap] = await Promise.all([
-		getPublicListingsByIds(listingIds),
-		getLastMessagesForConversations(token, conversationIds),
-	]);
-	const listingById = new Map(listingRows.map((row) => [row.id, row] as const));
+	const { contexts, lastMessages } = await loadMessageListData({
+		token,
+		userId,
+		route: "/messages",
+		conversationIds,
+	});
 
 	const threads: MessageThread[] = conversations.map((conversation) => {
-		const listingRow = conversation.listingId
-			? listingById.get(conversation.listingId) ?? null
-			: null;
-		const listing = listingRow ? rowToDiscoveryFields(listingRow) : null;
-		const lastMessage = lastMessageMap.get(conversation.id) ?? null;
+		const context = contexts.get(conversation.id) ?? null;
+		const lastMessage = lastMessages.get(conversation.id) ?? null;
 		return {
 			id: conversation.id,
-			hostName: listing?.host.name ?? "Host",
-			listingTitle: listing?.title ?? "Conversation",
-			category: listing?.category ?? "mix",
+			hostName: context?.hostName || "Host",
+			listingTitle: context?.listingTitle || "Conversation",
+			category: context?.listingCategory ?? "mix",
 			preview: lastMessage?.body ?? "No messages yet",
 			timeAgo: formatTimeAgo(conversation.lastMessageAt),
 			unread: lastMessage

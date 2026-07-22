@@ -4,9 +4,14 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@explore-and-earn/ui";
 
+import { resolvePostHogConfig } from "../lib/posthogConfig";
 import styles from "./CookieBanner.module.css";
 
 const CONSENT_KEY = "cookie_consent";
+const posthogConfig = resolvePostHogConfig(
+	process.env.NEXT_PUBLIC_POSTHOG_KEY,
+	process.env.NEXT_PUBLIC_POSTHOG_HOST,
+);
 
 type Consent = "accepted" | "essential";
 
@@ -44,13 +49,15 @@ export function CookieBanner() {
 		// into every route's first load just to flip this toggle. Providers
 		// also reads the stored choice at init, so the toggle here is a
 		// same-session convenience, not the source of truth.
-		void import("posthog-js").then(({ default: posthog }) => {
-			if (consent === "accepted") {
-				posthog.opt_in_capturing();
-			} else {
-				posthog.opt_out_capturing();
-			}
-		});
+		if (posthogConfig) {
+			void import("posthog-js").then(({ default: posthog }) => {
+				if (consent === "accepted") {
+					posthog.opt_in_capturing();
+				} else {
+					posthog.opt_out_capturing();
+				}
+			});
+		}
 
 		setVisible(false);
 	}

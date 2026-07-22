@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   public: {
     Tables: {
       applications: {
@@ -24,6 +19,7 @@ export type Database = {
           id: string
           listing_id: string
           origin_invite_id: string | null
+          reactivated_at: string | null
           reviewed_at: string | null
           seeker_profile_id: string
           source: string
@@ -41,6 +37,7 @@ export type Database = {
           id?: string
           listing_id: string
           origin_invite_id?: string | null
+          reactivated_at?: string | null
           reviewed_at?: string | null
           seeker_profile_id: string
           source?: string
@@ -58,6 +55,7 @@ export type Database = {
           id?: string
           listing_id?: string
           origin_invite_id?: string | null
+          reactivated_at?: string | null
           reviewed_at?: string | null
           seeker_profile_id?: string
           source?: string
@@ -76,6 +74,83 @@ export type Database = {
           },
           {
             foreignKeyName: "applications_seeker_profile_id_fkey"
+            columns: ["seeker_profile_id"]
+            isOneToOne: false
+            referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_messages: {
+        Row: {
+          created_at: string
+          id: string
+          parts: Json
+          role: string
+          thread_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          parts?: Json
+          role: string
+          thread_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          parts?: Json
+          role?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_threads: {
+        Row: {
+          clerk_user_id: string
+          created_at: string
+          host_profile_id: string | null
+          id: string
+          seeker_profile_id: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          clerk_user_id: string
+          created_at?: string
+          host_profile_id?: string | null
+          id?: string
+          seeker_profile_id?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          clerk_user_id?: string
+          created_at?: string
+          host_profile_id?: string | null
+          id?: string
+          seeker_profile_id?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_threads_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assistant_threads_seeker_profile_id_fkey"
             columns: ["seeker_profile_id"]
             isOneToOne: false
             referencedRelation: "seeker_profiles"
@@ -210,6 +285,44 @@ export type Database = {
           },
         ]
       }
+      community_photo_reports: {
+        Row: {
+          created_at: string
+          detail: string | null
+          id: string
+          photo_id: string
+          reason: string
+          reporter_clerk_user_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          photo_id: string
+          reason?: string
+          reporter_clerk_user_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          id?: string
+          photo_id?: string
+          reason?: string
+          reporter_clerk_user_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_photo_reports_photo_id_fkey"
+            columns: ["photo_id"]
+            isOneToOne: false
+            referencedRelation: "community_photos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       community_photos: {
         Row: {
           caption: string | null
@@ -325,6 +438,67 @@ export type Database = {
           },
         ]
       }
+      digest_memberships: {
+        Row: {
+          cadence: string
+          category: string
+          created_at: string
+          delivery_id: string | null
+          digest_delivery_id: string | null
+          event_id: string
+          id: string
+          recipient_clerk_user_id: string
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          cadence: string
+          category: string
+          created_at?: string
+          delivery_id?: string | null
+          digest_delivery_id?: string | null
+          event_id: string
+          id?: string
+          recipient_clerk_user_id: string
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          cadence?: string
+          category?: string
+          created_at?: string
+          delivery_id?: string | null
+          digest_delivery_id?: string | null
+          event_id?: string
+          id?: string
+          recipient_clerk_user_id?: string
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_memberships_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "notification_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_memberships_digest_delivery_id_fkey"
+            columns: ["digest_delivery_id"]
+            isOneToOne: false
+            referencedRelation: "notification_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_memberships_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_log: {
         Row: {
           error: string | null
@@ -349,6 +523,30 @@ export type Database = {
           recipient_email?: string
           sent_at?: string
           template_name?: string
+        }
+        Relationships: []
+      }
+      email_suppressions: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          reason: string
+          source: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          reason: string
+          source?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          reason?: string
+          source?: string | null
         }
         Relationships: []
       }
@@ -520,6 +718,7 @@ export type Database = {
           purchase_amount_cents: number | null
           purchase_duration_days: number | null
           status: string
+          stripe_checkout_session_id: string | null
           stripe_payment_intent_id: string | null
           title: string
           updated_at: string
@@ -534,6 +733,7 @@ export type Database = {
           purchase_amount_cents?: number | null
           purchase_duration_days?: number | null
           status?: string
+          stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
           title: string
           updated_at?: string
@@ -548,6 +748,7 @@ export type Database = {
           purchase_amount_cents?: number | null
           purchase_duration_days?: number | null
           status?: string
+          stripe_checkout_session_id?: string | null
           stripe_payment_intent_id?: string | null
           title?: string
           updated_at?: string
@@ -614,6 +815,7 @@ export type Database = {
           attestation_expires_at: string | null
           attestation_status: string
           attested_at: string | null
+          benefit_library: Json
           category_scopes: string[]
           clerk_user_id: string | null
           company_name: string
@@ -622,13 +824,17 @@ export type Database = {
           created_at: string
           current_attestation_id: string | null
           deleted_at: string | null
+          flagged_at: string | null
+          flagged_for_review: boolean
+          flagged_reason: string | null
           host_name: string | null
           housing_offered_generally: boolean
           id: string
           logo_asset_id: string | null
           meals_offered_generally: boolean
+          narrative: Json
           operating_regions: string[]
-          owner_user_id: string
+          owner_user_id: string | null
           photo_url: string | null
           primary_latitude: number | null
           primary_location_name: string | null
@@ -652,6 +858,7 @@ export type Database = {
           attestation_expires_at?: string | null
           attestation_status?: string
           attested_at?: string | null
+          benefit_library?: Json
           category_scopes?: string[]
           clerk_user_id?: string | null
           company_name: string
@@ -660,13 +867,17 @@ export type Database = {
           created_at?: string
           current_attestation_id?: string | null
           deleted_at?: string | null
+          flagged_at?: string | null
+          flagged_for_review?: boolean
+          flagged_reason?: string | null
           host_name?: string | null
           housing_offered_generally?: boolean
           id?: string
           logo_asset_id?: string | null
           meals_offered_generally?: boolean
+          narrative?: Json
           operating_regions?: string[]
-          owner_user_id: string
+          owner_user_id?: string | null
           photo_url?: string | null
           primary_latitude?: number | null
           primary_location_name?: string | null
@@ -690,6 +901,7 @@ export type Database = {
           attestation_expires_at?: string | null
           attestation_status?: string
           attested_at?: string | null
+          benefit_library?: Json
           category_scopes?: string[]
           clerk_user_id?: string | null
           company_name?: string
@@ -698,13 +910,17 @@ export type Database = {
           created_at?: string
           current_attestation_id?: string | null
           deleted_at?: string | null
+          flagged_at?: string | null
+          flagged_for_review?: boolean
+          flagged_reason?: string | null
           host_name?: string | null
           housing_offered_generally?: boolean
           id?: string
           logo_asset_id?: string | null
           meals_offered_generally?: boolean
+          narrative?: Json
           operating_regions?: string[]
-          owner_user_id?: string
+          owner_user_id?: string | null
           photo_url?: string | null
           primary_latitude?: number | null
           primary_location_name?: string | null
@@ -842,6 +1058,57 @@ export type Database = {
             columns: ["seeker_profile_id"]
             isOneToOne: false
             referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invite_credit_events: {
+        Row: {
+          created_at: string
+          credits: number
+          host_profile_id: string
+          id: string
+          invite_id: string | null
+          kind: string
+          period_key: string | null
+          source: string
+          stripe_checkout_session_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          credits?: number
+          host_profile_id: string
+          id?: string
+          invite_id?: string | null
+          kind: string
+          period_key?: string | null
+          source: string
+          stripe_checkout_session_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          credits?: number
+          host_profile_id?: string
+          id?: string
+          invite_id?: string | null
+          kind?: string
+          period_key?: string | null
+          source?: string
+          stripe_checkout_session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invite_credit_events_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invite_credit_events_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
             referencedColumns: ["id"]
           },
         ]
@@ -1022,6 +1289,66 @@ export type Database = {
           },
         ]
       }
+      listing_claims: {
+        Row: {
+          authority_evidence: Json
+          claimant_clerk_user_id: string
+          created_at: string
+          decided_at: string | null
+          host_profile_id: string | null
+          id: string
+          listing_id: string
+          pre_conversion_snapshot: Json | null
+          review_notes: string | null
+          reviewed_by_user_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          authority_evidence?: Json
+          claimant_clerk_user_id: string
+          created_at?: string
+          decided_at?: string | null
+          host_profile_id?: string | null
+          id?: string
+          listing_id: string
+          pre_conversion_snapshot?: Json | null
+          review_notes?: string | null
+          reviewed_by_user_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          authority_evidence?: Json
+          claimant_clerk_user_id?: string
+          created_at?: string
+          decided_at?: string | null
+          host_profile_id?: string | null
+          id?: string
+          listing_id?: string
+          pre_conversion_snapshot?: Json | null
+          review_notes?: string | null
+          reviewed_by_user_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_claims_host_profile_id_fkey"
+            columns: ["host_profile_id"]
+            isOneToOne: false
+            referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_claims_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_media_overrides: {
         Row: {
           bucket_type: string
@@ -1070,6 +1397,39 @@ export type Database = {
           },
         ]
       }
+      listing_passes: {
+        Row: {
+          created_at: string
+          listing_id: string
+          seeker_profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          listing_id: string
+          seeker_profile_id: string
+        }
+        Update: {
+          created_at?: string
+          listing_id?: string
+          seeker_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_passes_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_passes_seeker_profile_id_fkey"
+            columns: ["seeker_profile_id"]
+            isOneToOne: false
+            referencedRelation: "seeker_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_relevance_extensions: {
         Row: {
           completion_score: number
@@ -1114,6 +1474,48 @@ export type Database = {
           },
         ]
       }
+      listing_sources: {
+        Row: {
+          allow_raw_snapshot: boolean
+          compliance_notes: string | null
+          compliance_status: string
+          config: Json
+          created_at: string
+          full_snapshot: boolean
+          id: string
+          kind: string
+          name: string
+          terms_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          allow_raw_snapshot?: boolean
+          compliance_notes?: string | null
+          compliance_status?: string
+          config?: Json
+          created_at?: string
+          full_snapshot?: boolean
+          id?: string
+          kind: string
+          name: string
+          terms_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          allow_raw_snapshot?: boolean
+          compliance_notes?: string | null
+          compliance_status?: string
+          config?: Json
+          created_at?: string
+          full_snapshot?: boolean
+          id?: string
+          kind?: string
+          name?: string
+          terms_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       listings: {
         Row: {
           accepted_count: number
@@ -1121,6 +1523,8 @@ export type Database = {
           begins_at: string | null
           benefit_details: Json
           category: string
+          category_depth: Json
+          claim_summary: string
           closed_at: string | null
           compensation_currency: string
           compensation_max_cents: number | null
@@ -1133,25 +1537,48 @@ export type Database = {
           created_at: string
           description: string | null
           ends_at: string | null
+          experience_level_required: string | null
           expires_at: string | null
           filled_status: string
           gallery_photo_urls: string[]
-          host_profile_id: string
+          host_profile_id: string | null
           housing_description: string | null
+          housing_evidence: string
           housing_included: boolean
           id: string
           is_remote: boolean
           latitude: number | null
           location_display: string | null
+          logistics: Json
           longitude: number | null
           meals_description: string | null
+          meals_evidence: string
           meals_included: boolean
           mix_domains: string[]
           paused_at: string | null
+          pay_evidence: string
+          perks: Json
+          physical_demand: number | null
+          provenance: string
           published_at: string | null
           remaining_role_count: number
+          required_certifications: string[]
+          required_skill_tags: string[]
+          requirements: Json
+          responsibilities: Json
           role_count: number
           search_vector: unknown
+          seasonality: string[]
+          source_employer_name: string | null
+          source_evidence_meta: Json
+          source_external_id: string | null
+          source_fingerprint: string | null
+          source_id: string | null
+          source_last_seen_at: string | null
+          source_name: string | null
+          source_published_at: string | null
+          source_status: string
+          source_url: string | null
           status: string
           tags: string[]
           timeline_summary: string | null
@@ -1165,6 +1592,8 @@ export type Database = {
           begins_at?: string | null
           benefit_details?: Json
           category: string
+          category_depth?: Json
+          claim_summary?: string
           closed_at?: string | null
           compensation_currency?: string
           compensation_max_cents?: number | null
@@ -1177,25 +1606,48 @@ export type Database = {
           created_at?: string
           description?: string | null
           ends_at?: string | null
+          experience_level_required?: string | null
           expires_at?: string | null
           filled_status?: string
           gallery_photo_urls?: string[]
-          host_profile_id: string
+          host_profile_id?: string | null
           housing_description?: string | null
+          housing_evidence?: string
           housing_included?: boolean
           id?: string
           is_remote?: boolean
           latitude?: number | null
           location_display?: string | null
+          logistics?: Json
           longitude?: number | null
           meals_description?: string | null
+          meals_evidence?: string
           meals_included?: boolean
           mix_domains?: string[]
           paused_at?: string | null
+          pay_evidence?: string
+          perks?: Json
+          physical_demand?: number | null
+          provenance?: string
           published_at?: string | null
           remaining_role_count?: number
+          required_certifications?: string[]
+          required_skill_tags?: string[]
+          requirements?: Json
+          responsibilities?: Json
           role_count?: number
           search_vector?: unknown
+          seasonality?: string[]
+          source_employer_name?: string | null
+          source_evidence_meta?: Json
+          source_external_id?: string | null
+          source_fingerprint?: string | null
+          source_id?: string | null
+          source_last_seen_at?: string | null
+          source_name?: string | null
+          source_published_at?: string | null
+          source_status?: string
+          source_url?: string | null
           status?: string
           tags?: string[]
           timeline_summary?: string | null
@@ -1209,6 +1661,8 @@ export type Database = {
           begins_at?: string | null
           benefit_details?: Json
           category?: string
+          category_depth?: Json
+          claim_summary?: string
           closed_at?: string | null
           compensation_currency?: string
           compensation_max_cents?: number | null
@@ -1221,25 +1675,48 @@ export type Database = {
           created_at?: string
           description?: string | null
           ends_at?: string | null
+          experience_level_required?: string | null
           expires_at?: string | null
           filled_status?: string
           gallery_photo_urls?: string[]
-          host_profile_id?: string
+          host_profile_id?: string | null
           housing_description?: string | null
+          housing_evidence?: string
           housing_included?: boolean
           id?: string
           is_remote?: boolean
           latitude?: number | null
           location_display?: string | null
+          logistics?: Json
           longitude?: number | null
           meals_description?: string | null
+          meals_evidence?: string
           meals_included?: boolean
           mix_domains?: string[]
           paused_at?: string | null
+          pay_evidence?: string
+          perks?: Json
+          physical_demand?: number | null
+          provenance?: string
           published_at?: string | null
           remaining_role_count?: number
+          required_certifications?: string[]
+          required_skill_tags?: string[]
+          requirements?: Json
+          responsibilities?: Json
           role_count?: number
           search_vector?: unknown
+          seasonality?: string[]
+          source_employer_name?: string | null
+          source_evidence_meta?: Json
+          source_external_id?: string | null
+          source_fingerprint?: string | null
+          source_id?: string | null
+          source_last_seen_at?: string | null
+          source_name?: string | null
+          source_published_at?: string | null
+          source_status?: string
+          source_url?: string | null
           status?: string
           tags?: string[]
           timeline_summary?: string | null
@@ -1260,6 +1737,64 @@ export type Database = {
             columns: ["host_profile_id"]
             isOneToOne: false
             referencedRelation: "host_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listings_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "listing_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_scores: {
+        Row: {
+          band: string
+          caps_applied: string[]
+          components: Json
+          computed_at: string
+          confidence: number
+          listing_id: string
+          raw_score: number
+          score: number
+          seeker_profile_id: string
+        }
+        Insert: {
+          band: string
+          caps_applied?: string[]
+          components?: Json
+          computed_at?: string
+          confidence: number
+          listing_id: string
+          raw_score: number
+          score: number
+          seeker_profile_id: string
+        }
+        Update: {
+          band?: string
+          caps_applied?: string[]
+          components?: Json
+          computed_at?: string
+          confidence?: number
+          listing_id?: string
+          raw_score?: number
+          score?: number
+          seeker_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_scores_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_scores_seeker_profile_id_fkey"
+            columns: ["seeker_profile_id"]
+            isOneToOne: false
+            referencedRelation: "seeker_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1438,6 +1973,144 @@ export type Database = {
           },
         ]
       }
+      notification_deliveries: {
+        Row: {
+          attempt_count: number
+          cadence: string
+          category: string
+          channel: string
+          collapsed_into_delivery_id: string | null
+          created_at: string
+          dedup_key: string
+          delivered_at: string | null
+          event_id: string | null
+          failure_class: string | null
+          failure_detail: string | null
+          id: string
+          intent: Json
+          lease_expires_at: string | null
+          next_attempt_at: string
+          notification_type: string
+          provider_message_id: string | null
+          recipient_clerk_user_id: string
+          status: string
+          suppression_reason: string | null
+          updated_at: string
+          variant: string
+          worker_id: string | null
+        }
+        Insert: {
+          attempt_count?: number
+          cadence?: string
+          category: string
+          channel: string
+          collapsed_into_delivery_id?: string | null
+          created_at?: string
+          dedup_key: string
+          delivered_at?: string | null
+          event_id?: string | null
+          failure_class?: string | null
+          failure_detail?: string | null
+          id?: string
+          intent?: Json
+          lease_expires_at?: string | null
+          next_attempt_at?: string
+          notification_type: string
+          provider_message_id?: string | null
+          recipient_clerk_user_id: string
+          status?: string
+          suppression_reason?: string | null
+          updated_at?: string
+          variant?: string
+          worker_id?: string | null
+        }
+        Update: {
+          attempt_count?: number
+          cadence?: string
+          category?: string
+          channel?: string
+          collapsed_into_delivery_id?: string | null
+          created_at?: string
+          dedup_key?: string
+          delivered_at?: string | null
+          event_id?: string | null
+          failure_class?: string | null
+          failure_detail?: string | null
+          id?: string
+          intent?: Json
+          lease_expires_at?: string | null
+          next_attempt_at?: string
+          notification_type?: string
+          provider_message_id?: string | null
+          recipient_clerk_user_id?: string
+          status?: string
+          suppression_reason?: string | null
+          updated_at?: string
+          variant?: string
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_collapsed_into_delivery_id_fkey"
+            columns: ["collapsed_into_delivery_id"]
+            isOneToOne: false
+            referencedRelation: "notification_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_deliveries_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_engine_prefs: {
+        Row: {
+          category_prefs: Json
+          clerk_user_id: string
+          created_at: string
+          email_enabled: boolean
+          in_app_enabled: boolean
+          locale: string | null
+          push_enabled: boolean
+          quiet_end_minute: number | null
+          quiet_hours_enabled: boolean
+          quiet_start_minute: number | null
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_prefs?: Json
+          clerk_user_id: string
+          created_at?: string
+          email_enabled?: boolean
+          in_app_enabled?: boolean
+          locale?: string | null
+          push_enabled?: boolean
+          quiet_end_minute?: number | null
+          quiet_hours_enabled?: boolean
+          quiet_start_minute?: number | null
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_prefs?: Json
+          clerk_user_id?: string
+          created_at?: string
+          email_enabled?: boolean
+          in_app_enabled?: boolean
+          locale?: string | null
+          push_enabled?: boolean
+          quiet_end_minute?: number | null
+          quiet_hours_enabled?: boolean
+          quiet_start_minute?: number | null
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           category: string
@@ -1467,6 +2140,32 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      notification_processed_events: {
+        Row: {
+          delivery_count: number
+          event_id: string
+          processed_at: string
+        }
+        Insert: {
+          delivery_count?: number
+          event_id: string
+          processed_at?: string
+        }
+        Update: {
+          delivery_count?: number
+          event_id?: string
+          processed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_processed_events_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -1640,6 +2339,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          clerk_user_id: string
+          created_at: string
+          endpoint: string
+          failure_count: number
+          id: string
+          last_success_at: string | null
+          locale: string | null
+          p256dh: string
+          revoked_at: string | null
+          timezone: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          auth: string
+          clerk_user_id: string
+          created_at?: string
+          endpoint: string
+          failure_count?: number
+          id?: string
+          last_success_at?: string | null
+          locale?: string | null
+          p256dh: string
+          revoked_at?: string | null
+          timezone?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          auth?: string
+          clerk_user_id?: string
+          created_at?: string
+          endpoint?: string
+          failure_count?: number
+          id?: string
+          last_success_at?: string | null
+          locale?: string | null
+          p256dh?: string
+          revoked_at?: string | null
+          timezone?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
       }
       refund_requests: {
         Row: {
@@ -1928,10 +2672,12 @@ export type Database = {
           email_on_invite: boolean | null
           email_on_message: boolean | null
           email_on_status_change: boolean | null
+          experience_level: string | null
           general_skill_tags: string[]
           hero_cover_url: string | null
           housing_preference: string | null
           id: string
+          interest_tags: string[]
           location_pref: string | null
           match_confidence_score: number
           meals_preference: string | null
@@ -1944,11 +2690,13 @@ export type Database = {
           profile_photo_asset_id: string | null
           profile_photo_url: string | null
           relative_location: string | null
+          remote_preference: string | null
           seeking_timeline: string | null
           short_bio: string | null
           travel_readiness: string | null
           updated_at: string
           user_id: string | null
+          visa_support_needed: boolean
           visibility_status: string
         }
         Insert: {
@@ -1966,10 +2714,12 @@ export type Database = {
           email_on_invite?: boolean | null
           email_on_message?: boolean | null
           email_on_status_change?: boolean | null
+          experience_level?: string | null
           general_skill_tags?: string[]
           hero_cover_url?: string | null
           housing_preference?: string | null
           id?: string
+          interest_tags?: string[]
           location_pref?: string | null
           match_confidence_score?: number
           meals_preference?: string | null
@@ -1982,11 +2732,13 @@ export type Database = {
           profile_photo_asset_id?: string | null
           profile_photo_url?: string | null
           relative_location?: string | null
+          remote_preference?: string | null
           seeking_timeline?: string | null
           short_bio?: string | null
           travel_readiness?: string | null
           updated_at?: string
           user_id?: string | null
+          visa_support_needed?: boolean
           visibility_status?: string
         }
         Update: {
@@ -2004,10 +2756,12 @@ export type Database = {
           email_on_invite?: boolean | null
           email_on_message?: boolean | null
           email_on_status_change?: boolean | null
+          experience_level?: string | null
           general_skill_tags?: string[]
           hero_cover_url?: string | null
           housing_preference?: string | null
           id?: string
+          interest_tags?: string[]
           location_pref?: string | null
           match_confidence_score?: number
           meals_preference?: string | null
@@ -2020,11 +2774,13 @@ export type Database = {
           profile_photo_asset_id?: string | null
           profile_photo_url?: string | null
           relative_location?: string | null
+          remote_preference?: string | null
           seeking_timeline?: string | null
           short_bio?: string | null
           travel_readiness?: string | null
           updated_at?: string
           user_id?: string | null
+          visa_support_needed?: boolean
           visibility_status?: string
         }
         Relationships: []
@@ -2144,6 +2900,127 @@ export type Database = {
           },
         ]
       }
+      source_import_runs: {
+        Row: {
+          error: string | null
+          finished_at: string | null
+          id: string
+          payload_fingerprint: string
+          source_id: string
+          started_at: string
+          stats: Json
+          status: string
+        }
+        Insert: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          payload_fingerprint: string
+          source_id: string
+          started_at?: string
+          stats?: Json
+          status?: string
+        }
+        Update: {
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          payload_fingerprint?: string
+          source_id?: string
+          started_at?: string
+          stats?: Json
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_import_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "listing_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_records: {
+        Row: {
+          classification: Json
+          content_fingerprint: string
+          created_at: string
+          external_id: string | null
+          id: string
+          import_run_id: string
+          listing_id: string | null
+          matched_listing_id: string | null
+          needs_review: boolean
+          normalized: Json
+          outcome: string
+          raw: Json | null
+          reject_reason: string | null
+          source_id: string
+        }
+        Insert: {
+          classification?: Json
+          content_fingerprint: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          import_run_id: string
+          listing_id?: string | null
+          matched_listing_id?: string | null
+          needs_review?: boolean
+          normalized?: Json
+          outcome: string
+          raw?: Json | null
+          reject_reason?: string | null
+          source_id: string
+        }
+        Update: {
+          classification?: Json
+          content_fingerprint?: string
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          import_run_id?: string
+          listing_id?: string | null
+          matched_listing_id?: string | null
+          needs_review?: boolean
+          normalized?: Json
+          outcome?: string
+          raw?: Json | null
+          reject_reason?: string | null
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_records_import_run_id_fkey"
+            columns: ["import_run_id"]
+            isOneToOne: false
+            referencedRelation: "source_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_records_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_records_matched_listing_id_fkey"
+            columns: ["matched_listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_records_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "listing_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       team_memberships: {
         Row: {
           accepted_at: string | null
@@ -2244,11 +3121,152 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_notification_deliveries: {
+        Args: {
+          p_lease_seconds?: number
+          p_limit?: number
+          p_worker_id: string
+        }
+        Returns: {
+          attempt_count: number
+          cadence: string
+          category: string
+          channel: string
+          collapsed_into_delivery_id: string | null
+          created_at: string
+          dedup_key: string
+          delivered_at: string | null
+          event_id: string | null
+          failure_class: string | null
+          failure_detail: string | null
+          id: string
+          intent: Json
+          lease_expires_at: string | null
+          next_attempt_at: string
+          notification_type: string
+          provider_message_id: string | null
+          recipient_clerk_user_id: string
+          status: string
+          suppression_reason: string | null
+          updated_at: string
+          variant: string
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notification_deliveries"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      convert_claimed_listing: {
+        Args: {
+          p_actor_user_id: string
+          p_claim_id: string
+          p_confirmed?: Json
+          p_host_profile_id: string
+        }
+        Returns: Json
+      }
+      create_invite_with_credit: {
+        Args: {
+          p_host_profile_id: string
+          p_invited_by_user_id: string
+          p_listing_id: string
+          p_message: string
+          p_monthly_allowance: number
+          p_seeker_profile_id: string
+        }
+        Returns: Json
+      }
+      create_my_host_profile: {
+        Args: {
+          p_category_scopes: string[]
+          p_company_name: string
+          p_primary_location_name: string
+        }
+        Returns: string
+      }
       current_conversation_ids: { Args: never; Returns: string[] }
       current_host_listing_ids: { Args: never; Returns: string[] }
       current_host_profile_ids: { Args: never; Returns: string[] }
       current_seeker_profile_ids: { Args: never; Returns: string[] }
+      ensure_my_seeker_profile: { Args: never; Returns: string }
       get_clerk_user_id: { Args: never; Returns: string }
+      get_my_host_benefit_library: { Args: never; Returns: Json }
+      get_owned_benefit_context: {
+        Args: { p_listing_id: string }
+        Returns: {
+          benefit_details: Json
+          benefit_library: Json
+          host_profile_id: string
+          subscription_tier: string
+        }[]
+      }
+      get_public_benefit_details: {
+        Args: { p_listing_id: string }
+        Returns: Json
+      }
+      get_public_housing_photos: {
+        Args: { p_listing_id: string }
+        Returns: {
+          role: string
+          source: string
+          url: string
+        }[]
+      }
+      get_unprocessed_notification_events: {
+        Args: { p_limit?: number }
+        Returns: {
+          actor_scope: string | null
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          host_profile_id: string | null
+          id: string
+          listing_id: string | null
+          occurred_at: string
+          properties: Json
+          seeker_profile_id: string | null
+          session_id: string | null
+          source_surface: string | null
+          subject_id: string | null
+          subject_type: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      restore_invite_credit: { Args: { p_invite_id: string }; Returns: boolean }
+      save_owned_benefit_detail: {
+        Args: { p_detail: Json; p_kind: string; p_listing_id: string }
+        Returns: {
+          benefit_details: Json
+          previous_detail: Json
+        }[]
+      }
+      set_my_housing_library_photo: {
+        Args: { p_role: string; p_url: string }
+        Returns: {
+          benefit_library: Json
+          host_profile_id: string
+          previous_url: string
+        }[]
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      transition_listing_claim: {
+        Args: {
+          p_actor_user_id: string
+          p_claim_id: string
+          p_review_notes?: string
+          p_to_status: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

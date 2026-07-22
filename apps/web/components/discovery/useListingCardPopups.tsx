@@ -59,10 +59,10 @@ export interface ListingCardHandlers {
   readonly onSchedule?: ListingCardActionHandler;
   /** Passthrough — admin_review Approve; present only when supplied. */
   readonly onApprove?: ListingCardActionHandler;
-  /** Passthrough — admin_review Warn; present only when supplied. */
-  readonly onWarn?: ListingCardActionHandler;
-  /** Passthrough — admin_review Remove; present only when supplied. */
-  readonly onRemove?: ListingCardActionHandler;
+  /** Passthrough — admin_review Hold; present only when supplied. */
+  readonly onHold?: ListingCardActionHandler;
+  /** Passthrough — admin_review Reject; present only when supplied. */
+  readonly onReject?: ListingCardActionHandler;
 }
 
 /**
@@ -84,8 +84,8 @@ export interface ListingCardPopupOverrides {
   readonly onSkip?: ListingCardActionHandler;
   readonly onSchedule?: ListingCardActionHandler;
   readonly onApprove?: ListingCardActionHandler;
-  readonly onWarn?: ListingCardActionHandler;
-  readonly onRemove?: ListingCardActionHandler;
+  readonly onHold?: ListingCardActionHandler;
+  readonly onReject?: ListingCardActionHandler;
 }
 
 export interface UseListingCardPopupsResult {
@@ -181,8 +181,8 @@ export function useListingCardPopups(
       onSkip: overrides?.onSkip,
       onSchedule: overrides?.onSchedule,
       onApprove: overrides?.onApprove,
-      onWarn: overrides?.onWarn,
-      onRemove: overrides?.onRemove,
+      onHold: overrides?.onHold,
+      onReject: overrides?.onReject,
     }),
     [
       overrides?.onOpen,
@@ -197,8 +197,8 @@ export function useListingCardPopups(
       overrides?.onSkip,
       overrides?.onSchedule,
       overrides?.onApprove,
-      overrides?.onWarn,
-      overrides?.onRemove,
+      overrides?.onHold,
+      overrides?.onReject,
       openQuickPeek,
       openHost,
       openHousing,

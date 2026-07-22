@@ -36,10 +36,12 @@ function installClient(rpcResult: {
   const query = {
     select: vi.fn(),
     eq: vi.fn(),
+    is: vi.fn(),
     maybeSingle: vi.fn().mockResolvedValue({ data: profileRow, error: null }),
   };
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
+  query.is.mockReturnValue(query);
 
   const client = {
     from: vi.fn().mockReturnValue(query),

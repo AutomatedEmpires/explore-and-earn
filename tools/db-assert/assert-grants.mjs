@@ -20,7 +20,11 @@ import { existsSync } from "node:fs"
 const here = dirname(fileURLToPath(import.meta.url))
 const sqlFiles = [
   join(here, "sql", "assert_rpc_grants.sql"),
+  join(here, "sql", "assert_profile_onboarding.sql"),
   join(here, "sql", "assert_housing_photo_library.sql"),
+  join(here, "sql", "assert_listing_coordinates.sql"),
+  join(here, "sql", "assert_seeker_application_conversations.sql"),
+  join(here, "sql", "assert_listing_host_status_transitions.sql"),
 ]
 
 const dbUrl = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL

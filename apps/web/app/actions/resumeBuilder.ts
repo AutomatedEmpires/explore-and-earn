@@ -70,14 +70,29 @@ export async function saveInfoAction(input: SaveInfoInput): Promise<ResumeAction
     const session = await getAuth();
     if (!session) return { ok: false, error: "unauthenticated" };
 
+    // Each resume step saves only the fields it owns. Preserve every omitted
+    // field so saving Skills cannot erase Info (and saving Info cannot erase
+    // Skills). Explicit blank values still clear the corresponding field.
     const infoInput: SeekerProfileInfoInput = {
-      displayName: input.displayName?.trim() ?? null,
-      location: input.location?.trim() ?? null,
-      seekingTimeline: input.seekingTimeline && VALID_TIMELINES.has(input.seekingTimeline)
-        ? input.seekingTimeline
-        : null,
-      desiredCategories: input.desiredCategories ?? [],
-      generalSkills: (input.generalSkills ?? []).slice(0, 10),
+      ...(input.displayName !== undefined
+        ? { displayName: input.displayName.trim() || null }
+        : {}),
+      ...(input.location !== undefined
+        ? { location: input.location.trim() || null }
+        : {}),
+      ...(input.seekingTimeline !== undefined
+        ? {
+            seekingTimeline: VALID_TIMELINES.has(input.seekingTimeline)
+              ? input.seekingTimeline
+              : null,
+          }
+        : {}),
+      ...(input.desiredCategories !== undefined
+        ? { desiredCategories: input.desiredCategories }
+        : {}),
+      ...(input.generalSkills !== undefined
+        ? { generalSkills: input.generalSkills.slice(0, 10) }
+        : {}),
     };
 
     const [infoResult, bioResult] = await Promise.all([

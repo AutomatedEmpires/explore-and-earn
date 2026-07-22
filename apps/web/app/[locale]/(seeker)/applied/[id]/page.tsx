@@ -17,6 +17,7 @@ import {
 
 import { BucketPage } from "../../../../../components/seeker";
 import { CATEGORY_ICON } from "../../../../../components/discovery";
+import { OpenConversationButton } from "../../../../../components/messaging/OpenConversationButton";
 import { WithdrawButton } from "../WithdrawButton";
 import styles from "./detail.module.css";
 
@@ -188,6 +189,13 @@ export default async function AppliedDetailPage({ params }: Props) {
             >
               View listing
             </Link>
+          ) : null}
+          {application.canStartConversation ? (
+            <OpenConversationButton
+              role="seeker"
+              applicationId={application.id}
+              label="Message host"
+            />
           ) : null}
           {canWithdraw ? (
             <WithdrawButton applicationId={application.id} />

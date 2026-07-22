@@ -34,27 +34,6 @@
 	width: 100%;
 }
 
-.messageBtn {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-8);
-	flex: 1;
-	justify-content: center;
-	padding: var(--space-12) var(--space-16);
-	background: var(--color-cta);
-	color: var(--color-cta-text);
-	font-family: var(--font-ui);
-	font-size: var(--type-body-size);
-	font-weight: var(--font-weight-semibold);
-	border-radius: var(--radius-button);
-	text-decoration: none;
-	transition: opacity var(--motion-fast) var(--ease-standard);
-}
-
-.messageBtn:hover {
-	opacity: 0.88;
-}
-
 .detailBtn {
 	display: inline-flex;
 	align-items: center;

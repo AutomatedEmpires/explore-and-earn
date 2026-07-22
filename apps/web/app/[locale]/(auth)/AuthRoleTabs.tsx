@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 
+import { safeInternalRedirect } from "../../../lib/authRedirect";
 import styles from "./auth.module.css";
 
 /** The two self-serve entry paths. Admin is a separate quiet affordance. */
@@ -15,13 +16,14 @@ interface Props {
   readonly redirectUrl?: string;
 }
 
-function hrefFor(
+export function authRoleHref(
   mode: Props["mode"],
   role: Exclude<AuthRole, "admin">,
   redirectUrl?: string,
 ): string {
   const params = new URLSearchParams({ role });
-  if (redirectUrl) params.set("redirect_url", redirectUrl);
+  const safeRedirectUrl = safeInternalRedirect(redirectUrl);
+  if (safeRedirectUrl) params.set("redirect_url", safeRedirectUrl);
   return `/${mode}?${params.toString()}`;
 }
 
@@ -38,7 +40,7 @@ export function AuthRoleTabs({ mode, active, redirectUrl }: Props) {
         role="tab"
         aria-selected={active === "seeker"}
         className={`${styles.roleTab}${active === "seeker" ? ` ${styles.roleTabActive}` : ""}`}
-        href={hrefFor(mode, "seeker", redirectUrl)}
+        href={authRoleHref(mode, "seeker", redirectUrl)}
       >
         <Icon name="nav.seek" size={18} aria-hidden />
         I&rsquo;m a seeker
@@ -47,7 +49,7 @@ export function AuthRoleTabs({ mode, active, redirectUrl }: Props) {
         role="tab"
         aria-selected={active === "host"}
         className={`${styles.roleTab}${active === "host" ? ` ${styles.roleTabActive}` : ""}`}
-        href={hrefFor(mode, "host", redirectUrl)}
+        href={authRoleHref(mode, "host", redirectUrl)}
       >
         <Icon name="nav.host" size={18} aria-hidden />
         I&rsquo;m a host

@@ -23,6 +23,7 @@ import {
 } from "@explore-and-earn/contracts";
 
 import { checkRateLimit } from "../../lib/rateLimit";
+import { parseListingCoordinateSubmission } from "../../lib/listingCoordinates";
 import { isAllowedStorageUrl } from "../../lib/storageUrl";
 
 // Host-controllable transitions. The authoritative gate is canTransitionListing
@@ -123,7 +124,11 @@ function resolvePayPeriod(raw: FormDataEntryValue | null): CompensationUnit | un
 function parseAmount(raw: FormDataEntryValue | null): number | null | undefined {
   if (typeof raw !== "string") return undefined;
   const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
+  // Missing means "this caller did not edit pay"; a present blank means the
+  // host explicitly cleared that bound. ListingForm always submits both
+  // inputs, so preserving null here lets the writer replace stale public pay
+  // and recompute pay evidence from the complete range.
+  if (trimmed.length === 0) return null;
   const value = Number(trimmed);
   return Number.isFinite(value) ? value : null;
 }
@@ -235,6 +240,19 @@ function readListingFields(formData: FormData): ListingWriteFields {
   return fields;
 }
 
+function applyListingCoordinates(
+  formData: FormData,
+  fields: ListingWriteFields,
+): string | null {
+  const submission = parseListingCoordinateSubmission(formData);
+  if (!submission.ok) return submission.error;
+  if (submission.coordinates !== undefined) {
+    fields.latitude = submission.coordinates?.lat ?? null;
+    fields.longitude = submission.coordinates?.lng ?? null;
+  }
+  return null;
+}
+
 export async function createListingAction(
   formData: FormData,
 ): Promise<{ ok: boolean; listingId?: string; error?: string }> {
@@ -258,6 +276,10 @@ export async function createListingAction(
   }
 
   const fields = readListingFields(formData);
+  const coordinateError = applyListingCoordinates(formData, fields);
+  if (coordinateError) {
+    return { ok: false, error: coordinateError };
+  }
   const oversized = oversizedFieldError(fields);
   if (oversized) {
     return { ok: false, error: oversized };
@@ -306,6 +328,10 @@ export async function updateListingAction(
   }
 
   const fields = readListingFields(formData);
+  const coordinateError = applyListingCoordinates(formData, fields);
+  if (coordinateError) {
+    return { ok: false, error: coordinateError };
+  }
   const oversized = oversizedFieldError(fields);
   if (oversized) {
     return { ok: false, error: oversized };

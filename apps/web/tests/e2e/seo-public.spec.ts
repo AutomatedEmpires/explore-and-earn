@@ -43,6 +43,7 @@ test.describe("public SEO + LLM surfaces", () => {
 		const body = await res.text();
 		expect(body).toContain("/faq");
 		expect(body).toContain("/about");
+		expect(body).toContain("/refunds");
 	});
 
 	test("homepage emits Organization + WebSite JSON-LD", async ({ page }) => {
@@ -51,6 +52,28 @@ test.describe("public SEO + LLM surfaces", () => {
 		const blocks = (await ldJsonText(page)).join("\n");
 		expect(blocks).toContain("Organization");
 		expect(blocks).toContain("WebSite");
+	});
+
+	test("generated icon and social image are public", async ({ page }) => {
+		for (const path of ["/icon", "/opengraph-image", "/favicon.ico"]) {
+			const response = await page.request.get(path);
+			expect(response.ok()).toBeTruthy();
+			expect(response.headers()["content-type"]).toContain("image/");
+		}
+
+		await page.goto("/");
+		await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+			"href",
+			/\/icon/,
+		);
+		await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+			"content",
+			/opengraph-image/,
+		);
+		await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute(
+			"content",
+			/opengraph-image/,
+		);
 	});
 
 	test("/faq renders questions and FAQPage JSON-LD", async ({ page }) => {
@@ -66,6 +89,14 @@ test.describe("public SEO + LLM surfaces", () => {
 		const response = await page.goto("/about");
 		expect(response?.ok()).toBeTruthy();
 		await expect(page.getByText(/housing, meals, and pay/i).first()).toBeVisible();
+	});
+
+	test("/refunds serves the public policy linked from the footer", async ({ page }) => {
+		const response = await page.goto("/refunds");
+		expect(response?.ok()).toBeTruthy();
+		await expect(
+			page.getByRole("heading", { level: 1, name: "Refund Policy" }),
+		).toBeVisible();
 	});
 
 	test("listing detail emits JobPosting + BreadcrumbList JSON-LD", async ({ page }) => {

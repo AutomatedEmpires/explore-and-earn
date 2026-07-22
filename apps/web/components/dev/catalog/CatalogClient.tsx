@@ -115,8 +115,8 @@ const CARD_HANDLERS = {
   onReport: noop,
   onSchedule: noop,
   onApprove: noop,
-  onWarn: noop,
-  onRemove: noop,
+  onHold: noop,
+  onReject: noop,
 } as const;
 
 // ── Component ─────────────────────────────────────────────────────────────────

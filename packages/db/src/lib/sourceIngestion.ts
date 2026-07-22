@@ -243,8 +243,9 @@ function parseIsoDate(value: string | undefined): string | null {
 }
 
 function parseCoordinate(value: string | undefined, min: number, max: number): number | null {
-	if (!value) return null
-	const parsed = Number(value)
+	const normalized = value?.trim()
+	if (!normalized || !/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(normalized)) return null
+	const parsed = Number(normalized)
 	return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null
 }
 
@@ -321,6 +322,13 @@ export function normalizeRecord(
 	// An end before the start is source noise — keep the start, drop the end
 	// (never reorder or guess).
 	const endsAt = endsAtRaw && beginsAt && endsAtRaw < beginsAt ? null : endsAtRaw
+	const location = text(pick("location"))
+	const latitude = parseCoordinate(pick("latitude"), -90, 90)
+	const longitude = parseCoordinate(pick("longitude"), -180, 180)
+	// A map point is one sourced fact, not two independent numbers. Persist it
+	// only when the provider supplied a complete bounded pair and a display
+	// location; otherwise keep the honest label-only/unspecified state.
+	const coherentPoint = location !== null && latitude !== null && longitude !== null
 
 	return {
 		ok: true,
@@ -330,9 +338,9 @@ export function normalizeRecord(
 			employerName: text(pick("employerName")),
 			externalId,
 			sourceUrl,
-			location: text(pick("location")),
-			latitude: parseCoordinate(pick("latitude"), -90, 90),
-			longitude: parseCoordinate(pick("longitude"), -180, 180),
+			location,
+			latitude: coherentPoint ? latitude : null,
+			longitude: coherentPoint ? longitude : null,
 			housing: parseStatedBenefit(pick("housing")),
 			housingDetails: text(pick("housingDetails")),
 			meals: parseStatedBenefit(pick("meals")),

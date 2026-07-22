@@ -14,7 +14,7 @@
     {
       "key": "professional",
       "name": "Explore & Earn — Professional",
-      "description": "Professional host plan — 5 listings, 5 invite credits, full analytics.",
+      "description": "Professional host plan — 5 listings, 10 invite credits, full analytics.",
       "prices": [
         { "envVar": "STRIPE_PRICE_PROFESSIONAL_MONTHLY", "lookupKey": "ee_professional_monthly", "unitAmountCents": 39900, "type": "recurring", "interval": "month" },
         { "envVar": "STRIPE_PRICE_PROFESSIONAL_YEARLY", "lookupKey": "ee_professional_yearly", "unitAmountCents": 399000, "type": "recurring", "interval": "year" }
@@ -23,7 +23,7 @@
     {
       "key": "enterprise",
       "name": "Explore & Earn — Enterprise",
-      "description": "Enterprise host plan — 10 listings, 10 invite credits, 1 team seat.",
+      "description": "Enterprise host plan — 10 listings, 20 invite credits, 1 team seat.",
       "prices": [
         { "envVar": "STRIPE_PRICE_ENTERPRISE_MONTHLY", "lookupKey": "ee_enterprise_monthly", "unitAmountCents": 74900, "type": "recurring", "interval": "month" },
         { "envVar": "STRIPE_PRICE_ENTERPRISE_YEARLY", "lookupKey": "ee_enterprise_yearly", "unitAmountCents": 749000, "type": "recurring", "interval": "year" }

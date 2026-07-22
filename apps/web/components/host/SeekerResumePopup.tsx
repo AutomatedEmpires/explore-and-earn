@@ -5,6 +5,7 @@ import type { SeekerResume } from "@explore-and-earn/db";
 
 import { PopupShell } from "../overlay/PopupShell";
 import { SeekerResumeCard } from "../seeker/SeekerResumeCard";
+import { OpenConversationButton } from "../messaging/OpenConversationButton";
 import styles from "./SeekerResumePopup.module.css";
 
 export interface SeekerResumePopupProps {
@@ -16,8 +17,9 @@ export interface SeekerResumePopupProps {
   readonly resume: SeekerResume | null;
   /** Optional link to the full applicant detail page */
   readonly detailHref?: string;
-  /** Optional link to start a message thread with this seeker */
-  readonly messageHref?: string;
+  /** Exact application relationship for the explicit message POST action. */
+  readonly messageApplicationId?: string;
+  readonly messageSeekerProfileId?: string;
 }
 
 export function SeekerResumePopup({
@@ -26,19 +28,23 @@ export function SeekerResumePopup({
   applicantName,
   resume,
   detailHref,
-  messageHref,
+  messageApplicationId,
+  messageSeekerProfileId,
 }: SeekerResumePopupProps) {
   const name = applicantName ?? "Applicant";
 
   const footer =
-    detailHref || messageHref ? (
+    detailHref || (messageApplicationId && messageSeekerProfileId) ? (
       <div className={styles.footerActions}>
-        {messageHref && (
-          <a className={styles.messageBtn} href={messageHref}>
-            <Icon name="action.message" size={20} aria-hidden />
-            Message {name}
-          </a>
-        )}
+        {messageApplicationId && messageSeekerProfileId ? (
+          <OpenConversationButton
+            role="host"
+            applicationId={messageApplicationId}
+            seekerProfileId={messageSeekerProfileId}
+            label={`Message ${name}`}
+            variant="primary"
+          />
+        ) : null}
         {detailHref && (
           <a className={styles.detailBtn} href={detailHref}>
             Full application

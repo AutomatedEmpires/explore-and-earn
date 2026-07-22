@@ -23,10 +23,11 @@ async function uploadToBucket(
   bucket: string,
   path: string,
   file: File,
+  upsert = true,
 ): Promise<string> {
   const client = authedClient(token);
   const { error } = await client.storage.from(bucket).upload(path, file, {
-    upsert: true,
+    upsert,
     cacheControl: "3600",
     contentType: file.type || undefined,
   });
@@ -123,7 +124,9 @@ export async function uploadCommunityPhotoStorage(
   file: File,
 ): Promise<string> {
   const path = `${seekerProfileId}/${filename}`;
-  await uploadToBucket(token, "community-photos", path, file);
+  // Community object names are UUIDs. INSERT-only uploads avoid requiring the
+  // broad Storage SELECT/UPDATE policies that an overwrite-capable upsert needs.
+  await uploadToBucket(token, "community-photos", path, file, false);
   return path;
 }
 

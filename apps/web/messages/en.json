@@ -259,6 +259,20 @@
 			}
 		}
 	},
+	"HostLocationPicker": {
+		"placeholder": "Wenatchee, WA",
+		"finding": "Finding…",
+		"findPin": "Find map pin",
+		"help": "Search for a town or region, then choose the matching result. Street addresses are not requested or stored.",
+		"matchesLabel": "Matching locations",
+		"confirmedPrefix": "Map pin confirmed for",
+		"removePin": "Remove map pin",
+		"noPin": "No map pin selected. The location name can still be saved.",
+		"noMatches": "No matching places found. Try a nearby town or broader region.",
+		"invalidQuery": "Enter a town, city, or region using 20 words or fewer.",
+		"unavailable": "Location search is temporarily unavailable. Try again.",
+		"attribution": "Location search by"
+	},
 	"Apply": {
 		"signInToApply": "Sign in to apply",
 		"editListing": "Edit listing",

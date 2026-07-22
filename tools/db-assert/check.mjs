@@ -24,6 +24,12 @@ const checks = [
   },
 ]
 
+function stripSqlComments(sql) {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\r\n]*/g, " ")
+}
+
 let hasFailure = false
 const fileContents = new Map()
 
@@ -41,13 +47,12 @@ for (const file of migrationFiles) {
 
 // ---------------------------------------------------------------------------
 // G-SEC-RPC - Lane A static guardrail for SECURITY DEFINER RPC execute grants.
-// The 8 SECURITY DEFINER functions in `public` must never be granted EXECUTE to
-// the anon role in any migration, and the final 023 migration must explicitly
-// revoke the default-privilege re-arm and the per-function grants. This catches
-// regressions in source before they reach a database; the authoritative live
-// check is the DB-connected assert-grants.mjs / sql/assert_rpc_grants.sql.
+// Every identity-sensitive function in `public` must never be granted EXECUTE
+// to anon/PUBLIC. The original 8 functions must also remain explicitly revoked
+// by historical migration 023. Newer functions own their grants in their own
+// migrations and are covered by the source-wide grant scan below.
 // ---------------------------------------------------------------------------
-const LOCKED_FUNCTIONS = [
+const HISTORICAL_LOCKED_FUNCTIONS = [
   "set_host_attestation",
   "get_clerk_user_id",
   "current_seeker_profile_ids",
@@ -56,6 +61,14 @@ const LOCKED_FUNCTIONS = [
   "current_conversation_ids",
   "enforce_listing_cover_asset",
   "enforce_listing_media_override",
+]
+const LOCKED_FUNCTIONS = [
+  ...HISTORICAL_LOCKED_FUNCTIONS,
+  "create_my_host_profile",
+  "ensure_my_seeker_profile",
+  "ensure_my_application_conversation",
+  "ensure_my_host_application_conversation",
+  "get_my_conversation_contexts",
 ]
 
 for (const [file, content] of fileContents) {
@@ -105,7 +118,7 @@ if (!securityMigration) {
       `G-SEC-RPC: ${securityMigration} must revoke default EXECUTE on functions from anon, authenticated, and public.`,
     )
   }
-  for (const fn of LOCKED_FUNCTIONS) {
+  for (const fn of HISTORICAL_LOCKED_FUNCTIONS) {
     const revokeRe = new RegExp(
       `revoke\\s+execute\\s+on\\s+function\\s+(?:public\\.)?${fn}\\s*\\([^)]*\\)\\s+from\\s+([^;]*);`,
       "i",
@@ -126,6 +139,56 @@ if (!securityMigration) {
         `G-SEC-RPC: ${securityMigration} REVOKE on ${fn} must include anon, authenticated, and public.`,
       )
     }
+  }
+}
+
+// Clerk-native onboarding must stay behind narrow, JWT-derived functions. A
+// direct profile-table INSERT grant would re-open identity/trust-field choice.
+const profileOnboardingMigration = migrationFiles.find((f) => /^073_.*\.sql$/.test(f))
+if (!profileOnboardingMigration) {
+  hasFailure = true
+  console.error("G-PROFILE-ONBOARDING: expected migration 073 to be present.")
+} else {
+  const sql = fileContents
+    .get(profileOnboardingMigration)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "create or replace function public.get_clerk_user_id()",
+    "when (auth.jwt() ->> 'sub') ~ '^user_[a-za-z0-9_-]+$'",
+    "alter table public.host_profiles alter column owner_user_id drop not null;",
+    "revoke insert on table public.host_profiles from anon, authenticated;",
+    "revoke insert on table public.seeker_profiles from anon, authenticated;",
+    "create or replace function public.create_my_host_profile",
+    "create or replace function public.ensure_my_seeker_profile",
+    "security definer",
+    "set search_path = ''",
+    "public.get_clerk_user_id()",
+    "message = 'profile_identity_required'",
+    "message = 'profile_identity_disabled'",
+    "array['farm', 'maritime', 'remote', 'seasonal']::text[]",
+    "category_scopes is not null",
+    "cardinality(category_scopes) between 1 and 4",
+    "validate constraint host_profiles_category_scopes_lane_check",
+    "v_slug := v_slug_base || '-' || v_profile_id::text",
+    "grant execute on function public.create_my_host_profile(text, text[], text) to authenticated, service_role;",
+    "grant execute on function public.ensure_my_seeker_profile() to authenticated, service_role;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-PROFILE-ONBOARDING: ${profileOnboardingMigration} is missing ${needle}`,
+      )
+    }
+  }
+  if (
+    /grant\s+insert[\s\S]*public\.(?:host_profiles|seeker_profiles)[\s\S]*authenticated/.test(sql)
+  ) {
+    hasFailure = true
+    console.error(
+      `G-PROFILE-ONBOARDING: ${profileOnboardingMigration} grants direct profile INSERT.`,
+    )
   }
 }
 
@@ -176,8 +239,10 @@ if (!housingMigration) {
     "housing_photo_roles_missing:",
     "housing_photo_roles_in_use:",
     "housing_photo_object_in_use",
-    "housing_photo_migration_paused_listings=%",
-    "set status = 'paused'",
+    "housing_photo_migration_restricted_listings=%",
+    "set status = case",
+    "when l.status = 'under_review' then 'draft'",
+    "else 'paused'",
     "create or replace function private.preserve_claim_benefit_details",
     "create trigger trg_listings_claim_benefit_ownership",
     "'benefit_details', coalesce(old.benefit_details, '{}'::jsonb)",
@@ -207,6 +272,149 @@ if (!housingMigration) {
   ) {
     hasFailure = true
     console.error(`G-HOUSING-PHOTOS: ${housingMigration} broadens privileges or revives rejected storage.`)
+  }
+}
+
+// A host-editable coordinate pair must stay complete and geographically
+// bounded even when a caller bypasses the application parser.
+const coordinateMigration = migrationFiles.find((f) => /^074_.*\.sql$/.test(f))
+if (!coordinateMigration) {
+  hasFailure = true
+  console.error("G-LISTING-COORDINATES: expected migration 074 to be present.")
+} else {
+  const sql = fileContents
+    .get(coordinateMigration)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "add constraint listings_coordinates_pair_check",
+    "(latitude is null and longitude is null) or (latitude is not null and longitude is not null)",
+    "validate constraint listings_coordinates_pair_check",
+    "add constraint listings_coordinates_bounds_check",
+    "latitude between -90 and 90",
+    "longitude between -180 and 180",
+    "validate constraint listings_coordinates_bounds_check",
+    "add constraint listings_coordinates_location_check",
+    "or nullif(btrim(location_display), '') is not null",
+    "validate constraint listings_coordinates_location_check",
+    "create or replace function private.preserve_listing_coordinate_truth()",
+    "new.location_display is distinct from old.location_display",
+    "claim_coordinate_snapshot_missing",
+    "new.latitude := (v_snapshot->>'latitude')::double precision",
+    "create trigger trg_listings_claim_coordinate_ownership",
+    "grant update (latitude, longitude) on public.listings to authenticated;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-LISTING-COORDINATES: ${coordinateMigration} is missing ${needle}`,
+      )
+    }
+  }
+}
+
+// Either participant may open a message thread only through a JWT-owned,
+// application-derived RPC. Direct client INSERT is closed completely; both
+// functions serialize against terminal lifecycle changes and retain the
+// application-scoped unique-index race gate.
+const seekerConversationMigration = migrationFiles.find((f) => /^075_.*\.sql$/.test(f))
+if (!seekerConversationMigration) {
+  hasFailure = true
+  console.error("G-SEEKER-CONVERSATION: expected migration 075 to be present.")
+} else {
+  const sql = fileContents
+    .get(seekerConversationMigration)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "create or replace function public.ensure_my_application_conversation",
+    "create or replace function public.ensure_my_host_application_conversation",
+    "create or replace function public.get_my_conversation_contexts",
+    "drop policy if exists conversations_insert_party on public.conversations;",
+    "revoke insert on table public.conversations from anon, authenticated;",
+    "returns uuid",
+    "security definer",
+    "set search_path = ''",
+    "public.get_clerk_user_id()",
+    "s.clerk_user_id = v_clerk_user_id",
+    "h.clerk_user_id = v_clerk_user_id",
+    "a.id = p_application_id",
+    "l.host_profile_id",
+    "v_application_status not in",
+    "on conflict (seeker_profile_id, host_profile_id, application_id)",
+    "where application_id is not null",
+    "cardinality(coalesce(p_conversation_ids, '{}'::uuid[])) between 1 and 200",
+    "a.id = c.application_id",
+    "a.seeker_profile_id = c.seeker_profile_id",
+    "l.host_profile_id = c.host_profile_id",
+    "c.listing_id is null or c.listing_id = a.listing_id",
+    "s.clerk_user_id = actor.clerk_user_id",
+    "h.clerk_user_id = actor.clerk_user_id",
+    "revoke execute on function public.ensure_my_application_conversation(uuid) from public, anon;",
+    "grant execute on function public.ensure_my_application_conversation(uuid) to authenticated, service_role;",
+    "revoke execute on function public.ensure_my_host_application_conversation(uuid) from public, anon;",
+    "grant execute on function public.ensure_my_host_application_conversation(uuid) to authenticated, service_role;",
+    "revoke execute on function public.get_my_conversation_contexts(uuid[]) from public, anon;",
+    "grant execute on function public.get_my_conversation_contexts(uuid[]) to authenticated, service_role;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-SEEKER-CONVERSATION: ${seekerConversationMigration} is missing ${needle}`,
+      )
+    }
+  }
+  const lifecycleLockCount = sql.match(/for share of a, l/g)?.length ?? 0
+  if (lifecycleLockCount < 2) {
+    hasFailure = true
+    console.error(
+      `G-SEEKER-CONVERSATION: ${seekerConversationMigration} must lock lifecycle rows in both RPCs.`,
+    )
+  }
+  if (
+    /grant\s+insert\s+on\s+(?:table\s+)?public\.conversations\s+to\s+[^;]*authenticated/.test(
+      sql,
+    ) ||
+    /create\s+policy[\s\S]*conversations[\s\S]*for\s+insert/.test(sql)
+  ) {
+    hasFailure = true
+    console.error(
+      `G-SEEKER-CONVERSATION: ${seekerConversationMigration} opens direct conversation INSERT.`,
+    )
+  }
+}
+
+// Service-only workflow functions must not inherit caller-controlled name
+// resolution, and the public community bucket must not expose cross-owner
+// object metadata.
+const databaseHardeningMigration = migrationFiles.find((f) => /^076_.*\.sql$/.test(f))
+if (!databaseHardeningMigration) {
+  hasFailure = true
+  console.error("G-DATABASE-HARDENING: expected migration 076 to be present.")
+} else {
+  const sql = stripSqlComments(fileContents.get(databaseHardeningMigration))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "alter function public.create_invite_with_credit(uuid, uuid, uuid, text, uuid, integer) set search_path = '';",
+    "alter function public.restore_invite_credit(uuid) set search_path = '';",
+    "alter function public.transition_listing_claim(uuid, text, text, text) set search_path = '';",
+    "alter function public.convert_claimed_listing(uuid, text, uuid, jsonb) set search_path = '';",
+    "alter function public.claim_notification_deliveries(text, integer, integer) set search_path = '';",
+    "alter function public.get_unprocessed_notification_events(integer) set search_path = '';",
+    'drop policy if exists "community_photos_authenticated_select" on storage.objects;',
+    'create policy "community_photos_owner_select" on storage.objects for select to authenticated using (',
+    "bucket_id = 'community-photos' and (storage.foldername(name))[1] in ( select sp.id::text from public.seeker_profiles sp where sp.clerk_user_id = auth.jwt() ->> 'sub' )",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-DATABASE-HARDENING: ${databaseHardeningMigration} is missing ${needle}`,
+      )
+    }
   }
 }
 

@@ -21,23 +21,19 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 // Cloudflare Turnstile (Clerk bot protection).
 //
 // TO PROMOTE TO ENFORCING (Phase 2, do NOT do blindly):
-//   1. Add the PRODUCTION Clerk Frontend-API host to script-src + connect-src
-//      (e.g. https://clerk.<yourdomain>.com — it is domain-specific and is NOT
-//      under *.clerk.com, so an enforcing policy without it white-screens the
-//      whole app).
-//   2. Deploy report-only, then watch /api/csp-report (Sentry) for a real
+//   1. Deploy report-only, then watch /api/csp-report (Sentry) for a real
 //      traffic window across sign-in, map, swipe, listing, billing.
-//   3. Only then rename this key to "Content-Security-Policy".
+//   2. Only then rename this key to "Content-Security-Policy".
 const CSP_DIRECTIVES = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://*.clerk.com https://*.clerk.accounts.dev https://js.clerk.dev https://challenges.cloudflare.com https://browser.sentry-cdn.com https://us.posthog.com https://us-assets.i.posthog.com",
+  "script-src 'self' 'unsafe-inline' https://clerk.exploreandearn.com https://*.clerk.com https://*.clerk.accounts.dev https://js.clerk.dev https://challenges.cloudflare.com https://browser.sentry-cdn.com https://us.posthog.com https://us-assets.i.posthog.com",
   "style-src 'self' 'unsafe-inline' https://api.tiles.mapbox.com https://api.mapbox.com",
   "img-src 'self' blob: data: https://img.clerk.com https://*.supabase.co https://*.mapbox.com https://res.cloudinary.com",
   // res.cloudinary.com: the visual-assets layer fetch()es illustration SVGs at
   // runtime (packages/ui/src/visual-assets/useStreamlineSvg.ts) — img-src alone
   // does not cover fetch(), so without this the illustrations break the moment
   // CSP switches from report-only to enforcing.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.com https://*.clerk.accounts.dev https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://eu.posthog.com https://sentry.io https://*.ingest.sentry.io https://res.cloudinary.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.exploreandearn.com https://*.clerk.com https://*.clerk.accounts.dev https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://eu.posthog.com https://sentry.io https://*.ingest.sentry.io https://res.cloudinary.com",
   "font-src 'self' data:",
   "frame-src 'self' https://*.clerk.accounts.dev https://accounts.clerk.dev https://challenges.cloudflare.com https://accounts.google.com",
   "worker-src 'self' blob:",
@@ -83,6 +79,17 @@ const nextConfig: NextConfig = {
     // for @phosphor-icons/react (importing ~100 icons from its index must not
     // pull the full ~9,000-icon set) and for the @explore-and-earn/ui barrel.
     optimizePackageImports: ["@phosphor-icons/react", "@explore-and-earn/ui"],
+  },
+  async redirects() {
+    return [
+      {
+        // Some user agents still request the conventional path directly even
+        // when rel=icon points at the generated metadata route.
+        source: "/favicon.ico",
+        destination: "/icon",
+        permanent: true,
+      },
+    ];
   },
   async headers() {
     return [

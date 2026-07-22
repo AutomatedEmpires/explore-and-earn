@@ -172,6 +172,11 @@ describe("Organization + BreadcrumbList", () => {
     expect(org["@type"]).toBe("Organization");
     expect(org.url).toBe(BASE);
     expect(org.name).toBe("Explore & Earn");
+    expect(org.sameAs).toEqual([
+      "https://facebook.com/exploreandearn",
+      "https://instagram.com/exploreandearn",
+      "https://threads.net/@exploreandearn",
+    ]);
   });
 
   it("breadcrumbs number positions from 1 in order", () => {

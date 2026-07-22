@@ -39,6 +39,7 @@ function recordingBuilder(result: { data?: unknown; error?: unknown }) {
     "order",
     "limit",
     "range",
+    "abortSignal",
   ]) {
     chain[m] = record(m);
   }
@@ -67,7 +68,7 @@ vi.mock("../src/queries/passedListings.js", () => ({
   getPassedListingIds: vi.fn(async () => [] as string[]),
 }));
 
-import { searchListings } from "../src/queries/listings.js";
+import { getPublicListings, searchListings } from "../src/queries/listings.js";
 
 function callsFor(method: string): Call[] {
   return calls.filter((c) => c.method === method);
@@ -193,5 +194,22 @@ describe("searchListings filter semantics", () => {
       recordingBuilder({ data: null, error: { message: "down" } }),
     );
     await expect(searchListings({})).rejects.toThrow(/searchListings: down/);
+  });
+});
+
+describe("getPublicListings dependency bounds", () => {
+  it("passes an optional abort signal to the public feed query", async () => {
+    const signal = new AbortController().signal;
+
+    await getPublicListings(1, signal);
+
+    expect(callsFor("limit")[0]?.args).toEqual([1]);
+    expect(callsFor("abortSignal")[0]?.args).toEqual([signal]);
+  });
+
+  it("does not create an abort modifier for existing callers", async () => {
+    await getPublicListings(1);
+
+    expect(callsFor("abortSignal")).toHaveLength(0);
   });
 });

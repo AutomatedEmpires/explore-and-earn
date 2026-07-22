@@ -13,6 +13,7 @@ import {
 
 import {
   approveListingAction,
+  holdListingAction,
   rejectListingAction,
 } from "../../app/actions/admin";
 import { formatAdminDate, humanizeToken, listingStatusVariant } from "./status";
@@ -352,6 +353,7 @@ export function AdminListingsTable({
           {visible.map((listing) => {
             const busy = isPending && pendingId === listing.id;
             const review = isReviewState(listing.status);
+            const isAwaitingReview = listing.status === "under_review";
             const published = listing.publishedAt !== null;
             const category = humanizeToken(listing.category);
             return (
@@ -420,36 +422,51 @@ export function AdminListingsTable({
                     </span>
                   </div>
                   <div className={styles.actions}>
-                    <Button
-                      variant="primary"
-                      disabled={busy}
-                      onClick={() =>
-                        runAction(listing.id, () =>
-                          approveListingAction(listing.id),
-                        )
-                      }
-                    >
-                      Approve
-                    </Button>
-                    <div className={styles.actionsSecondary}>
+                    {isAwaitingReview ? (
                       <Button
-                        variant="ghost"
+                        variant="primary"
                         disabled={busy}
                         onClick={() =>
                           runAction(listing.id, () =>
-                            rejectListingAction(listing.id),
+                            approveListingAction(listing.id),
                           )
                         }
                       >
-                        Reject
+                        Approve
                       </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => router.push(`/listings/${listing.id}`)}
-                      >
-                        Review
-                      </Button>
-                    </div>
+                    ) : null}
+                    {isAwaitingReview ? (
+                      <div className={styles.actionsSecondary}>
+                        <Button
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() =>
+                            runAction(listing.id, () =>
+                              holdListingAction(listing.id),
+                            )
+                          }
+                        >
+                          Hold
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            runAction(listing.id, () =>
+                              rejectListingAction(listing.id),
+                            )
+                          }
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    ) : null}
+                    <Button
+                      variant="secondary"
+                      onClick={() => router.push(`/listings/${listing.id}`)}
+                    >
+                      Review
+                    </Button>
                   </div>
                 </div>
               </li>

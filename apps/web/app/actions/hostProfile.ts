@@ -13,9 +13,11 @@ import {
 } from "@explore-and-earn/db"
 import {
 	HOUSING_PHOTO_ROLES,
+	MARKETPLACE_LANES,
 	sanitizeHostBenefitLibrary,
 	type HostBenefitLibrary,
 	type HousingPhotoRole,
+	type MarketplaceLane,
 } from "@explore-and-earn/contracts"
 import { revalidatePath, revalidateTag } from "next/cache"
 
@@ -110,15 +112,53 @@ async function cleanupReplacedHousingPhotos(
  * Server action: create a host profile for the authenticated user.
  *
  * Auth is enforced here (Clerk) before any DB work; the Supabase-compatible JWT
- * is minted via Clerk's native Supabase integration and handed to the db layer,
- * along with the verified `userId` used as the app-level ownership scope.
+ * is minted via Clerk's native Supabase integration and handed to migration
+ * 073's narrow RPC. The RPC derives identity from the JWT; the client cannot
+ * choose a Clerk id, trust state, subscription tier, or lifecycle field.
  */
+export interface CreateHostProfileActionInput {
+	readonly companyName: string
+	readonly categoryScopes: readonly MarketplaceLane[]
+	readonly primaryLocationName?: string | null
+}
+
+const HOST_COMPANY_NAME_MAX = 160
+const HOST_LOCATION_NAME_MAX = 200
+
 async function createHostProfileActionImpl(
-	companyName: string,
+	input: CreateHostProfileActionInput,
 ): Promise<{ ok: boolean; error?: string }> {
-	const trimmed = companyName.trim()
-	if (!trimmed) {
+	const companyName =
+		typeof input?.companyName === "string" ? input.companyName.trim() : ""
+	if (!companyName) {
 		return { ok: false, error: "name_required" }
+	}
+	if (companyName.length > HOST_COMPANY_NAME_MAX) {
+		return { ok: false, error: "name_too_long" }
+	}
+
+	const allowedCategories = new Set<string>(MARKETPLACE_LANES)
+	const categoryScopes = Array.from(
+		new Set(
+			(Array.isArray(input?.categoryScopes) ? input.categoryScopes : []).filter(
+				(value): value is MarketplaceLane =>
+					typeof value === "string" && allowedCategories.has(value),
+			),
+		),
+	)
+	if (categoryScopes.length === 0) {
+		return { ok: false, error: "lanes_required" }
+	}
+
+	const primaryLocationName =
+		typeof input?.primaryLocationName === "string"
+			? input.primaryLocationName.trim() || null
+			: null
+	if (
+		primaryLocationName !== null &&
+		primaryLocationName.length > HOST_LOCATION_NAME_MAX
+	) {
+		return { ok: false, error: "location_too_long" }
 	}
 
 	const { userId, getToken } = await auth()
@@ -131,9 +171,18 @@ async function createHostProfileActionImpl(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const result = await createHostProfile(token, userId, trimmed)
+	const result = await createHostProfile(token, {
+		companyName,
+		categoryScopes,
+		primaryLocationName,
+	})
 	if (!result.ok) {
-		return { ok: false, error: "create_failed" }
+		return {
+			ok: false,
+			error: result.error?.includes("profile_identity_disabled")
+				? "account_unavailable"
+				: "create_failed",
+		}
 	}
 
 	revalidatePath("/host")
@@ -141,16 +190,16 @@ async function createHostProfileActionImpl(
 }
 
 export async function createHostProfileAction(
-	companyName: string,
+	input: CreateHostProfileActionInput,
 ): Promise<{ ok: boolean; error?: string }> {
 	try {
-		return await createHostProfileActionImpl(companyName)
+		return await createHostProfileActionImpl(input)
 	} catch (error) {
 		reportError(error, {
 			action: "createHostProfileAction",
 			userId: await currentUserId(),
 		})
-		throw error
+		return { ok: false, error: "create_failed" }
 	}
 }
 
@@ -166,7 +215,7 @@ export interface UpdateHostProfileInput {
 	socialLinks?: SocialLinks
 	housingOfferedGenerally?: boolean
 	mealsOfferedGenerally?: boolean
-	categoryScopes?: string[]
+	categoryScopes?: MarketplaceLane[]
 	benefitLibrary?: HostBenefitLibrary
 }
 

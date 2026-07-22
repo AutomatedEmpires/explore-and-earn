@@ -98,6 +98,117 @@ test.describe("public surfaces (guest)", () => {
     await expect(page).toHaveTitle(/page not found/i);
     await expect(page.getByText(/couldn.t load this listing/i)).toHaveCount(0);
   });
+
+  test("signed-out host onboarding preserves the host auth lane", async ({
+    page,
+  }) => {
+    await page.goto("/host/onboarding");
+
+    await expect(page).toHaveURL(/\/sign-in\?role=host&redirect_url=/);
+    await expect(page.getByRole("tab", { name: /i.m a host/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByRole("link", { name: /create an account/i })).toHaveAttribute(
+      "href",
+      "/sign-up?role=host&redirect_url=%2Fhost%2Fonboarding",
+    );
+  });
+
+  test("signed-out role funnels preserve the exact requested path", async ({
+    page,
+  }) => {
+    await page.goto("/host/messages?view=unread");
+    let redirected = new URL(page.url());
+    expect(redirected.pathname).toBe("/sign-in");
+    expect(redirected.searchParams.get("role")).toBe("host");
+    expect(redirected.searchParams.get("redirect_url")).toBe(
+      "/host/messages?view=unread",
+    );
+
+    await page.goto("/onboarding/skills?source=resume");
+    redirected = new URL(page.url());
+    expect(redirected.pathname).toBe("/sign-in");
+    expect(redirected.searchParams.get("role")).toBe("seeker");
+    expect(redirected.searchParams.get("redirect_url")).toBe(
+      "/onboarding/skills?source=resume",
+    );
+
+    const claimPath = "/claim/00000000-0000-4000-8000-000000000001";
+    await page.goto(claimPath);
+    redirected = new URL(page.url());
+    expect(redirected.pathname).toBe("/sign-in");
+    expect(redirected.searchParams.get("role")).toBe("host");
+    expect(redirected.searchParams.get("redirect_url")).toBe(claimPath);
+
+    const createAccount = page.getByRole("link", {
+      name: /create an account/i,
+    });
+    const claimSignUpHref = await createAccount.getAttribute("href");
+    expect(claimSignUpHref).not.toBeNull();
+    let authLink = new URL(claimSignUpHref!, BASE);
+    expect(authLink.pathname).toBe("/sign-up");
+    expect(authLink.searchParams.get("role")).toBe("host");
+    expect(authLink.searchParams.get("redirect_url")).toBe(claimPath);
+
+    await page.goto(claimSignUpHref!);
+    const signIn = page.getByRole("link", {
+      name: /already have an account/i,
+    });
+    const claimSignInHref = await signIn.getAttribute("href");
+    expect(claimSignInHref).not.toBeNull();
+    authLink = new URL(claimSignInHref!, BASE);
+    expect(authLink.pathname).toBe("/sign-in");
+    expect(authLink.searchParams.get("role")).toBe("host");
+    expect(authLink.searchParams.get("redirect_url")).toBe(claimPath);
+  });
+
+  test("auth entrypoints strip external return targets before Clerk renders", async ({
+    page,
+    request,
+  }) => {
+    const unsafeSignIn = await request.get(
+      `${BASE}/sign-in?role=host&redirect_url=https%3A%2F%2Fattacker.example`,
+      { maxRedirects: 0 },
+    );
+    expect(unsafeSignIn.status()).toBe(307);
+    expect(new URL(unsafeSignIn.headers().location, BASE).toString()).toBe(
+      `${BASE}/sign-in?role=host`,
+    );
+
+    await page.goto(
+      "/sign-in?role=host&redirect_url=https%3A%2F%2Fattacker.example",
+    );
+    await expect(page).toHaveURL(`${BASE}/sign-in?role=host`);
+    let canonical = new URL(page.url());
+    expect(canonical.pathname).toBe("/sign-in");
+    expect(canonical.searchParams.get("role")).toBe("host");
+    expect(canonical.searchParams.has("redirect_url")).toBe(false);
+    await expect(
+      page.getByRole("link", { name: /create an account/i }),
+    ).toHaveAttribute("href", "/sign-up?role=host");
+
+    const unsafeSignUp = await request.get(
+      `${BASE}/sign-up?role=host&redirect_url=%2F%2Fattacker.example`,
+      { maxRedirects: 0 },
+    );
+    expect(unsafeSignUp.status()).toBe(307);
+    expect(new URL(unsafeSignUp.headers().location, BASE).toString()).toBe(
+      `${BASE}/sign-up?role=host`,
+    );
+
+    await page.goto(
+      "/sign-up?role=host&redirect_url=%2F%2Fattacker.example",
+    );
+    await expect(page).toHaveURL(`${BASE}/sign-up?role=host`);
+    canonical = new URL(page.url());
+    expect(canonical.pathname).toBe("/sign-up");
+    expect(canonical.searchParams.get("role")).toBe("host");
+    expect(canonical.searchParams.has("redirect_url")).toBe(false);
+    await expect(
+      page.getByRole("link", { name: /already have an account/i }),
+    ).toHaveAttribute("href", "/sign-in?role=host");
+  });
 });
 
 test.describe("keyless auth fails closed", () => {

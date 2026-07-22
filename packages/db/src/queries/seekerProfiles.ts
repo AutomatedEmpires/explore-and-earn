@@ -141,9 +141,10 @@ export async function getSeekerProfile(
 }
 
 /**
- * Upsert the authed seeker's profile by clerk_user_id. A brand-new seeker may
- * have no row yet, so we look up first and insert when missing. Only keys
- * present on `update` are written (every onboarding field is skippable).
+ * Save the authed seeker's profile. Migration 073's narrow RPC creates the
+ * caller's minimal row when the Clerk webhook is delayed, then this function
+ * updates only the existing owner-writable columns through ordinary RLS.
+ * The client never receives direct INSERT privilege or chooses an identity.
  *
  * Best-effort: returns { ok: false, error } rather than throwing.
  */
@@ -174,39 +175,28 @@ export async function saveSeekerProfile(
     if (update.seekingTimeline !== undefined) patch.seeking_timeline = update.seekingTimeline;
     if (update.relativeLocation !== undefined) patch.relative_location = update.relativeLocation;
 
-    const { data: existing, error: lookupError } = await db
+    const { data: ensuredId, error: ensureError } = await db.rpc(
+      "ensure_my_seeker_profile",
+    );
+    if (ensureError) return { ok: false, error: ensureError.message };
+    if (typeof ensuredId !== "string" || ensuredId.length === 0) {
+      return { ok: false, error: "seeker_profile_create_failed" };
+    }
+
+    if (Object.keys(patch).length === 0) return { ok: true };
+
+    // Request the updated id back. PostgREST otherwise reports a zero-row RLS
+    // or deletion race as a successful UPDATE with no error.
+    const { data: saved, error } = await db
       .from(SEEKER_PROFILES)
-      .select("id")
+      .update(patch)
+      .eq("id", ensuredId)
       .eq("clerk_user_id", clerkUserId)
       .is("deleted_at", null)
+      .select("id")
       .maybeSingle();
-
-    if (lookupError) {
-      return { ok: false, error: lookupError.message };
-    }
-
-    const existingId =
-      existing && (existing as Record<string, unknown>).id
-        ? String((existing as Record<string, unknown>).id)
-        : null;
-
-    if (existingId) {
-      const { error } = await db
-        .from(SEEKER_PROFILES)
-        .update(patch)
-        .eq("id", existingId);
-      if (error) {
-        return { ok: false, error: error.message };
-      }
-      return { ok: true };
-    }
-
-    const { error } = await db
-      .from(SEEKER_PROFILES)
-      .insert({ clerk_user_id: clerkUserId, ...patch });
-    if (error) {
-      return { ok: false, error: error.message };
-    }
+    if (error) return { ok: false, error: error.message };
+    if (!saved) return { ok: false, error: "seeker_profile_update_failed" };
     return { ok: true };
   } catch (caught) {
     return {

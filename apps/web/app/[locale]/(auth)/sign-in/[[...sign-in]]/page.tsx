@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { SignIn } from "@clerk/nextjs";
 import { Icon } from "@explore-and-earn/ui";
 
+import { safeInternalRedirect } from "../../../../../lib/authRedirect";
 import styles from "../../auth.module.css";
 import { clerkAppearance } from "../../clerk-appearance";
 import { KeylessAuthNotice, isClerkKeyless } from "../../keyless-notice";
-import { AuthRoleTabs, type AuthRole } from "../../AuthRoleTabs";
+import {
+  AuthRoleTabs,
+  authRoleHref,
+  type AuthRole,
+} from "../../AuthRoleTabs";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -34,8 +40,19 @@ export default async function SignInPage({ searchParams }: Props) {
 
   // Route intent only — Clerk wiring is untouched; we just pass where to land
   // and where its "create account" link should go, carrying the chosen role.
-  const redirectTo = redirect_url ?? DEFAULT_REDIRECT[role];
-  const signUpUrl = role === "admin" ? "/sign-up" : `/sign-up?role=${role}`;
+  const safeRedirectUrl = safeInternalRedirect(redirect_url);
+  if (redirect_url !== undefined && !safeRedirectUrl) {
+    redirect(
+      role === "admin"
+        ? "/sign-in?role=admin"
+        : authRoleHref("sign-in", role),
+    );
+  }
+  const redirectTo = safeRedirectUrl ?? DEFAULT_REDIRECT[role];
+  const signUpUrl =
+    role === "admin"
+      ? "/sign-up"
+      : authRoleHref("sign-up", role, safeRedirectUrl);
 
   return (
     <main className={styles.authPage}>
@@ -50,7 +67,7 @@ export default async function SignInPage({ searchParams }: Props) {
             Admin access
           </span>
         ) : (
-          <AuthRoleTabs mode="sign-in" active={role} redirectUrl={redirect_url} />
+          <AuthRoleTabs mode="sign-in" active={role} redirectUrl={safeRedirectUrl} />
         )}
 
         <p className={styles.tagline}>{TAGLINE[role]}</p>

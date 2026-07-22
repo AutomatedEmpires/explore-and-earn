@@ -36,12 +36,22 @@ export default function OnboardingPrefsPage() {
   const router = useRouter();
   const [locationPref, setLocationPref] = useState<LocationPref | null>(null);
   const [housingPref, setHousingPref] = useState<HousingPref | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function goNext() {
     startTransition(async () => {
-      await saveOnboardingStep({ locationPref, housingPref });
-      router.push("/onboarding/skills");
+      setSaveError(null);
+      try {
+        const result = await saveOnboardingStep({ locationPref, housingPref });
+        if (!result.ok) {
+          setSaveError("We couldn’t save your preferences. Please try again.");
+          return;
+        }
+        router.push("/onboarding/skills");
+      } catch {
+        setSaveError("We couldn’t save your preferences. Please try again.");
+      }
     });
   }
 
@@ -75,6 +85,7 @@ export default function OnboardingPrefsPage() {
                     : styles.option
                 }
                 aria-pressed={locationPref === option.value}
+                disabled={pending}
                 onClick={() =>
                   setLocationPref((current) =>
                     current === option.value ? null : option.value,
@@ -100,6 +111,7 @@ export default function OnboardingPrefsPage() {
                     : styles.option
                 }
                 aria-pressed={housingPref === option.value}
+                disabled={pending}
                 onClick={() =>
                   setHousingPref((current) =>
                     current === option.value ? null : option.value,
@@ -113,6 +125,11 @@ export default function OnboardingPrefsPage() {
           </div>
         </fieldset>
       </div>
+      {saveError ? (
+        <p className={styles.error} role="alert">
+          {saveError}
+        </p>
+      ) : null}
       <footer className={styles.footer}>
         <button
           type="button"

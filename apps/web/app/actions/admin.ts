@@ -1,14 +1,16 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import {
   adminApproveListing,
   adminCloseListing,
+  adminHoldListing,
   adminSetHostAttestationStatus,
   clearHostFlag,
 } from "@explore-and-earn/db";
 
 import { isCurrentUserAdmin } from "../../lib/admin";
+import { LISTINGS_CACHE_TAG } from "../../lib/serverCache";
 import { reportError } from "../../lib/sentry";
 import { computeAndStoreMatchesForListing } from "../../services/matching";
 
@@ -52,6 +54,7 @@ async function approveListingActionImpl(
     reportError(error, { action: "approveListingAction:computeMatches" });
   }
 
+  revalidateTag(LISTINGS_CACHE_TAG);
   revalidatePath("/listings");
   revalidatePath(`/listings/${listingId}`);
   revalidatePath("/admin");
@@ -69,6 +72,32 @@ export async function approveListingAction(
   }
 }
 
+async function holdListingActionImpl(listingId: string): Promise<ActionResult> {
+  const denied = await guardAdmin();
+  if (denied) return denied;
+  if (!listingId) return { ok: false, error: "Missing listing id." };
+
+  const result = await adminHoldListing(SERVICE_ROLE_KEY, listingId);
+  if (!result.ok) return result;
+
+  revalidateTag(LISTINGS_CACHE_TAG);
+  revalidatePath("/listings");
+  revalidatePath(`/listings/${listingId}`);
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function holdListingAction(
+  listingId: string,
+): Promise<ActionResult> {
+  try {
+    return await holdListingActionImpl(listingId);
+  } catch (error) {
+    reportError(error, { action: "holdListingAction" });
+    throw error;
+  }
+}
+
 async function rejectListingActionImpl(
   listingId: string,
   reason?: string,
@@ -80,6 +109,7 @@ async function rejectListingActionImpl(
   const result = await adminCloseListing(SERVICE_ROLE_KEY, listingId, reason);
   if (!result.ok) return result;
 
+  revalidateTag(LISTINGS_CACHE_TAG);
   revalidatePath("/listings");
   revalidatePath(`/listings/${listingId}`);
   revalidatePath("/admin");

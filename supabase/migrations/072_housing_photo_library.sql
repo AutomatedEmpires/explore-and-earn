@@ -3,6 +3,12 @@
 
 begin;
 
+-- Fail quickly if another writer is holding the rollout tables, and bound the
+-- migration transaction itself. The deploy workflow can be retried safely;
+-- waiting indefinitely while Production is partially cut over is not safe.
+set local lock_timeout = '15s';
+set local statement_timeout = '10min';
+
 -- Freeze every table participating in the cross-row preflight before changing
 -- schema or scanning evidence. SHARE ROW EXCLUSIVE blocks concurrent writers
 -- while allowing ordinary reads and is held until this transaction commits.
@@ -306,16 +312,23 @@ $$;
 -- Existing deployments necessarily have an empty host library because this
 -- migration introduces the column. Do not let that make the upgrade
 -- impossible, and do not silently grandfather an unsupported public claim:
--- atomically pause every affected verified listing while the participating
--- tables are still locked. Draft/paused rows remain private and the triggers
--- installed below require any persisted role URL to be repaired on its next
--- write.
+-- atomically restrict every affected verified listing while the participating
+-- tables are still locked. A live listing has already passed moderation, so it
+-- may return to paused and resume after its photos are repaired. An
+-- under-review listing has not passed moderation and must return to draft;
+-- moving both states to paused would let migration 077's paused -> live host
+-- transition bypass the outstanding admin decision. Draft/paused rows remain
+-- private and the triggers installed below require any persisted role URL to
+-- be repaired on its next write.
 do $$
 declare
-  v_paused_count integer;
+  v_restricted_count integer;
 begin
   update public.listings l
-     set status = 'paused'
+     set status = case
+       when l.status = 'under_review' then 'draft'
+       else 'paused'
+     end
    where l.provenance <> 'sourced'
      and l.status in ('under_review', 'live')
      and l.housing_included = true
@@ -333,8 +346,8 @@ begin
        1
      ), 0) > 0;
 
-  get diagnostics v_paused_count = row_count;
-  raise notice 'housing_photo_migration_paused_listings=%', v_paused_count;
+  get diagnostics v_restricted_count = row_count;
+  raise notice 'housing_photo_migration_restricted_listings=%', v_restricted_count;
 end;
 $$;
 

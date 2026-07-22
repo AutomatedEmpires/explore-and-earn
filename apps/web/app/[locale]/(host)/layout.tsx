@@ -65,11 +65,15 @@ export default async function HostLayout({
 
   const { userId } = await auth();
   if (!userId) {
-    redirect("/sign-in");
+    redirect(
+      `/sign-in?role=host&redirect_url=${encodeURIComponent("/host")}`,
+    );
   }
   const token = await getSupabaseToken();
   if (!token) {
-    redirect("/sign-in");
+    redirect(
+      `/sign-in?role=host&redirect_url=${encodeURIComponent("/host")}`,
+    );
   }
   const [hostProfile, unreadMessages] = await Promise.all([
     cachedHostProfile(token, userId),

@@ -14,6 +14,7 @@ export const HOST_DASHBOARD_SEGMENTS = [
   "analytics",
   "announcements",
   "applicants",
+  "assistant",
   "billing",
   "help",
   "invites",

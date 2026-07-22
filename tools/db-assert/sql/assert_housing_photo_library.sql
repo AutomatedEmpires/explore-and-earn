@@ -77,7 +77,8 @@ values
   ('20000000-0000-0000-0000-000000000002', 'housing-owner-2@example.test', now(), now());
 
 insert into public.host_profiles (
-  id, owner_user_id, clerk_user_id, company_name, slug, public_status
+  id, owner_user_id, clerk_user_id, company_name, slug, category_scopes,
+  public_status
 )
 values
   (
@@ -86,6 +87,7 @@ values
     'user_housing_owner_1',
     'Housing Host One',
     'housing-host-one',
+    array['farm'],
     'active'
   ),
   (
@@ -94,6 +96,7 @@ values
     'user_housing_owner_2',
     'Housing Host Two',
     'housing-host-two',
+    array['seasonal'],
     'active'
   );
 
@@ -239,6 +242,7 @@ begin
 end;
 $$;
 reset role;
+set local request.jwt.claims = '{"sub":"service_role","role":"service_role"}';
 
 insert into public.listings (
   id, host_profile_id, title, category, status,
@@ -825,6 +829,7 @@ begin
 end;
 $$;
 reset role;
+set local request.jwt.claims = '{"sub":"service_role","role":"service_role"}';
 
 update public.listings
    set benefit_details = '{}'::jsonb
@@ -929,6 +934,7 @@ reset role;
 -- Anonymous users cannot read raw defaults, even though BOTH host rows are now
 -- public through live listings. They receive only one listing's effective set.
 set local role anon;
+set local request.jwt.claims = '{"role":"anon"}';
 do $$
 begin
   begin

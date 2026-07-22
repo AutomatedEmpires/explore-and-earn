@@ -1,6 +1,10 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  MARKETPLACE_CATEGORIES,
+  type OpportunityCategory,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 
@@ -8,13 +12,15 @@ import { authedClient } from "../client";
  * Messaging data access — scoped seeker <-> host conversations + transcripts.
  *
  * SECURITY: Row Level Security IS enabled on `conversations` / `messages`
- * (migration 048) and hardened in migration 050 — participant-scoped policies
+ * (migration 048) and hardened in migrations 050/075 — participant policies
  * plus column-level UPDATE grants (only `messages.read_at` and
- * `conversations.last_message_at` are writable by `authenticated`), and a
- * conversation INSERT policy that requires a real host<->seeker application
- * relationship. `authedClient()` talks to PostgREST with the anon key plus the
- * caller's Clerk JWT, which resolves to the `authenticated` role under those
- * policies. We ALSO scope every function in application code as defense in depth:
+ * `conversations.last_message_at` are writable by `authenticated`). Direct
+ * conversation INSERT is closed; narrow seeker/host RPCs derive every
+ * participant from the caller's owned application, and a participant-only RPC
+ * supplies private listing context after closure. `authedClient()` talks to PostgREST with the
+ * anon key plus the caller's Clerk JWT, which resolves to the `authenticated`
+ * role under those policies. We ALSO scope every function in application code
+ * as defense in depth:
  * we resolve the caller's `seeker_profiles.id` / `host_profiles.id` from the
  * already-verified `clerkUserId` (from `auth().userId`, never decoded from the
  * token) and refuse any conversation the caller does not own. Keep both layers.
@@ -54,6 +60,20 @@ export interface Message {
   readonly createdAt: string;
 }
 
+export interface ConversationContext {
+  readonly conversationId: string;
+  readonly listingId: string;
+  readonly listingTitle: string;
+  readonly listingCategory: OpportunityCategory;
+  readonly hostName: string;
+}
+
+export interface ConversationContextsResult {
+  readonly contexts: Map<string, ConversationContext>;
+  /** False only while the context RPC has not reached the connected database. */
+  readonly available: boolean;
+}
+
 export interface SendMessageResult {
   readonly ok: boolean;
   readonly error?: string;
@@ -62,7 +82,21 @@ export interface SendMessageResult {
 }
 
 const MAX_BODY_LENGTH = 4000;
-const UNIQUE_VIOLATION = "23505";
+
+export const APPLICATION_CONVERSATION_START_STATUSES: ReadonlySet<string> =
+  new Set([
+    "applied",
+    "reviewing",
+    "saved_by_host",
+    "offered",
+    "accepted",
+    "active",
+    "completed",
+  ]);
+
+export function canStartApplicationConversation(status: string): boolean {
+  return APPLICATION_CONVERSATION_START_STATUSES.has(status);
+}
 
 const CONVERSATION_COLUMNS =
   "id, seeker_profile_id, host_profile_id, listing_id, application_id, last_message_at, created_at";
@@ -79,6 +113,27 @@ function asString(value: unknown): string {
 
 function nullableString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+function opportunityCategory(value: unknown): OpportunityCategory {
+  return typeof value === "string" &&
+    (MARKETPLACE_CATEGORIES as readonly string[]).includes(value)
+    ? (value as OpportunityCategory)
+    : "mix";
+}
+
+function isMissingConversationContextRpc(error: {
+  readonly code?: string;
+  readonly message?: string;
+}): boolean {
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    error.code === "PGRST202" ||
+    error.code === "42883" ||
+    (message.includes("get_my_conversation_contexts") &&
+      (message.includes("could not find the function") ||
+        message.includes("does not exist")))
+  );
 }
 
 function rowToConversation(row: Record<string, unknown>): Conversation {
@@ -170,30 +225,6 @@ async function loadOwnedConversation(
   return null;
 }
 
-async function findConversation(
-  db: SupabaseClient,
-  seekerProfileId: string,
-  hostProfileId: string,
-  applicationId: string | null,
-): Promise<Conversation | null> {
-  let query = db
-    .from("conversations")
-    .select(CONVERSATION_COLUMNS)
-    .eq("seeker_profile_id", seekerProfileId)
-    .eq("host_profile_id", hostProfileId);
-  query =
-    applicationId === null
-      ? query.is("application_id", null)
-      : query.eq("application_id", applicationId);
-
-  const { data, error } = await query
-    .order("created_at", { ascending: true })
-    .limit(1);
-  if (error) throw new Error(`findConversation: ${error.message}`);
-  const row = (data ?? [])[0] as Record<string, unknown> | undefined;
-  return row ? rowToConversation(row) : null;
-}
-
 /**
  * All conversations for the caller in the given role, newest activity first.
  * Returns [] when the caller has no matching profile.
@@ -218,6 +249,50 @@ export async function getConversations(
     .order("last_message_at", { ascending: false, nullsFirst: false });
   if (error) throw new Error(`getConversations: ${error.message}`);
   return ((data ?? []) as Record<string, unknown>[]).map(rowToConversation);
+}
+
+/**
+ * Stable listing/host labels for already-owned conversations. The RPC derives
+ * context through the exact application tuple and only returns conversations
+ * belonging to the Clerk JWT, so paused/closed listings remain useful without
+ * broadening public listing visibility.
+ */
+export async function getConversationContexts(
+  clerkToken: string,
+  conversationIds: readonly string[],
+): Promise<ConversationContextsResult> {
+  const result = new Map<string, ConversationContext>();
+  const requestedIds = [...new Set(conversationIds)].slice(0, 200);
+  if (requestedIds.length === 0) {
+    return { contexts: result, available: true };
+  }
+
+  const db = untypedClient(clerkToken);
+  const { data, error } = await db.rpc("get_my_conversation_contexts", {
+    p_conversation_ids: requestedIds,
+  });
+  if (error) {
+    if (isMissingConversationContextRpc(error)) {
+      return { contexts: result, available: false };
+    }
+    throw new Error(`getConversationContexts: ${error.message}`);
+  }
+
+  const requested = new Set(requestedIds);
+  for (const row of (data ?? []) as Record<string, unknown>[]) {
+    const conversationId = asString(row.conversation_id);
+    const listingId = asString(row.listing_id);
+    if (!requested.has(conversationId) || !listingId) continue;
+
+    result.set(conversationId, {
+      conversationId,
+      listingId,
+      listingTitle: asString(row.listing_title),
+      listingCategory: opportunityCategory(row.listing_category),
+      hostName: asString(row.host_name),
+    });
+  }
+  return { contexts: result, available: true };
 }
 
 /**
@@ -381,72 +456,56 @@ export async function getUnreadMessageCount(
 }
 
 /**
- * Returns the existing seeker<->host conversation (optionally scoped to an
- * application) or creates one. Used when a host saves/contacts an applicant.
- *
- * `callerClerkUserId` (from `auth().userId`) must match one of the two
- * participants. Callers who are neither the seeker nor the host receive null
- * — this prevents cross-user conversation creation without a service-role key.
- *
- * Returns null when caller verification fails or either profile cannot be resolved.
+ * Seeker-initiated find-or-create for one owned application. The database RPC
+ * resolves the Clerk subject and derives seeker, listing, and host ids without
+ * trusting any relationship id from the browser. We then load the returned row
+ * through the normal participant guard as application-layer defense in depth.
  */
-export async function getOrCreateConversation(
+export async function getOrCreateConversationForSeekerApplication(
   clerkToken: string,
-  callerClerkUserId: string,
   seekerClerkUserId: string,
-  hostClerkUserId: string,
-  applicationId?: string,
+  applicationId: string,
 ): Promise<Conversation | null> {
-  if (callerClerkUserId !== seekerClerkUserId && callerClerkUserId !== hostClerkUserId) {
+  if (!applicationId) return null;
+
+  const db = untypedClient(clerkToken);
+  const { data, error } = await db.rpc("ensure_my_application_conversation", {
+    p_application_id: applicationId,
+  });
+  if (error) {
+    throw new Error(
+      `getOrCreateConversationForSeekerApplication: ${error.message}`,
+    );
+  }
+
+  const conversationId = nullableString(data);
+  if (!conversationId) return null;
+
+  const owned = await loadOwnedConversation(
+    db,
+    seekerClerkUserId,
+    conversationId,
+  );
+  if (
+    !owned ||
+    owned.role !== "seeker" ||
+    owned.conversation.applicationId !== applicationId
+  ) {
     return null;
   }
-  const db = untypedClient(clerkToken);
-  const [seekerProfileId, hostProfileId] = await Promise.all([
-    resolveSeekerProfileId(db, seekerClerkUserId),
-    resolveHostProfileId(db, hostClerkUserId),
-  ]);
-  if (!seekerProfileId || !hostProfileId) return null;
-
-  const appId = applicationId ?? null;
-
-  const existing = await findConversation(db, seekerProfileId, hostProfileId, appId);
-  if (existing) return existing;
-
-  const { data, error } = await db
-    .from("conversations")
-    .insert({
-      seeker_profile_id: seekerProfileId,
-      host_profile_id: hostProfileId,
-      application_id: appId,
-    })
-    .select(CONVERSATION_COLUMNS)
-    .single();
-  if (error) {
-    // Lost a race against a concurrent insert on the unique key — re-read.
-    if (error.code === UNIQUE_VIOLATION) {
-      return findConversation(db, seekerProfileId, hostProfileId, appId);
-    }
-    throw new Error(`getOrCreateConversation: ${error.message}`);
-  }
-  return data ? rowToConversation(data as Record<string, unknown>) : null;
+  return owned.conversation;
 }
 
 /**
- * Host-initiated find-or-create. The caller is the HOST (verified by `auth()`),
- * so we resolve the host side from their Clerk id and take the seeker's PROFILE
- * id directly — which is all the host UI has from an applicant row. The RLS
- * INSERT policy (migration 048) permits this because the host owns the host
- * side of the thread.
+ * Host-initiated find-or-create. The database resolves the host side from the
+ * caller's Clerk JWT and derives the seeker/listing relationship from the exact
+ * application while holding its lifecycle row lock.
  *
  * This is the entry point the host applicant UI uses to OPEN a conversation:
  * before this, `conversations` had no creator and messaging was unreachable.
  *
- * AUTHORIZATION: the host UI passes `seekerProfileId` from a query string, which
- * a host could forge to target an arbitrary seeker. So we do NOT trust it as
- * authorization evidence — we verify, under the host's own RLS-scoped token,
- * that the seeker has actually applied to one of THIS host's listings before
- * creating any thread. (Invite-only relationships, if a message entry point is
- * ever added there, would need this check extended to the `invites` table.)
+ * The supplied seeker profile is defense-in-depth confirmation only; it is not
+ * an input to the database function and cannot choose the counterparty.
  *
  * Returns null when the host profile cannot be resolved, or when no
  * host↔seeker application relationship exists.
@@ -455,45 +514,34 @@ export async function getOrCreateConversationForHost(
   clerkToken: string,
   hostClerkUserId: string,
   seekerProfileId: string,
-  applicationId?: string,
+  applicationId: string,
 ): Promise<Conversation | null> {
+  if (!seekerProfileId || !applicationId) return null;
+
   const db = untypedClient(clerkToken);
-  const hostProfileId = await resolveHostProfileId(db, hostClerkUserId);
-  if (!hostProfileId) return null;
-
-  // Relationship gate: require an application from this seeker to a listing this
-  // host owns. Mirrors the getHostApplications embed (listings!listing_id!inner
-  // + filter on the embedded host_profile_id) and runs under the host's token.
-  const { data: relation, error: relationError } = await db
-    .from("applications")
-    .select("id, listings!listing_id!inner(host_profile_id)")
-    .eq("seeker_profile_id", seekerProfileId)
-    .eq("listings.host_profile_id", hostProfileId)
-    .limit(1);
-  if (relationError) {
-    throw new Error(`getOrCreateConversationForHost (relation): ${relationError.message}`);
-  }
-  if (!relation || relation.length === 0) return null;
-
-  const appId = applicationId ?? null;
-
-  const existing = await findConversation(db, seekerProfileId, hostProfileId, appId);
-  if (existing) return existing;
-
-  const { data, error } = await db
-    .from("conversations")
-    .insert({
-      seeker_profile_id: seekerProfileId,
-      host_profile_id: hostProfileId,
-      application_id: appId,
-    })
-    .select(CONVERSATION_COLUMNS)
-    .single();
+  const { data, error } = await db.rpc(
+    "ensure_my_host_application_conversation",
+    { p_application_id: applicationId },
+  );
   if (error) {
-    if (error.code === UNIQUE_VIOLATION) {
-      return findConversation(db, seekerProfileId, hostProfileId, appId);
-    }
     throw new Error(`getOrCreateConversationForHost: ${error.message}`);
   }
-  return data ? rowToConversation(data as Record<string, unknown>) : null;
+
+  const conversationId = nullableString(data);
+  if (!conversationId) return null;
+
+  const owned = await loadOwnedConversation(
+    db,
+    hostClerkUserId,
+    conversationId,
+  );
+  if (
+    !owned ||
+    owned.role !== "host" ||
+    owned.conversation.seekerProfileId !== seekerProfileId ||
+    owned.conversation.applicationId !== applicationId
+  ) {
+    return null;
+  }
+  return owned.conversation;
 }

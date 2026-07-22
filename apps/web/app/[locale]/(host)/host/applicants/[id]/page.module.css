@@ -7,17 +7,3 @@
 .messageLink {
   padding: var(--space-4) 0;
 }
-
-.messageLinkAnchor {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--type-body-sm);
-  font-weight: 500;
-  color: var(--color-text-link);
-  text-decoration: none;
-}
-
-.messageLinkAnchor:hover {
-  text-decoration: underline;
-}
