@@ -381,10 +381,11 @@ export async function getRecentApplications(
 }
 
 /**
- * Approve a listing: set status = 'live', and backfill published_at = now()
- * only when it has never been set (first approval). Two writes: an
- * unconditional status update, then a published_at update filtered to rows
- * where published_at IS NULL.
+ * Approve a listing that is currently awaiting moderation.
+ *
+ * The status predicate is the concurrency/idempotency guard: an already
+ * decided, host-controlled, or missing listing must never report success. The
+ * database status trigger stamps published_at in the same atomic update.
  */
 export async function adminApproveListing(
   serviceRoleToken: string,
@@ -392,31 +393,51 @@ export async function adminApproveListing(
 ): Promise<{ ok: boolean; error?: string }> {
   const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
 
-  const { error: statusError } = await db
+  const { data, error } = await db
     .from("listings")
     .update({ status: "live" })
-    .eq("id", listingId);
-  if (statusError) {
-    return { ok: false, error: statusError.message };
+    .eq("id", listingId)
+    .eq("status", "under_review")
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!data) {
+    return { ok: false, error: "Listing is no longer awaiting review." };
   }
 
-  const { error: publishedError } = await db
+  return { ok: true };
+}
+
+/** Return a listing to draft so the host can supply missing facts. */
+export async function adminHoldListing(
+  serviceRoleToken: string,
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
+
+  const { data, error } = await db
     .from("listings")
-    .update({ published_at: new Date().toISOString() })
+    .update({ status: "draft" })
     .eq("id", listingId)
-    .is("published_at", null);
-  if (publishedError) {
-    return { ok: false, error: publishedError.message };
+    .eq("status", "under_review")
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!data) {
+    return { ok: false, error: "Listing is no longer awaiting review." };
   }
 
   return { ok: true };
 }
 
 /**
- * Reject a listing: set status = 'closed'. `reason` is accepted for API parity
- * with the server action but is not persisted — the listings table has no
- * rejection-reason column (006_listings.sql) and adding one would touch the
- * schema, which is out of scope for this change.
+ * Reject a listing that is currently awaiting moderation. `reason` is accepted
+ * for API parity with the server action but is not persisted — the listings
+ * table has no rejection-reason column (006_listings.sql).
  */
 export async function adminCloseListing(
   serviceRoleToken: string,
@@ -425,13 +446,20 @@ export async function adminCloseListing(
 ): Promise<{ ok: boolean; error?: string }> {
   void reason;
   const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
+  const nowIso = new Date().toISOString();
 
-  const { error } = await db
+  const { data, error } = await db
     .from("listings")
-    .update({ status: "closed" })
-    .eq("id", listingId);
+    .update({ status: "closed", closed_at: nowIso })
+    .eq("id", listingId)
+    .eq("status", "under_review")
+    .select("id")
+    .maybeSingle();
   if (error) {
     return { ok: false, error: error.message };
+  }
+  if (!data) {
+    return { ok: false, error: "Listing is no longer awaiting review." };
   }
 
   return { ok: true };

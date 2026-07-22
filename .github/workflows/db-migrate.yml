@@ -143,6 +143,40 @@ jobs:
             sleep 10
           done
 
+      - name: Verify production runtime readiness
+        timeout-minutes: 3
+        env:
+          PRODUCTION_HEALTH_URL: https://exploreandearn.com/api/health
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if response="$(curl \
+              --silent \
+              --show-error \
+              --fail-with-body \
+              --connect-timeout 5 \
+              --max-time 10 \
+              --retry 2 \
+              --retry-delay 2 \
+              --retry-connrefused \
+              "$PRODUCTION_HEALTH_URL")" &&
+              jq -e '
+                type == "object" and
+                .status == "ready" and
+                .checks.database == "ok"
+              ' <<<"$response" >/dev/null; then
+              echo "Production runtime and public database query are ready."
+              break
+            fi
+
+            if [[ "$attempt" -eq 12 ]]; then
+              echo "Production readiness probe did not become healthy; migrations will not run." >&2
+              exit 1
+            fi
+            echo "Production readiness probe is not healthy yet; waiting."
+            sleep 5
+          done
+
       - name: Link the production project
         run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
 

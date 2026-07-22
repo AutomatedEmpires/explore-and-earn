@@ -191,8 +191,8 @@ export function ListingCard({
           onSkip: overrides.onSkip ?? handlers.onSkip,
           onSchedule: overrides.onSchedule ?? handlers.onSchedule,
           onApprove: overrides.onApprove ?? handlers.onApprove,
-          onWarn: overrides.onWarn ?? handlers.onWarn,
-          onRemove: overrides.onRemove ?? handlers.onRemove,
+          onHold: overrides.onHold ?? handlers.onHold,
+          onReject: overrides.onReject ?? handlers.onReject,
         }
       : handlers;
 
@@ -209,8 +209,8 @@ export function ListingCard({
       onSkip: guardTap(merged.onSkip, suppressTap),
       onSchedule: guardTap(merged.onSchedule, suppressTap),
       onApprove: guardTap(merged.onApprove, suppressTap),
-      onWarn: guardTap(merged.onWarn, suppressTap),
-      onRemove: guardTap(merged.onRemove, suppressTap),
+      onHold: guardTap(merged.onHold, suppressTap),
+      onReject: guardTap(merged.onReject, suppressTap),
     };
   }, [handlers, overrides, suppressTap]);
 
@@ -238,8 +238,8 @@ export function ListingCard({
       onSkip={resolved.onSkip}
       onSchedule={resolved.onSchedule}
       onApprove={resolved.onApprove}
-      onWarn={resolved.onWarn}
-      onRemove={resolved.onRemove}
+      onHold={resolved.onHold}
+      onReject={resolved.onReject}
     />
   );
 }

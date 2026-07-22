@@ -102,8 +102,9 @@ export interface DiscoveryCardProps {
 	readonly onSkip?: (id: string) => void
 	readonly onSchedule?: (id: string) => void
 	readonly onApprove?: (id: string) => void
-	readonly onWarn?: (id: string) => void
-	readonly onRemove?: (id: string) => void
+	readonly onHold?: (id: string) => void
+	readonly onReject?: (id: string) => void
+	readonly adminActionsDisabled?: boolean
 	readonly actions?: ReactNode
 	/**
 	 * Seeker previously skipped this listing. Skipped listings are demoted-but-
@@ -285,8 +286,9 @@ export function DiscoveryCard({
 	onSkip,
 	onSchedule,
 	onApprove,
-	onWarn,
-	onRemove,
+	onHold,
+	onReject,
+	adminActionsDisabled = false,
 	actions,
 	previouslySkipped,
 	imageLoading = "lazy",
@@ -736,34 +738,43 @@ export function DiscoveryCard({
 					</div>
 				) : null}
 
-				{/* 7. CTA — admin_review: Approve/Warn/Remove strip; host_applicant_review: Skip/Save/Schedule strip; all other surfaces: single stamp button */}
+				{/* 7. CTA — admin_review: Approve/Hold/Reject strip; host_applicant_review: Skip/Save/Schedule strip; all other surfaces: single stamp button */}
 				{actions ?? (
-					isAdminReview ? (
+					isAdminReview && (onApprove || onHold || onReject) ? (
 						<div className={styles.actionStrip}>
-							<button
-								type="button"
-								className={`${styles.actionBtn} ${styles.actionApprove}`}
-								onClick={onApprove ? () => onApprove(data.id) : undefined}
-							>
-								<Icon name="system.success" size={16} aria-hidden />
-								Approve
-							</button>
-							<button
-								type="button"
-								className={`${styles.actionBtn} ${styles.actionWarn}`}
-								onClick={onWarn ? () => onWarn(data.id) : undefined}
-							>
-								<Icon name="system.info" size={16} aria-hidden />
-								Warn
-							</button>
-							<button
-								type="button"
-								className={`${styles.actionBtn} ${styles.actionRemove}`}
-								onClick={onRemove ? () => onRemove(data.id) : undefined}
-							>
-								<Icon name="action.close" size={16} aria-hidden />
-								Remove
-							</button>
+							{onApprove ? (
+								<button
+									type="button"
+									className={`${styles.actionBtn} ${styles.actionApprove}`}
+									disabled={adminActionsDisabled}
+									onClick={() => onApprove(data.id)}
+								>
+									<Icon name="system.success" size={16} aria-hidden />
+									Approve
+								</button>
+							) : null}
+							{onHold ? (
+								<button
+									type="button"
+									className={`${styles.actionBtn} ${styles.actionHold}`}
+									disabled={adminActionsDisabled}
+									onClick={() => onHold(data.id)}
+								>
+									<Icon name="system.info" size={16} aria-hidden />
+									Hold
+								</button>
+							) : null}
+							{onReject ? (
+								<button
+									type="button"
+									className={`${styles.actionBtn} ${styles.actionReject}`}
+									disabled={adminActionsDisabled}
+									onClick={() => onReject(data.id)}
+								>
+									<Icon name="action.close" size={16} aria-hidden />
+									Reject
+								</button>
+							) : null}
 						</div>
 					) : isApplicantReview ? (
 						<div className={styles.actionStrip}>

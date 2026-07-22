@@ -957,13 +957,13 @@ button.benefit:focus-visible {
   border: none;
 }
 
-.actionWarn {
+.actionHold {
   background: var(--color-surface);
   color: var(--status-warning-fg);
   border: 1px solid color-mix(in srgb, var(--status-warning-fg) 45%, var(--border-soft));
 }
 
-.actionRemove {
+.actionReject {
   background: var(--color-surface);
   color: var(--status-error-fg);
   border: 1px solid color-mix(in srgb, var(--status-error-fg) 45%, var(--border-soft));

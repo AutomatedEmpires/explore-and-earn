@@ -506,13 +506,15 @@ export const PUBLIC_LISTINGS_FEED_CAP = 200;
 /** Public live listings \u2014 no auth required. Bounded to `limit` most-recent. */
 export async function getPublicListings(
   limit: number = PUBLIC_LISTINGS_FEED_CAP,
+  signal?: AbortSignal,
 ): Promise<ListingRow[]> {
-  const { data, error } = await anonClient()
+  const query = anonClient()
     .from("listings")
     .select(LISTING_COLUMNS)
     .eq("status", "live")
     .order("published_at", { ascending: false })
     .limit(limit);
+  const { data, error } = await (signal ? query.abortSignal(signal) : query);
 
   if (error) throw new Error(`getPublicListings: ${error.message}`);
   return ((data ?? []) as unknown as RawListingRow[]).map(toListingRow);

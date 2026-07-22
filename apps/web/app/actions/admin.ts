@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   adminApproveListing,
   adminCloseListing,
+  adminHoldListing,
   adminSetHostAttestationStatus,
   clearHostFlag,
 } from "@explore-and-earn/db";
@@ -65,6 +66,31 @@ export async function approveListingAction(
     return await approveListingActionImpl(listingId);
   } catch (error) {
     reportError(error, { action: "approveListingAction" });
+    throw error;
+  }
+}
+
+async function holdListingActionImpl(listingId: string): Promise<ActionResult> {
+  const denied = await guardAdmin();
+  if (denied) return denied;
+  if (!listingId) return { ok: false, error: "Missing listing id." };
+
+  const result = await adminHoldListing(SERVICE_ROLE_KEY, listingId);
+  if (!result.ok) return result;
+
+  revalidatePath("/listings");
+  revalidatePath(`/listings/${listingId}`);
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+export async function holdListingAction(
+  listingId: string,
+): Promise<ActionResult> {
+  try {
+    return await holdListingActionImpl(listingId);
+  } catch (error) {
+    reportError(error, { action: "holdListingAction" });
     throw error;
   }
 }

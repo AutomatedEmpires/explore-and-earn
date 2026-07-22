@@ -7,6 +7,7 @@ import type { DiscoveryCardData } from "@explore-and-earn/ui";
 
 import {
   approveListingAction,
+  holdListingAction,
   rejectListingAction,
 } from "../../app/actions/admin";
 import styles from "./AdminListingCard.module.css";
@@ -58,23 +59,33 @@ export function AdminListingCard({
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function handleWarn(_id: string) {
-    setMessage({ ok: false, text: "Warn action is not yet implemented." });
-  }
-
-  function handleRemove(id: string) {
+  function handleReject(id: string) {
     setMessage(null);
     startTransition(async () => {
       const result = await rejectListingAction(id);
       setMessage(
         result.ok
-          ? { ok: true, text: "Listing removed." }
-          : { ok: false, text: result.error ?? "Could not remove listing." },
+          ? { ok: true, text: "Listing rejected and closed." }
+          : { ok: false, text: result.error ?? "Could not reject listing." },
       );
       if (result.ok) router.refresh();
     });
   }
+
+  function handleHold(id: string) {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await holdListingAction(id);
+      setMessage(
+        result.ok
+          ? { ok: true, text: "Listing returned to the host for updates." }
+          : { ok: false, text: result.error ?? "Could not hold listing." },
+      );
+      if (result.ok) router.refresh();
+    });
+  }
+
+  const isAwaitingReview = listingStatus === "under_review";
 
   return (
     <div className={styles.wrap}>
@@ -82,9 +93,10 @@ export function AdminListingCard({
         data={data}
         surface="admin_review"
         cardState={statusToCardState(listingStatus)}
-        onApprove={handleApprove}
-        onWarn={handleWarn}
-        onRemove={handleRemove}
+        onApprove={isAwaitingReview ? handleApprove : undefined}
+        onHold={isAwaitingReview ? handleHold : undefined}
+        onReject={isAwaitingReview ? handleReject : undefined}
+        adminActionsDisabled={isPending}
       />
       {isPending ? (
         <p className={styles.pending} role="status" aria-live="polite">
