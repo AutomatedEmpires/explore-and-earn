@@ -76,9 +76,11 @@ export default async function HostApplicantDetailPage({
   const applicantWithName = displayName
     ? { ...applicant, applicantName: displayName }
     : applicant;
+  const canStartConversation = canStartApplicationConversation(
+    application.status,
+  );
   const canOpenConversation =
-    Boolean(applicantWithName.threadId) ||
-    canStartApplicationConversation(application.status);
+    Boolean(applicantWithName.threadId) || canStartConversation;
 
   return (
     <section className={styles.block}>
@@ -97,7 +99,7 @@ export default async function HostApplicantDetailPage({
       />
       <HostApplicantDetail applicant={applicantWithName} resume={resume} />
       <StatusActions applicationId={application.id} status={application.status} />
-      {canOpenConversation ? (
+      {!applicantWithName.threadId && canStartConversation ? (
         <div className={detailStyles.messageLink}>
           <OpenConversationButton
             role="host"

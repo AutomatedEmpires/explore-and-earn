@@ -2,13 +2,11 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import {
   getConversations,
-  getConversationContexts,
-  getLastMessagesForConversations,
   getSeekerDisplayNames,
 } from "@explore-and-earn/db";
 
 import { EmptyState } from "../../../../../components/discovery";
-import { reportMessage } from "../../../../../lib/sentry";
+import { loadMessageListData } from "../../../../../lib/messageListData";
 import {
   HostSectionHeading,
   HostThreadGroups,
@@ -78,22 +76,19 @@ export default async function HostMessagesPage() {
   );
   const conversationIds = conversations.map((c) => c.id);
 
-  const [contextResult, seekerDisplayNames, lastMessageMap] = await Promise.all([
-    getConversationContexts(token, conversationIds),
-    getSeekerDisplayNames(token, seekerProfileIds),
-    getLastMessagesForConversations(token, conversationIds),
-  ]);
-  if (!contextResult.available) {
-    reportMessage("conversation_context_rpc_unavailable", "warning", {
-      route: "/host/messages",
+  const [{ contexts, lastMessages }, seekerDisplayNames] = await Promise.all([
+    loadMessageListData({
+      token,
       userId,
-    });
-  }
-  const contextByConversationId = contextResult.contexts;
+      route: "/host/messages",
+      conversationIds,
+    }),
+    getSeekerDisplayNames(token, seekerProfileIds),
+  ]);
 
   const threads: HostMessageThread[] = conversations.map((conversation) => {
-    const context = contextByConversationId.get(conversation.id) ?? null;
-    const lastMessage = lastMessageMap.get(conversation.id) ?? null;
+    const context = contexts.get(conversation.id) ?? null;
+    const lastMessage = lastMessages.get(conversation.id) ?? null;
     return {
       id: conversation.id,
       applicantName:

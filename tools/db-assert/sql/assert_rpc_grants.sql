@@ -124,23 +124,130 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
--- Guardrail 3: storage buckets no longer allow anon enumeration.
+-- Guardrail 3: storage buckets no longer allow client enumeration.
 -- ---------------------------------------------------------------------------
 do $$
 declare
-  v_count int;
+  v_public_count int;
+  v_authenticated_count int;
+  v_valid_owner_count int;
 begin
-  select count(*) into v_count
+  -- A SELECT policy for anon/PUBLIC applies across storage.objects even when
+  -- its rendered expression does not contain a literal bucket name.
+  select count(*) into v_public_count
   from pg_policies
   where schemaname = 'storage' and tablename = 'objects' and cmd = 'SELECT'
-    and roles && array['anon', 'public']::name[]
-    and (coalesce(qual, '') like '%listing-media%'
-         or coalesce(qual, '') like '%profile-photos%');
-  raise notice 'storage anon/public SELECT policies referencing the two buckets: %', v_count;
-  if v_count > 0 then
-    raise exception 'db-assert: storage bucket enumeration still open (anon/public SELECT policy present)';
+    and roles && array['anon', 'public']::name[];
+  raise notice 'storage anon/public SELECT policies: %', v_public_count;
+  if v_public_count > 0 then
+    raise exception 'db-assert: storage bucket enumeration still open to anon/PUBLIC';
+  end if;
+
+  -- Authenticated SELECT is limited to the three exact owner-folder policies.
+  -- Checking both policy identity and predicate shape prevents a renamed
+  -- USING (true) policy from passing merely because no bucket literal appears.
+  select count(*) into v_authenticated_count
+  from pg_policies
+  where schemaname = 'storage' and tablename = 'objects' and cmd = 'SELECT'
+    and roles && array['authenticated']::name[];
+
+  select count(*) into v_valid_owner_count
+  from pg_policies
+  where schemaname = 'storage' and tablename = 'objects' and cmd = 'SELECT'
+    and roles = array['authenticated']::name[]
+    and (
+      (
+        policyname = 'listing_media_select_own_folder'
+        and coalesce(qual, '') like '%bucket_id = ''listing-media''::text%'
+        and coalesce(qual, '') like '%storage.foldername(name)%'
+        and coalesce(qual, '') like '%host_profiles%'
+        and coalesce(qual, '') like '%clerk_user_id%auth.jwt()%''sub''::text%'
+      )
+      or (
+        policyname = 'profile_photos_select_own_folder'
+        and coalesce(qual, '') like '%bucket_id = ''profile-photos''::text%'
+        and coalesce(qual, '') like '%host_profiles%'
+        and coalesce(qual, '') like '%seeker_profiles%'
+        and coalesce(qual, '') like '%split_part(name, ''/''::text, 1)%'
+        and coalesce(qual, '') like '%clerk_user_id%auth.jwt()%''sub''::text%'
+      )
+      or (
+        policyname = 'community_photos_owner_select'
+        and coalesce(qual, '') like '%bucket_id = ''community-photos''::text%'
+        and coalesce(qual, '') like '%storage.foldername(name)%'
+        and coalesce(qual, '') like '%seeker_profiles%'
+        and coalesce(qual, '') like '%clerk_user_id%auth.jwt()%''sub''::text%'
+      )
+    );
+
+  raise notice 'storage authenticated SELECT policies: % (valid owner policies: %)',
+    v_authenticated_count, v_valid_owner_count;
+  if v_authenticated_count <> 3 or v_valid_owner_count <> 3 then
+    raise exception 'db-assert: storage authenticated SELECT policies are not the exact owner-scoped set';
   end if;
   raise notice 'db-assert: storage enumeration guardrail PASSED';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Guardrail 3b: service-only workflow functions remain SECURITY INVOKER,
+-- service-role-only, and pinned to an empty search_path.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  r record;
+  v_fail boolean := false;
+  v_found integer := 0;
+  fn_names text[] := array[
+    'create_invite_with_credit',
+    'restore_invite_credit',
+    'transition_listing_claim',
+    'convert_claimed_listing',
+    'claim_notification_deliveries',
+    'get_unprocessed_notification_events'
+  ];
+begin
+  for r in
+    select p.oid,
+           p.proname,
+           p.prosecdef,
+           p.proconfig,
+           has_function_privilege('anon', p.oid, 'EXECUTE') as anon_exec,
+           has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_exec,
+           has_function_privilege('service_role', p.oid, 'EXECUTE') as service_exec,
+           exists (
+             select 1
+             from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+             where a.grantee = 0 and a.privilege_type = 'EXECUTE'
+           ) as public_exec
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = any(fn_names)
+  loop
+    v_found := v_found + 1;
+    if r.prosecdef
+       or r.anon_exec
+       or r.auth_exec
+       or r.public_exec
+       or not r.service_exec
+       or not (
+         coalesce(r.proconfig, '{}'::text[])
+           @> array['search_path=""']::text[]
+       ) then
+      v_fail := true;
+      raise warning 'service workflow function % has unsafe execution/search_path configuration',
+        r.proname;
+    end if;
+  end loop;
+
+  if v_found <> array_length(fn_names, 1) then
+    raise exception 'db-assert: expected % service workflow functions, found %',
+      array_length(fn_names, 1), v_found;
+  end if;
+  if v_fail then
+    raise exception 'db-assert: service workflow function hardening FAILED';
+  end if;
+  raise notice 'db-assert: service workflow function hardening PASSED';
 end;
 $$;
 
@@ -362,8 +469,26 @@ where n.nspname = 'public'
     'current_host_profile_ids', 'current_host_listing_ids', 'current_conversation_ids',
     'enforce_listing_cover_asset', 'enforce_listing_media_override',
     'create_my_host_profile', 'ensure_my_seeker_profile',
+    'ensure_my_application_conversation', 'ensure_my_host_application_conversation',
+    'get_my_conversation_contexts',
     'get_public_housing_photos', 'get_public_benefit_details',
     'get_owned_benefit_context', 'get_my_host_benefit_library',
     'save_owned_benefit_detail', 'set_my_housing_library_photo'
+  )
+order by p.proname;
+
+select p.proname as service_function_name,
+       p.prosecdef as security_definer,
+       p.proconfig,
+       has_function_privilege('anon', p.oid, 'EXECUTE') as anon_execute,
+       has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_execute,
+       has_function_privilege('service_role', p.oid, 'EXECUTE') as service_role_execute
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.proname in (
+    'create_invite_with_credit', 'restore_invite_credit',
+    'transition_listing_claim', 'convert_claimed_listing',
+    'claim_notification_deliveries', 'get_unprocessed_notification_events'
   )
 order by p.proname;

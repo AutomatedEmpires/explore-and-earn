@@ -114,6 +114,26 @@ test.describe("public surfaces (guest)", () => {
       "/sign-up?role=host",
     );
   });
+
+  test("signed-out role funnels preserve the exact requested path", async ({
+    page,
+  }) => {
+    await page.goto("/host/messages?view=unread");
+    let redirected = new URL(page.url());
+    expect(redirected.pathname).toBe("/sign-in");
+    expect(redirected.searchParams.get("role")).toBe("host");
+    expect(redirected.searchParams.get("redirect_url")).toBe(
+      "/host/messages?view=unread",
+    );
+
+    await page.goto("/onboarding/skills?source=resume");
+    redirected = new URL(page.url());
+    expect(redirected.pathname).toBe("/sign-in");
+    expect(redirected.searchParams.get("role")).toBe("seeker");
+    expect(redirected.searchParams.get("redirect_url")).toBe(
+      "/onboarding/skills?source=resume",
+    );
+  });
 });
 
 test.describe("keyless auth fails closed", () => {

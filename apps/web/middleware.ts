@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { routing } from "./i18n/routing";
 import { DEV_ROLE_COOKIE, isDevBenchEnabled } from "./lib/devBench";
+import { isPrivateHostDashboardPath } from "./lib/hostRoutes";
 
 // next-intl locale middleware. Handles locale negotiation + the "as-needed"
 // prefix scheme: unprefixed English paths pass through untouched, a stray
@@ -116,6 +117,34 @@ const isPublicRoute = createRouteMatcher([
   "/onboarding/(.*)",
 ]);
 
+type FunnelRole = "host" | "seeker";
+
+/**
+ * Some auth-required funnels intentionally sit inside the broad public matcher
+ * to avoid colliding with public /host/{id} pages or onboarding layout gates.
+ * Preserve their role and exact return path before the request reaches a layout.
+ */
+function protectedFunnelRole(pathname: string): FunnelRole | null {
+  if (isPrivateHostDashboardPath(pathname)) return "host";
+  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
+    return "seeker";
+  }
+  return null;
+}
+
+function redirectToRoleSignIn(
+  request: NextRequest,
+  role: FunnelRole,
+): NextResponse {
+  const requestedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const url = request.nextUrl.clone();
+  url.pathname = "/sign-in";
+  url.search = "";
+  url.searchParams.set("role", role);
+  url.searchParams.set("redirect_url", requestedPath);
+  return NextResponse.redirect(url);
+}
+
 const hasClerkMiddlewareConfig =
   Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) &&
   Boolean(process.env.CLERK_SECRET_KEY);
@@ -148,6 +177,11 @@ export default hasClerkMiddlewareConfig
         // /[locale]/ route (just without the Clerk gate).
         return localize ? intlMiddleware(request) : undefined;
       }
+      const funnelRole = protectedFunnelRole(request.nextUrl.pathname);
+      if (funnelRole) {
+        const { userId } = await auth();
+        if (!userId) return redirectToRoleSignIn(request, funnelRole);
+      }
       if (!isPublicRoute(request)) {
         await auth.protect();
       }
@@ -168,6 +202,8 @@ export default hasClerkMiddlewareConfig
       if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
         return localize ? intlMiddleware(request) : NextResponse.next();
       }
+      const funnelRole = protectedFunnelRole(request.nextUrl.pathname);
+      if (funnelRole) return redirectToRoleSignIn(request, funnelRole);
       // Fail closed: when Clerk is not configured (local/dev only, since
       // production and preview throw above), protected routes are denied
       // rather than silently opened.

@@ -1,14 +1,10 @@
 import type { Metadata } from "next";
 
 import { auth } from "@clerk/nextjs/server";
-import {
-	getConversations,
-	getConversationContexts,
-	getLastMessagesForConversations,
-} from "@explore-and-earn/db";
+import { getConversations } from "@explore-and-earn/db";
 
 import { devFallback } from "../../../../lib/devBench/fallback";
-import { reportMessage } from "../../../../lib/sentry";
+import { loadMessageListData } from "../../../../lib/messageListData";
 import { EmptyState } from "../../../../components/discovery";
 import {
 	BucketPage,
@@ -89,21 +85,16 @@ export default async function MessagesPage() {
 	// public listing query, this preserves labels after a listing closes.
 	const conversationIds = conversations.map((c) => c.id);
 
-	const [contextResult, lastMessageMap] = await Promise.all([
-		getConversationContexts(token, conversationIds),
-		getLastMessagesForConversations(token, conversationIds),
-	]);
-	if (!contextResult.available) {
-		reportMessage("conversation_context_rpc_unavailable", "warning", {
-			route: "/messages",
-			userId,
-		});
-	}
-	const contextByConversationId = contextResult.contexts;
+	const { contexts, lastMessages } = await loadMessageListData({
+		token,
+		userId,
+		route: "/messages",
+		conversationIds,
+	});
 
 	const threads: MessageThread[] = conversations.map((conversation) => {
-		const context = contextByConversationId.get(conversation.id) ?? null;
-		const lastMessage = lastMessageMap.get(conversation.id) ?? null;
+		const context = contexts.get(conversation.id) ?? null;
+		const lastMessage = lastMessages.get(conversation.id) ?? null;
 		return {
 			id: conversation.id,
 			hostName: context?.hostName || "Host",

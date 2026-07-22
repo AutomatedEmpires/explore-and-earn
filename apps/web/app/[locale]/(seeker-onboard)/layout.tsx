@@ -31,7 +31,9 @@ export default async function SeekerOnboardLayout({
 }) {
   const { userId } = await auth();
   if (!userId) {
-    redirect("/sign-in");
+    redirect(
+      `/sign-in?role=seeker&redirect_url=${encodeURIComponent("/onboarding")}`,
+    );
   }
   return <div className={styles.page}>{children}</div>;
 }

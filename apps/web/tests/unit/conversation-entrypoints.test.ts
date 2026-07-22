@@ -35,6 +35,9 @@ describe("conversation open entry points", () => {
 
     expect(seekerApplication).toContain("<OpenConversationButton");
     expect(hostApplication).toContain("<OpenConversationButton");
+    expect(hostApplication).toContain(
+      "!applicantWithName.threadId && canStartConversation",
+    );
     expect(button).toContain("openSeekerApplicationConversationAction");
     expect(button).toContain("openHostApplicationConversationAction");
   });
@@ -46,10 +49,14 @@ describe("conversation open entry points", () => {
     const hostMessages = source(
       "app/[locale]/(host)/host/messages/page.tsx",
     );
+    const messageListData = source("lib/messageListData.ts");
 
     for (const page of [seekerMessages, hostMessages]) {
-      expect(page).toContain("getConversationContexts");
+      expect(page).toContain("loadMessageListData");
       expect(page).not.toContain("getPublicListingsByIds");
     }
+    expect(messageListData).toContain("getConversationContexts");
+    expect(messageListData).toContain("getLastMessagesForConversations");
+    expect(messageListData).toContain("conversation_context_rpc_unavailable");
   });
 });

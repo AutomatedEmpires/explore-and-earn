@@ -62,6 +62,23 @@ describe("onboarding persistence and preview truth", () => {
     expect(signIn).toContain("`/sign-up?role=${role}`");
   });
 
+  it("preserves role and exact return paths at the public-route auth boundary", () => {
+    const middleware = source("middleware.ts");
+    const hostLayout = source("app/[locale]/(host)/layout.tsx");
+    const seekerLayout = source("app/[locale]/(seeker-onboard)/layout.tsx");
+
+    expect(middleware).toContain("isPrivateHostDashboardPath(pathname)");
+    expect(middleware).toContain(
+      "`${request.nextUrl.pathname}${request.nextUrl.search}`",
+    );
+    expect(middleware).toContain('url.searchParams.set("role", role)');
+    expect(middleware).toContain(
+      'url.searchParams.set("redirect_url", requestedPath)',
+    );
+    expect(hostLayout).toContain("/sign-in?role=host&redirect_url=");
+    expect(seekerLayout).toContain("/sign-in?role=seeker&redirect_url=");
+  });
+
   it("keeps the linked refund policy public", () => {
     const middleware = source("middleware.ts");
     expect(middleware).toContain('"/refunds"');

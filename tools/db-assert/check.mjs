@@ -24,6 +24,12 @@ const checks = [
   },
 ]
 
+function stripSqlComments(sql) {
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\r\n]*/g, " ")
+}
+
 let hasFailure = false
 const fileContents = new Map()
 
@@ -375,6 +381,38 @@ if (!seekerConversationMigration) {
     console.error(
       `G-SEEKER-CONVERSATION: ${seekerConversationMigration} opens direct conversation INSERT.`,
     )
+  }
+}
+
+// Service-only workflow functions must not inherit caller-controlled name
+// resolution, and the public community bucket must not expose cross-owner
+// object metadata.
+const databaseHardeningMigration = migrationFiles.find((f) => /^076_.*\.sql$/.test(f))
+if (!databaseHardeningMigration) {
+  hasFailure = true
+  console.error("G-DATABASE-HARDENING: expected migration 076 to be present.")
+} else {
+  const sql = stripSqlComments(fileContents.get(databaseHardeningMigration))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "alter function public.create_invite_with_credit(uuid, uuid, uuid, text, uuid, integer) set search_path = '';",
+    "alter function public.restore_invite_credit(uuid) set search_path = '';",
+    "alter function public.transition_listing_claim(uuid, text, text, text) set search_path = '';",
+    "alter function public.convert_claimed_listing(uuid, text, uuid, jsonb) set search_path = '';",
+    "alter function public.claim_notification_deliveries(text, integer, integer) set search_path = '';",
+    "alter function public.get_unprocessed_notification_events(integer) set search_path = '';",
+    'drop policy if exists "community_photos_authenticated_select" on storage.objects;',
+    'create policy "community_photos_owner_select" on storage.objects for select to authenticated using (',
+    "bucket_id = 'community-photos' and (storage.foldername(name))[1] in ( select sp.id::text from public.seeker_profiles sp where sp.clerk_user_id = auth.jwt() ->> 'sub' )",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-DATABASE-HARDENING: ${databaseHardeningMigration} is missing ${needle}`,
+      )
+    }
   }
 }
 
