@@ -54,6 +54,16 @@ function assertExactProductionDeploymentGate(source: string): void {
 }
 
 describe("housing-photo migration deploy ordering", () => {
+  it("runs the production migration job only from main", () => {
+    const deployJob = workflow.indexOf("  deploy:");
+    const checkout = workflow.indexOf("- name: Checkout", deployJob);
+
+    expect(deployJob).toBeGreaterThanOrEqual(0);
+    expect(workflow.slice(deployJob, checkout)).toContain(
+      "if: github.ref == 'refs/heads/main'",
+    );
+  });
+
   it("gates the database push on exact-SHA Vercel Production success", () => {
     assertExactProductionDeploymentGate(workflow);
   });

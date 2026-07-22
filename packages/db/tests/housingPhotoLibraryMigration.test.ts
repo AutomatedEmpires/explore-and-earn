@@ -62,8 +62,10 @@ function assertDatabaseBoundary(sql: string): void {
   expect(sql).toContain("housing_photo_roles_missing:");
   expect(sql).toContain("housing_photo_roles_in_use:");
   expect(sql).toContain("housing_photo_object_in_use");
-  expect(sql).toContain("housing_photo_migration_paused_listings=%");
-  expect(sql).toContain("set status = 'paused'");
+  expect(sql).toContain("housing_photo_migration_restricted_listings=%");
+  expect(sql).toContain("set status = case");
+  expect(sql).toContain("when l.status = 'under_review' then 'draft'");
+  expect(sql).toContain("else 'paused'");
   expect(sql).toContain("revoke execute on function private.enforce_listing_housing_photos()");
   expect(sql).toContain(
     "revoke execute on function private.preserve_claim_benefit_details()",
@@ -149,14 +151,20 @@ describe("housing photo library migration", () => {
     );
   });
 
-  it("rehearses the real 071 to 072 upgrade and pauses only unsupported live claims", () => {
+  it("rehearses the real 071 upgrade without granting unmoderated listings a live path", () => {
     expect(upgradeRunner).toContain('"--version",');
     expect(upgradeRunner).toContain('"071",');
     expect(upgradeRunner).toContain('"migration", "up", "--local", "--yes"');
     expect(upgradeFixture).toContain("legacy live listing without role photos");
     expect(upgradeFixture).toContain("legacy live listing with a complete role set");
-    expect(upgradeAssertion).toContain("unsupported legacy live listing was not paused");
-    expect(upgradeAssertion).toContain("complete legacy listing was unnecessarily paused");
+    expect(upgradeFixture).toContain("legacy under-review listing without role photos");
+    expect(upgradeFixture).toContain("sourced live listing remains source-controlled");
+    expect(upgradeAssertion).toContain("unsupported legacy live listing did not return to draft");
+    expect(upgradeAssertion).toContain("unprovable complete live listing did not return to review");
+    expect(upgradeAssertion).toContain("unmoderated legacy listing did not return to draft");
+    expect(upgradeAssertion).toContain("sourced listing left its separate lifecycle");
+    expect(upgradeFixture).toContain("legacy paused listing without moderation provenance");
+    expect(upgradeAssertion).toContain("unprovable paused listing did not return to draft");
   });
 
   it("has a negative control for accidental trigger removal", () => {

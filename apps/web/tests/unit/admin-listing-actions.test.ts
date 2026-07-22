@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const revalidatePathMock = vi.hoisted(() => vi.fn());
+const revalidateTagMock = vi.hoisted(() => vi.fn());
 const isCurrentUserAdminMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
 const computeMatchesMock = vi.hoisted(() => vi.fn());
@@ -12,10 +13,16 @@ const dbMocks = vi.hoisted(() => ({
   clearHostFlag: vi.fn(),
 }));
 
-vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
+vi.mock("next/cache", () => ({
+  revalidatePath: revalidatePathMock,
+  revalidateTag: revalidateTagMock,
+}));
 vi.mock("@explore-and-earn/db", () => dbMocks);
 vi.mock("../../lib/admin", () => ({
   isCurrentUserAdmin: isCurrentUserAdminMock,
+}));
+vi.mock("../../lib/serverCache", () => ({
+  LISTINGS_CACHE_TAG: "public-listings",
 }));
 vi.mock("../../lib/sentry", () => ({ reportError: reportErrorMock }));
 vi.mock("../../services/matching", () => ({
@@ -46,6 +53,7 @@ describe("admin listing review actions", () => {
     });
     expect(dbMocks.adminHoldListing).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(revalidateTagMock).not.toHaveBeenCalled();
   });
 
   it("approves, computes matches, and refreshes affected surfaces", async () => {
@@ -58,6 +66,7 @@ describe("admin listing review actions", () => {
       "listing-1",
     );
     expect(computeMatchesMock).toHaveBeenCalledWith("listing-1");
+    expect(revalidateTagMock).toHaveBeenCalledWith("public-listings");
     expect(revalidatePathMock.mock.calls).toEqual([
       ["/listings"],
       ["/listings/listing-1"],
@@ -77,6 +86,7 @@ describe("admin listing review actions", () => {
     });
     expect(computeMatchesMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(revalidateTagMock).not.toHaveBeenCalled();
   });
 
   it("holds a reviewable listing and refreshes affected surfaces", async () => {
@@ -87,6 +97,7 @@ describe("admin listing review actions", () => {
       "listing-2",
     );
     expect(computeMatchesMock).not.toHaveBeenCalled();
+    expect(revalidateTagMock).toHaveBeenCalledWith("public-listings");
     expect(revalidatePathMock.mock.calls).toEqual([
       ["/listings"],
       ["/listings/listing-2"],
@@ -105,6 +116,7 @@ describe("admin listing review actions", () => {
       "Safety risk",
     );
     expect(computeMatchesMock).not.toHaveBeenCalled();
+    expect(revalidateTagMock).toHaveBeenCalledWith("public-listings");
     expect(revalidatePathMock.mock.calls).toEqual([
       ["/listings"],
       ["/listings/listing-3"],

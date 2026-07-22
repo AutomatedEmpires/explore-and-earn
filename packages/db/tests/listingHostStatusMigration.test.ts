@@ -12,6 +12,14 @@ const migration = readFileSync(
   .replace(/\s+/g, " ");
 
 function assertLifecycleBoundary(sql: string): void {
+  expect(sql).toContain("begin;");
+  expect(sql).toContain("lock table public.listings in share row exclusive mode;");
+  expect(sql).toContain("update public.listings l set status = case");
+  expect(sql).toContain("when l.status = 'live' then 'under_review'");
+  expect(sql).toContain("else 'draft'");
+  expect(sql).toContain("where l.provenance <> 'sourced'");
+  expect(sql).toContain("and l.status in ('live', 'paused')");
+  expect(sql).toContain("listing_status_provenance_reset=%");
   expect(sql).toContain(
     "create or replace function private.enforce_listing_host_status_transition()",
   );
@@ -32,6 +40,7 @@ function assertLifecycleBoundary(sql: string): void {
   expect(sql).toContain(
     "create trigger trg_listings_host_status_transition before insert or update on public.listings",
   );
+  expect(sql).toContain("commit;");
 }
 
 describe("listing host status transition migration", () => {
@@ -42,6 +51,14 @@ describe("listing host status transition migration", () => {
   it("keeps trusted moderation outside the authenticated-only guard", () => {
     expect(migration).toContain("if not v_is_authenticated_request then return new; end if;");
     expect(migration).not.toContain("current_user = 'service_role'");
+  });
+
+  it("requeues unprovable live state and resets paused state before enabling resume", () => {
+    expect(migration).toContain("where l.provenance <> 'sourced'");
+    expect(migration).toContain("and l.status in ('live', 'paused')");
+    expect(migration).toContain("when l.status = 'live' then 'under_review'");
+    expect(migration).toContain("else 'draft'");
+    expect(migration).toContain("old.status = 'paused' and new.status in ('live', 'archived')");
   });
 
   it("has a negative control for accidental trigger removal", () => {

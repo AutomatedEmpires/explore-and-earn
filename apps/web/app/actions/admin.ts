@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import {
   adminApproveListing,
   adminCloseListing,
@@ -10,6 +10,7 @@ import {
 } from "@explore-and-earn/db";
 
 import { isCurrentUserAdmin } from "../../lib/admin";
+import { LISTINGS_CACHE_TAG } from "../../lib/serverCache";
 import { reportError } from "../../lib/sentry";
 import { computeAndStoreMatchesForListing } from "../../services/matching";
 
@@ -53,6 +54,7 @@ async function approveListingActionImpl(
     reportError(error, { action: "approveListingAction:computeMatches" });
   }
 
+  revalidateTag(LISTINGS_CACHE_TAG);
   revalidatePath("/listings");
   revalidatePath(`/listings/${listingId}`);
   revalidatePath("/admin");
@@ -78,6 +80,7 @@ async function holdListingActionImpl(listingId: string): Promise<ActionResult> {
   const result = await adminHoldListing(SERVICE_ROLE_KEY, listingId);
   if (!result.ok) return result;
 
+  revalidateTag(LISTINGS_CACHE_TAG);
   revalidatePath("/listings");
   revalidatePath(`/listings/${listingId}`);
   revalidatePath("/admin");
@@ -106,6 +109,7 @@ async function rejectListingActionImpl(
   const result = await adminCloseListing(SERVICE_ROLE_KEY, listingId, reason);
   if (!result.ok) return result;
 
+  revalidateTag(LISTINGS_CACHE_TAG);
   revalidatePath("/listings");
   revalidatePath(`/listings/${listingId}`);
   revalidatePath("/admin");

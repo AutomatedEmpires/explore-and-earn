@@ -37,6 +37,9 @@ concurrency:
 
 jobs:
   deploy:
+    # workflow_dispatch lets maintainers choose any ref. Never allow a branch
+    # checkout to use production credentials or satisfy the Vercel gate.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
 
