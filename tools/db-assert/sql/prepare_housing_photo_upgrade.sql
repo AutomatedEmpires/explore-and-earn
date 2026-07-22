@@ -14,7 +14,8 @@ values (
 );
 
 insert into public.host_profiles (
-  id, owner_user_id, clerk_user_id, company_name, slug, public_status
+  id, owner_user_id, clerk_user_id, company_name, slug, category_scopes,
+  public_status
 )
 values (
   '72000000-0000-0000-0000-000000000002',
@@ -22,6 +23,7 @@ values (
   'user_housing_upgrade_owner',
   'Housing Upgrade Host',
   'housing-upgrade-host',
+  array['farm'],
   'active'
 );
 

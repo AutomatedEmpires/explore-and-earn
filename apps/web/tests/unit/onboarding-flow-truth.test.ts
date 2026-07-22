@@ -16,8 +16,12 @@ describe("onboarding persistence and preview truth", () => {
 
   it("keeps PostHog ingestion in connect-src and assets in script-src", () => {
     const config = source("next.config.ts");
-    expect(config.match(/https:\/\/us\.i\.posthog\.com/g)).toHaveLength(1);
-    expect(config.match(/https:\/\/us-assets\.i\.posthog\.com/g)).toHaveLength(1);
+    expect(config).toMatch(
+      /connect-src[^;]*https:\/\/us\.i\.posthog\.com/,
+    );
+    expect(config).toMatch(
+      /script-src[^;]*https:\/\/us-assets\.i\.posthog\.com/,
+    );
   });
 
   it("ships operative legal pages without internal draft disclaimers", () => {

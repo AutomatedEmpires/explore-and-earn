@@ -77,7 +77,8 @@ values
   ('20000000-0000-0000-0000-000000000002', 'housing-owner-2@example.test', now(), now());
 
 insert into public.host_profiles (
-  id, owner_user_id, clerk_user_id, company_name, slug, public_status
+  id, owner_user_id, clerk_user_id, company_name, slug, category_scopes,
+  public_status
 )
 values
   (
@@ -86,6 +87,7 @@ values
     'user_housing_owner_1',
     'Housing Host One',
     'housing-host-one',
+    array['farm'],
     'active'
   ),
   (
@@ -94,6 +96,7 @@ values
     'user_housing_owner_2',
     'Housing Host Two',
     'housing-host-two',
+    array['seasonal'],
     'active'
   );
 

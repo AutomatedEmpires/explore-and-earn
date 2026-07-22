@@ -142,6 +142,15 @@ begin
   exception when check_violation then
     null;
   end;
+
+  begin
+    update public.host_profiles
+       set category_scopes = '{}'::text[]
+     where id = v_first;
+    raise exception 'profile-onboarding: raw host update persisted empty scopes';
+  exception when check_violation then
+    null;
+  end;
 end;
 $$;
 reset role;
@@ -276,10 +285,10 @@ reset role;
 
 -- Soft deletion is never silently undone by an onboarding retry.
 insert into public.host_profiles (
-  owner_user_id, clerk_user_id, company_name, slug, deleted_at
+  owner_user_id, clerk_user_id, company_name, slug, category_scopes, deleted_at
 ) values (
   null, 'user_profile_deleted_host', 'Deleted Host',
-  'deleted-host-profile-test', now()
+  'deleted-host-profile-test', array['farm'], now()
 );
 insert into public.seeker_profiles (clerk_user_id, deleted_at)
 values ('user_profile_deleted_seeker', now());

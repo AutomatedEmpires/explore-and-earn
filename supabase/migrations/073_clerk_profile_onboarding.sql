@@ -36,7 +36,8 @@ alter table public.host_profiles
 alter table public.host_profiles
   add constraint host_profiles_category_scopes_lane_check
   check (
-    cardinality(category_scopes) <= 4
+    category_scopes is not null
+    and cardinality(category_scopes) between 1 and 4
     and category_scopes <@ array['farm', 'maritime', 'remote', 'seasonal']::text[]
     and array_position(category_scopes, null) is null
   ) not valid;

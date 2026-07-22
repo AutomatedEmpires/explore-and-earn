@@ -158,6 +158,8 @@ if (!profileOnboardingMigration) {
     "message = 'profile_identity_required'",
     "message = 'profile_identity_disabled'",
     "array['farm', 'maritime', 'remote', 'seasonal']::text[]",
+    "category_scopes is not null",
+    "cardinality(category_scopes) between 1 and 4",
     "validate constraint host_profiles_category_scopes_lane_check",
     "v_slug := v_slug_base || '-' || v_profile_id::text",
     "grant execute on function public.create_my_host_profile(text, text[], text) to authenticated, service_role;",
