@@ -385,6 +385,7 @@ end;
 $$;
 
 reset role;
+set local request.jwt.claims = '{"sub":"service_role","role":"service_role"}';
 
 -- Context survives a listing leaving public discovery, but only when every
 -- conversation/application participant tuple agrees.
