@@ -90,6 +90,8 @@ describe("housing photo library migration", () => {
   });
 
   it("locks the rollout, constrains Storage, and reserves Housing writes for the server", () => {
+    expect(source).toContain("set local lock_timeout = '15s';");
+    expect(source).toContain("set local statement_timeout = '10min';");
     expect(source).toContain("lock table public.host_profiles in share row exclusive mode;");
     expect(source).toContain("lock table public.listings in share row exclusive mode;");
     expect(source).toContain("lock table storage.objects in share row exclusive mode;");

@@ -187,4 +187,60 @@ jobs:
         run: supabase migration list
 
       - name: Push migrations
+        timeout-minutes: 20
         run: supabase db push
+
+      - name: Verify production schema contract
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          proof="$(supabase db query \
+            --linked \
+            --output json \
+            --file tools/db-assert/sql/assert_production_launch.sql)"
+          jq -e '
+            length == 1 and
+            .[0].migration_077_applied == true and
+            .[0].launch_functions_present == true and
+            .[0].launch_rpc_grants_safe == true and
+            .[0].direct_profile_insert_closed == true and
+            .[0].launch_constraints_valid == true and
+            .[0].launch_triggers_enabled == true and
+            .[0].community_bucket_listing_closed == true and
+            .[0].service_function_search_paths_pinned == true
+          ' <<<"$proof" >/dev/null
+          echo "Production migration 077 and launch schema contract verified."
+
+      - name: Verify post-migration production runtime
+        timeout-minutes: 3
+        env:
+          PRODUCTION_HEALTH_URL: https://exploreandearn.com/api/health
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if response="$(curl \
+              --silent \
+              --show-error \
+              --fail-with-body \
+              --connect-timeout 5 \
+              --max-time 10 \
+              --retry 2 \
+              --retry-delay 2 \
+              --retry-connrefused \
+              "$PRODUCTION_HEALTH_URL")" &&
+              jq -e '
+                type == "object" and
+                .status == "ready" and
+                .checks.database == "ok"
+              ' <<<"$response" >/dev/null; then
+              echo "Post-migration production runtime and database are ready."
+              break
+            fi
+
+            if [[ "$attempt" -eq 12 ]]; then
+              echo "Post-migration production readiness probe failed." >&2
+              exit 1
+            fi
+            echo "Post-migration production readiness probe is not healthy yet; waiting."
+            sleep 5
+          done

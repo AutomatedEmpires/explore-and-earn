@@ -13,7 +13,7 @@
  * Handled Clerk events:
  *   - user.created  -> ensures rows in users_profile_shadow + seeker_profiles,
  *                      then sends a best-effort welcome email (seeker or host)
- *   - user.updated  -> updates the cached email on users_profile_shadow
+ *   - user.updated  -> repairs missing profile rows, then updates cached email
  *   - user.deleted  -> soft-deletes (sets deleted_at) on users_profile_shadow
  *
  * Requests are verified with Svix using the svix-id / svix-timestamp /
@@ -117,7 +117,7 @@ async function sendWelcomeEmail(user: ClerkUserPayload): Promise<void> {
 	})
 }
 
-async function syncUserCreated(user: ClerkUserPayload): Promise<boolean> {
+async function ensureUserRows(user: ClerkUserPayload): Promise<boolean> {
 	if (!user.id) {
 		throw new Error("Clerk user.created payload is missing data.id.")
 	}
@@ -154,6 +154,11 @@ async function syncUserUpdated(user: ClerkUserPayload): Promise<void> {
 	if (!user.id) {
 		throw new Error("Clerk user.updated payload is missing data.id.")
 	}
+
+	// An older or out-of-order delivery can leave Clerk authoritative while one
+	// or both database rows are absent. Repair the same idempotent pair as
+	// user.created, but never send a welcome from an update event.
+	await ensureUserRows(user)
 
 	const supabase = getSupabaseServiceRoleClient()
 	const { error } = await supabase
@@ -198,7 +203,7 @@ export async function POST(request: Request) {
 	try {
 		switch (event.type) {
 			case "user.created":
-				if (await syncUserCreated(event.data)) {
+				if (await ensureUserRows(event.data)) {
 					try {
 						await sendWelcomeEmail(event.data)
 					} catch (welcomeError) {

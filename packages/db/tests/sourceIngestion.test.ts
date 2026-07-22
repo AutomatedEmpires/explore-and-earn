@@ -30,6 +30,10 @@ import {
   type InventoryIndex,
   type SourceFieldMapping,
 } from "../src/lib/sourceIngestion";
+import {
+  insertColumns,
+  plannedToListingColumns,
+} from "../src/queries/sourcedListings";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -462,10 +466,7 @@ describe("validateSourceConfig", () => {
 /* --------------------------------------------------- update-column safety */
 
 describe("import column sets — updates never touch ownership/claim state", () => {
-  it("update columns exclude provenance/host/claim; insert columns include them", async () => {
-    const { plannedToListingColumns, insertColumns } = await import(
-      "../src/queries/sourcedListings"
-    );
+  it("update columns exclude provenance/host/claim; insert columns include them", () => {
     const normalizedResult = normalizeRecord(baseRaw, MAPPING);
     if (!normalizedResult.ok) throw new Error("normalize failed");
     const entry = {

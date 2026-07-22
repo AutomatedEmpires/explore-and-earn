@@ -62,6 +62,7 @@ function request() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  webhookEvent.current.type = "user.created";
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://project.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
   process.env.CLERK_WEBHOOK_SECRET = "whsec_test";
@@ -151,6 +152,40 @@ describe("Clerk user.created retry handling", () => {
 
     expect(response.status).toBe(500);
     expect(from).toHaveBeenCalledTimes(1);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Clerk user.updated repair handling", () => {
+  it("repairs missing profile rows without sending a welcome", async () => {
+    webhookEvent.current.type = "user.updated";
+
+    const inserts = new Map<string, ReturnType<typeof vi.fn>>();
+    const updateEq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn(() => ({ eq: updateEq }));
+    const from = vi.fn((table: string) => {
+      const insert = vi.fn().mockResolvedValue({ error: null });
+      inserts.set(table, insert);
+      return { insert, update };
+    });
+    createClientMock.mockReturnValue({ from });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(from.mock.calls.map(([table]) => table)).toEqual([
+      "users_profile_shadow",
+      "seeker_profiles",
+      "users_profile_shadow",
+    ]);
+    expect(inserts.get("seeker_profiles")).toHaveBeenCalledWith({
+      clerk_user_id: "user_webhook_retry",
+    });
+    expect(update).toHaveBeenCalledWith({ email: "retry@example.test" });
+    expect(updateEq).toHaveBeenCalledWith(
+      "clerk_user_id",
+      "user_webhook_retry",
+    );
     expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });

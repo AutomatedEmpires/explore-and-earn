@@ -31,6 +31,7 @@
 
 /* ── Hero — framed photo, homepage pattern ────────────────────── */
 .hero {
+  box-sizing: border-box;
   width: 100%;
   max-width: 1120px;
   margin: 0 auto;
@@ -170,6 +171,7 @@
 
 /* ── Dashboard preview ────────────────────────────────────────── */
 .previewWrap {
+  box-sizing: border-box;
   max-width: 960px;
   width: 100%;
   margin: var(--space-24) auto 0;
@@ -339,6 +341,7 @@
 }
 
 .flows {
+  box-sizing: border-box;
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
@@ -388,6 +391,7 @@
 
 /* ── Pricing ──────────────────────────────────────────────────── */
 .pricing {
+  box-sizing: border-box;
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
@@ -562,6 +566,7 @@
 
 /* ── Final CTA ────────────────────────────────────────────────── */
 .finalCta {
+  box-sizing: border-box;
   max-width: 640px;
   width: 100%;
   margin: 0 auto;

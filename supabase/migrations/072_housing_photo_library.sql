@@ -3,6 +3,12 @@
 
 begin;
 
+-- Fail quickly if another writer is holding the rollout tables, and bound the
+-- migration transaction itself. The deploy workflow can be retried safely;
+-- waiting indefinitely while Production is partially cut over is not safe.
+set local lock_timeout = '15s';
+set local statement_timeout = '10min';
+
 -- Freeze every table participating in the cross-row preflight before changing
 -- schema or scanning evidence. SHARE ROW EXCLUSIVE blocks concurrent writers
 -- while allowing ordinary reads and is held until this transaction commits.

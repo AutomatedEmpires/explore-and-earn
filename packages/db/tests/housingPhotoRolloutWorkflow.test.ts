@@ -9,6 +9,13 @@ const securityWorkflow = readFileSync(
   new URL("../../../.github/workflows/db-security.yml", import.meta.url),
   "utf8",
 );
+const productionLaunchAssertion = readFileSync(
+  new URL(
+    "../../../tools/db-assert/sql/assert_production_launch.sql",
+    import.meta.url,
+  ),
+  "utf8",
+).toLowerCase();
 
 function assertExactProductionDeploymentGate(source: string): void {
   const locate = (fragment: string, after = 0): number => {
@@ -111,6 +118,55 @@ describe("housing-photo migration deploy ordering", () => {
     expect(gate).toContain("failure|error)");
     expect(gate).toContain(
       "Timed out waiting for Vercel production deployment of ${GITHUB_SHA}.",
+    );
+  });
+
+  it("bounds the push and fails closed on post-migration schema and runtime proof", () => {
+    const pushStep = workflow.indexOf("- name: Push migrations");
+    const schemaStep = workflow.indexOf(
+      "- name: Verify production schema contract",
+      pushStep,
+    );
+    const runtimeStep = workflow.indexOf(
+      "- name: Verify post-migration production runtime",
+      schemaStep,
+    );
+
+    expect(workflow.slice(pushStep, schemaStep)).toContain("timeout-minutes: 20");
+    expect(workflow.slice(schemaStep, runtimeStep)).toContain(
+      "--file tools/db-assert/sql/assert_production_launch.sql",
+    );
+    for (const proof of [
+      "migration_077_applied",
+      "launch_functions_present",
+      "launch_rpc_grants_safe",
+      "direct_profile_insert_closed",
+      "launch_constraints_valid",
+      "launch_triggers_enabled",
+      "community_bucket_listing_closed",
+      "service_function_search_paths_pinned",
+    ]) {
+      expect(workflow.slice(schemaStep, runtimeStep)).toContain(
+        `.[0].${proof} == true`,
+      );
+      expect(productionLaunchAssertion).toContain(`as ${proof}`);
+    }
+    expect(workflow.slice(runtimeStep)).toContain(
+      "Post-migration production runtime and database are ready.",
+    );
+    expect(workflow.slice(runtimeStep)).toContain(
+      "Post-migration production readiness probe failed.",
+    );
+  });
+
+  it("keeps the production launch assertion read-only", () => {
+    expect(productionLaunchAssertion.trimStart()).toMatch(/^select\b/);
+    const withoutStringLiterals = productionLaunchAssertion.replace(
+      /'(?:''|[^'])*'/g,
+      "''",
+    );
+    expect(withoutStringLiterals).not.toMatch(
+      /\b(insert|update|delete|alter|create|drop|truncate|grant|revoke)\b/,
     );
   });
 });
