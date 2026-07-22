@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { SignUp } from "@clerk/nextjs";
 import { Icon } from "@explore-and-earn/ui";
 
@@ -35,6 +36,9 @@ export default async function SignUpPage({ searchParams }: Props) {
   // Route intent only — Clerk wiring is untouched; seekers land in onboarding,
   // hosts in the host onboarding flow, and "already have an account" keeps role.
   const safeRedirectUrl = safeInternalRedirect(redirect_url);
+  if (redirect_url !== undefined && !safeRedirectUrl) {
+    redirect(authRoleHref("sign-up", role));
+  }
   const redirectTo = safeRedirectUrl ?? DEFAULT_REDIRECT[role];
   const signInUrl = authRoleHref("sign-in", role, safeRedirectUrl);
 

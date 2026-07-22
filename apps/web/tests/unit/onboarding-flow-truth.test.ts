@@ -76,6 +76,8 @@ describe("onboarding persistence and preview truth", () => {
 
     expect(middleware).toContain("isPrivateHostDashboardPath(pathname)");
     expect(middleware).toContain('pathname.startsWith("/claim/")');
+    expect(middleware).toContain("stripUnsafeAuthRedirect(request)");
+    expect(middleware).toContain('searchParams.getAll("redirect_url")');
     expect(middleware).toContain(
       "`${request.nextUrl.pathname}${request.nextUrl.search}`",
     );

@@ -162,6 +162,53 @@ test.describe("public surfaces (guest)", () => {
     expect(authLink.searchParams.get("role")).toBe("host");
     expect(authLink.searchParams.get("redirect_url")).toBe(claimPath);
   });
+
+  test("auth entrypoints strip external return targets before Clerk renders", async ({
+    page,
+    request,
+  }) => {
+    const unsafeSignIn = await request.get(
+      `${BASE}/sign-in?role=host&redirect_url=https%3A%2F%2Fattacker.example`,
+      { maxRedirects: 0 },
+    );
+    expect(unsafeSignIn.status()).toBe(307);
+    expect(new URL(unsafeSignIn.headers().location, BASE).toString()).toBe(
+      `${BASE}/sign-in?role=host`,
+    );
+
+    await page.goto(
+      "/sign-in?role=host&redirect_url=https%3A%2F%2Fattacker.example",
+    );
+    await expect(page).toHaveURL(`${BASE}/sign-in?role=host`);
+    let canonical = new URL(page.url());
+    expect(canonical.pathname).toBe("/sign-in");
+    expect(canonical.searchParams.get("role")).toBe("host");
+    expect(canonical.searchParams.has("redirect_url")).toBe(false);
+    await expect(
+      page.getByRole("link", { name: /create an account/i }),
+    ).toHaveAttribute("href", "/sign-up?role=host");
+
+    const unsafeSignUp = await request.get(
+      `${BASE}/sign-up?role=host&redirect_url=%2F%2Fattacker.example`,
+      { maxRedirects: 0 },
+    );
+    expect(unsafeSignUp.status()).toBe(307);
+    expect(new URL(unsafeSignUp.headers().location, BASE).toString()).toBe(
+      `${BASE}/sign-up?role=host`,
+    );
+
+    await page.goto(
+      "/sign-up?role=host&redirect_url=%2F%2Fattacker.example",
+    );
+    await expect(page).toHaveURL(`${BASE}/sign-up?role=host`);
+    canonical = new URL(page.url());
+    expect(canonical.pathname).toBe("/sign-up");
+    expect(canonical.searchParams.get("role")).toBe("host");
+    expect(canonical.searchParams.has("redirect_url")).toBe(false);
+    await expect(
+      page.getByRole("link", { name: /already have an account/i }),
+    ).toHaveAttribute("href", "/sign-in?role=host");
+  });
 });
 
 test.describe("keyless auth fails closed", () => {

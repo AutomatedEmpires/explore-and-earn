@@ -3,6 +3,7 @@ import createIntlMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { routing } from "./i18n/routing";
+import { safeInternalRedirect } from "./lib/authRedirect";
 import { DEV_ROLE_COOKIE, isDevBenchEnabled } from "./lib/devBench";
 import { isPrivateHostDashboardPath } from "./lib/hostRoutes";
 
@@ -151,6 +152,23 @@ function redirectToRoleSignIn(
   return NextResponse.redirect(url);
 }
 
+function stripUnsafeAuthRedirect(request: NextRequest): NextResponse | null {
+  const { pathname, searchParams } = request.nextUrl;
+  if (pathname !== "/sign-in" && pathname !== "/sign-up") return null;
+  const candidates = searchParams.getAll("redirect_url");
+  if (candidates.length === 0) return null;
+  if (
+    candidates.length === 1 &&
+    safeInternalRedirect(candidates[0] ?? undefined)
+  ) {
+    return null;
+  }
+
+  const url = request.nextUrl.clone();
+  url.searchParams.delete("redirect_url");
+  return NextResponse.redirect(url);
+}
+
 const hasClerkMiddlewareConfig =
   Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) &&
   Boolean(process.env.CLERK_SECRET_KEY);
@@ -169,6 +187,8 @@ export default hasClerkMiddlewareConfig
   ? clerkMiddleware(async (auth, request) => {
       const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
       if (defaultLocaleRedirect) return defaultLocaleRedirect;
+      const safeAuthRedirect = stripUnsafeAuthRedirect(request);
+      if (safeAuthRedirect) return safeAuthRedirect;
       const localize = shouldLocalize(request.nextUrl.pathname);
       // DEV MOCK BENCH (review tooling only): when impersonating a role locally,
       // skip Clerk protection so every surface is reachable without a login.
@@ -204,6 +224,8 @@ export default hasClerkMiddlewareConfig
       // lib/devBench + lib/admin, so this only ever opens inert shells.
       const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
       if (defaultLocaleRedirect) return defaultLocaleRedirect;
+      const safeAuthRedirect = stripUnsafeAuthRedirect(request);
+      if (safeAuthRedirect) return safeAuthRedirect;
       const localize = shouldLocalize(request.nextUrl.pathname);
       if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
         return localize ? intlMiddleware(request) : NextResponse.next();

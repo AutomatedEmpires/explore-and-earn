@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { SignIn } from "@clerk/nextjs";
 import { Icon } from "@explore-and-earn/ui";
 
@@ -40,6 +41,13 @@ export default async function SignInPage({ searchParams }: Props) {
   // Route intent only — Clerk wiring is untouched; we just pass where to land
   // and where its "create account" link should go, carrying the chosen role.
   const safeRedirectUrl = safeInternalRedirect(redirect_url);
+  if (redirect_url !== undefined && !safeRedirectUrl) {
+    redirect(
+      role === "admin"
+        ? "/sign-in?role=admin"
+        : authRoleHref("sign-in", role),
+    );
+  }
   const redirectTo = safeRedirectUrl ?? DEFAULT_REDIRECT[role];
   const signUpUrl =
     role === "admin"
