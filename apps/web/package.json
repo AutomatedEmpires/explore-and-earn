@@ -6,7 +6,7 @@
 		"dev": "next dev --turbopack",
 		"dev:webpack": "next dev",
 		"dev:poll": "WATCHPACK_POLLING=true next dev",
-		"build": "next build && node ../../tools/scripts/repair-client-reference-manifests.mjs",
+		"build": "node ../../tools/scripts/check-posthog-env.mjs && next build && node ../../tools/scripts/repair-client-reference-manifests.mjs",
 		"start": "next start",
 		"lint": "eslint .",
 		"typecheck": "tsc -p tsconfig.json --noEmit",

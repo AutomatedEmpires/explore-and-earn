@@ -160,7 +160,6 @@ export function generateOrganizationJsonLd(baseUrl: string): string {
       "https://facebook.com/exploreandearn",
       "https://instagram.com/exploreandearn",
       "https://threads.net/@exploreandearn",
-      "https://x.com/exploreandearn",
     ],
   };
   return escapeJsonLdHtml(JSON.stringify(org, null, 2));

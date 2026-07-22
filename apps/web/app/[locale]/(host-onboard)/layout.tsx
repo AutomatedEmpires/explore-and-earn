@@ -33,7 +33,9 @@ export default async function HostOnboardLayout({
 
 	const { userId } = await optionalAuth();
 	if (!userId) {
-		redirect(`/sign-in?redirect_url=${encodeURIComponent("/host/onboarding")}`);
+		redirect(
+			`/sign-in?role=host&redirect_url=${encodeURIComponent("/host/onboarding")}`,
+		);
 	}
 
 	return <>{children}</>;

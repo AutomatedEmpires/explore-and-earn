@@ -262,6 +262,45 @@ if (!housingMigration) {
   }
 }
 
+// A host-editable coordinate pair must stay complete and geographically
+// bounded even when a caller bypasses the application parser.
+const coordinateMigration = migrationFiles.find((f) => /^074_.*\.sql$/.test(f))
+if (!coordinateMigration) {
+  hasFailure = true
+  console.error("G-LISTING-COORDINATES: expected migration 074 to be present.")
+} else {
+  const sql = fileContents
+    .get(coordinateMigration)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "add constraint listings_coordinates_pair_check",
+    "(latitude is null and longitude is null) or (latitude is not null and longitude is not null)",
+    "validate constraint listings_coordinates_pair_check",
+    "add constraint listings_coordinates_bounds_check",
+    "latitude between -90 and 90",
+    "longitude between -180 and 180",
+    "validate constraint listings_coordinates_bounds_check",
+    "add constraint listings_coordinates_location_check",
+    "or nullif(btrim(location_display), '') is not null",
+    "validate constraint listings_coordinates_location_check",
+    "create or replace function private.preserve_listing_coordinate_truth()",
+    "new.location_display is distinct from old.location_display",
+    "claim_coordinate_snapshot_missing",
+    "new.latitude := (v_snapshot->>'latitude')::double precision",
+    "create trigger trg_listings_claim_coordinate_ownership",
+    "grant update (latitude, longitude) on public.listings to authenticated;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-LISTING-COORDINATES: ${coordinateMigration} is missing ${needle}`,
+      )
+    }
+  }
+}
+
 if (hasFailure) {
   process.exit(1)
 }

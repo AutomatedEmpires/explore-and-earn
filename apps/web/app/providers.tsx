@@ -3,8 +3,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type posthogType from "posthog-js";
 
-const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST;
+import { resolvePostHogConfig } from "../lib/posthogConfig";
+
+const posthogConfig = resolvePostHogConfig(
+	process.env.NEXT_PUBLIC_POSTHOG_KEY,
+	process.env.NEXT_PUBLIC_POSTHOG_HOST,
+);
 
 /**
  * PostHog is deferred off the critical path: the static import shipped
@@ -16,7 +20,7 @@ export function Providers({ children }: { children: ReactNode }) {
 	const [, setClient] = useState<typeof posthogType | null>(null);
 
 	useEffect(() => {
-		if (!posthogKey) return;
+		if (!posthogConfig) return;
 		const load = () =>
 			import("posthog-js").then(({ default: posthog }) => {
 				// Honor the persisted cookie-banner choice at init — the banner's
@@ -27,8 +31,8 @@ export function Providers({ children }: { children: ReactNode }) {
 				} catch {
 					// Private mode — stay opted out.
 				}
-				posthog.init(posthogKey, {
-					api_host: posthogHost,
+				posthog.init(posthogConfig.key, {
+					api_host: posthogConfig.host,
 					capture_pageview: "history_change",
 					opt_out_capturing_by_default: !accepted,
 					// Product analytics is consent-gated above. Replay and console capture

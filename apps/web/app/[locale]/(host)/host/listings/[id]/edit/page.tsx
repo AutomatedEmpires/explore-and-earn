@@ -48,6 +48,8 @@ export default async function HostListingEditPage({
     title: listing.title,
     category: listing.category,
     locationName: listing.location_display ?? undefined,
+    latitude: listing.latitude ?? undefined,
+    longitude: listing.longitude ?? undefined,
     summary: listing.description ?? undefined,
     // Hydrate every field the form submits — otherwise a blank field re-saves as
     // empty and wipes the stored value (housing/meals flipping included→false,

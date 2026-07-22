@@ -94,6 +94,7 @@ const isPublicRoute = createRouteMatcher([
   "/terms",
   "/privacy",
   "/cookies",
+  "/refunds",
   "/about",
   "/faq", // Advertised in sitemap + llms.txt; legal/marketing content, no auth.
   "/for-hosts", // Prospect-facing host preview — MUST be reachable without a login.
@@ -101,6 +102,11 @@ const isPublicRoute = createRouteMatcher([
   "/blog/(.*)",
   "/sitemap.xml",
   "/robots.txt",
+  // Generated metadata images are requested by browsers and link unfurlers
+  // without a Clerk session. Keep them outside the auth wall just like the
+  // static metadata routes above.
+  "/icon",
+  "/opengraph-image",
   // Advertised AI site guide (linked from robots + docs) — must be readable
   // by anonymous crawlers/agents, exactly like robots.txt and the sitemap.
   "/llms.txt",

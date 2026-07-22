@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Icon } from "@explore-and-earn/ui";
 
-import { DraftBanner } from "../DraftBanner";
 import styles from "../legal.module.css";
 
 export const dynamic = "force-static";
@@ -17,8 +16,6 @@ export function generateMetadata(): Metadata {
 export default function RefundsPage() {
 	return (
 		<>
-			<DraftBanner />
-
 			{/* Hero */}
 			<div className={`${styles.hero} ${styles.heroRefunds}`}>
 				<span className={styles.heroIcon}>

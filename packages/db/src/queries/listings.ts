@@ -23,6 +23,7 @@ import {
   hostBenefitDecision,
   formatOpportunityWindow,
   hasVerifiedHostSubscription,
+  isValidGeoPoint,
   sanitizeCategoryDepth,
   sanitizeLogistics,
 } from "@explore-and-earn/contracts";
@@ -1005,6 +1006,8 @@ export interface ListingWriteFields {
   title?: string;
   category?: OpportunityCategory;
   locationName?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   housingProvision?: BenefitProvision;
   housingDescription?: string | null;
   mealsProvision?: BenefitProvision;
@@ -1052,6 +1055,8 @@ type ListingColumnPatch = {
   title?: string;
   category?: OpportunityCategory;
   location_display?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   description?: string | null;
   begins_at?: string | null;
   ends_at?: string | null;
@@ -1105,6 +1110,27 @@ function toCentsOrNull(amount: number | null | undefined): number | null {
  */
 const benefitDecision = hostBenefitDecision;
 
+function listingCoordinateError(fields: ListingWriteFields): string | null {
+  const hasLatitude = fields.latitude !== undefined;
+  const hasLongitude = fields.longitude !== undefined;
+  if (!hasLatitude && !hasLongitude) return null;
+  if (hasLatitude !== hasLongitude) {
+    return "A map pin must include both latitude and longitude.";
+  }
+  if (fields.latitude === null && fields.longitude === null) return null;
+  if (
+    fields.latitude === null ||
+    fields.longitude === null ||
+    !isValidGeoPoint({ lat: fields.latitude, lng: fields.longitude })
+  ) {
+    return "The map pin coordinates are invalid.";
+  }
+  if (!fields.locationName?.trim()) {
+    return "Choose a location name before saving its map pin.";
+  }
+  return null;
+}
+
 function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch {
   const patch: ListingColumnPatch = {};
 
@@ -1114,6 +1140,17 @@ function buildListingColumnPatch(fields: ListingWriteFields): ListingColumnPatch
   if (fields.locationName !== undefined) {
     const trimmed = fields.locationName?.trim() ?? "";
     patch.location_display = trimmed.length > 0 ? trimmed : null;
+    // A changed/cleared label cannot safely retain coordinates for an earlier
+    // place. Legacy callers that do not know the point fields therefore clear
+    // the stale pin instead of silently moving only its display text.
+    if (fields.latitude === undefined && fields.longitude === undefined) {
+      patch.latitude = null;
+      patch.longitude = null;
+    }
+  }
+  if (fields.latitude !== undefined && fields.longitude !== undefined) {
+    patch.latitude = fields.latitude;
+    patch.longitude = fields.longitude;
   }
   if (fields.summary !== undefined) {
     const trimmed = fields.summary?.trim() ?? "";
@@ -1202,6 +1239,8 @@ export async function createListing(
   const title = fields.title?.trim() ?? "";
   if (title.length === 0) return { ok: false, error: "A listing title is required." };
   if (!fields.category) return { ok: false, error: "Choose a valid category for the listing." };
+  const coordinateError = listingCoordinateError(fields);
+  if (coordinateError) return { ok: false, error: coordinateError };
 
   const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
   if (!hostProfileId) {
@@ -1229,6 +1268,8 @@ export async function updateListing(
   fields: ListingWriteFields,
 ): Promise<{ ok: boolean; error?: string }> {
   if (!listingId) return { ok: false, error: "Missing listing id." };
+  const coordinateError = listingCoordinateError(fields);
+  if (coordinateError) return { ok: false, error: coordinateError };
 
   const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
   if (!hostProfileId) return { ok: false, error: "No host profile found for your account." };

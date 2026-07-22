@@ -68,8 +68,9 @@ export const metadata: Metadata = {
 		statusBarStyle: "default",
 	},
 	icons: {
-		// app/icon.tsx still provides the generated favicon; this adds the
-		// PWA/home-screen icons from the Glacier maskable set.
+		// app/icon.tsx provides the regular browser icon; the static PNG is the
+		// higher-resolution PWA/home-screen treatment.
+		icon: [{ url: "/icon", type: "image/png", sizes: "32x32" }],
 		apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
 	},
 	openGraph: {

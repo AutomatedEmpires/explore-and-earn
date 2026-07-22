@@ -15,12 +15,14 @@ import {
   COMPENSATION_UNIT,
   NOT_STATED_LABEL,
   hasVerifiedHostSubscription,
+  isValidGeoPoint,
   sanitizeConnectivity,
   sanitizeMaritimeDepth,
   statedFactsKey,
   type BenefitEvidenceStatus,
   type CompensationUnit,
   type ConnectivityInfo,
+  type GeoPoint,
   type HostBenefitChoice,
   type MarketplaceCategory,
   type MaritimeDepth,
@@ -29,6 +31,7 @@ import {
 import { ImageUpload } from "../ImageUpload";
 import { BenefitTrustModal, type BenefitKind } from "../discovery";
 import { ConnectivityFields } from "./ConnectivityFields";
+import { LocationPicker } from "./LocationPicker";
 import { MaritimeDepthFields } from "./MaritimeDepthFields";
 import { MediaGalleryUpload, type GalleryItem } from "./MediaGalleryUpload";
 import { createListingAction, updateListingAction } from "../../app/actions/listings";
@@ -48,6 +51,8 @@ export interface ListingFormInitialValues {
   readonly title?: string;
   readonly category?: MarketplaceCategory;
   readonly locationName?: string;
+  readonly latitude?: number;
+  readonly longitude?: number;
   readonly housingDescription?: string;
   readonly mealsDescription?: string;
   /** Stored evidence + value, so an edit hydrates the host's real answer. */
@@ -177,6 +182,13 @@ function lanesFromCategory(category: MarketplaceCategory | undefined): Marketpla
   return [category];
 }
 
+/** Never hydrate a partial/out-of-range legacy point into the host editor. */
+function pointFromInitial(initial: ListingFormInitialValues | undefined): GeoPoint | null {
+  if (!initial?.locationName?.trim()) return null;
+  const point = { lat: initial.latitude, lng: initial.longitude };
+  return isValidGeoPoint(point) ? point : null;
+}
+
 /** Collapse the multi-select back to the single stored category the action reads. */
 function categoryFromLanes(lanes: readonly MarketplaceCategory[]): MarketplaceCategory | undefined {
   if (lanes.includes("mix")) return "mix";
@@ -262,6 +274,9 @@ export function ListingForm({
     lanesFromCategory(initial?.category),
   );
   const [locationName, setLocationName] = useState(initial?.locationName ?? "");
+  const [locationPoint, setLocationPoint] = useState<GeoPoint | null>(() =>
+    pointFromInitial(initial),
+  );
   const [connectivity, setConnectivity] = useState<ConnectivityInfo>(
     initial?.connectivity ?? {},
   );
@@ -506,6 +521,8 @@ export function ListingForm({
     formData.set("title", title.trim());
     formData.set("category", derivedCategory);
     formData.set("locationName", locationName.trim());
+    formData.set("latitude", locationPoint ? String(locationPoint.lat) : "");
+    formData.set("longitude", locationPoint ? String(locationPoint.lng) : "");
     formData.set("housingDescription", housingDescription.trim());
     formData.set("mealsDescription", mealsDescription.trim());
     // Always submitted, INCLUDING the empty unanswered state — that is a fact
@@ -788,19 +805,14 @@ export function ListingForm({
                     Location name
                   </label>
                 </div>
-                <input
-                  className={styles.input}
-                  id="listing-location"
-                  name="locationName"
-                  type="text"
+                <LocationPicker
                   value={locationName}
-                  onChange={(event) => setLocationName(event.target.value)}
-                  placeholder="Wenatchee, WA"
+                  point={locationPoint}
+                  onChange={(nextName, nextPoint) => {
+                    setLocationName(nextName);
+                    setLocationPoint(nextPoint);
+                  }}
                 />
-                <p className={styles.hint}>
-                  Use a town + state or region. Precise map coordinates are set later on the
-                  listing.
-                </p>
               </div>
 
               {/* Connectivity — a property of the PLACE, and often the fact that

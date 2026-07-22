@@ -175,13 +175,46 @@ describe("normalizeRecord — stated facts only", () => {
     expect(result.record.endsAt).toBeNull();
   });
 
-  it("ignores out-of-range coordinates rather than shipping bad geo", () => {
-    const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
-    const result = normalizeRecord({ ...baseRaw, lat: "95.2", lng: "-121.5" }, withGeo);
-    if (!result.ok) throw new Error("expected ok");
-    expect(result.record.latitude).toBeNull();
-    expect(result.record.longitude).toBe(-121.5);
-  });
+	it("drops the whole point when either coordinate is invalid", () => {
+		const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
+		const result = normalizeRecord({ ...baseRaw, lat: "95.2", lng: "-121.5" }, withGeo);
+		if (!result.ok) throw new Error("expected ok");
+		expect(result.record.latitude).toBeNull();
+		expect(result.record.longitude).toBeNull();
+	});
+
+	it("drops a bounded pair when no display location was stated", () => {
+		const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
+		const result = normalizeRecord(
+			{ ...baseRaw, place: "", lat: "47.4", lng: "-121.5" },
+			withGeo,
+		);
+		if (!result.ok) throw new Error("expected ok");
+		expect(result.record.latitude).toBeNull();
+		expect(result.record.longitude).toBeNull();
+	});
+
+	it("never converts blank source coordinates into a fabricated zero point", () => {
+		const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
+		const result = normalizeRecord(
+			{ ...baseRaw, lat: "  ", lng: "\t" },
+			withGeo,
+		);
+		if (!result.ok) throw new Error("expected ok");
+		expect(result.record.latitude).toBeNull();
+		expect(result.record.longitude).toBeNull();
+	});
+
+	it("keeps a genuinely stated zero point", () => {
+		const withGeo: SourceFieldMapping = { ...MAPPING, latitude: "lat", longitude: "lng" };
+		const result = normalizeRecord(
+			{ ...baseRaw, lat: "0", lng: "0" },
+			withGeo,
+		);
+		if (!result.ok) throw new Error("expected ok");
+		expect(result.record.latitude).toBe(0);
+		expect(result.record.longitude).toBe(0);
+	});
 });
 
 describe("parseStatedBenefit — absence is never evidence", () => {

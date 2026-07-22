@@ -98,6 +98,22 @@ test.describe("public surfaces (guest)", () => {
     await expect(page).toHaveTitle(/page not found/i);
     await expect(page.getByText(/couldn.t load this listing/i)).toHaveCount(0);
   });
+
+  test("signed-out host onboarding preserves the host auth lane", async ({
+    page,
+  }) => {
+    await page.goto("/host/onboarding");
+
+    await expect(page).toHaveURL(/\/sign-in\?role=host&redirect_url=/);
+    await expect(page.getByRole("tab", { name: /i.m a host/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(page.getByRole("link", { name: /create an account/i })).toHaveAttribute(
+      "href",
+      "/sign-up?role=host",
+    );
+  });
 });
 
 test.describe("keyless auth fails closed", () => {

@@ -14,6 +14,26 @@ describe("onboarding persistence and preview truth", () => {
     ).toHaveLength(2);
   });
 
+  it("keeps PostHog ingestion in connect-src and assets in script-src", () => {
+    const config = source("next.config.ts");
+    expect(config.match(/https:\/\/us\.i\.posthog\.com/g)).toHaveLength(1);
+    expect(config.match(/https:\/\/us-assets\.i\.posthog\.com/g)).toHaveLength(1);
+  });
+
+  it("ships operative legal pages without internal draft disclaimers", () => {
+    const pages = [
+      "app/[locale]/(legal)/terms/page.tsx",
+      "app/[locale]/(legal)/cookies/page.tsx",
+      "app/[locale]/(legal)/refunds/page.tsx",
+    ];
+
+    for (const path of pages) {
+      const page = source(path);
+      expect(page).not.toContain("DraftBanner");
+      expect(page).not.toContain("not legally binding");
+    }
+  });
+
   it("persists every host essential without fabricating verification or benefits", () => {
     const page = source("app/[locale]/(host-onboard)/host/onboarding/page.tsx");
 
@@ -24,6 +44,32 @@ describe("onboarding persistence and preview truth", () => {
       'benefitProvision: { housing: "not_stated", meals: "not_stated", pay: "not_stated" }',
     );
     expect(page).not.toContain("verifiedHost: true");
+  });
+
+  it("preserves host intent when signed-out hosts enter onboarding", () => {
+    const layout = source(
+      "app/[locale]/(host-onboard)/layout.tsx",
+    );
+    const signIn = source(
+      "app/[locale]/(auth)/sign-in/[[...sign-in]]/page.tsx",
+    );
+
+    expect(layout).toContain("/sign-in?role=host&redirect_url=");
+    expect(signIn).toContain("`/sign-up?role=${role}`");
+  });
+
+  it("keeps the linked refund policy public", () => {
+    const middleware = source("middleware.ts");
+    expect(middleware).toContain('"/refunds"');
+  });
+
+  it("keeps generated metadata images public and advertises a browser icon", () => {
+    const middleware = source("middleware.ts");
+    const layout = source("app/layout.tsx");
+
+    expect(middleware).toContain('"/icon"');
+    expect(middleware).toContain('"/opengraph-image"');
+    expect(layout).toContain('icon: [{ url: "/icon"');
   });
 
   it("never advances seeker onboarding after a failed save", () => {

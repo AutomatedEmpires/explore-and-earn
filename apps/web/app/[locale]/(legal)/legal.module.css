@@ -10,55 +10,6 @@
 	gap: var(--space-4);
 }
 
-/* ── Draft banner (pre-launch legal drafts — non-dismissible) ────────────── */
-
-.draftBanner {
-	display: flex;
-	align-items: flex-start;
-	gap: var(--space-10);
-	padding: var(--space-12) var(--space-14);
-	border-radius: var(--radius-card);
-	background: var(--status-warning-bg);
-	border: 1.5px solid color-mix(in srgb, var(--status-warning-fg) 42%, transparent);
-	border-left: 3px solid var(--status-warning-fg);
-	margin-bottom: var(--space-4);
-}
-
-.draftBannerIcon {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 1.85rem;
-	height: 1.85rem;
-	flex-shrink: 0;
-	border-radius: var(--radius-pill);
-	background: color-mix(in srgb, var(--status-warning-fg) 16%, transparent);
-	color: var(--status-warning-fg);
-}
-
-.draftBannerBody {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	min-width: 0;
-}
-
-.draftBannerTitle {
-	margin: 0;
-	font-family: var(--font-display);
-	font-size: var(--type-body-size);
-	line-height: 1.2;
-	color: var(--status-warning-fg);
-}
-
-.draftBannerText {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-meta-size);
-	line-height: var(--type-body-lh);
-	color: color-mix(in srgb, var(--status-warning-fg) 82%, var(--text-primary));
-}
-
 /* ── Hero ────────────────────────────────────────────────────────────────── */
 
 .hero {

@@ -23,6 +23,7 @@ import {
 } from "@explore-and-earn/contracts";
 
 import { checkRateLimit } from "../../lib/rateLimit";
+import { parseListingCoordinateSubmission } from "../../lib/listingCoordinates";
 import { isAllowedStorageUrl } from "../../lib/storageUrl";
 
 // Host-controllable transitions. The authoritative gate is canTransitionListing
@@ -235,6 +236,19 @@ function readListingFields(formData: FormData): ListingWriteFields {
   return fields;
 }
 
+function applyListingCoordinates(
+  formData: FormData,
+  fields: ListingWriteFields,
+): string | null {
+  const submission = parseListingCoordinateSubmission(formData);
+  if (!submission.ok) return submission.error;
+  if (submission.coordinates !== undefined) {
+    fields.latitude = submission.coordinates?.lat ?? null;
+    fields.longitude = submission.coordinates?.lng ?? null;
+  }
+  return null;
+}
+
 export async function createListingAction(
   formData: FormData,
 ): Promise<{ ok: boolean; listingId?: string; error?: string }> {
@@ -258,6 +272,10 @@ export async function createListingAction(
   }
 
   const fields = readListingFields(formData);
+  const coordinateError = applyListingCoordinates(formData, fields);
+  if (coordinateError) {
+    return { ok: false, error: coordinateError };
+  }
   const oversized = oversizedFieldError(fields);
   if (oversized) {
     return { ok: false, error: oversized };
@@ -306,6 +324,10 @@ export async function updateListingAction(
   }
 
   const fields = readListingFields(formData);
+  const coordinateError = applyListingCoordinates(formData, fields);
+  if (coordinateError) {
+    return { ok: false, error: coordinateError };
+  }
   const oversized = oversizedFieldError(fields);
   if (oversized) {
     return { ok: false, error: oversized };

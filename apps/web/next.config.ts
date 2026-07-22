@@ -80,6 +80,17 @@ const nextConfig: NextConfig = {
     // pull the full ~9,000-icon set) and for the @explore-and-earn/ui barrel.
     optimizePackageImports: ["@phosphor-icons/react", "@explore-and-earn/ui"],
   },
+  async redirects() {
+    return [
+      {
+        // Some user agents still request the conventional path directly even
+        // when rel=icon points at the generated metadata route.
+        source: "/favicon.ico",
+        destination: "/icon",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       { source: "/(.*)", headers: securityHeaders },

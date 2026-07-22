@@ -40,6 +40,20 @@ export interface GeoBounds {
 const isFiniteNumber = (value: unknown): value is number =>
 	typeof value === "number" && Number.isFinite(value)
 
+/** Validate a concrete point before it crosses a persistence or map boundary. */
+export function isValidGeoPoint(value: unknown): value is GeoPoint {
+	if (!value || typeof value !== "object") return false
+	const point = value as Record<string, unknown>
+	return (
+		isFiniteNumber(point.lat) &&
+		isFiniteNumber(point.lng) &&
+		point.lat >= -90 &&
+		point.lat <= 90 &&
+		point.lng >= -180 &&
+		point.lng <= 180
+	)
+}
+
 export function isValidGeoBounds(value: unknown): value is GeoBounds {
 	if (!value || typeof value !== "object") return false
 	const b = value as Record<string, unknown>
