@@ -125,7 +125,13 @@ type FunnelRole = "host" | "seeker";
  * Preserve their role and exact return path before the request reaches a layout.
  */
 function protectedFunnelRole(pathname: string): FunnelRole | null {
-  if (isPrivateHostDashboardPath(pathname)) return "host";
+  if (
+    isPrivateHostDashboardPath(pathname) ||
+    pathname === "/claim" ||
+    pathname.startsWith("/claim/")
+  ) {
+    return "host";
+  }
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
     return "seeker";
   }

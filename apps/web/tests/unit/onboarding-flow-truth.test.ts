@@ -59,7 +59,14 @@ describe("onboarding persistence and preview truth", () => {
     );
 
     expect(layout).toContain("/sign-in?role=host&redirect_url=");
-    expect(signIn).toContain("`/sign-up?role=${role}`");
+    expect(signIn).toContain('authRoleHref("sign-up", role, safeRedirectUrl)');
+  });
+
+  it("preserves host intent when signed-out employers claim a sourced listing", () => {
+    const claimPage = source("app/[locale]/claim/[id]/page.tsx");
+
+    expect(claimPage).toContain("/sign-in?role=host&redirect_url=");
+    expect(claimPage).toContain("encodeURIComponent(`/claim/${id}`)");
   });
 
   it("preserves role and exact return paths at the public-route auth boundary", () => {
@@ -68,6 +75,7 @@ describe("onboarding persistence and preview truth", () => {
     const seekerLayout = source("app/[locale]/(seeker-onboard)/layout.tsx");
 
     expect(middleware).toContain("isPrivateHostDashboardPath(pathname)");
+    expect(middleware).toContain('pathname.startsWith("/claim/")');
     expect(middleware).toContain(
       "`${request.nextUrl.pathname}${request.nextUrl.search}`",
     );

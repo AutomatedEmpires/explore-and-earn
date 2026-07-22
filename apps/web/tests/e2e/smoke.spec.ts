@@ -111,7 +111,7 @@ test.describe("public surfaces (guest)", () => {
     );
     await expect(page.getByRole("link", { name: /create an account/i })).toHaveAttribute(
       "href",
-      "/sign-up?role=host",
+      "/sign-up?role=host&redirect_url=%2Fhost%2Fonboarding",
     );
   });
 
@@ -133,6 +133,34 @@ test.describe("public surfaces (guest)", () => {
     expect(redirected.searchParams.get("redirect_url")).toBe(
       "/onboarding/skills?source=resume",
     );
+
+    const claimPath = "/claim/00000000-0000-4000-8000-000000000001";
+    await page.goto(claimPath);
+    redirected = new URL(page.url());
+    expect(redirected.pathname).toBe("/sign-in");
+    expect(redirected.searchParams.get("role")).toBe("host");
+    expect(redirected.searchParams.get("redirect_url")).toBe(claimPath);
+
+    const createAccount = page.getByRole("link", {
+      name: /create an account/i,
+    });
+    const claimSignUpHref = await createAccount.getAttribute("href");
+    expect(claimSignUpHref).not.toBeNull();
+    let authLink = new URL(claimSignUpHref!, BASE);
+    expect(authLink.pathname).toBe("/sign-up");
+    expect(authLink.searchParams.get("role")).toBe("host");
+    expect(authLink.searchParams.get("redirect_url")).toBe(claimPath);
+
+    await page.goto(claimSignUpHref!);
+    const signIn = page.getByRole("link", {
+      name: /already have an account/i,
+    });
+    const claimSignInHref = await signIn.getAttribute("href");
+    expect(claimSignInHref).not.toBeNull();
+    authLink = new URL(claimSignInHref!, BASE);
+    expect(authLink.pathname).toBe("/sign-in");
+    expect(authLink.searchParams.get("role")).toBe("host");
+    expect(authLink.searchParams.get("redirect_url")).toBe(claimPath);
   });
 });
 

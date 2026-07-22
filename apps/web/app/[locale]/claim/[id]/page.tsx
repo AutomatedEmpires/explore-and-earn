@@ -37,7 +37,9 @@ export default async function ClaimListingPage({ params }: Props) {
 
   const { userId, getToken } = await optionalAuth();
   if (!userId) {
-    redirect(`/sign-in?redirect_url=/claim/${id}`);
+    redirect(
+      `/sign-in?role=host&redirect_url=${encodeURIComponent(`/claim/${id}`)}`,
+    );
   }
 
   const { listing, myClaim } = await getClaimContextAction(id);

@@ -3,10 +3,11 @@ import Link from "next/link";
 import { SignUp } from "@clerk/nextjs";
 import { Icon } from "@explore-and-earn/ui";
 
+import { safeInternalRedirect } from "../../../../../lib/authRedirect";
 import styles from "../../auth.module.css";
 import { clerkAppearance } from "../../clerk-appearance";
 import { KeylessAuthNotice, isClerkKeyless } from "../../keyless-notice";
-import { AuthRoleTabs } from "../../AuthRoleTabs";
+import { AuthRoleTabs, authRoleHref } from "../../AuthRoleTabs";
 
 export const metadata: Metadata = { title: "Join" };
 
@@ -33,8 +34,9 @@ export default async function SignUpPage({ searchParams }: Props) {
 
   // Route intent only — Clerk wiring is untouched; seekers land in onboarding,
   // hosts in the host onboarding flow, and "already have an account" keeps role.
-  const redirectTo = redirect_url ?? DEFAULT_REDIRECT[role];
-  const signInUrl = `/sign-in?role=${role}`;
+  const safeRedirectUrl = safeInternalRedirect(redirect_url);
+  const redirectTo = safeRedirectUrl ?? DEFAULT_REDIRECT[role];
+  const signInUrl = authRoleHref("sign-in", role, safeRedirectUrl);
 
   return (
     <main className={styles.authPage}>
@@ -43,7 +45,7 @@ export default async function SignUpPage({ searchParams }: Props) {
           Explore<span className={styles.brandAmp}>&amp;</span>Earn
         </Link>
 
-        <AuthRoleTabs mode="sign-up" active={role} redirectUrl={redirect_url} />
+        <AuthRoleTabs mode="sign-up" active={role} redirectUrl={safeRedirectUrl} />
 
         <p className={styles.tagline}>{TAGLINE[role]}</p>
 
