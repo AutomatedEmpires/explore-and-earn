@@ -155,6 +155,19 @@ describe("theme persistence round-trip", () => {
     expect(world.dataset.theme).toBe("light");
   });
 
+  it("bootstrap never converts an unrecognized value into an expressed preference", () => {
+    // Review 2026-07-22: syncing on RAW non-null would overwrite "midnight"
+    // with the default, silently pinning a user who never chose anything.
+    const world = runBootstrap({ stored: { [THEME_STORAGE_KEY]: "midnight" } });
+    expect(world.localStore.get(THEME_STORAGE_KEY)).toBe("midnight");
+    expect(world.cookieWrites).toEqual([]);
+
+    const cookieOnly = runBootstrap({ cookie: `${THEME_COOKIE_NAME}=midnight` });
+    expect(cookieOnly.dataset.theme).toBe("light");
+    expect(cookieOnly.localStore.size).toBe(0);
+    expect(cookieOnly.cookieWrites).toEqual([]);
+  });
+
   it("bootstrap still applies the accent palette pass", () => {
     const world = runBootstrap({ stored: { "ee-palette": "sunset" } });
     expect(world.dataset.palette).toBe("sunset");

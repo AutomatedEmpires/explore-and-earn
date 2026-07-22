@@ -58,6 +58,16 @@
 	color: var(--ts-active-fg);
 }
 
+/* Touch devices get the repo's --tap-min (44px) hit target; pointer-precise
+   desktops keep the compact chrome scale (matches GlobalHeader's 36px .iconBtn
+   tier). */
+@media (pointer: coarse) {
+	.option {
+		width: var(--tap-min, 2.75rem);
+		height: var(--tap-min, 2.75rem);
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.option {
 		transition: none;

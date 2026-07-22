@@ -125,10 +125,11 @@ export function applyThemePref(pref: ThemePref): void {
  *   1. localStorage "ee-theme" (authority), else the "ee-theme" cookie
  *      ("auto" normalizes to "system"), else DEFAULT ENTRY: LIGHT.
  *   2. "system" resolves via the OS prefers-color-scheme.
- *   3. When a preference exists in either store, both stores are re-synced
- *      (legacy "auto" migrates, missing cookie backfills so SSR is right on the
- *      next load). A first-time visitor writes NOTHING — the default is not an
- *      expressed preference.
+ *   3. When a RECOGNIZED preference exists in either store, both stores are
+ *      re-synced (legacy "auto" migrates, missing cookie backfills so SSR is
+ *      right on the next load). A first-time visitor — or a store holding an
+ *      unrecognized value — writes NOTHING: neither the default nor an unknown
+ *      value may be converted into an expressed preference (review 2026-07-22).
  *
  * It also applies the optional accent PALETTE ("ee-palette" -> data-palette)
  * flash-free in the same pass (see styles/palettes.css); "glacier" is the
@@ -136,4 +137,4 @@ export function applyThemePref(pref: ThemePref): void {
  *
  * Keep this first in <head> so it stays render-blocking and flash-free.
  */
-export const THEME_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var ls=null;try{ls=localStorage.getItem('ee-theme');}catch(e){}var ck=null;try{var m=document.cookie.match(/(?:^|; *)ee-theme=([^;]*)/);if(m){ck=m[1];}}catch(e){}var norm=function(v){return v==='light'||v==='dark'||v==='system'?v:v==='auto'?'system':null;};var sp=norm(ls);var cp=norm(ck);var pref=sp||cp||'light';/* DEFAULT ENTRY: light (founder 2026-07-22). Dark/System are opt-in. */var t=pref;if(pref==='system'){var osDark=false;try{osDark=typeof window.matchMedia==='function'&&window.matchMedia('(prefers-color-scheme: dark)').matches;}catch(e){}t=osDark?'dark':'light';}d.dataset.theme=t;d.style.colorScheme=t;if(ls!==null||ck!==null){try{if(ls!==pref){localStorage.setItem('ee-theme',pref);}}catch(e){}try{if(ck!==pref){document.cookie='ee-theme='+pref+'; path=/; max-age=31536000; samesite=lax';}}catch(e){}}try{var pal=localStorage.getItem('ee-palette');if(pal&&/^[a-z]{2,12}$/.test(pal)&&pal!=='glacier'){d.dataset.palette=pal;}}catch(e){}}catch(e){}})();`;
+export const THEME_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var ls=null;try{ls=localStorage.getItem('ee-theme');}catch(e){}var ck=null;try{var m=document.cookie.match(/(?:^|; *)ee-theme=([^;]*)/);if(m){ck=m[1];}}catch(e){}var norm=function(v){return v==='light'||v==='dark'||v==='system'?v:v==='auto'?'system':null;};var sp=norm(ls);var cp=norm(ck);var pref=sp||cp||'light';/* DEFAULT ENTRY: light (founder 2026-07-22). Dark/System are opt-in. */var t=pref;if(pref==='system'){var osDark=false;try{osDark=typeof window.matchMedia==='function'&&window.matchMedia('(prefers-color-scheme: dark)').matches;}catch(e){}t=osDark?'dark':'light';}d.dataset.theme=t;d.style.colorScheme=t;if(sp!==null||cp!==null){/* sync only a RECOGNIZED preference — never persist the default or an unknown value */try{if(ls!==pref){localStorage.setItem('ee-theme',pref);}}catch(e){}try{if(ck!==pref){document.cookie='ee-theme='+pref+'; path=/; max-age=31536000; samesite=lax';}}catch(e){}}try{var pal=localStorage.getItem('ee-palette');if(pal&&/^[a-z]{2,12}$/.test(pal)&&pal!=='glacier'){d.dataset.palette=pal;}}catch(e){}}catch(e){}})();`;
