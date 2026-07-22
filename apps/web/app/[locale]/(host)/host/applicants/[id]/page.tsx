@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 
 import {
+  canStartApplicationConversation,
   getConversations,
   getHostApplications,
   getHostListings,
@@ -20,6 +20,7 @@ import type { DiscoveryListing } from "../../../../../../components/discovery";
 import { toApplicantItem, threadsByApplicationId } from "../applicants-data";
 import { StatusActions } from "./StatusActions";
 import { ApplicantResumePopupButton } from "./ApplicantResumePopupButton";
+import { OpenConversationButton } from "../../../../../../components/messaging/OpenConversationButton";
 import styles from "../page.module.css";
 import detailStyles from "./page.module.css";
 
@@ -75,6 +76,9 @@ export default async function HostApplicantDetailPage({
   const applicantWithName = displayName
     ? { ...applicant, applicantName: displayName }
     : applicant;
+  const canOpenConversation =
+    Boolean(applicantWithName.threadId) ||
+    canStartApplicationConversation(application.status);
 
   return (
     <section className={styles.block}>
@@ -89,18 +93,20 @@ export default async function HostApplicantDetailPage({
         resume={resume}
         applicationId={application.id}
         seekerProfileId={application.seekerProfileId}
-        threadId={applicantWithName.threadId}
+        canMessage={canOpenConversation}
       />
       <HostApplicantDetail applicant={applicantWithName} resume={resume} />
       <StatusActions applicationId={application.id} status={application.status} />
-      <div className={detailStyles.messageLink}>
-        <Link
-          href={`/host/messages?seekerProfileId=${application.seekerProfileId}`}
-          className={detailStyles.messageLinkAnchor}
-        >
-          Send a message to this applicant
-        </Link>
-      </div>
+      {canOpenConversation ? (
+        <div className={detailStyles.messageLink}>
+          <OpenConversationButton
+            role="host"
+            seekerProfileId={application.seekerProfileId}
+            applicationId={application.id}
+            label="Send a message to this applicant"
+          />
+        </div>
+      ) : null}
     </section>
   );
 }

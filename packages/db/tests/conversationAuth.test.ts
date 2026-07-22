@@ -1,13 +1,6 @@
 /**
- * Unit tests for getOrCreateConversationForHost in
- * packages/db/src/queries/messages.ts — the host-initiated thread opener wired
- * in Phase 1 so messaging is reachable end-to-end.
- *
- * Focus: the authorization gate. The host UI passes seekerProfileId from a query
- * string, so the function must (a) resolve the caller's host profile and (b)
- * verify the seeker actually applied to one of THIS host's listings before
- * creating a thread — otherwise a host could forge an id to message any seeker
- * (the IDOR the security review flagged). The Supabase client is mocked; no DB.
+ * Messaging thread-open authorization tests. Supabase is mocked here; connected
+ * SQL assertions cover both identity-derived RPCs, grants, locks, and inserts.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -15,117 +8,276 @@ vi.mock("server-only", () => ({}));
 
 interface Result {
   data: unknown;
-  error: unknown;
+  error: null | { code?: string; message: string };
 }
 
 let cfg: {
   hostProfile: Result;
-  applicationRel: Result;
-  conversationFind: Result;
-  conversationInsert: Result;
+  seekerProfile: Result;
+  conversationOwned: Result;
+  seekerRpc: Result;
+  hostRpc: Result;
+  contextRpc: Result;
 };
-const insertedConversations: Array<Record<string, unknown>> = [];
+
+const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
 
 vi.mock("../src/client", () => ({
   authedClient: () => ({
+    rpc: (name: string, args: Record<string, unknown>) => {
+      rpcCalls.push({ name, args });
+      return Promise.resolve(
+        name === "ensure_my_host_application_conversation"
+          ? cfg.hostRpc
+          : name === "get_my_conversation_contexts"
+            ? cfg.contextRpc
+            : cfg.seekerRpc,
+      );
+    },
     from: (table: string) => {
-      let isInsert = false;
       const settle = () => {
         if (table === "host_profiles") return Promise.resolve(cfg.hostProfile);
-        if (table === "applications") return Promise.resolve(cfg.applicationRel);
+        if (table === "seeker_profiles") return Promise.resolve(cfg.seekerProfile);
         if (table === "conversations") {
-          return Promise.resolve(
-            isInsert ? cfg.conversationInsert : cfg.conversationFind,
-          );
+          return Promise.resolve(cfg.conversationOwned);
         }
         return Promise.resolve({ data: null, error: null });
       };
       const builder: Record<string, unknown> = {
         select: () => builder,
-        insert: (obj: Record<string, unknown>) => {
-          isInsert = true;
-          if (table === "conversations") insertedConversations.push(obj);
-          return builder;
-        },
         eq: () => builder,
-        is: () => builder,
-        order: () => builder,
-        limit: () => settle(),
-        maybeSingle: () => settle(),
-        single: () => settle(),
+        maybeSingle: settle,
       };
       return builder;
     },
   }),
 }));
 
-const { getOrCreateConversationForHost } = await import("../src/queries/messages");
+const {
+  canStartApplicationConversation,
+  getConversationContexts,
+  getOrCreateConversationForHost,
+  getOrCreateConversationForSeekerApplication,
+} = await import("../src/queries/messages");
 
 const CONV_ROW = {
   id: "conv-1",
   seeker_profile_id: "seeker-1",
   host_profile_id: "host-1",
-  listing_id: null,
-  application_id: null,
+  listing_id: "listing-1",
+  application_id: "app-1",
   last_message_at: null,
   created_at: "2026-06-30T00:00:00.000Z",
 };
 
-const ok = { data: null, error: null };
+const none: Result = { data: null, error: null };
+
+function baseConfig(): typeof cfg {
+  return {
+    hostProfile: none,
+    seekerProfile: none,
+    conversationOwned: { data: CONV_ROW, error: null },
+    seekerRpc: { data: "conv-1", error: null },
+    hostRpc: { data: "conv-1", error: null },
+    contextRpc: { data: [], error: null },
+  };
+}
 
 afterEach(() => {
-  insertedConversations.length = 0;
+  rpcCalls.length = 0;
 });
 
-describe("getOrCreateConversationForHost — authorization", () => {
-  it("returns null when the caller has no host profile", async () => {
-    cfg = {
-      hostProfile: { data: null, error: null },
-      applicationRel: { data: [], error: null },
-      conversationFind: ok,
-      conversationInsert: ok,
-    };
-    const result = await getOrCreateConversationForHost("tok", "host-clerk", "seeker-1");
-    expect(result).toBeNull();
-    expect(insertedConversations).toHaveLength(0);
+describe("application conversation lifecycle gate", () => {
+  it.each([
+    "applied",
+    "reviewing",
+    "saved_by_host",
+    "offered",
+    "accepted",
+    "active",
+    "completed",
+  ])("allows a new thread for %s", (status) => {
+    expect(canStartApplicationConversation(status)).toBe(true);
   });
 
-  it("returns null (IDOR guard) when the seeker never applied to this host's listings", async () => {
-    cfg = {
-      hostProfile: { data: { id: "host-1" }, error: null },
-      applicationRel: { data: [], error: null }, // no application relationship
-      conversationFind: ok,
-      conversationInsert: ok,
-    };
-    // A forged/arbitrary seekerProfileId must NOT open a thread.
-    const result = await getOrCreateConversationForHost("tok", "host-clerk", "stranger-seeker");
-    expect(result).toBeNull();
-    expect(insertedConversations).toHaveLength(0);
-  });
+  it.each(["not_selected", "withdrawn", "expired"])(
+    "blocks a new thread for %s",
+    (status) => {
+      expect(canStartApplicationConversation(status)).toBe(false);
+    },
+  );
+});
 
-  it("returns the existing thread without inserting when one already exists", async () => {
-    cfg = {
-      hostProfile: { data: { id: "host-1" }, error: null },
-      applicationRel: { data: [{ id: "app-1" }], error: null },
-      conversationFind: { data: [CONV_ROW], error: null },
-      conversationInsert: ok,
-    };
-    const result = await getOrCreateConversationForHost("tok", "host-clerk", "seeker-1");
+describe("getOrCreateConversationForSeekerApplication", () => {
+  it("passes only the application id to the seeker identity RPC", async () => {
+    cfg = baseConfig();
+    cfg.seekerProfile = { data: { id: "seeker-1" }, error: null };
+
+    const result = await getOrCreateConversationForSeekerApplication(
+      "tok",
+      "seeker-clerk",
+      "app-1",
+    );
+
     expect(result?.id).toBe("conv-1");
-    expect(insertedConversations).toHaveLength(0);
+    expect(rpcCalls).toEqual([
+      {
+        name: "ensure_my_application_conversation",
+        args: { p_application_id: "app-1" },
+      },
+    ]);
   });
 
-  it("creates the thread when the relationship exists and none is open yet", async () => {
-    cfg = {
-      hostProfile: { data: { id: "host-1" }, error: null },
-      applicationRel: { data: [{ id: "app-1" }], error: null },
-      conversationFind: { data: [], error: null },
-      conversationInsert: { data: CONV_ROW, error: null },
-    };
-    const result = await getOrCreateConversationForHost("tok", "host-clerk", "seeker-1");
+  it("returns null without leaking a foreign or terminal application", async () => {
+    cfg = baseConfig();
+    cfg.seekerRpc = none;
+
+    const result = await getOrCreateConversationForSeekerApplication(
+      "tok",
+      "seeker-clerk",
+      "foreign-app",
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects an RPC row that fails the seeker ownership guard", async () => {
+    cfg = baseConfig();
+    cfg.seekerProfile = { data: { id: "different-seeker" }, error: null };
+
+    const result = await getOrCreateConversationForSeekerApplication(
+      "tok",
+      "seeker-clerk",
+      "app-1",
+    );
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("getOrCreateConversationForHost", () => {
+  it("passes only the application id to the host identity RPC", async () => {
+    cfg = baseConfig();
+    cfg.hostProfile = { data: { id: "host-1" }, error: null };
+
+    const result = await getOrCreateConversationForHost(
+      "tok",
+      "host-clerk",
+      "seeker-1",
+      "app-1",
+    );
+
     expect(result?.id).toBe("conv-1");
-    expect(insertedConversations).toHaveLength(1);
-    expect(insertedConversations[0].seeker_profile_id).toBe("seeker-1");
-    expect(insertedConversations[0].host_profile_id).toBe("host-1");
+    expect(rpcCalls).toEqual([
+      {
+        name: "ensure_my_host_application_conversation",
+        args: { p_application_id: "app-1" },
+      },
+    ]);
+  });
+
+  it("returns null when the owned application cannot open a thread", async () => {
+    cfg = baseConfig();
+    cfg.hostRpc = none;
+
+    const result = await getOrCreateConversationForHost(
+      "tok",
+      "host-clerk",
+      "seeker-1",
+      "app-1",
+    );
+
+    expect(result).toBeNull();
+  });
+
+  it("rejects a derived row that does not match the expected applicant", async () => {
+    cfg = baseConfig();
+    cfg.hostProfile = { data: { id: "host-1" }, error: null };
+
+    const result = await getOrCreateConversationForHost(
+      "tok",
+      "host-clerk",
+      "different-seeker",
+      "app-1",
+    );
+
+    expect(result).toBeNull();
+  });
+});
+
+describe("getConversationContexts", () => {
+  it("requests only unique owned ids and rejects unexpected RPC rows", async () => {
+    cfg = baseConfig();
+    cfg.contextRpc = {
+      data: [
+        {
+          conversation_id: "conv-1",
+          listing_id: "listing-1",
+          listing_title: "Closed orchard role",
+          listing_category: "farm",
+          host_name: "Orchard Host",
+        },
+        {
+          conversation_id: "unrequested-conversation",
+          listing_id: "hidden-listing",
+          listing_title: "Must not escape",
+          listing_category: "remote",
+          host_name: "Other Host",
+        },
+      ],
+      error: null,
+    };
+
+    const result = await getConversationContexts("tok", ["conv-1", "conv-1"]);
+
+    expect(rpcCalls).toEqual([
+      {
+        name: "get_my_conversation_contexts",
+        args: { p_conversation_ids: ["conv-1"] },
+      },
+    ]);
+    expect(result.available).toBe(true);
+    expect([...result.contexts.values()]).toEqual([
+      {
+        conversationId: "conv-1",
+        listingId: "listing-1",
+        listingTitle: "Closed orchard role",
+        listingCategory: "farm",
+        hostName: "Orchard Host",
+      },
+    ]);
+  });
+
+  it("fails closed to the mixed category for malformed database data", async () => {
+    cfg = baseConfig();
+    cfg.contextRpc = {
+      data: [
+        {
+          conversation_id: "conv-1",
+          listing_id: "listing-1",
+          listing_title: "Legacy role",
+          listing_category: "not-a-category",
+          host_name: "Host",
+        },
+      ],
+      error: null,
+    };
+
+    const result = await getConversationContexts("tok", ["conv-1"]);
+
+    expect(result.contexts.get("conv-1")?.listingCategory).toBe("mix");
+  });
+
+  it("degrades without breaking inboxes while migration 075 is pending", async () => {
+    cfg = baseConfig();
+    cfg.contextRpc = {
+      data: null,
+      error: { code: "PGRST202", message: "schema cache miss" },
+    };
+
+    const result = await getConversationContexts("tok", ["conv-1"]);
+
+    expect(result.available).toBe(false);
+    expect(result.contexts.size).toBe(0);
   });
 });

@@ -18,6 +18,7 @@ import type { SeekerApplicationListing } from "./applications";
 import { getActiveBoostedListingIds } from "./idReaders";
 import { MEANINGFUL_MATCH_SCORE_THRESHOLD } from "./listings";
 import { getMatchScoresForSeeker } from "./matchScores";
+import { canStartApplicationConversation } from "./messages";
 
 /*
  * Seeker self-service dashboard data (Agent 2 / PR 2).
@@ -153,6 +154,8 @@ export interface RichSeekerApplication {
   readonly id: string;
   readonly listingId: string;
   readonly status: string;
+  /** Advisory UI flag; the database RPC remains the creation authority. */
+  readonly canStartConversation: boolean;
   readonly submittedAt: string;
   readonly reviewedAt: string | null;
   readonly decidedAt: string | null;
@@ -196,10 +199,12 @@ export async function getSeekerApplicationsRich(
 
   return (data ?? []).map((raw) => {
     const r = raw as unknown as Record<string, unknown>;
+    const status = typeof r.status === "string" ? r.status : "applied";
     return {
       id: String(r.id),
       listingId: String(r.listing_id),
-      status: typeof r.status === "string" ? r.status : "applied",
+      status,
+      canStartConversation: canStartApplicationConversation(status),
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
       reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
       decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
@@ -247,10 +252,12 @@ export async function getSeekerApplicationRichById(
   if (!data) return null;
 
   const r = data as unknown as Record<string, unknown>;
+  const status = typeof r.status === "string" ? r.status : "applied";
   return {
     id: String(r.id),
     listingId: String(r.listing_id),
-    status: typeof r.status === "string" ? r.status : "applied",
+    status,
+    canStartConversation: canStartApplicationConversation(status),
     submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
     reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
     decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,

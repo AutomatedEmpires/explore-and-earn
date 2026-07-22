@@ -28,7 +28,10 @@ declare
     'enforce_listing_cover_asset',
     'enforce_listing_media_override',
     'create_my_host_profile',
-    'ensure_my_seeker_profile'
+    'ensure_my_seeker_profile',
+    'ensure_my_application_conversation',
+    'ensure_my_host_application_conversation',
+    'get_my_conversation_contexts'
   ];
   trigger_fns text[] := array[
     'enforce_listing_cover_asset',

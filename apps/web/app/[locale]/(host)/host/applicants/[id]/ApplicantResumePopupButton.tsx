@@ -12,7 +12,7 @@ export interface ApplicantResumePopupButtonProps {
   readonly resume: SeekerResume | null;
   readonly applicationId: string;
   readonly seekerProfileId: string;
-  readonly threadId?: string | null;
+  readonly canMessage: boolean;
 }
 
 export function ApplicantResumePopupButton({
@@ -20,7 +20,7 @@ export function ApplicantResumePopupButton({
   resume,
   applicationId,
   seekerProfileId,
-  threadId,
+  canMessage,
 }: ApplicantResumePopupButtonProps) {
   const [open, setOpen] = useState(false);
 
@@ -41,11 +41,8 @@ export function ApplicantResumePopupButton({
         applicantName={applicantName}
         resume={resume}
         detailHref={`/host/applicants/${applicationId}`}
-        messageHref={
-          threadId
-            ? `/host/messages/${threadId}`
-            : `/host/messages?seekerProfileId=${seekerProfileId}`
-        }
+        messageApplicationId={canMessage ? applicationId : undefined}
+        messageSeekerProfileId={canMessage ? seekerProfileId : undefined}
       />
     </>
   );

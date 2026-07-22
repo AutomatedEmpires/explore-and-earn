@@ -60,6 +60,9 @@ const LOCKED_FUNCTIONS = [
   ...HISTORICAL_LOCKED_FUNCTIONS,
   "create_my_host_profile",
   "ensure_my_seeker_profile",
+  "ensure_my_application_conversation",
+  "ensure_my_host_application_conversation",
+  "get_my_conversation_contexts",
 ]
 
 for (const [file, content] of fileContents) {
@@ -300,6 +303,78 @@ if (!coordinateMigration) {
         `G-LISTING-COORDINATES: ${coordinateMigration} is missing ${needle}`,
       )
     }
+  }
+}
+
+// Either participant may open a message thread only through a JWT-owned,
+// application-derived RPC. Direct client INSERT is closed completely; both
+// functions serialize against terminal lifecycle changes and retain the
+// application-scoped unique-index race gate.
+const seekerConversationMigration = migrationFiles.find((f) => /^075_.*\.sql$/.test(f))
+if (!seekerConversationMigration) {
+  hasFailure = true
+  console.error("G-SEEKER-CONVERSATION: expected migration 075 to be present.")
+} else {
+  const sql = fileContents
+    .get(seekerConversationMigration)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "create or replace function public.ensure_my_application_conversation",
+    "create or replace function public.ensure_my_host_application_conversation",
+    "create or replace function public.get_my_conversation_contexts",
+    "drop policy if exists conversations_insert_party on public.conversations;",
+    "revoke insert on table public.conversations from anon, authenticated;",
+    "returns uuid",
+    "security definer",
+    "set search_path = ''",
+    "public.get_clerk_user_id()",
+    "s.clerk_user_id = v_clerk_user_id",
+    "h.clerk_user_id = v_clerk_user_id",
+    "a.id = p_application_id",
+    "l.host_profile_id",
+    "v_application_status not in",
+    "on conflict (seeker_profile_id, host_profile_id, application_id)",
+    "where application_id is not null",
+    "cardinality(coalesce(p_conversation_ids, '{}'::uuid[])) between 1 and 200",
+    "a.id = c.application_id",
+    "a.seeker_profile_id = c.seeker_profile_id",
+    "l.host_profile_id = c.host_profile_id",
+    "c.listing_id is null or c.listing_id = a.listing_id",
+    "s.clerk_user_id = actor.clerk_user_id",
+    "h.clerk_user_id = actor.clerk_user_id",
+    "revoke execute on function public.ensure_my_application_conversation(uuid) from public, anon;",
+    "grant execute on function public.ensure_my_application_conversation(uuid) to authenticated, service_role;",
+    "revoke execute on function public.ensure_my_host_application_conversation(uuid) from public, anon;",
+    "grant execute on function public.ensure_my_host_application_conversation(uuid) to authenticated, service_role;",
+    "revoke execute on function public.get_my_conversation_contexts(uuid[]) from public, anon;",
+    "grant execute on function public.get_my_conversation_contexts(uuid[]) to authenticated, service_role;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-SEEKER-CONVERSATION: ${seekerConversationMigration} is missing ${needle}`,
+      )
+    }
+  }
+  const lifecycleLockCount = sql.match(/for share of a, l/g)?.length ?? 0
+  if (lifecycleLockCount < 2) {
+    hasFailure = true
+    console.error(
+      `G-SEEKER-CONVERSATION: ${seekerConversationMigration} must lock lifecycle rows in both RPCs.`,
+    )
+  }
+  if (
+    /grant\s+insert\s+on\s+(?:table\s+)?public\.conversations\s+to\s+[^;]*authenticated/.test(
+      sql,
+    ) ||
+    /create\s+policy[\s\S]*conversations[\s\S]*for\s+insert/.test(sql)
+  ) {
+    hasFailure = true
+    console.error(
+      `G-SEEKER-CONVERSATION: ${seekerConversationMigration} opens direct conversation INSERT.`,
+    )
   }
 }
 

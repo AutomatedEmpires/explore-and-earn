@@ -3,6 +3,8 @@
 import { auth } from "@clerk/nextjs/server";
 import {
 	getMessages,
+	getOrCreateConversationForHost,
+	getOrCreateConversationForSeekerApplication,
 	markMessagesRead,
 	recordEvent,
 	sendMessage,
@@ -20,11 +22,96 @@ export interface SendMessageActionResult {
 	readonly error?: string;
 }
 
+export interface OpenConversationActionResult {
+	readonly ok: boolean;
+	readonly conversationId?: string;
+	readonly error?: "unauthenticated" | "rate_limit_exceeded" | "unavailable";
+}
+
 async function currentUserId(): Promise<string | undefined> {
 	try {
 		return (await auth()).userId ?? undefined;
 	} catch {
 		return undefined;
+	}
+}
+
+async function conversationOpenIdentity(): Promise<
+	| { readonly userId: string; readonly token: string }
+	| OpenConversationActionResult
+> {
+	const { userId, getToken } = await auth();
+	if (!userId) return { ok: false, error: "unauthenticated" };
+
+	const { allowed } = checkRateLimit(
+		`conversation-open:${userId}`,
+		30,
+		5 * 60 * 1000,
+	);
+	if (!allowed) return { ok: false, error: "rate_limit_exceeded" };
+
+	const token = await getToken();
+	if (!token) return { ok: false, error: "unauthenticated" };
+	return { userId, token };
+}
+
+/** Explicit POST boundary for a seeker opening their application's thread. */
+export async function openSeekerApplicationConversationAction(
+	applicationId: string,
+): Promise<OpenConversationActionResult> {
+	try {
+		if (!applicationId) return { ok: false, error: "unavailable" };
+		const identity = await conversationOpenIdentity();
+		if ("ok" in identity) return identity;
+
+		const conversation = await getOrCreateConversationForSeekerApplication(
+			identity.token,
+			identity.userId,
+			applicationId,
+		);
+		if (!conversation) return { ok: false, error: "unavailable" };
+
+		revalidatePath("/messages");
+		return { ok: true, conversationId: conversation.id };
+	} catch (error) {
+		reportError(error, {
+			action: "openSeekerApplicationConversationAction",
+			userId: await currentUserId(),
+		});
+		// During deploys the web SHA becomes live before its migration workflow.
+		// Treat a temporarily unavailable RPC like any other unavailable thread.
+		return { ok: false, error: "unavailable" };
+	}
+}
+
+/** Explicit POST boundary for a host opening one exact applicant thread. */
+export async function openHostApplicationConversationAction(
+	seekerProfileId: string,
+	applicationId: string,
+): Promise<OpenConversationActionResult> {
+	try {
+		if (!seekerProfileId || !applicationId) {
+			return { ok: false, error: "unavailable" };
+		}
+		const identity = await conversationOpenIdentity();
+		if ("ok" in identity) return identity;
+
+		const conversation = await getOrCreateConversationForHost(
+			identity.token,
+			identity.userId,
+			seekerProfileId,
+			applicationId,
+		);
+		if (!conversation) return { ok: false, error: "unavailable" };
+
+		revalidatePath("/host/messages");
+		return { ok: true, conversationId: conversation.id };
+	} catch (error) {
+		reportError(error, {
+			action: "openHostApplicationConversationAction",
+			userId: await currentUserId(),
+		});
+		return { ok: false, error: "unavailable" };
 	}
 }
 
