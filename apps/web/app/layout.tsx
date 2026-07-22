@@ -1,5 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { getLocale } from "next-intl/server";
+import { cookies } from "next/headers";
 import { Patrick_Hand, Cabin_Sketch, Inter } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
@@ -38,6 +39,13 @@ import { AppShell } from "../components/shell";
 import { DevBenchToolbar } from "../components/dev/DevBenchToolbar";
 import { PwaProvider } from "../components/pwa/PwaProvider";
 import { isDevBenchEnabled } from "../lib/devBench";
+import {
+	THEME_COOKIE_NAME,
+	THEME_INIT_SCRIPT,
+	normalizeThemePref,
+	themeHtmlAttr,
+	type ThemePref,
+} from "../lib/theme";
 import { Providers } from "./providers";
 
 /**
@@ -100,12 +108,11 @@ export const metadata: Metadata = {
  * chrome (address bar / status bar / task-switcher) tints ice-white in light
  * and cool-graphite at night — matching the page base tokens in tokens.css
  * (--palette-paper: #EDF2F6 light / #0B141B dark). These metas follow the OS
- * `prefers-color-scheme`, which covers the no-JS/SSR baseline and the common
- * case. NOTE: meta theme-color can only key off the OS media query, not the
- * `data-theme` attribute, so during a clock-driven night override while the OS
- * is in light mode the toolbar tint tracks the OS while page content tracks the
- * clock — an accepted, documented limitation (the no-flash theme-init script
- * that resolves the clock/stored theme is intentionally left untouched).
+ * `prefers-color-scheme`, which covers the no-JS/SSR baseline and the "System"
+ * preference exactly. NOTE: meta theme-color can only key off the OS media
+ * query, not the `data-theme` attribute, so a user who FORCES Light/Dark
+ * against their OS setting gets a toolbar tint that tracks the OS while page
+ * content tracks their choice — an accepted, documented limitation.
  *
  * `viewport-fit: cover` lets the standalone PWA paint under the notch/safe-area
  * insets (the install prompt and offline page respect env(safe-area-inset-*)).
@@ -139,49 +146,49 @@ function AuthBoundary({ children }: { children: ReactNode }) {
 }
 
 /**
- * No-flash theme init — Glacier day/night.
+ * Theme — Glacier Light/Dark/System.
  *
- * Runs synchronously in <head> BEFORE first paint, so the correct theme is
- * committed to <html data-theme> with zero flash. Resolution order:
- *   1. an EXPLICIT stored preference ("ee-theme" = "dark" | "light"), else
- *   2. "auto" (explicitly stored) — by local clock (dark 20:00–06:00, matches
- *      Sweepza), falling back to the OS prefers-color-scheme in daytime, else
- *   3. DEFAULT ENTRY (nothing stored) — DARK (founder 2026-07; Light/Auto are
- *      opt-in via the Appearance control).
+ * The full contract (values, default, storage, resolution) lives in
+ * lib/theme.ts — this layout only renders it:
+ *   • SSR reads the "ee-theme" COOKIE and emits the matching <html data-theme>
+ *     ("light"/"dark" verbatim; "system" omits the attribute so tokens.css's
+ *     @media (prefers-color-scheme: dark) block paints the OS theme with zero
+ *     JS; no cookie -> the DEFAULT ENTRY, LIGHT — founder 2026-07-22).
+ *   • THEME_INIT_SCRIPT (lib/theme.ts) stays render-blocking first in <head>
+ *     as the client authority: it applies localStorage/cookie prefs pre-paint
+ *     and keeps both stores in sync. Keep it first so it stays flash-free.
  *
- * It also applies the optional accent PALETTE ("ee-palette" -> data-palette)
- * flash-free in the same pass (see styles/palettes.css); "glacier" is the
- * default and needs no attribute.
+ * The writers are the header ThemeSwitcher (every top bar) and the Appearance
+ * control in seeker Settings — both persist localStorage + cookie via
+ * lib/theme.ts, so SSR renders the right theme on the next request.
  *
- * The Appearance control in seeker Settings (AppearanceControl.tsx) writes the
- * "ee-theme" key with one of "auto" | "dark" | "light" and applies the same
- * resolution live; this script is the flash-free bootstrap of that same logic.
- *
- * Contract for later waves (e.g. i18n):
- *   • The theme lives ONLY in the `data-theme` attribute on <html>
- *     ("dark" | "light"). tokens.css keys off :root[data-theme="dark"]
- *     and @media (prefers-color-scheme: dark):root:not([data-theme="light"]).
- *   • localStorage key is "ee-theme" — persisted as "auto" | "dark" | "light".
- *     A runtime toggle writes that key and sets
- *     document.documentElement.dataset.theme + .style.colorScheme. "auto" (and
- *     any unrecognized/absent value) resolves via the clock/OS fallback above.
- *   • Integrate locale logic ALONGSIDE this script; do not remove it. Keep it
- *     first in <head> so it stays render-blocking and flash-free.
+ * Integrate locale logic ALONGSIDE the init script; do not remove it.
  */
-const THEME_INIT_SCRIPT = `(function(){try{var d=document.documentElement;var p=null;try{p=localStorage.getItem('ee-theme');}catch(e){}var t;if(p==='dark'||p==='light'){t=p;}else if(p==='auto'){/* explicit auto -> clock (dark 20:00-06:00) + OS fallback */var h=new Date().getHours();var night=h>=20||h<6;var osDark=typeof window.matchMedia==='function'&&window.matchMedia('(prefers-color-scheme: dark)').matches;t=(night||osDark)?'dark':'light';}else{/* DEFAULT ENTRY: dark (founder 2026-07). Light/Auto are opt-in. */t='dark';}d.dataset.theme=t;d.style.colorScheme=t;try{var pal=localStorage.getItem('ee-palette');if(pal&&/^[a-z]{2,12}$/.test(pal)&&pal!=='glacier'){d.dataset.palette=pal;}}catch(e){}}catch(e){}})();`;
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
 	// Negotiated by the next-intl middleware and resolved via i18n/request.ts.
 	// Drives <html lang>/dir. The theme still lives ONLY in data-theme (below) —
-	// locale and theme are independent, per the theme-init contract.
+	// locale and theme are independent, per the theme contract.
 	const locale = await getLocale();
+
+	// SSR theme from the cookie mirror. Statically prerendered routes (blog is
+	// force-static) have no request cookies — degrade to the default; the
+	// render-blocking bootstrap still applies any stored preference pre-paint.
+	let themePref: ThemePref | null = null;
+	try {
+		themePref = normalizeThemePref(
+			(await cookies()).get(THEME_COOKIE_NAME)?.value,
+		);
+	} catch {
+		/* static prerender — no request scope; render the default entry. */
+	}
 
 	return (
 		<AuthBoundary>
 			<html
 				lang={locale}
 				dir={dirForLocale(locale)}
-				data-theme="light"
+				data-theme={themeHtmlAttr(themePref)}
 				suppressHydrationWarning
 				className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable}`}
 			>

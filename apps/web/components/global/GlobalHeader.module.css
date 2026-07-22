@@ -271,6 +271,20 @@
   gap: var(--space-8);
 }
 
+/* Theme switcher on the deep-sky bar — retint the --ts-* surface to the
+   header's steel/chrome scheme (matches .iconBtn / .signInBtn treatments). */
+.themeSlot {
+  display: inline-flex;
+  --ts-line: color-mix(in srgb, var(--hdr-chrome) 30%, transparent);
+  --ts-bg: color-mix(in srgb, var(--hdr-chrome) 9%, transparent);
+  --ts-fg: color-mix(in srgb, var(--hdr-text) 88%, transparent);
+  --ts-fg-hover: var(--palette-white);
+  --ts-hover-bg: color-mix(in srgb, var(--hdr-chrome) 16%, transparent);
+  --ts-active-bg: var(--palette-sky-light);
+  --ts-active-fg: var(--palette-sky-dark);
+  --ts-focus: var(--hdr-focus);
+}
+
 /* Logged-out sign-in chooser (I'm a seeker · I'm a host · New here) */
 .authMenuWrap {
   position: relative;

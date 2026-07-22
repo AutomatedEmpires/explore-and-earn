@@ -1,0 +1,65 @@
+/*
+ * ThemeSwitcher — compact Light/Dark/System segmented control.
+ *
+ * Fully tokenized (G50/G51): every color derives from semantic tokens via
+ * var()/color-mix(), so both themes stay legible and the accent works on both
+ * grounds. The `--ts-*` custom properties are the retint surface — a mount
+ * context on a non-surface ground (e.g. the deep-sky GlobalHeader bar) can
+ * override them on a wrapper element (see GlobalHeader.module.css .themeSlot).
+ */
+
+.group {
+	--ts-line: color-mix(in srgb, var(--color-chrome) 32%, transparent);
+	--ts-bg: color-mix(in srgb, var(--color-chrome) 9%, transparent);
+	--ts-fg: color-mix(in srgb, var(--text-primary) 72%, transparent);
+	--ts-fg-hover: var(--text-primary);
+	--ts-hover-bg: color-mix(in srgb, var(--color-chrome) 18%, transparent);
+	--ts-active-bg: color-mix(in srgb, var(--color-cta) 16%, transparent);
+	--ts-active-fg: var(--color-cta);
+	--ts-focus: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--palette-sky-light);
+
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 2px;
+	border: 1.5px solid var(--ts-line);
+	border-radius: var(--radius-pill);
+	background: var(--ts-bg);
+}
+
+.option {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.65rem;
+	height: 1.65rem;
+	border: none;
+	border-radius: var(--radius-pill);
+	background: transparent;
+	color: var(--ts-fg);
+	cursor: pointer;
+	transition:
+		background var(--motion-fast) var(--ease-standard),
+		color var(--motion-fast) var(--ease-standard);
+	outline: none;
+}
+
+.option:hover {
+	background: var(--ts-hover-bg);
+	color: var(--ts-fg-hover);
+}
+
+.option:focus-visible {
+	box-shadow: var(--ts-focus);
+}
+
+.option[data-selected="true"] {
+	background: var(--ts-active-bg);
+	color: var(--ts-active-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.option {
+		transition: none;
+	}
+}

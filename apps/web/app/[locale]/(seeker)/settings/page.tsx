@@ -56,7 +56,7 @@ export default async function SettingsPage() {
 				<section className={styles.section}>
 					<SectionHeading
 						title="Appearance"
-						description="Dark by default — switch to Light or Auto (Auto follows the time of day and your device), and pick an accent palette to recolor the app."
+						description="Light by default — switch to Dark, or System to follow your device, and pick an accent palette to recolor the app."
 					/>
 					<AppearanceControl />
 					<PaletteControl />

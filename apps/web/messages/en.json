@@ -15,7 +15,11 @@
 		"becomeAdmin": "Become an admin",
 		"yourProfile": "Your profile",
 		"notifications": "Notifications",
-		"homeAriaLabel": "Explore and Earn — home"
+		"homeAriaLabel": "Explore and Earn — home",
+		"themeLabel": "Appearance",
+		"themeLight": "Light theme",
+		"themeDark": "Dark theme",
+		"themeSystem": "Follow device theme"
 	},
 	"Common": {
 		"apply": "Apply",

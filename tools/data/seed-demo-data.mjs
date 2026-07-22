@@ -152,33 +152,51 @@ const SEEKERS = [
   },
 ];
 
+// Seeded as DRAFTS on purpose: the housing-truth gate (migration 072,
+// trg_listings_housing_photos) blocks `live`/`under_review` listings with
+// housing_included=true until the host's housing photo library carries the
+// four required roles (sleeping_area, bathroom, kitchen, dining_common).
+// A seed must not fabricate "verified" photo evidence to sneak past the gate —
+// draft is the honest state for housing listings with no evidence on file.
+// (Dev-bench discovery surfaces render from components/discovery/fixtures.ts
+// regardless, so drafts here don't blank the seek/map/swipe visuals.)
+//
+// The *_evidence columns record that the demo host ANSWERED the benefit
+// questions (migration 070: included=true with evidence='not_stated' is an
+// incoherent pair in any status — listings_housing_included_evidence_chk).
 const LISTINGS = [
   {
     key: "farm-harvest",
     host: "greenfield-farm",
     title: "Summer Harvest Crew",
     category: "farm",
-    status: "live",
+    status: "draft",
     housing_included: true,
+    housing_evidence: "confirmed",
     meals_included: true,
+    meals_evidence: "confirmed",
   },
   {
     key: "farm-orchard",
     host: "greenfield-farm",
     title: "Orchard Care Assistant",
     category: "farm",
-    status: "live",
+    status: "draft",
     housing_included: true,
+    housing_evidence: "confirmed",
     meals_included: false,
+    meals_evidence: "confirmed",
   },
   {
     key: "sea-deckhand",
     host: "harbor-maritime",
     title: "Seasonal Deckhand",
     category: "maritime",
-    status: "live",
+    status: "draft",
     housing_included: true,
+    housing_evidence: "confirmed",
     meals_included: true,
+    meals_evidence: "confirmed",
   },
 ];
 
@@ -322,7 +340,9 @@ async function main() {
         category: listing.category,
         status: listing.status,
         housing_included: listing.housing_included,
+        housing_evidence: listing.housing_evidence,
         meals_included: listing.meals_included,
+        meals_evidence: listing.meals_evidence,
         published_at:
           listing.status === "live" ? new Date().toISOString() : null,
       },

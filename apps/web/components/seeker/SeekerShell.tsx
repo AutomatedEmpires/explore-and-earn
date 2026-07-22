@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { ScopeShellNav, type ScopeNavItem } from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
+import { ThemeSwitcher } from "../global/ThemeSwitcher";
 import { OnboardingWalkthrough, SEEKER_TOUR_STEPS } from "../onboarding";
 
 /**
@@ -141,6 +142,7 @@ export function SeekerShell({
             action="/seek"
             placeholder="Search opportunities, places, hosts…"
           />
+          <ThemeSwitcher />
           <Link
             className="seekeros-tact seekeros-tact--icon ui-pressable"
             href="/notifications"
