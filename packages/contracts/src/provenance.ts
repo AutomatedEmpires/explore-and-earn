@@ -194,6 +194,24 @@ export const SOURCED_FRESHNESS = [
 ] as const
 export type SourcedFreshness = (typeof SOURCED_FRESHNESS)[number]
 
+/**
+ * STORED per-listing source lifecycle (listings.source_status — CHECK
+ * constraint listings_source_status_chk, migrations 064 + 078). Keep in
+ * lockstep with the DB CHECK: 078 legalized 'stale' after 064's CHECK omitted
+ * it and the freshness sweep's UPDATE silently failed forever (the cron
+ * swallows sweep errors — a value written outside this list is a permanent,
+ * invisible dishonesty failure, which is why sourcedFreshness.test.ts pins
+ * the sweep's written value against this list).
+ */
+export const LISTING_SOURCE_STATUSES = [
+	"not_applicable",
+	"active",
+	"removed",
+	"withdrawn",
+	"stale",
+] as const
+export type ListingSourceStatus = (typeof LISTING_SOURCE_STATUSES)[number]
+
 /** Days since last observation before a sourced listing is 'aging' / 'stale'. */
 export const SOURCED_AGING_DAYS = 21
 export const SOURCED_STALE_DAYS = 45

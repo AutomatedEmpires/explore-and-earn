@@ -102,6 +102,7 @@ const isPublicRoute = createRouteMatcher([
   "/privacy",
   "/cookies",
   "/refunds",
+  "/sourced-listings", // Policy §6 disclosure page — linked from every sourced band.
   "/about",
   "/faq", // Advertised in sitemap + llms.txt; legal/marketing content, no auth.
   "/for-hosts", // Prospect-facing host preview — MUST be reachable without a login.

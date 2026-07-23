@@ -3,10 +3,12 @@
 import { auth } from "@clerk/nextjs/server"
 import {
 	getRecordsNeedingReview,
+	listListingSources,
 	recordEvent,
 	runSourceImport,
 	upsertListingSource,
 	type ImportReport,
+	type ListingSourceSummary,
 	type SourceRecordReviewRow,
 	type UpsertListingSourceInput,
 } from "@explore-and-earn/db"
@@ -146,6 +148,18 @@ export async function getSourceReviewQueueAction(): Promise<SourceRecordReviewRo
 		return await getRecordsNeedingReview()
 	} catch (error) {
 		reportError(error, { action: "getSourceReviewQueueAction" })
+		return []
+	}
+}
+
+/** Source registry listing for the admin sourcing console. */
+export async function listListingSourcesAction(): Promise<ListingSourceSummary[]> {
+	try {
+		const gate = await requireAdmin()
+		if (!gate.ok) return []
+		return await listListingSources()
+	} catch (error) {
+		reportError(error, { action: "listListingSourcesAction" })
 		return []
 	}
 }

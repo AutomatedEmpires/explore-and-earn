@@ -196,6 +196,21 @@ export default async function AdminDashboardPage() {
               </span>
             </Link>
 
+            <Link href="/admin/sourcing" className={styles.queueRow}>
+              <span className={styles.queueIcon}>
+                <Icon name="action.download" size={20} aria-hidden />
+              </span>
+              <span className={styles.queueBody}>
+                <span className={styles.queueLabel}>Sourcing console</span>
+                <span className={styles.queueMeta}>
+                  Compliance-gated listing ingestion
+                </span>
+              </span>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
+
             <Link
               href="/admin/reports"
               className={styles.queueRow}
