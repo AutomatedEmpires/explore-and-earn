@@ -6,20 +6,22 @@
 		<title>Offline · Explore &amp; Earn</title>
 		<meta name="theme-color" media="(prefers-color-scheme: light)" content="#EDF2F6" />
 		<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B141B" />
-		<!-- Mirror the app's Glacier day/night no-flash resolution (clock + OS + stored ee-theme). -->
+		<!-- Mirror the app's theme contract (lib/theme.ts): stored ee-theme
+		     "light"/"dark" verbatim, "system" (or legacy "auto") = OS scheme,
+		     nothing stored = LIGHT (founder 2026-07-22). -->
 		<script>
 			(function () {
 				try {
 					var d = document.documentElement;
 					var p = null;
 					try { p = localStorage.getItem("ee-theme"); } catch (e) {}
-					var t;
-					if (p === "dark" || p === "light") { t = p; }
-					else {
-						var h = new Date().getHours();
-						var night = h >= 20 || h < 6;
+					if (p !== "light" && p !== "dark" && p !== "system") {
+						p = p === "auto" ? "system" : "light";
+					}
+					var t = p;
+					if (p === "system") {
 						var osDark = typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches;
-						t = (night || osDark) ? "dark" : "light";
+						t = osDark ? "dark" : "light";
 					}
 					d.dataset.theme = t;
 					d.style.colorScheme = t;

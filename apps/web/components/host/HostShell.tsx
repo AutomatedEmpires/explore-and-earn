@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import { ScopeShellNav, SCOPE_RAIL_WIDTH, type ScopeNavItem } from "../shell";
+import { ThemeSwitcher } from "../global/ThemeSwitcher";
 import { OnboardingWalkthrough, HOST_TOUR_STEPS } from "../onboarding";
 import styles from "./HostShell.module.css";
 
@@ -120,6 +121,7 @@ export function HostShell({ companyName, photoUrl, unread = 0, children }: HostS
           </Link>
           <span className={styles.spacer} />
           <div className={styles.topActions}>
+            <ThemeSwitcher />
             <Link className={styles.newBtn} href="/host/listings/new">
               <span aria-hidden>+</span>
               <span className={styles.newLabel}>New listing</span>

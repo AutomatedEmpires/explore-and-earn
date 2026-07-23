@@ -10,6 +10,7 @@ import {
   type ScopeNavItem,
 } from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
+import { ThemeSwitcher } from "../global/ThemeSwitcher";
 
 /**
  * Admin OS shell — the moderation command center chrome.
@@ -131,6 +132,7 @@ export function AdminShell({
             placeholder="Search listings, hosts, applications…"
           />
           <div className="adminos-topmeta">
+            <ThemeSwitcher />
             <span
               className="adminos-health"
               role="meter"

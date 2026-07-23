@@ -77,6 +77,8 @@ import {
 	MapTrifold,
 	Medal,
 	Megaphone,
+	Monitor,
+	Moon,
 	Newspaper,
 	NotePencil,
 	PaperPlaneTilt,
@@ -173,6 +175,9 @@ export type CanonicalIconKey =
 	| "action.download"
 	| "action.view"
 	| "action.link"
+	| "action.theme_light"
+	| "action.theme_dark"
+	| "action.theme_system"
 	// nav -- primary navigation surfaces + community dashboard tabs + admin tabs
 	| "nav.seek"
 	| "nav.swipe"
@@ -318,6 +323,10 @@ export const ICON_REGISTRY: Record<IconKey, IconEntry> = {
 	"action.download": { key: "action.download", icon: DownloadSimple, label: "Download" },
 	"action.view": { key: "action.view", icon: Eye, label: "View" },
 	"action.link": { key: "action.link", icon: LinkSimple, label: "Link" },
+	// Theme switcher (Light / Dark / System) — header appearance control.
+	"action.theme_light": { key: "action.theme_light", icon: Sun, label: "Light theme" },
+	"action.theme_dark": { key: "action.theme_dark", icon: Moon, label: "Dark theme" },
+	"action.theme_system": { key: "action.theme_system", icon: Monitor, label: "Follow device theme" },
 
 	// ---- nav ----
 	"nav.seek": { key: "nav.seek", icon: Compass, label: "Seek / Discover" },

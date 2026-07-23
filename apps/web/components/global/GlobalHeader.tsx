@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Icon } from "@explore-and-earn/ui";
 
 import { UnreadBadge } from "../seeker/UnreadBadge";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 import styles from "./GlobalHeader.module.css";
 
 const IMMERSIVE_ROUTES = ["/map", "/swipe"];
@@ -212,8 +213,12 @@ export function GlobalHeader({
           </nav>
         )}
 
-        {/* ── Col 3: auth ──────────────────────────────────────────────── */}
+        {/* ── Col 3: theme + auth ──────────────────────────────────────── */}
         <div className={styles.authArea}>
+          {/* Light/Dark/System — retinted for the deep-sky bar via .themeSlot. */}
+          <span className={styles.themeSlot}>
+            <ThemeSwitcher />
+          </span>
           {isAuthenticated ? (
             <>
               <Link
