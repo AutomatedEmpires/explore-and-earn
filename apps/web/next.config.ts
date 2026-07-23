@@ -134,6 +134,15 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "res.cloudinary.com",
         pathname: "/**"
+      },
+      {
+        // Local Supabase stack (dev bench) — without this, next/image rejects
+        // locally-stored covers on the bench now that cards render through it.
+        // Loopback-only; irrelevant (and unreachable) in production.
+        protocol: "http",
+        hostname: "127.0.0.1",
+        port: "54321",
+        pathname: "/storage/v1/object/**"
       }
     ]
   },

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Icon, Skeleton } from "@explore-and-earn/ui";
 import type { OpportunityCategory } from "@explore-and-earn/contracts";
@@ -97,13 +98,17 @@ function EmployerCard({ employer }: { employer: FeaturedEmployer }) {
       <div className={styles.imageSection}>
         <div className={`${styles.imageFrame} ${styles[`imageFrame_${employer.category}`]}`}>
           {employer.coverImageUrl ? (
-            <img
+            /* next/image: srcset via the Vercel optimizer — rail cards are a
+               fixed 18rem (288px), so one small candidate serves them instead
+               of the stored-resolution host upload (audit 2026-07-22). */
+            <Image
               className={styles.image}
               src={employer.coverImageUrl}
               alt=""
               aria-hidden="true"
+              fill
               loading="lazy"
-              decoding="async"
+              sizes="288px"
             />
           ) : null}
         </div>

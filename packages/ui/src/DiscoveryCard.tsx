@@ -118,6 +118,22 @@ export interface DiscoveryCardProps {
 	 * feeds keep below-fold covers off the critical path.
 	 */
 	readonly imageLoading?: "eager" | "lazy"
+	/**
+	 * Optional cover-image renderer — lets the host app substitute a framework
+	 * image component (e.g. next/image for srcset/responsive resizing) without
+	 * packages/ui taking a framework dependency. The renderer receives the
+	 * cover box's contract and MUST apply `className` (absolute-inset,
+	 * object-fit cover — the .hero parent is a fixed 16/10 aspect box, so
+	 * sizing never shifts layout) and honor `loading`/`fetchPriority`.
+	 * Default: the plain `<img>` below.
+	 */
+	readonly renderCoverImage?: (cover: {
+		readonly src: string
+		readonly alt: string
+		readonly className: string
+		readonly loading: "eager" | "lazy"
+		readonly fetchPriority?: "high"
+	}) => ReactNode
 	readonly cardState?:
 		| "saved" | "applied" | "offered" | "scheduled"
 		| "accepted" | "matched" | "not_selected" | "withdrawn"
@@ -292,6 +308,7 @@ export function DiscoveryCard({
 	actions,
 	previouslySkipped,
 	imageLoading = "lazy",
+	renderCoverImage,
 }: DiscoveryCardProps) {
 	const cat      = data.category
 	const roleText = data.positionTitle ?? data.title
@@ -467,14 +484,24 @@ export function DiscoveryCard({
 			{/* ── 1. IMAGE / COVER AREA ── */}
 			<div className={styles.hero}>
 				{data.coverImageUrl ? (
-					<img
-						src={data.coverImageUrl}
-						alt={`${data.hostName} cover`}
-						loading={imageLoading}
-						fetchPriority={imageLoading === "eager" ? "high" : undefined}
-						decoding="async"
-						className={styles.heroImg}
-					/>
+					renderCoverImage ? (
+						renderCoverImage({
+							src: data.coverImageUrl,
+							alt: `${data.hostName} cover`,
+							className: styles.heroImg,
+							loading: imageLoading,
+							fetchPriority: imageLoading === "eager" ? "high" : undefined,
+						})
+					) : (
+						<img
+							src={data.coverImageUrl}
+							alt={`${data.hostName} cover`}
+							loading={imageLoading}
+							fetchPriority={imageLoading === "eager" ? "high" : undefined}
+							decoding="async"
+							className={styles.heroImg}
+						/>
+					)
 				) : (
 					/* No cover yet — a large category watermark so the frame reads as
 					   intentional, not empty (placeholder, not a filter on a photo). */

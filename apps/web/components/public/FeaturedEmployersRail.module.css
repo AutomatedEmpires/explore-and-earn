@@ -296,6 +296,9 @@
 }
 
 .imageFrame {
+  /* position: relative anchors next/image fill (the frame is a fixed 3/2
+     aspect box, so image sizing can never shift layout). */
+  position: relative;
   aspect-ratio: 3 / 2;
   border: 1.5px solid var(--border-ink-warm);
   border-radius: 14px;
