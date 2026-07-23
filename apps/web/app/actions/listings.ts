@@ -22,7 +22,7 @@ import {
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { parseListingCoordinateSubmission } from "../../lib/listingCoordinates";
 import { isAllowedStorageUrl } from "../../lib/storageUrl";
 
@@ -263,7 +263,7 @@ export async function createListingAction(
 
   // Rate limit: 10 new listings per day per host — real hosts publish a few,
   // and every create lands in the moderation queue (spam pre-moderation guard).
-  const { allowed } = checkRateLimit(
+  const { allowed } = await checkRateLimitDistributed(
     `listing-create:${authResult.auth.userId}`,
     10,
     24 * 60 * 60 * 1000,
@@ -441,7 +441,7 @@ export async function duplicateListingAction(
 
   // Rate limit: 10 duplicates per day per host — same budget as create, since
   // a duplicate mints a whole new listing row.
-  const { allowed } = checkRateLimit(
+  const { allowed } = await checkRateLimitDistributed(
     `listing-duplicate:${authResult.auth.userId}`,
     10,
     24 * 60 * 60 * 1000,

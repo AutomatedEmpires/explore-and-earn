@@ -11,7 +11,7 @@ import {
 } from "@explore-and-earn/db";
 
 import { triggerDispatch } from "../../services/notifications/dispatcher";
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 
 export interface StatusActionResult {
@@ -45,7 +45,7 @@ async function updateApplicationStatusActionImpl(
   // Rate limit: 60 status changes per hour per host — generous enough for a
   // busy applicant-review session, tight enough to stop scripted churn (every
   // change also fans out a seeker notification via the engine).
-  const { allowed } = checkRateLimit(`application-status:${userId}`, 60, 60 * 60 * 1000);
+  const { allowed } = await checkRateLimitDistributed(`application-status:${userId}`, 60, 60 * 60 * 1000);
   if (!allowed) {
     return {
       ok: false,

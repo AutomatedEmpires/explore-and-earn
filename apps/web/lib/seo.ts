@@ -21,6 +21,17 @@ export function generateJobPostingJsonLd(
 ): string | null {
   const listingUrl = `${baseUrl}/listing/${listing.id}`;
 
+  // baseSalary surfaces exactly what the host stated: a range when max exists
+  // (minValue/maxValue render better in Google Jobs than a bare value and were
+  // previously discarded), a single value otherwise. unitText is emitted ONLY
+  // when the stated unit maps to Google's accepted enum (HOUR/DAY/WEEK/MONTH/
+  // YEAR) — "other"/absent units get NO unitText rather than an invented
+  // "TOTAL", which is outside the enum and can invalidate the whole baseSalary
+  // property in Search Console (review 2026-07-22; no-fabrication law).
+  const salaryUnitText =
+    listing.compensationUnit && listing.compensationUnit !== "other"
+      ? listing.compensationUnit.toUpperCase()
+      : undefined;
   const baseSalary =
     listing.compensationMinCents != null
       ? {
@@ -28,11 +39,14 @@ export function generateJobPostingJsonLd(
           currency: listing.compensationCurrency,
           value: {
             "@type": "QuantitativeValue",
-            value: listing.compensationMinCents / 100,
-            unitText:
-              listing.compensationUnit && listing.compensationUnit !== "other"
-                ? listing.compensationUnit.toUpperCase()
-                : "TOTAL",
+            ...(listing.compensationMaxCents != null &&
+            listing.compensationMaxCents !== listing.compensationMinCents
+              ? {
+                  minValue: listing.compensationMinCents / 100,
+                  maxValue: listing.compensationMaxCents / 100,
+                }
+              : { value: listing.compensationMinCents / 100 }),
+            ...(salaryUnitText ? { unitText: salaryUnitText } : {}),
           },
         }
       : undefined;

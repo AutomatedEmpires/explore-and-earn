@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import {
-	getHomepageBoostedListings,
-	getHomepageFeaturedEmployers,
-	getHomepageFallbackListings,
 	HOMEPAGE_LISTING_SLOTS,
 	HOMEPAGE_EMPLOYER_SLOTS,
 	HOMEPAGE_MIN_BOOSTED_THRESHOLD,
 	type HomepageFeaturedEmployer,
 } from "@explore-and-earn/db";
+
+import {
+	getHomepageBoostedListingsCached,
+	getHomepageFeaturedEmployersCached,
+	getHomepageFallbackListingsCached,
+} from "../../lib/serverCache";
+import { HOME_HERO_ROTATION } from "../../components/home/home-data";
 
 import { MarketplaceHome } from "../../components/home/MarketplaceHome";
 import { buildDestinations, buildAnnouncements } from "../../components/home/home-data";
@@ -65,9 +69,12 @@ function toRailEmployer(e: HomepageFeaturedEmployer): FeaturedEmployer {
 }
 
 export default async function HomePage() {
+	// Cached anon reads (60s, tag-busted on publish/edit — lib/serverCache.ts):
+	// the homepage was the one hot public surface still running its full query
+	// chain per request (review 2026-07-22).
 	const [boostedListings, featuredEmployerCampaigns] = await Promise.all([
-		getHomepageBoostedListings(HOMEPAGE_LISTING_SLOTS),
-		getHomepageFeaturedEmployers(HOMEPAGE_EMPLOYER_SLOTS),
+		getHomepageBoostedListingsCached(HOMEPAGE_LISTING_SLOTS),
+		getHomepageFeaturedEmployersCached(HOMEPAGE_EMPLOYER_SLOTS),
 	]);
 
 	let featuredEmployers: readonly FeaturedEmployer[] =
@@ -78,8 +85,18 @@ export default async function HomePage() {
 	if (hasBoostedInventory) {
 		feedListings = boostedListings.slice(0, HOMEPAGE_LISTING_SLOTS) as DiscoveryListing[];
 	} else {
-		feedListings = await getHomepageFallbackListings(HOMEPAGE_LISTING_SLOTS);
+		feedListings = await getHomepageFallbackListingsCached(HOMEPAGE_LISTING_SLOTS);
 	}
+
+	// Hero rotation is picked SERVER-side per request (the page stays
+	// force-dynamic): the SSR priority-preload then fetches the image that
+	// actually stays on screen. The old post-mount random pick threw away the
+	// preloaded hero and re-downloaded a different full-viewport image on 4/5
+	// of visits (review 2026-07-22).
+	const heroIndex =
+		HOME_HERO_ROTATION.length > 1
+			? Math.floor(Math.random() * HOME_HERO_ROTATION.length)
+			: 0;
 
 	if (!hasDiscoveryPublicDataConfig() && canUseDiscoveryFixtureFallback()) {
 		if (featuredEmployers.length === 0) {
@@ -125,6 +142,7 @@ export default async function HomePage() {
 						employers={landingEmployers}
 						destinations={destinations}
 						announcements={announcements}
+						heroIndex={heroIndex}
 					/>
 				</div>
 			</PublicShell>

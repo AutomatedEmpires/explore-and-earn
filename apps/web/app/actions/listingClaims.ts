@@ -20,7 +20,7 @@ import {
 } from "@explore-and-earn/db"
 
 import { isCurrentUserAdmin } from "../../lib/admin"
-import { checkRateLimit } from "../../lib/rateLimit"
+import { checkRateLimitDistributed } from "../../lib/rateLimit"
 import { LISTINGS_CACHE_TAG } from "../../lib/serverCache"
 import { reportError } from "../../lib/sentry"
 
@@ -60,7 +60,7 @@ export async function initiateClaimAction(
 		const { userId } = await auth()
 		if (!userId) return { ok: false, error: "unauthenticated" }
 
-		const { allowed } = checkRateLimit(`claim:${userId}`, 5, 60 * 60 * 1000)
+		const { allowed } = await checkRateLimitDistributed(`claim:${userId}`, 5, 60 * 60 * 1000)
 		if (!allowed) return { ok: false, error: "rate_limit_exceeded" }
 
 		const evidence = validAuthority(authority)

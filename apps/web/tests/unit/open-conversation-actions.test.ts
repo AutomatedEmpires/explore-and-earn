@@ -17,7 +17,12 @@ vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
 vi.mock("@explore-and-earn/db", () => dbMocks);
 vi.mock("next/cache", () => ({ revalidatePath: revalidatePathMock }));
 vi.mock("next/server", () => ({ after: vi.fn() }));
-vi.mock("../../lib/rateLimit", () => ({ checkRateLimit: checkRateLimitMock }));
+vi.mock("../../lib/rateLimit", () => ({
+  checkRateLimit: checkRateLimitMock,
+  // Actions now call the distributed (async) limiter — same mock drives both.
+  checkRateLimitDistributed: (...args: unknown[]) =>
+    Promise.resolve(checkRateLimitMock(...args)),
+}));
 vi.mock("../../lib/sentry", () => ({ reportError: reportErrorMock }));
 vi.mock("../../services/notifications/dispatcher", () => ({
   triggerDispatch: vi.fn(),

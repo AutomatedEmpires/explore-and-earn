@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 
 import {
   ANNOUNCEMENT_FREE_DURATION_DAYS,
@@ -61,7 +61,7 @@ export async function uploadCommunityPhotoAction(fd: FormData): Promise<UploadPh
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
   // Service-role writes get no RLS backstop — rate limits are the guard.
-  if (!checkRateLimit(`community-photo:${session.userId}`, 10, 60 * 60 * 1000).allowed) {
+  if (!(await checkRateLimitDistributed(`community-photo:${session.userId}`, 10, 60 * 60 * 1000)).allowed) {
     return { ok: false, reason: "upload_failed" };
   }
 
@@ -129,7 +129,7 @@ export type ReportPhotoResult =
 export async function reportCommunityPhotoAction(photoId: string): Promise<ReportPhotoResult> {
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
-  if (!photoId || !checkRateLimit(`community-photo-report:${session.userId}`, 10, 60 * 60 * 1000).allowed) {
+  if (!photoId || !(await checkRateLimitDistributed(`community-photo-report:${session.userId}`, 10, 60 * 60 * 1000)).allowed) {
     return { ok: false, reason: "invalid_input" };
   }
 
@@ -267,7 +267,7 @@ export async function createAnnouncementCheckoutAction(): Promise<AnnouncementCh
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
   // Each call mints a Stripe Checkout Session — cap the mint rate.
-  if (!checkRateLimit(`announce-checkout:${session.userId}`, 5, 60 * 60 * 1000).allowed) {
+  if (!(await checkRateLimitDistributed(`announce-checkout:${session.userId}`, 5, 60 * 60 * 1000)).allowed) {
     return { ok: false, reason: "checkout_failed" };
   }
 
@@ -307,7 +307,7 @@ export async function toggleReactionAction(
 ): Promise<ToggleReactionResult> {
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
-  if (!checkRateLimit(`community-react:${session.userId}`, 60, 5 * 60 * 1000).allowed) {
+  if (!(await checkRateLimitDistributed(`community-react:${session.userId}`, 60, 5 * 60 * 1000)).allowed) {
     return { ok: false, reason: "toggle_failed" };
   }
 
@@ -351,7 +351,7 @@ export type AddCommentResult =
 export async function addCommentAction(fd: FormData): Promise<AddCommentResult> {
   const session = await resolveAuth();
   if (!session) return { ok: false, reason: "unauthenticated" };
-  if (!checkRateLimit(`community-comment:${session.userId}`, 20, 5 * 60 * 1000).allowed) {
+  if (!(await checkRateLimitDistributed(`community-comment:${session.userId}`, 20, 5 * 60 * 1000)).allowed) {
     return { ok: false, reason: "insert_failed" };
   }
 

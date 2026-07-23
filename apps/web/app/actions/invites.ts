@@ -20,7 +20,7 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 
 import { triggerDispatch } from "../../services/notifications/dispatcher"
-import { checkRateLimit } from "../../lib/rateLimit"
+import { checkRateLimitDistributed } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
 /** Best-effort current Clerk user id for error attribution (catch paths only). */
@@ -196,7 +196,7 @@ async function createInviteForCurrentHost(
 
 	// Rate limit: 20 invites per hour per host. Checked after auth, before any DB
 	// work. Never throws — degrades to a friendly error code.
-	const { allowed } = checkRateLimit(`invite:${userId}`, 20, 60 * 60 * 1000)
+	const { allowed } = await checkRateLimitDistributed(`invite:${userId}`, 20, 60 * 60 * 1000)
 	if (!allowed) {
 		return { ok: false, error: "rate_limit_exceeded" }
 	}
@@ -326,7 +326,7 @@ async function searchSeekersActionImpl(
 	// Rate limit: 30 searches per hour per user. This action reads seeker names
 	// and bios, so a scripted caller must not be able to enumerate profiles at
 	// speed (the db layer additionally requires a host profile and caps results).
-	const { allowed } = checkRateLimit(`seeker-search:${userId}`, 30, 60 * 60 * 1000)
+	const { allowed } = await checkRateLimitDistributed(`seeker-search:${userId}`, 30, 60 * 60 * 1000)
 	if (!allowed) {
 		return []
 	}

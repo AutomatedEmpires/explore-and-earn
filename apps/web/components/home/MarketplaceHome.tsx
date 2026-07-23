@@ -29,6 +29,8 @@ interface MarketplaceHomeProps {
   readonly employers: readonly FeaturedEmployer[];
   readonly destinations: readonly HomeDestination[];
   readonly announcements: readonly HomeAnnouncement[];
+  /** Server-picked HOME_HERO_ROTATION index — see HomeHero for why. */
+  readonly heroIndex?: number;
 }
 
 // ─── Small shared pieces ───────────────────────────────────────────────────
@@ -85,8 +87,10 @@ const TRIAD_BADGES: ReadonlyArray<{ key: string; labelKey: "triadHousing" | "tri
 
 function HomeHero({
   peek,
+  heroIndex = 0,
 }: {
   peek?: DiscoveryListing;
+  heroIndex?: number;
 }) {
   const router = useRouter();
   const t = useTranslations("Home");
@@ -95,16 +99,12 @@ function HomeHero({
   const [loc, setLoc] = useState("");
   const [category, setCategory] = useState("");
 
-  // Dynamic hero — rotate through the controllable HOME_HERO_ROTATION bucket.
-  // Start on index 0 (matches the server render and first client paint), then
-  // advance to a rotated pick after mount. Because the pick happens in an effect
-  // it never runs during SSR/hydration, so there's no hydration mismatch.
-  const [heroIndex, setHeroIndex] = useState(0);
-  useEffect(() => {
-    if (HOME_HERO_ROTATION.length <= 1) return;
-    setHeroIndex(Math.floor(Math.random() * HOME_HERO_ROTATION.length));
-  }, []);
-  const hero = HOME_HERO_ROTATION[heroIndex] ?? HOME_HERO_ROTATION[0];
+  // Dynamic hero — rotation index is picked SERVER-side per landing and passed
+  // down (review 2026-07-22): the priority-preloaded image is the one that
+  // stays on screen. The previous post-mount random pick threw the preload
+  // away and re-downloaded a different full-viewport hero on most visits.
+  // Server value rides the RSC payload, so SSR and hydration always agree.
+  const hero = HOME_HERO_ROTATION[heroIndex % HOME_HERO_ROTATION.length] ?? HOME_HERO_ROTATION[0];
   const heroImage = hero.imageUrl;
   const heroCategory = hero.category;
 
@@ -740,17 +740,18 @@ export function MarketplaceHome({
   employers,
   destinations,
   announcements,
+  heroIndex,
 }: MarketplaceHomeProps) {
   // The hero photo rotates through the controllable HOME_HERO_ROTATION bucket
-  // (picked client-side per landing) so first impression always sells the place;
-  // the floating peek is a real listing.
+  // (index picked server-side per landing) so first impression always sells the
+  // place; the floating peek is a real listing.
   const heroListing = listings.find((l) => l.conditionalBadges?.includes("boosted")) ?? listings[0];
 
   // Organic-first sequence: promise → inventory → discovery story → browse
   // lanes → paid rails → free-forever → host conversion arc.
   return (
     <div className={styles.home}>
-      <HomeHero peek={heroListing} />
+      <HomeHero peek={heroListing} heroIndex={heroIndex} />
       <ThreeQuestions />
       <FeaturedJobs listings={listings} />
       <DiscoverModes listings={listings} />

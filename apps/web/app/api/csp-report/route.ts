@@ -33,8 +33,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 	try {
 		// Unauthenticated public sink — cap the amplification surface: a bounded
 		// body, a bounded number of forwarded reports, and a per-IP budget.
+		// x-real-ip first: on Vercel it is platform-set and non-forgeable, while
+		// the LEFTMOST x-forwarded-for hop is client-supplied (same trust model
+		// as lib/publicApi.ts clientIp — review 2026-07-22).
 		const ip =
-			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+			request.headers.get("x-real-ip")?.trim() ||
+			request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+			"unknown";
 		if (!checkRateLimit(`csp-report:${ip}`, 30, 60 * 1000).allowed) {
 			return new NextResponse(null, { status: 204 });
 		}

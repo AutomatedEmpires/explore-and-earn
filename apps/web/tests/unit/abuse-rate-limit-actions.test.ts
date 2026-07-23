@@ -84,7 +84,12 @@ vi.mock("next/cache", () => ({
 vi.mock("next/server", () => ({ after: afterMock }));
 vi.mock("next/navigation", () => ({ redirect: redirectMock }));
 vi.mock("@explore-and-earn/db", () => dbMocks);
-vi.mock("../../lib/rateLimit", () => ({ checkRateLimit: checkRateLimitMock }));
+vi.mock("../../lib/rateLimit", () => ({
+  checkRateLimit: checkRateLimitMock,
+  // Actions now call the distributed (async) limiter — same mock drives both.
+  checkRateLimitDistributed: (...args: unknown[]) =>
+    Promise.resolve(checkRateLimitMock(...args)),
+}));
 vi.mock("../../lib/sentry", () => ({ reportError: reportErrorMock }));
 vi.mock("../../lib/admin", () => ({ isAdminUserId: vi.fn(() => false) }));
 vi.mock("../../lib/clerkUser", () => ({ getClerkContact: vi.fn() }));

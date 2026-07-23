@@ -12,7 +12,7 @@ import {
 } from "@explore-and-earn/db"
 
 import { isCurrentUserAdmin } from "../../lib/admin"
-import { checkRateLimit } from "../../lib/rateLimit"
+import { checkRateLimitDistributed } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
 /**
@@ -76,7 +76,7 @@ export async function runSourceImportAction(args: {
 		if (!gate.ok) return { ok: false, runId: null, error: gate.error, stats: {}, needsReview: 0 }
 
 		const { userId } = await auth()
-		const { allowed } = checkRateLimit(`source-import:${userId}`, 10, 10 * 60 * 1000)
+		const { allowed } = await checkRateLimitDistributed(`source-import:${userId}`, 10, 10 * 60 * 1000)
 		if (!allowed) {
 			return { ok: false, runId: null, error: "rate_limit_exceeded", stats: {}, needsReview: 0 }
 		}

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { saveListing, unsaveListing } from "@explore-and-earn/db";
 
 import { applyToListingAction } from "./applications";
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 
 async function currentUserId(): Promise<string | undefined> {
@@ -27,7 +27,7 @@ async function saveListingActionImpl(
 ): Promise<{ ok: boolean }> {
 	const { userId, getToken } = await auth();
 	if (!userId) return { ok: false };
-	const { allowed } = checkRateLimit(`save:${userId}`, 60, 5 * 60 * 1000);
+	const { allowed } = await checkRateLimitDistributed(`save:${userId}`, 60, 5 * 60 * 1000);
 	if (!allowed) return { ok: false };
 	const token = await getToken();
 	if (!token) return { ok: false };
