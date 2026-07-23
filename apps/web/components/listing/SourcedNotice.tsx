@@ -84,6 +84,12 @@ export function SourcedNotice({
           <Icon name="trust.verified_host" size={16} aria-hidden />
           Is this your opportunity? Claim it
         </Link>
+        {/* Policy §6: the plain-language explanation + takedown contact must be
+            linked from the disclosure band. */}
+        <Link className={styles.sourceLink} href="/sourced-listings">
+          <Icon name="system.info" size={16} aria-hidden />
+          About sourced listings
+        </Link>
       </div>
     </section>
   );

@@ -58,6 +58,10 @@ export async function sweepStaleSourcedListings(
       })
       .eq("provenance", "sourced")
       .eq("status", "live")
+      // Only ACTIVE source rows go stale — withdrawn/removed rows carry a
+      // terminal semantic the sweep must never overwrite (review 2026-07-23;
+      // previously the docstring promised this but the predicate didn't).
+      .eq("source_status", "active")
       .neq("claim_summary", "claim_pending")
       .lt("source_last_seen_at", cutoffIso)
       .select("id");

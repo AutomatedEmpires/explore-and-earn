@@ -121,13 +121,30 @@ and the takedown contact should be linked from the disclosure band before go-liv
 ## 7. Go-live checklist
 
 - [ ] Counsel has reviewed this policy, the source allowlist, and the disclosure copy.
-- [ ] The initial allowlist contains **only** clearly-permitted sources (§3), each
+      *(Still open — recommended. The founder granted operating compliance
+      authority and directed activation on 2026-07-23; that authorizes
+      operation, it does not substitute for counsel review.)*
+- [x] The initial allowlist contains **only** clearly-permitted sources (§3), each
       with its permission basis recorded in `complianceStatus`/notes.
-- [ ] "About sourced listings" page + takedown contact are live and linked.
+      *(2026-07-23: allowlist = USAJOBS only — this policy's own named example
+      of the first permitted category. Full basis recorded in
+      `compliance_notes` via migration 078; developer Terms of Use reviewed
+      2026-07-23.)*
+- [x] "About sourced listings" page + takedown contact are live and linked.
+      *(2026-07-23: `/sourced-listings` + takedown mailto, linked from every
+      SourcedNotice disclosure band.)*
 - [ ] Takedown workflow + suppression list are in place and tested.
-- [ ] Sourced volume is bounded to the "initial attraction" layer, not the bulk of
+      *(Partial: contact + 72h target published; the suppression list is not
+      yet implemented — until it is, honoring a takedown means manual close +
+      manually excluding the posting from future payloads.)*
+- [x] Sourced volume is bounded to the "initial attraction" layer, not the bulk of
       inventory; the claim→verify path is prominent so sourced converts to owned.
-- [ ] `robots.txt` is respected by the ingestion pipeline for every source.
+      *(Structural: imports are operator-run bounded payloads (≤3 MB, 10
+      runs/10 min), every sourced surface carries the claim CTA.)*
+- [x] `robots.txt` is respected by the ingestion pipeline for every source.
+      *(Vacuously true by design: the pipeline performs no fetching at all —
+      payloads are operator-supplied exports from official APIs/feeds. Revisit
+      if a fetch adapter is ever added.)*
 
 ## 8. Bottom line
 

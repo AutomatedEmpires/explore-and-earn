@@ -480,3 +480,10 @@
 		grid-template-columns: 1fr;
 	}
 }
+
+/* Inline prose link (added with /sourced-listings, 2026-07-23). */
+.inlineLink {
+	color: var(--color-cta);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}

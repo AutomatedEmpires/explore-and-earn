@@ -76,6 +76,40 @@ export async function getListingSource(
   };
 }
 
+export interface ListingSourceSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: "csv" | "json" | "partner_api";
+  readonly complianceStatus: "approved" | "pending_review" | "rejected";
+  readonly complianceNotes: string | null;
+  readonly termsUrl: string | null;
+  readonly fullSnapshot: boolean;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/** All registered sources for the admin sourcing console (service role). */
+export async function listListingSources(): Promise<ListingSourceSummary[]> {
+  const { data, error } = await db()
+    .from("listing_sources")
+    .select(
+      "id, name, kind, compliance_status, compliance_notes, terms_url, full_snapshot, created_at, updated_at",
+    )
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`listListingSources: ${error.message}`);
+  return ((data ?? []) as Array<Record<string, unknown>>).map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    kind: row.kind as ListingSourceSummary["kind"],
+    complianceStatus: row.compliance_status as ListingSourceSummary["complianceStatus"],
+    complianceNotes: row.compliance_notes == null ? null : String(row.compliance_notes),
+    termsUrl: row.terms_url == null ? null : String(row.terms_url),
+    fullSnapshot: row.full_snapshot === true,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  }));
+}
+
 export interface UpsertListingSourceInput {
   readonly name: string;
   readonly kind: "csv" | "json" | "partner_api";
