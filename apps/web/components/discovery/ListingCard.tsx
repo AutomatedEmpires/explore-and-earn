@@ -9,6 +9,7 @@ import {
 import { DiscoveryCard, type DiscoveryCardProps } from "@explore-and-earn/ui";
 import type { DiscoveryCardSurface } from "@explore-and-earn/contracts";
 
+import { renderCardCoverImage } from "./CardCoverImage";
 import { DiscoveryCardSkeleton } from "./DiscoveryCardSkeleton";
 import { EmptyState } from "./EmptyState";
 import { toDiscoveryCardData, type DiscoveryListing } from "./listing";
@@ -224,6 +225,7 @@ export function ListingCard({
       cardState={cardState}
       variant={variant}
       imageLoading={imageLoading}
+      renderCoverImage={renderCardCoverImage}
       actions={actions}
       previouslySkipped={skipped}
       onOpen={resolved.onOpen}
