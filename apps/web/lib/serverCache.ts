@@ -106,7 +106,12 @@ export const getPublicHostProfileCached = unstable_cache(
 export const getHomepageBoostedListingsCached = unstable_cache(
   (limit: number) => getHomepageBoostedListings(limit),
   ["homepage-boosted-listings"],
-  { revalidate: PUBLIC_REVALIDATE_SECONDS, tags: [LISTINGS_CACHE_TAG] },
+  {
+    revalidate: PUBLIC_REVALIDATE_SECONDS,
+    // Both tags: the query joins host_profiles (tier/verification), so a host
+    // profile change must bust this too (review 2026-07-22).
+    tags: [LISTINGS_CACHE_TAG, HOST_PROFILES_CACHE_TAG],
+  },
 );
 
 /** Homepage featured-employer rail (anon) — reads listings AND host profiles. */
@@ -123,5 +128,9 @@ export const getHomepageFeaturedEmployersCached = unstable_cache(
 export const getHomepageFallbackListingsCached = unstable_cache(
   (limit: number) => getHomepageFallbackListings(limit),
   ["homepage-fallback-listings"],
-  { revalidate: PUBLIC_REVALIDATE_SECONDS, tags: [LISTINGS_CACHE_TAG] },
+  {
+    revalidate: PUBLIC_REVALIDATE_SECONDS,
+    // Both tags — same host_profiles join as the boosted query above.
+    tags: [LISTINGS_CACHE_TAG, HOST_PROFILES_CACHE_TAG],
+  },
 );

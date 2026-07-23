@@ -88,14 +88,18 @@ export default async function HomePage() {
 		feedListings = await getHomepageFallbackListingsCached(HOMEPAGE_LISTING_SLOTS);
 	}
 
-	// Hero rotation is picked SERVER-side per request (the page stays
-	// force-dynamic): the SSR priority-preload then fetches the image that
-	// actually stays on screen. The old post-mount random pick threw away the
-	// preloaded hero and re-downloaded a different full-viewport image on 4/5
-	// of visits (review 2026-07-22).
+	// Hero rotation is picked SERVER-side (the page stays force-dynamic): the
+	// SSR priority-preload then fetches the image that actually stays on
+	// screen. The old post-mount random pick threw away the preloaded hero and
+	// re-downloaded a different full-viewport image on 4/5 of visits (review
+	// 2026-07-22). The pick is a deterministic 3-minute time window — the
+	// founder's spec ("rotates per landing or every 3–5 min") verbatim, no
+	// randomness (CodeQL js/insecure-randomness stays quiet), and consecutive
+	// requests within a window agree, which plays well with any edge caching.
+	const HERO_ROTATION_WINDOW_MS = 3 * 60 * 1000;
 	const heroIndex =
 		HOME_HERO_ROTATION.length > 1
-			? Math.floor(Math.random() * HOME_HERO_ROTATION.length)
+			? Math.floor(Date.now() / HERO_ROTATION_WINDOW_MS) % HOME_HERO_ROTATION.length
 			: 0;
 
 	if (!hasDiscoveryPublicDataConfig() && canUseDiscoveryFixtureFallback()) {

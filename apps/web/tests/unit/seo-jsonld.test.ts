@@ -136,15 +136,18 @@ describe("JobPosting — representative listing types", () => {
     expect(quantitative.maxValue).toBeUndefined();
   });
 
-  it("unmappable pay unit omits unitText instead of inventing one outside Google's enum", () => {
-    const jp = parse(
-      generateJobPostingJsonLd(listing({ compensationUnit: "other" }), host, BASE),
-    );
-    const quantitative = (jp.baseSalary as Record<string, unknown>).value as Record<string, unknown>;
-    expect(quantitative.unitText).toBeUndefined();
-    // The stated dollar figures still surface — only the invalid label is dropped.
-    expect(quantitative.minValue).toBe(1800);
-  });
+  it.each(["other", "stipend", "exchange"] as const)(
+    "unmappable pay unit %s omits unitText instead of emitting one outside Google's enum",
+    (unit) => {
+      const jp = parse(
+        generateJobPostingJsonLd(listing({ compensationUnit: unit }), host, BASE),
+      );
+      const quantitative = (jp.baseSalary as Record<string, unknown>).value as Record<string, unknown>;
+      expect(quantitative.unitText).toBeUndefined();
+      // The stated dollar figures still surface — only the invalid label is dropped.
+      expect(quantitative.minValue).toBe(1800);
+    },
+  );
 
   it("no employmentType is asserted (the model records none)", () => {
     const jp = parse(generateJobPostingJsonLd(listing(), host, BASE));

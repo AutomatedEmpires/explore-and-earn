@@ -23,13 +23,22 @@ export function generateJobPostingJsonLd(
 
   // baseSalary surfaces exactly what the host stated: a range when max exists
   // (minValue/maxValue render better in Google Jobs than a bare value and were
-  // previously discarded), a single value otherwise. unitText is emitted ONLY
-  // when the stated unit maps to Google's accepted enum (HOUR/DAY/WEEK/MONTH/
-  // YEAR) — "other"/absent units get NO unitText rather than an invented
-  // "TOTAL", which is outside the enum and can invalidate the whole baseSalary
-  // property in Search Console (review 2026-07-22; no-fabrication law).
+  // previously discarded), a single value otherwise. unitText is an ALLOWLIST:
+  // only units in Google's accepted enum (HOUR/DAY/WEEK/MONTH/YEAR — see the
+  // JobPosting doc linked in the function header) are emitted. Everything else
+  // in CompensationUnit ("stipend", "exchange", "other", absent) gets NO
+  // unitText rather than a label outside the enum, which can invalidate the
+  // whole baseSalary property in Search Console (review 2026-07-22;
+  // no-fabrication law per this file's header contract).
+  const GOOGLE_SALARY_UNITS: ReadonlySet<string> = new Set([
+    "hour",
+    "day",
+    "week",
+    "month",
+    "year",
+  ]);
   const salaryUnitText =
-    listing.compensationUnit && listing.compensationUnit !== "other"
+    listing.compensationUnit && GOOGLE_SALARY_UNITS.has(listing.compensationUnit)
       ? listing.compensationUnit.toUpperCase()
       : undefined;
   const baseSalary =
