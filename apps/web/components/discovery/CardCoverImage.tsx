@@ -11,8 +11,11 @@ import type { ReactNode } from "react";
  *     Supabase covers previously shipped at STORED resolution to ~360px card
  *     slots (48 of them on /seek), the largest single slice of mobile page
  *     weight (production audit 2026-07-22);
- *   • `sizes` matched to the canonical DiscoveryFeed grid (1-col mobile,
- *     2-col ≥768px, 3-col ≥1024px), so browsers pick the smallest candidate.
+ *   • `sizes` matched to the card's REAL rendered slot: full-viewport in the
+ *     1-col mobile grid, and the component's own 360px width cap everywhere
+ *     else (DiscoveryCard.module.css caps the card at 360px, so grid-fraction
+ *     sizes like 50vw/33vw would overstate the slot on wide viewports and
+ *     select needlessly large candidates — review 2026-07-23).
  *
  * `fill` mirrors the .heroImg contract exactly (absolute inset, object-fit
  * cover via the passed className) inside the card's FIXED 16/10 aspect box —
@@ -20,8 +23,7 @@ import type { ReactNode } from "react";
  * fetchpriority=high, matching the raw-img behavior they replace).
  */
 
-const CARD_COVER_SIZES =
-	"(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 33vw";
+const CARD_COVER_SIZES = "(max-width: 767px) 100vw, 360px";
 
 export function renderCardCoverImage(cover: {
 	readonly src: string;

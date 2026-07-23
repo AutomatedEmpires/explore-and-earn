@@ -2,7 +2,13 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { DiscoveryCard, type DiscoveryCardData } from "@explore-and-earn/ui";
+import {
+  DiscoveryCard,
+  type DiscoveryCardData,
+  type DiscoveryCardProps,
+} from "@explore-and-earn/ui";
+
+type CoverContract = Parameters<NonNullable<DiscoveryCardProps["renderCoverImage"]>>[0];
 
 /**
  * The renderCoverImage seam (responsive card images, 2026-07-23): packages/ui
@@ -23,13 +29,15 @@ const data: DiscoveryCardData = {
   coverImageUrl: "https://res.cloudinary.com/demo/t_ee-card/cover.jpg",
 };
 
-function render(props: Record<string, unknown>): string {
+// Typed helper (review 2026-07-23): the props object stays compile-checked, so
+// a future rename of the renderCoverImage seam breaks this test at typecheck.
+function render(props: Partial<DiscoveryCardProps>): string {
   return renderToStaticMarkup(
     createElement(DiscoveryCard, {
       data,
       surface: "discovery_feed",
       ...props,
-    } as never),
+    }),
   );
 }
 
@@ -44,10 +52,10 @@ describe("DiscoveryCard cover renderer seam", () => {
   });
 
   it("with a renderer, delegates the cover and passes the full contract", () => {
-    const seen: Array<Record<string, unknown>> = [];
+    const seen: CoverContract[] = [];
     const html = render({
       imageLoading: "eager",
-      renderCoverImage: (cover: Record<string, unknown>) => {
+      renderCoverImage: (cover) => {
         seen.push(cover);
         return createElement("picture", { "data-custom-cover": "true" });
       },
@@ -63,14 +71,13 @@ describe("DiscoveryCard cover renderer seam", () => {
       loading: "eager",
       fetchPriority: "high",
     });
-    expect(typeof seen[0]!.className).toBe("string");
-    expect((seen[0]!.className as string).length).toBeGreaterThan(0);
+    expect(seen[0]!.className.length).toBeGreaterThan(0);
   });
 
   it("lazy covers pass no fetchPriority", () => {
-    const seen: Array<Record<string, unknown>> = [];
+    const seen: CoverContract[] = [];
     render({
-      renderCoverImage: (cover: Record<string, unknown>) => {
+      renderCoverImage: (cover) => {
         seen.push(cover);
         return null;
       },
@@ -80,16 +87,16 @@ describe("DiscoveryCard cover renderer seam", () => {
   });
 
   it("coverless listings render the category watermark, never the renderer", () => {
-    const seen: unknown[] = [];
+    const seen: CoverContract[] = [];
     const html = renderToStaticMarkup(
       createElement(DiscoveryCard, {
         data: { ...data, coverImageUrl: undefined },
         surface: "discovery_feed",
-        renderCoverImage: (cover: unknown) => {
+        renderCoverImage: (cover) => {
           seen.push(cover);
           return null;
         },
-      } as never),
+      }),
     );
     expect(seen).toHaveLength(0);
     expect(html).not.toContain("<img");
