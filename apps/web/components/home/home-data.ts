@@ -167,11 +167,14 @@ export interface HomeCategory {
  * previously fanned Seasonal into five role-tiles, fracturing the taxonomy into
  * a false "eight categories" — the blurb now carries that breadth instead.
  */
+// Tiles link the indexable /jobs/{lane} landing pages (2026-07-23) — the
+// crawlable category surface. Each landing page carries a "Filter & sort in
+// Seek" CTA, so the /seek?category= path is one click deeper, not gone.
 export const HOME_CATEGORIES: readonly HomeCategory[] = [
-  { key: "farm", label: "Farm", imageCategory: "farm", imageUrl: lanePhoto("farm", "young-sung-jang-7-6pulwb1d0"), href: "/seek?category=farm", blurb: "Orchards, ranches, harvests & greenhouses" },
-  { key: "maritime", label: "Maritime", imageCategory: "maritime", imageUrl: lanePhoto("maritime", "vidar-nordli-mathisen-pjiv1ekevzk"), href: "/seek?category=maritime", blurb: "Boats, docks, fisheries & processing" },
-  { key: "remote", label: "Remote", imageCategory: "remote", imageUrl: lanePhoto("remote", "justin-kauffman-fpohihximhg"), href: "/seek?category=remote", blurb: "Cabins, backcountry ops, guiding & off-grid" },
-  { key: "seasonal", label: "Seasonal", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vojtech-bruzek-yrxr3bspds0"), href: "/seek?category=seasonal", blurb: "Lodges, resorts, parks & hospitality" },
+  { key: "farm", label: "Farm", imageCategory: "farm", imageUrl: lanePhoto("farm", "young-sung-jang-7-6pulwb1d0"), href: "/jobs/farm", blurb: "Orchards, ranches, harvests & greenhouses" },
+  { key: "maritime", label: "Maritime", imageCategory: "maritime", imageUrl: lanePhoto("maritime", "vidar-nordli-mathisen-pjiv1ekevzk"), href: "/jobs/maritime", blurb: "Boats, docks, fisheries & processing" },
+  { key: "remote", label: "Remote", imageCategory: "remote", imageUrl: lanePhoto("remote", "justin-kauffman-fpohihximhg"), href: "/jobs/remote", blurb: "Cabins, backcountry ops, guiding & off-grid" },
+  { key: "seasonal", label: "Seasonal", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vojtech-bruzek-yrxr3bspds0"), href: "/jobs/seasonal", blurb: "Lodges, resorts, parks & hospitality" },
 ];
 
 // ─── Rolling announcements (monetized rail) ────────────────────────────────

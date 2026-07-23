@@ -66,6 +66,11 @@ const isPublicRoute = createRouteMatcher([
   // public — they MUST be reachable without a login or the funnel dead-ends.
   "/seek",
   "/map",
+  // Indexable category landing pages (/jobs + /jobs/{lane}) — advertised in
+  // the sitemap and footer; MUST be reachable without a login or they cannot
+  // be crawled. Bare path + "/(.*)" pair per the /sign-in convention below.
+  "/jobs",
+  "/jobs/(.*)",
   "/listing/(.*)",
   "/host/(.*)", // Public host profiles (/host/{id}) + layout-gated authed routes
   // Bare path + "/(.*)" pair (like /blog below) so the entry URLs themselves

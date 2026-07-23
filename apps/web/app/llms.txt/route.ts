@@ -44,7 +44,8 @@ export async function GET(): Promise<Response> {
 		const count = counts[key];
 		const countNote =
 			typeof count === "number" ? ` (${count === 200 ? "200+" : count} live now)` : "";
-		return `- ${label}${countNote} — ${blurb}.`;
+		// Each lane links its indexable landing page (/jobs/{lane}).
+		return `- [${label}](${baseUrl}/jobs/${key})${countNote} — ${blurb}.`;
 	}).join("\n");
 
 	const body = `# Explore & Earn

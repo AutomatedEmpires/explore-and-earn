@@ -93,6 +93,11 @@ export const DEV_SURFACES: readonly DevSurfaceGroup[] = [
     surfaces: [
       { label: "Home", href: "/" },
       { label: "Search", href: "/search" },
+      { label: "Jobs hub", href: "/jobs" },
+      { label: "Jobs · Farm", href: "/jobs/farm" },
+      { label: "Jobs · Maritime", href: "/jobs/maritime" },
+      { label: "Jobs · Remote", href: "/jobs/remote" },
+      { label: "Jobs · Seasonal", href: "/jobs/seasonal" },
       { label: "Listing detail", href: "/listing/lst_orchard_wenatchee" },
       { label: "For hosts", href: "/for-hosts" },
       { label: "Blog", href: "/blog" },

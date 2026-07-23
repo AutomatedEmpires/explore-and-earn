@@ -258,3 +258,38 @@ export function generateBreadcrumbJsonLd(
   };
   return escapeJsonLdHtml(JSON.stringify(breadcrumb, null, 2));
 }
+
+/**
+ * CollectionPage + ItemList JSON-LD for category landing pages (/jobs/{lane}).
+ * `items` are the ACTUAL listings rendered on the page — `numberOfItems` is
+ * their real count, never a fabricated marketplace total (no-fabrication law).
+ * Per-listing JobPosting JSON-LD stays on the detail pages; the list page only
+ * points at them.
+ *
+ * @see https://schema.org/CollectionPage
+ */
+export function generateCollectionPageJsonLd(args: {
+  name: string;
+  description: string;
+  url: string;
+  items: ReadonlyArray<{ name: string; url: string }>;
+}): string {
+  const page = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: args.name,
+    description: args.description,
+    url: args.url,
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: args.items.length,
+      itemListElement: args.items.map((item, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: item.name,
+        url: item.url,
+      })),
+    },
+  };
+  return escapeJsonLdHtml(JSON.stringify(page, null, 2));
+}

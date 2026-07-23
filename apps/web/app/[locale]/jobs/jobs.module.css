@@ -1,0 +1,235 @@
+/*
+ * /jobs hub + /jobs/{lane} category landing pages.
+ *
+ * Fully tokenized (G50): every color is a var()/color-mix over the founder
+ * tokens. Per-lane atmosphere rides the --cat-* token sets from tokens.css
+ * (both themes already defined there), keyed by data-category.
+ */
+
+.page {
+	max-width: 74rem;
+	margin: 0 auto;
+	padding: var(--space-24) var(--space-16) var(--space-48);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-24);
+}
+
+/* ─── Hub ────────────────────────────────────────────────────────────────── */
+
+.hubHeader {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding-top: var(--space-8);
+}
+
+.hubTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-title-size);
+	line-height: var(--type-title-line);
+	color: var(--text-primary);
+}
+
+.hubSub {
+	margin: 0;
+	color: var(--text-secondary);
+}
+
+.laneGrid {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-16);
+}
+
+@media (min-width: 768px) {
+	.laneGrid {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+.laneItem {
+	display: block;
+}
+
+.laneCard {
+	position: relative;
+	display: flex;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--space-12);
+	min-height: 11rem;
+	padding: var(--space-16);
+	border-radius: var(--radius-lg);
+	overflow: hidden;
+	text-decoration: none;
+	color: var(--palette-white);
+	border: 1px solid color-mix(in srgb, var(--color-chrome) 30%, transparent);
+}
+
+.laneCard[data-category="farm"] { background: var(--cat-farm-cover); }
+.laneCard[data-category="maritime"] { background: var(--cat-maritime-cover); }
+.laneCard[data-category="remote"] { background: var(--cat-remote-cover); }
+.laneCard[data-category="seasonal"] { background: var(--cat-seasonal-cover); }
+
+.laneImage {
+	object-fit: cover;
+}
+
+.laneScrim {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		180deg,
+		transparent 30%,
+		color-mix(in srgb, var(--palette-ink) 72%, transparent) 100%
+	);
+}
+
+.laneBody {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.laneLabel {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+}
+
+.laneBlurb {
+	font-size: var(--type-meta-size);
+	color: color-mix(in srgb, var(--palette-white) 85%, transparent);
+}
+
+/* ─── Category hero ──────────────────────────────────────────────────────── */
+
+.hero {
+	position: relative;
+	min-height: 16rem;
+	border-radius: var(--radius-lg);
+	overflow: hidden;
+	display: flex;
+	align-items: flex-end;
+	border: 1px solid color-mix(in srgb, var(--color-chrome) 30%, transparent);
+}
+
+.hero[data-category="farm"] { background: var(--cat-farm-cover); }
+.hero[data-category="maritime"] { background: var(--cat-maritime-cover); }
+.hero[data-category="remote"] { background: var(--cat-remote-cover); }
+.hero[data-category="seasonal"] { background: var(--cat-seasonal-cover); }
+
+.heroImage {
+	object-fit: cover;
+}
+
+.heroScrim {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		180deg,
+		transparent 20%,
+		color-mix(in srgb, var(--palette-ink) 78%, transparent) 100%
+	);
+}
+
+.heroBody {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding: var(--space-24) var(--space-16);
+	color: var(--palette-white);
+}
+
+.heroEyebrow {
+	margin: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	font-size: var(--type-meta-size);
+	color: color-mix(in srgb, var(--palette-white) 85%, transparent);
+}
+
+.heroTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-title-size);
+	line-height: var(--type-title-line);
+}
+
+.heroCount {
+	margin: 0;
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--palette-white);
+}
+
+.heroActions {
+	display: flex;
+	gap: var(--space-8);
+	margin-top: var(--space-4);
+}
+
+.heroCta {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-8) var(--space-16);
+	border-radius: var(--radius-pill);
+	background: var(--palette-sky-light);
+	color: var(--palette-sky-dark);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+}
+
+/* ─── Lane cross-nav ─────────────────────────────────────────────────────── */
+
+.laneNav {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding-top: var(--space-8);
+}
+
+.laneNavLabel {
+	margin: 0;
+	font-size: var(--type-meta-size);
+	color: var(--text-secondary);
+}
+
+.laneNavList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+.laneNavChip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--color-chrome) 40%, transparent);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font-size: var(--type-meta-size);
+	text-decoration: none;
+}
+
+.laneNavChip:hover {
+	border-color: color-mix(in srgb, var(--color-cta) 55%, transparent);
+	color: var(--color-cta);
+}

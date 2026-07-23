@@ -12,6 +12,7 @@ import {
   getPublicHostProfile,
   getPublicListings,
   getSeekerProfile,
+  searchListings,
 } from "@explore-and-earn/db";
 
 /**
@@ -131,6 +132,22 @@ export const getHomepageFallbackListingsCached = unstable_cache(
   {
     revalidate: PUBLIC_REVALIDATE_SECONDS,
     // Both tags — same host_profiles join as the boosted query above.
+    tags: [LISTINGS_CACHE_TAG, HOST_PROFILES_CACHE_TAG],
+  },
+);
+
+/**
+ * Category landing-page feed (anon) — /jobs/{lane}. unstable_cache keys on the
+ * args, so one wrapper serves all four lanes. searchListings joins
+ * host_profiles (subscription_tier for the monetization ranking), hence both
+ * tags. Anonymous + live-only by construction.
+ */
+export const getCategoryListingsCached = unstable_cache(
+  (category: string, limit: number) =>
+    searchListings({ categories: [category], limit }),
+  ["public-category-listings"],
+  {
+    revalidate: PUBLIC_REVALIDATE_SECONDS,
     tags: [LISTINGS_CACHE_TAG, HOST_PROFILES_CACHE_TAG],
   },
 );
