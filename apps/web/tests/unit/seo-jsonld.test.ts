@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   generateBreadcrumbJsonLd,
+  generateCollectionPageJsonLd,
   generateJobPostingJsonLd,
   generateOrganizationJsonLd,
 } from "../../lib/seo";
@@ -218,5 +219,57 @@ describe("Organization + BreadcrumbList", () => {
     const items = bc.itemListElement as Array<Record<string, unknown>>;
     expect(items.map((i) => i.position)).toEqual([1, 2, 3]);
     expect(items[2]!.name).toBe("Orchard crew");
+  });
+});
+
+describe("CollectionPage (category landing pages)", () => {
+  it("numberOfItems is the REAL rendered count — never a fabricated total", () => {
+    const cp = parse(
+      generateCollectionPageJsonLd({
+        name: "Farm jobs with housing, meals & pay upfront",
+        description: "Orchards, ranches, harvests & greenhouses.",
+        url: `${BASE}/jobs/farm`,
+        items: [
+          { name: "Summer Harvest Crew", url: `${BASE}/listing/a` },
+          { name: "Orchard Care Assistant", url: `${BASE}/listing/b` },
+        ],
+      }),
+    );
+    expect(cp["@type"]).toBe("CollectionPage");
+    const list = cp.mainEntity as Record<string, unknown>;
+    expect(list["@type"]).toBe("ItemList");
+    expect(list.numberOfItems).toBe(2);
+    const items = list.itemListElement as Array<Record<string, unknown>>;
+    expect(items.map((i) => i.position)).toEqual([1, 2]);
+    expect(items[0]!.url).toBe(`${BASE}/listing/a`);
+  });
+
+  it("an empty lane emits an honest zero-item list", () => {
+    const cp = parse(
+      generateCollectionPageJsonLd({
+        name: "Remote jobs with housing, meals & pay upfront",
+        description: "Cabins, backcountry ops, guiding & off-grid.",
+        url: `${BASE}/jobs/remote`,
+        items: [],
+      }),
+    );
+    const list = cp.mainEntity as Record<string, unknown>;
+    expect(list.numberOfItems).toBe(0);
+    expect(list.itemListElement).toEqual([]);
+  });
+
+  it("escapes script-breakout characters from listing titles", () => {
+    const raw = generateCollectionPageJsonLd({
+      name: "x",
+      description: "y",
+      url: `${BASE}/jobs/farm`,
+      items: [{ name: "</script><script>alert(1)</script>", url: `${BASE}/listing/a` }],
+    });
+    expect(raw).not.toContain("</script>");
+    // Still parses back to the original title after unescaping.
+    const cp = parse(raw);
+    const items = (cp.mainEntity as { itemListElement: Array<{ name: string }> })
+      .itemListElement;
+    expect(items[0]!.name).toBe("</script><script>alert(1)</script>");
   });
 });

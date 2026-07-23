@@ -9,6 +9,10 @@ const FOOTER_COLUMNS = [
 			{ label: "Seek",  href: "/seek"  },
 			{ label: "Swipe", href: "/swipe" },
 			{ label: "Map",   href: "/map"   },
+			{ label: "Farm jobs",     href: "/jobs/farm"     },
+			{ label: "Maritime jobs", href: "/jobs/maritime" },
+			{ label: "Remote jobs",   href: "/jobs/remote"   },
+			{ label: "Seasonal jobs", href: "/jobs/seasonal" },
 		],
 	},
 	{
