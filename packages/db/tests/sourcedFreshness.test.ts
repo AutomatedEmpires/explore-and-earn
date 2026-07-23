@@ -79,6 +79,9 @@ describe("sweepStaleSourcedListings DB contract", () => {
       expect.arrayContaining([
         ["provenance", "sourced"],
         ["status", "live"],
+        // Terminal source states (withdrawn/removed) are never overwritten —
+        // only active rows can go stale (review 2026-07-23).
+        ["source_status", "active"],
       ]),
     );
     expect(byOp("neq").map((f) => f.args)).toEqual([["claim_summary", "claim_pending"]]);

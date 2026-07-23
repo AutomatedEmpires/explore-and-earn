@@ -20,11 +20,16 @@
 --   'stale'     — not observed recently enough to keep presenting as current
 -- The canonical value list lives in packages/contracts/src/provenance.ts
 -- (LISTING_SOURCE_STATUSES) — keep the two in lockstep.
+-- NOT VALID + immediate VALIDATE (the 070 precedent): the expanded list is a
+-- strict superset of 064's, so validation can't fail — but this shape avoids
+-- the write-blocking table scan on ADD and stays correct at any table size.
 alter table public.listings
   drop constraint if exists listings_source_status_chk;
 alter table public.listings
   add constraint listings_source_status_chk
-    check (source_status in ('not_applicable', 'active', 'removed', 'withdrawn', 'stale'));
+    check (source_status in ('not_applicable', 'active', 'removed', 'withdrawn', 'stale'))
+    not valid;
+alter table public.listings validate constraint listings_source_status_chk;
 
 -- ── 2. Register the first APPROVED source: USAJOBS (US OPM) ────────────────
 -- Registered by MIGRATION (not Studio/MCP, not an ad-hoc admin call) so the

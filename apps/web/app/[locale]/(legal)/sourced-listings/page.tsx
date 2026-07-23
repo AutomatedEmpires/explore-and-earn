@@ -50,7 +50,8 @@ export default function SourcedListingsPage() {
 					A sourced listing is a <strong>real, public job posting</strong> we
 					found from a permitted public source — for example, a government job
 					board. We show the facts the posting itself stated, name the source,
-					and link to the original posting.
+					and link out to the original posting whenever the source provides a
+					link.
 				</p>
 				<p className={styles.body}>
 					<strong>Explore &amp; Earn has not confirmed</strong> the employer or
@@ -72,8 +73,8 @@ export default function SourcedListingsPage() {
 					<strong>&ldquo;Not stated&rdquo;</strong> — never assumed, never filled
 					in, and never silently turned into a &ldquo;no&rdquo;. We extract stated
 					facts only; we never copy full posting text, add descriptions, or
-					invent housing, meals, or pay details. Every sourced listing shows when
-					it was last seen at its source, and listings we can no longer observe
+					invent housing, meals, or pay details. Sourced listings show when they
+					were last seen at their source, and listings we can no longer observe
 					are closed automatically rather than left up looking current.
 				</p>
 			</section>
@@ -108,8 +109,8 @@ export default function SourcedListingsPage() {
 						{TAKEDOWN_EMAIL}
 					</a>{" "}
 					with the listing link. We action valid requests promptly — our target
-					is within <strong>72 hours</strong> — and we won&apos;t re-ingest a
-					posting you&apos;ve asked us to remove.
+					is within <strong>72 hours</strong> — and we exclude removed postings
+					from future imports.
 				</p>
 				<p className={styles.body}>
 					Prefer the listing stays up? <Link className={styles.inlineLink} href="/for-hosts">Claim and verify it</Link>{" "}
