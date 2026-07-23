@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { insertReport, type ReportReason } from "@explore-and-earn/db"
 
-import { checkRateLimit } from "../../lib/rateLimit"
+import { checkRateLimitDistributed } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
 /** Best-effort current Clerk user id for error attribution (catch paths only). */
@@ -31,7 +31,7 @@ async function submitReportActionImpl(
 	}
 
 	// 5 reports per user per hour — abuse defence.
-	const { allowed } = checkRateLimit(`report:${userId}`, 5, 60 * 60 * 1000)
+	const { allowed } = await checkRateLimitDistributed(`report:${userId}`, 5, 60 * 60 * 1000)
 	if (!allowed) {
 		return { ok: false, error: "rate_limit_exceeded" }
 	}

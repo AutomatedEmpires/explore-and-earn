@@ -89,16 +89,13 @@ export const metadata: Metadata = {
 	metadataBase: new URL(
 		process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com",
 	),
-	// hreflang scaffold — English only today. As locales are added to
-	// i18n/routing.ts, extend this map (and per-page generateMetadata alternates)
-	// so crawlers see every localized variant. x-default points at the
-	// unprefixed default-locale URL.
-	alternates: {
-		languages: {
-			en: "/",
-			"x-default": "/",
-		},
-	},
+	// NOTE: no `alternates` here on purpose (review 2026-07-22). Next merges
+	// metadata per top-level key, so a root-layout `alternates.languages` map
+	// pointing at "/" was inherited by EVERY page that declared no alternates —
+	// emitting hreflang links that told crawlers each page's en/x-default
+	// variant is the homepage. The hreflang scaffold lives in the homepage's
+	// own metadata ([locale]/page.tsx); as locales are added, declare per-page
+	// alternates in each page's generateMetadata.
 };
 
 /**

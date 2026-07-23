@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { createHostReview, type HostReviewInput } from "@explore-and-earn/db";
 
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 
 // Matches the review composer's maxLength (LeaveReview textarea) and the db
 // layer's own 1000-char truncation — only a scripted caller can exceed it.
@@ -27,7 +27,7 @@ export async function submitHostReviewAction(
 
   // Rate limit: 3 reviews per day per seeker. A seeker finishes at most a
   // handful of engagements at once; anything faster is spam.
-  const { allowed } = checkRateLimit(`host-review:${userId}`, 3, 24 * 60 * 60 * 1000);
+  const { allowed } = await checkRateLimitDistributed(`host-review:${userId}`, 3, 24 * 60 * 60 * 1000);
   if (!allowed) return { ok: false, error: "rate_limit_exceeded" };
 
   if (typeof input?.body !== "string" || input.body.length > MAX_BODY_CHARS) {

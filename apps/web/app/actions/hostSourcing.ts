@@ -14,7 +14,7 @@ import {
 	hasStripeCheckoutConfig,
 	isInvitePackSize,
 } from "../../services/stripe"
-import { checkRateLimit } from "../../lib/rateLimit"
+import { checkRateLimitDistributed } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
 /**
@@ -48,7 +48,7 @@ export async function getMatchedSeekersAction(
 	try {
 		const { userId, getToken } = await auth()
 		if (!userId) return null
-		const { allowed } = checkRateLimit(`sourcing:${userId}`, 60, 5 * 60 * 1000)
+		const { allowed } = await checkRateLimitDistributed(`sourcing:${userId}`, 60, 5 * 60 * 1000)
 		if (!allowed) return null
 		const token = await getToken()
 		if (!token) return null
@@ -105,7 +105,7 @@ export async function purchaseInviteCreditsAction(
 			return { ok: false, error: "billing_unavailable" }
 		}
 
-		const { allowed } = checkRateLimit(`invite-pack:${userId}`, 5, 10 * 60 * 1000)
+		const { allowed } = await checkRateLimitDistributed(`invite-pack:${userId}`, 5, 10 * 60 * 1000)
 		if (!allowed) return { ok: false, error: "rate_limit_exceeded" }
 
 		const token = await getToken()

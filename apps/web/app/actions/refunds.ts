@@ -13,7 +13,7 @@ import {
 } from "@explore-and-earn/db";
 
 import { isAdminUserId } from "../../lib/admin";
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 import { issueRefund } from "../../services/stripe";
 
@@ -98,7 +98,7 @@ async function requestRefundImpl(
 
   // Rate limit: 3 refund requests per day per host. A real host files at most a
   // couple; each request is money-adjacent admin-queue work, so throttle hard.
-  const { allowed } = checkRateLimit(`refund-request:${userId}`, 3, 24 * 60 * 60 * 1000);
+  const { allowed } = await checkRateLimitDistributed(`refund-request:${userId}`, 3, 24 * 60 * 60 * 1000);
   if (!allowed) {
     return {
       ok: false,

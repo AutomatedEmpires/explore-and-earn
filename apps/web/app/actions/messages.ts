@@ -14,7 +14,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { triggerDispatch } from "../../services/notifications/dispatcher";
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 
 export interface SendMessageActionResult {
@@ -43,7 +43,7 @@ async function conversationOpenIdentity(): Promise<
 	const { userId, getToken } = await auth();
 	if (!userId) return { ok: false, error: "unauthenticated" };
 
-	const { allowed } = checkRateLimit(
+	const { allowed } = await checkRateLimitDistributed(
 		`conversation-open:${userId}`,
 		30,
 		5 * 60 * 1000,
@@ -129,7 +129,7 @@ async function sendMessageActionImpl(
 
 	// Rate limit: 30 messages per minute per user. Checked after auth, before any
 	// DB work. Never throws — degrades to a friendly error code.
-	const { allowed } = checkRateLimit(`msg:${userId}`, 30, 60 * 1000);
+	const { allowed } = await checkRateLimitDistributed(`msg:${userId}`, 30, 60 * 1000);
 	if (!allowed) return { ok: false, error: "rate_limit_exceeded" };
 
 	const token = await getToken();

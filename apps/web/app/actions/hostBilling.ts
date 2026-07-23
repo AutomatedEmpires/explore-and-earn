@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { getHostProfile } from "@explore-and-earn/db";
 
 import { getClerkContact } from "../../lib/clerkUser";
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import {
   createBillingPortalSession,
   createCheckoutSession,
@@ -68,7 +68,7 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
 
   // Rate limit: 10 checkout sessions per hour per host. Each submit creates a
   // real Stripe Checkout session; a legitimate host needs a handful at most.
-  const checkoutLimit = checkRateLimit(
+  const checkoutLimit = await checkRateLimitDistributed(
     `host-checkout:${authResult.auth.userId}`,
     10,
     60 * 60 * 1000,
@@ -122,7 +122,7 @@ export async function startHostBillingPortalAction(): Promise<never> {
 
   // Rate limit: 10 portal sessions per hour per host (same budget shape as
   // checkout — every call mints a real Stripe billing-portal session).
-  const portalLimit = checkRateLimit(
+  const portalLimit = await checkRateLimitDistributed(
     `host-billing-portal:${authResult.auth.userId}`,
     10,
     60 * 60 * 1000,

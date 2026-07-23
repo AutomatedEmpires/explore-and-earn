@@ -5,7 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { passListing, saveListingWithStatus, unpassListing } from "@explore-and-earn/db";
 
 import { getSwipeListings, type SwipeBatch } from "../../components/discovery/data";
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 
 /**
@@ -61,7 +61,7 @@ async function saveListingActionImpl(
 	if (!userId) {
 		return { ok: false, alreadySaved: false };
 	}
-	const { allowed } = checkRateLimit(`save:${userId}`, 60, 5 * 60 * 1000);
+	const { allowed } = await checkRateLimitDistributed(`save:${userId}`, 60, 5 * 60 * 1000);
 	if (!allowed) {
 		return { ok: false, alreadySaved: false };
 	}
@@ -98,7 +98,7 @@ async function passListingActionImpl(listingId: string): Promise<{ ok: boolean }
 	}
 	const { userId, getToken } = await auth();
 	if (!userId) return { ok: false };
-	const { allowed } = checkRateLimit(`pass:${userId}`, 200, 5 * 60 * 1000);
+	const { allowed } = await checkRateLimitDistributed(`pass:${userId}`, 200, 5 * 60 * 1000);
 	if (!allowed) return { ok: false };
 	const token = await getToken();
 	if (!token) return { ok: false };

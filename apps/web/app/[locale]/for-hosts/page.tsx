@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   title: "Host on Explore & Earn — your command center",
   description:
     "See exactly what your host dashboard looks like before you sign up: post opportunities with Housing, Meals & Pay up front, add photos, boost for visibility, post announcements, and review applicants — all in one command center.",
+  // Canonical guards the revenue-side acquisition page against UTM/query
+  // variants indexing as duplicates (review 2026-07-22).
+  alternates: { canonical: "/for-hosts" },
   openGraph: {
     title: "Host on Explore & Earn",
     description:

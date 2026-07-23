@@ -4,6 +4,9 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 import {
+  getHomepageBoostedListings,
+  getHomepageFallbackListings,
+  getHomepageFeaturedEmployers,
   getHostProfile,
   getListingDetailPublic,
   getPublicHostProfile,
@@ -90,4 +93,44 @@ export const getPublicHostProfileCached = unstable_cache(
   (hostProfileId: string) => getPublicHostProfile(hostProfileId),
   ["public-host-profile"],
   { revalidate: PUBLIC_REVALIDATE_SECONDS, tags: [HOST_PROFILES_CACHE_TAG] },
+);
+
+/**
+ * Homepage anon reads (review 2026-07-22) — the most-hit URL previously ran
+ * its 3–4 query Supabase chain uncached on EVERY request while /seek,
+ * /listing/[id] and /host/[id] already sat behind this seam. Same policy:
+ * 60s revalidate, listing-tag busting on publish/edit. Boost-campaign
+ * activations (Stripe webhook / admin) go at most 60s stale — accepted, same
+ * as every other paid-placement read on the cached surfaces.
+ */
+export const getHomepageBoostedListingsCached = unstable_cache(
+  (limit: number) => getHomepageBoostedListings(limit),
+  ["homepage-boosted-listings"],
+  {
+    revalidate: PUBLIC_REVALIDATE_SECONDS,
+    // Both tags: the query joins host_profiles (tier/verification), so a host
+    // profile change must bust this too (review 2026-07-22).
+    tags: [LISTINGS_CACHE_TAG, HOST_PROFILES_CACHE_TAG],
+  },
+);
+
+/** Homepage featured-employer rail (anon) — reads listings AND host profiles. */
+export const getHomepageFeaturedEmployersCached = unstable_cache(
+  (limit: number) => getHomepageFeaturedEmployers(limit),
+  ["homepage-featured-employers"],
+  {
+    revalidate: PUBLIC_REVALIDATE_SECONDS,
+    tags: [LISTINGS_CACHE_TAG, HOST_PROFILES_CACHE_TAG],
+  },
+);
+
+/** Homepage fallback feed when boosted inventory is under threshold (anon). */
+export const getHomepageFallbackListingsCached = unstable_cache(
+  (limit: number) => getHomepageFallbackListings(limit),
+  ["homepage-fallback-listings"],
+  {
+    revalidate: PUBLIC_REVALIDATE_SECONDS,
+    // Both tags — same host_profiles join as the boosted query above.
+    tags: [LISTINGS_CACHE_TAG, HOST_PROFILES_CACHE_TAG],
+  },
 );

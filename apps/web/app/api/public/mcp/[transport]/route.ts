@@ -202,11 +202,20 @@ function resolveOrgId(value: string): string | null {
 	return match ? match[0] : null;
 }
 
-/** Client ip from the MCP request context (falls back to a shared bucket). */
+/**
+ * Client ip from the MCP request context (falls back to a shared bucket).
+ * x-real-ip first: on Vercel it is platform-set and non-forgeable, while the
+ * LEFTMOST x-forwarded-for hop is client-supplied (same trust model as
+ * lib/publicApi.ts clientIp — review 2026-07-22).
+ */
 function ipFromExtra(extra: unknown): string {
 	const maybe = extra as { requestInfo?: { headers?: Record<string, unknown> } } | undefined;
 	const headers = maybe?.requestInfo?.headers;
 	if (headers) {
+		const realIp = headers["x-real-ip"];
+		if (typeof realIp === "string" && realIp.trim().length > 0) {
+			return realIp.trim();
+		}
 		const forwarded = headers["x-forwarded-for"];
 		if (typeof forwarded === "string" && forwarded.length > 0) {
 			return forwarded.split(",")[0]!.trim();

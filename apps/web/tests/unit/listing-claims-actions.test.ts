@@ -42,7 +42,12 @@ vi.mock("next/cache", () => ({
 }));
 vi.mock("@explore-and-earn/db", () => dbMocks);
 vi.mock("../../lib/admin", () => ({ isCurrentUserAdmin: isCurrentUserAdminMock }));
-vi.mock("../../lib/rateLimit", () => ({ checkRateLimit: checkRateLimitMock }));
+vi.mock("../../lib/rateLimit", () => ({
+  checkRateLimit: checkRateLimitMock,
+  // Actions now call the distributed (async) limiter — same mock drives both.
+  checkRateLimitDistributed: (...args: unknown[]) =>
+    Promise.resolve(checkRateLimitMock(...args)),
+}));
 vi.mock("../../lib/serverCache", () => ({ LISTINGS_CACHE_TAG: "public-listings" }));
 vi.mock("../../lib/sentry", () => ({ reportError: reportErrorMock }));
 

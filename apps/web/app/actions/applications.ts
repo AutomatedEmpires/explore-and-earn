@@ -14,7 +14,7 @@ import { after } from "next/server"
 import { computeAndStoreMatchForApplication } from "../../services/matching"
 import { triggerDispatch } from "../../services/notifications/dispatcher"
 
-import { checkRateLimit } from "../../lib/rateLimit"
+import { checkRateLimitDistributed } from "../../lib/rateLimit"
 import { reportError } from "../../lib/sentry"
 
 async function currentUserId(): Promise<string | undefined> {
@@ -34,7 +34,7 @@ async function applyToListingActionImpl(
 		return { ok: false, error: "unauthenticated" }
 	}
 
-	const { allowed } = checkRateLimit(`apply:${userId}`, 5, 60 * 60 * 1000)
+	const { allowed } = await checkRateLimitDistributed(`apply:${userId}`, 5, 60 * 60 * 1000)
 	if (!allowed) {
 		return { ok: false, error: "rate_limit_exceeded" }
 	}

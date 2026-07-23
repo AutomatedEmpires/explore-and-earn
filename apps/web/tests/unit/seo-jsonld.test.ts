@@ -75,7 +75,12 @@ describe("JobPosting — representative listing types", () => {
     expect(jp.validThrough).toBe("2026-11-15T00:00:00Z");
     const salary = jp.baseSalary as Record<string, unknown>;
     expect(salary["@type"]).toBe("MonetaryAmount");
-    expect((salary.value as Record<string, unknown>).value).toBe(1800);
+    // Host stated a range (min ≠ max) — both ends surface, nothing invented.
+    const quantitative = salary.value as Record<string, unknown>;
+    expect(quantitative.minValue).toBe(1800);
+    expect(quantitative.maxValue).toBe(2200);
+    expect(quantitative.value).toBeUndefined();
+    expect(quantitative.unitText).toBe("HOUR");
     const org = jp.hiringOrganization as Record<string, unknown>;
     expect(org.name).toBe("Sunrise Orchards");
     expect(org.sameAs).toBe(`${BASE}/host/${host.id}`);
@@ -120,6 +125,29 @@ describe("JobPosting — representative listing types", () => {
     );
     expect(jp.baseSalary).toBeUndefined();
   });
+
+  it("min-only compensation emits a single value, not a fabricated range", () => {
+    const jp = parse(
+      generateJobPostingJsonLd(listing({ compensationMaxCents: null }), host, BASE),
+    );
+    const quantitative = (jp.baseSalary as Record<string, unknown>).value as Record<string, unknown>;
+    expect(quantitative.value).toBe(1800);
+    expect(quantitative.minValue).toBeUndefined();
+    expect(quantitative.maxValue).toBeUndefined();
+  });
+
+  it.each(["other", "stipend", "exchange"] as const)(
+    "unmappable pay unit %s omits unitText instead of emitting one outside Google's enum",
+    (unit) => {
+      const jp = parse(
+        generateJobPostingJsonLd(listing({ compensationUnit: unit }), host, BASE),
+      );
+      const quantitative = (jp.baseSalary as Record<string, unknown>).value as Record<string, unknown>;
+      expect(quantitative.unitText).toBeUndefined();
+      // The stated dollar figures still surface — only the invalid label is dropped.
+      expect(quantitative.minValue).toBe(1800);
+    },
+  );
 
   it("no employmentType is asserted (the model records none)", () => {
     const jp = parse(generateJobPostingJsonLd(listing(), host, BASE));

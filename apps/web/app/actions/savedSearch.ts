@@ -9,7 +9,7 @@ import {
   type SavedSearchFilters,
 } from "@explore-and-earn/db";
 
-import { checkRateLimit } from "../../lib/rateLimit";
+import { checkRateLimitDistributed } from "../../lib/rateLimit";
 
 // Action-boundary input caps. The db layer truncates the label at 120 chars, so
 // 200 rejects nothing a legitimate client sends; the filters object is a small
@@ -32,7 +32,7 @@ export async function saveSearchAction(
 
   // Rate limit: 10 saved searches per hour per seeker. Checked after auth,
   // before any DB work (each row also becomes saved-search-alert cron work).
-  const { allowed } = checkRateLimit(`saved-search:${userId}`, 10, 60 * 60 * 1000);
+  const { allowed } = await checkRateLimitDistributed(`saved-search:${userId}`, 10, 60 * 60 * 1000);
   if (!allowed) return { ok: false, error: "rate_limit_exceeded" };
 
   if (typeof label !== "string" || label.length > MAX_LABEL_CHARS) {
