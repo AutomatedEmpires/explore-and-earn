@@ -2,7 +2,7 @@ import { RESUME_APPLY_THRESHOLD } from "./models";
 import { SEEKER_STATUS } from "./fixtures";
 
 /** Completion (0..100) recommended for stronger match confidence. */
-export const RESUME_RECOMMENDED_THRESHOLD = 85;
+export { RESUME_RECOMMENDED_THRESHOLD } from "./resumeThresholds";
 
 export type ResumeSectionStatus = "complete" | "incomplete" | "optional";
 
@@ -78,6 +78,12 @@ export interface ResumeProgress {
 	readonly applyThreshold: number;
 	readonly recommendedThreshold: number;
 	readonly canApply: boolean;
+	/**
+	 * The required sections still missing, straight from the apply gate. Lets
+	 * the panel name what is actually outstanding instead of quoting a
+	 * percentage — applying was never gated on one.
+	 */
+	readonly missing?: readonly string[];
 	readonly sections: readonly ResumeSection[];
 }
 

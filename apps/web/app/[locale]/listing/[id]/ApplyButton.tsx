@@ -9,6 +9,21 @@ import { saveListingAction, unsaveListingAction } from "../../../actions/savedLi
 import { resolveSaveOutcome } from "../../../../lib/saveOutcome";
 import styles from "./ApplyButton.module.css";
 
+/**
+ * Seeker-facing names for the gate's section identifiers
+ * (ResumeMissingSection in @explore-and-earn/db). Kept beside the gate that
+ * shows them; the gate copy previously named "your bio, location, timeline, and
+ * skills" for everyone, which was both generic and wrong — it omitted
+ * displayName entirely and listed fields the seeker may already have.
+ */
+const RESUME_SECTION_LABEL: Record<string, string> = {
+  displayName: "Your name",
+  location: "Where you're based",
+  seekingTimeline: "When you're available",
+  skills: "At least one skill",
+  bioOrExperience: "A short bio, or one experience",
+};
+
 interface Props {
   listingId: string;
   title: string;
@@ -16,6 +31,8 @@ interface Props {
   alreadyApplied: boolean;
   alreadySaved: boolean;
   resumeComplete: boolean;
+  /** Required résumé sections still outstanding, straight from the apply gate. */
+  resumeMissing?: readonly string[];
   /** Sourced listings have no host on the platform — see the sourced branch below. */
   isSourced?: boolean;
   /** The original public posting, when the source recorded one. */
@@ -29,6 +46,7 @@ export function ApplyButton({
   alreadyApplied,
   alreadySaved,
   resumeComplete,
+  resumeMissing = [],
   isSourced = false,
   sourceUrl = null,
 }: Props) {
@@ -260,10 +278,29 @@ export function ApplyButton({
           onClose={() => setShowResumeModal(false)}
         >
           <p className={styles.modalText}>{t("resumeGateBody")}</p>
+          {resumeMissing.length > 0 && (
+            <>
+              <p className={styles.modalText}>{t("resumeGateMissingHeading")}</p>
+              <ul className={styles.missingList}>
+                {resumeMissing.map((section) => (
+                  <li key={section}>
+                    {RESUME_SECTION_LABEL[section] ?? section}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <div className={styles.buttonRow}>
             <Button
               variant="primary"
-              onClick={() => router.push("/resume")}
+              // Carry the listing along so finishing the résumé returns the
+              // seeker to the opportunity they were applying to, instead of
+              // stranding them on a bare /resume with no way back.
+              onClick={() =>
+                router.push(
+                  `/resume?redirect_url=${encodeURIComponent(`/listing/${listingId}`)}`,
+                )
+              }
             >
               {t("finishResume")}
             </Button>

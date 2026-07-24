@@ -166,6 +166,10 @@ export default async function ListingDetailPage({ params }: Props) {
   let alreadyApplied = false;
   let alreadySaved = false;
   let resumeComplete = false;
+  // The gate already knows WHICH sections are outstanding; it used to be
+  // discarded, so every blocked seeker got the same generic sentence naming a
+  // field list that did not match the real requirements.
+  let resumeMissing: readonly string[] = [];
   let seekerProfile: Awaited<ReturnType<typeof cachedSeekerProfile>> = null;
 
   if (userId && token && viewerRole === "seeker" && !isFixtureListing) {
@@ -179,6 +183,7 @@ export default async function ListingDetailPage({ params }: Props) {
     alreadySaved = saved;
     seekerProfile = profile;
     resumeComplete = resumeStatus.complete;
+    resumeMissing = resumeStatus.missing;
   }
 
   // Seeker-facing ADR-040 fit signal: computed on the fly with the same engine
@@ -492,6 +497,7 @@ export default async function ListingDetailPage({ params }: Props) {
               alreadyApplied={alreadyApplied}
               alreadySaved={alreadySaved}
               resumeComplete={resumeComplete}
+              resumeMissing={resumeMissing}
               isSourced={isSourced}
               sourceUrl={listing.provenanceInfo?.source?.sourceUrl ?? null}
             />
