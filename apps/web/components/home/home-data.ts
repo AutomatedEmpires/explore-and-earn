@@ -122,11 +122,31 @@ function realCountsByState(listings: readonly DiscoveryListing[]) {
   return { jobs, hosts };
 }
 
+/**
+ * Destination cards for the homepage.
+ *
+ * HONESTY + DEAD-END RULE (UX review 2026-07-23): a destination is rendered
+ * ONLY when it actually has live inventory. Previously all six seeds always
+ * rendered; in production (where the derived count is undefined) that put six
+ * large, inviting cards on the homepage — Alaska, Colorado, Montana, Wyoming,
+ * Maine, California — each linking to `/seek?location=<state>` and each
+ * landing on an empty result set. The copy was honest ("New season", never a
+ * fabricated number) but the EXPERIENCE was six guaranteed dead ends at the
+ * exact moment a first-time seeker is deciding whether this marketplace has
+ * anything for them. Empty states must guide toward action, not manufacture
+ * disappointment.
+ *
+ * Preview keeps the curated demo figures so the design can be reviewed
+ * populated; production shows only destinations backed by real listings, and
+ * the section hides itself entirely when none qualify (see DestinationGrid).
+ */
 export function buildDestinations(
   listings: readonly DiscoveryListing[],
 ): readonly HomeDestination[] {
   const { jobs, hosts } = realCountsByState(listings);
-  return DESTINATION_SEEDS.map((seed) => {
+  return DESTINATION_SEEDS.filter(
+    (seed) => IS_PREVIEW || (jobs.get(seed.slug) ?? 0) > 0,
+  ).map((seed) => {
     // Preview reads as a populated seasonal marketplace via the curated demo
     // figures; production shows only real derived counts (0 → "New season"),
     // so a live/empty DB never displays a fabricated number.

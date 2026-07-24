@@ -202,8 +202,20 @@ function HomeHero({
             ))}
           </ul>
 
+          {/*
+            The seeker's zero-input path into inventory (UX review 2026-07-23).
+            Before this the hero's ONLY standalone button was "Post a job" — a
+            HOST action — so the seeker, who is the primary audience, could not
+            reach a single opportunity from the hero without first engaging a
+            three-field search form. A first-time visitor does not yet know
+            what to type. Browsing must never require input.
+          */}
           <div className={styles.heroCtas}>
-            <Link className={styles.heroSecondary} href="/for-hosts">
+            <Link className={styles.heroPrimary} href="/jobs">
+              Browse all opportunities
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
+            <Link className={styles.heroHostLink} href="/for-hosts">
               {tc("postAJob")}
             </Link>
           </div>
@@ -511,6 +523,10 @@ function CategoryGrid() {
 // ─── Where will you go next? (destinations) ────────────────────────────────
 
 function DestinationGrid({ destinations }: { destinations: readonly HomeDestination[] }) {
+  // No destination has live inventory → render nothing rather than a wall of
+  // cards that all land on empty results (UX review 2026-07-23). buildDestinations
+  // already filters to real inventory in production.
+  if (destinations.length === 0) return null;
   return (
     <section className={styles.section} aria-labelledby="destinations-title">
       <SectionHead

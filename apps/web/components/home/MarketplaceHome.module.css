@@ -369,6 +369,34 @@
 .heroSecondary:active { transform: translateY(0) scale(0.98); }
 .heroSecondary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--palette-sky-dark), 0 0 0 4px var(--palette-white); }
 
+/**
+ * The host entry point in a SEEKER hero: reachable, never competing.
+ * It was previously the hero's only standalone button (.heroSecondary), which
+ * made a host action the most prominent call to action on the seeker's landing
+ * page. It keeps a full --tap-min target and an underline (never colour alone),
+ * but reads as a quiet link beside the seeker's primary browse CTA.
+ * (UX review 2026-07-23.)
+ */
+.heroHostLink {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--tap-min);
+	padding: 0 var(--space-8);
+	color: var(--palette-white);
+	font-family: var(--font-ui);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-medium);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	text-decoration-color: color-mix(in srgb, var(--palette-white) 55%, transparent);
+	border-radius: var(--radius-button);
+	transition: text-decoration-color var(--motion-fast) var(--ease-standard);
+}
+
+.heroHostLink:hover { text-decoration-color: var(--palette-white); }
+.heroHostLink:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--palette-sky-dark), 0 0 0 4px var(--palette-white); }
+
 /* Floating job peek — a "this is what you'll browse" signal (desktop only) */
 .heroPeek {
 	position: absolute;

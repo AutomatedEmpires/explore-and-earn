@@ -24,6 +24,23 @@
 	padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/**
+ * Mobile-only, exactly like the seeker dock it mirrors (seeker-os.css hides
+ * .seekeros-mnav at the same 1024px breakpoint). Without this the public dock
+ * stayed pinned on desktop and DEFEATED its own stated purpose: the bar is
+ * meant to stop the bottom chrome shifting as a visitor crosses into the
+ * seeker scope, but the seeker dock disappears ≥1024px — so on desktop the
+ * bar appeared on public pages and vanished on seeker pages, which is the
+ * shift it exists to prevent. It also permanently occupied bottom viewport
+ * space on desktop, where the header already carries the same destinations.
+ * (UX review 2026-07-23, measured at 1440×900.)
+ */
+@media (min-width: 1024px) {
+	.nav {
+		display: none;
+	}
+}
+
 .list {
 	display: flex;
 	align-items: stretch;
