@@ -14,6 +14,24 @@
   gap: var(--space-12);
 }
 
+/* The sourced-listing primary action is an outbound <a>, not a <button>: it
+   leaves the platform for the original posting. It borrows .ui-button so it
+   carries the same tap target and press state as every other primary action —
+   only the anchor underline needs removing. */
+.sourcedApply {
+  text-decoration: none;
+}
+
+/* Shown when a sourced listing has no recorded source URL: there is genuinely
+   nowhere to send the seeker, so we say that instead of rendering a control. */
+.sourcedUnavailable {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-secondary);
+}
+
 .modalText {
   font-family: var(--font-ui);
   font-size: var(--type-body-size);

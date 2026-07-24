@@ -116,11 +116,28 @@ export async function applyToListing(
   const authed = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data: listingOwner } = await authed
     .from("listings")
-    .select("host_profiles!host_profile_id(clerk_user_id)")
+    .select("provenance,host_profiles!host_profile_id(clerk_user_id)")
     .eq("id", listingId)
     .maybeSingle();
 
-  const hostClerkId = (listingOwner as unknown as { host_profiles?: { clerk_user_id?: string } } | null)?.host_profiles?.clerk_user_id;
+  const listingRow = listingOwner as unknown as {
+    provenance?: string;
+    host_profiles?: { clerk_user_id?: string };
+  } | null;
+
+  // A sourced listing has NO host on the platform — 064 drops NOT NULL on
+  // host_profile_id precisely to allow that ("Sourced listings have no host
+  // (yet)"), and the host-side applications query inner-joins host_profiles.
+  // An application here would therefore be invisible to every host forever
+  // while the seeker was shown "Application sent" — a conversion that does not
+  // exist. Refuse it here: the detail page hides the Apply control for sourced
+  // listings, but hidden UI is never authorization. The seeker's real path is
+  // the original posting, which the sourced disclosure links.
+  if (listingRow?.provenance === "sourced") {
+    return { ok: false, error: "listing_not_accepting_applications" as const };
+  }
+
+  const hostClerkId = listingRow?.host_profiles?.clerk_user_id;
   if (hostClerkId && hostClerkId === clerkUserId) {
     return { ok: false, error: "cannot_apply_to_own_listing" as const };
   }

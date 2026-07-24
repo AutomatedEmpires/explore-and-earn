@@ -482,6 +482,8 @@ export default async function ListingDetailPage({ params }: Props) {
               alreadyApplied={alreadyApplied}
               alreadySaved={alreadySaved}
               resumeComplete={resumeComplete}
+              isSourced={isSourced}
+              sourceUrl={listing.provenanceInfo?.source?.sourceUrl ?? null}
             />
           </div>
         </div>
