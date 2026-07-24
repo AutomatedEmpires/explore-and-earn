@@ -85,6 +85,16 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
     billingRedirect("host_profile_missing");
   }
 
+  // A host who ALREADY pays must never be sent through checkout again: Stripe
+  // would happily create a second concurrent subscription and bill for both.
+  // The billing page renders "Start monthly/annual" for all three tiers
+  // regardless of the current plan, so this is reachable by simply clicking a
+  // different tier. Plan changes belong in the billing portal, which prorates
+  // and replaces rather than stacking.
+  if (hostProfile.subscriptionTier !== "none") {
+    billingRedirect("already_subscribed");
+  }
+
   let checkoutUrl: string;
   try {
     const contact = await getClerkContact(authResult.auth.userId);

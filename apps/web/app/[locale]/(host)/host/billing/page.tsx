@@ -106,6 +106,14 @@ function resolveFeedback(searchParams: BillingSearchParams): {
         message:
           "You've started several billing sessions just now. Give it a few minutes, then try again.",
       };
+    // Guarded rather than silently allowed: a second checkout would create a
+    // second concurrent Stripe subscription and bill for both.
+    case "already_subscribed":
+      return {
+        tone: "warning",
+        message:
+          "You're already on a plan. Use “Manage billing” to switch tiers or change how you pay — that swaps your plan instead of starting a second subscription.",
+      };
     default:
       return null;
   }
