@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import {
-  computeSeekerListingFit,
+  computeSeekerListingFitTrace,
   getSeekerResumeStatus,
   hasApplied,
   hasSaved,
@@ -14,6 +14,8 @@ import {
   benefitStateLabel,
   hasCategoryDepth,
   hasLogistics,
+  matchBandFor,
+  matchBandLabel,
   NOT_STATED_LABEL,
 } from "@explore-and-earn/contracts";
 import {
@@ -189,10 +191,18 @@ export default async function ListingDetailPage({ params }: Props) {
   // Seeker-facing ADR-040 fit signal: computed on the fly with the same engine
   // the assistant uses. Shown only to seekers who have enough profile signal for
   // an honest band; otherwise a gentle prompt to complete their profile.
-  const fit =
+  // The TRACE, not the bare score: it tags every sentinel-derived signal with
+  // polarity "missing", which is the only thing that stops an uncomputed
+  // component being rendered as a confident reason.
+  //
+  // nowMs is passed explicitly. computeMatch defaults it to 0 (the epoch), so
+  // omitting it meant listingEnded was never true and the ended-listing penalty
+  // could not fire on this page at all.
+  const fitTrace =
     viewerRole === "seeker" && seekerProfile && seekerHasMatchInputs(seekerProfile)
-      ? computeSeekerListingFit(seekerProfile, listing)
+      ? computeSeekerListingFitTrace(seekerProfile, listing, Date.now())
       : null;
+  const fit = fitTrace;
   const seekerNeedsProfileForFit =
     viewerRole === "seeker" && (!seekerProfile || !seekerHasMatchInputs(seekerProfile));
 
@@ -253,8 +263,15 @@ export default async function ListingDetailPage({ params }: Props) {
       value: `${listing.host.companyName}${listing.host.verified ? " · Verified" : ""}`,
     });
   }
+  // The band word, not "82 / 100": half the engine's seeker inputs are never
+  // supplied on this surface, so a two-digit score would imply a precision the
+  // number does not have. The section below shows what it was actually based on.
   if (fit && !fit.excluded) {
-    glanceItems.push({ icon: "status.match", label: "Your fit", value: `${fit.score} / 100` });
+    glanceItems.push({
+      icon: "status.match",
+      label: "Your fit",
+      value: matchBandLabel(matchBandFor(fit.score)),
+    });
   }
 
   // "Why you're a good fit" prompt for viewers who can't get an honest score.
@@ -346,8 +363,8 @@ export default async function ListingDetailPage({ params }: Props) {
           {/* 3. At a glance */}
           <ListingGlance items={glanceItems} />
 
-          {/* 4. Why you're a good fit */}
-          <FitReasons fit={fit} prompt={fitPrompt} />
+          {/* 4. How this lines up for you */}
+          <FitReasons trace={fitTrace} prompt={fitPrompt} listingId={listing.id} />
 
           {/* 5. The deal, upfront (+ TrueValue) */}
           <DealUpfront

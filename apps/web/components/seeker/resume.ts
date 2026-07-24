@@ -2,7 +2,11 @@ import { RESUME_APPLY_THRESHOLD } from "./models";
 import { SEEKER_STATUS } from "./fixtures";
 
 /** Completion (0..100) recommended for stronger match confidence. */
-export { RESUME_RECOMMENDED_THRESHOLD } from "./resumeThresholds";
+// Imported (not just re-exported) because RESUME_PROGRESS below reads it —
+// `export … from` re-exports without binding the name in this module.
+import { RESUME_RECOMMENDED_THRESHOLD } from "./resumeThresholds";
+
+export { RESUME_RECOMMENDED_THRESHOLD };
 
 export type ResumeSectionStatus = "complete" | "incomplete" | "optional";
 
