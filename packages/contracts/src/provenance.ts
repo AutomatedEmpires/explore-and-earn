@@ -248,3 +248,30 @@ export const SOURCED_DISCLOSURE_LABEL = "Sourced · not yet confirmed by Explore
 
 /** The canonical "no information" display for a not_stated benefit. */
 export const NOT_STATED_LABEL = "Not stated"
+
+/**
+ * The one place that turns a benefit boolean + its evidence into words.
+ *
+ * "Absence is never a no": when the source never stated whether housing or
+ * meals were included, the boolean is merely a default and must NOT be read as
+ * "not included". This lives in contracts rather than beside any one renderer
+ * because it is an honesty rule, and honesty rules kept as private helpers get
+ * silently reverted — the listing detail page's OG/SEO description proved it,
+ * asserting "Housing not included" from an unanswered field while the visible
+ * triad on the same page correctly said "Not stated".
+ *
+ * @param lowercase  for prose ("housing not stated") rather than a table cell.
+ */
+export function benefitStateLabel(
+	included: boolean,
+	evidence: BenefitEvidenceStatus | undefined,
+	opts: { readonly lowercase?: boolean } = {},
+): string {
+	const label =
+		evidence === "not_stated"
+			? NOT_STATED_LABEL
+			: included
+				? "Included"
+				: "Not included"
+	return opts.lowercase ? label.toLowerCase() : label
+}

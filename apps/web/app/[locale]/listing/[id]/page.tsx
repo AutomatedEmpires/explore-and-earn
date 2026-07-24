@@ -10,7 +10,12 @@ import {
   recordEvent,
   seekerHasMatchInputs,
 } from "@explore-and-earn/db";
-import { hasCategoryDepth, hasLogistics } from "@explore-and-earn/contracts";
+import {
+  benefitStateLabel,
+  hasCategoryDepth,
+  hasLogistics,
+  NOT_STATED_LABEL,
+} from "@explore-and-earn/contracts";
 import {
   cachedHostProfile,
   cachedSeekerProfile,
@@ -37,7 +42,8 @@ import { WhyWorkForUs } from "../../../../components/listing/WhyWorkForUs";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../../lib/seo";
 import { fetchWeather } from "../../../../lib/weather";
-import { formatMoney, formatMonthYear } from "../../../../lib/format";
+import { formatMoney } from "../../../../lib/format";
+import { formatListingWindow } from "../../../../lib/listingWindow";
 import { isUuid } from "../../../../lib/ids";
 import { optionalAuth } from "../../../../lib/optionalAuth";
 import { getFixtureListingDetail } from "../../../../components/discovery/fixtureDetail";
@@ -86,9 +92,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = listing.host?.companyName
     ? `${listing.title} — ${listing.host.companyName}`
     : listing.title;
+  // The fallback description is a PUBLIC claim — it ships to search engines and
+  // social cards. It previously read the raw housingIncluded/mealsIncluded
+  // booleans and announced "Housing not included" for a listing whose source
+  // never stated it, while the visible triad on the same page correctly said
+  // "Not stated". Route it through the shared contract so the OG description
+  // and the page can never disagree.
+  const evidence = listing.provenanceInfo?.benefitEvidence;
   const description = listing.description
     ? listing.description.slice(0, 155)
-    : `${listing.title} opportunity at ${listing.host?.companyName ?? "a host organization"}. Housing ${listing.housingIncluded ? "included" : "not included"}, meals ${listing.mealsIncluded ? "included" : "not included"}.`;
+    : `${listing.title} opportunity at ${listing.host?.companyName ?? "a host organization"}. Housing ${benefitStateLabel(listing.housingIncluded, evidence?.housing, { lowercase: true })}, meals ${benefitStateLabel(listing.mealsIncluded, evidence?.meals, { lowercase: true })}.`;
 
   const canonical = `${baseUrl}/listing/${listing.id}`;
   const ogImage = listing.coverPhotoUrl ?? `${baseUrl}/opengraph-image`;
@@ -209,22 +222,19 @@ export default async function ListingDetailPage({ params }: Props) {
       ? `${formatMoney(listing.compensationMinCents, { currency: listing.compensationCurrency })}${listing.compensationUnit && listing.compensationUnit !== "other" ? `/${listing.compensationUnit}` : ""}`
       : "See listing");
 
-  const dateLabel =
-    listing.beginsAt && listing.endsAt
-      ? `${formatMonthYear(listing.beginsAt)} – ${formatMonthYear(listing.endsAt)}`
-      : listing.beginsAt
-        ? `Starting ${formatMonthYear(listing.beginsAt)}`
-        : "Ongoing";
+  const dateLabel = formatListingWindow(listing);
 
   // At-a-glance facts — each cell added ONLY when its underlying field is real.
   const glanceItems: GlanceItem[] = [];
   if (listing.locationDisplay) {
     glanceItems.push({ icon: "nav.map", label: "Location", value: listing.locationDisplay });
   }
+  // The glance grid is a facts table, so an unstated window reads "Not stated"
+  // here — the same word the Housing/Meals/Pay triad already uses for silence.
   glanceItems.push({
     icon: "status.begins",
     label: "When",
-    value: listing.timelineSummary ?? dateLabel,
+    value: listing.timelineSummary ?? dateLabel ?? NOT_STATED_LABEL,
   });
   glanceItems.push({
     icon: `category.${listing.category}`,

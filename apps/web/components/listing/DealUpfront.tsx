@@ -3,6 +3,7 @@ import Image from "next/image";
 
 import { Icon } from "@explore-and-earn/ui";
 import {
+  benefitStateLabel,
   housingPhotoLabel,
   NOT_STATED_LABEL,
   type BenefitEvidenceStatus,
@@ -38,10 +39,9 @@ export interface DealUpfrontProps {
   readonly children?: ReactNode;
 }
 
-function benefitCellValue(included: boolean, evidence: BenefitEvidenceStatus | undefined): string {
-  if (evidence === "not_stated") return NOT_STATED_LABEL;
-  return included ? "Included" : "Not included";
-}
+/* The included/not-included/not-stated wording is a shared honesty rule, not a
+   local presentation choice — see benefitStateLabel in contracts/provenance. */
+const benefitCellValue = benefitStateLabel;
 
 /**
  * "The deal, upfront" — the honest money-and-living block. The HOUSING / MEALS /

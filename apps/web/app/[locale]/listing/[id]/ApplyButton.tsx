@@ -76,7 +76,10 @@ export function ApplyButton({
   // Seeker role
   if (alreadyApplied && !isSourced) {
     return (
-      <div className={styles.appliedState}>
+      // role="status" so the swap is announced: the modal unmounts and
+      // router.refresh() replaces this row, which otherwise happens in silence
+      // for a screen-reader user who has just committed to an application.
+      <div className={styles.appliedState} role="status">
         {/* Decorative: the adjacent text already says it. Left announced, a
             screen reader reads "check mark Application sent". */}
         <span aria-hidden>✓</span>
@@ -194,7 +197,7 @@ export function ApplyButton({
           )}
         </div>
         {errorDialog && (
-          <Modal heading={errorDialog.heading}>
+          <Modal heading={errorDialog.heading} onClose={() => setErrorDialog(null)}>
             <p className={styles.modalText}>{errorDialog.message}</p>
             <Button variant="ghost" onClick={() => setErrorDialog(null)}>
               {tc("dismiss")}
@@ -222,7 +225,10 @@ export function ApplyButton({
       </div>
 
       {showConfirmModal && (
-        <Modal heading={t("confirmHeading")}>
+        <Modal
+          heading={t("confirmHeading")}
+          onClose={() => setShowConfirmModal(false)}
+        >
           <p className={styles.modalText}>
             {t.rich("confirmBody", {
               title,
@@ -249,7 +255,10 @@ export function ApplyButton({
       )}
 
       {showResumeModal && (
-        <Modal heading={t("resumeGateHeading")}>
+        <Modal
+          heading={t("resumeGateHeading")}
+          onClose={() => setShowResumeModal(false)}
+        >
           <p className={styles.modalText}>{t("resumeGateBody")}</p>
           <div className={styles.buttonRow}>
             <Button
@@ -269,7 +278,7 @@ export function ApplyButton({
       )}
 
       {errorDialog && (
-        <Modal heading={errorDialog.heading}>
+        <Modal heading={errorDialog.heading} onClose={() => setErrorDialog(null)}>
           <p className={styles.modalText}>{errorDialog.message}</p>
           <Button variant="ghost" onClick={() => setErrorDialog(null)}>
             {tc("dismiss")}

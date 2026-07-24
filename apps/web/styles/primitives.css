@@ -98,14 +98,26 @@ html {
 /* =================================================================== */
 /* Modal -- full-bleed dialog layer + raised surface                    */
 /* =================================================================== */
+/* Modal portals to <body>, so this z-index is measured against the page root
+   rather than whatever fixed bar happened to contain the call site. Without it
+   the dialog inherited the listing action bar's stacking context (z 50) and
+   sat UNDER the bottom-nav dock (z 70), which stayed visible and tappable
+   through the scrim on every phone viewport. */
 .ui-modal {
   position: fixed;
   inset: 0;
+  z-index: var(--z-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-gutter);
   background: var(--ui-scrim);
+}
+
+/* The surface is programmatically focused when the dialog opens; it is a
+   focus anchor, not a control, so it must not paint a focus ring. */
+.ui-modal__surface:focus {
+  outline: none;
 }
 
 .ui-modal__surface {
