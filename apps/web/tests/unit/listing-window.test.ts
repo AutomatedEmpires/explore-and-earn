@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { formatListingWindow } from "../../lib/listingWindow";
+import {
+  formatListingWindow,
+  listingDurationMonths,
+} from "../../lib/listingWindow";
 
 /**
  * The listing detail page's opportunity window (UX review 2026-07-23).
@@ -65,5 +68,63 @@ describe("formatListingWindow", () => {
         if (label !== null) expect(label).not.toMatch(/ongoing/i);
       }
     }
+  });
+});
+
+/**
+ * TrueValue's long-run figure was keptMonthly * 12, rendered as "roughly $X
+ * over a year". These are SEASONAL roles — a Jun–Sep listing runs four months,
+ * so the figure was ~3x what the seeker would ever actually keep. Overstating
+ * the money is exactly the "no misleading marketplace metrics" prohibition.
+ */
+describe("listingDurationMonths", () => {
+  it("measures the stated engagement", () => {
+    expect(
+      listingDurationMonths({ beginsAt: MID_JUNE, endsAt: MID_SEPT }),
+    ).toBe(3);
+  });
+
+  it("returns null when either end is unstated — never assumes a year", () => {
+    expect(listingDurationMonths({ beginsAt: MID_JUNE, endsAt: null })).toBeNull();
+    expect(listingDurationMonths({ beginsAt: null, endsAt: MID_SEPT })).toBeNull();
+    expect(listingDurationMonths({})).toBeNull();
+  });
+
+  it("rejects a reversed or zero-length window rather than inventing one", () => {
+    expect(
+      listingDurationMonths({ beginsAt: MID_SEPT, endsAt: MID_JUNE }),
+    ).toBeNull();
+    expect(
+      listingDurationMonths({ beginsAt: MID_JUNE, endsAt: MID_JUNE }),
+    ).toBeNull();
+  });
+
+  it("floors a sub-month engagement at one month rather than zero", () => {
+    expect(
+      listingDurationMonths({
+        beginsAt: "2026-06-01T12:00:00Z",
+        endsAt: "2026-06-10T12:00:00Z",
+      }),
+    ).toBe(1);
+  });
+
+  /** The negative control: no input may yield the old hard-coded 12. */
+  it("NEVER returns 12 for a listing that did not state a year", () => {
+    const cases = [
+      { beginsAt: MID_JUNE, endsAt: MID_SEPT },
+      { beginsAt: MID_JUNE, endsAt: null },
+      { beginsAt: null, endsAt: null },
+      { beginsAt: "2026-06-15T12:00:00Z", endsAt: "2026-08-15T12:00:00Z" },
+    ];
+    for (const c of cases) {
+      expect(listingDurationMonths(c)).not.toBe(12);
+    }
+    // ...and a genuine 12-month engagement still measures 12.
+    expect(
+      listingDurationMonths({
+        beginsAt: "2026-01-15T12:00:00Z",
+        endsAt: "2027-01-15T12:00:00Z",
+      }),
+    ).toBe(12);
   });
 });

@@ -21,6 +21,28 @@ export interface ListingWindowInput {
  * Returning null rather than a placeholder keeps the decision with the caller:
  * the hero shows no chip, the at-a-glance grid shows "Not stated".
  */
+/**
+ * Whole months the engagement actually runs, or null when the host didn't state
+ * both ends.
+ *
+ * TrueValue needs this because it used to annualise: keptMonthly * 12, rendered
+ * as "roughly $X over a year". On a marketplace built for SEASONAL work that
+ * overstates the benefit badly — a Jun–Sep orchard role is four months, so the
+ * figure was ~3x the truth. A saving the seeker will never realise is a
+ * fabricated metric, so when the duration is unknown we say nothing rather than
+ * assume a year.
+ */
+export function listingDurationMonths(listing: ListingWindowInput): number | null {
+  if (!listing.beginsAt || !listing.endsAt) return null;
+  const begins = new Date(listing.beginsAt).getTime();
+  const ends = new Date(listing.endsAt).getTime();
+  if (!Number.isFinite(begins) || !Number.isFinite(ends) || ends <= begins) {
+    return null;
+  }
+  const months = Math.round((ends - begins) / (30.44 * 24 * 60 * 60 * 1000));
+  return months >= 1 ? months : 1;
+}
+
 export function formatListingWindow(listing: ListingWindowInput): string | null {
   if (listing.beginsAt && listing.endsAt) {
     return `${formatMonthYear(listing.beginsAt)} – ${formatMonthYear(listing.endsAt)}`;

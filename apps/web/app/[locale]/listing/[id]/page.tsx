@@ -45,7 +45,10 @@ import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../../lib/seo";
 import { fetchWeather } from "../../../../lib/weather";
 import { formatMoney } from "../../../../lib/format";
-import { formatListingWindow } from "../../../../lib/listingWindow";
+import {
+  formatListingWindow,
+  listingDurationMonths,
+} from "../../../../lib/listingWindow";
 import { isUuid } from "../../../../lib/ids";
 import { optionalAuth } from "../../../../lib/optionalAuth";
 import { getFixtureListingDetail } from "../../../../components/discovery/fixtureDetail";
@@ -385,6 +388,7 @@ export default async function ListingDetailPage({ params }: Props) {
               housingIncluded={listing.housingIncluded}
               mealsIncluded={listing.mealsIncluded}
               paySummary={paySummary}
+              durationMonths={listingDurationMonths(listing)}
             />
             )}
           </DealUpfront>
