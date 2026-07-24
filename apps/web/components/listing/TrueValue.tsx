@@ -74,9 +74,12 @@ export function TrueValue({ housingIncluded, mealsIncluded, paySummary }: TrueVa
           <Icon name="benefit.pay" size={16} aria-hidden />
           True value
         </span>
-        <h2 id={`${rentId}-title`} className={styles.title}>
+        {/* h3, not h2: TrueValue renders INSIDE DealUpfront's section, whose
+            own heading is the h2 "The deal, upfront". An h2 here sent the
+            outline h2 -> h3 ("Housing evidence") -> h2 within one section. */}
+        <h3 id={`${rentId}-title`} className={styles.title}>
           Your pay is what you <em>keep</em>.
-        </h2>
+        </h3>
         <p className={styles.sub}>
           {coveredWord} here — so the {eatsWord} a city job quietly takes out of your
           paycheck stays in your pocket

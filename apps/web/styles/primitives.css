@@ -59,9 +59,16 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* A TRANSPARENT outline, not `outline: none`. The box-shadow ring is the
+   design, but shadows are dropped entirely in Windows high-contrast / forced-
+   colors mode — `outline: none` therefore left every button and chip with no
+   focus indicator at all for the users who most depend on one. Forced-colors
+   repaints a transparent outline in the system colour, so this restores a real
+   ring there while looking identical everywhere else. */
 .ui-button:focus-visible,
 .ui-chip:focus-visible {
-  outline: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   box-shadow: var(--ui-focus-ring);
 }
 

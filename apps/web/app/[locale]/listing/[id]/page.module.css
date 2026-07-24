@@ -41,6 +41,15 @@
   z-index: var(--z-content-bar);
 }
 
+/* The dock is mobile-only (both PublicBottomNav and the seeker dock hide at
+   1024px), so reserving its height on desktop left the bar floating well above
+   the viewport edge for no reason. */
+@media (min-width: 1024px) {
+  .actionBar {
+    bottom: calc(var(--space-16) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .actionBarInner {
   display: flex;
   flex-direction: column;
