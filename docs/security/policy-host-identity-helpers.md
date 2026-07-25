@@ -108,6 +108,15 @@ Three, at different layers:
    and therefore the db-migrate pipeline — if any policy reachable by `anon` or
    `authenticated` still sub-selects `host_profiles.clerk_user_id`. A future
    migration reintroducing the inline pattern cannot apply.
+
+   The reachability test must treat **PUBLIC** as in scope: a policy written
+   without a `TO` clause applies to PUBLIC, which `pg_policy.polroles` stores as
+   OID 0, and `pg_roles` has no row with OID 0 — so a check written against role
+   *names* alone silently misses the widest audience there is. Caught in review
+   by Copilot on this PR. The live enumeration was re-run including PUBLIC to
+   confirm no policy had been missed: all eleven carry an explicit
+   `TO authenticated`, so the rewrite set is unchanged. The guard is fixed
+   regardless, because it exists to catch the policy nobody has written yet.
 2. **In CI, static.** `G-POLICY-HOST-IDENTITY` in `tools/db-assert/check.mjs`
    (runs under `pnpm guardrails`) pins the rewritten policy set, requires both
    helpers, requires the Housing carve-out to survive, and rejects any inline

@@ -294,9 +294,16 @@ begin
            coalesce(pg_get_expr(p.polqual, p.polrelid), '') || ' ' ||
            coalesce(pg_get_expr(p.polwithcheck, p.polrelid), '')
          ) ilike '%clerk_user_id%'
-     and exists (
-           select 1 from pg_roles r
-            where r.oid = any(p.polroles) and r.rolname in ('anon', 'authenticated')
+     and (
+           -- A policy written without a TO clause applies to PUBLIC, which is
+           -- stored as OID 0 in polroles. pg_roles has no row with oid 0, so
+           -- checking role NAMES alone silently misses it — and PUBLIC is the
+           -- widest audience there is, anon and authenticated included.
+           0 = any(p.polroles)
+           or exists (
+                select 1 from pg_roles r
+                 where r.oid = any(p.polroles) and r.rolname in ('anon', 'authenticated')
+              )
          );
 
   if v_leftover is not null then
