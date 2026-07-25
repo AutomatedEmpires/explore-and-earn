@@ -72,7 +72,7 @@ export default function TermsPage() {
 					<h2 className={styles.sectionTitle}>Accounts &amp; eligibility</h2>
 				</div>
 				<p className={styles.body}>
-					You must provide accurate information and keep it up to date. You are responsible for keeping your login credentials secure and for all activity under your account. One person, one account — unless you operate as a host with team members, in which case your subscription tier determines access.
+					You must provide accurate information and keep it up to date. You are responsible for keeping your login credentials secure and for all activity under your account. One person, one account.
 				</p>
 			</section>
 

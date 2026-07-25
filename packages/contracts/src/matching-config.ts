@@ -86,6 +86,15 @@ export function matchBandFor(score: number): MatchBand {
   return "needs_attention"
 }
 
+/**
+ * The canon label for a band. Seeker-facing surfaces show this WORD rather than
+ * a raw score: the engine receives only part of its seeker input on some
+ * surfaces, so a two-digit number would assert a precision it does not have.
+ */
+export function matchBandLabel(band: MatchBand): string {
+  return MATCH_BANDS.find((b) => b.id === band)?.label ?? "Match"
+}
+
 /* ========================================================= DISCOVERY RANKING */
 // display_score = sum(componentScore[0..100] * weight). Weights sum to 1.00.
 // Monetization is EXPOSURE ONLY (ADR-007). Agreed across both formula pages and

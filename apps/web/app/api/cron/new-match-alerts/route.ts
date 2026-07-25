@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
+import { reportCronException } from "../../../../lib/cronReport";
 
 import { runNewMatchAlerts } from "../../../../services/matching/newMatchAlerts";
 import { runDispatchOnce } from "../../../../services/notifications/dispatcher";
@@ -31,6 +32,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const dispatch = await runDispatchOnce();
     return NextResponse.json({ ok: true, ...result, dispatch });
   } catch (error) {
+    reportCronException("new-match-alerts", error);
     const message = error instanceof Error ? error.message : "unknown_error";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }

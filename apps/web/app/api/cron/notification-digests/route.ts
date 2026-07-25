@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
+import { reportCronException } from "../../../../lib/cronReport";
 import { drainDueDeliveries } from "../../../../services/notifications/dispatcher";
 import {
   enqueueScheduledReminders,
@@ -45,6 +46,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const delivery = await drainDueDeliveries(nowMs);
     return NextResponse.json({ ok: true, stage, reminders, daily, weekly, delivery });
   } catch (error) {
+    reportCronException("notification-digests", error);
     const message = error instanceof Error ? error.message : "unknown_error";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }

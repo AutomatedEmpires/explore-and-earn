@@ -202,8 +202,20 @@ function HomeHero({
             ))}
           </ul>
 
+          {/*
+            The seeker's zero-input path into inventory (UX review 2026-07-23).
+            Before this the hero's ONLY standalone button was "Post a job" — a
+            HOST action — so the seeker, who is the primary audience, could not
+            reach a single opportunity from the hero without first engaging a
+            three-field search form. A first-time visitor does not yet know
+            what to type. Browsing must never require input.
+          */}
           <div className={styles.heroCtas}>
-            <Link className={styles.heroSecondary} href="/for-hosts">
+            <Link className={styles.heroPrimary} href="/jobs">
+              Browse all opportunities
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
+            <Link className={styles.heroHostLink} href="/for-hosts">
               {tc("postAJob")}
             </Link>
           </div>
@@ -283,8 +295,16 @@ function ThreeQuestions() {
       <div className={styles.triadBand}>
         <div className={styles.triadHead}>
           <p className={styles.triadEyebrow}>The deal, upfront</p>
+          {/* Was "Every listing answers three questions. Always." — which
+              sourced listings falsify. Migration 070's publication gate blocks
+              a HOST-posted listing from going live while any of the three is
+              unanswered, but its check begins `provenance = 'sourced' or`, and
+              ingested rows are inserted live with evidence 'not_stated'. So the
+              absolute was true only while there was no sourced inventory.
+              The guarantee we can actually keep is the stronger one anyway: we
+              never guess on the seeker's behalf. */}
           <h2 id="triad-title" className={styles.triadTitle}>
-            Every listing answers three questions. Always.
+            Every listing answers three questions — or shows you what wasn&apos;t stated.
           </h2>
         </div>
         <div className={styles.triadGrid}>
@@ -511,6 +531,10 @@ function CategoryGrid() {
 // ─── Where will you go next? (destinations) ────────────────────────────────
 
 function DestinationGrid({ destinations }: { destinations: readonly HomeDestination[] }) {
+  // No destination has live inventory → render nothing rather than a wall of
+  // cards that all land on empty results (UX review 2026-07-23). buildDestinations
+  // already filters to real inventory in production.
+  if (destinations.length === 0) return null;
   return (
     <section className={styles.section} aria-labelledby="destinations-title">
       <SectionHead

@@ -10,6 +10,7 @@ import {
   PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
 
+import { requestAccountDeletionAction } from "../../app/actions/accountDeletion";
 import {
   startHostCheckoutAction,
   startHostBillingPortalAction,
@@ -79,9 +80,9 @@ function planFeatures(tier: PaidTier): string[] {
     e.includedInviteCredits > 0
       ? `${e.includedInviteCredits} invite credits / month`
       : null,
-    e.teamSeats > 0
-      ? `${e.teamSeats} team seat${e.teamSeats === 1 ? "" : "s"} included`
-      : null,
+    // Team seats intentionally absent: no plan grants any (pricing.ts), because
+    // team membership has no implementation. The typechecker flags this line as
+    // unreachable the moment it is reinstated without one.
     "Public host profile",
     "Direct applicant messaging",
   ];
@@ -342,58 +343,49 @@ function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProp
   );
 }
 
-function TeamPanel({ subscriptionTier, companyName }: { subscriptionTier: HostSettingsProps["subscriptionTier"]; companyName: string }) {
-  const hasTeam = subscriptionTier === "enterprise";
-
+/**
+ * Team members — deliberately NOT gated on a plan.
+ *
+ * This panel used to assert "Enterprise plans include a team seat", show
+ * Enterprise hosts a disabled button under "coming soon", and show everyone
+ * else an "Enterprise plan required" gate with a Contact sales button. So a
+ * $749/mo tier was being sold on a capability that has no application code at
+ * all, and non-Enterprise hosts were upsold toward it.
+ *
+ * Until team membership is built, this states the truth once, for everyone,
+ * and sells nothing.
+ */
+function TeamPanel({ companyName }: { companyName: string }) {
   return (
     <div className={styles.panel} id="panel-team" role="tabpanel" aria-label="Team">
       <div className={styles.panelHead}>
         <h2 className={styles.panelTitle}>Team members</h2>
         <p className={styles.panelDesc}>
-          Enterprise plans include a team seat so a crew member can manage listings and review
-          applicants under your account.
+          Your host account has a single owner today.
         </p>
       </div>
 
-      {hasTeam ? (
-        <div className={styles.teamSection}>
-          <div className={styles.teamMember}>
-            <div className={styles.teamAvatar}>
-              <Icon name="nav.profile" size={20} aria-hidden />
-            </div>
-            <div className={styles.teamMemberInfo}>
-              <span className={styles.teamMemberName}>{companyName}</span>
-              <span className={styles.teamMemberRole}>Owner</span>
-            </div>
-            <span className={styles.teamOwnerBadge}>You</span>
+      <div className={styles.teamSection}>
+        <div className={styles.teamMember}>
+          <div className={styles.teamAvatar}>
+            <Icon name="nav.profile" size={20} aria-hidden />
           </div>
-          <button type="button" className={styles.addMemberBtn} disabled>
-            <Icon name="action.apply" size={16} aria-hidden />
-            Invite team member
-          </button>
-          <p className={styles.teamNote}>
-            Team member invitations are coming soon. You will be notified when this feature
-            launches.
-          </p>
+          <div className={styles.teamMemberInfo}>
+            <span className={styles.teamMemberName}>{companyName}</span>
+            <span className={styles.teamMemberRole}>Owner</span>
+          </div>
+          <span className={styles.teamOwnerBadge}>You</span>
         </div>
-      ) : (
-        <div className={styles.gateBlock}>
-          <span className={styles.gateBlockIcon}>
-            <Icon name="system.info" size={24} aria-hidden />
-          </span>
-          <p className={styles.gateBlockTitle}>Enterprise plan required</p>
-          <p className={styles.gateBlockNote}>
-            Add team members to your host account so your crew can manage listings and review
-            applicants together.
-          </p>
-          <a
-            className={styles.gateBlockBtn}
-            href={`mailto:${SUPPORT_EMAIL}?subject=Enterprise%20Plan%20Inquiry`}
-          >
-            Contact sales
+        <p className={styles.teamNote}>
+          Adding other people to your account isn&apos;t available yet, on any plan. If you
+          need a colleague to help manage listings or review applicants in the meantime,
+          email{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}?subject=Host%20account%20access`}>
+            {SUPPORT_EMAIL}
           </a>
-        </div>
-      )}
+          .
+        </p>
+      </div>
     </div>
   );
 }
@@ -478,15 +470,30 @@ function AccountPanel({
   companyName: string;
   hostProfileId: string | null;
 }) {
-  const [deleteStep, setDeleteStep] = useState<"idle" | "confirm" | "sent">("idle");
+  const [deleteStep, setDeleteStep] = useState<
+    "idle" | "confirm" | "saving" | "sent" | "error"
+  >("idle");
 
+  /**
+   * This used to open a `mailto:` and then declare "Deletion request received"
+   * unconditionally. A person with no configured mail client — or who simply
+   * closed the compose window — was told their request had been received when
+   * nobody had received anything, and no record existed to measure a statutory
+   * erasure deadline against. The request is now RECORDED server-side first,
+   * and the confirmation only appears if that succeeded.
+   */
   function handleDeleteRequest() {
     if (deleteStep === "idle") {
       setDeleteStep("confirm");
       return;
     }
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=Account%20Deletion%20Request&body=Please%20delete%20my%20host%20account%20(${encodeURIComponent(companyName || "unknown")}).%20I%20understand%20this%20is%20permanent%20and%20cannot%20be%20undone.`;
-    setDeleteStep("sent");
+    setDeleteStep("saving");
+    void requestAccountDeletionAction("host", companyName || undefined)
+      .then((result) => {
+        // alreadyOpen is success: we hold their request either way.
+        setDeleteStep(result.ok ? "sent" : "error");
+      })
+      .catch(() => setDeleteStep("error"));
   }
 
   return (
@@ -551,6 +558,8 @@ function AccountPanel({
               history. This cannot be undone.
             </p>
             <div className={styles.dangerConfirmActions}>
+              {/* "saving" renders its own branch below, so this button is
+                  never on screen mid-request — no disabled state needed. */}
               <button
                 type="button"
                 className={styles.dangerBtnConfirm}
@@ -567,12 +576,33 @@ function AccountPanel({
               </button>
             </div>
           </div>
+        ) : deleteStep === "saving" ? (
+          <div className={styles.dangerSent}>
+            <p>Sending your request…</p>
+          </div>
+        ) : deleteStep === "error" ? (
+          // Never claim receipt we cannot evidence. A failed write must send
+          // the person somewhere that actually reaches a human.
+          <div className={styles.dangerSent}>
+            <Icon name="system.warning" size={20} aria-hidden />
+            <p>
+              We couldn&apos;t record your request just now. Please try again, or email{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=Account%20Deletion%20Request`}>
+                {SUPPORT_EMAIL}
+              </a>{" "}
+              so we have it on record.
+            </p>
+          </div>
         ) : (
           <div className={styles.dangerSent}>
             <Icon name="system.success" size={20} aria-hidden />
             <p>
-              Deletion request received. Our team will process it within 5 business days and
-              confirm via email.
+              Deletion request received and logged. We&apos;ll review it and confirm by email.
+              Your listings stay live until it&apos;s actioned — email{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=Account%20Deletion%20Request`}>
+                {SUPPORT_EMAIL}
+              </a>{" "}
+              if you need it handled urgently.
             </p>
           </div>
         )}
@@ -595,7 +625,7 @@ export function HostSettings({
       <TabBar active={activeTab} onChange={setActiveTab} />
       {activeTab === "billing" && <BillingPanel subscriptionTier={subscriptionTier} />}
       {activeTab === "team" && (
-        <TeamPanel subscriptionTier={subscriptionTier} companyName={companyName} />
+        <TeamPanel companyName={companyName} />
       )}
       {activeTab === "support" && <SupportPanel />}
       {activeTab === "account" && (

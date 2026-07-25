@@ -22,7 +22,13 @@ export interface ListingHeroProps {
   readonly coverPhotoUrl: string | null;
   readonly host: ListingHeroHost | null;
   /** Human date/season line, e.g. "Jun 2026 – Sep 2026". */
-  readonly dateLabel: string;
+  /**
+   * The opportunity window, or null when the host stated no dates at all. The
+   * hero is a headline, not a facts table: with nothing to say it shows no
+   * chip rather than a "Not stated" placeholder (the at-a-glance grid below
+   * carries that). Never pass an invented value here.
+   */
+  readonly dateLabel: string | null;
 }
 
 /**
@@ -62,10 +68,12 @@ export function ListingHero({
       <div className={styles.overlay}>
         <div className={styles.badgeRow}>
           <CategoryBadge category={category} />
-          <span className={styles.dateChip}>
-            <Icon name="status.begins" size={16} aria-hidden />
-            <span>{dateLabel}</span>
-          </span>
+          {dateLabel ? (
+            <span className={styles.dateChip}>
+              <Icon name="status.begins" size={16} aria-hidden />
+              <span>{dateLabel}</span>
+            </span>
+          ) : null}
         </div>
 
         <h1 className={styles.title}>{title}</h1>

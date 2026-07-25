@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
+import { reportCronFailure } from "../../../../lib/cronReport";
 
 import { sweepExpiredLifecycles } from "@explore-and-earn/db";
 
@@ -27,6 +28,9 @@ export async function GET(request: Request): Promise<NextResponse> {
   const result = await sweepExpiredLifecycles();
 
   if (!result.ok) {
+    // A returned error is silent by construction — nothing throws, so nothing
+    // reaches Sentry unless it is reported here.
+    reportCronFailure("expire-lifecycle", result.error ?? "sweepExpiredLifecycles reported ok:false");
     return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
   }
 

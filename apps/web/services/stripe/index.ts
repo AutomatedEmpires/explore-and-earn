@@ -362,9 +362,43 @@ async function syncInviteCreditPurchase(
   };
 }
 
+/**
+ * Has Stripe actually collected the money for this session?
+ *
+ * `checkout.session.completed` does NOT mean paid. Delayed-notification methods
+ * (ACH/SEPA debit, bank transfers, some wallets, and "buy now pay later") fire
+ * completed with payment_status 'unpaid' and only settle later via
+ * checkout.session.async_payment_succeeded — or fail via
+ * async_payment_failed. Granting on `completed` alone therefore hands out a
+ * paid tier, a boost campaign, a paid announcement or invite credits for money
+ * that may never arrive.
+ *
+ * 'no_payment_required' is a legitimate paid state (a 100% coupon or a zero-
+ * amount trial), so it is honoured.
+ */
+function checkoutIsPaid(session: Stripe.Checkout.Session): boolean {
+  return (
+    session.payment_status === "paid" ||
+    session.payment_status === "no_payment_required"
+  );
+}
+
 async function syncCheckoutCompleted(
   session: Stripe.Checkout.Session,
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
+  // Nothing is granted until the money is real. The matching
+  // async_payment_succeeded event re-enters this same function once it is.
+  if (!checkoutIsPaid(session)) {
+    return {
+      action: "deferred_unpaid_checkout",
+      clerkUserId:
+        typeof session.metadata?.clerkUserId === "string"
+          ? session.metadata.clerkUserId
+          : null,
+      tier: null,
+    };
+  }
+
   if (session.metadata?.productType === "announcement") {
     return syncAnnouncementPurchase(session);
   }
@@ -758,6 +792,61 @@ export async function createBillingPortalSession(params: {
  * cents — never dollars). Stripe is idempotent enough that a duplicate refund
  * attempt surfaces as a StripeError here, which we map to { ok: false }.
  */
+/**
+ * Cancel a host's active subscription immediately.
+ *
+ * Used when a SUBSCRIPTION refund is approved: returning the money while the
+ * host keeps the tier is a straight loss. Cancelling in Stripe emits
+ * customer.subscription.deleted, which syncSubscriptionEvent already handles by
+ * writing the tier back down — so the entitlement change flows through the same
+ * path as every other subscription state change rather than being duplicated
+ * here.
+ *
+ * Finding no subscription is NOT an error: it may already have been cancelled,
+ * or the refund may be for a host whose subscription lapsed. The caller should
+ * treat that as nothing-to-do.
+ */
+export async function cancelHostSubscription(
+  clerkUserId: string,
+): Promise<{ ok: boolean; cancelled: boolean; error?: string }> {
+  if (!hasStripeServerConfig()) {
+    return { ok: false, cancelled: false, error: "Stripe is not configured on this environment." };
+  }
+  if (!clerkUserId) {
+    return { ok: false, cancelled: false, error: "Missing Clerk user id." };
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const customers = await stripe.customers.search({
+      query: `metadata['clerkUserId']:'${clerkUserId.replace(/'/g, "")}'`,
+      limit: 1,
+    });
+    const customer = customers.data[0];
+    if (!customer) return { ok: true, cancelled: false };
+
+    const subs = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: "active",
+      limit: 10,
+    });
+    if (subs.data.length === 0) return { ok: true, cancelled: false };
+
+    for (const sub of subs.data) {
+      await stripe.subscriptions.cancel(sub.id);
+    }
+    return { ok: true, cancelled: true };
+  } catch (error) {
+    const message =
+      error instanceof Stripe.errors.StripeError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Unknown Stripe error.";
+    return { ok: false, cancelled: false, error: message };
+  }
+}
+
 export async function issueRefund(
   paymentIntentId: string,
   amountCents?: number,
@@ -804,8 +893,28 @@ export async function handleStripeWebhookEvent(
   event: Stripe.Event,
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
   switch (event.type) {
+    // eslint-disable-next-line no-fallthrough -- deliberate: both events carry
+    // a Checkout.Session and must grant identically. `completed` for a
+    // delayed-notification payment (ACH/SEPA and friends) arrives UNPAID and is
+    // deferred inside syncCheckoutCompleted; async_payment_succeeded is where
+    // the money actually lands, so it has to run the same path.
     case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded":
       return syncCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+    // The payment failed after checkout "completed". Nothing was granted
+    // (completed was deferred), so this only needs recording — but it must not
+    // fall through to the generic ignore, which would hide a real failure.
+    case "checkout.session.async_payment_failed":
+      return {
+        action: "async_payment_failed",
+        clerkUserId:
+          typeof (event.data.object as Stripe.Checkout.Session).metadata?.clerkUserId ===
+          "string"
+            ? ((event.data.object as Stripe.Checkout.Session).metadata
+                ?.clerkUserId as string)
+            : null,
+        tier: null,
+      };
     case "customer.subscription.created":
     case "customer.subscription.updated":
       return syncSubscriptionEvent(event.data.object as Stripe.Subscription, false);

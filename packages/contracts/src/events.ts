@@ -165,6 +165,13 @@ export const MODERATION_EVENTS = [
   "account_reinstated",
   "appeal_submitted",
   "appeal_resolved",
+  /**
+   * A person asked for their account to be erased. Recorded so the request is
+   * observable and time-stamped independently of the request row itself —
+   * erasure is subject to a statutory clock, so "when were we told" must be
+   * answerable from the append-only log.
+   */
+  "account_deletion_requested",
 ] as const
 
 export const MEDIA_EVENTS = [

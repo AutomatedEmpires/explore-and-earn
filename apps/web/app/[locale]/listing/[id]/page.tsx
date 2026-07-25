@@ -3,14 +3,21 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import {
-  computeSeekerListingFit,
+  computeSeekerListingFitTrace,
   getSeekerResumeStatus,
   hasApplied,
   hasSaved,
   recordEvent,
   seekerHasMatchInputs,
 } from "@explore-and-earn/db";
-import { hasCategoryDepth, hasLogistics } from "@explore-and-earn/contracts";
+import {
+  benefitStateLabel,
+  hasCategoryDepth,
+  hasLogistics,
+  matchBandFor,
+  matchBandLabel,
+  NOT_STATED_LABEL,
+} from "@explore-and-earn/contracts";
 import {
   cachedHostProfile,
   cachedSeekerProfile,
@@ -37,7 +44,11 @@ import { WhyWorkForUs } from "../../../../components/listing/WhyWorkForUs";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../../lib/seo";
 import { fetchWeather } from "../../../../lib/weather";
-import { formatMoney, formatMonthYear } from "../../../../lib/format";
+import { formatMoney } from "../../../../lib/format";
+import {
+  formatListingWindow,
+  listingDurationMonths,
+} from "../../../../lib/listingWindow";
 import { isUuid } from "../../../../lib/ids";
 import { optionalAuth } from "../../../../lib/optionalAuth";
 import { getFixtureListingDetail } from "../../../../components/discovery/fixtureDetail";
@@ -86,9 +97,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = listing.host?.companyName
     ? `${listing.title} — ${listing.host.companyName}`
     : listing.title;
+  // The fallback description is a PUBLIC claim — it ships to search engines and
+  // social cards. It previously read the raw housingIncluded/mealsIncluded
+  // booleans and announced "Housing not included" for a listing whose source
+  // never stated it, while the visible triad on the same page correctly said
+  // "Not stated". Route it through the shared contract so the OG description
+  // and the page can never disagree.
+  const evidence = listing.provenanceInfo?.benefitEvidence;
   const description = listing.description
     ? listing.description.slice(0, 155)
-    : `${listing.title} opportunity at ${listing.host?.companyName ?? "a host organization"}. Housing ${listing.housingIncluded ? "included" : "not included"}, meals ${listing.mealsIncluded ? "included" : "not included"}.`;
+    : `${listing.title} opportunity at ${listing.host?.companyName ?? "a host organization"}. Housing ${benefitStateLabel(listing.housingIncluded, evidence?.housing, { lowercase: true })}, meals ${benefitStateLabel(listing.mealsIncluded, evidence?.meals, { lowercase: true })}.`;
 
   const canonical = `${baseUrl}/listing/${listing.id}`;
   const ogImage = listing.coverPhotoUrl ?? `${baseUrl}/opengraph-image`;
@@ -153,6 +171,10 @@ export default async function ListingDetailPage({ params }: Props) {
   let alreadyApplied = false;
   let alreadySaved = false;
   let resumeComplete = false;
+  // The gate already knows WHICH sections are outstanding; it used to be
+  // discarded, so every blocked seeker got the same generic sentence naming a
+  // field list that did not match the real requirements.
+  let resumeMissing: readonly string[] = [];
   let seekerProfile: Awaited<ReturnType<typeof cachedSeekerProfile>> = null;
 
   if (userId && token && viewerRole === "seeker" && !isFixtureListing) {
@@ -166,15 +188,24 @@ export default async function ListingDetailPage({ params }: Props) {
     alreadySaved = saved;
     seekerProfile = profile;
     resumeComplete = resumeStatus.complete;
+    resumeMissing = resumeStatus.missing;
   }
 
   // Seeker-facing ADR-040 fit signal: computed on the fly with the same engine
   // the assistant uses. Shown only to seekers who have enough profile signal for
   // an honest band; otherwise a gentle prompt to complete their profile.
-  const fit =
+  // The TRACE, not the bare score: it tags every sentinel-derived signal with
+  // polarity "missing", which is the only thing that stops an uncomputed
+  // component being rendered as a confident reason.
+  //
+  // nowMs is passed explicitly. computeMatch defaults it to 0 (the epoch), so
+  // omitting it meant listingEnded was never true and the ended-listing penalty
+  // could not fire on this page at all.
+  const fitTrace =
     viewerRole === "seeker" && seekerProfile && seekerHasMatchInputs(seekerProfile)
-      ? computeSeekerListingFit(seekerProfile, listing)
+      ? computeSeekerListingFitTrace(seekerProfile, listing, Date.now())
       : null;
+  const fit = fitTrace;
   const seekerNeedsProfileForFit =
     viewerRole === "seeker" && (!seekerProfile || !seekerHasMatchInputs(seekerProfile));
 
@@ -209,22 +240,19 @@ export default async function ListingDetailPage({ params }: Props) {
       ? `${formatMoney(listing.compensationMinCents, { currency: listing.compensationCurrency })}${listing.compensationUnit && listing.compensationUnit !== "other" ? `/${listing.compensationUnit}` : ""}`
       : "See listing");
 
-  const dateLabel =
-    listing.beginsAt && listing.endsAt
-      ? `${formatMonthYear(listing.beginsAt)} – ${formatMonthYear(listing.endsAt)}`
-      : listing.beginsAt
-        ? `Starting ${formatMonthYear(listing.beginsAt)}`
-        : "Ongoing";
+  const dateLabel = formatListingWindow(listing);
 
   // At-a-glance facts — each cell added ONLY when its underlying field is real.
   const glanceItems: GlanceItem[] = [];
   if (listing.locationDisplay) {
     glanceItems.push({ icon: "nav.map", label: "Location", value: listing.locationDisplay });
   }
+  // The glance grid is a facts table, so an unstated window reads "Not stated"
+  // here — the same word the Housing/Meals/Pay triad already uses for silence.
   glanceItems.push({
     icon: "status.begins",
     label: "When",
-    value: listing.timelineSummary ?? dateLabel,
+    value: listing.timelineSummary ?? dateLabel ?? NOT_STATED_LABEL,
   });
   glanceItems.push({
     icon: `category.${listing.category}`,
@@ -238,8 +266,15 @@ export default async function ListingDetailPage({ params }: Props) {
       value: `${listing.host.companyName}${listing.host.verified ? " · Verified" : ""}`,
     });
   }
+  // The band word, not "82 / 100": half the engine's seeker inputs are never
+  // supplied on this surface, so a two-digit score would imply a precision the
+  // number does not have. The section below shows what it was actually based on.
   if (fit && !fit.excluded) {
-    glanceItems.push({ icon: "status.match", label: "Your fit", value: `${fit.score} / 100` });
+    glanceItems.push({
+      icon: "status.match",
+      label: "Your fit",
+      value: matchBandLabel(matchBandFor(fit.score)),
+    });
   }
 
   // "Why you're a good fit" prompt for viewers who can't get an honest score.
@@ -331,8 +366,8 @@ export default async function ListingDetailPage({ params }: Props) {
           {/* 3. At a glance */}
           <ListingGlance items={glanceItems} />
 
-          {/* 4. Why you're a good fit */}
-          <FitReasons fit={fit} prompt={fitPrompt} />
+          {/* 4. How this lines up for you */}
+          <FitReasons trace={fitTrace} prompt={fitPrompt} listingId={listing.id} />
 
           {/* 5. The deal, upfront (+ TrueValue) */}
           <DealUpfront
@@ -353,6 +388,7 @@ export default async function ListingDetailPage({ params }: Props) {
               housingIncluded={listing.housingIncluded}
               mealsIncluded={listing.mealsIncluded}
               paySummary={paySummary}
+              durationMonths={listingDurationMonths(listing)}
             />
             )}
           </DealUpfront>
@@ -482,6 +518,9 @@ export default async function ListingDetailPage({ params }: Props) {
               alreadyApplied={alreadyApplied}
               alreadySaved={alreadySaved}
               resumeComplete={resumeComplete}
+              resumeMissing={resumeMissing}
+              isSourced={isSourced}
+              sourceUrl={listing.provenanceInfo?.source?.sourceUrl ?? null}
             />
           </div>
         </div>

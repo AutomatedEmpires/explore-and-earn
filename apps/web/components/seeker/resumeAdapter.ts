@@ -1,10 +1,12 @@
-import { RESUME_APPLY_THRESHOLD } from "./models";
+// Types only from ./resume (erased at build time) — a VALUE import there pulls
+// its fixture exports and, through ./models, the discovery component barrel.
+import type { ResumeProgress, ResumeSection } from "./resume";
+import { RESUME_RECOMMENDED_THRESHOLD } from "./resumeThresholds";
 import {
-	RESUME_RECOMMENDED_THRESHOLD,
-	type ResumeProgress,
-	type ResumeSection,
-} from "./resume";
-import type { SeekerResume } from "@explore-and-earn/db";
+	seekerResumeCompletion,
+	type ResumeMissingSection,
+	type SeekerResume,
+} from "@explore-and-earn/db";
 
 /**
  * Real-data adapter for the seeker resume.
@@ -24,45 +26,92 @@ function hasBio(resume: SeekerResume): boolean {
 }
 
 /**
- * Resume completion — weighted:
- *   bio: 40 pts, experience: 40 pts, education: 15 pts, certifications: 5 pts
- * Bio + experience alone = 80%, which unlocks applying. Education and certs
- * push toward 100% for stronger match confidence.
+ * Résumé completion, measured against the SAME sections the apply gate
+ * enforces.
+ *
+ * This used to be its own weighting (bio 40 / experience 40 / education 15 /
+ * certifications 5) with a comment claiming "bio + experience alone = 80%,
+ * which unlocks applying". That was false in both directions, and the number
+ * fed /resume, /profile and the seeker dashboard:
+ *
+ *   - A seeker with bio + experience saw 80% and "You can apply now", then was
+ *     blocked, because the gate ALSO requires displayName, location,
+ *     seekingTimeline and skills.
+ *   - A seeker who satisfied every required section via bio alone saw 40% and
+ *     "Reach 70% to unlock applying" — while already able to apply.
+ *
+ * Applying was never gated on a percentage at all; seekerResumeCompletion is
+ * the server-authoritative contract (the same one applyToListing calls), so
+ * deferring to it is what makes the number mean something.
  */
 export function computeResumeCompletion(resume: SeekerResume): number {
-	let score = 0;
-	if (hasBio(resume)) score += 40;
-	if (resume.experiences.length > 0) score += 40;
-	if (resume.educations.length > 0) score += 15;
-	if (resume.certifications.length > 0) score += 5;
-	return Math.min(100, score);
+	return seekerResumeCompletion(resume).completion;
 }
 
-/** Map a live resume into the ResumeProgress shape ResumePanel renders. */
+/**
+ * Map a live résumé into the ResumeProgress shape ResumePanel renders.
+ *
+ * The REQUIRED sections mirror the apply gate exactly (and are derived from its
+ * own `missing` list, so they cannot drift). Education and certifications stay
+ * as clearly-optional strengtheners: they help a host judge an applicant, but
+ * they never gated applying and must no longer inflate a number that implies
+ * they do.
+ */
 export function toResumeProgress(resume: SeekerResume): ResumeProgress {
-	const completion = computeResumeCompletion(resume);
+	const status = seekerResumeCompletion(resume);
+	const missing = new Set(status.missing);
+	const isMissing = (section: ResumeMissingSection) => missing.has(section);
+
 	const experienceCount = resume.experiences.length;
 	const educationCount = resume.educations.length;
 	const certCount = resume.certifications.length;
 
 	const sections: readonly ResumeSection[] = [
 		{
-			id: "bio",
-			title: "Bio",
-			status: hasBio(resume) ? "complete" : "incomplete",
-			detail: hasBio(resume)
-				? "Your short bio is set"
-				: "Add a short bio so hosts get to know you",
+			id: "displayName",
+			title: "Your name",
+			status: isMissing("displayName") ? "incomplete" : "complete",
+			detail: isMissing("displayName")
+				? "Hosts need a name to put to your application"
+				: "Set",
 			required: true,
 		},
 		{
-			id: "experience",
-			title: "Experience",
-			status: experienceCount > 0 ? "complete" : "incomplete",
-			detail:
-				experienceCount > 0
-					? `${experienceCount} experience ${experienceCount === 1 ? "card" : "cards"}`
-					: "Add at least one experience",
+			id: "location",
+			title: "Where you're based",
+			status: isMissing("location") ? "incomplete" : "complete",
+			detail: isMissing("location")
+				? "Add your general location — hosts plan travel around it"
+				: "Set",
+			required: true,
+		},
+		{
+			id: "seekingTimeline",
+			title: "When you're available",
+			status: isMissing("seekingTimeline") ? "incomplete" : "complete",
+			detail: isMissing("seekingTimeline")
+				? "Add the window you're looking to work"
+				: "Set",
+			required: true,
+		},
+		{
+			id: "skills",
+			title: "Skills",
+			status: isMissing("skills") ? "incomplete" : "complete",
+			detail: isMissing("skills")
+				? "Add at least one skill, or tag skills on an experience"
+				: "Set",
+			required: true,
+		},
+		{
+			id: "bioOrExperience",
+			title: "Bio or experience",
+			status: isMissing("bioOrExperience") ? "incomplete" : "complete",
+			detail: isMissing("bioOrExperience")
+				? "Add a short bio, or at least one experience"
+				: hasBio(resume)
+					? "Your short bio is set"
+					: `${experienceCount} experience ${experienceCount === 1 ? "card" : "cards"}`,
 			required: true,
 		},
 		{
@@ -88,10 +137,14 @@ export function toResumeProgress(resume: SeekerResume): ResumeProgress {
 	];
 
 	return {
-		completion,
-		applyThreshold: RESUME_APPLY_THRESHOLD,
+		completion: status.completion,
+		// Every required section, not an arbitrary percentage: applying was never
+		// gated on a number, and saying it was is what let the page contradict
+		// the gate.
+		applyThreshold: 100,
 		recommendedThreshold: RESUME_RECOMMENDED_THRESHOLD,
-		canApply: completion >= RESUME_APPLY_THRESHOLD,
+		canApply: status.complete,
+		missing: status.missing,
 		sections,
 	};
 }

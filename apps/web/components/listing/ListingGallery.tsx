@@ -16,10 +16,14 @@ export function ListingGallery({ title, photoUrls }: ListingGalleryProps) {
   if (photoUrls.length === 0) return null;
 
   return (
+    // tabIndex=0 because this is a horizontal scroll container whose children
+    // are all non-focusable images: without it a keyboard or switch user can
+    // never scroll it and only ever sees the photos that happen to fit.
     <div
       className={styles.gallery}
       role="group"
       aria-label={`More photos of ${title}`}
+      tabIndex={0}
     >
       {photoUrls.map((url, idx) => (
         <div key={`${idx}-${url}`} className={styles.thumb}>

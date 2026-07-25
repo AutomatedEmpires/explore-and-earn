@@ -1,13 +1,102 @@
-.reasons {
+/* ─── Fit verdict ─────────────────────────────────────────────────────────── */
+
+.verdict {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+  margin-top: var(--space-8);
+}
+
+/* The band WORD is the signal; colour and icon shape reinforce it, never carry
+   it on their own. */
+.bandChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background-color: var(--color-surface-raised);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.band_strong svg {
+  color: var(--match-strong);
+}
+
+.band_developing svg {
+  color: var(--match-fair);
+}
+
+.band_needs_attention svg {
+  color: var(--match-low);
+}
+
+/* Exactly three steps because there are exactly three bands — the meter carries
+   the resolution the data actually has, and no more. */
+.steps {
+  display: inline-flex;
+  gap: var(--space-4);
+}
+
+.step {
+  width: var(--space-24);
+  height: var(--space-6);
+  border-radius: var(--radius-pill);
+  background-color: var(--border-soft);
+}
+
+.stepOn {
+  background-color: var(--match-good);
+}
+
+.coverage {
+  margin: var(--space-10) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-muted);
+}
+
+.note {
+  margin: var(--space-10) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-lh);
+  color: var(--text-secondary);
+}
+
+/* ─── Grouped evidence ────────────────────────────────────────────────────── */
+
+.group {
+  margin-top: var(--space-16);
+}
+
+.groupTitle {
+  margin: 0 0 var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.rows {
   list-style: none;
-  margin: var(--space-16) 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-10);
 }
 
-.reason {
+.row {
   display: flex;
   align-items: flex-start;
   gap: var(--space-10);
@@ -17,16 +106,51 @@
   color: var(--text-secondary);
 }
 
-.reason svg {
+.row svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--benefit-housing-fg);
 }
+
+.tonePositive {
+  color: var(--state-ready-fg);
+}
+
+.toneNegative {
+  color: var(--state-soon-fg);
+}
+
+.toneBlocker {
+  color: var(--status-error-fg);
+}
+
+.toneMissing {
+  color: var(--text-muted);
+}
+
+.fixLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-top: var(--space-10);
+  min-height: var(--tap-min);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  text-decoration: none;
+}
+
+.fixLink:hover {
+  text-decoration: underline;
+}
+
+/* ─── Guest / thin-profile prompt ─────────────────────────────────────────── */
 
 .prompt {
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  margin-top: var(--space-16);
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-card);
   border: 1px dashed var(--border-ink);

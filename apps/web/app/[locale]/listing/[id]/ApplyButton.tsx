@@ -6,7 +6,23 @@ import { useState, useTransition } from "react";
 import { Button, Modal } from "@explore-and-earn/ui";
 import { applyToListingAction } from "../../../actions/applications";
 import { saveListingAction, unsaveListingAction } from "../../../actions/savedListings";
+import { resolveSaveOutcome } from "../../../../lib/saveOutcome";
 import styles from "./ApplyButton.module.css";
+
+/**
+ * Seeker-facing names for the gate's section identifiers
+ * (ResumeMissingSection in @explore-and-earn/db). Kept beside the gate that
+ * shows them; the gate copy previously named "your bio, location, timeline, and
+ * skills" for everyone, which was both generic and wrong — it omitted
+ * displayName entirely and listed fields the seeker may already have.
+ */
+const RESUME_SECTION_LABEL: Record<string, string> = {
+  displayName: "Your name",
+  location: "Where you're based",
+  seekingTimeline: "When you're available",
+  skills: "At least one skill",
+  bioOrExperience: "A short bio, or one experience",
+};
 
 interface Props {
   listingId: string;
@@ -15,6 +31,12 @@ interface Props {
   alreadyApplied: boolean;
   alreadySaved: boolean;
   resumeComplete: boolean;
+  /** Required résumé sections still outstanding, straight from the apply gate. */
+  resumeMissing?: readonly string[];
+  /** Sourced listings have no host on the platform — see the sourced branch below. */
+  isSourced?: boolean;
+  /** The original public posting, when the source recorded one. */
+  sourceUrl?: string | null;
 }
 
 export function ApplyButton({
@@ -24,6 +46,9 @@ export function ApplyButton({
   alreadyApplied,
   alreadySaved,
   resumeComplete,
+  resumeMissing = [],
+  isSourced = false,
+  sourceUrl = null,
 }: Props) {
   const router = useRouter();
   const t = useTranslations("Apply");
@@ -31,10 +56,15 @@ export function ApplyButton({
   const [isPending, startTransition] = useTransition();
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
-  const [applyError, setApplyError] = useState<string | null>(null);
+  // One dialog for every failed action. It carries its own heading because
+  // "Could not submit application" is the wrong thing to say when a Save fails.
+  const [errorDialog, setErrorDialog] = useState<{
+    heading: string;
+    message: string;
+  } | null>(null);
   const [saved, setSaved] = useState(alreadySaved);
 
-  if (viewerRole === "guest") {
+  if (viewerRole === "guest" && !isSourced) {
     return (
       <Button
         variant="primary"
@@ -48,7 +78,7 @@ export function ApplyButton({
     );
   }
 
-  if (viewerRole === "owner") {
+  if (viewerRole === "owner" && !isSourced) {
     return (
       <Button
         variant="secondary"
@@ -62,10 +92,15 @@ export function ApplyButton({
   }
 
   // Seeker role
-  if (alreadyApplied) {
+  if (alreadyApplied && !isSourced) {
     return (
-      <div className={styles.appliedState}>
-        <span>✓</span>
+      // role="status" so the swap is announced: the modal unmounts and
+      // router.refresh() replaces this row, which otherwise happens in silence
+      // for a screen-reader user who has just committed to an application.
+      <div className={styles.appliedState} role="status">
+        {/* Decorative: the adjacent text already says it. Left announced, a
+            screen reader reads "check mark Application sent". */}
+        <span aria-hidden>✓</span>
         <span>{t("applicationSent")}</span>
       </div>
     );
@@ -96,25 +131,100 @@ export function ApplyButton({
             : result.error === "unauthenticated"
               ? t("errorSessionExpired")
               : (result.error ?? t("errorGeneric"));
-          setApplyError(msg);
+          setErrorDialog({ heading: t("errorHeading"), message: msg });
         }
       } catch {
-        setApplyError(t("errorGeneric"));
+        setErrorDialog({ heading: t("errorHeading"), message: t("errorGeneric") });
       }
     });
   };
 
+  /**
+   * Save/unsave used to flip the label before knowing whether anything was
+   * written: the result was discarded and nothing caught a throw, so a
+   * rate-limited or signed-out seeker was told "Saved" while the listing was
+   * not. The label now moves only on a confirmed write, and every other
+   * outcome says what happened.
+   */
   const handleToggleSave = () => {
+    const nextSaved = !saved;
     startTransition(async () => {
-      if (saved) {
-        await unsaveListingAction(listingId);
-        setSaved(false);
-      } else {
-        await saveListingAction(listingId);
-        setSaved(true);
+      // null encodes "the action threw" — resolveSaveOutcome treats that the
+      // same as an unexplained failure, because both mean we do not know the
+      // write happened.
+      const result = await (nextSaved
+        ? saveListingAction(listingId)
+        : unsaveListingAction(listingId)
+      ).catch(() => null);
+
+      const outcome = resolveSaveOutcome(nextSaved, result);
+      if (outcome.kind === "committed") {
+        setSaved(outcome.saved);
+        return;
       }
+      setErrorDialog({
+        heading: nextSaved ? t("saveErrorHeading") : t("unsaveErrorHeading"),
+        message:
+          outcome.reason === "rate_limit_exceeded"
+            ? t("saveErrorRateLimit")
+            : outcome.reason === "unauthenticated"
+              ? t("errorSessionExpired")
+              : t("errorGeneric"),
+      });
     });
   };
+
+  /**
+   * A sourced listing is a real public posting we found — no employer has
+   * claimed it here, so there is nobody on the platform to receive an
+   * application. 064 drops NOT NULL on listings.host_profile_id for exactly
+   * this case, and the host-side applications query inner-joins host_profiles,
+   * so an application would be invisible to everyone forever while the seeker
+   * was shown "Application sent". Offering Apply here would manufacture a
+   * conversion that does not exist, so the seeker's real next step — the
+   * original posting — becomes the primary action instead. When the source
+   * recorded no URL we say so plainly rather than render a button to nowhere.
+   * (applyToListing refuses these server-side too; this is the honest surface,
+   * not the enforcement.)
+   */
+  if (isSourced) {
+    return (
+      <>
+        <div className={styles.buttonRow}>
+          {sourceUrl ? (
+            <a
+              className={`ui-button ui-button--primary ${styles.sourcedApply}`}
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+            >
+              {t("applyOnOriginal")}
+            </a>
+          ) : (
+            <p className={styles.sourcedUnavailable}>{t("sourcedNoApplyPath")}</p>
+          )}
+          {viewerRole === "seeker" && (
+            <Button
+              variant="secondary"
+              onClick={handleToggleSave}
+              disabled={isPending}
+              aria-pressed={saved}
+            >
+              {saved ? tc("saved") : tc("save")}
+            </Button>
+          )}
+        </div>
+        {errorDialog && (
+          <Modal heading={errorDialog.heading} onClose={() => setErrorDialog(null)}>
+            <p className={styles.modalText}>{errorDialog.message}</p>
+            <Button variant="ghost" onClick={() => setErrorDialog(null)}>
+              {tc("dismiss")}
+            </Button>
+          </Modal>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -126,13 +236,17 @@ export function ApplyButton({
           variant="secondary"
           onClick={handleToggleSave}
           disabled={isPending}
+          aria-pressed={saved}
         >
           {saved ? tc("saved") : tc("save")}
         </Button>
       </div>
 
       {showConfirmModal && (
-        <Modal heading={t("confirmHeading")}>
+        <Modal
+          heading={t("confirmHeading")}
+          onClose={() => setShowConfirmModal(false)}
+        >
           <p className={styles.modalText}>
             {t.rich("confirmBody", {
               title,
@@ -159,12 +273,34 @@ export function ApplyButton({
       )}
 
       {showResumeModal && (
-        <Modal heading={t("resumeGateHeading")}>
+        <Modal
+          heading={t("resumeGateHeading")}
+          onClose={() => setShowResumeModal(false)}
+        >
           <p className={styles.modalText}>{t("resumeGateBody")}</p>
+          {resumeMissing.length > 0 && (
+            <>
+              <p className={styles.modalText}>{t("resumeGateMissingHeading")}</p>
+              <ul className={styles.missingList}>
+                {resumeMissing.map((section) => (
+                  <li key={section}>
+                    {RESUME_SECTION_LABEL[section] ?? section}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <div className={styles.buttonRow}>
             <Button
               variant="primary"
-              onClick={() => router.push("/resume")}
+              // Carry the listing along so finishing the résumé returns the
+              // seeker to the opportunity they were applying to, instead of
+              // stranding them on a bare /resume with no way back.
+              onClick={() =>
+                router.push(
+                  `/resume?redirect_url=${encodeURIComponent(`/listing/${listingId}`)}`,
+                )
+              }
             >
               {t("finishResume")}
             </Button>
@@ -178,10 +314,10 @@ export function ApplyButton({
         </Modal>
       )}
 
-      {applyError && (
-        <Modal heading={t("errorHeading")}>
-          <p className={styles.modalText}>{applyError}</p>
-          <Button variant="ghost" onClick={() => setApplyError(null)}>
+      {errorDialog && (
+        <Modal heading={errorDialog.heading} onClose={() => setErrorDialog(null)}>
+          <p className={styles.modalText}>{errorDialog.message}</p>
+          <Button variant="ghost" onClick={() => setErrorDialog(null)}>
             {tc("dismiss")}
           </Button>
         </Modal>

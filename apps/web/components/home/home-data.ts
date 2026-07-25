@@ -122,11 +122,31 @@ function realCountsByState(listings: readonly DiscoveryListing[]) {
   return { jobs, hosts };
 }
 
+/**
+ * Destination cards for the homepage.
+ *
+ * HONESTY + DEAD-END RULE (UX review 2026-07-23): a destination is rendered
+ * ONLY when it actually has live inventory. Previously all six seeds always
+ * rendered; in production (where the derived count is undefined) that put six
+ * large, inviting cards on the homepage — Alaska, Colorado, Montana, Wyoming,
+ * Maine, California — each linking to `/seek?location=<state>` and each
+ * landing on an empty result set. The copy was honest ("New season", never a
+ * fabricated number) but the EXPERIENCE was six guaranteed dead ends at the
+ * exact moment a first-time seeker is deciding whether this marketplace has
+ * anything for them. Empty states must guide toward action, not manufacture
+ * disappointment.
+ *
+ * Preview keeps the curated demo figures so the design can be reviewed
+ * populated; production shows only destinations backed by real listings, and
+ * the section hides itself entirely when none qualify (see DestinationGrid).
+ */
 export function buildDestinations(
   listings: readonly DiscoveryListing[],
 ): readonly HomeDestination[] {
   const { jobs, hosts } = realCountsByState(listings);
-  return DESTINATION_SEEDS.map((seed) => {
+  return DESTINATION_SEEDS.filter(
+    (seed) => IS_PREVIEW || (jobs.get(seed.slug) ?? 0) > 0,
+  ).map((seed) => {
     // Preview reads as a populated seasonal marketplace via the curated demo
     // figures; production shows only real derived counts (0 → "New season"),
     // so a live/empty DB never displays a fabricated number.
@@ -270,10 +290,17 @@ export const HOME_PLANS: readonly HomePlan[] = [
     blurb: "Hosts hiring across a full season.",
     features: [
       `Up to ${PLAN_ENTITLEMENTS.professional.listings} active listings`,
+      // Backed: getHomepageFallbackListings sorts by subscription tier
+      // (Enterprise -> Professional -> Starter), so a paid tier really does
+      // place above an unpaid one.
       "Boosted placement",
       `${PLAN_ENTITLEMENTS.professional.monthlyAnnouncements} announcement / month`,
       "Applicant pipeline + full analytics",
-      "Featured-employer eligibility",
+      `${PLAN_ENTITLEMENTS.professional.includedInviteCredits} invite credits / month`,
+      // REMOVED "Featured-employer eligibility": buildFeaturedEmployers groups
+      // listings by host name with no tier gate at all, so every host is
+      // already "eligible". Selling eligibility implies a paid gate that does
+      // not exist.
     ],
     featured: true,
     cta: "Go Professional",
@@ -285,10 +312,17 @@ export const HOME_PLANS: readonly HomePlan[] = [
     blurb: "Multi-location operators hiring at scale.",
     features: [
       `${PLAN_ENTITLEMENTS.enterprise.listings}+ active listings`,
+      // Backed: top of the tier sort in getHomepageFallbackListings.
       "Homepage placement",
       `${PLAN_ENTITLEMENTS.enterprise.monthlyAnnouncements} announcements / month`,
-      "Multi-location + team seats",
-      "Priority support & trust tools",
+      `${PLAN_ENTITLEMENTS.enterprise.includedInviteCredits} invite credits / month`,
+      "Applicant pipeline + full analytics",
+      // REMOVED "Multi-location + team seats": team membership has a table and
+      // RLS but no application code and no UI beyond a disabled button, and
+      // "multi-location" is not a separate capability — it is just the listing
+      // allowance above.
+      // REMOVED "Priority support & trust tools": there is no support
+      // entitlement, queue, or SLA anywhere in the product.
     ],
     cta: "Talk to us",
   },

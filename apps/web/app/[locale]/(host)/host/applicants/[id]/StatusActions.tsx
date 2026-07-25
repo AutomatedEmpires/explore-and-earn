@@ -12,7 +12,14 @@ import { Button } from "@explore-and-earn/ui";
 import { updateApplicationStatusAction } from "../../../../../actions/applicationStatus";
 import styles from "./StatusActions.module.css";
 
-type HostSettable = "reviewing" | "saved_by_host" | "offered" | "not_selected" | "accepted";
+type HostSettable =
+  | "reviewing"
+  | "saved_by_host"
+  | "offered"
+  | "not_selected"
+  | "accepted"
+  | "active"
+  | "completed";
 
 interface StatusButton {
   readonly label: string;
@@ -26,6 +33,12 @@ const STATUS_BUTTONS: readonly StatusButton[] = [
   { label: "Make Offer", status: "offered", variant: "primary" },
   { label: "Accept", status: "accepted", variant: "primary" },
   { label: "Pass", status: "not_selected", variant: "ghost" },
+  // The engagement itself. Without these two an application stopped at
+  // 'accepted' forever, and since a seeker may only review an 'active' or
+  // 'completed' engagement, no review could ever be written. The buttons are
+  // filtered by canTransition below, so each appears only where it is legal.
+  { label: "They've started", status: "active", variant: "primary" },
+  { label: "Engagement finished", status: "completed", variant: "primary" },
 ];
 
 /** Friendly copy for known action error codes (unknown codes pass through). */

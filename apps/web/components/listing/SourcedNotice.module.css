@@ -70,6 +70,11 @@
 .claimLink {
 	display: inline-flex;
 	align-items: center;
+	/* These are the seeker's real next steps on a sourced listing — the original
+	   posting, and the employer's claim entry point. At --type-meta-size the row
+	   was well under the 44px minimum, so on a phone they were easy to miss and
+	   easy to mis-tap. */
+	min-height: var(--tap-min);
 	gap: var(--space-6);
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);

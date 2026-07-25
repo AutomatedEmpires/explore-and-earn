@@ -21,10 +21,35 @@ export interface ResumePanelProps {
 	readonly progress: ResumeProgress;
 }
 
+/** Seeker-facing names for the gate's section identifiers. */
+const MISSING_LABEL: Record<string, string> = {
+	displayName: "your name",
+	location: "where you're based",
+	seekingTimeline: "when you're available",
+	skills: "at least one skill",
+	bioOrExperience: "a bio or one experience",
+};
+
+/** "a, b and c" — a list a person would actually read aloud. */
+function humanList(items: readonly string[]): string {
+	if (items.length <= 1) return items[0] ?? "";
+	return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
 export function ResumePanel({ progress }: ResumePanelProps) {
+	// This used to say "Reach 70% to unlock applying" — a rule that does not
+	// exist. Applying is gated on a SET of required sections, so a seeker at 80%
+	// could be blocked and a seeker at 40% could already apply. Name what is
+	// actually outstanding instead of quoting a threshold.
+	const outstanding = (progress.missing ?? [])
+		.map((section) => MISSING_LABEL[section] ?? section)
+		.filter(Boolean);
+
 	const gateMessage = progress.canApply
-		? `You can apply now. Reach ${progress.recommendedThreshold}% for stronger match confidence.`
-		: `Reach ${progress.applyThreshold}% to unlock applying.`;
+		? "Your résumé has everything hosts need — you can apply to any listing."
+		: outstanding.length > 0
+			? `Add ${humanList(outstanding)} to start applying.`
+			: "Finish the required sections below to start applying.";
 
 	return (
 		<div className={styles.panel}>

@@ -38,7 +38,12 @@ export function WeatherWidget({ locationLabel, outlook }: WeatherWidgetProps) {
       }
     >
       {outlook ? (
-        <div className={styles.strip} role="list">
+        <div
+          className={styles.strip}
+          role="list"
+          aria-label="10-day outlook"
+          tabIndex={0}
+        >
           {outlook.days.map((day) => (
             <div key={day.date} className={styles.day} role="listitem">
               <span className={styles.weekday}>{weekday(day.date)}</span>
@@ -49,9 +54,19 @@ export function WeatherWidget({ locationLabel, outlook }: WeatherWidgetProps) {
                   <span className={styles.glyphDot} />
                 )}
               </span>
+              {/* Two bare numbers separated only by font weight told a screen
+                  reader "72 degrees 51 degrees" with no way to tell which is
+                  which. The visible layout is unchanged; the words are added
+                  for assistive tech only. */}
               <span className={styles.temps}>
-                <span className={styles.high}>{day.highF}&deg;</span>
-                <span className={styles.low}>{day.lowF}&deg;</span>
+                <span className={styles.high}>
+                  <span className={styles.srOnly}>High </span>
+                  {day.highF}&deg;
+                </span>
+                <span className={styles.low}>
+                  <span className={styles.srOnly}>Low </span>
+                  {day.lowF}&deg;
+                </span>
               </span>
               <span className={styles.label}>{day.label}</span>
             </div>

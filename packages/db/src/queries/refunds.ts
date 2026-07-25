@@ -589,3 +589,67 @@ export async function getRefundRequestById(
     status: (typeof r.status === "string" ? r.status : "requested") as RefundStatus,
   };
 }
+
+/* ------------------------------------------------------- refund revocation */
+
+/**
+ * Take back what a refunded purchase bought.
+ *
+ * Approving a refund used to update refund_requests and nothing else, so the
+ * money went back while the goods stayed delivered: a boost campaign kept
+ * running to its ends_at, a paid announcement stayed live in the feed, and a
+ * refunded subscriber kept their tier. Every approved refund was a pure loss.
+ *
+ * Subscriptions are NOT handled here — cancelling one belongs to the Stripe
+ * layer, whose customer.subscription.deleted webhook already owns turning a
+ * cancellation into a tier downgrade. Keeping that in one place is why this
+ * function covers only the two rows we own.
+ */
+export async function revokeRefundedPurchaseRow(
+  serviceRoleToken: string,
+  purchaseType: RefundPurchaseType,
+  referenceId: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  // A purchase with no reference row (or a subscription) has nothing to revoke
+  // here; the caller handles subscriptions separately.
+  if (!referenceId) return { ok: true };
+
+  const db = untypedAdmin(serviceRoleToken);
+
+  if (purchaseType === "boost") {
+    // Migration 029 already declared a 'refunded' status for exactly this case;
+    // nothing had ever written it.
+    const { error } = await db
+      .from("boost_campaigns")
+      .update({ status: "refunded" })
+      .eq("id", referenceId);
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+
+  if (purchaseType === "announcement") {
+    const { error } = await db
+      .from("host_announcements")
+      .update({ status: "removed" })
+      .eq("id", referenceId);
+    return error ? { ok: false, error: error.message } : { ok: true };
+  }
+
+  return { ok: true };
+}
+
+/** The Clerk id behind a host profile — refund_requests stores only the profile id. */
+export async function getHostClerkUserIdByProfileId(
+  serviceRoleToken: string,
+  hostProfileId: string,
+): Promise<string | null> {
+  if (!hostProfileId) return null;
+  const db = untypedAdmin(serviceRoleToken);
+  const { data, error } = await db
+    .from("host_profiles")
+    .select("clerk_user_id")
+    .eq("id", hostProfileId)
+    .maybeSingle();
+  if (error) return null;
+  const value = (data as { clerk_user_id?: string } | null)?.clerk_user_id;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}

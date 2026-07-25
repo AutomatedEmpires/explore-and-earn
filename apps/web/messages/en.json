@@ -284,11 +284,17 @@
 		"confirmHeading": "Apply to this listing?",
 		"confirmBody": "Confirm your application to <strong>{title}</strong>. The host will review your profile and contact you if interested.",
 		"resumeGateHeading": "Complete your résumé to apply",
-		"resumeGateBody": "Hosts move people across the world on a handshake — so they need to know who they're inviting. Finish your résumé (your bio, location, timeline, and skills) before applying to listings.",
+		"resumeGateBody": "Hosts move people across the world on a handshake — so they need to know who they're inviting.",
+		"resumeGateMissingHeading": "Still needed:",
 		"finishResume": "Finish your résumé",
 		"errorHeading": "Could not submit application",
 		"errorRateLimit": "You're applying too quickly. Please wait a moment and try again.",
 		"errorSessionExpired": "Your session expired. Please sign in and try again.",
-		"errorGeneric": "Something went wrong. Please try again."
+		"errorGeneric": "Something went wrong. Please try again.",
+		"saveErrorHeading": "Could not save this listing",
+		"unsaveErrorHeading": "Could not remove this listing",
+		"saveErrorRateLimit": "You're saving too quickly. Please wait a moment and try again.",
+		"applyOnOriginal": "Apply on the original posting",
+		"sourcedNoApplyPath": "This employer hasn't joined Explore & Earn yet, so applications can't be sent from here."
 	}
 }

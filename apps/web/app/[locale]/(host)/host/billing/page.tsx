@@ -106,6 +106,14 @@ function resolveFeedback(searchParams: BillingSearchParams): {
         message:
           "You've started several billing sessions just now. Give it a few minutes, then try again.",
       };
+    // Guarded rather than silently allowed: a second checkout would create a
+    // second concurrent Stripe subscription and bill for both.
+    case "already_subscribed":
+      return {
+        tone: "warning",
+        message:
+          "You're already on a plan. Use “Manage billing” to switch tiers or change how you pay — that swaps your plan instead of starting a second subscription.",
+      };
     default:
       return null;
   }
@@ -223,7 +231,12 @@ export default async function HostBillingPage({
                 <li>{entitlements.listings} live listing slots</li>
                 <li>{entitlements.includedInviteCredits} included invite credits / month</li>
                 <li>{entitlements.monthlyAnnouncements} monthly announcements</li>
-                <li>{entitlements.teamSeats} team seats</li>
+                {/* Only listed when a plan actually grants seats. Team
+                    membership is not built, so every tier is 0 today and this
+                    row is absent rather than reading "0 team seats". */}
+                {entitlements.teamSeats > 0 ? (
+                  <li>{entitlements.teamSeats} team seats</li>
+                ) : null}
                 <li>{entitlements.analytics} analytics access</li>
               </ul>
 

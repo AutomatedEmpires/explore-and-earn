@@ -257,11 +257,30 @@ function BenefitTriadCell({
 				? styles.benefitProvided
 				: styles.benefitNot
 	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
-	// Housing/Meals carry NO icon and NO checkmark on the card — just the label on
-	// a COLOR-CODED cell (green = included, red = not, neutral = not stated); the
-	// detail lives in the popup. Pay shows the rate. aria still states the state.
+	// Housing/Meals carry NO icon and NO checkmark on the card (founder card-v2.2
+	// lock) — just the label on a COLOR-CODED cell; the detail lives in the popup.
+	// Pay shows the rate. aria states the state.
+	//
+	// UX review 2026-07-23 — COLOUR IS NO LONGER THE SOLE CARRIER. Previously
+	// "included" and "not included" rendered the SAME text ("Housing"), with no
+	// icon and no marker, distinguished ONLY by the success-green vs error-red
+	// label token (measured live in the dev catalog). Red/green is precisely the
+	// pair ~8% of men cannot separate, and this is the product's core promise —
+	// a seeker who cannot read the colour cannot learn whether housing is
+	// included at all.
+	// Founder law: "Information must never be communicated only through color."
+	// The fix keeps the v2.2 lock intact (no icon, no checkmark, one compact
+	// tier) and instead lets the LABEL carry the state, exactly as the
+	// "Not stated" cell already does in this same component.
 	const stateText = isPay ? "" : notStated ? "not stated" : provided ? "included" : "not included"
 	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
+	const benefitText = notStated
+		? NOT_STATED_LABEL
+		: provided
+			? label
+			: kind === "housing"
+				? "No housing"
+				: "No meals"
 
 	const inner = isPay ? (
 		<>
@@ -269,7 +288,7 @@ function BenefitTriadCell({
 			<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{value}</span>
 		</>
 	) : (
-		<span className={styles.benefitLabel}>{notStated ? NOT_STATED_LABEL : label}</span>
+		<span className={styles.benefitLabel}>{benefitText}</span>
 	)
 
 	return onClick ? (
@@ -537,10 +556,23 @@ export function DiscoveryCard({
 					</button>
 
 					{/* Verified check — host listing surfaces only. NEVER on a seeker
-					    applicant card, and NEVER on a sourced listing (unconfirmed
-					    inventory must not present as Explore & Earn-verified). */}
-					{!isApplicantReview && !isSourced ? (
-						<span className={styles.verifiedDot} aria-label="Verified Host">
+					    applicant card, NEVER on a sourced listing (unconfirmed
+					    inventory must not present as Explore & Earn-verified), and
+					    ONLY when the host is actually verified.
+					    UX review 2026-07-23: this gate previously read
+					    `!isApplicantReview && !isSourced` — it never consulted
+					    `verified` (computed at :324 and used only in the host
+					    button's aria-label). Result: the green check rendered on
+					    EVERY host-owned listing on 9 of 10 surfaces, so a free host
+					    wore the same trust mark as a paying Verified Host, the
+					    badge could not discriminate any two listings in a feed, and
+					    the paid tier's only on-card benefit was void. The badge
+					    asserts an active paid plan (contracts/card.ts
+					    hasVerifiedHostSubscription) — asserting it for unpaid hosts
+					    is fabricated trust. role="img" so the label is actually
+					    announced rather than sitting on a generic span. */}
+					{!isApplicantReview && verified ? (
+						<span className={styles.verifiedDot} role="img" aria-label="Verified Host">
 							<Icon name="trust.verified_host" size={16} aria-hidden />
 						</span>
 					) : null}
@@ -650,11 +682,16 @@ export function DiscoveryCard({
 				{(() => {
 					// Sourced listings carry NO verified-host glyph on the name row —
 					// the employer name is source-stated, not a verified host.
+					// UX review 2026-07-23: the non-sourced branch handed the SealCheck
+					// (trust.verified_host) glyph to EVERY host listing — a second,
+					// ungated verification-shaped mark beside the host's name. Only a
+					// genuinely verified host earns it; everyone else gets the neutral
+					// host glyph.
 					const hostIcon = isApplicantReview
 						? "nav.profile"
-						: isSourced
-							? "nav.hosts"
-							: "trust.verified_host"
+						: verified
+							? "trust.verified_host"
+							: "nav.hosts"
 					return titleHandler ? (
 						<button type="button" className={`${styles.metaRow} ${styles.hostRow}`} onClick={titleHandler}>
 							<Icon name={hostIcon} size={18} aria-hidden />

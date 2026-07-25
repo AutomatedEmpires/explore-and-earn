@@ -13,6 +13,11 @@ export interface TrueValueProps {
   readonly mealsIncluded: boolean;
   /** Human pay summary already computed by the page (e.g. "$18/hr"). */
   readonly paySummary: string;
+  /**
+   * Whole months the role actually runs, or null when the host didn't state
+   * both dates. Never defaulted to 12 — see the long-run figure below.
+   */
+  readonly durationMonths?: number | null;
 }
 
 const RENT_DEFAULT = 1200;
@@ -38,7 +43,12 @@ function money(value: number): string {
  * stays in their pocket. Gated by the real housingIncluded / mealsIncluded flags
  * — if neither is covered there's no value story, so we render nothing.
  */
-export function TrueValue({ housingIncluded, mealsIncluded, paySummary }: TrueValueProps) {
+export function TrueValue({
+  housingIncluded,
+  mealsIncluded,
+  paySummary,
+  durationMonths = null,
+}: TrueValueProps) {
   const rentId = useId();
   const foodId = useId();
   const [rent, setRent] = useState(RENT_DEFAULT);
@@ -49,7 +59,13 @@ export function TrueValue({ housingIncluded, mealsIncluded, paySummary }: TrueVa
   }
 
   const keptMonthly = (housingIncluded ? rent : 0) + (mealsIncluded ? food : 0);
-  const keptYearly = keptMonthly * 12;
+  // The long-run figure used to be keptMonthly * 12, rendered as "over a year".
+  // These are SEASONAL roles: a Jun–Sep listing runs four months, so that
+  // overstated what the seeker actually keeps by roughly 3x. Now it spans the
+  // stated engagement — and when the host stated no dates we omit the claim
+  // entirely rather than assume a year.
+  const keptOverRole =
+    durationMonths && durationMonths > 1 ? keptMonthly * durationMonths : null;
   // Only append the "on top of <pay>" clause when pay is a real figure — a vague
   // "See listing" would read awkwardly.
   const hasPayFigure = paySummary.includes("$");
@@ -74,9 +90,12 @@ export function TrueValue({ housingIncluded, mealsIncluded, paySummary }: TrueVa
           <Icon name="benefit.pay" size={16} aria-hidden />
           True value
         </span>
-        <h2 id={`${rentId}-title`} className={styles.title}>
+        {/* h3, not h2: TrueValue renders INSIDE DealUpfront's section, whose
+            own heading is the h2 "The deal, upfront". An h2 here sent the
+            outline h2 -> h3 ("Housing evidence") -> h2 within one section. */}
+        <h3 id={`${rentId}-title`} className={styles.title}>
           Your pay is what you <em>keep</em>.
-        </h2>
+        </h3>
         <p className={styles.sub}>
           {coveredWord} here — so the {eatsWord} a city job quietly takes out of your
           paycheck stays in your pocket
@@ -135,8 +154,15 @@ export function TrueValue({ housingIncluded, mealsIncluded, paySummary }: TrueVa
           <small>/mo</small>
         </span>
         <span className={styles.resultSub}>
-          that a role without {eatsWord} covered would eat — roughly{" "}
-          <strong>{money(keptYearly)}</strong> over a year.
+          that a role without {eatsWord} covered would eat
+          {keptOverRole !== null ? (
+            <>
+              {" "}
+              — roughly <strong>{money(keptOverRole)}</strong> across the{" "}
+              {durationMonths} months of this role
+            </>
+          ) : null}
+          .
         </span>
       </div>
 

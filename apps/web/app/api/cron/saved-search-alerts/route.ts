@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
+import { reportCronException } from "../../../../lib/cronReport";
 
 import { runSavedSearchAlerts } from "@explore-and-earn/db";
 
@@ -61,6 +62,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const delivery = await drainDueDeliveries(Date.now());
     return NextResponse.json({ ok: true, ...result, delivery });
   } catch (error) {
+    reportCronException("saved-search-alerts", error);
     const message = error instanceof Error ? error.message : "unknown_error";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
