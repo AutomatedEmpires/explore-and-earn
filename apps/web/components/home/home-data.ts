@@ -199,7 +199,31 @@ export const HOME_CATEGORIES: readonly HomeCategory[] = [
 
 // ─── Rolling announcements (monetized rail) ────────────────────────────────
 
-export type AnnouncementLabel = "Featured Host" | "Boosted" | "Sponsored" | "Enterprise";
+/**
+ * "Featured Host", "Boosted", "Sponsored" and "Enterprise" are the PAID
+ * taxonomy — a card wearing one asserts that someone bought that placement.
+ * "Explore & Earn" is the house label, for our own invitations. It exists
+ * because the empty-marketplace fallback used to ship as "Featured Host": on a
+ * marketplace with zero listings and zero paying hosts, the live homepage
+ * advertised a featured host that did not exist.
+ */
+export type AnnouncementLabel =
+  | "Featured Host"
+  | "Boosted"
+  | "Sponsored"
+  | "Enterprise"
+  | "Explore & Earn";
+
+/** The paid placements. A house card must never carry one of these. */
+export const PAID_ANNOUNCEMENT_LABELS = [
+  "Featured Host",
+  "Boosted",
+  "Sponsored",
+  "Enterprise",
+] as const satisfies readonly AnnouncementLabel[];
+
+/** Our own invitation — bought by nobody, so it claims nothing. */
+export const HOUSE_ANNOUNCEMENT_LABEL = "Explore & Earn" as const;
 
 export interface HomeAnnouncement {
   readonly id: string;
@@ -222,8 +246,15 @@ const DEMO_ANNOUNCEMENTS: readonly HomeAnnouncement[] = [
 /**
  * Real featured-employer campaigns become "Featured Host" announcements; in
  * preview they're interleaved with the demo taxonomy so the paid surface reads
- * fully. In an empty prod marketplace the rail carries a neutral host invitation
- * — never a fabricated listing count.
+ * fully.
+ *
+ * In an empty production marketplace the rail carries OUR OWN invitation, under
+ * the house label. The previous version claimed to be "a neutral host
+ * invitation" while shipping it as `label: "Featured Host"` with the paid
+ * featured tone — so with zero listings and zero paying hosts, the live
+ * homepage showed a "Hiring now" rail containing a "Featured Host". Both were
+ * false, and it is the same fabricated-trust-signal class as an unearned
+ * Verified badge.
  */
 export function buildAnnouncements(
   employers: readonly FeaturedEmployer[],
@@ -249,9 +280,11 @@ export function buildAnnouncements(
   if (fromEmployers.length > 0) return fromEmployers;
   return [{
     id: "host_onboarding",
-    label: "Featured Host",
+    label: HOUSE_ANNOUNCEMENT_LABEL,
     category: "seasonal",
-    text: "Hosts are onboarding now — housing, meals & pay upfront",
+    // Also reworded: "Hosts are onboarding now" asserted activity we cannot
+    // evidence on an empty marketplace. An invitation claims nothing.
+    text: "Hiring? List your opportunity — housing, meals & pay upfront",
     href: "/for-hosts",
   }];
 }

@@ -21,6 +21,7 @@ import {
   type HomeAnnouncement,
   type HomeDestination,
   type AnnouncementLabel,
+  HOUSE_ANNOUNCEMENT_LABEL,
 } from "./home-data";
 import styles from "./MarketplaceHome.module.css";
 
@@ -333,16 +334,27 @@ const ANNOUNCEMENT_TONE: Record<AnnouncementLabel, string> = {
   Boosted: styles.tagBoosted,
   Sponsored: styles.tagSponsored,
   Enterprise: styles.tagEnterprise,
+  // Neutral on purpose: the house label must not borrow a paid tone.
+  "Explore & Earn": styles.tagHouse,
 };
 
 function AnnouncementRail({ items }: { items: readonly HomeAnnouncement[] }) {
   if (items.length === 0) return null;
+
+  // "Hiring now" is a claim about the marketplace, not about the rail. When the
+  // only card is our own invitation — an empty marketplace — nobody is hiring,
+  // so the kicker and the section name must not say otherwise.
+  const houseOnly = items.every((a) => a.label === HOUSE_ANNOUNCEMENT_LABEL);
+
   return (
-    <section className={styles.announceSection} aria-label="Featured host announcements">
+    <section
+      className={styles.announceSection}
+      aria-label={houseOnly ? "From Explore & Earn" : "Featured host announcements"}
+    >
       <div className={styles.announceHeadRow}>
         <span className={styles.announceKicker}>
           <Icon name="nav.announcements" size={16} aria-hidden />
-          Hiring now
+          {houseOnly ? "From Explore & Earn" : "Hiring now"}
         </span>
       </div>
       <div className={styles.announceScroller}>
