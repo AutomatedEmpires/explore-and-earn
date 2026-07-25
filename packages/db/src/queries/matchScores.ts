@@ -1,12 +1,12 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { MatchBand } from "@explore-and-earn/contracts";
+
 import {
-  MATCH_SCORE_CAPS,
-  type MatchBand,
-  type MatchCap,
-  type MatchComponentScores,
-} from "@explore-and-earn/contracts";
+  decodeStoredMatchRow,
+  type StoredMatchResult,
+} from "../lib/storedMatchDecode";
 
 import { authedClient } from "../client";
 
@@ -101,17 +101,6 @@ export async function getMatchScoresForSeeker(
   return scores;
 }
 
-/** The full stored engine result for ONE (seeker, listing) pairing. */
-export interface StoredMatchResult {
-  readonly score: number;
-  readonly rawScore: number;
-  readonly band: MatchBand;
-  readonly confidence: number;
-  readonly components: MatchComponentScores;
-  readonly capsApplied: readonly MatchCap[];
-  readonly computedAt: string | null;
-}
-
 /**
  * The stored engine result for the authed seeker and ONE listing — the same row
  * the discovery pill reads, not a recomputation of it.
@@ -148,25 +137,7 @@ export async function getSeekerListingMatch(
       .maybeSingle();
     if (error || !data) return null;
 
-    const row = data as Record<string, unknown>;
-    if (typeof row.score !== "number") return null;
-
-    return {
-      score: row.score,
-      rawScore: typeof row.raw_score === "number" ? row.raw_score : row.score,
-      band: row.band as MatchBand,
-      confidence: typeof row.confidence === "number" ? row.confidence : 0,
-      components: (row.components ?? {}) as MatchComponentScores,
-      // caps_applied is text[]; anything unrecognised is dropped rather than
-      // rendered, so a future cap added server-side cannot print as a raw code.
-      capsApplied: Array.isArray(row.caps_applied)
-        ? (row.caps_applied.filter(
-            (cap): cap is MatchCap =>
-              typeof cap === "string" && cap in MATCH_SCORE_CAPS,
-          ) as MatchCap[])
-        : [],
-      computedAt: typeof row.computed_at === "string" ? row.computed_at : null,
-    };
+    return decodeStoredMatchRow(data as Record<string, unknown>);
   } catch {
     // match_scores may not exist yet (pre-052) — degrade to "not scored yet".
     return null;

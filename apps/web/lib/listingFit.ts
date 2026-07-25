@@ -85,8 +85,14 @@ export function resolveListingFit(
   return {
     kind: "scored",
     trace: {
-      // Numbers are the stored row's, verbatim — this is the whole point.
+      // Always null, and that is a property of the writer rather than an
+      // assumption: the matching service filters `result.excluded === null`
+      // before it upserts, so an excluded pairing never becomes a stored row.
+      // A row existing therefore *means* not-excluded. If that filter is ever
+      // removed, `excluded` must start being persisted and read here — an
+      // excluded pairing must not render as a band.
       excluded: null,
+      // Numbers are the stored row's, verbatim — this is the whole point.
       score: stored.score,
       rawScore: stored.rawScore,
       band: stored.band,

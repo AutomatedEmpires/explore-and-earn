@@ -40,6 +40,7 @@ export * from "./lib/matchTrace";
 export * from "./lib/behavioralSignals";
 export * from "./lib/resumeInsights";
 export * from "./lib/seekerListingFit";
+export * from "./lib/storedMatchDecode";
 export * from "./lib/resumeCompleteness";
 export * from "./lib/resumeDraft";
 export * from "./queries/behaviorInteractions";
