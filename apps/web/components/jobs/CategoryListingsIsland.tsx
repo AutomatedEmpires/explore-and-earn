@@ -43,9 +43,12 @@ export function CategoryListingsIsland({
 			overrides={{ onApply: (id) => router.push(`/listing/${id}`) }}
 			eagerCount={3}
 			emptyState={
+				/* Same correction as the homepage empty state: "is being staffed" /
+				   "Hosts are onboarding now" assert activity nothing here can
+				   evidence, and this renders whenever the lane is empty. */
 				<EmptyState
-					title={`The first ${CATEGORY_LANDING[category].label.toLowerCase()} season is being staffed.`}
-					message="Hosts are onboarding now. Be first in line when roles open — or scout another lane."
+					title={`No ${CATEGORY_LANDING[category].label.toLowerCase()} roles listed yet.`}
+					message="We only publish opportunities that answer housing, meals and pay upfront. Try another lane in the meantime."
 					icon={`category.${category}`}
 					suggestions={suggestions}
 					actionLabel="Explore the marketplace"
