@@ -334,8 +334,13 @@ const ANNOUNCEMENT_TONE: Record<AnnouncementLabel, string> = {
   Boosted: styles.tagBoosted,
   Sponsored: styles.tagSponsored,
   Enterprise: styles.tagEnterprise,
-  // Neutral on purpose: the house label must not borrow a paid tone.
-  "Explore & Earn": styles.tagHouse,
+  // Computed key, not a repeated literal: keyed off the constant so renaming the
+  // house label cannot leave this map silently missing it. Record<> checks the
+  // key SET at compile time but would not catch a literal drifting from the
+  // source of truth — the lookup would just return undefined and the chip would
+  // render with no tone, i.e. visually indistinguishable from a paid one.
+  // (Raised by Copilot on PR 277.)
+  [HOUSE_ANNOUNCEMENT_LABEL]: styles.tagHouse,
 };
 
 function AnnouncementRail({ items }: { items: readonly HomeAnnouncement[] }) {
@@ -394,8 +399,19 @@ function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
       {shown.length === 0 ? (
         <div className={styles.emptyPanel}>
           <Icon name="status.open" size={24} aria-hidden />
-          <p className={styles.emptyTitle}>The first season is being staffed.</p>
-          <p className={styles.emptySub}>Hosts are onboarding now. Be first in line when roles open.</p>
+          {/* Was "The first season is being staffed." / "Hosts are onboarding
+              now." — both assert activity nothing here can evidence. This block
+              renders whenever the list is empty, so on a marketplace with no
+              listings and no paying hosts it told every visitor that staffing
+              and onboarding were underway. Same defect as the "Featured Host"
+              house card; it just lived in the empty state too.
+              (No PR numbers here: the G50 ratchet reads a leading-hash number
+              as a hex colour and fails the build.) */}
+          <p className={styles.emptyTitle}>No roles listed yet.</p>
+          <p className={styles.emptySub}>
+            We only publish opportunities that answer housing, meals and pay upfront —
+            so this stays empty until they do.
+          </p>
           <Link className={styles.heroPrimary} href="/seek">
             Explore the marketplace
             <Icon name="action.forward" size={16} aria-hidden />

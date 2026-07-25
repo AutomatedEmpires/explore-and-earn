@@ -35,15 +35,23 @@ afterEach(() => {
   vi.resetModules();
 });
 
+/**
+ * Fully typed — no `as` cast. The cast previously hid two missing required
+ * fields (listingCount, verified), which meant a future buildAnnouncements that
+ * started reading them would compile fine here and only fail in production.
+ * (Raised by Copilot on PR 277.)
+ */
 function employer(overrides: Partial<FeaturedEmployer> = {}): FeaturedEmployer {
   return {
     listingId: "l1",
     hostId: "h1",
     hostName: "Cascade Bloom Orchards",
     location: "Wenatchee, WA",
+    listingCount: 1,
+    verified: false,
     category: "farm",
     ...overrides,
-  } as FeaturedEmployer;
+  };
 }
 
 // Each test re-imports the module graph after resetModules(); the first cold
