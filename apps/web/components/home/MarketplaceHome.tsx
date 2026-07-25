@@ -334,8 +334,13 @@ const ANNOUNCEMENT_TONE: Record<AnnouncementLabel, string> = {
   Boosted: styles.tagBoosted,
   Sponsored: styles.tagSponsored,
   Enterprise: styles.tagEnterprise,
-  // Neutral on purpose: the house label must not borrow a paid tone.
-  "Explore & Earn": styles.tagHouse,
+  // Computed key, not a repeated literal: keyed off the constant so renaming the
+  // house label cannot leave this map silently missing it. Record<> checks the
+  // key SET at compile time but would not catch a literal drifting from the
+  // source of truth — the lookup would just return undefined and the chip would
+  // render with no tone, i.e. visually indistinguishable from a paid one.
+  // (Raised by Copilot on PR 277.)
+  [HOUSE_ANNOUNCEMENT_LABEL]: styles.tagHouse,
 };
 
 function AnnouncementRail({ items }: { items: readonly HomeAnnouncement[] }) {
