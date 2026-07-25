@@ -680,6 +680,9 @@
 	letter-spacing: 0.03em;
 }
 
+/* The house label. Deliberately the plainest chip on the rail — it must not be
+   mistakable for a bought placement, so it borrows no paid status token. */
+.tagHouse      { background: var(--color-surface); color: var(--text-secondary); border: 1px solid var(--border-soft); }
 .tagFeatured   { background: var(--status-featured-bg); color: var(--status-featured-fg); }
 .tagBoosted    { background: var(--status-boosted-bg); color: var(--status-boosted-fg); }
 .tagSponsored  { background: var(--status-verified_host-bg); color: var(--status-verified_host-fg); }
