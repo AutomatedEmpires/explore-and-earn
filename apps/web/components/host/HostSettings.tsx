@@ -10,6 +10,7 @@ import {
   PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
 
+import { requestAccountDeletionAction } from "../../app/actions/accountDeletion";
 import {
   startHostCheckoutAction,
   startHostBillingPortalAction,
@@ -478,15 +479,30 @@ function AccountPanel({
   companyName: string;
   hostProfileId: string | null;
 }) {
-  const [deleteStep, setDeleteStep] = useState<"idle" | "confirm" | "sent">("idle");
+  const [deleteStep, setDeleteStep] = useState<
+    "idle" | "confirm" | "saving" | "sent" | "error"
+  >("idle");
 
+  /**
+   * This used to open a `mailto:` and then declare "Deletion request received"
+   * unconditionally. A person with no configured mail client — or who simply
+   * closed the compose window — was told their request had been received when
+   * nobody had received anything, and no record existed to measure a statutory
+   * erasure deadline against. The request is now RECORDED server-side first,
+   * and the confirmation only appears if that succeeded.
+   */
   function handleDeleteRequest() {
     if (deleteStep === "idle") {
       setDeleteStep("confirm");
       return;
     }
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=Account%20Deletion%20Request&body=Please%20delete%20my%20host%20account%20(${encodeURIComponent(companyName || "unknown")}).%20I%20understand%20this%20is%20permanent%20and%20cannot%20be%20undone.`;
-    setDeleteStep("sent");
+    setDeleteStep("saving");
+    void requestAccountDeletionAction("host", companyName || undefined)
+      .then((result) => {
+        // alreadyOpen is success: we hold their request either way.
+        setDeleteStep(result.ok ? "sent" : "error");
+      })
+      .catch(() => setDeleteStep("error"));
   }
 
   return (
@@ -551,6 +567,8 @@ function AccountPanel({
               history. This cannot be undone.
             </p>
             <div className={styles.dangerConfirmActions}>
+              {/* "saving" renders its own branch below, so this button is
+                  never on screen mid-request — no disabled state needed. */}
               <button
                 type="button"
                 className={styles.dangerBtnConfirm}
@@ -567,12 +585,33 @@ function AccountPanel({
               </button>
             </div>
           </div>
+        ) : deleteStep === "saving" ? (
+          <div className={styles.dangerSent}>
+            <p>Sending your request…</p>
+          </div>
+        ) : deleteStep === "error" ? (
+          // Never claim receipt we cannot evidence. A failed write must send
+          // the person somewhere that actually reaches a human.
+          <div className={styles.dangerSent}>
+            <Icon name="system.warning" size={20} aria-hidden />
+            <p>
+              We couldn&apos;t record your request just now. Please try again, or email{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=Account%20Deletion%20Request`}>
+                {SUPPORT_EMAIL}
+              </a>{" "}
+              so we have it on record.
+            </p>
+          </div>
         ) : (
           <div className={styles.dangerSent}>
             <Icon name="system.success" size={20} aria-hidden />
             <p>
-              Deletion request received. Our team will process it within 5 business days and
-              confirm via email.
+              Deletion request received and logged. We&apos;ll review it and confirm by email.
+              Your listings stay live until it&apos;s actioned — email{" "}
+              <a href={`mailto:${SUPPORT_EMAIL}?subject=Account%20Deletion%20Request`}>
+                {SUPPORT_EMAIL}
+              </a>{" "}
+              if you need it handled urgently.
             </p>
           </div>
         )}
