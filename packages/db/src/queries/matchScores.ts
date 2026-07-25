@@ -1,7 +1,12 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { MatchBand } from "@explore-and-earn/contracts";
+import {
+  MATCH_SCORE_CAPS,
+  type MatchBand,
+  type MatchCap,
+  type MatchComponentScores,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 
@@ -94,6 +99,78 @@ export async function getMatchScoresForSeeker(
     // match_scores may not exist yet (pre-052) — degrade to no scores.
   }
   return scores;
+}
+
+/** The full stored engine result for ONE (seeker, listing) pairing. */
+export interface StoredMatchResult {
+  readonly score: number;
+  readonly rawScore: number;
+  readonly band: MatchBand;
+  readonly confidence: number;
+  readonly components: MatchComponentScores;
+  readonly capsApplied: readonly MatchCap[];
+  readonly computedAt: string | null;
+}
+
+/**
+ * The stored engine result for the authed seeker and ONE listing — the same row
+ * the discovery pill reads, not a recomputation of it.
+ *
+ * This exists because the listing-detail page used to recompute the fit inline
+ * from a much smaller input set than the matching service uses, so the page and
+ * the card it was opened from could disagree about the same pairing. Reading the
+ * stored row is what makes them the same assertion; see
+ * docs/product/listing-fit-single-source.md.
+ *
+ * Scoped exactly like {@link getMatchScoresForSeeker}: the
+ * match_scores_select_seeker RLS policy restricts rows to the caller's own
+ * seeker profile(s), and we additionally filter by the resolved
+ * seeker_profile_id so a user who is also a host can never pull a
+ * host-readable row into a seeker surface. Resilient by design — returns null
+ * on any fault (pre-052 schema, no profile, RLS/permission error), which
+ * callers must treat as "not scored yet", never as "scored zero".
+ */
+export async function getSeekerListingMatch(
+  clerkToken: string,
+  clerkUserId: string,
+  listingId: string,
+): Promise<StoredMatchResult | null> {
+  try {
+    const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
+    if (!seekerProfileId) return null;
+
+    const db = authedClient(clerkToken) as unknown as SupabaseClient;
+    const { data, error } = await db
+      .from("match_scores")
+      .select("score, raw_score, band, confidence, components, caps_applied, computed_at")
+      .eq("seeker_profile_id", seekerProfileId)
+      .eq("listing_id", listingId)
+      .maybeSingle();
+    if (error || !data) return null;
+
+    const row = data as Record<string, unknown>;
+    if (typeof row.score !== "number") return null;
+
+    return {
+      score: row.score,
+      rawScore: typeof row.raw_score === "number" ? row.raw_score : row.score,
+      band: row.band as MatchBand,
+      confidence: typeof row.confidence === "number" ? row.confidence : 0,
+      components: (row.components ?? {}) as MatchComponentScores,
+      // caps_applied is text[]; anything unrecognised is dropped rather than
+      // rendered, so a future cap added server-side cannot print as a raw code.
+      capsApplied: Array.isArray(row.caps_applied)
+        ? (row.caps_applied.filter(
+            (cap): cap is MatchCap =>
+              typeof cap === "string" && cap in MATCH_SCORE_CAPS,
+          ) as MatchCap[])
+        : [],
+      computedAt: typeof row.computed_at === "string" ? row.computed_at : null,
+    };
+  } catch {
+    // match_scores may not exist yet (pre-052) — degrade to "not scored yet".
+    return null;
+  }
 }
 
 /**

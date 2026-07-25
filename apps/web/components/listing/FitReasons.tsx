@@ -96,7 +96,12 @@ const GROUPS: ReadonlyArray<{
 
 export interface FitReasonsPrompt {
   readonly text: string;
-  readonly href: string;
+  /**
+   * Omitted when there is nothing for the seeker to DO. "We haven't scored this
+   * yet" is a statement about us, not a task for them, and rendering it as a
+   * call to action would invite a click that fixes nothing.
+   */
+  readonly href?: string | null;
 }
 
 export interface FitReasonsProps {
@@ -195,11 +200,20 @@ export function FitReasons({ trace, prompt, listingId }: FitReasonsProps) {
         : null}
 
       {!trace && prompt ? (
-        <Link href={prompt.href} className={styles.prompt}>
-          <Icon name="status.match" size={20} aria-hidden />
-          <span>{prompt.text}</span>
-          <Icon name="action.forward" size={16} aria-hidden />
-        </Link>
+        prompt.href ? (
+          <Link href={prompt.href} className={styles.prompt}>
+            <Icon name="status.match" size={20} aria-hidden />
+            <span>{prompt.text}</span>
+            <Icon name="action.forward" size={16} aria-hidden />
+          </Link>
+        ) : (
+          // No href: a status, not a CTA. No forward chevron, because there is
+          // nowhere to go and nothing the seeker can do about it.
+          <p className={styles.prompt}>
+            <Icon name="status.match" size={20} aria-hidden />
+            <span>{prompt.text}</span>
+          </p>
+        )
       ) : null}
     </ListingSection>
   );
