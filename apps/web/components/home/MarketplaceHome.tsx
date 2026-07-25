@@ -295,8 +295,16 @@ function ThreeQuestions() {
       <div className={styles.triadBand}>
         <div className={styles.triadHead}>
           <p className={styles.triadEyebrow}>The deal, upfront</p>
+          {/* Was "Every listing answers three questions. Always." — which
+              sourced listings falsify. Migration 070's publication gate blocks
+              a HOST-posted listing from going live while any of the three is
+              unanswered, but its check begins `provenance = 'sourced' or`, and
+              ingested rows are inserted live with evidence 'not_stated'. So the
+              absolute was true only while there was no sourced inventory.
+              The guarantee we can actually keep is the stronger one anyway: we
+              never guess on the seeker's behalf. */}
           <h2 id="triad-title" className={styles.triadTitle}>
-            Every listing answers three questions. Always.
+            Every listing answers three questions — or shows you what wasn&apos;t stated.
           </h2>
         </div>
         <div className={styles.triadGrid}>

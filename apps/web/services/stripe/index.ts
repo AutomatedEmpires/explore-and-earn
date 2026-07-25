@@ -792,6 +792,61 @@ export async function createBillingPortalSession(params: {
  * cents — never dollars). Stripe is idempotent enough that a duplicate refund
  * attempt surfaces as a StripeError here, which we map to { ok: false }.
  */
+/**
+ * Cancel a host's active subscription immediately.
+ *
+ * Used when a SUBSCRIPTION refund is approved: returning the money while the
+ * host keeps the tier is a straight loss. Cancelling in Stripe emits
+ * customer.subscription.deleted, which syncSubscriptionEvent already handles by
+ * writing the tier back down — so the entitlement change flows through the same
+ * path as every other subscription state change rather than being duplicated
+ * here.
+ *
+ * Finding no subscription is NOT an error: it may already have been cancelled,
+ * or the refund may be for a host whose subscription lapsed. The caller should
+ * treat that as nothing-to-do.
+ */
+export async function cancelHostSubscription(
+  clerkUserId: string,
+): Promise<{ ok: boolean; cancelled: boolean; error?: string }> {
+  if (!hasStripeServerConfig()) {
+    return { ok: false, cancelled: false, error: "Stripe is not configured on this environment." };
+  }
+  if (!clerkUserId) {
+    return { ok: false, cancelled: false, error: "Missing Clerk user id." };
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const customers = await stripe.customers.search({
+      query: `metadata['clerkUserId']:'${clerkUserId.replace(/'/g, "")}'`,
+      limit: 1,
+    });
+    const customer = customers.data[0];
+    if (!customer) return { ok: true, cancelled: false };
+
+    const subs = await stripe.subscriptions.list({
+      customer: customer.id,
+      status: "active",
+      limit: 10,
+    });
+    if (subs.data.length === 0) return { ok: true, cancelled: false };
+
+    for (const sub of subs.data) {
+      await stripe.subscriptions.cancel(sub.id);
+    }
+    return { ok: true, cancelled: true };
+  } catch (error) {
+    const message =
+      error instanceof Stripe.errors.StripeError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Unknown Stripe error.";
+    return { ok: false, cancelled: false, error: message };
+  }
+}
+
 export async function issueRefund(
   paymentIntentId: string,
   amountCents?: number,

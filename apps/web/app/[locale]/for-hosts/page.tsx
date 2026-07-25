@@ -94,7 +94,8 @@ const TIERS: ReadonlyArray<{
   {
     name: "Enterprise",
     monthly: FOUNDER_LOCKED_PRICING.enterprise.monthly,
-    blurb: "10 listings, more credits, a team seat.",
+    // "a team seat" removed — team membership is unbuilt (see pricing.ts).
+    blurb: "10 listings, more credits, homepage placement.",
   },
 ];
 

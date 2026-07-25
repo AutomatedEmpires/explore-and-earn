@@ -55,7 +55,13 @@ export const PLAN_ENTITLEMENTS = {
     listings: 10,
     includedInviteCredits: 20,
     monthlyAnnouncements: 3,
-    teamSeats: 1,
+    // 0, not 1. This was Enterprise's headline differentiator at $749/mo and
+    // nothing implemented it: team_memberships exists as a table with RLS, but
+    // no application code reads or writes it, and the only UI was a disabled
+    // "Invite team member" button under "coming soon". An entitlement that
+    // renders as a sold feature must be backed by a code path — until team
+    // membership is built, this must not read as included.
+    teamSeats: 0,
     analytics: "full",
   },
 } as const

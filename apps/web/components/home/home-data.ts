@@ -290,10 +290,17 @@ export const HOME_PLANS: readonly HomePlan[] = [
     blurb: "Hosts hiring across a full season.",
     features: [
       `Up to ${PLAN_ENTITLEMENTS.professional.listings} active listings`,
+      // Backed: getHomepageFallbackListings sorts by subscription tier
+      // (Enterprise -> Professional -> Starter), so a paid tier really does
+      // place above an unpaid one.
       "Boosted placement",
       `${PLAN_ENTITLEMENTS.professional.monthlyAnnouncements} announcement / month`,
       "Applicant pipeline + full analytics",
-      "Featured-employer eligibility",
+      `${PLAN_ENTITLEMENTS.professional.includedInviteCredits} invite credits / month`,
+      // REMOVED "Featured-employer eligibility": buildFeaturedEmployers groups
+      // listings by host name with no tier gate at all, so every host is
+      // already "eligible". Selling eligibility implies a paid gate that does
+      // not exist.
     ],
     featured: true,
     cta: "Go Professional",
@@ -305,10 +312,17 @@ export const HOME_PLANS: readonly HomePlan[] = [
     blurb: "Multi-location operators hiring at scale.",
     features: [
       `${PLAN_ENTITLEMENTS.enterprise.listings}+ active listings`,
+      // Backed: top of the tier sort in getHomepageFallbackListings.
       "Homepage placement",
       `${PLAN_ENTITLEMENTS.enterprise.monthlyAnnouncements} announcements / month`,
-      "Multi-location + team seats",
-      "Priority support & trust tools",
+      `${PLAN_ENTITLEMENTS.enterprise.includedInviteCredits} invite credits / month`,
+      "Applicant pipeline + full analytics",
+      // REMOVED "Multi-location + team seats": team membership has a table and
+      // RLS but no application code and no UI beyond a disabled button, and
+      // "multi-location" is not a separate capability — it is just the listing
+      // allowance above.
+      // REMOVED "Priority support & trust tools": there is no support
+      // entitlement, queue, or SLA anywhere in the product.
     ],
     cta: "Talk to us",
   },

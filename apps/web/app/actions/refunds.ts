@@ -4,18 +4,21 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 import {
   createRefundRequest,
+  getHostClerkUserIdByProfileId,
   getHostProfile,
   getHostRefundablePurchases,
   getRefundRequestById,
   markRefundResolved,
+  revokeRefundedPurchaseRow,
   type RefundablePurchase,
   type RefundPurchaseType,
+  type RefundRequestRecord,
 } from "@explore-and-earn/db";
 
 import { isAdminUserId } from "../../lib/admin";
 import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
-import { issueRefund } from "../../services/stripe";
+import { cancelHostSubscription, issueRefund } from "../../services/stripe";
 
 interface ActionResult {
   ok: boolean;
@@ -273,7 +276,57 @@ async function resolveRefundImpl(
     return { ok: false, error: refund.error ?? "Stripe refund failed." };
   }
 
+  // The money is back — now take back what it bought. Without this the refund
+  // was a pure loss: the boost campaign kept running to ends_at, the paid
+  // announcement stayed in the feed, and a refunded subscriber kept their tier.
+  // Reported to the admin rather than thrown: the refund itself SUCCEEDED, and
+  // an admin who is told "refunded but the boost is still live" can act, while
+  // a thrown error would imply the money did not move.
+  const revoked = await revokeRefundedPurchase(request);
+  if (!revoked.ok) {
+    return {
+      ok: false,
+      error: `Refund issued in Stripe, but revoking the purchase failed: ${revoked.error ?? "unknown error"}. Revoke it manually.`,
+    };
+  }
+
   return { ok: true };
+}
+
+/**
+ * Take back what a refunded purchase bought.
+ *
+ * resolveRefundImpl previously fired the Stripe refund and then only updated
+ * refund_requests, so every approved refund was a pure loss: the boost campaign
+ * kept running to its ends_at, the paid announcement stayed live in the feed,
+ * and a refunded subscriber kept their tier until they chose to cancel.
+ *
+ * Subscription cancellation deliberately goes through Stripe rather than
+ * writing the tier directly — cancelling emits customer.subscription.deleted,
+ * which the existing webhook path already turns into a tier downgrade, so there
+ * is exactly one place that decides what a subscription state means.
+ */
+async function revokeRefundedPurchase(
+  request: RefundRequestRecord,
+): Promise<{ ok: boolean; error?: string }> {
+  if (request.purchaseType === "subscription") {
+    // refund_requests stores only the host profile id.
+    const clerkUserId = await getHostClerkUserIdByProfileId(
+      SERVICE_ROLE_KEY,
+      request.hostProfileId,
+    );
+    if (!clerkUserId) return { ok: false, error: "Host has no Clerk user id on record." };
+
+    const cancelled = await cancelHostSubscription(clerkUserId);
+    // "Nothing to cancel" is a legitimate outcome — it may already be gone.
+    return cancelled.ok ? { ok: true } : { ok: false, error: cancelled.error };
+  }
+
+  return revokeRefundedPurchaseRow(
+    SERVICE_ROLE_KEY,
+    request.purchaseType,
+    request.referenceId,
+  );
 }
 
 export async function resolveRefundAction(

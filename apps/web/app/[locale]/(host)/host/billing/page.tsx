@@ -231,7 +231,12 @@ export default async function HostBillingPage({
                 <li>{entitlements.listings} live listing slots</li>
                 <li>{entitlements.includedInviteCredits} included invite credits / month</li>
                 <li>{entitlements.monthlyAnnouncements} monthly announcements</li>
-                <li>{entitlements.teamSeats} team seats</li>
+                {/* Only listed when a plan actually grants seats. Team
+                    membership is not built, so every tier is 0 today and this
+                    row is absent rather than reading "0 team seats". */}
+                {entitlements.teamSeats > 0 ? (
+                  <li>{entitlements.teamSeats} team seats</li>
+                ) : null}
                 <li>{entitlements.analytics} analytics access</li>
               </ul>
 
