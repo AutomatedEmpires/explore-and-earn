@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  countOpenAccountDeletionRequests,
   getMarketplaceStats,
   getModerationStats,
   getRefundStats,
@@ -38,9 +39,12 @@ export default async function AdminDashboardPage() {
   // reports and refund/payment requests. Read resiliently — a transient failure
   // yields zeros so the overview always renders. Counts are honest when present,
   // never fabricated.
-  const [moderation, refunds] = await Promise.all([
+  const [moderation, refunds, openDeletions] = await Promise.all([
     getModerationStats(serviceRoleToken).catch(() => null),
     getRefundStats(serviceRoleToken).catch(() => null),
+    // Erasure requests run against a statutory deadline, so they belong on the
+    // overview beside the other queues rather than only behind their own URL.
+    countOpenAccountDeletionRequests(serviceRoleToken).catch(() => 0),
   ]);
   const openReports = (moderation?.open ?? 0) + (moderation?.reviewing ?? 0);
   const openRefunds = refunds?.requested ?? 0;
@@ -191,6 +195,24 @@ export default async function AdminDashboardPage() {
                 <span className={styles.queueMeta}>Held for moderation</span>
               </span>
               <span className={styles.queueCount}>{stats.underReviewListings}</span>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/deletions"
+              className={styles.queueRow}
+              data-tone={openDeletions > 0 ? "hot" : undefined}
+            >
+              <span className={styles.queueIcon}>
+                <Icon name="action.delete" size={20} aria-hidden />
+              </span>
+              <span className={styles.queueBody}>
+                <span className={styles.queueLabel}>Account deletion requests</span>
+                <span className={styles.queueMeta}>Statutory response deadline</span>
+              </span>
+              <span className={styles.queueCount}>{openDeletions}</span>
               <span className={styles.queueGo} aria-hidden="true">
                 <Icon name="action.view" size={20} aria-hidden />
               </span>

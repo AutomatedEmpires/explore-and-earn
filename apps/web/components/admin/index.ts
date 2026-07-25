@@ -9,6 +9,8 @@ export type {
   ModerationReportRowView,
   ModerationStatsView,
 } from "./ModerationWorkbench";
+export { DeletionQueue } from "./DeletionQueue";
+export type { DeletionRequestView } from "./DeletionQueue";
 export { RefundQueue } from "./RefundQueue";
 export type { RefundQueueRowView, RefundStatsView } from "./RefundQueue";
 export { ClaimsReviewQueue } from "./ClaimsReviewQueue";

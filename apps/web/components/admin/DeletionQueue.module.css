@@ -1,0 +1,113 @@
+/*
+ * Admin deletion queue — the operator surface for account-erasure requests,
+ * inside the admin (emerald) dark-glass OS. Token-driven only: every
+ * color/space/radius resolves through the .admin-os scope cascade, matching
+ * RefundQueue and ModerationWorkbench so the admin queues feel like one system.
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.error {
+  margin: 0;
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-card);
+  background: var(--status-error-bg);
+  color: var(--status-error-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-24);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+}
+
+.empty p {
+  margin: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  flex-wrap: wrap;
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+}
+
+/* Past the usual response window. The row is also labelled in TEXT
+   ("waiting N days · past the usual 30-day response window") — this tint is
+   reinforcement, never the only carrier. */
+.row[data-tone="hot"] {
+  border-color: var(--status-error-fg);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  flex: 1 1 22rem;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--type-card-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.note {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}

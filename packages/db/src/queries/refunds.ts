@@ -653,3 +653,103 @@ export async function getHostClerkUserIdByProfileId(
   const value = (data as { clerk_user_id?: string } | null)?.clerk_user_id;
   return typeof value === "string" && value.length > 0 ? value : null;
 }
+
+/* --------------------------------------------- account deletion requests */
+
+export interface AccountDeletionRequestRecord {
+  readonly id: string;
+  readonly clerkUserId: string;
+  readonly subjectScope: "host" | "seeker";
+  readonly displayLabel: string | null;
+  readonly requestedAt: string;
+  readonly status: string;
+  readonly requesterNote: string | null;
+  readonly resolutionNote: string | null;
+  readonly resolvedAt: string | null;
+}
+
+/**
+ * The open erasure queue, oldest first.
+ *
+ * Oldest first is the point: erasure runs against a statutory clock (GDPR
+ * Art. 17, CCPA/CPRA), so the operator must see the request that has been
+ * waiting longest, not the newest one. Recording the request (079) made the
+ * "request received" confirmation true; this is what makes it actionable.
+ */
+export async function getOpenAccountDeletionRequests(
+  serviceRoleToken: string,
+  limit = 100,
+): Promise<AccountDeletionRequestRecord[]> {
+  const db = untypedAdmin(serviceRoleToken);
+  const { data, error } = await db
+    .from("account_deletion_requests")
+    .select(
+      "id, clerk_user_id, subject_scope, display_label, requested_at, status, requester_note, resolution_note, resolved_at",
+    )
+    .in("status", ["open", "in_progress"])
+    .order("requested_at", { ascending: true })
+    .limit(limit);
+
+  if (error || !data) return [];
+  return (data as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    clerkUserId: String(r.clerk_user_id),
+    subjectScope: (r.subject_scope === "host" ? "host" : "seeker") as "host" | "seeker",
+    displayLabel: typeof r.display_label === "string" ? r.display_label : null,
+    requestedAt: String(r.requested_at),
+    status: String(r.status),
+    requesterNote: typeof r.requester_note === "string" ? r.requester_note : null,
+    resolutionNote: typeof r.resolution_note === "string" ? r.resolution_note : null,
+    resolvedAt: typeof r.resolved_at === "string" ? r.resolved_at : null,
+  }));
+}
+
+/** How many erasure requests are still waiting — for the admin overview. */
+export async function countOpenAccountDeletionRequests(
+  serviceRoleToken: string,
+): Promise<number> {
+  const db = untypedAdmin(serviceRoleToken);
+  const { count, error } = await db
+    .from("account_deletion_requests")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["open", "in_progress"]);
+  return error ? 0 : (count ?? 0);
+}
+
+/**
+ * Record what an operator did about a request.
+ *
+ * Service-role only by construction: 079 revokes UPDATE from `authenticated`,
+ * so a requester can never mark their own erasure complete.
+ */
+export async function resolveAccountDeletionRequest(
+  serviceRoleToken: string,
+  input: {
+    readonly requestId: string;
+    readonly status: "in_progress" | "completed" | "rejected";
+    readonly adminClerkUserId: string;
+    readonly resolutionNote?: string | null;
+  },
+): Promise<{ ok: boolean; error?: string }> {
+  const { requestId, status, adminClerkUserId, resolutionNote } = input;
+  if (!requestId) return { ok: false, error: "Missing request id." };
+  if (!adminClerkUserId) return { ok: false, error: "Missing admin id." };
+
+  const db = untypedAdmin(serviceRoleToken);
+  const patch: Record<string, unknown> = {
+    status,
+    resolution_note: resolutionNote?.slice(0, 2000) ?? null,
+  };
+  // Only a terminal state stamps the clock — 'in_progress' is still open.
+  if (status !== "in_progress") {
+    patch.resolved_at = new Date().toISOString();
+    patch.resolved_by = adminClerkUserId;
+  }
+
+  const { error } = await db
+    .from("account_deletion_requests")
+    .update(patch)
+    .eq("id", requestId);
+
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
