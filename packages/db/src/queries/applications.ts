@@ -478,6 +478,16 @@ export const HOST_SETTABLE_STATUSES = [
   // The lifecycle guard (trg_applications_lifecycle) enforces that only the
   // offered -> accepted edge is valid; any other path is rejected by Postgres.
   "accepted",
+  // The ENGAGEMENT states. These were legal everywhere except here: migration
+  // 001 seeds the accepted->active and active->completed edges, contracts
+  // mirrors them in APPLICATION_TRANSITIONS, RLS applications_update_host
+  // scopes by listing ownership with no status restriction, and 066 grants
+  // update(status). Nothing wrote them, so no application ever left 'accepted'
+  // — and because hostReviews REVIEWABLE_STATUSES is ['active','completed'],
+  // the review gate could never open. The entire two-sided trust layer was
+  // unreachable through a five-item allow-list.
+  "active",
+  "completed",
 ] as const;
 
 export type HostSettableStatus = (typeof HOST_SETTABLE_STATUSES)[number];

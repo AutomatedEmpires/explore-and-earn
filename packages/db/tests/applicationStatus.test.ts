@@ -72,13 +72,28 @@ describe("HOST_SETTABLE_STATUSES", () => {
     expect(HOST_SETTABLE_STATUSES).toContain("accepted");
   });
 
-  it("contains all expected host-actionable statuses", () => {
+  it('includes the engagement states so the review gate can ever open', () => {
+    // hostReviews gates on REVIEWABLE_STATUSES = ['active','completed'] and
+    // nothing in the product wrote either, so no application ever left
+    // 'accepted' and no review could be written. See
+    // packages/db/tests/engagementReachability.test.ts for the end-to-end
+    // reachability property.
+    expect(HOST_SETTABLE_STATUSES).toContain("active");
+    expect(HOST_SETTABLE_STATUSES).toContain("completed");
+  });
+
+  it("contains exactly the expected host-actionable statuses", () => {
+    // Exact equality on purpose: this list is an authorization boundary, so a
+    // status must never be added to it casually. 'withdrawn' belongs to the
+    // seeker and 'expired' to the lifecycle sweep — neither may appear here.
     const expected = [
       "reviewing",
       "saved_by_host",
       "offered",
       "not_selected",
       "accepted",
+      "active",
+      "completed",
     ];
     expect([...HOST_SETTABLE_STATUSES].sort()).toEqual([...expected].sort());
   });
