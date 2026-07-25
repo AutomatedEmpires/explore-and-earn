@@ -146,6 +146,17 @@ begin
   -- Authenticated SELECT is limited to the three exact owner-folder policies.
   -- Checking both policy identity and predicate shape prevents a renamed
   -- USING (true) policy from passing merely because no bucket literal appears.
+  --
+  -- Migration 081 moved the two host-bearing policies off an inline
+  -- `host_profiles ... clerk_user_id = auth.jwt() ->> 'sub'` sub-select and onto
+  -- the SECURITY DEFINER helpers, because a cross-table sub-select inside a
+  -- policy IS permission-checked against the invoking role (verified: it raises
+  -- 42501 once the column grant is withdrawn). The owner-scoping evidence is
+  -- therefore now the helper call, and this guardrail requires the helper form
+  -- rather than merely accepting it — reverting a policy to the inline sub-select
+  -- would reintroduce the hazard 081 closed, so it must fail here.
+  -- community_photos_owner_select is untouched by 081 (it reads seeker_profiles,
+  -- which 082 does not revoke) and keeps the legacy shape check.
   select count(*) into v_authenticated_count
   from pg_policies
   where schemaname = 'storage' and tablename = 'objects' and cmd = 'SELECT'
@@ -160,16 +171,16 @@ begin
         policyname = 'listing_media_select_own_folder'
         and coalesce(qual, '') like '%bucket_id = ''listing-media''::text%'
         and coalesce(qual, '') like '%storage.foldername(name)%'
-        and coalesce(qual, '') like '%host_profiles%'
-        and coalesce(qual, '') like '%clerk_user_id%auth.jwt()%''sub''::text%'
+        and coalesce(qual, '') like '%current_host_profile_ids()%'
+        and coalesce(qual, '') not like '%clerk_user_id%'
       )
       or (
         policyname = 'profile_photos_select_own_folder'
         and coalesce(qual, '') like '%bucket_id = ''profile-photos''::text%'
-        and coalesce(qual, '') like '%host_profiles%'
-        and coalesce(qual, '') like '%seeker_profiles%'
+        and coalesce(qual, '') like '%current_host_profile_ids()%'
+        and coalesce(qual, '') like '%current_seeker_profile_ids()%'
         and coalesce(qual, '') like '%split_part(name, ''/''::text, 1)%'
-        and coalesce(qual, '') like '%clerk_user_id%auth.jwt()%''sub''::text%'
+        and coalesce(qual, '') not like '%clerk_user_id%'
       )
       or (
         policyname = 'community_photos_owner_select'
