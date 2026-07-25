@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isAuthorizedCronRequest } from "../../../../lib/cronAuth";
+import { reportCronException } from "../../../../lib/cronReport";
 import { runDispatchOnce } from "../../../../services/notifications/dispatcher";
 
 // The dispatcher must always run fresh (never statically cached).
@@ -28,6 +29,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const result = await runDispatchOnce();
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
+    reportCronException("notification-dispatch", error);
     const message = error instanceof Error ? error.message : "unknown_error";
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
