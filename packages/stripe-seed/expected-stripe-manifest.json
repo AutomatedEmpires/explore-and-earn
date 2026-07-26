@@ -23,7 +23,7 @@
     {
       "key": "enterprise",
       "name": "Explore & Earn — Enterprise",
-      "description": "Enterprise host plan — 10 listings, 20 invite credits, 1 team seat.",
+      "description": "Enterprise host plan — 10 listings, 20 invite credits, 1 team seat alongside the owner, full analytics.",
       "prices": [
         { "envVar": "STRIPE_PRICE_ENTERPRISE_MONTHLY", "lookupKey": "ee_enterprise_monthly", "unitAmountCents": 74900, "type": "recurring", "interval": "month" },
         { "envVar": "STRIPE_PRICE_ENTERPRISE_YEARLY", "lookupKey": "ee_enterprise_yearly", "unitAmountCents": 749000, "type": "recurring", "interval": "year" }
@@ -45,6 +45,16 @@
         { "envVar": "STRIPE_PRICE_BOOST_7D", "lookupKey": "ee_boost_7d", "unitAmountCents": 20000, "type": "one_time", "optional": true },
         { "envVar": "STRIPE_PRICE_BOOST_14D", "lookupKey": "ee_boost_14d", "unitAmountCents": 35000, "type": "one_time", "optional": true },
         { "envVar": "STRIPE_PRICE_BOOST_28D", "lookupKey": "ee_boost_28d", "unitAmountCents": 50000, "type": "one_time", "optional": true }
+      ]
+    },
+    {
+      "key": "additional_listing",
+      "name": "Explore & Earn — Additional Active Listing",
+      "description": "Recurring monthly add-on, one extra active listing, priced by the buyer's plan. Optional — the app falls back to inline price_data when these are unset.",
+      "prices": [
+        { "envVar": "STRIPE_PRICE_ADDITIONAL_LISTING_STARTER", "lookupKey": "ee_additional_listing_starter", "unitAmountCents": 9900, "type": "recurring", "interval": "month", "optional": true },
+        { "envVar": "STRIPE_PRICE_ADDITIONAL_LISTING_PROFESSIONAL", "lookupKey": "ee_additional_listing_professional", "unitAmountCents": 7500, "type": "recurring", "interval": "month", "optional": true },
+        { "envVar": "STRIPE_PRICE_ADDITIONAL_LISTING_ENTERPRISE", "lookupKey": "ee_additional_listing_enterprise", "unitAmountCents": 4900, "type": "recurring", "interval": "month", "optional": true }
       ]
     }
   ]

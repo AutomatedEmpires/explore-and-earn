@@ -4,11 +4,15 @@ import Stripe from "stripe";
 import {
   adminClient,
   activateBoostCampaignFromCheckout,
+  creditListingSlotPurchase,
   insertHostAnnouncement,
   recordInvitePackPurchase,
+  revokeListingSlotPurchase,
   type BoostPurchaseTier,
 } from "@explore-and-earn/db";
 import {
+  ADDITIONAL_LISTING_MAX_PER_CHECKOUT,
+  ADDITIONAL_LISTING_PRICING,
   ANNOUNCEMENT_PRICE_CENTS,
   ANNOUNCEMENT_RUN_DAYS,
   BOOST_DURATIONS,
@@ -363,6 +367,62 @@ async function syncInviteCreditPurchase(
 }
 
 /**
+ * Land a paid additional-listing add-on as purchased allowance (migration 085).
+ *
+ * Idempotent on the checkout session id inside credit_listing_slot_purchase, so
+ * Stripe's at-least-once delivery can never credit the same payment twice.
+ * A failure to record THROWS, so the webhook route returns non-2xx and Stripe
+ * redelivers — silently swallowing it would take the money and grant nothing.
+ */
+async function syncAdditionalListingPurchase(
+  session: Stripe.Checkout.Session,
+): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
+  const clerkUserId = session.metadata?.clerkUserId ?? null;
+  const hostProfileId = session.metadata?.hostProfileId ?? null;
+  const quantityRaw = session.metadata?.quantity;
+  const quantity = quantityRaw ? parseInt(quantityRaw, 10) : null;
+  const tier = session.metadata?.tier ?? "none";
+
+  if (!hostProfileId || !quantity || !Number.isInteger(quantity)) {
+    return { action: "ignored_missing_listing_slot_metadata", clerkUserId, tier: null };
+  }
+  if (quantity <= 0 || quantity > ADDITIONAL_LISTING_MAX_PER_CHECKOUT) {
+    return { action: "ignored_invalid_listing_slot_quantity", clerkUserId, tier: null };
+  }
+
+  // The contract price is authoritative for the RECORD (what one slot costs at
+  // this tier). session.amount_total is the whole line, quantity included, so
+  // dividing it would re-derive a per-unit figure that a coupon could distort.
+  const unitAmountCents = isAdditionalListingTier(tier)
+    ? ADDITIONAL_LISTING_PRICING[tier]
+    : ADDITIONAL_LISTING_PRICING.none;
+
+  const subscriptionId =
+    typeof session.subscription === "string" ? session.subscription : null;
+
+  const result = await creditListingSlotPurchase({
+    hostProfileId,
+    quantity,
+    unitAmountCents,
+    tier,
+    stripeCheckoutSessionId: session.id,
+    stripeSubscriptionId: subscriptionId,
+  });
+
+  if (!result.ok) {
+    throw new Error("additional listing purchase could not be recorded");
+  }
+
+  return {
+    action: result.alreadyCredited
+      ? "listing_slots_already_credited"
+      : "credited_listing_slots",
+    clerkUserId,
+    tier: null,
+  };
+}
+
+/**
  * Has Stripe actually collected the money for this session?
  *
  * `checkout.session.completed` does NOT mean paid. Delayed-notification methods
@@ -409,6 +469,13 @@ async function syncCheckoutCompleted(
 
   if (session.metadata?.productType === "invite_credits") {
     return syncInviteCreditPurchase(session);
+  }
+
+  // Must precede the mode check below: the additional-listing add-on is a
+  // RECURRING product, so its session.mode is "subscription" — falling through
+  // would treat it as a host plan and rewrite subscription_tier.
+  if (session.metadata?.productType === ADDITIONAL_LISTING_PRODUCT_TYPE) {
+    return syncAdditionalListingPurchase(session);
   }
 
   if (session.mode !== "subscription") {
@@ -462,6 +529,37 @@ async function syncSubscriptionEvent(
   subscription: Stripe.Subscription,
   deleted: boolean,
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
+  // ── The add-on branch, FIRST ────────────────────────────────────────────────
+  // A host who buys the additional-listing add-on holds TWO Stripe
+  // subscriptions. `deleted` below hard-codes tier "none" without consulting the
+  // price, so cancelling the ADD-ON would silently downgrade a paying host's
+  // plan to unsubscribed. The add-on carries its own productType in
+  // subscription metadata; it never touches subscription_tier.
+  if (subscription.metadata?.productType === ADDITIONAL_LISTING_PRODUCT_TYPE) {
+    if (!deleted) {
+      // The allowance is credited from checkout.session.completed, where the
+      // session id gives idempotency. Lifecycle updates need no action.
+      return {
+        action: "ignored_additional_listing_subscription_update",
+        clerkUserId: subscription.metadata?.clerkUserId ?? null,
+        tier: null,
+      };
+    }
+    const revoked = await revokeListingSlotPurchase(subscription.id);
+    if (!revoked.ok) {
+      throw new Error("additional listing allowance could not be revoked");
+    }
+    return {
+      action: revoked.found
+        ? revoked.alreadyRevoked
+          ? "listing_slots_already_revoked"
+          : "revoked_listing_slots"
+        : "listing_slots_purchase_not_found",
+      clerkUserId: subscription.metadata?.clerkUserId ?? null,
+      tier: null,
+    };
+  }
+
   const customerId =
     typeof subscription.customer === "string" ? subscription.customer : null;
   const metadataClerkUserId = subscription.metadata.clerkUserId;
@@ -693,6 +791,82 @@ export async function createBoostCheckoutSession(params: {
     success_url: absoluteAppUrl("/host/listings?boosted=1"),
     cancel_url:  absoluteAppUrl("/host/listings"),
     metadata,
+    line_items: [lineItem],
+  });
+}
+
+// ─── Additional-listing add-on checkout ───────────────────────────────────────
+// Founder decision 2026-07-26: "additional listings need to be an add on. price
+// based on tier." The three prices are founder-locked in
+// ADDON_PRICING.additionalListingMonthly and surfaced through
+// ADDITIONAL_LISTING_PRICING — this module never states a price of its own.
+//
+// The add-on is MONTHLY, so this is a `subscription`-mode Checkout and the host
+// ends up with a second Stripe subscription alongside their plan. That is
+// deliberate and is why both webhook paths branch on productType before doing
+// anything tier-related.
+
+/** Webhook + metadata key for the add-on. One constant, three call sites. */
+export const ADDITIONAL_LISTING_PRODUCT_TYPE = "additional_listing";
+
+export type AdditionalListingTier = keyof typeof ADDITIONAL_LISTING_PRICING;
+
+export function isAdditionalListingTier(value: string): value is AdditionalListingTier {
+  return Object.prototype.hasOwnProperty.call(ADDITIONAL_LISTING_PRICING, value);
+}
+
+/** Optional pre-created Stripe Price ids per tier. Unset falls back to inline
+ * price_data from the founder-locked contract, exactly as boost does. */
+const ADDITIONAL_LISTING_PRICE_ENV: Record<AdditionalListingTier, string> = {
+  none: "STRIPE_PRICE_ADDITIONAL_LISTING_STARTER",
+  starter: "STRIPE_PRICE_ADDITIONAL_LISTING_STARTER",
+  professional: "STRIPE_PRICE_ADDITIONAL_LISTING_PROFESSIONAL",
+  enterprise: "STRIPE_PRICE_ADDITIONAL_LISTING_ENTERPRISE",
+};
+
+export async function createAdditionalListingCheckoutSession(params: {
+  clerkUserId: string;
+  hostProfileId: string;
+  /** The host's stored tier — decides the price AND is recorded on the purchase. */
+  hostSubscriptionTier: AdditionalListingTier;
+  /** How many extra active listings to buy. Validated by the caller. */
+  quantity: number;
+}): Promise<Stripe.Checkout.Session> {
+  const stripe = getStripeClient();
+  const unitAmountCents = ADDITIONAL_LISTING_PRICING[params.hostSubscriptionTier];
+  const envPriceId = process.env[ADDITIONAL_LISTING_PRICE_ENV[params.hostSubscriptionTier]];
+
+  const metadata = {
+    productType: ADDITIONAL_LISTING_PRODUCT_TYPE,
+    hostProfileId: params.hostProfileId,
+    clerkUserId: params.clerkUserId,
+    quantity: String(params.quantity),
+    tier: params.hostSubscriptionTier,
+    amountCents: String(unitAmountCents),
+  } as const;
+
+  const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = envPriceId
+    ? { price: envPriceId, quantity: params.quantity }
+    : {
+        quantity: params.quantity,
+        price_data: {
+          currency: "usd",
+          unit_amount: unitAmountCents,
+          recurring: { interval: "month" },
+          product_data: { name: "Additional active listing" },
+        },
+      };
+
+  return stripe.checkout.sessions.create({
+    mode: "subscription",
+    client_reference_id: params.clerkUserId,
+    success_url: absoluteAppUrl("/host/settings?addon=listing"),
+    cancel_url: absoluteAppUrl("/host/settings"),
+    metadata,
+    // The webhook reads the SUBSCRIPTION's metadata on cancellation, which is a
+    // different object from the session's — without this, a cancelled add-on
+    // would fall through to the host-plan branch and zero the host's tier.
+    subscription_data: { metadata },
     line_items: [lineItem],
   });
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
-import { getHostAnalytics, getHostProfile } from "@explore-and-earn/db";
+import { getHostAnalytics } from "@explore-and-earn/db";
 
 import { HostSectionHeading } from "../../../../../components/host";
 import { HostAnalyticsDashboard } from "../../../../../components/host/HostAnalyticsDashboard";
@@ -44,24 +44,24 @@ export default async function HostAnalyticsPage() {
     );
   }
 
-  const [analytics, hostProfile] = await Promise.all([
-    getHostAnalytics(token, userId),
-    getHostProfile(token, userId),
-  ]);
-
-  const subscriptionTier = hostProfile?.subscriptionTier ?? "none";
-  // Gate per-listing data at the server — never send it to the DOM for unpaid tiers.
-  const gatedAnalytics = subscriptionTier === "none"
-    ? { ...analytics, perListingStats: [] }
-    : analytics;
+  // getHostAnalytics resolves the host's tier itself and returns data ALREADY
+  // scoped to what their plan includes (packages/db/src/lib/hostAnalyticsScope).
+  // The gate is not re-applied here: a page that redacts is a page that can
+  // forget to, and this one used to gate only `subscriptionTier === "none"` —
+  // which handed Starter, sold "basic analytics", the full per-listing dataset.
+  const analytics = await getHostAnalytics(token, userId);
 
   return (
     <section className={styles.block}>
       <HostSectionHeading
         title="Analytics"
-        description="Application pipeline, invite acceptance rates, and per-listing performance across all your opportunities."
+        description={
+          analytics.analyticsScope === "full"
+            ? "Application pipeline, invite acceptance rates, and per-listing performance across all your opportunities."
+            : "Application pipeline and invite acceptance rates across all your opportunities."
+        }
       />
-      <HostAnalyticsDashboard analytics={gatedAnalytics} subscriptionTier={subscriptionTier} />
+      <HostAnalyticsDashboard analytics={analytics} />
     </section>
   );
 }

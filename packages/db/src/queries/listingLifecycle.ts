@@ -4,18 +4,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   effectiveHousingPhotoMap,
-  PLAN_ENTITLEMENTS,
   sanitizeHostBenefitLibrary,
   sanitizeHousingPhotoMap,
   validateListingForPublication,
   type BenefitEvidenceStatus,
   type ListingStatus,
-  type PlanTier,
   type PublicationBlocker,
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
+import {
+  CAP_COUNTED_LISTING_STATUSES,
+  effectiveListingCap,
+} from "../lib/listingAllowance";
 import { getBenefitDetailsContext } from "./benefitDetails";
+import { getPurchasedListingSlots } from "./listingSlotPurchase";
 
 /**
  * Read an evidence column, degrading anything unrecognised to the WEAKEST
@@ -49,21 +52,16 @@ export function canTransitionListing(from: ListingStatus, to: ListingStatus): bo
 }
 
 /**
- * Statuses that count toward PLAN_ENTITLEMENTS[tier].listings (ADR-039) —
- * "each active (live or paused) listing counts toward your plan limit; you
- * can have unlimited drafts on any plan" per the host-facing FAQ copy
- * (HostSettings.tsx AddOnsSection), which already stated this policy before
- * any code enforced it.
+ * Statuses that count toward the effective listing cap (ADR-039) — "each active
+ * (live or paused) listing counts toward your plan limit; you can have unlimited
+ * drafts on any plan" per the host-facing FAQ copy (HostSettings.tsx), which
+ * already stated this policy before any code enforced it.
+ *
+ * Defined in lib/listingAllowance.ts alongside the cap arithmetic so the two can
+ * never disagree.
  */
-const CAP_COUNTED_STATUSES: readonly ListingStatus[] = ["live", "paused"];
-
-/** "none" (no active subscription) is floored at the starter entitlement,
- * same policy as the boost-purchase tier fallback — the lowest real paid
- * tier, not zero and not unlimited. */
-function listingCapFor(tier: PlanTier): number {
-  const entitlementTier = tier === "professional" || tier === "enterprise" ? tier : "starter";
-  return PLAN_ENTITLEMENTS[entitlementTier].listings;
-}
+const CAP_COUNTED_STATUSES: readonly ListingStatus[] =
+  CAP_COUNTED_LISTING_STATUSES as readonly ListingStatus[];
 
 /**
  * Resolve host_profiles.id for the authed Clerk user. Replicated locally (the
@@ -199,10 +197,14 @@ export async function updateListingStatus(
     }
   }
 
-  // Enforce PLAN_ENTITLEMENTS.listings at the one host-initiated transition
+  // Enforce the effective listing allowance at the one host-initiated transition
   // that can newly consume a slot: submitting a draft for review. (live<->paused
   // don't need this check — both already count as "active" per
   // CAP_COUNTED_STATUSES, so pausing/resuming never changes the count.)
+  //
+  // "Effective" = the plan's included listings PLUS every additional-listing
+  // add-on slot the host has paid for (founder decision 2026-07-26). Without the
+  // second term the add-on would be a charge that buys nothing.
   if (newStatus === "under_review") {
     if (!hostProfile || typeof hostProfile.subscription_tier !== "string") {
       const { data, error } = await db
@@ -216,8 +218,12 @@ export async function updateListingStatus(
         ...((data as Record<string, unknown> | null) ?? {}),
       };
     }
-    const tier = (hostProfile?.subscription_tier ?? "none") as PlanTier;
-    const cap = listingCapFor(tier);
+    const tier =
+      typeof hostProfile?.subscription_tier === "string"
+        ? hostProfile.subscription_tier
+        : "none";
+    const purchasedSlots = await getPurchasedListingSlots(clerkToken);
+    const cap = effectiveListingCap(tier, purchasedSlots);
 
     const { count: activeCount, error: countError } = await db
       .from("listings")

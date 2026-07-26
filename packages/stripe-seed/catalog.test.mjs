@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  ADDITIONAL_LISTING_PRICING,
   ANNOUNCEMENT_PRICE_CENTS,
   BOOST_PRICING,
   FOUNDER_LOCKED_PRICING,
@@ -46,6 +47,15 @@ describe("stripe-seed catalog", () => {
     expect(amountFor("ee_boost_7d")).toBe(BOOST_PRICING[7]);
     expect(amountFor("ee_boost_14d")).toBe(BOOST_PRICING[14]);
     expect(amountFor("ee_boost_28d")).toBe(BOOST_PRICING[28]);
+    expect(amountFor("ee_additional_listing_starter")).toBe(
+      ADDITIONAL_LISTING_PRICING.starter,
+    );
+    expect(amountFor("ee_additional_listing_professional")).toBe(
+      ADDITIONAL_LISTING_PRICING.professional,
+    );
+    expect(amountFor("ee_additional_listing_enterprise")).toBe(
+      ADDITIONAL_LISTING_PRICING.enterprise,
+    );
   });
 
   it("env vars and lookup keys are unique", () => {
