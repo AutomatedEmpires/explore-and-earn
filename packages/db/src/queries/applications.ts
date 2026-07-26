@@ -758,6 +758,12 @@ export interface SeekerApplicationListing extends ApplicationListing {
    * card uses (founder decision: match % shows wherever a stored score >= 75). So
    * offered / invited / saved lifecycle cards show the same number the listing
    * detail does. Undefined when there is no stored score or it is below the gate.
+   *
+   * The final sentence of that claim only became true once the listing-detail
+   * page started reading this same stored row (apps/web/lib/listingFit.ts).
+   * Before that the page recomputed from a reduced input set and could disagree
+   * with every card here. Do not reintroduce a recompute on any surface that
+   * renders this number.
    */
   readonly matchScore?: number;
 }

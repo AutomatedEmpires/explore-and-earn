@@ -180,8 +180,23 @@ function listingRow(overrides: Partial<ListingRow> = {}): ListingRow {
   };
 }
 
-describe("scoreSeekerListingRow — feed/detail consistency", () => {
-  it("returns the SAME score the detail page computes for the same pairing", () => {
+describe("scoreSeekerListingRow — row/detail mapper parity", () => {
+  /**
+   * NOTE ON WHAT THIS DOES AND DOES NOT PROVE.
+   *
+   * This used to be titled "feed/detail consistency" and read as a guarantee
+   * that a card and the listing it opens agree. It never was one: both sides of
+   * the assertion go through the same reduced mappers in this module, and no
+   * feed surface calls either function. It could not have detected the drift it
+   * appeared to guard, and it stayed green while the two live paths differed by
+   * 12 points on a realistic pairing.
+   *
+   * What it legitimately pins is narrower and still worth having: the row-shaped
+   * and detail-shaped adapters agree with each other, so a caller can use either
+   * without changing the answer. The real card-vs-page invariant is enforced in
+   * apps/web/lib/listingFit.ts and its tests, by reading the stored row.
+   */
+  it("row-shaped and detail-shaped adapters agree (mapper parity only)", () => {
     const rowScore = scoreSeekerListingRow(seeker(), listingRow(), NOW);
     const detailScore = computeSeekerListingFit(seeker(), listing(), NOW).score;
     expect(rowScore).toBe(detailScore);

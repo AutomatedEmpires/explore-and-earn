@@ -3,6 +3,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { MatchBand } from "@explore-and-earn/contracts";
 
+import {
+  decodeStoredMatchRow,
+  type StoredMatchResult,
+} from "../lib/storedMatchDecode";
+
 import { authedClient } from "../client";
 
 /**
@@ -94,6 +99,49 @@ export async function getMatchScoresForSeeker(
     // match_scores may not exist yet (pre-052) — degrade to no scores.
   }
   return scores;
+}
+
+/**
+ * The stored engine result for the authed seeker and ONE listing — the same row
+ * the discovery pill reads, not a recomputation of it.
+ *
+ * This exists because the listing-detail page used to recompute the fit inline
+ * from a much smaller input set than the matching service uses, so the page and
+ * the card it was opened from could disagree about the same pairing. Reading the
+ * stored row is what makes them the same assertion; see
+ * docs/product/listing-fit-single-source.md.
+ *
+ * Scoped exactly like {@link getMatchScoresForSeeker}: the
+ * match_scores_select_seeker RLS policy restricts rows to the caller's own
+ * seeker profile(s), and we additionally filter by the resolved
+ * seeker_profile_id so a user who is also a host can never pull a
+ * host-readable row into a seeker surface. Resilient by design — returns null
+ * on any fault (pre-052 schema, no profile, RLS/permission error), which
+ * callers must treat as "not scored yet", never as "scored zero".
+ */
+export async function getSeekerListingMatch(
+  clerkToken: string,
+  clerkUserId: string,
+  listingId: string,
+): Promise<StoredMatchResult | null> {
+  try {
+    const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
+    if (!seekerProfileId) return null;
+
+    const db = authedClient(clerkToken) as unknown as SupabaseClient;
+    const { data, error } = await db
+      .from("match_scores")
+      .select("score, raw_score, band, confidence, components, caps_applied, computed_at")
+      .eq("seeker_profile_id", seekerProfileId)
+      .eq("listing_id", listingId)
+      .maybeSingle();
+    if (error || !data) return null;
+
+    return decodeStoredMatchRow(data as Record<string, unknown>);
+  } catch {
+    // match_scores may not exist yet (pre-052) — degrade to "not scored yet".
+    return null;
+  }
 }
 
 /**

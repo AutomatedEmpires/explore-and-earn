@@ -4,12 +4,14 @@ import Link from "next/link";
 
 import {
   computeSeekerListingFitTrace,
+  getSeekerListingMatch,
   getSeekerResumeStatus,
   hasApplied,
   hasSaved,
   recordEvent,
   seekerHasMatchInputs,
 } from "@explore-and-earn/db";
+import { resolveListingFit } from "../../../../lib/listingFit";
 import {
   benefitStateLabel,
   hasCategoryDepth,
@@ -201,13 +203,37 @@ export default async function ListingDetailPage({ params }: Props) {
   // nowMs is passed explicitly. computeMatch defaults it to 0 (the epoch), so
   // omitting it meant listingEnded was never true and the ended-listing penalty
   // could not fire on this page at all.
-  const fitTrace =
+  // The fit shown here is the STORED engine result — the same match_scores row
+  // the discovery pill reads — never a local recompute. See lib/listingFit.ts:
+  // the inline recompute ran on 7 of 20 seeker fields and 12 of 20 listing
+  // fields against the service's 18 and 17, and because the card's pill
+  // threshold (75) is exactly the "Strong match" floor, a pairing straddling it
+  // made the card and this page contradict each other on the same claim.
+  //
+  // The local trace is still built, but ONLY for its qualitative per-axis
+  // signals. resolveListingFit discards its blockers: the smaller input set
+  // reports "no certification required" for a listing that requires one,
+  // because the detail listing mapper never carries requiredCertifications.
+  const localFitTrace =
     viewerRole === "seeker" && seekerProfile && seekerHasMatchInputs(seekerProfile)
       ? computeSeekerListingFitTrace(seekerProfile, listing, Date.now())
       : null;
+  const storedMatch =
+    userId && token && viewerRole === "seeker" && seekerProfile && !isFixtureListing
+      ? await getSeekerListingMatch(token, userId, listing.id)
+      : null;
+  const fitResolution = resolveListingFit(storedMatch, localFitTrace);
+  const fitTrace = fitResolution.kind === "scored" ? fitResolution.trace : null;
   const fit = fitTrace;
   const seekerNeedsProfileForFit =
     viewerRole === "seeker" && (!seekerProfile || !seekerHasMatchInputs(seekerProfile));
+  // A seeker who HAS given us enough signal but has no stored row yet is not
+  // "a bad match" — they are not scored yet, and the card shows them no pill
+  // either. Saying nothing is the only answer that agrees with the card.
+  const fitPending =
+    viewerRole === "seeker" &&
+    !seekerNeedsProfileForFit &&
+    fitResolution.kind === "not_scored";
 
   // Location-aware 10-day outlook — fetched in the RSC only when the listing
   // carries real coordinates. fetchWeather never throws (null on any failure),
@@ -266,9 +292,10 @@ export default async function ListingDetailPage({ params }: Props) {
       value: `${listing.host.companyName}${listing.host.verified ? " · Verified" : ""}`,
     });
   }
-  // The band word, not "82 / 100": half the engine's seeker inputs are never
-  // supplied on this surface, so a two-digit score would imply a precision the
-  // number does not have. The section below shows what it was actually based on.
+  // The band word, not "82 / 100". The score itself is now the stored one, so
+  // it no longer disagrees with the card — but the card already prints the
+  // number, and repeating it here would just be the same claim twice. The
+  // section below shows what it was based on.
   if (fit && !fit.excluded) {
     glanceItems.push({
       icon: "status.match",
@@ -284,6 +311,14 @@ export default async function ListingDetailPage({ params }: Props) {
       fitPrompt = {
         text: "Finish your profile to see how well this opportunity fits you.",
         href: "/onboarding",
+      };
+    } else if (fitPending) {
+      // Deliberately claims nothing about the pairing. Scoring runs off the
+      // request path (on profile save, on apply, on publish), so "not yet"
+      // is the truth here — and it matches the card, which shows no pill.
+      fitPrompt = {
+        text: "We're still working out how this one fits you — check back shortly.",
+        href: null,
       };
     } else if (viewerRole === "guest") {
       fitPrompt = {
