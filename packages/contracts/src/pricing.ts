@@ -27,6 +27,49 @@ export const FOUNDING_LOCKED_PRICING = {
 } as const
 export const FOUNDING_SEAT_CAP = 100
 
+// Team seats INCLUDED per tier — founder decision 2026-07-26: "team seats and
+// basic/ full analytics are included per tier. not additional products."
+//
+// ⚠ AWAITS FOUNDER CONFIRMATION OF THE COUNTS. The founder stated that seats
+// are included; the founder has NOT stated how many each tier gets. Enterprise
+// 1 is the only per-tier seat figure this repository already states anywhere —
+// packages/stripe-seed/expected-stripe-manifest.json describes the Enterprise
+// product as including "1 team seat" — so it is used here, and Starter /
+// Professional stay at 0 until the founder says otherwise.
+//
+// A seat is a colleague IN ADDITION to the account owner. The owner holds no
+// team_memberships row and is never counted against this number.
+//
+// 'none' is present so the server can resolve a limit for a host with no active
+// subscription without a separate lookup (mirrors MONTHLY_INVITE_QUOTA's shape).
+export const TEAM_SEATS_BY_TIER = {
+  none: 0,
+  starter: 0,
+  professional: 0,
+  enterprise: 1,
+} as const
+
+// Analytics depth per STORED tier. PLAN_ENTITLEMENTS carries the same fact for
+// the three paid tiers; this mirror adds the 'none' key the server needs to
+// resolve a scope for a host with no subscription, exactly as
+// MONTHLY_INVITE_QUOTA does for invites. The analyticsEntitlementConsistency
+// test keeps the two from drifting.
+//
+// WHAT THE TWO SCOPES MEAN (the definition every surface must honour):
+//   basic — account-wide aggregates only: applications by pipeline stage,
+//           active/total listing counts, invite acceptance rate.
+//   full  — everything in basic PLUS the per-listing breakdown: applications by
+//           status, invites sent and invites accepted, for each listing.
+export const ANALYTICS_ENTITLEMENT = {
+  none: "basic",
+  starter: "basic",
+  professional: "full",
+  enterprise: "full",
+} as const
+
+export type AnalyticsScope =
+  (typeof ANALYTICS_ENTITLEMENT)[keyof typeof ANALYTICS_ENTITLEMENT]
+
 // Per-tier entitlements (ADR-039). Server-computed from Subscription +
 // PlanEntitlement; never frontend-hardcoded (G14).
 //
@@ -41,28 +84,28 @@ export const PLAN_ENTITLEMENTS = {
     listings: 1,
     includedInviteCredits: 3,
     monthlyAnnouncements: 0,
-    teamSeats: 0,
-    analytics: "basic",
+    teamSeats: TEAM_SEATS_BY_TIER.starter,
+    analytics: ANALYTICS_ENTITLEMENT.starter,
   },
   professional: {
     listings: 5,
     includedInviteCredits: 10,
     monthlyAnnouncements: 1,
-    teamSeats: 0,
-    analytics: "full",
+    teamSeats: TEAM_SEATS_BY_TIER.professional,
+    analytics: ANALYTICS_ENTITLEMENT.professional,
   },
   enterprise: {
     listings: 10,
     includedInviteCredits: 20,
     monthlyAnnouncements: 3,
-    // 0, not 1. This was Enterprise's headline differentiator at $749/mo and
-    // nothing implemented it: team_memberships exists as a table with RLS, but
-    // no application code reads or writes it, and the only UI was a disabled
-    // "Invite team member" button under "coming soon". An entitlement that
-    // renders as a sold feature must be backed by a code path — until team
-    // membership is built, this must not read as included.
-    teamSeats: 0,
-    analytics: "full",
+    // Restored from 0 by founder decision 2026-07-26 ("team seats ... are
+    // included per tier"). The previous zero existed because team_memberships
+    // had a table and RLS but no application code; invite / accept / revoke now
+    // exist and the limit is enforced in a SECURITY DEFINER function, so the
+    // number is backed by a code path. The COUNT itself still awaits founder
+    // confirmation — see TEAM_SEATS_BY_TIER.
+    teamSeats: TEAM_SEATS_BY_TIER.enterprise,
+    analytics: ANALYTICS_ENTITLEMENT.enterprise,
   },
 } as const
 
@@ -92,8 +135,10 @@ export const INVITE_CREDITS_REFUNDABLE = false
 // Boost: ADR-031 (founder override 2026-05-31) — priced at the same point as
 // Featured Employer; exposure-only, never affects match score (G8).
 // Team seat: ADR-032 — $49/seat/mo. NOT surfaced as a self-serve add-on
-// (founder directive 2026-06-21: "i dont need team seat addons"); retained here
-// as the locked rate only.
+// (founder directive 2026-06-21: "i dont need team seat addons", reaffirmed
+// 2026-07-26: seats are "included per tier. not additional products"); retained
+// here as the locked rate only. The number of seats a plan INCLUDES is
+// TEAM_SEATS_BY_TIER above — nothing charges this rate.
 // Additional active listing: founder directive 2026-06-21 — tiered per plan so
 // higher tiers get a cheaper marginal listing. Monthly, per extra active listing
 // beyond the plan's included count.
@@ -130,6 +175,27 @@ export const BOOST_PRICING: Record<BoostDuration, number> = {
   14: ADDON_PRICING.boost.d14, // $350
   28: ADDON_PRICING.boost.d28, // $500
 }
+
+// Additional active listing — the self-serve add-on surface. DERIVED from
+// ADDON_PRICING.additionalListingMonthly so there is a single source of truth
+// for the three tier prices (founder directive 2026-06-21). Keyed by STORED
+// tier: a host with no active subscription is quoted the Starter rate, the same
+// floor the listing cap itself uses (listingCapFor in
+// packages/db/src/lib/listingAllowance.ts). Integer cents; recurring monthly.
+export const ADDITIONAL_LISTING_PRICING = {
+  none: ADDON_PRICING.additionalListingMonthly.starter,
+  starter: ADDON_PRICING.additionalListingMonthly.starter,
+  professional: ADDON_PRICING.additionalListingMonthly.professional,
+  enterprise: ADDON_PRICING.additionalListingMonthly.enterprise,
+} as const
+
+// Upper bound on how many extra listing slots a SINGLE checkout may buy.
+//
+// ⚠ AWAITS FOUNDER CONFIRMATION. This is not a founder-given number and it is
+// not a price. It exists only so a crafted request cannot mint an unbounded
+// allowance in one call; a host who needs more buys again. Raise or remove it
+// on founder instruction.
+export const ADDITIONAL_LISTING_MAX_PER_CHECKOUT = 10
 
 // Service credits expire 12 months after issuance; redemption is FIFO
 // oldest-first, auto-applied to the next invoice, capped at invoice total, no

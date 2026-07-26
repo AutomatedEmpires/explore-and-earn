@@ -350,12 +350,22 @@ export const HOME_PLANS: readonly HomePlan[] = [
       `${PLAN_ENTITLEMENTS.enterprise.monthlyAnnouncements} announcements / month`,
       `${PLAN_ENTITLEMENTS.enterprise.includedInviteCredits} invite credits / month`,
       "Applicant pipeline + full analytics",
-      // REMOVED "Multi-location + team seats": team membership has a table and
-      // RLS but no application code and no UI beyond a disabled button, and
-      // "multi-location" is not a separate capability — it is just the listing
-      // allowance above.
-      // REMOVED "Priority support & trust tools": there is no support
-      // entitlement, queue, or SLA anywhere in the product.
+      // Restored, derived, and now backed: invite / accept / remove exist
+      // (app/actions/hostTeam.ts) and the limit is enforced in the database
+      // (migration 085). The COUNT awaits founder confirmation —
+      // TEAM_SEATS_BY_TIER in packages/contracts/src/pricing.ts. The ternary is
+      // not decoration: if that number ever returns to zero this line disappears
+      // rather than selling a seat nobody gets.
+      ...(PLAN_ENTITLEMENTS.enterprise.teamSeats > 0
+        ? [
+            `${PLAN_ENTITLEMENTS.enterprise.teamSeats} team seat${
+              PLAN_ENTITLEMENTS.enterprise.teamSeats === 1 ? "" : "s"
+            } alongside the owner`,
+          ]
+        : []),
+      // STILL REMOVED — "multi-location" is not a separate capability, it is
+      // just the listing allowance above; and "Priority support & trust tools"
+      // has no support entitlement, queue, or SLA anywhere in the product.
     ],
     cta: "Talk to us",
   },

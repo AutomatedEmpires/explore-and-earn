@@ -4,8 +4,13 @@ import { Icon, MetricCard, MetricGrid, type IconKey } from "@explore-and-earn/ui
 import styles from "./HostAnalyticsDashboard.module.css";
 
 export interface HostAnalyticsDashboardProps {
+  /**
+   * Already scoped by getHostAnalytics. `analytics.analyticsScope` says which
+   * plan depth produced it; on "basic", perListingStats is empty because the
+   * server never fetched it into this object — not because this component hid
+   * it.
+   */
   readonly analytics: HostAnalytics;
-  readonly subscriptionTier?: "none" | "starter" | "professional" | "enterprise";
 }
 
 const APPLICATION_STATUS_LABEL: Record<string, string> = {
@@ -176,18 +181,21 @@ function ListingDiagnosis({ stat }: { stat: HostPerListingStats }) {
   );
 }
 
-export function HostAnalyticsDashboard({
-  analytics,
-  subscriptionTier = "none",
-}: HostAnalyticsDashboardProps) {
-  const { totalApplicationsByStatus, activeListingCount, inviteAcceptanceRate, perListingStats } =
-    analytics;
+export function HostAnalyticsDashboard({ analytics }: HostAnalyticsDashboardProps) {
+  const {
+    totalApplicationsByStatus,
+    activeListingCount,
+    listingCount,
+    inviteAcceptanceRate,
+    perListingStats,
+    analyticsScope,
+  } = analytics;
 
   const totalApps = totalApplications(totalApplicationsByStatus);
   const acceptedApps = totalApplicationsByStatus.accepted ?? 0;
   const reviewingApps = countFor(totalApplicationsByStatus, ["reviewing", "saved_by_host"]);
   const score = conversionScore(totalApplicationsByStatus);
-  const hasPerListingAccess = subscriptionTier !== "none";
+  const hasPerListingAccess = analyticsScope === "full";
 
   return (
     <div className={styles.page}>
@@ -274,8 +282,8 @@ export function HostAnalyticsDashboard({
         </div>
       </section>
 
-      {/* ── Per-listing diagnosis ──────────────────────────────────────── */}
-      {perListingStats.length > 0 ? (
+      {/* ── Per-listing diagnosis (the FULL-analytics entitlement) ─────── */}
+      {hasPerListingAccess && perListingStats.length > 0 ? (
         <section className={styles.section} aria-labelledby="listings-heading">
           <h2 id="listings-heading" className={styles.sectionTitle}>
             <Icon name="analytics.donut" size={16} aria-hidden />
@@ -284,33 +292,45 @@ export function HostAnalyticsDashboard({
           <p className={styles.sectionLede}>
             Each listing gets a growth read — not just raw numbers.
           </p>
-          <div className={styles.gatedWrap}>
-            <div className={`${styles.diagGrid}${!hasPerListingAccess ? ` ${styles.blurred}` : ""}`}>
-              {perListingStats.map((stat) => (
-                <ListingDiagnosis key={stat.listingId} stat={stat} />
-              ))}
-            </div>
-            {!hasPerListingAccess ? (
-              <div className={styles.gateOverlay} aria-label="Upgrade to access per-listing breakdown">
-                <span className={styles.gateIcon}>
-                  <Icon name="system.lock" size={24} aria-hidden />
-                </span>
-                <p className={styles.gateTitle}>Starter plan required</p>
-                <p className={styles.gateNote}>
-                  Upgrade to see per-listing application counts, invite rates, and acceptance
-                  data for each of your opportunities.
-                </p>
-                <a className={styles.gateBtn} href="/host/settings#billing">
-                  View plans
-                </a>
-              </div>
-            ) : null}
+          <div className={styles.diagGrid}>
+            {perListingStats.map((stat) => (
+              <ListingDiagnosis key={stat.listingId} stat={stat} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ── The upsell, on data the host actually has ──────────────────────
+          Shown only when there IS a per-listing breakdown to sell — a host with
+          no listings is not upsold on a report of nothing. Nothing is blurred
+          here because nothing was fetched: on the basic scope the server never
+          put per-listing rows in this object. */}
+      {!hasPerListingAccess && listingCount > 0 ? (
+        <section className={styles.section} aria-labelledby="listings-heading">
+          <h2 id="listings-heading" className={styles.sectionTitle}>
+            <Icon name="analytics.donut" size={16} aria-hidden />
+            Role-level diagnosis
+          </h2>
+          <div className={styles.gateOverlay} aria-label="Per-listing breakdown requires full analytics">
+            <span className={styles.gateIcon}>
+              <Icon name="system.lock" size={24} aria-hidden />
+            </span>
+            <p className={styles.gateTitle}>Full analytics required</p>
+            <p className={styles.gateNote}>
+              Your plan includes the account-wide figures above. Professional and
+              Enterprise add the per-listing breakdown — applications by stage, invites
+              sent, and invites accepted for each of your {listingCount}{" "}
+              {listingCount === 1 ? "listing" : "listings"}.
+            </p>
+            <a className={styles.gateBtn} href="/host/settings#billing">
+              View plans
+            </a>
           </div>
         </section>
       ) : null}
 
       {/* ── Empty state ────────────────────────────────────────────────── */}
-      {perListingStats.length === 0 && totalApps === 0 ? (
+      {listingCount === 0 && totalApps === 0 ? (
         <div className={styles.emptyState}>
           <span className={styles.emptyIcon}>
             <Icon name="analytics.meter" size={24} aria-hidden />

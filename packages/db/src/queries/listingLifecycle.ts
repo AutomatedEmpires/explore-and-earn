@@ -233,6 +233,13 @@ export async function updateListingStatus(
   //
   // Gating the last two would refuse a host who is legitimately at their
   // allowance and only wants to pause or resume what they already hold.
+  //
+  // The allowance the RPC returns ALREADY includes every additional-listing
+  // add-on slot the host has paid for: 083's private.host_listing_allowance()
+  // adds private.host_purchased_listing_allowance(), which reads
+  // host_profiles.purchased_listing_slots by name. Adding the purchased term a
+  // second time here — from a separate read — is how the application and the
+  // database came to quote different numbers in the first place.
   if (
     countsTowardListingAllowance(newStatus) &&
     !countsTowardListingAllowance(current)
