@@ -121,9 +121,11 @@ export default function HostOnboardingPage() {
 									? "Keep your primary location under 200 characters."
 									: result.error === "unauthenticated"
 										? "Please sign in to continue."
-										: result.error === "account_unavailable"
-											? "This account cannot create a host profile. Contact support if this looks wrong."
-											: "Something went wrong. Please try again."
+										: result.error === "subscription_required"
+											? "Choose a plan before creating your host profile. Every host is on one of the three plans."
+											: result.error === "account_unavailable"
+												? "This account cannot create a host profile. Contact support if this looks wrong."
+												: "Something went wrong. Please try again."
 				setState({ status: "error", message })
 			} catch {
 				setState({

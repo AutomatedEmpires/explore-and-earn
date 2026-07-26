@@ -67,6 +67,15 @@ export async function getHostTierAndProfile(
   };
 }
 
+/**
+ * Plan-INCLUDED announcements this UTC month.
+ *
+ * Purchased placements are excluded. They carry Stripe identifiers and are an
+ * ADDITIONAL announcement; counting them here meant a professional host who
+ * bought the paid extra lost their included one — they paid for a second slot
+ * and received a substitute. Migration 083's create_my_host_announcement()
+ * counts the same way, and that count is the one that decides.
+ */
 export async function countHostAnnouncementsThisMonth(
   token: string,
   hostProfileId: string,
@@ -81,10 +90,42 @@ export async function countHostAnnouncementsThisMonth(
     .select("id", { count: "exact", head: true })
     .eq("host_profile_id", hostProfileId)
     .in("status", ["active", "draft"])
+    .is("stripe_payment_intent_id", null)
+    .is("stripe_checkout_session_id", null)
     .gte("created_at", startOfMonth.toISOString());
 
   if (error) throw new Error(`countHostAnnouncementsThisMonth: ${error.message}`);
   return count ?? 0;
+}
+
+export type CreateHostAnnouncementResult =
+  | { ok: true; id: string }
+  | { ok: false; error: string };
+
+/**
+ * Create a plan-included announcement through migration 083's counted RPC.
+ *
+ * `authenticated` holds no INSERT privilege on host_announcements any more, so
+ * this is the only client-reachable creation path — and it is the RPC, not this
+ * function, that takes the per-host advisory lock and refuses once the tier's
+ * monthly allowance is spent. Nothing here is a gate; a caller that skipped it
+ * entirely would still be refused by the database.
+ */
+export async function createHostAnnouncement(
+  token: string,
+  input: { title: string; body: string; kind: AnnouncementKind },
+): Promise<CreateHostAnnouncementResult> {
+  const db = authedClient(token) as unknown as SupabaseClient;
+  const { data, error } = await db.rpc("create_my_host_announcement", {
+    p_title: input.title,
+    p_body: input.body,
+    p_kind: input.kind,
+  });
+  if (error) return { ok: false, error: error.message };
+  if (typeof data !== "string" || data.length === 0) {
+    return { ok: false, error: "announcement_create_failed" };
+  }
+  return { ok: true, id: data };
 }
 
 // ─── Feed queries ─────────────────────────────────────────────────────────────

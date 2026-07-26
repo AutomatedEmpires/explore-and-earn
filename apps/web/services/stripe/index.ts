@@ -6,7 +6,9 @@ import {
   activateBoostCampaignFromCheckout,
   insertHostAnnouncement,
   recordInvitePackPurchase,
+  upsertHostSubscription,
   type BoostPurchaseTier,
+  type HostBillingStatusValue,
 } from "@explore-and-earn/db";
 import {
   ANNOUNCEMENT_PRICE_CENTS,
@@ -194,10 +196,40 @@ async function resolveCustomerClerkUserId(customerId: string): Promise<string | 
     : null;
 }
 
+/**
+ * Record a subscription state change in BOTH places, authority first.
+ *
+ * public.host_subscriptions (migration 083) is keyed by Clerk user id and is
+ * what create_my_host_profile reads, so it must be written even when the
+ * customer has no host profile yet — which is now the normal order of events:
+ * sign up, choose a tier, pay, then create the profile. The host_profiles UPDATE
+ * that used to be the whole of this function matched zero rows in exactly that
+ * case, so the payment landed and nothing recorded it.
+ *
+ * host_profiles.subscription_tier remains the denormalized copy that listing,
+ * search and badge queries join, so it is still kept in step. It is written
+ * SECOND and its zero-row result is not an error: a host who has not onboarded
+ * yet has no row to update, and the authority above already has the fact.
+ */
 async function syncHostSubscriptionTier(
   clerkUserId: string,
   subscriptionTier: StoredSubscriptionTier,
+  details?: {
+    billingStatus?: HostBillingStatusValue;
+    stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
+    currentPeriodEnd?: string | null;
+  },
 ): Promise<void> {
+  await upsertHostSubscription({
+    clerkUserId,
+    tier: subscriptionTier,
+    billingStatus: details?.billingStatus,
+    stripeCustomerId: details?.stripeCustomerId ?? null,
+    stripeSubscriptionId: details?.stripeSubscriptionId ?? null,
+    currentPeriodEnd: details?.currentPeriodEnd ?? null,
+  });
+
   const db = adminClient();
   const { error } = await db
     .from("host_profiles")
@@ -206,6 +238,28 @@ async function syncHostSubscriptionTier(
 
   if (error) {
     throw new Error(`Failed to sync host subscription tier: ${error.message}`);
+  }
+}
+
+/** Map a Stripe subscription status onto the stored billing_status vocabulary. */
+function toBillingStatus(status: Stripe.Subscription.Status): HostBillingStatusValue {
+  switch (status) {
+    case "trialing":
+      return "trialing";
+    case "active":
+      return "active";
+    case "past_due":
+      return "past_due";
+    case "canceled":
+      return "cancelled";
+    case "unpaid":
+      return "unpaid";
+    case "paused":
+      return "paused";
+    default:
+      // incomplete / incomplete_expired: nothing is paying, and 'none' is the
+      // vocabulary's word for that.
+      return "none";
   }
 }
 
@@ -449,7 +503,13 @@ async function syncCheckoutCompleted(
     };
   }
 
-  await syncHostSubscriptionTier(clerkUserId, subscriptionTier);
+  await syncHostSubscriptionTier(clerkUserId, subscriptionTier, {
+    billingStatus: "active",
+    stripeCustomerId:
+      typeof session.customer === "string" ? session.customer : null,
+    stripeSubscriptionId:
+      typeof session.subscription === "string" ? session.subscription : null,
+  });
 
   return {
     action: "synced_checkout_session",
@@ -494,7 +554,11 @@ async function syncSubscriptionEvent(
     await ensureCustomerMetadata(customerId, billingMetadata(clerkUserId, tier));
   }
 
-  await syncHostSubscriptionTier(clerkUserId, tier);
+  await syncHostSubscriptionTier(clerkUserId, tier, {
+    billingStatus: deleted ? "cancelled" : toBillingStatus(subscription.status),
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: subscription.id,
+  });
 
   return {
     action: deleted ? "synced_subscription_deleted" : "synced_subscription_state",

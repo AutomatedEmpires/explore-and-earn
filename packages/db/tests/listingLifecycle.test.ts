@@ -15,7 +15,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const mockFrom = vi.fn();
-const mockClient = { from: mockFrom };
+const mockRpc = vi.fn();
+const mockClient = { from: mockFrom, rpc: mockRpc };
 vi.mock("../src/client.js", () => ({
   authedClient: () => mockClient,
 }));
@@ -55,7 +56,13 @@ const HOST_PROFILE = makeChain({ data: { id: "host-1" } });
 
 beforeEach(() => {
   mockFrom.mockReset();
+  mockRpc.mockReset();
 });
+
+/** Stub public.my_listing_allowance_state(uuid) — migration 083. */
+function allowanceState(tier: string, allowance: number, used: number) {
+  return { data: { tier, allowance, used }, error: null };
+}
 
 // ── canTransitionListing: pin the whole map ────────────────────────────────
 
@@ -120,39 +127,78 @@ const ANSWERED_DRAFT = {
 } as const;
 
 describe("updateListingStatus", () => {
-  it("submits a draft for review when under the plan cap", async () => {
+  it("submits a draft for review when under the plan allowance", async () => {
     const read = makeChain({ data: { ...ANSWERED_DRAFT } });
-    const tierRead = makeChain({ data: { subscription_tier: "starter" } });
-    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings - 1 });
     const update = makeChain({ data: { id: "l1" } });
-    queueFromResults(HOST_PROFILE, read, tierRead, capCount, update);
+    queueFromResults(HOST_PROFILE, read, update);
+    mockRpc.mockResolvedValueOnce(
+      allowanceState("starter", PLAN_ENTITLEMENTS.starter.listings, 0),
+    );
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
 
     expect(result).toEqual({ ok: true, status: "under_review" });
     expect(update.update).toHaveBeenCalledWith({ status: "under_review" });
+    // The allowance is read from the database helper the trigger itself uses —
+    // never recomputed here from a tier column.
+    expect(mockRpc).toHaveBeenCalledWith("my_listing_allowance_state", {
+      p_host_profile_id: "host-1",
+    });
   });
 
-  it("returns listing_cap_reached when active listings are at the tier cap", async () => {
+  it("returns listing_cap_reached when active listings are at the allowance", async () => {
     const read = makeChain({ data: { ...ANSWERED_DRAFT } });
-    const tierRead = makeChain({ data: { subscription_tier: "starter" } });
-    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
-    queueFromResults(HOST_PROFILE, read, tierRead, capCount);
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(
+      allowanceState(
+        "starter",
+        PLAN_ENTITLEMENTS.starter.listings,
+        PLAN_ENTITLEMENTS.starter.listings,
+      ),
+    );
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
 
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
   });
 
-  it("floors a host with no subscription (tier null -> 'none') at the starter cap", async () => {
+  it("REFUSES a host with no subscription — 'none' is zero, not a free starter plan", async () => {
+    // The old behaviour floored 'none' at the starter allowance, so an
+    // unsubscribed host got a live listing for free while the FAQ said a plan was
+    // required. Founder, 2026-07-26: there is no free tier.
     const read = makeChain({ data: { ...ANSWERED_DRAFT } });
-    const tierRead = makeChain({ data: { subscription_tier: null } });
-    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
-    queueFromResults(HOST_PROFILE, read, tierRead, capCount);
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(allowanceState("none", 0, 0));
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
 
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  it("counts a queued under_review listing against the allowance", async () => {
+    // The slot is committed the moment a draft enters review. Counting only
+    // live + paused let a host queue an unlimited number and have them all
+    // approved; the RPC now reports under_review in `used`.
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(allowanceState("starter", 1, 1));
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  it("does NOT re-check the allowance when moving between two counted statuses", async () => {
+    // paused -> live consumes no new slot, so a host sitting exactly at their
+    // allowance must still be able to resume a listing they already paid for.
+    const read = makeChain({ data: { id: "l1", status: "paused", housing_evidence: "confirmed", provenance: "verified", housing_included: false, meals_evidence: "confirmed", pay_evidence: "confirmed", compensation_min_cents: 22_000 } });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: true, status: "live" });
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   // ── The publication gate (founder, 2026-07-17) ───────────────────────────
