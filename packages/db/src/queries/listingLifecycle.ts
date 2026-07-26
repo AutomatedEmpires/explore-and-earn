@@ -4,17 +4,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   effectiveHousingPhotoMap,
-  PLAN_ENTITLEMENTS,
   sanitizeHostBenefitLibrary,
   sanitizeHousingPhotoMap,
   validateListingForPublication,
   type BenefitEvidenceStatus,
   type ListingStatus,
-  type PlanTier,
   type PublicationBlocker,
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
+import {
+  countsTowardListingAllowance,
+  hasListingCapacity,
+  parseListingAllowanceState,
+} from "../lib/entitlements";
 import { getBenefitDetailsContext } from "./benefitDetails";
 
 /**
@@ -61,23 +64,6 @@ const LISTING_STATUS_TRANSITIONS: Record<ListingStatus, readonly ListingStatus[]
 /** True when `from -> to` is a permitted host listing transition. */
 export function canTransitionListing(from: ListingStatus, to: ListingStatus): boolean {
   return (LISTING_STATUS_TRANSITIONS[from] ?? []).includes(to);
-}
-
-/**
- * Statuses that count toward PLAN_ENTITLEMENTS[tier].listings (ADR-039) —
- * "each active (live or paused) listing counts toward your plan limit; you
- * can have unlimited drafts on any plan" per the host-facing FAQ copy
- * (HostSettings.tsx AddOnsSection), which already stated this policy before
- * any code enforced it.
- */
-const CAP_COUNTED_STATUSES: readonly ListingStatus[] = ["live", "paused"];
-
-/** "none" (no active subscription) is floored at the starter entitlement,
- * same policy as the boost-purchase tier fallback — the lowest real paid
- * tier, not zero and not unlimited. */
-function listingCapFor(tier: PlanTier): number {
-  const entitlementTier = tier === "professional" || tier === "enterprise" ? tier : "starter";
-  return PLAN_ENTITLEMENTS[entitlementTier].listings;
 }
 
 /**
@@ -224,44 +210,41 @@ export async function updateListingStatus(
     }
   }
 
-  // Enforce PLAN_ENTITLEMENTS.listings at every host-initiated transition that
-  // can newly consume a slot. (live<->paused don't need this check — both
-  // already count as "active" per CAP_COUNTED_STATUSES, so pausing/resuming
-  // never changes the count.)
+  // The plan listing allowance.
   //
-  // TWO transitions qualify now that hosts publish their own listings (082).
-  // `under_review` is not a CAP_COUNTED_STATUS, so charging only the submit
-  // step would let a host stage N listings at under_review under a cap of 1 and
-  // then publish every one of them: the count is still 0 at each publish. The
-  // second clause is the one that actually protects the entitlement — entering
-  // a counted status from an uncounted one — and the first keeps the earlier,
-  // friendlier refusal at submit time.
-  const entersCountedStatus =
-    CAP_COUNTED_STATUSES.includes(newStatus) && !CAP_COUNTED_STATUSES.includes(current);
-  if (newStatus === "under_review" || entersCountedStatus) {
-    if (!hostProfile || typeof hostProfile.subscription_tier !== "string") {
-      const { data, error } = await db
-        .from("host_profiles")
-        .select("subscription_tier")
-        .eq("id", hostProfileId)
-        .maybeSingle();
-      if (error) return { ok: false, error: error.message };
-      hostProfile = {
-        ...(hostProfile ?? {}),
-        ...((data as Record<string, unknown> | null) ?? {}),
-      };
-    }
-    const tier = (hostProfile?.subscription_tier ?? "none") as PlanTier;
-    const cap = listingCapFor(tier);
+  // This is NOT the enforcement — migration 083's trg_listings_plan_allowance is
+  // (`authenticated` can PATCH `status` through PostgREST, so a determined client
+  // never runs this code). It exists so a host meets "you are at your plan limit"
+  // instead of a raw 23514, and it reads the allowance through the RPC that wraps
+  // the trigger's OWN helpers, so the number it quotes cannot drift from the
+  // number the database enforces.
+  //
+  // Checked only when the target status newly occupies a slot AND the current one
+  // does not. Which edges that covers depends entirely on `under_review` being a
+  // counted status, and it is — that single fact is what closes the hole 082
+  // opened by making under_review -> live a HOST edge. Were under_review
+  // uncounted, a host on a cap of 1 could stage N drafts through review (count
+  // still reads 0 at every step) and then publish every one of them. Counting it
+  // charges the slot at submit time, so:
+  //
+  //   draft -> under_review    uncounted -> counted   CHECKED
+  //   under_review -> live     counted -> counted     already paid for
+  //   live <-> paused          counted -> counted     consumes nothing
+  //
+  // Gating the last two would refuse a host who is legitimately at their
+  // allowance and only wants to pause or resume what they already hold.
+  if (
+    countsTowardListingAllowance(newStatus) &&
+    !countsTowardListingAllowance(current)
+  ) {
+    const { data: allowanceData, error: allowanceError } = await db.rpc(
+      "my_listing_allowance_state",
+      { p_host_profile_id: hostProfileId },
+    );
+    if (allowanceError) return { ok: false, error: allowanceError.message };
 
-    const { count: activeCount, error: countError } = await db
-      .from("listings")
-      .select("id", { count: "exact", head: true })
-      .eq("host_profile_id", hostProfileId)
-      .in("status", CAP_COUNTED_STATUSES);
-    if (countError) return { ok: false, error: countError.message };
-
-    if ((activeCount ?? 0) >= cap) {
+    const allowance = parseListingAllowanceState(allowanceData);
+    if (!hasListingCapacity(allowance.used, allowance.allowance)) {
       return { ok: false, error: "listing_cap_reached" };
     }
   }

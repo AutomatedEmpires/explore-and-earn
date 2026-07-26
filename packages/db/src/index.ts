@@ -23,6 +23,8 @@ export * from "./queries/invites";
 export * from "./queries/inviteEntitlements";
 export * from "./queries/hostSourcing";
 export * from "./queries/hostProfiles";
+export * from "./queries/hostSubscriptions";
+export * from "./lib/entitlements";
 export * from "./queries/seekerResume";
 export * from "./queries/seekerProfiles";
 export * from "./queries/notifications";

@@ -6,7 +6,9 @@ import {
   activateBoostCampaignFromCheckout,
   insertHostAnnouncement,
   recordInvitePackPurchase,
+  upsertHostSubscription,
   type BoostPurchaseTier,
+  type HostBillingStatusValue,
 } from "@explore-and-earn/db";
 import {
   ANNOUNCEMENT_PRICE_CENTS,
@@ -201,20 +203,57 @@ async function resolveCustomerClerkUserId(customerId: string): Promise<string | 
 }
 
 /**
- * Write the tier a host has actually paid for onto their host_profiles row.
+ * Record a subscription state change in BOTH places, authority first.
  *
- * The `.select("id")` is load-bearing, not decoration. Supabase answers a
- * zero-row UPDATE with `{ data: [], error: null }`, so checking `error` alone
- * cannot tell "granted the tier" apart from "matched no host_profiles row at
- * all" — which is exactly what happens when someone pays before their host
- * profile exists. That host was charged and silently granted nothing. Throwing
- * on an empty match turns the webhook into a non-2xx, so Stripe redelivers the
- * event and the grant lands once the profile is there.
+ * public.host_subscriptions (migration 083) is keyed by Clerk user id and is
+ * what create_my_host_profile reads, so it must be written even when the
+ * customer has no host profile yet — which is now the normal order of events:
+ * sign up, choose a tier, pay, then create the profile. The host_profiles UPDATE
+ * that used to be the whole of this function matched zero rows in exactly that
+ * case, so the payment landed and nothing recorded it. upsertHostSubscription
+ * throws on failure, so that write is the one this function guarantees.
+ *
+ * host_profiles.subscription_tier remains the denormalized copy that listing,
+ * search and badge queries join, so it is still kept in step. The `.select("id")`
+ * is load-bearing: Supabase answers a zero-row UPDATE with
+ * `{ data: [], error: null }`, so checking `error` alone cannot tell "wrote the
+ * tier" apart from "matched nothing".
+ *
+ * WHAT A ZERO-ROW MATCH MEANS DEPENDS ENTIRELY ON THE DIRECTION.
+ *
+ * On a GRANT (any tier but 'none') it is still raised, so the webhook answers
+ * non-2xx and Stripe redelivers until the denormalized copy carries the tier the
+ * host is paying for.
+ *
+ * On a REVOCATION — customer.subscription.deleted and every downgrade, both of
+ * which call this with 'none' — it is the expected result and must resolve.
+ * Nothing is being granted, so nothing can be lost, and there is no state to
+ * redeliver INTO: a Clerk user with no host_profiles row has no tier to take
+ * away. Raising there would return 500 for events that are already correct,
+ * Stripe would retry each for about three days, and sustained 5xx is how Stripe
+ * disables an endpoint — which would silently stop every GRANT too. Production
+ * holds zero host_profiles rows today, so on that path every cancellation would
+ * have failed.
  */
 async function syncHostSubscriptionTier(
   clerkUserId: string,
   subscriptionTier: StoredSubscriptionTier,
+  details?: {
+    billingStatus?: HostBillingStatusValue;
+    stripeCustomerId?: string | null;
+    stripeSubscriptionId?: string | null;
+    currentPeriodEnd?: string | null;
+  },
 ): Promise<void> {
+  await upsertHostSubscription({
+    clerkUserId,
+    tier: subscriptionTier,
+    billingStatus: details?.billingStatus,
+    stripeCustomerId: details?.stripeCustomerId ?? null,
+    stripeSubscriptionId: details?.stripeSubscriptionId ?? null,
+    currentPeriodEnd: details?.currentPeriodEnd ?? null,
+  });
+
   const db = adminClient();
   const { data, error } = await db
     .from("host_profiles")
@@ -226,12 +265,38 @@ async function syncHostSubscriptionTier(
     throw new Error(`Failed to sync host subscription tier: ${error.message}`);
   }
 
-  if (!data || data.length === 0) {
+  const isGrant = subscriptionTier !== "none";
+  if (isGrant && (!data || data.length === 0)) {
     // The Clerk id is deliberately NOT in the message — this string reaches
-    // logs and Sentry, and the event id there is enough to trace the payer.
+    // logs and Sentry, and the event id there is enough to trace the host.
+    // The word "paying" is likewise absent: this same function runs on
+    // revocations, and a message that assumed a payer would be a lie half the
+    // time it could ever be printed.
     throw new Error(
-      "Failed to sync host subscription tier: no host_profiles row matched the paying Clerk user.",
+      "Failed to sync host subscription tier: no host_profiles row matched the granted Clerk user.",
     );
+  }
+}
+
+/** Map a Stripe subscription status onto the stored billing_status vocabulary. */
+function toBillingStatus(status: Stripe.Subscription.Status): HostBillingStatusValue {
+  switch (status) {
+    case "trialing":
+      return "trialing";
+    case "active":
+      return "active";
+    case "past_due":
+      return "past_due";
+    case "canceled":
+      return "cancelled";
+    case "unpaid":
+      return "unpaid";
+    case "paused":
+      return "paused";
+    default:
+      // incomplete / incomplete_expired: nothing is paying, and 'none' is the
+      // vocabulary's word for that.
+      return "none";
   }
 }
 
@@ -475,7 +540,13 @@ async function syncCheckoutCompleted(
     };
   }
 
-  await syncHostSubscriptionTier(clerkUserId, subscriptionTier);
+  await syncHostSubscriptionTier(clerkUserId, subscriptionTier, {
+    billingStatus: "active",
+    stripeCustomerId:
+      typeof session.customer === "string" ? session.customer : null,
+    stripeSubscriptionId:
+      typeof session.subscription === "string" ? session.subscription : null,
+  });
 
   return {
     action: "synced_checkout_session",
@@ -520,7 +591,11 @@ async function syncSubscriptionEvent(
     await ensureCustomerMetadata(customerId, billingMetadata(clerkUserId, tier));
   }
 
-  await syncHostSubscriptionTier(clerkUserId, tier);
+  await syncHostSubscriptionTier(clerkUserId, tier, {
+    billingStatus: deleted ? "cancelled" : toBillingStatus(subscription.status),
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: subscription.id,
+  });
 
   return {
     action: deleted ? "synced_subscription_deleted" : "synced_subscription_state",

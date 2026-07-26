@@ -52,6 +52,18 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
 
+    // Migration 083: there is no free tier, so a host cannot be created without
+    // a recorded subscription, and three listings in review need an allowance of
+    // at least three. Enterprise is the fixture's plan for that reason, not for
+    // any behaviour under test here.
+    const subscribed = await admin
+      .from("host_subscriptions")
+      .upsert(
+        { clerk_user_id: clerkUserId, tier: "enterprise", billing_status: "active" },
+        { onConflict: "clerk_user_id" },
+      );
+    expect(subscribed.error).toBeNull();
+
     const profile = await host.rpc("create_my_host_profile", {
       p_company_name: "Lifecycle Integration Host",
       p_category_scopes: ["farm"],
@@ -177,6 +189,7 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
     } finally {
       const cleanup = await admin.from("host_profiles").delete().eq("id", hostProfileId);
       expect(cleanup.error).toBeNull();
+      await admin.from("host_subscriptions").delete().eq("clerk_user_id", clerkUserId);
     }
   });
 });
