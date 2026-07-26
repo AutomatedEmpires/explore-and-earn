@@ -19,10 +19,20 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const migration = readFileSync(
+const rawMigration = readFileSync(
   new URL("../../../supabase/migrations/085_tier_features_and_addons.sql", import.meta.url),
   "utf8",
-)
+);
+
+const migration = rawMigration.toLowerCase().replace(/\s+/g, " ");
+
+/** The same SQL with `-- line comments` removed. Needed wherever the assertion
+ * is about what the DATABASE does: a comment claiming a property is exactly the
+ * thing being checked, so it must not be able to satisfy the check itself. */
+const migrationCode = rawMigration
+  .split("\n")
+  .map((line) => line.replace(/--.*$/, ""))
+  .join("\n")
   .toLowerCase()
   .replace(/\s+/g, " ");
 
@@ -47,6 +57,66 @@ function assertSeatEnforcement(sql: string): void {
   );
   expect(sql).toContain(
     "grant execute on function public.invite_host_team_member(uuid, text, text, integer, uuid, integer) to service_role;",
+  );
+}
+
+/**
+ * An expired invitation must give its seat back.
+ *
+ * The defect: nothing ever moved a stale 'invited' row. accept_host_team_
+ * invitation only flips one when somebody presents its token — and nobody can,
+ * because it has expired. So the seat was spent forever, the invite form (hidden
+ * at zero remaining) never appeared, and uq_team_memberships_pending_email kept
+ * refusing a fresh invitation to the same address. The sweep runs inside the
+ * advisory lock, BEFORE the count, or it would race a concurrent invite.
+ */
+function assertExpirySweep(sql: string): void {
+  expect(sql).toContain(
+    "update public.team_memberships set status = 'expired', invite_token = null " +
+      "where host_profile_id = p_host_profile_id and status = 'invited' " +
+      "and invite_expires_at is not null and invite_expires_at < now();",
+  );
+  const sweepAt = sql.indexOf("and invite_expires_at < now();");
+  const lockAt = sql.indexOf("hashtextextended('team_seat:");
+  const countAt = sql.indexOf("select count(*) into v_used");
+  expect(lockAt).toBeGreaterThan(-1);
+  expect(sweepAt).toBeGreaterThan(lockAt);
+  expect(countAt).toBeGreaterThan(sweepAt);
+}
+
+/**
+ * The add-on allowance must follow the subscription, not only its deletion.
+ *
+ * The defect: syncSubscriptionEvent's add-on branch acted on `deleted` alone, so
+ * a subscription parked in a non-paying status ('unpaid', 'incomplete_expired',
+ * 'paused' — Stripe may never emit deleted for these) and a quantity changed in
+ * the billing portal both left the host holding slots they were not paying for.
+ */
+function assertLifecycleSync(sql: string): void {
+  expect(sql).toContain(
+    "create or replace function public.sync_listing_slot_subscription( p_subscription_id text, p_quantity integer, p_entitled boolean )",
+  );
+  // The allowance moves by a DELTA against what this purchase contributes, so a
+  // redelivered event is a no-op rather than a second decrement.
+  expect(sql).toContain(
+    "v_current := case when v_row.status = 'active' then v_row.quantity else 0 end;",
+  );
+  expect(sql).toContain(
+    "set purchased_listing_slots = greatest(purchased_listing_slots + (v_target - v_current), 0)",
+  );
+  // Not entitled means zero contribution, whatever the quantity says.
+  expect(sql).toContain("when coalesce(p_entitled, false)");
+  // Serialized and re-read under the lock, like every other allowance write.
+  expect(sql).toContain(
+    "pg_advisory_xact_lock( hashtextextended('listing_slots:' || v_row.host_profile_id::text, 0) )",
+  );
+  expect(sql).toContain("for update;");
+  // Service-role only, like the other write functions.
+  expect(sql).toContain(
+    "revoke execute on function public.sync_listing_slot_subscription(text, integer, boolean) from public, anon, authenticated;",
+  );
+  expect(sql).toContain(
+    "grant execute on function public.sync_listing_slot_subscription(text, integer, boolean) to service_role;",
   );
 }
 
@@ -87,6 +157,50 @@ describe("migration 085 — tier features and add-ons", () => {
 
   it("makes the purchased listing allowance real, idempotent, and unforgeable", () => {
     assertAddOnAllowance(migration);
+  });
+
+  it("gives an expired invitation's seat back", () => {
+    assertExpirySweep(migration);
+  });
+
+  it("takes the allowance back on non-payment and follows a quantity change", () => {
+    assertLifecycleSync(migration);
+  });
+
+  it("has exactly ONE security definer function, and the prose agrees", () => {
+    // The comments used to describe the write functions as SECURITY DEFINER for
+    // functions whose pg_proc.prosecdef is false. Only my_purchased_listing_slots
+    // is a definer function — it has to be, because it reads a column 080
+    // deliberately withholds from `authenticated`. The rest are invoker-rights
+    // functions with EXECUTE granted to service_role alone.
+    expect(migrationCode.split("security definer")).toHaveLength(2);
+
+    const definerAt = migrationCode.indexOf("security definer");
+    const selfReadAt = migrationCode.indexOf(
+      "create or replace function public.my_purchased_listing_slots()",
+    );
+    expect(selfReadAt).toBeGreaterThan(-1);
+    expect(definerAt).toBeGreaterThan(selfReadAt);
+
+    // …and no comment describes any of the others as one.
+    for (const fn of [
+      "invite_host_team_member",
+      "accept_host_team_invitation",
+      "revoke_host_team_member",
+      "credit_listing_slot_purchase",
+      "revoke_listing_slot_purchase",
+      "sync_listing_slot_subscription",
+    ]) {
+      const body = migration.slice(
+        migration.indexOf(`create or replace function public.${fn}`),
+      );
+      const nextDefiner = body.indexOf("security definer");
+      const nextFunctionEnd = body.indexOf("$$;");
+      expect(
+        nextDefiner === -1 || nextDefiner > nextFunctionEnd,
+        `${fn} is described as security definer but is not declared one`,
+      ).toBe(true);
+    }
   });
 
   it("NEVER grants the purchased allowance column to anon or authenticated", () => {
@@ -157,6 +271,44 @@ describe("migration 085 — tier features and add-ons", () => {
         migration.replace(
           "create unique index if not exists uq_host_listing_slot_purchase_session",
           "create index if not exists uq_host_listing_slot_purchase_session",
+        ),
+      ),
+    ).toThrow();
+  });
+
+  it("negative control: dropping the sweep fails the expiry assertions", () => {
+    expect(() =>
+      assertExpirySweep(
+        migration.replace("and invite_expires_at < now();", "and false;"),
+      ),
+    ).toThrow();
+  });
+
+  it("negative control: moving the sweep AFTER the count fails the expiry assertions", () => {
+    // Order is the invariant, not mere presence: a sweep that runs after the
+    // count frees the seat one invitation too late.
+    const sweep =
+      "update public.team_memberships set status = 'expired', invite_token = null " +
+      "where host_profile_id = p_host_profile_id and status = 'invited' " +
+      "and invite_expires_at is not null and invite_expires_at < now();";
+    expect(() =>
+      assertExpirySweep(
+        migration
+          .replace(sweep, "")
+          .replace(
+            "if v_used >= coalesce(p_seat_limit, 0) then",
+            `${sweep} if v_used >= coalesce(p_seat_limit, 0) then`,
+          ),
+      ),
+    ).toThrow();
+  });
+
+  it("negative control: dropping the delta fails the lifecycle-sync assertions", () => {
+    expect(() =>
+      assertLifecycleSync(
+        migration.replace(
+          "set purchased_listing_slots = greatest(purchased_listing_slots + (v_target - v_current), 0)",
+          "set purchased_listing_slots = purchased_listing_slots",
         ),
       ),
     ).toThrow();

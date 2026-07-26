@@ -20,11 +20,25 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
  *
  * Both depend on metadata.productType being present on the SESSION *and* on the
  * SUBSCRIPTION (they are different Stripe objects and the cancellation event
- * only carries the latter), which is why that is asserted too.
+ * only carries the latter), which is why that is asserted too — including the
+ * `subscription_data: { metadata }` on the Checkout call that is the ONLY thing
+ * putting it on the subscription. Deleting that line used to leave every test
+ * green while a cancelled add-on downgraded a paying host to unsubscribed.
+ *
+ * Two more, added when the branch was finished:
+ *
+ *  3. The allowance was only ever taken back on `deleted`. Stripe leaves an
+ *     uncollected subscription in 'unpaid' / 'incomplete_expired' / 'paused' and
+ *     may never emit deleted, so a host who stopped paying kept their slots.
+ *  4. A quantity changed in the billing portal surfaces only on
+ *     customer.subscription.updated. The credit path is keyed on the checkout
+ *     session, which never fires again, so the allowance never followed it.
  */
 
 const creditListingSlotPurchase = vi.fn();
 const revokeListingSlotPurchase = vi.fn();
+const syncListingSlotSubscription = vi.fn();
+const createCheckoutSession = vi.fn();
 const syncTier = vi.fn();
 
 vi.mock("server-only", () => ({}));
@@ -45,12 +59,13 @@ vi.mock("@explore-and-earn/db", () => ({
   recordInvitePackPurchase: vi.fn(),
   creditListingSlotPurchase,
   revokeListingSlotPurchase,
+  syncListingSlotSubscription,
 }));
 
 vi.mock("stripe", () => {
   class FakeStripe {
     static errors = { StripeError: class extends Error {} };
-    checkout = { sessions: { create: vi.fn() } };
+    checkout = { sessions: { create: createCheckoutSession } };
     customers = { retrieve: vi.fn(), search: vi.fn(), list: vi.fn(), update: vi.fn() };
     subscriptions = { list: vi.fn(), cancel: vi.fn() };
     billingPortal = { sessions: { create: vi.fn() } };
@@ -60,9 +75,14 @@ vi.mock("stripe", () => {
   return { default: FakeStripe };
 });
 
-const { ADDITIONAL_LISTING_PRODUCT_TYPE, handleStripeWebhookEvent } = await import(
-  "../../services/stripe"
-);
+process.env.STRIPE_SECRET_KEY ??= "sk_test_addon";
+
+const {
+  ADDITIONAL_LISTING_PRODUCT_TYPE,
+  createAdditionalListingCheckoutSession,
+  handleStripeWebhookEvent,
+  isAdditionalListingTier,
+} = await import("../../services/stripe");
 
 type WebhookEvent = Parameters<typeof handleStripeWebhookEvent>[0];
 
@@ -96,9 +116,35 @@ function subscriptionDeletedEvent(metadata: Record<string, string>): WebhookEven
   } as unknown as WebhookEvent;
 }
 
+function subscriptionUpdatedEvent(args: {
+  status: string;
+  quantity?: number;
+  metadata?: Record<string, string>;
+}): WebhookEvent {
+  return {
+    type: "customer.subscription.updated",
+    data: {
+      object: {
+        id: "sub_addon_1",
+        status: args.status,
+        customer: "cus_1",
+        metadata: args.metadata ?? {
+          productType: ADDITIONAL_LISTING_PRODUCT_TYPE,
+          clerkUserId: "user_1",
+        },
+        items: {
+          data: [{ price: { id: "price_addon" }, quantity: args.quantity }],
+        },
+      },
+    },
+  } as unknown as WebhookEvent;
+}
+
 beforeEach(() => {
   creditListingSlotPurchase.mockReset();
   revokeListingSlotPurchase.mockReset();
+  syncListingSlotSubscription.mockReset();
+  createCheckoutSession.mockReset();
   syncTier.mockReset();
 });
 
@@ -248,22 +294,187 @@ describe("additional-listing add-on cancellation", () => {
     ).rejects.toThrow(/could not be revoked/);
   });
 
-  it("does not touch the allowance on an ordinary add-on lifecycle update", async () => {
-    const result = await handleStripeWebhookEvent({
-      type: "customer.subscription.updated",
-      data: {
-        object: {
-          id: "sub_addon_1",
-          status: "active",
-          customer: "cus_1",
-          metadata: { productType: ADDITIONAL_LISTING_PRODUCT_TYPE },
-          items: { data: [{ price: { id: "price_addon" } }] },
-        },
-      },
-    } as unknown as WebhookEvent);
+});
 
-    expect(result.action).toBe("ignored_additional_listing_subscription_update");
-    expect(revokeListingSlotPurchase).not.toHaveBeenCalled();
+describe("additional-listing add-on lifecycle (non-deletion events)", () => {
+  it.each(["unpaid", "incomplete_expired", "paused", "canceled"])(
+    "TAKES THE ALLOWANCE BACK when the subscription is %s — the host stopped paying",
+    async (status) => {
+      // The defect: this branch acted only on `deleted`, and Stripe can leave an
+      // uncollected subscription in these statuses indefinitely without ever
+      // emitting one. The host kept listing slots nobody was paying for.
+      syncListingSlotSubscription.mockResolvedValue({
+        ok: true,
+        found: true,
+        changed: true,
+        slots: 0,
+      });
+
+      const result = await handleStripeWebhookEvent(
+        subscriptionUpdatedEvent({ status, quantity: 3 }),
+      );
+
+      expect(result.action).toBe("revoked_listing_slots_unpaid");
+      expect(syncListingSlotSubscription).toHaveBeenCalledWith({
+        stripeSubscriptionId: "sub_addon_1",
+        quantity: 3,
+        entitled: false,
+      });
+      expect(syncTier).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["active", "trialing", "past_due"])(
+    "keeps the allowance while the subscription is %s",
+    async (status) => {
+      syncListingSlotSubscription.mockResolvedValue({
+        ok: true,
+        found: true,
+        changed: false,
+        slots: 2,
+      });
+
+      const result = await handleStripeWebhookEvent(
+        subscriptionUpdatedEvent({ status, quantity: 2 }),
+      );
+
+      expect(result.action).toBe("listing_slots_unchanged");
+      expect(syncListingSlotSubscription.mock.calls[0][0].entitled).toBe(true);
+    },
+  );
+
+  it("FOLLOWS a quantity changed in the billing portal", async () => {
+    // The defect: crediting is keyed on the checkout session, which never fires
+    // again, so a portal-side quantity change moved the invoice and not the
+    // allowance.
+    syncListingSlotSubscription.mockResolvedValue({
+      ok: true,
+      found: true,
+      changed: true,
+      slots: 5,
+    });
+
+    const result = await handleStripeWebhookEvent(
+      subscriptionUpdatedEvent({ status: "active", quantity: 5 }),
+    );
+
+    expect(result.action).toBe("synced_listing_slots");
+    expect(syncListingSlotSubscription.mock.calls[0][0].quantity).toBe(5);
+  });
+
+  it("sends a NULL quantity when Stripe did not state one, so nothing is invented", async () => {
+    syncListingSlotSubscription.mockResolvedValue({
+      ok: true,
+      found: true,
+      changed: false,
+      slots: 1,
+    });
+
+    await handleStripeWebhookEvent(subscriptionUpdatedEvent({ status: "active" }));
+
+    expect(syncListingSlotSubscription.mock.calls[0][0].quantity).toBeNull();
+  });
+
+  it("reports a subscription we hold no purchase for, without failing the webhook", async () => {
+    // customer.subscription.created routinely arrives before the checkout
+    // session credited the ledger row.
+    syncListingSlotSubscription.mockResolvedValue({
+      ok: true,
+      found: false,
+      changed: false,
+      slots: 0,
+    });
+
+    const result = await handleStripeWebhookEvent(
+      subscriptionUpdatedEvent({ status: "active", quantity: 1 }),
+    );
+
+    expect(result.action).toBe("listing_slots_purchase_not_found");
+  });
+
+  it("THROWS when the sync could not be recorded, so Stripe redelivers", async () => {
+    syncListingSlotSubscription.mockResolvedValue({
+      ok: false,
+      found: false,
+      changed: false,
+      slots: 0,
+    });
+
+    await expect(
+      handleStripeWebhookEvent(subscriptionUpdatedEvent({ status: "unpaid" })),
+    ).rejects.toThrow(/could not be synced/);
+  });
+
+  it("NEVER writes a subscription tier from an add-on lifecycle event", async () => {
+    syncListingSlotSubscription.mockResolvedValue({
+      ok: true,
+      found: true,
+      changed: true,
+      slots: 0,
+    });
+
+    const result = await handleStripeWebhookEvent(
+      subscriptionUpdatedEvent({ status: "unpaid", quantity: 1 }),
+    );
+
+    expect(result.tier).toBeNull();
     expect(syncTier).not.toHaveBeenCalled();
+  });
+
+  it("leaves a NON-add-on subscription to the plan path", async () => {
+    const result = await handleStripeWebhookEvent(
+      subscriptionUpdatedEvent({
+        status: "active",
+        metadata: { clerkUserId: "user_1" },
+      }),
+    );
+
+    expect(syncListingSlotSubscription).not.toHaveBeenCalled();
+    // No mapped price id in this environment, so the plan path declines to guess.
+    expect(result.action).toBe("ignored_unmapped_subscription_price");
+  });
+});
+
+describe("additional-listing add-on checkout session", () => {
+  it("puts the productType metadata on the SUBSCRIPTION, not only the session", async () => {
+    // This is the assertion that was missing: `subscription_data: { metadata }`
+    // could be deleted and 606 of 606 tests still passed. It is the ONLY thing
+    // that puts productType on the subscription object — and every cancellation
+    // and lifecycle event carries the subscription, never the session. Without
+    // it, cancelling an add-on falls through to the plan branch and writes a
+    // paying host's subscription_tier down to 'none'.
+    createCheckoutSession.mockResolvedValue({ id: "cs_1", url: "https://stripe" });
+
+    await createAdditionalListingCheckoutSession({
+      clerkUserId: "user_1",
+      hostProfileId: "host-1",
+      hostSubscriptionTier: "professional",
+      quantity: 2,
+    });
+
+    const params = createCheckoutSession.mock.calls[0][0];
+    expect(params.subscription_data?.metadata).toMatchObject({
+      productType: ADDITIONAL_LISTING_PRODUCT_TYPE,
+      hostProfileId: "host-1",
+      clerkUserId: "user_1",
+      quantity: "2",
+      tier: "professional",
+    });
+    // Both objects carry it: the session drives crediting, the subscription
+    // drives cancellation.
+    expect(params.metadata).toMatchObject({
+      productType: ADDITIONAL_LISTING_PRODUCT_TYPE,
+    });
+    expect(params.mode).toBe("subscription");
+  });
+
+  it("REFUSES to recognise an unsubscribed host as a buyable tier — there is no free tier", () => {
+    // includedListingCapFor('none') is 0 and this map has no 'none' key, so
+    // there is no rate at which an unsubscribed host can be quoted. Together
+    // they close the arbitrage: Starter's allowance without Starter's price.
+    expect(isAdditionalListingTier("none")).toBe(false);
+    expect(isAdditionalListingTier("starter")).toBe(true);
+    expect(isAdditionalListingTier("professional")).toBe(true);
+    expect(isAdditionalListingTier("enterprise")).toBe(true);
   });
 });

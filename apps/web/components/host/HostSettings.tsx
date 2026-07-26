@@ -45,6 +45,8 @@ export interface HostSettingsProps {
   readonly invitableRoles: readonly string[];
   /** Additional-listing add-on slots this host has paid for. */
   readonly purchasedListingSlots: number;
+  /** Listings the host's PLAN includes — 0 with no subscription (no free tier). */
+  readonly includedListingCap: number;
   /** Included listings + purchased slots — what the server will actually enforce. */
   readonly effectiveListingCap: number;
 }
@@ -93,6 +95,10 @@ function usd(cents: number): string {
 /** Human feature list derived entirely from the locked plan entitlements. */
 function planFeatures(tier: PaidTier): string[] {
   const e = PLAN_ENTITLEMENTS[tier];
+  // Widened from the `as const` literal so the singular/plural test stays a
+  // runtime branch. Every tier is 0 today (see TEAM_SEATS_BY_TIER), which would
+  // otherwise make `=== 1` a compile error instead of a false condition.
+  const teamSeats: number = e.teamSeats;
   const features: (string | null)[] = [
     `${e.listings} active listing${e.listings === 1 ? "" : "s"}`,
     e.analytics === "full"
@@ -105,11 +111,9 @@ function planFeatures(tier: PaidTier): string[] {
       ? `${e.includedInviteCredits} invite credits / month`
       : null,
     // Seats are listed only where the plan actually grants one — a zero must not
-    // render as a sold feature. The counts are founder-locked in
-    // TEAM_SEATS_BY_TIER and await founder confirmation.
-    e.teamSeats > 0
-      ? `${e.teamSeats} team seat${e.teamSeats === 1 ? "" : "s"}`
-      : null,
+    // render as a sold feature. Every tier is 0 today because accepting a team
+    // invitation grants no access; see TEAM_SEATS_BY_TIER.
+    teamSeats > 0 ? `${teamSeats} team seat${teamSeats === 1 ? "" : "s"}` : null,
     "Public host profile",
     "Direct applicant messaging",
   ];
@@ -262,21 +266,29 @@ function PlanCard({
  * price, and no per-host allowance column, so the number on screen could not be
  * honoured even manually. It now starts a Stripe Checkout; the allowance is
  * credited by the webhook and counted by the publication cap.
+ *
+ * IT IS NOT SOLD TO AN UNSUBSCRIBED HOST. There is no free tier, so a host with
+ * no plan has no included listing count to buy "beyond" and no tier to be priced
+ * by. The card shows the three rates and points at the plans instead — quoting
+ * them the Starter rate is how the settings page came to offer the Starter
+ * allowance without the Starter subscription. The server refuses the same
+ * request (actions/listingSlots.ts returns no_subscription), so this is
+ * presentation, not the gate.
  */
 function AdditionalListingCard({
   subscriptionTier,
   purchasedListingSlots,
+  included,
   cap,
 }: {
   subscriptionTier: HostSettingsProps["subscriptionTier"];
   purchasedListingSlots: number;
+  included: number;
   cap: number;
 }) {
   const [state, setState] = useState<"idle" | "starting" | "error">("idle");
-  const included = PLAN_ENTITLEMENTS[
-    subscriptionTier === "none" ? "starter" : subscriptionTier
-  ].listings;
-  const unitPrice = ADDITIONAL_LISTING_PRICING[subscriptionTier];
+  const unitPrice =
+    subscriptionTier === "none" ? null : ADDITIONAL_LISTING_PRICING[subscriptionTier];
 
   function handleBuy() {
     setState("starting");
@@ -295,7 +307,9 @@ function AdditionalListingCard({
     <div className={styles.addonCard}>
       <div className={styles.addonCardHead}>
         <span className={styles.addonName}>Additional active listing</span>
-        <span className={styles.addonPrice}>{usd(unitPrice)}/mo each</span>
+        <span className={styles.addonPrice}>
+          {unitPrice === null ? "With a plan" : `${usd(unitPrice)}/mo each`}
+        </span>
       </div>
       <p className={styles.addonDesc}>
         One more active listing beyond your plan&rsquo;s included count, billed monthly.
@@ -303,18 +317,27 @@ function AdditionalListingCard({
         {usd(ADDITIONAL_LISTING_PRICING.professional)} Pro ·{" "}
         {usd(ADDITIONAL_LISTING_PRICING.enterprise)} Enterprise.
       </p>
-      <p className={styles.addonDesc}>
-        Your plan includes {included}. You have bought {purchasedListingSlots}, so you
-        can hold {cap} active {cap === 1 ? "listing" : "listings"} at once.
-      </p>
-      <button
-        type="button"
-        className={styles.planCta}
-        onClick={handleBuy}
-        disabled={state === "starting"}
-      >
-        {state === "starting" ? "Opening checkout…" : "Add one listing"}
-      </button>
+      {unitPrice === null ? (
+        <p className={styles.addonDesc}>
+          Extra listings are an add-on to a paid plan, so there&rsquo;s nothing to add
+          on to yet. Choose a plan above and this unlocks at that plan&rsquo;s rate.
+        </p>
+      ) : (
+        <p className={styles.addonDesc}>
+          Your plan includes {included}. You have bought {purchasedListingSlots}, so you
+          can hold {cap} active {cap === 1 ? "listing" : "listings"} at once.
+        </p>
+      )}
+      {unitPrice === null ? null : (
+        <button
+          type="button"
+          className={styles.planCta}
+          onClick={handleBuy}
+          disabled={state === "starting"}
+        >
+          {state === "starting" ? "Opening checkout…" : "Add one listing"}
+        </button>
+      )}
       {state === "error" ? (
         <p className={styles.addonDesc}>
           We couldn&rsquo;t start checkout just now. Try again, or email{" "}
@@ -331,10 +354,12 @@ function AdditionalListingCard({
 function AddOnsSection({
   subscriptionTier,
   purchasedListingSlots,
+  includedListingCap,
   effectiveListingCap,
 }: {
   subscriptionTier: HostSettingsProps["subscriptionTier"];
   purchasedListingSlots: number;
+  includedListingCap: number;
   effectiveListingCap: number;
 }) {
   const ann = ADDON_PRICING.additionalAnnouncement;
@@ -363,6 +388,7 @@ function AddOnsSection({
         <AdditionalListingCard
           subscriptionTier={subscriptionTier}
           purchasedListingSlots={purchasedListingSlots}
+          included={includedListingCap}
           cap={effectiveListingCap}
         />
         {addons.map((a) => (
@@ -382,10 +408,12 @@ function AddOnsSection({
 function BillingPanel({
   subscriptionTier,
   purchasedListingSlots,
+  includedListingCap,
   effectiveListingCap,
 }: {
   subscriptionTier: HostSettingsProps["subscriptionTier"];
   purchasedListingSlots: number;
+  includedListingCap: number;
   effectiveListingCap: number;
 }) {
   const [interval, setInterval] = useState<BillingInterval>("monthly");
@@ -434,6 +462,7 @@ function BillingPanel({
       <AddOnsSection
         subscriptionTier={subscriptionTier}
         purchasedListingSlots={purchasedListingSlots}
+        includedListingCap={includedListingCap}
         effectiveListingCap={effectiveListingCap}
       />
 
@@ -478,10 +507,19 @@ const TEAM_INVITE_ERROR: Record<string, string> = {
 /**
  * Team members.
  *
- * Seats are INCLUDED per tier (founder, 2026-07-26). The number of seats a plan
- * grants is TEAM_SEATS_BY_TIER and awaits founder confirmation; the enforcement
- * is server-side — this panel hides the form when there is no seat left, but the
- * refusal that matters happens in migration 085's SQL function.
+ * NO PLAN GRANTS A SEAT TODAY (TEAM_SEATS_BY_TIER is 0 for every tier), so this
+ * panel shows the owner and says plainly that nobody else can be added. The
+ * reason is not a missing number: accepting an invitation grants no access to
+ * listings, applicants, messages or analytics, because no policy admits a team
+ * membership to any of them. Until it does, a card offering seats would sell
+ * something acceptance does not deliver.
+ *
+ * The invite form below is therefore unreachable — seats.remaining is always 0 —
+ * and it is kept, rather than deleted, because the plumbing behind it is real
+ * and tested; it becomes reachable the moment a seat count can honestly rise.
+ * The refusal that matters is server-side either way: the seat limit passed to
+ * migration 085's SQL function is resolved from the host's real tier, so it is
+ * zero even if this component is bypassed.
  *
  * DELIVERY IS EXPLICIT. Accepting the invitation needs the link below; nothing
  * here emails it, and nothing here says it did.
@@ -541,7 +579,7 @@ function TeamPanel({
         <h2 className={styles.panelTitle}>Team members</h2>
         <p className={styles.panelDesc}>
           {seats.limit === 0
-            ? "Your plan doesn't include a team seat. The account owner is the only person who can sign in."
+            ? "Team accounts aren't available yet — no plan includes a seat, so the account owner is the only person who can sign in."
             : `Your plan includes ${seats.limit} team seat${seats.limit === 1 ? "" : "s"} alongside the owner — ${seats.used} in use, ${seats.remaining} free.`}
         </p>
       </div>
@@ -629,12 +667,13 @@ function TeamPanel({
           </p>
         ) : (
           <p className={styles.teamNote}>
-            Team seats come with the Enterprise plan. If you need a colleague to help
-            manage listings or review applicants, email{" "}
+            No plan includes a team seat right now, and upgrading won&rsquo;t add
+            one. If you need a colleague to help manage listings or review
+            applicants, email{" "}
             <a href={`mailto:${SUPPORT_EMAIL}?subject=Host%20account%20access`}>
               {SUPPORT_EMAIL}
-            </a>
-            .
+            </a>{" "}
+            and we&rsquo;ll work it out with you directly.
           </p>
         )}
 
@@ -886,6 +925,7 @@ export function HostSettings({
   teamAvailable,
   invitableRoles,
   purchasedListingSlots,
+  includedListingCap,
   effectiveListingCap,
 }: HostSettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("billing");
@@ -897,6 +937,7 @@ export function HostSettings({
         <BillingPanel
           subscriptionTier={subscriptionTier}
           purchasedListingSlots={purchasedListingSlots}
+          includedListingCap={includedListingCap}
           effectiveListingCap={effectiveListingCap}
         />
       )}

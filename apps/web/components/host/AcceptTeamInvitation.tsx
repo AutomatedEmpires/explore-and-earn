@@ -24,6 +24,14 @@ const ACCEPT_ERROR: Record<string, string> = {
  * Acceptance is an explicit button, not an on-load effect: a link preview
  * fetcher or an email scanner must not be able to consume a single-use token by
  * merely opening the URL.
+ *
+ * WHAT ACCEPTANCE CURRENTLY GRANTS: nothing. No policy admits a team membership
+ * to a host's listings, applicants, messages or analytics, and a member holds no
+ * host_profiles row — so /host would bounce them to onboarding. This screen
+ * therefore records the link and says so, instead of offering a dashboard button
+ * that goes nowhere. No seat exists to issue an invitation against either
+ * (TEAM_SEATS_BY_TIER is 0 for every tier), so in practice this page is only
+ * ever reached with a token that no longer resolves.
  */
 export function AcceptTeamInvitation({ token }: { token: string }) {
   const [state, setState] = useState<"idle" | "working" | "done" | "error">("idle");
@@ -39,7 +47,7 @@ export function AcceptTeamInvitation({ token }: { token: string }) {
           setMessage(
             result.alreadyAccepted
               ? "You had already accepted this invitation."
-              : "You're on the team.",
+              : "Invitation accepted.",
           );
           return;
         }
@@ -58,13 +66,20 @@ export function AcceptTeamInvitation({ token }: { token: string }) {
       {state === "done" ? (
         <>
           <p>{message}</p>
-          <Link href="/host">Go to the host dashboard</Link>
+          <p>
+            Team access itself isn&rsquo;t switched on yet, so this doesn&rsquo;t give
+            you the host&rsquo;s listings or applicants — the account owner still does
+            that work. We&rsquo;ve recorded the link and will tell you when it does
+            something.
+          </p>
+          <Link href="/">Back to Explore &amp; Earn</Link>
         </>
       ) : (
         <>
           <p>
             You&rsquo;ve been invited to help manage a host account on Explore &amp; Earn.
-            Accepting links this signed-in account to their team.
+            Accepting records this signed-in account against their team. It does not
+            yet grant access to their listings or applicants.
           </p>
           <button type="button" onClick={handleAccept} disabled={state === "working"}>
             {state === "working" ? "Accepting…" : "Accept invitation"}

@@ -98,6 +98,73 @@ export async function creditListingSlotPurchase(args: {
   }
 }
 
+export interface SyncListingSlotSubscriptionResult {
+  readonly ok: boolean;
+  readonly found: boolean;
+  readonly changed: boolean;
+  /** The allowance this purchase contributes after the sync. */
+  readonly slots: number;
+}
+
+/**
+ * Reconcile an add-on subscription's allowance to what Stripe currently says.
+ *
+ * `revokeListingSlotPurchase` only covers final cancellation. This covers the
+ * two lifecycle states that otherwise leave a host holding an allowance they no
+ * longer pay for: a subscription parked in a non-paying status (unpaid,
+ * incomplete_expired, paused), and a quantity changed through the billing
+ * portal, which only ever surfaces on customer.subscription.updated.
+ *
+ * `entitled: false` drives the contribution to zero without deleting the ledger
+ * row. `found: false` is not an error — the cancelled or updated subscription
+ * may be a host plan rather than an add-on. Never throws; `ok: false` means the
+ * webhook must fail so Stripe redelivers.
+ */
+export async function syncListingSlotSubscription(args: {
+  readonly stripeSubscriptionId: string;
+  /** Stripe's current line quantity; null leaves the recorded quantity alone. */
+  readonly quantity: number | null;
+  /** Whether the current Stripe status entitles the host to the allowance. */
+  readonly entitled: boolean;
+}): Promise<SyncListingSlotSubscriptionResult> {
+  if (!args.stripeSubscriptionId) {
+    return { ok: false, found: false, changed: false, slots: 0 };
+  }
+  const quantity =
+    typeof args.quantity === "number" &&
+    Number.isInteger(args.quantity) &&
+    args.quantity >= 0
+      ? args.quantity
+      : null;
+
+  try {
+    const admin = adminClient() as unknown as SupabaseClient;
+    const { data, error } = await admin.rpc("sync_listing_slot_subscription", {
+      p_subscription_id: args.stripeSubscriptionId,
+      p_quantity: quantity,
+      p_entitled: args.entitled,
+    });
+    if (error) return { ok: false, found: false, changed: false, slots: 0 };
+    const result = data as {
+      ok?: boolean;
+      found?: boolean;
+      changed?: boolean;
+      slots?: number;
+    } | null;
+    if (!result || result.ok !== true) {
+      return { ok: false, found: false, changed: false, slots: 0 };
+    }
+    return {
+      ok: true,
+      found: result.found === true,
+      changed: result.changed === true,
+      slots: typeof result.slots === "number" ? result.slots : 0,
+    };
+  } catch {
+    return { ok: false, found: false, changed: false, slots: 0 };
+  }
+}
+
 export interface RevokeListingSlotPurchaseResult {
   readonly ok: boolean;
   readonly found: boolean;

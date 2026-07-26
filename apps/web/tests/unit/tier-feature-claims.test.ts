@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { PLAN_ENTITLEMENTS, TEAM_SEATS_BY_TIER } from "@explore-and-earn/contracts";
@@ -9,14 +10,19 @@ import { HOME_PLANS } from "../../components/home/home-data";
  *
  * This is the "empty promise" class that zeroed teamSeats in the first place:
  * the Enterprise card used to sell "Multi-location + team seats" while
- * team_memberships had a table, RLS, and no application code. The fix was to
- * delete the claim; the fix now that seats are real (founder decision
- * 2026-07-26) is to state exactly the number the server will enforce.
+ * team_memberships had a table, RLS, and no application code. Building invite /
+ * accept / revoke did not settle it — accepting still grants no access to any
+ * listing, applicant or analytic — so the entitlement is back at zero and no
+ * surface may claim one.
  *
  * Both directions are asserted, because either one alone is the defect:
  *   • a card that sells a seat when the entitlement is 0 is a lie;
  *   • a card that hides a seat the plan grants means a host paid for something
  *     nobody told them about.
+ *
+ * The Stripe product description is checked too: it is customer-facing copy that
+ * lives outside the app, and it is where the "1 team seat" figure was quoted
+ * back at the contract as evidence for restoring the entitlement.
  */
 
 const SEAT_CLAIM = /team seat/i;
@@ -59,6 +65,29 @@ describe("home plan cards state the real team-seat entitlement", () => {
       for (const claim of seatClaims(plan.features)) {
         expect(claim.toLowerCase()).toContain("owner");
       }
+    }
+  });
+
+  it("the Stripe product description sells no seat the plan does not grant", () => {
+    const manifest = JSON.parse(
+      readFileSync(
+        new URL(
+          "../../../../packages/stripe-seed/expected-stripe-manifest.json",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ) as { products: { key: string; description: string }[] };
+
+    for (const key of ["starter", "professional", "enterprise"] as const) {
+      const product = manifest.products.find((p) => p.key === key);
+      expect(product, `no Stripe product for ${key}`).toBeDefined();
+      const claimsSeat = SEAT_CLAIM.test(product!.description);
+      expect(
+        claimsSeat,
+        `${key}'s Stripe description ${claimsSeat ? "sells" : "omits"} a team ` +
+          `seat while PLAN_ENTITLEMENTS grants ${PLAN_ENTITLEMENTS[key].teamSeats}`,
+      ).toBe(PLAN_ENTITLEMENTS[key].teamSeats > 0);
     }
   });
 

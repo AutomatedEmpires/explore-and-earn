@@ -13,6 +13,15 @@
  *     whoever accepted first.
  *  3. An unreadable tier resolving to an entitlement. Unknown / null / "none"
  *     must be zero seats, never a default.
+ *  4. An expired invitation holding its seat forever. lib/teamSeats.ts said
+ *     expiry gave a seat back and nothing made that true: the row stays
+ *     'invited' until somebody tries to accept it, so the seat was gone, the
+ *     invite form was hidden, and the sweep that would have freed it could never
+ *     run.
+ *
+ * WHAT THIS FILE DOES NOT ASSERT: that any tier grants a seat. Every count is
+ * zero because accepting an invitation grants no access — see
+ * teamSeatCapability.test.ts, which is what stops a number rising without one.
  *
  * All Supabase and server-only I/O is mocked so no DB connection is required.
  */
@@ -79,6 +88,12 @@ describe("team seat entitlement consistency", () => {
     }
   });
 
+  it("gives an Enterprise host zero seats, because acceptance grants nothing", () => {
+    // The count and the capability are one claim. Raising this without landing
+    // the access half is the empty promise teamSeatCapability.test.ts refuses.
+    expect(seatLimitForTier("enterprise")).toBe(0);
+  });
+
   it("never offers 'owner' as an invitable role — the owner holds no membership row", () => {
     expect(INVITABLE_TEAM_ROLES).not.toContain("owner");
     expect(isInvitableTeamRole("owner")).toBe(false);
@@ -102,7 +117,51 @@ describe("seat accounting", () => {
     ).toBe(0);
   });
 
-  it("an Enterprise host with one pending invitation has no seat left", () => {
+  it("a pending invitation PAST ITS EXPIRY consumes nothing", () => {
+    // The defect: the row is still 'invited' — nothing flips it until somebody
+    // tries to accept, and nobody can, because it has expired. Counting it held
+    // the seat forever and hid the invite form whose sweep would free it.
+    const now = new Date("2026-07-26T00:00:00Z");
+    expect(
+      countConsumedSeats(
+        [{ status: "invited", inviteExpiresAt: "2026-07-25T23:59:59Z" }],
+        now,
+      ),
+    ).toBe(0);
+  });
+
+  it("a pending invitation still inside its window DOES consume a seat", () => {
+    const now = new Date("2026-07-26T00:00:00Z");
+    expect(
+      countConsumedSeats(
+        [{ status: "invited", inviteExpiresAt: "2026-07-27T00:00:00Z" }],
+        now,
+      ),
+    ).toBe(1);
+  });
+
+  it.each([undefined, null, "not-a-timestamp"])(
+    "treats an unreadable expiry (%s) as still live — never as a free seat",
+    (expiry) => {
+      expect(
+        countConsumedSeats([
+          { status: "invited", inviteExpiresAt: expiry as string | null | undefined },
+        ]),
+      ).toBe(1);
+    },
+  );
+
+  it("an active member's expiry field is irrelevant", () => {
+    const now = new Date("2026-07-26T00:00:00Z");
+    expect(
+      countConsumedSeats(
+        [{ status: "active", inviteExpiresAt: "2020-01-01T00:00:00Z" }],
+        now,
+      ),
+    ).toBe(1);
+  });
+
+  it("reports usage against the limit the tier actually grants", () => {
     const usage = summarizeTeamSeats("enterprise", [{ status: "invited" }]);
     expect(usage.limit).toBe(TEAM_SEATS_BY_TIER.enterprise);
     expect(usage.used).toBe(1);
@@ -143,13 +202,13 @@ describe("refuseTeamInvite", () => {
     ).toBe("seat_limit_reached");
   });
 
-  it("REFUSES an Enterprise host whose one seat is already spent on a PENDING invitation", () => {
+  it("REFUSES an Enterprise host, because no plan includes a seat today", () => {
     expect(
       refuseTeamInvite({
         tier: "enterprise",
-        existing: [{ status: "invited" }],
+        existing: [],
         role: "viewer",
-        email: "second@example.com",
+        email: "colleague@example.com",
       }),
     ).toBe("seat_limit_reached");
   });
@@ -176,7 +235,13 @@ describe("refuseTeamInvite", () => {
     ).toBe("invalid_email");
   });
 
-  it("permits the one invitation an Enterprise host is entitled to", () => {
+  it("permits an invitation exactly when the tier has a seat left", () => {
+    // Expressed against a hypothetical limit rather than a tier name: no real
+    // tier grants a seat today, and this is the arithmetic that would govern one
+    // if it did. summarizeTeamSeats is the same function refuseTeamInvite calls.
+    expect(summarizeTeamSeats("enterprise", []).remaining).toBe(
+      TEAM_SEATS_BY_TIER.enterprise,
+    );
     expect(
       refuseTeamInvite({
         tier: "enterprise",
@@ -184,7 +249,18 @@ describe("refuseTeamInvite", () => {
         role: "hiring_manager",
         email: "colleague@example.com",
       }),
-    ).toBeNull();
+    ).toBe(TEAM_SEATS_BY_TIER.enterprise > 0 ? null : "seat_limit_reached");
+  });
+
+  it("checks the ROLE and the ADDRESS before the seat, so the reason shown is the fixable one", () => {
+    expect(
+      refuseTeamInvite({
+        tier: "starter",
+        existing: [],
+        role: "owner",
+        email: "colleague@example.com",
+      }),
+    ).toBe("invalid_role");
   });
 });
 

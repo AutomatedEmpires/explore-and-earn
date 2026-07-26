@@ -19,6 +19,7 @@ export type AdditionalListingCheckoutResult =
       reason:
         | "unauthenticated"
         | "not_host"
+        | "no_subscription"
         | "invalid_quantity"
         | "no_stripe_config"
         | "rate_limited"
@@ -33,6 +34,12 @@ export type AdditionalListingCheckoutResult =
  * client sends only how many slots it wants. Nothing is credited here: the
  * allowance lands in the webhook (syncAdditionalListingPurchase), idempotent on
  * the checkout session id, mirroring the boost and invite-pack flows.
+ *
+ * AN UNSUBSCRIBED HOST IS REFUSED. The add-on is priced "based on tier" and
+ * sells a listing "beyond your plan's included count"; there is no free tier, so
+ * a host with no plan has no rate and no included count to go beyond. Selling it
+ * to them at the Starter rate would be the Starter allowance without the Starter
+ * subscription.
  */
 export async function createAdditionalListingCheckoutAction(
   quantity: number,
@@ -66,9 +73,12 @@ export async function createAdditionalListingCheckoutAction(
   const host = await getHostTierAndProfile(token, userId);
   if (!host) return { ok: false, reason: "not_host" };
 
-  const tier = isAdditionalListingTier(host.subscriptionTier)
-    ? host.subscriptionTier
-    : "none";
+  // "none" — and anything else this layer cannot read as a paid tier — has no
+  // add-on rate, so there is nothing to charge and no session to open.
+  if (!isAdditionalListingTier(host.subscriptionTier)) {
+    return { ok: false, reason: "no_subscription" };
+  }
+  const tier = host.subscriptionTier;
 
   try {
     const checkout = await createAdditionalListingCheckoutSession({

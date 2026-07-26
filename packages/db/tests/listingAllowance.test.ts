@@ -55,9 +55,25 @@ describe("effectiveListingCap", () => {
     );
   });
 
-  it("floors a host with no subscription at the Starter entitlement, not at zero", () => {
-    expect(includedListingCapFor("none")).toBe(PLAN_ENTITLEMENTS.starter.listings);
-    expect(includedListingCapFor(null)).toBe(PLAN_ENTITLEMENTS.starter.listings);
+  it.each(["none", null, undefined, "", "gold", "STARTER"])(
+    "gives an unsubscribed or unreadable tier (%s) ZERO included listings — there is no free tier",
+    (tier) => {
+      // The defect: this floored at the Starter entitlement, so a host who had
+      // never paid held Starter's active listing for nothing — and, paired with
+      // an add-on quoted at the Starter rate for tier 'none', could buy every
+      // further listing without ever buying the plan they belong to.
+      expect(includedListingCapFor(tier as string | null | undefined)).toBe(0);
+    },
+  );
+
+  it("still gives each PAID tier exactly its entitlement", () => {
+    expect(includedListingCapFor("starter")).toBe(PLAN_ENTITLEMENTS.starter.listings);
+    expect(includedListingCapFor("professional")).toBe(
+      PLAN_ENTITLEMENTS.professional.listings,
+    );
+    expect(includedListingCapFor("enterprise")).toBe(
+      PLAN_ENTITLEMENTS.enterprise.listings,
+    );
   });
 
   it.each([null, undefined, -4, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
@@ -75,6 +91,16 @@ describe("effectiveListingCap", () => {
 });
 
 describe("hasListingSlotAvailable", () => {
+  it("REFUSES an unsubscribed host their very first active listing", () => {
+    expect(
+      hasListingSlotAvailable({
+        tier: "none",
+        purchasedSlots: 0,
+        activeListingCount: 0,
+      }),
+    ).toBe(false);
+  });
+
   it("REFUSES when the host is at the included cap and has bought nothing", () => {
     expect(
       hasListingSlotAvailable({
@@ -175,6 +201,18 @@ describe("updateListingStatus honours the purchased allowance", () => {
       .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }))
       .mockReturnValueOnce(makeChain({ data: { subscription_tier: "starter" } }))
       .mockReturnValueOnce(makeChain({ count: PLAN_ENTITLEMENTS.starter.listings + 1 }));
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+    expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  it("REFUSES an unsubscribed host with no listings at all — no free tier", async () => {
+    mockRpc.mockResolvedValue({ data: 0, error: null });
+    mockFrom
+      .mockReturnValueOnce(HOST_PROFILE)
+      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }))
+      .mockReturnValueOnce(makeChain({ data: { subscription_tier: "none" } }))
+      .mockReturnValueOnce(makeChain({ count: 0 }));
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });

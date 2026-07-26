@@ -119,6 +119,10 @@ export async function getHostTeam(
   }
 
   const members = ((data ?? []) as Record<string, unknown>[]).map(rowToMember);
+  // TeamMember carries inviteExpiresAt, and summarizeTeamSeats reads it: an
+  // invitation past its expiry is dead weight, not a spent seat, and it is
+  // invite_host_team_member that actually sweeps it. Counting it here would hide
+  // the invite form that runs the sweep, so the seat could never come back.
   return {
     members,
     seats: summarizeTeamSeats(subscriptionTier, members),

@@ -302,6 +302,19 @@ export interface HomePlan {
   readonly cta: string;
 }
 
+/**
+ * The team-seat bullet, or nothing.
+ *
+ * Takes a plain `number` on purpose: PLAN_ENTITLEMENTS is `as const`, so reading
+ * the field directly narrows it to the literal 0 and the singular/plural test
+ * becomes a compile error rather than a runtime branch. Widening keeps the
+ * pluralisation honest for whatever number the contract eventually carries.
+ */
+function teamSeatFeature(seats: number): string[] {
+  if (seats <= 0) return [];
+  return [`${seats} team seat${seats === 1 ? "" : "s"} alongside the owner`];
+}
+
 export const HOME_PLANS: readonly HomePlan[] = [
   {
     key: "starter",
@@ -350,19 +363,14 @@ export const HOME_PLANS: readonly HomePlan[] = [
       `${PLAN_ENTITLEMENTS.enterprise.monthlyAnnouncements} announcements / month`,
       `${PLAN_ENTITLEMENTS.enterprise.includedInviteCredits} invite credits / month`,
       "Applicant pipeline + full analytics",
-      // Restored, derived, and now backed: invite / accept / remove exist
-      // (app/actions/hostTeam.ts) and the limit is enforced in the database
-      // (migration 085). The COUNT awaits founder confirmation —
-      // TEAM_SEATS_BY_TIER in packages/contracts/src/pricing.ts. The ternary is
-      // not decoration: if that number ever returns to zero this line disappears
-      // rather than selling a seat nobody gets.
-      ...(PLAN_ENTITLEMENTS.enterprise.teamSeats > 0
-        ? [
-            `${PLAN_ENTITLEMENTS.enterprise.teamSeats} team seat${
-              PLAN_ENTITLEMENTS.enterprise.teamSeats === 1 ? "" : "s"
-            } alongside the owner`,
-          ]
-        : []),
+      // Derived, and currently EMPTY. TEAM_SEATS_BY_TIER holds every tier at 0
+      // because accepting a team invitation grants no access to anything — the
+      // invite plumbing exists (migration 085) but no policy admits a member to
+      // a listing, an applicant or an analytics figure. The ternary is not
+      // decoration: it is what keeps this card from selling a seat nobody gets,
+      // and it will render the bullet by itself the day the number can honestly
+      // rise.
+      ...teamSeatFeature(PLAN_ENTITLEMENTS.enterprise.teamSeats),
       // STILL REMOVED — "multi-location" is not a separate capability, it is
       // just the listing allowance above; and "Priority support & trust tools"
       // has no support entitlement, queue, or SLA anywhere in the product.

@@ -18,14 +18,23 @@ export const CAP_COUNTED_LISTING_STATUSES = ["live", "paused"] as const;
 /**
  * Listings INCLUDED in a stored tier.
  *
- * "none" (no active subscription) is floored at the Starter entitlement — the
- * same policy as the boost-purchase tier fallback: the lowest real paid tier,
- * not zero and not unlimited.
+ * "none" (no active subscription) gets ZERO, and so does any tier string this
+ * function cannot read. There is no free tier (founder), and the previous floor
+ * at the Starter entitlement was one: it handed an unsubscribed host Starter's
+ * active listing at no charge, and — paired with an add-on quoted at the Starter
+ * rate for tier 'none' — let them buy every further listing without ever buying
+ * the plan those listings belong to. Publishing is a paid capability with an
+ * honest upsell, the same rule MONTHLY_INVITE_QUOTA.none = 0 already states for
+ * invites.
+ *
+ * An unreadable tier resolving to zero is the same discipline as
+ * seatLimitForTier: a tier we cannot read must never be handed an entitlement.
  */
 export function includedListingCapFor(tier: string | null | undefined): number {
-  const entitlementTier =
-    tier === "professional" || tier === "enterprise" ? tier : "starter";
-  return PLAN_ENTITLEMENTS[entitlementTier].listings;
+  if (tier === "starter" || tier === "professional" || tier === "enterprise") {
+    return PLAN_ENTITLEMENTS[tier].listings;
+  }
+  return 0;
 }
 
 /**

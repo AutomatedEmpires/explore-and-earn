@@ -3,15 +3,22 @@
  * seats and basic/ full analytics are included per tier. not additional
  * products.").
  *
- * The COUNTS come from TEAM_SEATS_BY_TIER in packages/contracts/src/pricing.ts
- * and await founder confirmation; this module only decides who may occupy one.
+ * THE COUNTS ARE ALL ZERO TODAY. TEAM_SEATS_BY_TIER holds every tier at 0
+ * because accepting an invitation grants no access to anything — see the note
+ * on that constant. This module is the accounting that would govern seats if
+ * there were any, and the thing that keeps the number the server enforces equal
+ * to the number the UI shows; it does not decide the entitlement.
  *
  * SEAT ACCOUNTING. A seat is consumed the moment an invitation is issued, not
  * when it is accepted — otherwise a host could paper the marketplace with
  * pending invitations and hand out unlimited access on a first-come basis. So
- * both 'invited' and 'active' rows count, and only revoking (or letting an
- * invitation expire) gives a seat back. The account OWNER holds no membership
- * row and is never counted.
+ * 'active' rows and LIVE 'invited' rows count. An invitation past its expiry
+ * consumes nothing: it can no longer be accepted (the accept function refuses it
+ * and flips it to 'expired'), so charging a seat for it would strand the seat
+ * forever, and the host would never reach the invite form that runs the sweep.
+ * invite_host_team_member expires this host's stale invitations inside its
+ * advisory lock before counting, so the two agree. The account OWNER holds no
+ * membership row and is never counted.
  *
  * No I/O and no `server-only` import: the SQL function
  * public.invite_host_team_member enforces the same rule inside a per-host
@@ -41,11 +48,39 @@ export function isInvitableTeamRole(value: string): value is InvitableTeamRole {
   return (INVITABLE_TEAM_ROLES as readonly string[]).includes(value);
 }
 
-/** Statuses that occupy a seat. */
+/** Statuses that can occupy a seat. 'invited' only does so while it is still
+ * acceptable — see isSeatConsuming. */
 export const SEAT_CONSUMING_STATUSES: readonly TeamMembershipStatus[] = [
   "invited",
   "active",
 ];
+
+/** The shape seat accounting needs from a membership row. `inviteExpiresAt` is
+ * the ISO timestamp team_memberships.invite_expires_at carries; a row without
+ * one is treated as never expiring, matching the SQL. */
+export interface SeatRow {
+  readonly status: string;
+  readonly inviteExpiresAt?: string | null;
+}
+
+/**
+ * Does this row occupy a seat right now?
+ *
+ * An 'invited' row past its expiry does not. accept_host_team_invitation
+ * refuses such a token and marks the row 'expired', and
+ * invite_host_team_member sweeps them before it counts — so a stale invitation
+ * is dead weight, not a spent seat.
+ */
+export function isSeatConsuming(row: SeatRow, now: Date = new Date()): boolean {
+  if (row.status === "active") return true;
+  if (row.status !== "invited") return false;
+  if (row.inviteExpiresAt == null) return true;
+  const expiry = Date.parse(row.inviteExpiresAt);
+  // An unparseable timestamp is treated as "still live": guessing that a seat is
+  // free is the direction that over-grants.
+  if (Number.isNaN(expiry)) return true;
+  return expiry > now.getTime();
+}
 
 /**
  * Seats INCLUDED in a stored tier. Unknown values resolve to zero: an
@@ -60,11 +95,10 @@ export function seatLimitForTier(tier: string | null | undefined): number {
 
 /** How many seats a set of membership rows occupies. */
 export function countConsumedSeats(
-  rows: readonly { readonly status: string }[],
+  rows: readonly SeatRow[],
+  now: Date = new Date(),
 ): number {
-  return rows.filter((row) =>
-    (SEAT_CONSUMING_STATUSES as readonly string[]).includes(row.status),
-  ).length;
+  return rows.filter((row) => isSeatConsuming(row, now)).length;
 }
 
 export type TeamSeatRefusal = "seat_limit_reached" | "invalid_role" | "invalid_email";
@@ -77,10 +111,11 @@ export interface TeamSeatUsage {
 
 export function summarizeTeamSeats(
   tier: string | null | undefined,
-  rows: readonly { readonly status: string }[],
+  rows: readonly SeatRow[],
+  now: Date = new Date(),
 ): TeamSeatUsage {
   const limit = seatLimitForTier(tier);
-  const used = countConsumedSeats(rows);
+  const used = countConsumedSeats(rows, now);
   return { limit, used, remaining: Math.max(0, limit - used) };
 }
 
@@ -93,13 +128,14 @@ export function summarizeTeamSeats(
  */
 export function refuseTeamInvite(args: {
   readonly tier: string | null | undefined;
-  readonly existing: readonly { readonly status: string }[];
+  readonly existing: readonly SeatRow[];
   readonly role: string;
   readonly email: string;
+  readonly now?: Date;
 }): TeamSeatRefusal | null {
   if (!isInvitableTeamRole(args.role)) return "invalid_role";
   if (!isPlausibleEmail(args.email)) return "invalid_email";
-  const { remaining } = summarizeTeamSeats(args.tier, args.existing);
+  const { remaining } = summarizeTeamSeats(args.tier, args.existing, args.now);
   if (remaining <= 0) return "seat_limit_reached";
   return null;
 }

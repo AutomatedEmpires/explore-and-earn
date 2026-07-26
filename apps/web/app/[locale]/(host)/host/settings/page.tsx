@@ -7,6 +7,7 @@ import {
   getHostProfile,
   getHostTeam,
   getPurchasedListingSlots,
+  includedListingCapFor,
   seatLimitForTier,
 } from "@explore-and-earn/db";
 
@@ -79,6 +80,7 @@ export default async function HostSettingsPage() {
         teamAvailable={team?.available ?? false}
         invitableRoles={INVITABLE_TEAM_ROLES}
         purchasedListingSlots={purchasedListingSlots}
+        includedListingCap={includedListingCapFor(subscriptionTier)}
         effectiveListingCap={effectiveListingCap(subscriptionTier, purchasedListingSlots)}
       />
       <HostSectionHeading title={t("heading")} description={t("description")} />

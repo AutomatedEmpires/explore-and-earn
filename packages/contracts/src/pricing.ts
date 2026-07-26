@@ -30,12 +30,21 @@ export const FOUNDING_SEAT_CAP = 100
 // Team seats INCLUDED per tier — founder decision 2026-07-26: "team seats and
 // basic/ full analytics are included per tier. not additional products."
 //
-// ⚠ AWAITS FOUNDER CONFIRMATION OF THE COUNTS. The founder stated that seats
-// are included; the founder has NOT stated how many each tier gets. Enterprise
-// 1 is the only per-tier seat figure this repository already states anywhere —
-// packages/stripe-seed/expected-stripe-manifest.json describes the Enterprise
-// product as including "1 team seat" — so it is used here, and Starter /
-// Professional stay at 0 until the founder says otherwise.
+// EVERY TIER IS ZERO, and that is not a placeholder for a number nobody has
+// given — it is the only honest figure while accepting an invitation grants no
+// access. The invite / accept / revoke plumbing exists (migration 085,
+// queries/hostTeam.ts) but the ACCESS half does not: no policy on listings,
+// applications, conversations, messages or any analytics source admits a
+// team_memberships row, current_host_profile_ids() is keyed on
+// host_profiles.clerk_user_id alone, and nothing anywhere reads role_preset or
+// custom_permissions. A person who accepts an invitation today can sign in and
+// see exactly what a stranger sees.
+//
+// So the seat count stays at 0 until a policy admits a member to something. The
+// founder's decision is recorded and unimplemented, NOT contradicted: raising
+// any of these numbers is the last step of building team access, never the
+// first. packages/db/tests/teamSeatCapability.test.ts fails if a number here
+// goes above zero while no migration grants a team member access to anything.
 //
 // A seat is a colleague IN ADDITION to the account owner. The owner holds no
 // team_memberships row and is never counted against this number.
@@ -46,7 +55,7 @@ export const TEAM_SEATS_BY_TIER = {
   none: 0,
   starter: 0,
   professional: 0,
-  enterprise: 1,
+  enterprise: 0,
 } as const
 
 // Analytics depth per STORED tier. PLAN_ENTITLEMENTS carries the same fact for
@@ -98,12 +107,12 @@ export const PLAN_ENTITLEMENTS = {
     listings: 10,
     includedInviteCredits: 20,
     monthlyAnnouncements: 3,
-    // Restored from 0 by founder decision 2026-07-26 ("team seats ... are
-    // included per tier"). The previous zero existed because team_memberships
-    // had a table and RLS but no application code; invite / accept / revoke now
-    // exist and the limit is enforced in a SECURITY DEFINER function, so the
-    // number is backed by a code path. The COUNT itself still awaits founder
-    // confirmation — see TEAM_SEATS_BY_TIER.
+    // 0, not 1. This was Enterprise's headline differentiator at $749/mo and
+    // nothing implements it. Invite / accept / revoke were built (migration 085)
+    // but ACCEPTING GRANTS NOTHING: no policy admits a team member to a
+    // listing, an applicant, a conversation or an analytics figure. An
+    // entitlement that renders as a sold feature must be backed by a capability,
+    // so this stays at zero until one exists — see TEAM_SEATS_BY_TIER.
     teamSeats: TEAM_SEATS_BY_TIER.enterprise,
     analytics: ANALYTICS_ENTITLEMENT.enterprise,
   },
@@ -178,12 +187,19 @@ export const BOOST_PRICING: Record<BoostDuration, number> = {
 
 // Additional active listing — the self-serve add-on surface. DERIVED from
 // ADDON_PRICING.additionalListingMonthly so there is a single source of truth
-// for the three tier prices (founder directive 2026-06-21). Keyed by STORED
-// tier: a host with no active subscription is quoted the Starter rate, the same
-// floor the listing cap itself uses (listingCapFor in
-// packages/db/src/lib/listingAllowance.ts). Integer cents; recurring monthly.
+// for the three tier prices (founder directive 2026-06-21). Integer cents;
+// recurring monthly.
+//
+// KEYED BY PAID TIER ONLY, deliberately. The add-on is "one more active listing
+// beyond your plan's included count", which presupposes a plan. A 'none' key set
+// to the Starter rate — alongside a listing cap that floored 'none' at the
+// Starter entitlement — meant an unsubscribed host got Starter's included
+// listing for nothing and every further listing for the add-on rate, i.e. the
+// Starter allowance without the Starter subscription. The founder ruled there is
+// no free tier, so: includedListingCapFor('none') is 0
+// (packages/db/src/lib/listingAllowance.ts) and this map has no 'none' entry, so
+// there is no rate at which an unsubscribed host can be quoted.
 export const ADDITIONAL_LISTING_PRICING = {
-  none: ADDON_PRICING.additionalListingMonthly.starter,
   starter: ADDON_PRICING.additionalListingMonthly.starter,
   professional: ADDON_PRICING.additionalListingMonthly.professional,
   enterprise: ADDON_PRICING.additionalListingMonthly.enterprise,

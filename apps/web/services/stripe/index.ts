@@ -8,6 +8,7 @@ import {
   insertHostAnnouncement,
   recordInvitePackPurchase,
   revokeListingSlotPurchase,
+  syncListingSlotSubscription,
   type BoostPurchaseTier,
 } from "@explore-and-earn/db";
 import {
@@ -393,9 +394,18 @@ async function syncAdditionalListingPurchase(
   // The contract price is authoritative for the RECORD (what one slot costs at
   // this tier). session.amount_total is the whole line, quantity included, so
   // dividing it would re-derive a per-unit figure that a coupon could distort.
+  //
+  // The tier can only fail to resolve if our own metadata is corrupt — the
+  // checkout refuses to open for anything but a paid tier. There is no
+  // "unsubscribed rate" to fall back to any more, so fall back to the figure we
+  // QUOTED into the session's metadata rather than inventing one, and to 0 if
+  // even that is unreadable. The purchase is still credited: the money arrived.
+  const quotedAmountCents = Number.parseInt(session.metadata?.amountCents ?? "", 10);
   const unitAmountCents = isAdditionalListingTier(tier)
     ? ADDITIONAL_LISTING_PRICING[tier]
-    : ADDITIONAL_LISTING_PRICING.none;
+    : Number.isInteger(quotedAmountCents) && quotedAmountCents >= 0
+      ? quotedAmountCents
+      : 0;
 
   const subscriptionId =
     typeof session.subscription === "string" ? session.subscription : null;
@@ -537,10 +547,37 @@ async function syncSubscriptionEvent(
   // subscription metadata; it never touches subscription_tier.
   if (subscription.metadata?.productType === ADDITIONAL_LISTING_PRODUCT_TYPE) {
     if (!deleted) {
-      // The allowance is credited from checkout.session.completed, where the
-      // session id gives idempotency. Lifecycle updates need no action.
+      // NOT a no-op. Crediting happens once, from checkout.session.completed —
+      // so without this branch the allowance never moves again, and two things
+      // slip through: a subscription parked in a NON-PAYING status (Stripe
+      // leaves an uncollected subscription in 'unpaid' / 'incomplete_expired' /
+      // 'paused' and may never emit deleted), and a QUANTITY CHANGED in the
+      // billing portal, which only ever surfaces here. Either way the host
+      // holds listing slots they are not paying for.
+      //
+      // The sync is a delta against what this purchase currently contributes,
+      // so a redelivered event changes nothing.
+      // Same verdict the PLAN path uses (resolveSubscriptionTier reads this
+      // exact set): active / trialing / past_due are still paying, everything
+      // else is not. One definition, so a plan and its add-on can never
+      // disagree about whether a host is in good standing.
+      const entitled = ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status);
+      const synced = await syncListingSlotSubscription({
+        stripeSubscriptionId: subscription.id,
+        quantity: additionalListingQuantity(subscription),
+        entitled,
+      });
+      if (!synced.ok) {
+        throw new Error("additional listing allowance could not be synced");
+      }
       return {
-        action: "ignored_additional_listing_subscription_update",
+        action: !synced.found
+          ? "listing_slots_purchase_not_found"
+          : !synced.changed
+            ? "listing_slots_unchanged"
+            : entitled
+              ? "synced_listing_slots"
+              : "revoked_listing_slots_unpaid",
         clerkUserId: subscription.metadata?.clerkUserId ?? null,
         tier: null,
       };
@@ -809,6 +846,16 @@ export async function createBoostCheckoutSession(params: {
 /** Webhook + metadata key for the add-on. One constant, three call sites. */
 export const ADDITIONAL_LISTING_PRODUCT_TYPE = "additional_listing";
 
+/**
+ * The tiers the add-on can be sold to — the PAID ones, and only those.
+ *
+ * ADDITIONAL_LISTING_PRICING deliberately has no 'none' key: an extra listing
+ * "beyond your plan's included count" presupposes a plan, and quoting an
+ * unsubscribed host the Starter rate (while the cap floored 'none' at Starter's
+ * included listing) sold the Starter allowance without the Starter
+ * subscription. isAdditionalListingTier is therefore FALSE for "none", which is
+ * what stops the checkout being created at all.
+ */
 export type AdditionalListingTier = keyof typeof ADDITIONAL_LISTING_PRICING;
 
 export function isAdditionalListingTier(value: string): value is AdditionalListingTier {
@@ -818,11 +865,25 @@ export function isAdditionalListingTier(value: string): value is AdditionalListi
 /** Optional pre-created Stripe Price ids per tier. Unset falls back to inline
  * price_data from the founder-locked contract, exactly as boost does. */
 const ADDITIONAL_LISTING_PRICE_ENV: Record<AdditionalListingTier, string> = {
-  none: "STRIPE_PRICE_ADDITIONAL_LISTING_STARTER",
   starter: "STRIPE_PRICE_ADDITIONAL_LISTING_STARTER",
   professional: "STRIPE_PRICE_ADDITIONAL_LISTING_PROFESSIONAL",
   enterprise: "STRIPE_PRICE_ADDITIONAL_LISTING_ENTERPRISE",
 };
+
+/**
+ * The add-on subscription's current line quantity, or null when Stripe did not
+ * send one. Null means "leave the recorded quantity alone" — inventing a
+ * quantity from an incomplete payload would rewrite an allowance nobody
+ * changed.
+ */
+function additionalListingQuantity(
+  subscription: Stripe.Subscription,
+): number | null {
+  const quantity = subscription.items?.data?.[0]?.quantity;
+  return typeof quantity === "number" && Number.isInteger(quantity) && quantity >= 0
+    ? quantity
+    : null;
+}
 
 export async function createAdditionalListingCheckoutSession(params: {
   clerkUserId: string;

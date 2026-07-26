@@ -9,11 +9,25 @@
 -- packages/contracts/src/pricing.ts (TEAM_SEATS_BY_TIER, ANALYTICS_ENTITLEMENT,
 -- ADDITIONAL_LISTING_PRICING).
 --
--- ── 1) TEAM SEATS ───────────────────────────────────────────────────────────
+-- ── 1) TEAM SEATS — PLUMBING ONLY, THE FEATURE IS DARK ──────────────────────
 --
--- team_memberships has existed since 003 with RLS since 015 and NO application
--- code. Turning it into a real feature needs three schema facts it does not
--- currently have:
+-- READ THIS BEFORE RAISING A SEAT COUNT. Everything below is the INVITATION
+-- half: issue, accept, revoke, with a seat limit the server resolves and the
+-- database re-counts. The ACCESS half does not exist. No policy on listings,
+-- applications, conversations, messages or any analytics source references
+-- team_memberships; public.current_host_profile_ids() resolves host identity
+-- from host_profiles.clerk_user_id alone; and nothing in the product reads
+-- role_preset or custom_permissions. Accepting an invitation therefore links a
+-- row and grants NOTHING.
+--
+-- So TEAM_SEATS_BY_TIER in packages/contracts/src/pricing.ts holds every tier
+-- at 0, no surface sells a seat, and invite_host_team_member refuses every
+-- invitation because the limit it is handed is zero. This migration is additive
+-- and inert until somebody builds the access half — at which point the seat
+-- counts are the LAST thing to move, not the first.
+--
+-- Turning the invitation half into working plumbing needed three schema facts
+-- team_memberships did not have:
 --
 --   a) An invitee who has not signed up yet. `user_id` is NOT NULL and
 --      references auth.users(id) — but this product authenticates with Clerk,
@@ -124,8 +138,13 @@ alter table public.team_memberships
 -- ---------------------------------------------------------------------------
 -- Reads stay: team_memberships_all_host (015) lets an owner list their team and
 -- team_memberships_select_self lets a member see their own row. Writes go
--- through the SECURITY DEFINER functions below, which are the only place the
--- seat limit is enforced.
+-- through the functions below, which are the only place the seat limit is
+-- enforced. Those functions are NOT security definer — they are plain
+-- invoker-rights functions whose EXECUTE is revoked from public / anon /
+-- authenticated and granted only to service_role, so they run with the
+-- privileges of the server-side caller that is allowed to call them at all.
+-- Definer rights would widen the blast radius (the owner is a superuser role)
+-- without buying anything: service_role already bypasses RLS.
 revoke insert, update, delete on table public.team_memberships from anon, authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -173,6 +192,20 @@ begin
   perform pg_advisory_xact_lock(
     hashtextextended('team_seat:' || p_host_profile_id::text, 0)
   );
+
+  -- Retire this host's stale invitations FIRST. An invitation past its expiry
+  -- can no longer be accepted — accept_host_team_invitation refuses it and
+  -- marks it 'expired' — so leaving it 'invited' would hold a seat that nothing
+  -- can ever free, and would also keep uq_team_memberships_pending_email
+  -- blocking a fresh invitation to the same address. The sweep runs inside the
+  -- advisory lock, so it cannot race the count below.
+  update public.team_memberships
+     set status       = 'expired',
+         invite_token = null
+   where host_profile_id = p_host_profile_id
+     and status = 'invited'
+     and invite_expires_at is not null
+     and invite_expires_at < now();
 
   select count(*)
     into v_used
@@ -364,7 +397,8 @@ alter table public.host_listing_slot_purchases enable row level security;
 -- Reads: a host sees only their own purchases (the settings surface shows what
 -- they bought). Writes: service-role only — there is no authenticated write
 -- policy, and the grants below withhold the privilege as well, so the
--- SECURITY DEFINER functions are the only write path.
+-- service-role-only functions are the only write path. (They are invoker-rights
+-- functions, not definer ones; see the note above section 2.)
 drop policy if exists host_listing_slot_purchases_select_own
   on public.host_listing_slot_purchases;
 create policy host_listing_slot_purchases_select_own
@@ -475,6 +509,94 @@ begin
 end;
 $$;
 
+-- Reconcile a live add-on subscription to what Stripe currently says it is.
+--
+-- revoke_listing_slot_purchase above only fires on customer.subscription.deleted
+-- — a FINAL cancellation. It leaves two states unhandled, and in both of them
+-- the host keeps an allowance they are no longer paying for:
+--
+--   * NON-PAYMENT. Stripe moves a subscription whose invoices go uncollected to
+--     'unpaid' (or 'incomplete_expired', or 'paused') and may sit there
+--     indefinitely without ever emitting deleted.
+--   * A PORTAL-SIDE QUANTITY CHANGE. The billing portal can change the line
+--     quantity. Only customer.subscription.updated reports it, and the credit
+--     path is keyed on the checkout session, which never fires again.
+--
+-- p_entitled is the caller's verdict on the Stripe status; p_quantity is the
+-- line quantity. The allowance moves by the DELTA between what this purchase
+-- currently contributes and what it should, so the function is idempotent under
+-- redelivery: a second identical event computes a delta of zero. Floored at zero
+-- so a manual data fix can never drive the column negative.
+create or replace function public.sync_listing_slot_subscription(
+  p_subscription_id text,
+  p_quantity        integer,
+  p_entitled        boolean
+) returns jsonb
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_row      public.host_listing_slot_purchases%rowtype;
+  v_current  integer;
+  v_target   integer;
+begin
+  if p_subscription_id is null or btrim(p_subscription_id) = '' then
+    return jsonb_build_object('ok', false, 'error', 'missing_subscription');
+  end if;
+
+  select * into v_row
+    from public.host_listing_slot_purchases
+   where stripe_subscription_id = p_subscription_id;
+
+  -- Not an add-on we hold a purchase for. Most often this is the created event
+  -- arriving before checkout.session.completed credited the row; the session
+  -- path is what credits, so there is nothing to do either way.
+  if not found then
+    return jsonb_build_object('ok', true, 'found', false, 'changed', false);
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtextextended('listing_slots:' || v_row.host_profile_id::text, 0)
+  );
+
+  -- Re-read under the lock: a concurrent credit or revoke may have moved it
+  -- between the lookup above and here.
+  select * into v_row
+    from public.host_listing_slot_purchases
+   where id = v_row.id
+     for update;
+
+  v_current := case when v_row.status = 'active' then v_row.quantity else 0 end;
+  v_target  := case
+                 when coalesce(p_entitled, false)
+                   then greatest(coalesce(p_quantity, v_row.quantity), 0)
+                 else 0
+               end;
+
+  if v_current = v_target then
+    return jsonb_build_object('ok', true, 'found', true, 'changed', false,
+                              'slots', v_target);
+  end if;
+
+  update public.host_profiles
+     set purchased_listing_slots =
+           greatest(purchased_listing_slots + (v_target - v_current), 0)
+   where id = v_row.host_profile_id;
+
+  -- quantity has a `> 0` CHECK, so a revoked purchase keeps the figure it was
+  -- bought at and records the loss of the allowance in `status` instead. That
+  -- also lets the same subscription be reinstated later at its own quantity.
+  update public.host_listing_slot_purchases
+     set quantity     = case when v_target > 0 then v_target else v_row.quantity end,
+         status       = case when v_target > 0 then 'active' else 'cancelled' end,
+         cancelled_at = case when v_target > 0 then null else now() end
+   where id = v_row.id;
+
+  return jsonb_build_object('ok', true, 'found', true, 'changed', true,
+                            'slots', v_target);
+end;
+$$;
+
 -- The host's OWN purchased allowance. Exists because the column is deliberately
 -- not in 080's SELECT allow-list — granting it would let every signed-in user
 -- read every host's add-on spend through host_profiles_select_public.
@@ -512,6 +634,8 @@ revoke execute on function public.credit_listing_slot_purchase(uuid, integer, in
   from public, anon, authenticated;
 revoke execute on function public.revoke_listing_slot_purchase(text)
   from public, anon, authenticated;
+revoke execute on function public.sync_listing_slot_subscription(text, integer, boolean)
+  from public, anon, authenticated;
 revoke execute on function public.my_purchased_listing_slots()
   from public, anon;
 
@@ -524,6 +648,8 @@ grant execute on function public.revoke_host_team_member(uuid, uuid)
 grant execute on function public.credit_listing_slot_purchase(uuid, integer, integer, text, text, text)
   to service_role;
 grant execute on function public.revoke_listing_slot_purchase(text)
+  to service_role;
+grant execute on function public.sync_listing_slot_subscription(text, integer, boolean)
   to service_role;
 grant execute on function public.my_purchased_listing_slots()
   to authenticated, service_role;

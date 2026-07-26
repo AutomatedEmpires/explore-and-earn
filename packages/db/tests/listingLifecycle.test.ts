@@ -144,10 +144,14 @@ describe("updateListingStatus", () => {
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
   });
 
-  it("floors a host with no subscription (tier null -> 'none') at the starter cap", async () => {
+  it("gives a host with no subscription (tier null -> 'none') NO listings at all", async () => {
+    // This used to floor 'none' at the Starter entitlement, which was a free
+    // tier: one active listing for a host who had never paid. The founder ruled
+    // there is none, so the refusal now lands at zero active listings, not one.
+    // See includedListingCapFor in lib/listingAllowance.ts.
     const read = makeChain({ data: { ...ANSWERED_DRAFT } });
     const tierRead = makeChain({ data: { subscription_tier: null } });
-    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
+    const capCount = makeChain({ count: 0 });
     queueFromResults(HOST_PROFILE, read, tierRead, capCount);
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
