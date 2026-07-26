@@ -275,6 +275,78 @@ if (!housingMigration) {
   }
 }
 
+// An RLS policy on table A that sub-selects table B is permission-checked
+// against the INVOKING role, column bitmap included -- unlike a policy on its
+// own table, which is evaluated as the table owner. Migration 081 moved every
+// anon/authenticated policy that reached host_profiles.clerk_user_id onto the
+// SECURITY DEFINER helpers so that withdrawing the column grant cannot 42501
+// storage uploads or the community feed. Reverting any of them to the inline
+// sub-select reopens that hazard silently, so the shape is pinned here.
+const policyIdentityMigration = migrationFiles.find((f) => /^081_.*\.sql$/.test(f))
+if (!policyIdentityMigration) {
+  hasFailure = true
+  console.error("G-POLICY-HOST-IDENTITY: expected migration 081 to be present.")
+} else {
+  const sql = fileContents
+    .get(policyIdentityMigration)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "create policy host_announcements_owner_read_all",
+    "create policy host_announcements_owner_insert",
+    "create policy host_announcements_owner_update",
+    "create policy listing_media_select_own_folder",
+    "create policy listing_media_insert_own_folder",
+    "create policy listing_media_update_own_folder",
+    "create policy listing_media_delete_own_folder",
+    "create policy profile_photos_select_own_folder",
+    "create policy profile_photos_insert_own_folder",
+    "create policy profile_photos_update_own_folder",
+    "create policy profile_photos_delete_own_folder",
+    "public.current_host_profile_ids()",
+    "public.current_seeker_profile_ids()",
+    // 072's Housing-evidence carve-out must survive the rewrite: those objects
+    // are written only by the trusted service-role path, never by a client.
+    "split_part(name, '/', 2) = 'library' and split_part(name, '/', 3) = 'housing'",
+    "split_part(name, '/', 2) = 'benefit' and split_part(name, '/', 4) = 'housing'",
+    // The migration proves the category is empty at apply time.
+    "still reachable from anon/authenticated policies",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-POLICY-HOST-IDENTITY: ${policyIdentityMigration} is missing ${needle}`,
+      )
+    }
+  }
+  // The whole point is that no rewritten policy reaches the column any more.
+  // Comments must be stripped FIRST: this migration explains the old expression
+  // in its header, and a naive scan of the raw text would fail on the very
+  // documentation that justifies the change.
+  const executable = fileContents
+    .get(policyIdentityMigration)
+    .split("\n")
+    .map((line) => line.replace(/--.*$/, ""))
+    .join(" ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const forbidden = [
+    "from host_profiles hp",
+    "from public.host_profiles hp",
+    "hp.clerk_user_id",
+    "sp.clerk_user_id",
+  ]
+  for (const needle of forbidden) {
+    if (executable.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-POLICY-HOST-IDENTITY: ${policyIdentityMigration} still inlines ${needle} in executable SQL.`,
+      )
+    }
+  }
+}
+
 // A host-editable coordinate pair must stay complete and geographically
 // bounded even when a caller bypasses the application parser.
 const coordinateMigration = migrationFiles.find((f) => /^074_.*\.sql$/.test(f))
