@@ -1,6 +1,8 @@
 /**
  * Connected proof for migration 077. Opt-in because it creates and removes
  * rows in a real local/staging Supabase database; production is hard-disabled.
+ * Opt-in means it does not run in CI: the always-on authorization coverage is
+ * `tools/db-assert/sql/assert_authorization_matrix.sql`.
  *
  * Run against `supabase start` after a local reset:
  *   SUPABASE_RLS_INTEGRATION=1 NEXT_PUBLIC_SUPABASE_URL=... \

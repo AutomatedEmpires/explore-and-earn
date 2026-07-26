@@ -6,7 +6,8 @@
   "scripts": {
     "check": "node ./check.mjs",
     "assert:grants": "node ./assert-grants.mjs",
+    "assert:authz": "node ./assert-authorization.mjs",
     "assert:housing-upgrade": "node ./assert-housing-photo-upgrade.mjs",
-    "verify:security": "node ./check.mjs && node ./assert-grants.mjs"
+    "verify:security": "node ./check.mjs && node ./assert-grants.mjs && node ./assert-authorization.mjs"
   }
 }

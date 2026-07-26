@@ -1,18 +1,17 @@
 name: Database Security
 
+# Deliberately unfiltered. This job used to run only when supabase/migrations or
+# tools/db-assert changed, which meant the authorization suite could not see a
+# regression introduced anywhere else -- a policy is data in the database, and a
+# PR that never touches a .sql file can still change which rows a role reaches
+# (a new grant applied out of band, a reverted migration, a merge that drops a
+# policy). Payments make an unverified authorization model expensive, so the
+# suite now runs against a real database on every pull request.
 on:
   pull_request:
-    paths:
-      - "supabase/migrations/**"
-      - "tools/db-assert/**"
-      - ".github/workflows/db-security.yml"
   push:
     branches:
       - main
-    paths:
-      - "supabase/migrations/**"
-      - "tools/db-assert/**"
-      - ".github/workflows/db-security.yml"
   workflow_dispatch:
 
 permissions:
@@ -50,6 +49,19 @@ jobs:
           PGPASSWORD: postgres
           PGDATABASE: postgres
         run: node tools/db-assert/assert-grants.mjs
+
+      # Row-level and column-level authorization, exercised as the anon and
+      # authenticated roles against the database that was just rebuilt from 001.
+      # Kept as its own step so a failure here reads as "a refusal stopped
+      # refusing" rather than as a grant-catalog drift.
+      - name: Verify authorization matrix
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: node tools/db-assert/assert-authorization.mjs
 
       - name: Stop local Supabase
         if: always()
