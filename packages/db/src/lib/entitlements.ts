@@ -67,16 +67,25 @@ export function planAnnouncementQuota(tier: string | null | undefined): number {
 
 /**
  * Total listing allowance: the plan's included count plus any purchased
- * extra-listing allowance. A negative or non-finite purchased value is read as
- * zero rather than being allowed to shrink the plan allowance.
+ * extra-listing allowance.
+ *
+ * A purchased figure that is not a positive INTEGER contributes nothing. It
+ * cannot shrink the plan allowance, and — the half that matters — it cannot
+ * widen it either. host_profiles.purchased_listing_slots is an integer column
+ * with a non-negative CHECK (migration 083), so no fractional value can be a
+ * real allowance; anything fractional arriving here is a corrupted or
+ * hand-crafted payload, and rounding one of those DOWN still hands out a slot
+ * nobody bought.
  */
 export function totalListingAllowance(
   tier: string | null | undefined,
   purchasedAllowance: number | null | undefined = 0,
 ): number {
   const purchased =
-    typeof purchasedAllowance === "number" && Number.isFinite(purchasedAllowance)
-      ? Math.max(0, Math.trunc(purchasedAllowance))
+    typeof purchasedAllowance === "number" &&
+    Number.isInteger(purchasedAllowance) &&
+    purchasedAllowance > 0
+      ? purchasedAllowance
       : 0;
   return planListingAllowance(tier) + purchased;
 }

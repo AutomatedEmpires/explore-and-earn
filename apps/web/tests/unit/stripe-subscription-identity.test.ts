@@ -20,6 +20,17 @@ const hostProfilesUpdate = vi.hoisted(() => vi.fn());
 const stripeCustomersRetrieve = vi.hoisted(() => vi.fn());
 const stripeCustomersUpdate = vi.hoisted(() => vi.fn());
 
+/**
+ * What the host_profiles UPDATE reports back. A grant that matches a profile
+ * returns the row; the pay-before-onboarding case returns an empty array, which
+ * is what the cancellation cases below turn on.
+ */
+const hostProfilesResult = vi.hoisted(
+  () => ({ current: { data: [{ id: "host-1" }], error: null } }) as {
+    current: { data: unknown; error: unknown };
+  },
+);
+
 vi.mock("server-only", () => ({}));
 
 vi.mock("@explore-and-earn/db", () => ({
@@ -27,13 +38,20 @@ vi.mock("@explore-and-earn/db", () => ({
     from: () => ({
       update: (values: unknown) => {
         hostProfilesUpdate(values);
-        return { eq: () => Promise.resolve({ error: null }) };
+        // .select("id") is how the caller tells "wrote the tier" apart from
+        // "matched nothing" — Supabase reports both as error: null.
+        const chain = {
+          eq: () => chain,
+          select: () => Promise.resolve(hostProfilesResult.current),
+        };
+        return chain;
       },
     }),
   }),
   activateBoostCampaignFromCheckout: vi.fn(),
   insertHostAnnouncement: vi.fn(),
   recordInvitePackPurchase: vi.fn(),
+  revokeListingSlotPurchase: vi.fn(),
   upsertHostSubscription: upsertHostSubscriptionMock,
 }));
 
@@ -52,6 +70,7 @@ import { handleStripeWebhookEvent } from "../../services/stripe";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  hostProfilesResult.current = { data: [{ id: "host-1" }], error: null };
   process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
   process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY = "price_pro_monthly";
   stripeCustomersRetrieve.mockResolvedValue({
@@ -141,6 +160,82 @@ describe("stripe subscription sync writes the Clerk-keyed authority", () => {
     expect(upsertHostSubscriptionMock).toHaveBeenCalledWith(
       expect.objectContaining({ tier: "none", billingStatus: "unpaid" }),
     );
+  });
+
+  // ── The zero-row match, by direction ─────────────────────────────────────
+  //
+  // A host_profiles UPDATE that matches nothing means two completely different
+  // things depending on which way the entitlement is moving, and treating them
+  // alike is how a webhook endpoint gets disabled.
+  //
+  // On a GRANT the host paid and the denormalized copy every listing/search/badge
+  // query joins does not carry it, so the webhook must fail and let Stripe
+  // redeliver.
+  //
+  // On a REVOCATION nothing is being granted, so nothing can be lost — there is
+  // no tier to take away from a Clerk user with no profile. 5xx there would fire
+  // on customer.subscription.deleted and on every downgrade, Stripe would retry
+  // each for roughly three days, and sustained 5xx is how Stripe disables an
+  // endpoint — which would silently stop the GRANTS too. Production holds zero
+  // host_profiles rows, so every cancellation would have taken that path.
+
+  it("RESOLVES a cancellation that matched zero host_profiles rows", async () => {
+    hostProfilesResult.current = { data: [], error: null };
+
+    await expect(
+      handleStripeWebhookEvent(
+        subscriptionEvent("customer.subscription.deleted", "canceled"),
+      ),
+    ).resolves.toEqual(expect.objectContaining({ tier: "none" }));
+
+    // …and the authority still recorded the revocation.
+    expect(upsertHostSubscriptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: "none", billingStatus: "cancelled" }),
+    );
+  });
+
+  it("RESOLVES a downgrade to none that matched zero host_profiles rows", async () => {
+    hostProfilesResult.current = { data: null, error: null };
+
+    await expect(
+      handleStripeWebhookEvent(
+        subscriptionEvent("customer.subscription.updated", "unpaid"),
+      ),
+    ).resolves.toEqual(expect.objectContaining({ tier: "none" }));
+  });
+
+  it("still THROWS when a GRANT matched zero host_profiles rows", async () => {
+    hostProfilesResult.current = { data: [], error: null };
+
+    await expect(
+      handleStripeWebhookEvent(
+        subscriptionEvent("customer.subscription.created", "active"),
+      ),
+    ).rejects.toThrow(/no host_profiles row matched/i);
+  });
+
+  it("never calls a revocation's payer 'paying' — nobody paid on that path", async () => {
+    hostProfilesResult.current = { data: [], error: null };
+
+    await expect(
+      handleStripeWebhookEvent(
+        subscriptionEvent("customer.subscription.created", "active"),
+      ),
+    ).rejects.toThrow(
+      expect.objectContaining({
+        message: expect.not.stringContaining("paying"),
+      }) as Error,
+    );
+  });
+
+  it("surfaces a real database error in EITHER direction", async () => {
+    hostProfilesResult.current = { data: null, error: { message: "permission denied" } };
+
+    await expect(
+      handleStripeWebhookEvent(
+        subscriptionEvent("customer.subscription.deleted", "canceled"),
+      ),
+    ).rejects.toThrow(/permission denied/i);
   });
 
   it("writes NOTHING when the event carries no resolvable Clerk user", async () => {

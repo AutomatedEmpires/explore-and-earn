@@ -5,6 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { ADDITIONAL_LISTING_MAX_PER_CHECKOUT } from "@explore-and-earn/contracts";
 import { getHostTierAndProfile } from "@explore-and-earn/db";
 
+import { getClerkContact } from "../../lib/clerkUser";
 import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import {
   createAdditionalListingCheckoutSession,
@@ -71,11 +72,21 @@ export async function createAdditionalListingCheckoutAction(
     : "none";
 
   try {
+    // The email is how the add-on checkout reaches the host's EXISTING Stripe
+    // customer when the clerkUserId metadata search misses. Without a customer
+    // the session mints an orphan one, and the billing portal — which resolves
+    // by that metadata — would never show the add-on subscription the host is
+    // being charged for.
+    const contact = await getClerkContact(userId).catch(() => ({
+      email: null,
+      name: null,
+    }));
     const checkout = await createAdditionalListingCheckoutSession({
       clerkUserId: userId,
       hostProfileId: host.hostProfileId,
       hostSubscriptionTier: tier,
       quantity,
+      customerEmail: contact.email,
     });
     const url = checkout.url;
     if (!url) return { ok: false, reason: "checkout_failed" };

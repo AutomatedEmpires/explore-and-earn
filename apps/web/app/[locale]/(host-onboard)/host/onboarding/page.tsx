@@ -110,6 +110,17 @@ export default function HostOnboardingPage() {
 					router.push("/host")
 					return
 				}
+				// Migration 083 refuses profile creation without a paid tier, so
+				// this is not something the host can correct on THIS form. Send
+				// them to the plans page rather than leaving them re-reading a
+				// sentence they have no way to act on. /host/plans lives in this
+				// same route group precisely so it is reachable without a profile;
+				// every other plan surface sits behind the (host) layout, which
+				// redirects a profile-less host straight back here.
+				if (result.error === "subscription_required") {
+					router.push("/host/plans")
+					return
+				}
 				const message =
 					result.error === "name_required"
 						? "Please enter your company or farm name."

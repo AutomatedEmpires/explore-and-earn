@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getHostProfile } from "@explore-and-earn/db";
+import { getHostProfile, getHostSubscriptionByClerkUserId } from "@explore-and-earn/db";
 
 import { getClerkContact } from "../../lib/clerkUser";
 import { checkRateLimitDistributed } from "../../lib/rateLimit";
@@ -77,21 +77,48 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
     billingRedirect("rate_limited");
   }
 
+  // NO HOST PROFILE IS REQUIRED TO PAY, and demanding one closed the funnel.
+  //
+  // 083 gates create_my_host_profile on an active paid tier (founder: "no host
+  // can create a profile or publish for free"), so the order is now sign up ->
+  // choose a plan -> pay -> create the profile. This action used to resolve
+  // getHostProfile() first and redirect ?error=host_profile_missing when there
+  // was none, while the (host) layout redirected every profile-less user to
+  // /host/onboarding — and onboarding answered "choose a plan first". Both
+  // checkout surfaces lived inside that layout, so the only way to choose a plan
+  // sent the host back to the page telling them to choose a plan. With zero
+  // hosts in production and payments switching on, that is new-host revenue at
+  // zero from the first day.
+  //
+  // Nothing here ever needed the profile. createCheckoutSession is keyed by
+  // clerkUserId, host_subscriptions is keyed by clerkUserId, and the Stripe
+  // customer is resolved from clerkUserId metadata. The profile only supplied a
+  // display string for Stripe's submit button.
+  //
+  // /host/plans (in the (host-onboard) group, outside the profile gate) is the
+  // pre-profile entry point; /host/billing remains the one for hosts who already
+  // have a profile.
   const hostProfile = await getHostProfile(
     authResult.auth.token,
     authResult.auth.userId,
   ).catch(() => null);
-  if (!hostProfile) {
-    billingRedirect("host_profile_missing");
-  }
 
   // A host who ALREADY pays must never be sent through checkout again: Stripe
   // would happily create a second concurrent subscription and bill for both.
-  // The billing page renders "Start monthly/annual" for all three tiers
+  // Both plan surfaces render "Start monthly/annual" for all three tiers
   // regardless of the current plan, so this is reachable by simply clicking a
   // different tier. Plan changes belong in the billing portal, which prorates
   // and replaces rather than stacking.
-  if (hostProfile.subscriptionTier !== "none") {
+  //
+  // Read from host_subscriptions, not from host_profiles.subscription_tier: the
+  // profile-less payer this action now serves has no row carrying that column,
+  // and a guard that cannot see an existing subscription would let them buy a
+  // second one.
+  const subscription = await getHostSubscriptionByClerkUserId(
+    authResult.auth.userId,
+  ).catch(() => null);
+  const currentTier = subscription?.tier ?? hostProfile?.subscriptionTier ?? "none";
+  if (currentTier !== "none") {
     billingRedirect("already_subscribed");
   }
 
@@ -103,7 +130,7 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
       customerEmail: contact.email,
       customerName: contact.name,
       companyName:
-        hostProfile.companyName && hostProfile.companyName.trim().length > 0
+        hostProfile?.companyName && hostProfile.companyName.trim().length > 0
           ? hostProfile.companyName
           : "Explore & Earn host",
       subscriptionTier: tierValue,

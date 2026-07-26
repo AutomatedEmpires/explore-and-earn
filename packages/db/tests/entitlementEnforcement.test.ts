@@ -101,15 +101,22 @@ describe("plan listing allowance", () => {
     );
   });
 
-  it("never lets a bad purchased value shrink or inflate the plan allowance", () => {
-    expect(totalListingAllowance("starter", -5)).toBe(PLAN_ENTITLEMENTS.starter.listings);
-    expect(totalListingAllowance("starter", Number.NaN)).toBe(
-      PLAN_ENTITLEMENTS.starter.listings,
-    );
-    expect(totalListingAllowance("starter", 2.9)).toBe(
-      PLAN_ENTITLEMENTS.starter.listings + 2,
-    );
-  });
+  /**
+   * A fractional figure USED to be truncated (2.9 became +2), which the title of
+   * this case already contradicted: rounding a value down still inflates the cap
+   * by two slots nobody bought. host_profiles.purchased_listing_slots is an
+   * integer column with a non-negative CHECK, so a fraction can only arrive from
+   * a corrupted or hand-crafted payload — the one case where the answer must be
+   * "nothing", not "nearly all of it".
+   */
+  it.each([-5, Number.NaN, Number.POSITIVE_INFINITY, 2.9, 0.9])(
+    "contributes nothing for a purchased value of %s — no shrinking, no inflating",
+    (bad) => {
+      expect(totalListingAllowance("starter", bad)).toBe(
+        PLAN_ENTITLEMENTS.starter.listings,
+      );
+    },
+  );
 
   it("gives an unsubscribed host nothing even when extras were purchased", () => {
     // A purchased extra is an addition to a plan, not a plan of its own.
@@ -328,6 +335,65 @@ describe("migration 083 shape", () => {
     expect(EXECUTABLE).toMatch(
       /pg_advisory_xact_lock\(\s*hashtextextended\('listing_allowance:'/,
     );
+  });
+
+  // ── The paid add-on the allowance has to honour ───────────────────────────
+  //
+  // An earlier draft DISCOVERED this column from a list of four plausible names
+  // and returned 0 when none matched. The name the add-on actually shipped
+  // (purchased_listing_slots) was not among them, so a host who bought five
+  // extra listings was enforced at one while the application told them six —
+  // Stripe and the database disagreeing in the direction that keeps the money.
+  // These assertions exist to make that shape unwritable again.
+
+  it("DECLARES the purchased-allowance column, so the read below can name it", () => {
+    expect(EXECUTABLE).toContain(
+      "add column if not exists purchased_listing_slots integer not null default 0",
+    );
+    expect(EXECUTABLE).toContain("check (purchased_listing_slots >= 0)");
+  });
+
+  it("NAMES host_profiles.purchased_listing_slots rather than guessing at it", () => {
+    const body = sqlFunctionBody("private", "host_purchased_listing_allowance");
+    expect(body).toContain("h.purchased_listing_slots");
+    expect(body).toContain("from public.host_profiles h");
+  });
+
+  /**
+   * `language sql` is the assertion, not a style note: the body is parsed and the
+   * column resolved when the function is CREATED, so a dropped or renamed column
+   * fails `supabase db reset` here. A plpgsql body would not be checked until it
+   * ran, and the discovery version could not fail at all.
+   */
+  it("resolves the column at CREATE time, so a missing column fails the reset", () => {
+    const definition = EXECUTABLE.slice(
+      EXECUTABLE.indexOf("function private.host_purchased_listing_allowance"),
+    );
+    expect(definition.slice(0, 200)).toContain("language sql");
+  });
+
+  it("carries no column-name discovery machinery at all", () => {
+    const body = sqlFunctionBody("private", "host_purchased_listing_allowance");
+    // A guessed identifier that falls back to 0 sells an entitlement and
+    // enforces nothing. There is no acceptable amount of it.
+    expect(body).not.toContain("pg_attribute");
+    expect(body).not.toContain("execute format");
+    expect(body).not.toContain("attname");
+    for (const guess of [
+      "purchased_listing_allowance",
+      "additional_listing_allowance",
+      "extra_listing_allowance",
+      "purchased_extra_listings",
+    ]) {
+      expect(body).not.toContain(guess);
+    }
+  });
+
+  it("adds the purchased term to the plan term rather than replacing it", () => {
+    const body = sqlFunctionBody("private", "host_listing_allowance");
+    expect(body).toContain("private.plan_listing_allowance(v_tier)");
+    expect(body).toContain("private.host_purchased_listing_allowance(p_host_profile_id)");
+    expect(body).toMatch(/\+\s*private\.host_purchased_listing_allowance/);
   });
 
   it("does not gate service-role moderation or sourced inventory", () => {

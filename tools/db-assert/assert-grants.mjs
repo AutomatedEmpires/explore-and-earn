@@ -27,6 +27,7 @@ const sqlFiles = [
   join(here, "sql", "assert_listing_coordinates.sql"),
   join(here, "sql", "assert_seeker_application_conversations.sql"),
   join(here, "sql", "assert_listing_host_status_transitions.sql"),
+  join(here, "sql", "assert_listing_allowance_enforcement.sql"),
 ]
 
 runSqlFiles(sqlFiles, "assert-grants")

@@ -8,6 +8,22 @@
  * must actually RAISE the cap the publication gate enforces, or the add-on is a
  * charge for nothing.
  *
+ * RECONCILED 2026-07-26. Two workstreams shipped two allowance implementations
+ * that disagreed, and this file used to assert the losing half of both
+ * disagreements. What changed and why:
+ *
+ *   * tier 'none' was asserted to floor at the Starter allowance. There is no
+ *     free tier; 083's private.plan_listing_allowance() returns 0 for 'none',
+ *     and a test that pins the application to 1 where the database enforces 0
+ *     documents a disagreement instead of a contract.
+ *   * counted statuses were asserted to be exactly live + paused. under_review
+ *     counts too — that is what stops a host staging listings through review
+ *     under a cap of 1 and publishing all of them.
+ *   * updateListingStatus was asserted to compose the cap from a tier read plus
+ *     a separate purchased-slots read. It now asks the database for one number
+ *     (my_listing_allowance_state), which is what closes the gap where Stripe
+ *     said "you have capacity" and the database said "no".
+ *
  * All Supabase and server-only I/O is mocked so no DB connection is required.
  */
 
@@ -49,15 +65,41 @@ describe("effectiveListingCap", () => {
     );
   });
 
-  it("RAISES the cap by every purchased slot — the whole point of the add-on", () => {
-    expect(effectiveListingCap("starter", 3)).toBe(
-      PLAN_ENTITLEMENTS.starter.listings + 3,
+  /**
+   * The add-on's entire promise, stated as arithmetic: allowance = plan + N.
+   * Migration 083's private.host_listing_allowance() computes the same sum from
+   * host_profiles.purchased_listing_slots; entitlementAllowanceSql.test.ts holds
+   * that half.
+   */
+  it.each([
+    ["starter", 5],
+    ["professional", 2],
+    ["enterprise", 11],
+  ] as const)("gives a %s host with N purchased slots exactly plan + N", (tier, slots) => {
+    expect(effectiveListingCap(tier, slots)).toBe(
+      PLAN_ENTITLEMENTS[tier].listings + slots,
     );
   });
 
-  it("floors a host with no subscription at the Starter entitlement, not at zero", () => {
-    expect(includedListingCapFor("none")).toBe(PLAN_ENTITLEMENTS.starter.listings);
-    expect(includedListingCapFor(null)).toBe(PLAN_ENTITLEMENTS.starter.listings);
+  /**
+   * No free tier (founder, 2026-07-26). An unsubscribed host gets ZERO included
+   * listings — flooring them at Starter handed every non-paying host a free live
+   * listing while the FAQ said a plan was required.
+   */
+  it("gives a host with no subscription an included allowance of ZERO", () => {
+    expect(includedListingCapFor("none")).toBe(0);
+    expect(includedListingCapFor(null)).toBe(0);
+    expect(includedListingCapFor(undefined)).toBe(0);
+    expect(includedListingCapFor("nonsense")).toBe(0);
+  });
+
+  /**
+   * A slot bought while unsubscribed is still a slot bought. This is the one
+   * case where 'none' is not a flat refusal, and it matches the database:
+   * private.host_listing_allowance() adds the purchased term to a plan term of 0.
+   */
+  it("still counts purchased slots for an unsubscribed host", () => {
+    expect(effectiveListingCap("none", 2)).toBe(2);
   });
 
   it.each([null, undefined, -4, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
@@ -69,8 +111,16 @@ describe("effectiveListingCap", () => {
     },
   );
 
-  it("counts live and paused listings against the cap, and nothing else", () => {
-    expect([...CAP_COUNTED_LISTING_STATUSES]).toEqual(["live", "paused"]);
+  /**
+   * under_review is in the set, and that is load-bearing. 082 made
+   * under_review -> live a HOST edge with no operator in between, so if entering
+   * review cost nothing a host on a cap of 1 could stage N drafts through review
+   * — the count reads 0 at every step — and then publish all N.
+   */
+  it("counts under_review as well as live and paused", () => {
+    expect([...CAP_COUNTED_LISTING_STATUSES].sort()).toEqual(
+      ["live", "paused", "under_review"].sort(),
+    );
   });
 });
 
@@ -82,6 +132,12 @@ describe("hasListingSlotAvailable", () => {
         purchasedSlots: 0,
         activeListingCount: PLAN_ENTITLEMENTS.starter.listings,
       }),
+    ).toBe(false);
+  });
+
+  it("REFUSES an unsubscribed host their first listing", () => {
+    expect(
+      hasListingSlotAvailable({ tier: "none", purchasedSlots: 0, activeListingCount: 0 }),
     ).toBe(false);
   });
 
@@ -135,6 +191,11 @@ const ANSWERED_DRAFT = {
   compensation_max_cents: null,
 } as const;
 
+/** The jsonb my_listing_allowance_state returns. */
+function allowanceState(tier: string, allowance: number, used: number) {
+  return { data: { tier, allowance, used }, error: null };
+}
+
 beforeEach(() => {
   mockFrom.mockReset();
   mockRpc.mockReset();
@@ -142,25 +203,24 @@ beforeEach(() => {
 
 describe("updateListingStatus honours the purchased allowance", () => {
   it("REFUSES publication at the included cap when nothing was purchased", async () => {
-    mockRpc.mockResolvedValue({ data: 0, error: null });
+    mockRpc.mockResolvedValue(
+      allowanceState("starter", PLAN_ENTITLEMENTS.starter.listings, PLAN_ENTITLEMENTS.starter.listings),
+    );
     mockFrom
       .mockReturnValueOnce(HOST_PROFILE)
-      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }))
-      .mockReturnValueOnce(makeChain({ data: { subscription_tier: "starter" } }))
-      .mockReturnValueOnce(makeChain({ count: PLAN_ENTITLEMENTS.starter.listings }));
+      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }));
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
   });
 
   it("PERMITS publication past the included cap once a slot has been bought", async () => {
-    mockRpc.mockResolvedValue({ data: 1, error: null });
+    const base = PLAN_ENTITLEMENTS.starter.listings;
+    mockRpc.mockResolvedValue(allowanceState("starter", base + 1, base));
     const update = makeChain({ data: { id: "l1" } });
     mockFrom
       .mockReturnValueOnce(HOST_PROFILE)
       .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }))
-      .mockReturnValueOnce(makeChain({ data: { subscription_tier: "starter" } }))
-      .mockReturnValueOnce(makeChain({ count: PLAN_ENTITLEMENTS.starter.listings }))
       .mockReturnValueOnce(update);
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
@@ -169,24 +229,61 @@ describe("updateListingStatus honours the purchased allowance", () => {
   });
 
   it("REFUSES again once the purchased slots are themselves used up", async () => {
-    mockRpc.mockResolvedValue({ data: 1, error: null });
+    const base = PLAN_ENTITLEMENTS.starter.listings;
+    mockRpc.mockResolvedValue(allowanceState("starter", base + 1, base + 1));
     mockFrom
       .mockReturnValueOnce(HOST_PROFILE)
-      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }))
-      .mockReturnValueOnce(makeChain({ data: { subscription_tier: "starter" } }))
-      .mockReturnValueOnce(makeChain({ count: PLAN_ENTITLEMENTS.starter.listings + 1 }));
+      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }));
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  /**
+   * The number quoted to the host is the number the database enforces, because
+   * it is literally the same number: one RPC read, no local recomposition. If
+   * this ever needed a second read to reach the right answer, the application
+   * and the trigger would be free to drift again.
+   */
+  it("asks the database for the allowance instead of composing its own", async () => {
+    const base = PLAN_ENTITLEMENTS.starter.listings;
+    mockRpc.mockResolvedValue(allowanceState("starter", base + 4, 0));
+    mockFrom
+      .mockReturnValueOnce(HOST_PROFILE)
+      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }))
+      .mockReturnValueOnce(makeChain({ data: { id: "l1" } }));
+
+    await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(mockRpc).toHaveBeenCalledWith("my_listing_allowance_state", {
+      p_host_profile_id: "host-1",
+    });
+    // No subscription_tier read and no my_purchased_listing_slots read: three
+    // from() calls only — host profile, listing, and the status UPDATE.
+    expect(mockFrom).toHaveBeenCalledTimes(3);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
   });
 
   it("treats an unreadable allowance as zero — a fault must not widen the cap", async () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: "conn reset" } });
     mockFrom
       .mockReturnValueOnce(HOST_PROFILE)
-      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }))
-      .mockReturnValueOnce(makeChain({ data: { subscription_tier: "starter" } }))
-      .mockReturnValueOnce(makeChain({ count: PLAN_ENTITLEMENTS.starter.listings }));
+      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }));
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+    expect(result).toEqual({ ok: false, error: "conn reset" });
+  });
+
+  /**
+   * A malformed jsonb payload must refuse, not pass. parseListingAllowanceState
+   * degrades an unreadable `used` to MAX_SAFE_INTEGER precisely so this cannot
+   * read as spare capacity.
+   */
+  it("REFUSES on a malformed allowance payload", async () => {
+    mockRpc.mockResolvedValue({ data: { tier: "starter" }, error: null });
+    mockFrom
+      .mockReturnValueOnce(HOST_PROFILE)
+      .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }));
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });

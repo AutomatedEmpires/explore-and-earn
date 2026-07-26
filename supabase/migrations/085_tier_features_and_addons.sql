@@ -41,8 +41,12 @@
 -- ── 2) ADDITIONAL-LISTING ADD-ON ────────────────────────────────────────────
 --
 -- host_profiles.purchased_listing_slots is the per-host allowance the plan cap
--- is added to, so a cap check can count it (server-side today in
--- queries/listingLifecycle.ts; the database-side cap is migration 083's).
+-- is added to. It is DECLARED IN 083, next to the enforcement trigger that has
+-- to add it up, and read there by private.host_purchased_listing_allowance().
+-- This migration owns everything else about the add-on and is the only writer of
+-- the column. There is exactly one cap in the system — 083's trigger — and the
+-- application's pre-flight check reads it through 083's RPC rather than
+-- recomputing it.
 --
 -- The column is NOT the record — host_listing_slot_purchases is. Balances are
 -- derived from an auditable row per purchase, and the column is maintained
@@ -320,14 +324,10 @@ $$;
 -- 4) ADDITIONAL-LISTING ADD-ON — allowance column + purchase ledger
 -- ---------------------------------------------------------------------------
 
-alter table public.host_profiles
-  add column if not exists purchased_listing_slots integer not null default 0;
-
-alter table public.host_profiles
-  drop constraint if exists host_profiles_purchased_listing_slots_nonneg;
-alter table public.host_profiles
-  add constraint host_profiles_purchased_listing_slots_nonneg
-  check (purchased_listing_slots >= 0);
+-- host_profiles.purchased_listing_slots and its non-negative CHECK are created
+-- by 083. Restating them here would put two declarations of one column in the
+-- tree, and the next person to change the type or the default would have to find
+-- both. The ledger that justifies every value it holds is below.
 
 create table if not exists public.host_listing_slot_purchases (
   id                          uuid        primary key default gen_random_uuid(),
@@ -431,9 +431,31 @@ begin
 end;
 $$;
 
--- Take the allowance back when the add-on subscription ends. Idempotent: a row
--- already 'cancelled' decrements nothing. Floored at zero so a manual data fix
--- can never drive the column negative.
+-- Take the allowance back when the add-on subscription ends.
+--
+-- IDEMPOTENT BECAUSE THE UPDATE DECIDES, NOT A SNAPSHOT. Stripe delivers
+-- customer.subscription.deleted at least once, and two deliveries can be in
+-- flight at the same moment. The first version of this function read the ledger
+-- row into a variable BEFORE taking the advisory lock, tested that variable for
+-- status = 'cancelled', and then issued an unguarded `update ... where id = ...`.
+-- Both callers read 'active' from their own pre-lock snapshot, both passed the
+-- test, and both decremented: an allowance of 3 went to 0 against a SINGLE
+-- cancelled ledger row. The greatest(..., 0) floor hid it, because the second
+-- subtraction of 3 from 0 still reports a perfectly valid 0.
+--
+-- The fix is the shape credit_listing_slot_purchase already uses: let the write
+-- itself be the arbiter. The lock comes first, the UPDATE carries
+-- `and status = 'active'`, and the allowance moves only when row_count is
+-- exactly 1 — the row the caller actually transitioned. A redelivery finds the
+-- row already 'cancelled', changes zero rows, and takes nothing back.
+--
+-- The pre-lock SELECT resolves the LOCK KEY and nothing else. It reads only
+-- immutable columns (id, host_profile_id) and no decision is made from it; the
+-- quantity to subtract comes back from the guarded UPDATE's RETURNING, so it is
+-- read under the lock from the row that was genuinely cancelled.
+--
+-- greatest(..., 0) stays, but it is now a floor against a manual data fix rather
+-- than the thing standing between this function and a negative allowance.
 create or replace function public.revoke_listing_slot_purchase(
   p_subscription_id text
 ) returns jsonb
@@ -441,13 +463,18 @@ language plpgsql
 set search_path = public, pg_temp
 as $$
 declare
-  v_row public.host_listing_slot_purchases%rowtype;
+  v_id              uuid;
+  v_host_profile_id uuid;
+  v_quantity        integer;
+  v_count           integer := 0;
 begin
   if p_subscription_id is null or btrim(p_subscription_id) = '' then
     return jsonb_build_object('ok', false, 'error', 'missing_subscription');
   end if;
 
-  select * into v_row
+  -- Lock key only. Both columns are immutable for the life of the row.
+  select id, host_profile_id
+    into v_id, v_host_profile_id
     from public.host_listing_slot_purchases
    where stripe_subscription_id = p_subscription_id;
 
@@ -455,21 +482,28 @@ begin
     return jsonb_build_object('ok', true, 'already_revoked', false, 'found', false);
   end if;
 
+  -- Same key credit_listing_slot_purchase takes, so a credit and a revoke for
+  -- one host serialize against each other as well as against themselves.
   perform pg_advisory_xact_lock(
-    hashtextextended('listing_slots:' || v_row.host_profile_id::text, 0)
+    hashtextextended('listing_slots:' || v_host_profile_id::text, 0)
   );
-
-  if v_row.status = 'cancelled' then
-    return jsonb_build_object('ok', true, 'already_revoked', true, 'found', true);
-  end if;
 
   update public.host_listing_slot_purchases
      set status = 'cancelled', cancelled_at = now()
-   where id = v_row.id;
+   where id = v_id
+     and status = 'active'
+  returning quantity into v_quantity;
+  get diagnostics v_count = row_count;
+
+  -- Zero rows means somebody else cancelled this purchase. They decremented the
+  -- allowance; this caller must not do it again.
+  if v_count <> 1 then
+    return jsonb_build_object('ok', true, 'already_revoked', true, 'found', true);
+  end if;
 
   update public.host_profiles
-     set purchased_listing_slots = greatest(purchased_listing_slots - v_row.quantity, 0)
-   where id = v_row.host_profile_id;
+     set purchased_listing_slots = greatest(purchased_listing_slots - v_quantity, 0)
+   where id = v_host_profile_id;
 
   return jsonb_build_object('ok', true, 'already_revoked', false, 'found', true);
 end;

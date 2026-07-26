@@ -9,6 +9,11 @@
  *
  * The fix asks for the affected rows (.select("id")) and throws when none came
  * back, which makes the webhook route answer non-2xx so Stripe redelivers.
+ *
+ * SCOPE, added when this met the entitlements workstream: the throw is for
+ * GRANTS. Revocations run through the same function with tier 'none' and must
+ * resolve on a zero-row match — stripe-subscription-identity.test.ts holds that
+ * half. Every case here is a paid checkout, so every case here is a grant.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type Stripe from "stripe";
@@ -45,6 +50,10 @@ vi.mock("@explore-and-earn/db", () => ({
   activateBoostCampaignFromCheckout: vi.fn(),
   insertHostAnnouncement: vi.fn(),
   recordInvitePackPurchase: vi.fn(),
+  revokeListingSlotPurchase: vi.fn(),
+  // The Clerk-keyed authority (083) is written first and throws on its own
+  // failure; a no-op here isolates these cases to the denormalized copy.
+  upsertHostSubscription: vi.fn(),
 }));
 
 const { handleStripeWebhookEvent } = await import("../../services/stripe");

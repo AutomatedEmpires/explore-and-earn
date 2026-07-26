@@ -114,12 +114,24 @@
 --     for a slot (070 decision 4), and `provenance` is not host-writable (071),
 --     so this is not an opening.
 --
--- The allowance is base plan + any purchased extra-listing allowance. The
--- purchased half is being added by a separate change in this wave that this
--- migration must neither depend on nor pre-empt, so
--- private.host_purchased_listing_allowance() DISCOVERS the column at call time
--- from a closed candidate list and adds it when present. If none of the names
--- match, the allowance is the base plan - today's correct answer.
+-- The allowance is base plan + purchased extra-listing allowance, and this
+-- migration DECLARES the column that carries the second term:
+-- host_profiles.purchased_listing_slots. 085 fills it (the add-on ledger, the
+-- credit/revoke functions and the host-facing read all live there) and reads it
+-- back; the column is declared HERE because the enforcement trigger below is the
+-- thing that has to add it up, and a gate that cannot find the entitlement it is
+-- meant to honour is worse than no gate.
+--
+-- An earlier draft of this file DISCOVERED the column at call time from a
+-- candidate list of four plausible names and returned 0 when none matched. Not
+-- one of the four was the name the add-on actually shipped
+-- (purchased_listing_slots), so a host who bought five extra listings was
+-- allowed one - while the application, which added the slots correctly, told
+-- them they had six. Stripe and the database disagreed in the direction that
+-- keeps the money. A guessed identifier that FAILS OPEN on a paid entitlement
+-- has no place in an enforcement path: it is named outright below, so if the
+-- column is ever absent this migration fails at reset instead of quietly
+-- selling nothing.
 
 begin;
 
@@ -612,66 +624,52 @@ grant execute on function public.create_my_host_announcement(text, text, text)
 -- 5) Listing allowance: base plan + purchased extras, counted in the database.
 -- ---------------------------------------------------------------------------
 
--- Discovering the purchased-allowance column instead of naming it outright is a
--- concession to sequencing, not a preference. The change that introduces it is
--- being written in parallel and owns its own migration number; this one has to
--- work whether that lands first, second or never. The candidate list is closed
--- and ordered, the column must be an integer type, and NULL reads as zero.
+-- The per-host paid add-on allowance. Declared here, ahead of the function that
+-- has to read it, so the read below can name it. 085 owns everything else about
+-- the add-on: the host_listing_slot_purchases ledger that justifies every
+-- increment, the credit/revoke functions that maintain this column inside the
+-- same transaction as the ledger row, and the host-facing read.
+--
+-- Not host-writable and not host-readable: 054 revoked table-wide UPDATE on
+-- host_profiles and 080 revoked table-wide SELECT, and this column is added to
+-- neither allow-list.
+alter table public.host_profiles
+  add column if not exists purchased_listing_slots integer not null default 0;
+
+alter table public.host_profiles
+  drop constraint if exists host_profiles_purchased_listing_slots_nonneg;
+alter table public.host_profiles
+  add constraint host_profiles_purchased_listing_slots_nonneg
+  check (purchased_listing_slots >= 0);
+
+-- NAMED, not discovered. `language sql` is the point: the body is parsed and the
+-- column reference resolved when this function is CREATED, so if
+-- purchased_listing_slots is ever dropped or renamed, `supabase db reset` fails
+-- here with a missing-column error. The discovery version this replaces could
+-- not fail at all — it returned 0, which reads as "this host bought nothing" and
+-- is indistinguishable from the truth for every host who bought nothing.
+--
+-- greatest(..., 0) floors a value the CHECK constraint above already refuses to
+-- store; it is here so a service-role data fix in flight cannot momentarily
+-- widen a cap rather than narrow one.
 create or replace function private.host_purchased_listing_allowance(
   p_host_profile_id uuid
 ) returns integer
-language plpgsql
+language sql
 stable
 security definer
 set search_path = ''
 as $$
-declare
-  v_candidates text[] := array[
-    'purchased_listing_allowance',
-    'additional_listing_allowance',
-    'extra_listing_allowance',
-    'purchased_extra_listings'
-  ];
-  v_relation text;
-  v_column text;
-  v_extra integer;
-begin
-  foreach v_relation in array array['public.host_profiles', 'public.host_subscriptions'] loop
-    select a.attname
-      into v_column
-      from pg_catalog.pg_attribute a
-     where a.attrelid = v_relation::regclass
-       and a.attnum > 0
-       and not a.attisdropped
-       and a.attname = any(v_candidates)
-       and a.atttypid in ('smallint'::regtype, 'integer'::regtype, 'bigint'::regtype)
-     order by array_position(v_candidates, a.attname)
-     limit 1;
-
-    if v_column is not null then
-      if v_relation = 'public.host_profiles' then
-        execute format(
-          'select coalesce(h.%I, 0) from public.host_profiles h where h.id = $1',
-          v_column
-        ) into v_extra using p_host_profile_id;
-      else
-        execute format(
-          'select coalesce(s.%I, 0) from public.host_subscriptions s '
-          'join public.host_profiles h on h.clerk_user_id = s.clerk_user_id '
-          'where h.id = $1',
-          v_column
-        ) into v_extra using p_host_profile_id;
-      end if;
-      return greatest(coalesce(v_extra, 0), 0);
-    end if;
-  end loop;
-
-  return 0;
-end;
+  select greatest(coalesce(
+    (select h.purchased_listing_slots
+       from public.host_profiles h
+      where h.id = p_host_profile_id),
+    0
+  ), 0)
 $$;
 
 comment on function private.host_purchased_listing_allowance(uuid) is
-  'Purchased extra-listing allowance, if a later migration has added a column for it. Returns 0 when no candidate column exists, so the base plan allowance is unaffected until that change lands.';
+  'The host''s paid additional-listing allowance, read from host_profiles.purchased_listing_slots by name. Added to the plan allowance by private.host_listing_allowance so the enforcement trigger honours what the host bought.';
 
 create or replace function private.host_listing_allowance(
   p_host_profile_id uuid

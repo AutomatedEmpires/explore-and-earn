@@ -216,20 +216,34 @@ grant insert on pg_temp.authz_log to public;
 -- assertion below re-reads them through anon or authenticated.
 -- ===========================================================================
 
+-- PAID hosts. Migration 083 added a database cap on how many listings a host may
+-- hold in a counted status, and it is a BEFORE trigger, so it fires ahead of
+-- 070's publication-triad CHECK. An unsubscribed fixture has an allowance of
+-- zero, which means every publication case below would be refused with
+-- listing_allowance_exceeded and would stop proving anything about the
+-- constraint it names. The allowance has its own proof in
+-- assert_listing_allowance_enforcement.sql; here it must simply never be the
+-- thing that refuses.
+insert into public.host_subscriptions (clerk_user_id, tier, billing_status)
+values
+  ('user_authz_host_a', 'enterprise', 'active'),
+  ('user_authz_host_b', 'enterprise', 'active');
+
 insert into public.host_profiles (
   id, owner_user_id, clerk_user_id, company_name, slug, category_scopes,
-  public_status, trust_status, primary_latitude, primary_longitude
+  public_status, trust_status, primary_latitude, primary_longitude,
+  subscription_tier, purchased_listing_slots
 )
 values
   (
     '0a17a000-0000-4000-8000-000000000001', null, 'user_authz_host_a',
     'Authz Host A', 'authz-host-a', array['farm'], 'active', 'unverified',
-    47.4235, -120.3103
+    47.4235, -120.3103, 'enterprise', 50
   ),
   (
     '0a17b000-0000-4000-8000-000000000002', null, 'user_authz_host_b',
     'Authz Host B', 'authz-host-b', array['seasonal'], 'active', 'unverified',
-    44.0521, -123.0868
+    44.0521, -123.0868, 'enterprise', 50
   );
 
 insert into public.seeker_profiles (id, clerk_user_id, display_name)

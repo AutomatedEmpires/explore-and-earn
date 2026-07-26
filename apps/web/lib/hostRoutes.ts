@@ -21,6 +21,10 @@ export const HOST_DASHBOARD_SEGMENTS = [
   "listings",
   "messages",
   "onboarding",
+  // Plan selection before a host profile exists. Sits in the (host-onboard)
+  // group with onboarding — outside the profile gate — but it is still a
+  // signed-in surface, not the public /host/{id} profile, so it belongs here.
+  "plans",
   "profile",
   "seeker",
   "settings",

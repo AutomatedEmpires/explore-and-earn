@@ -349,10 +349,8 @@ describe("updateListingStatus", () => {
 
   it("PUBLISHES an under_review listing — no admin approval stands in the way", async () => {
     const read = makeChain({ data: { ...ANSWERED_READY } });
-    const tierRead = makeChain({ data: { subscription_tier: "starter" } });
-    const capCount = makeChain({ count: 0 });
     const update = makeChain({ data: { id: "l1" } });
-    queueFromResults(HOST_PROFILE, read, tierRead, capCount, update);
+    queueFromResults(HOST_PROFILE, read, update);
 
     const result = await updateListingStatus("token", "user_1", "l1", "live");
 
@@ -376,19 +374,60 @@ describe("updateListingStatus", () => {
     expect(result.blockers?.map((b) => b.field)).toEqual(["pay"]);
   });
 
-  it("CHARGES the plan cap at publish, not only at submit", async () => {
-    // under_review is not a CAP_COUNTED_STATUS. Charging only draft->under_review
-    // would let a host queue any number of listings at under_review under a cap
-    // of one and then publish every one of them, because the live+paused count
-    // is still zero at each publish.
+  /**
+   * THE SLOT IS CHARGED AT SUBMIT, WHICH IS WHY PUBLISH IS FREE.
+   *
+   * This case used to assert the opposite — that under_review -> live is itself
+   * cap-checked — because under_review did not count toward the allowance, so
+   * charging only draft -> under_review would have let a host queue any number
+   * of listings under a cap of one and publish them all. The reconciliation with
+   * the entitlements workstream answers that hole one level down: under_review
+   * IS a counted status now, in the application (lib/entitlements.ts) and in the
+   * database (083's private.host_active_listing_count). Entering review is what
+   * spends the slot.
+   *
+   * So the invariant is the pair below, and BOTH halves are load-bearing: the
+   * host at their allowance is refused at submit, and the host who already spent
+   * a slot is not charged a second time for publishing what they hold. Refusing
+   * the publish edge as well would strand a listing at under_review — paid for,
+   * unpublishable — for every host sitting exactly at their allowance, which is
+   * every starter host with one listing.
+   */
+  it("charges the slot at SUBMIT — a host at their allowance cannot enter review", async () => {
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(
+      allowanceState(
+        "starter",
+        PLAN_ENTITLEMENTS.starter.listings,
+        PLAN_ENTITLEMENTS.starter.listings,
+      ),
+    );
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  it("does NOT charge again at publish — the slot was spent entering review", async () => {
     const read = makeChain({ data: { ...ANSWERED_READY } });
-    const tierRead = makeChain({ data: { subscription_tier: "starter" } });
-    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
-    queueFromResults(HOST_PROFILE, read, tierRead, capCount);
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+    // Deliberately at the allowance: a starter host with their one listing in
+    // review must still be able to publish it.
+    mockRpc.mockResolvedValue(
+      allowanceState(
+        "starter",
+        PLAN_ENTITLEMENTS.starter.listings,
+        PLAN_ENTITLEMENTS.starter.listings,
+      ),
+    );
 
     const result = await updateListingStatus("token", "user_1", "l1", "live");
 
-    expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+    expect(result).toEqual({ ok: true, status: "live" });
+    // The allowance RPC is not even consulted: both statuses are counted.
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it("REOPENS a closed listing as a draft", async () => {

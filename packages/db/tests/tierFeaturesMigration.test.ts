@@ -51,10 +51,11 @@ function assertSeatEnforcement(sql: string): void {
 }
 
 function assertAddOnAllowance(sql: string): void {
-  expect(sql).toContain(
-    "add column if not exists purchased_listing_slots integer not null default 0",
-  );
-  expect(sql).toContain("check (purchased_listing_slots >= 0)");
+  // host_profiles.purchased_listing_slots and its CHECK are declared in 083,
+  // next to the enforcement trigger that has to add it up — asserted there by
+  // entitlementEnforcement.test.ts. Restating the column here would put two
+  // declarations of one column in the tree.
+  //
   // Idempotency is structural, not procedural.
   expect(sql).toContain(
     "create unique index if not exists uq_host_listing_slot_purchase_session on public.host_listing_slot_purchases (stripe_checkout_session_id);",
@@ -73,6 +74,48 @@ function assertAddOnAllowance(sql: string): void {
   expect(sql).toContain(
     "revoke execute on function public.credit_listing_slot_purchase(uuid, integer, integer, text, text, text) from public, anon, authenticated;",
   );
+}
+
+/** The dollar-quoted body of one function in the given migration text. */
+function functionBody(sql: string, name: string): string {
+  const start = sql.indexOf(`create or replace function public.${name}(`);
+  expect(start, `public.${name} must exist in migration 085`).toBeGreaterThan(-1);
+  const bodyStart = sql.indexOf("as $$", start);
+  const bodyEnd = sql.indexOf("$$", bodyStart + "as $$".length);
+  expect(bodyEnd).toBeGreaterThan(bodyStart);
+  return sql.slice(bodyStart, bodyEnd);
+}
+
+/**
+ * The revoke path must decide under the lock, not from a pre-lock snapshot.
+ * Written as an ORDER assertion because every individual ingredient can be
+ * present and the function still be wrong: the original had the lock AND the
+ * status test AND the update, in the order that double-decrements.
+ */
+function assertRevokeIsSerialized(sql: string): void {
+  const body = functionBody(sql, "revoke_listing_slot_purchase");
+
+  const lockAt = body.indexOf("pg_advisory_xact_lock");
+  const updateAt = body.indexOf("update public.host_listing_slot_purchases");
+  const decrementAt = body.indexOf("update public.host_profiles");
+  expect(lockAt).toBeGreaterThan(-1);
+  expect(updateAt).toBeGreaterThan(-1);
+  expect(decrementAt).toBeGreaterThan(-1);
+
+  // Lock BEFORE the write that decides, and both before the allowance moves.
+  expect(lockAt).toBeLessThan(updateAt);
+  expect(updateAt).toBeLessThan(decrementAt);
+
+  // The write itself refuses a row somebody else already cancelled…
+  expect(body).toContain("where id = v_id and status = 'active'");
+  // …and the decrement is gated on that write having actually happened.
+  expect(body).toContain("get diagnostics v_count = row_count;");
+  expect(body).toMatch(/if v_count <> 1 then[^$]*'already_revoked', true/);
+
+  // No decision may be taken from a row read before the lock. `select *` into a
+  // rowtype is how the stale snapshot got there in the first place.
+  expect(body).not.toContain("select * into v_row");
+  expect(body).not.toContain("if v_row.status = 'cancelled'");
 }
 
 describe("migration 085 — tier features and add-ons", () => {
@@ -130,11 +173,28 @@ describe("migration 085 — tier features and add-ons", () => {
     );
   });
 
+  /**
+   * A REDELIVERED cancellation must decrement exactly once.
+   *
+   * The first version read the ledger row into a variable BEFORE taking the
+   * advisory lock, decided from that stale snapshot, and issued an unguarded
+   * `update ... where id = v_row.id`. Two overlapping deliveries both read
+   * 'active', both passed the test, and both subtracted: an allowance of 3 went
+   * to 0 against ONE cancelled row, with greatest(..., 0) hiding it because a
+   * second subtraction from 0 still reports a valid 0.
+   *
+   * The shape that fixes it — the one credit_listing_slot_purchase already uses
+   * — is lock first, let the guarded UPDATE be the arbiter, move the allowance
+   * only when row_count is exactly 1.
+   */
+  it("decrements the allowance only for the caller that actually cancelled the row", () => {
+    assertRevokeIsSerialized(migration);
+  });
+
   it("floors the allowance at zero when an add-on subscription ends", () => {
     expect(migration).toContain(
-      "set purchased_listing_slots = greatest(purchased_listing_slots - v_row.quantity, 0)",
+      "set purchased_listing_slots = greatest(purchased_listing_slots - v_quantity, 0)",
     );
-    expect(migration).toContain("if v_row.status = 'cancelled' then");
   });
 
   // ── Negative controls ─────────────────────────────────────────────────────
@@ -147,6 +207,17 @@ describe("migration 085 — tier features and add-ons", () => {
           "revoke insert, update, delete on table public.team_memberships from anon, authenticated;",
           "-- revoke removed",
         ),
+      ),
+    ).toThrow();
+  });
+
+  it("negative control: dropping the status guard fails the revoke assertions", () => {
+    // Restore the shape that double-decremented — an unguarded UPDATE — and
+    // confirm the assertion above actually depends on it rather than passing on
+    // the surrounding scaffolding.
+    expect(() =>
+      assertRevokeIsSerialized(
+        migration.replace("where id = v_id and status = 'active'", "where id = v_id"),
       ),
     ).toThrow();
   });

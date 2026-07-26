@@ -50,20 +50,35 @@ begin
 end;
 $assert_shape$;
 
+-- A PAID host, because migration 083 added a database cap on how many listings
+-- one host may hold in a counted status (live, paused, under_review) and an
+-- unsubscribed host's allowance is zero. This suite is about the TRANSITION
+-- GRAPH, not the allowance — that has its own proof in
+-- assert_listing_allowance_enforcement.sql — so the fixture is given an
+-- enterprise plan and enough purchased slots that the cap can never be the
+-- thing refusing an edge here. Without this every case below fails with
+-- listing_allowance_exceeded and stops testing what it claims to test.
+insert into public.host_subscriptions (clerk_user_id, tier, billing_status)
+values ('user_db_assert_listing_lifecycle', 'enterprise', 'active');
+
 insert into public.host_profiles (
   id,
   owner_user_id,
   clerk_user_id,
   company_name,
   slug,
-  category_scopes
+  category_scopes,
+  subscription_tier,
+  purchased_listing_slots
 ) values (
   '07700000-0000-4000-8000-000000000001',
   null,
   'user_db_assert_listing_lifecycle',
   'Listing lifecycle assertion host',
   'listing-lifecycle-assertion-host',
-  array['farm']::text[]
+  array['farm']::text[],
+  'enterprise',
+  50
 );
 
 -- A sourced posting the ingestion lifecycle has closed, carrying a

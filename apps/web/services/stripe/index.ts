@@ -932,6 +932,9 @@ export async function createAdditionalListingCheckoutSession(params: {
   hostSubscriptionTier: AdditionalListingTier;
   /** How many extra active listings to buy. Validated by the caller. */
   quantity: number;
+  /** The host's Clerk email, used to find their existing Stripe customer when
+   * the metadata search misses. Same resolution the plan checkout uses. */
+  customerEmail?: string | null;
 }): Promise<Stripe.Checkout.Session> {
   const stripe = getStripeClient();
   const unitAmountCents = ADDITIONAL_LISTING_PRICING[params.hostSubscriptionTier];
@@ -945,6 +948,32 @@ export async function createAdditionalListingCheckoutSession(params: {
     tier: params.hostSubscriptionTier,
     amountCents: String(unitAmountCents),
   } as const;
+
+  // ATTACH THE HOST'S EXISTING CUSTOMER. This is what makes the add-on
+  // cancellable.
+  //
+  // Passing neither `customer` nor `customer_email` makes Stripe mint a BRAND
+  // NEW Customer for every add-on checkout, carrying no clerkUserId metadata.
+  // createBillingPortalSession resolves its customer from exactly that metadata,
+  // so it opens the host's PLAN customer — which does not contain the add-on
+  // subscription. The host would be billed monthly with no self-serve way to
+  // stop, while HostSettings tells them "To cancel an add-on, use Manage
+  // billing". Same resolution and the same ensureCustomerMetadata call the plan
+  // checkout makes, so both products land on ONE customer and the portal shows
+  // both subscriptions.
+  //
+  // A host reaching this surface has a host profile, which under 083 means they
+  // have paid for a plan, which means a customer exists. `customer_email` is
+  // still supplied for the case where it does not — Stripe then creates one
+  // customer that ensureCustomerMetadata will find next time, rather than a
+  // fresh orphan on every purchase.
+  const customer = await findStripeCustomer({
+    clerkUserId: params.clerkUserId,
+    customerEmail: params.customerEmail ?? null,
+  });
+  if (customer) {
+    await ensureCustomerMetadata(customer.id, { clerkUserId: params.clerkUserId });
+  }
 
   const lineItem: Stripe.Checkout.SessionCreateParams.LineItem = envPriceId
     ? { price: envPriceId, quantity: params.quantity }
@@ -969,6 +998,8 @@ export async function createAdditionalListingCheckoutSession(params: {
     // would fall through to the host-plan branch and zero the host's tier.
     subscription_data: { metadata },
     line_items: [lineItem],
+    customer: customer?.id,
+    customer_email: customer ? undefined : params.customerEmail ?? undefined,
   });
 }
 

@@ -1,0 +1,132 @@
+/* Plan selection, pre-profile. Shares the visual language of
+   (host)/host/billing so a host meets the same three cards whichever door they
+   arrive through, but sits outside the host shell — this page renders before
+   there is a host to shell. */
+
+.page {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 72rem;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--type-heading-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-sm);
+}
+
+.feedback {
+  margin: 0;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--type-body-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.planGrid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 64rem) {
+  .planGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.pricingBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.pricePair {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-text-primary);
+}
+
+.pricePair strong {
+  font-size: var(--type-heading-sm);
+}
+
+.pricePair span {
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.entitlements {
+  margin: 0 0 var(--space-4);
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-sm);
+}
+
+.actionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.primaryButton,
+.secondaryButton {
+  width: 100%;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid var(--color-text-primary);
+  background: var(--color-text-primary);
+  color: var(--color-surface);
+}
+
+.secondaryButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
