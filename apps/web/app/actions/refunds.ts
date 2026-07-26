@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
 import {
+  claimRefundForProcessing,
   createRefundRequest,
   getHostClerkUserIdByProfileId,
   getHostProfile,
@@ -18,7 +19,16 @@ import {
 import { isAdminUserId } from "../../lib/admin";
 import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
-import { cancelHostSubscription, issueRefund } from "../../services/stripe";
+import {
+  cancelHostSubscription,
+  findLatestHostSubscriptionCharge,
+  getRefundableChargeCents,
+  issueRefund,
+} from "../../services/stripe";
+import {
+  overRefundRefusal,
+  refundIdempotencyKey,
+} from "../../services/stripe/refundVerification";
 
 interface ActionResult {
   ok: boolean;
@@ -128,14 +138,37 @@ async function requestRefundImpl(
   let referenceId: string | null;
 
   if (input.purchaseType === "subscription") {
-    // No local purchase row to read — the charge is on a Stripe invoice. Trust
-    // the host's stated amount (an admin reviews + can correct before approving).
+    // No local purchase row to read — the charge is on a Stripe invoice, so it
+    // is read FROM STRIPE here rather than taken on the host's word. The billing
+    // form promises "we'll verify the exact charge in Stripe"; this is that
+    // verification, and it is why the recorded PaymentIntent is a real one
+    // instead of null.
     referenceId = null;
-    stripePaymentIntentId = null;
     if (!Number.isFinite(input.amountCents) || (input.amountCents ?? 0) <= 0) {
       return { ok: false, error: "Enter the amount you were charged for the subscription." };
     }
-    amountCents = Math.round(input.amountCents as number);
+    const requestedCents = Math.round(input.amountCents as number);
+
+    const lookup = await findLatestHostSubscriptionCharge(userId);
+    if (!lookup.ok || !lookup.charge) {
+      return {
+        ok: false,
+        error:
+          lookup.error ??
+          "We couldn't find a subscription charge on your account to refund.",
+      };
+    }
+
+    // Refuse an amount larger than the invoice actually collected. The admin
+    // approval re-checks this against Stripe's live refundable balance too — this
+    // one just stops an impossible request from ever entering the queue.
+    const refusal = overRefundRefusal(requestedCents, lookup.charge.amountPaidCents);
+    if (refusal) {
+      return { ok: false, error: refusal };
+    }
+
+    stripePaymentIntentId = lookup.charge.paymentIntentId;
+    amountCents = requestedCents;
   } else {
     // Announcement / boost: read the AUTHORITATIVE amount + payment intent from
     // the host's own purchase server-side. The client cannot fabricate a charge.
@@ -228,9 +261,14 @@ async function resolveRefundImpl(
   }
 
   // ── APPROVE: this is the ONLY path that fires a real Stripe refund, and only
-  // after an admin clicked Approve. Without a payment intent there is nothing to
-  // refund (e.g. a free/included purchase) — record 'failed' so it is auditable.
-  if (!request.stripePaymentIntentId) {
+  // after an admin clicked Approve. Everything before the claim below is a READ:
+  // nothing has moved yet, so a refusal here can safely leave the request open
+  // for the admin to correct or deny.
+  const paymentIntentId = await resolveApprovalPaymentIntentId(request);
+
+  // Without a payment intent there is nothing to refund (e.g. a free/included
+  // purchase) — record 'failed' so it is auditable.
+  if (!paymentIntentId) {
     return markRefundResolved(SERVICE_ROLE_KEY, {
       requestId,
       status: "failed",
@@ -241,18 +279,50 @@ async function resolveRefundImpl(
     });
   }
 
+  // Ask Stripe what it can still give back on this charge, and refuse anything
+  // larger. An unverifiable charge is refused too: issuing money we could not
+  // confirm is the failure this guard exists to prevent.
+  const refundable = await getRefundableChargeCents(paymentIntentId);
+  if (!refundable.ok || refundable.refundableCents === undefined) {
+    return {
+      ok: false,
+      error: `Could not verify the charge in Stripe, so no refund was issued: ${refundable.error ?? "unknown error"}`,
+    };
+  }
+
+  const refusal = overRefundRefusal(request.amountCents, refundable.refundableCents);
+  if (refusal) {
+    return { ok: false, error: refusal };
+  }
+
+  // CLAIM the row before touching Stripe. A concurrent approval (double-clicked
+  // button, retried action) loses this conditional update and returns here
+  // instead of issuing a second payout.
+  const claimed = await claimRefundForProcessing(SERVICE_ROLE_KEY, {
+    requestId,
+    adminClerkUserId,
+  });
+  if (!claimed.ok) {
+    return { ok: false, error: claimed.error };
+  }
+
   const refund = await issueRefund(
-    request.stripePaymentIntentId,
-    request.amountCents > 0 ? request.amountCents : undefined,
+    paymentIntentId,
+    request.amountCents,
+    // Same request id -> same key -> Stripe replays the original refund rather
+    // than creating a second one, even if this action runs twice.
+    refundIdempotencyKey(requestId),
   );
 
   // Record the Stripe outcome: 'refunded' on success, 'failed' otherwise. Either
   // way the request leaves the open queue, with the failure reason captured for
-  // the admin to retry or investigate.
+  // the admin to retry or investigate. fromStatus is 'approved' because the row
+  // was claimed above.
   const resolved = await markRefundResolved(SERVICE_ROLE_KEY, {
     requestId,
     status: refund.ok ? "refunded" : "failed",
     adminClerkUserId,
+    fromStatus: "approved",
     adminNote: refund.ok
       ? adminNote ?? null
       : (adminNote?.trim() ? `${adminNote.trim()} · ` : "") +
@@ -291,6 +361,33 @@ async function resolveRefundImpl(
   }
 
   return { ok: true };
+}
+
+/**
+ * The PaymentIntent an approval should refund against.
+ *
+ * announcement / boost requests captured a real PaymentIntent from their own
+ * purchase row at request time, so the stored id is authoritative.
+ *
+ * subscription requests have no local purchase row. Requests filed before the
+ * charge lookup existed stored NULL, and the amount was whatever the host typed,
+ * so the stored id cannot be relied on: re-resolve it from Stripe here. A stored
+ * id is still preferred when present.
+ */
+async function resolveApprovalPaymentIntentId(
+  request: RefundRequestRecord,
+): Promise<string | null> {
+  if (request.stripePaymentIntentId) return request.stripePaymentIntentId;
+  if (request.purchaseType !== "subscription") return null;
+
+  const clerkUserId = await getHostClerkUserIdByProfileId(
+    SERVICE_ROLE_KEY,
+    request.hostProfileId,
+  );
+  if (!clerkUserId) return null;
+
+  const lookup = await findLatestHostSubscriptionCharge(clerkUserId);
+  return lookup.ok && lookup.charge ? lookup.charge.paymentIntentId : null;
 }
 
 /**

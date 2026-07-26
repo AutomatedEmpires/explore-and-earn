@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type Stripe from "stripe";
 
 /**
  * Nothing is granted until Stripe says the money is real (readiness audit
@@ -14,37 +15,46 @@ import { describe, expect, it } from "vitest";
  * checkout.session.async_payment_succeeded, or fail via async_payment_failed.
  * So a host could obtain a paid tier for money that never arrived.
  *
- * This mirrors the shipped predicate. It is deliberately a pure table rather
- * than a webhook integration test: the rule is "which payment_status values
- * mean paid", and that is what must never silently widen.
+ * This file used to declare its own copy of checkoutIsPaid three lines above the
+ * assertions, so it tested the copy: the shipped predicate could widen to grant
+ * on 'unpaid' and every case here would still pass. It imports the real exported
+ * predicate now — the rule is "which payment_status values mean paid", and that
+ * is what must never silently widen.
  */
 
-type PaymentStatus = "paid" | "unpaid" | "no_payment_required";
+vi.mock("server-only", () => ({}));
+vi.mock("@explore-and-earn/db", () => ({
+  adminClient: () => ({}),
+  activateBoostCampaignFromCheckout: vi.fn(),
+  insertHostAnnouncement: vi.fn(),
+  recordInvitePackPurchase: vi.fn(),
+}));
 
-/** Mirror of checkoutIsPaid in services/stripe/index.ts. */
-function checkoutIsPaid(session: { payment_status?: PaymentStatus }): boolean {
-  return (
-    session.payment_status === "paid" ||
-    session.payment_status === "no_payment_required"
-  );
+const { checkoutIsPaid } = await import("../../services/stripe");
+
+type PaymentStatus = Stripe.Checkout.Session["payment_status"];
+
+/** Only payment_status is read; the rest of the session is irrelevant here. */
+function session(payment_status?: PaymentStatus): Stripe.Checkout.Session {
+  return { payment_status } as unknown as Stripe.Checkout.Session;
 }
 
 describe("checkout payment confirmation", () => {
   it("grants on a genuinely paid session", () => {
-    expect(checkoutIsPaid({ payment_status: "paid" })).toBe(true);
+    expect(checkoutIsPaid(session("paid"))).toBe(true);
   });
 
   it("grants when Stripe required no payment (100% coupon / zero-amount)", () => {
-    expect(checkoutIsPaid({ payment_status: "no_payment_required" })).toBe(true);
+    expect(checkoutIsPaid(session("no_payment_required"))).toBe(true);
   });
 
   /** The whole defect: ACH/SEPA/BNPL complete BEFORE the money settles. */
   it("does NOT grant on a completed-but-unpaid session", () => {
-    expect(checkoutIsPaid({ payment_status: "unpaid" })).toBe(false);
+    expect(checkoutIsPaid(session("unpaid"))).toBe(false);
   });
 
   it("does NOT grant when payment_status is absent", () => {
-    expect(checkoutIsPaid({})).toBe(false);
+    expect(checkoutIsPaid(session())).toBe(false);
   });
 
   /**
@@ -61,7 +71,7 @@ describe("checkout payment confirmation", () => {
       "",
       undefined,
     ] as unknown as PaymentStatus[];
-    const granted = statuses.filter((s) => checkoutIsPaid({ payment_status: s }));
+    const granted = statuses.filter((s) => checkoutIsPaid(session(s)));
     expect(granted).toEqual(["paid", "no_payment_required"]);
   });
 });

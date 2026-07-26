@@ -42,6 +42,13 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+/**
+ * The boost-purchase table, named once. Every reference in this module goes
+ * through this constant so a read path and a write path cannot name two
+ * different tables again.
+ */
+export const BOOST_CAMPAIGNS_TABLE = "listing_boost_campaigns";
+
 /** Which purchase a refund targets — mirrors the CHECK in 047. */
 export type RefundPurchaseType = "subscription" | "announcement" | "boost";
 
@@ -255,7 +262,7 @@ export async function getHostRefundablePurchases(
       .eq("host_profile_id", hostProfileId)
       .not("stripe_payment_intent_id", "is", null),
     db
-      .from("listing_boost_campaigns")
+      .from(BOOST_CAMPAIGNS_TABLE)
       .select(
         "id, purchase_amount_cents, purchase_duration_days, stripe_payment_intent_id, created_at",
       )
@@ -383,6 +390,13 @@ export interface MarkRefundResolvedInput {
   /** Acting admin's Clerk user id — from auth().userId, never the client. */
   readonly adminClerkUserId: string;
   readonly adminNote?: string | null;
+  /**
+   * The status this row must still be in for the write to land. Defaults to
+   * 'requested' (the deny path, which never touches Stripe). The approve path
+   * passes 'approved' because it has already claimed the row before calling
+   * Stripe — see claimRefundForProcessing.
+   */
+  readonly fromStatus?: Extract<RefundStatus, "requested" | "approved">;
 }
 
 const REFUND_QUEUE_SELECT =
@@ -494,20 +508,71 @@ export async function getRefundStats(
 }
 
 /**
+ * CLAIM a refund request for processing: 'requested' -> 'approved'.
+ *
+ * This is the double-spend guard, and it has to run BEFORE the Stripe call.
+ * markRefundResolved's conditional update is correct but it fires AFTER the
+ * money has already moved, so two concurrent approvals could both read
+ * 'requested', both call stripe.refunds.create, and only then race on the write
+ * — one payout recorded, two payouts made. Claiming first means the second
+ * caller loses the update here and never reaches Stripe at all.
+ *
+ * 'approved' is the transient in-flight state 047 declared for exactly this:
+ * a row sitting in 'approved' means an approval started and did not record its
+ * outcome, which is legible to an operator instead of invisible.
+ */
+export async function claimRefundForProcessing(
+  serviceRoleToken: string,
+  input: { readonly requestId: string; readonly adminClerkUserId: string },
+): Promise<{ ok: boolean; error?: string }> {
+  const { requestId, adminClerkUserId } = input;
+
+  if (!requestId) return { ok: false, error: "Missing request id." };
+  if (!adminClerkUserId) return { ok: false, error: "Missing admin id." };
+
+  const db = untypedAdmin(serviceRoleToken);
+
+  const { data, error } = await db
+    .from("refund_requests")
+    .update({
+      status: "approved",
+      resolved_by_clerk_user_id: adminClerkUserId,
+    })
+    .eq("id", requestId)
+    .eq("status", "requested")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  if (!data) {
+    return {
+      ok: false,
+      error: "Refund request is already being processed or was already resolved.",
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
  * Record an admin's decision against a refund request (service-role client).
  * Writes the terminal status + stamps WHO resolved it and WHEN, plus an optional
  * admin note. The actual Stripe refund happens in the server action BEFORE this
  * call (on approve); this only records the outcome, so passing 'refunded' means
  * Stripe already succeeded and 'failed' means it errored. 'denied' skips Stripe.
  *
- * Only advances rows still in 'requested' (idempotency / double-submit guard):
- * a request already resolved by another admin won't be silently re-stamped.
+ * Only advances rows still in the expected prior status (`fromStatus`, default
+ * 'requested'): a request already resolved by another admin won't be silently
+ * re-stamped. The approve path passes 'approved' because it claimed the row via
+ * claimRefundForProcessing before calling Stripe.
  */
 export async function markRefundResolved(
   serviceRoleToken: string,
   input: MarkRefundResolvedInput,
 ): Promise<{ ok: boolean; error?: string }> {
-  const { requestId, status, adminClerkUserId, adminNote } = input;
+  const { requestId, status, adminClerkUserId, adminNote, fromStatus } = input;
 
   if (!requestId) return { ok: false, error: "Missing request id." };
   if (!adminClerkUserId) return { ok: false, error: "Missing admin id." };
@@ -524,7 +589,7 @@ export async function markRefundResolved(
       resolved_at: new Date().toISOString(),
     })
     .eq("id", requestId)
-    .eq("status", "requested")
+    .eq("status", fromStatus ?? "requested")
     .select("id")
     .maybeSingle();
 
@@ -617,10 +682,12 @@ export async function revokeRefundedPurchaseRow(
   const db = untypedAdmin(serviceRoleToken);
 
   if (purchaseType === "boost") {
-    // Migration 029 already declared a 'refunded' status for exactly this case;
-    // nothing had ever written it.
+    // The table is `listing_boost_campaigns` (029) — there has never been a
+    // `boost_campaigns` table, and naming one made PostgREST answer 42P01, so
+    // the revoke failed and a refunded boost kept running to its ends_at.
+    // 029 already declared the 'refunded' status for exactly this case.
     const { error } = await db
-      .from("boost_campaigns")
+      .from(BOOST_CAMPAIGNS_TABLE)
       .update({ status: "refunded" })
       .eq("id", referenceId);
     return error ? { ok: false, error: error.message } : { ok: true };
