@@ -1,6 +1,16 @@
 /**
- * RLS isolation — integration test (the highest-risk gap: no DB-backed RLS test
- * existed). It runs ONLY when real Supabase credentials are present, and SKIPS
+ * RLS isolation — integration test through PostgREST.
+ *
+ * NOT the primary RLS coverage. This file self-skips whenever its Supabase
+ * credentials are absent, which is every run of the credential-less unit-test
+ * job, so it cannot be relied on as a gate. The suite that actually runs on
+ * every pull request against a database rebuilt from migration 001 is
+ * `tools/db-assert/sql/assert_authorization_matrix.sql`, driven by
+ * `tools/db-assert/assert-authorization.mjs` from the Database Security
+ * workflow. Add new refusals there; keep this file for what it uniquely
+ * exercises — the anon key and the PostgREST layer above the policies.
+ *
+ * It runs ONLY when real Supabase credentials are present, and SKIPS
  * cleanly otherwise — so it never gives false-green in a credential-less CI, but
  * gives the founder / a secret-injected CI a real cross-tenant regression guard.
  *
