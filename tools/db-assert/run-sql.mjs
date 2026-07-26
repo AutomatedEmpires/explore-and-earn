@@ -15,25 +15,6 @@ import { spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
 
 /**
- * A libpq key/value conninfo assembled from the standard PG* variables, for the
- * case where the caller supplied those instead of a URL.
- * @returns {string}
- */
-function libpqConninfo() {
-  const parts = [
-    ["host", process.env.PGHOST],
-    ["port", process.env.PGPORT],
-    ["user", process.env.PGUSER],
-    ["password", process.env.PGPASSWORD],
-    ["dbname", process.env.PGDATABASE],
-  ]
-  return parts
-    .filter(([, value]) => Boolean(value))
-    .map(([key, value]) => `${key}='${String(value).replace(/'/g, "\\'")}'`)
-    .join(" ")
-}
-
-/**
  * Run each SQL file in order, exiting the process on the first failure.
  * @param {string[]} sqlFiles absolute paths
  * @param {string} label prefix for diagnostics
@@ -56,26 +37,10 @@ export function runSqlFiles(sqlFiles, label) {
     }
   }
 
-  // A suite that has to prove something about CONCURRENCY needs a second
-  // session, which means dblink, which means a connection string it can hand to
-  // dblink_connect. `dbname=current_database()` is not enough: the local
-  // `postgres` role is not a superuser, and a non-superuser dblink connection
-  // must carry a password. Passed to every suite as :conninfo; suites that do
-  // not open a second session simply never reference it.
-  const conninfo = dbUrl || libpqConninfo()
-
   for (const sqlFile of sqlFiles) {
     const result = spawnSync(
       "psql",
-      [
-        ...connectionArgs,
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-v",
-        `conninfo=${conninfo}`,
-        "-f",
-        sqlFile,
-      ],
+      [...connectionArgs, "-v", "ON_ERROR_STOP=1", "-f", sqlFile],
       { stdio: "inherit", encoding: "utf8" },
     )
 
