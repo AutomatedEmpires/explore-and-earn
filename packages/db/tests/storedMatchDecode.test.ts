@@ -41,6 +41,42 @@ describe("decodeStoredMatchRow — refusals", () => {
     expect(decodeStoredMatchRow({})).toBeNull();
   });
 
+  it("returns null for NaN, Infinity, and out-of-range scores", () => {
+    // typeof NaN === "number", so a bare typeof check admits it — and NaN
+    // compares false against every band floor, so it would have resolved to
+    // "needs_attention" and presented as a real verdict.
+    expect(decodeStoredMatchRow({ ...good, score: Number.NaN })).toBeNull();
+    expect(decodeStoredMatchRow({ ...good, score: Number.POSITIVE_INFINITY })).toBeNull();
+    expect(decodeStoredMatchRow({ ...good, score: -1 })).toBeNull();
+    expect(decodeStoredMatchRow({ ...good, score: 101 })).toBeNull();
+    // the boundaries themselves are valid
+    expect(decodeStoredMatchRow({ ...good, score: 0 })?.score).toBe(0);
+    expect(decodeStoredMatchRow({ ...good, score: 100 })?.score).toBe(100);
+  });
+
+  it("falls back on an out-of-range rawScore / confidence rather than passing it through", () => {
+    expect(decodeStoredMatchRow({ ...good, raw_score: Number.NaN })?.rawScore).toBe(84);
+    expect(decodeStoredMatchRow({ ...good, raw_score: 999 })?.rawScore).toBe(84);
+    expect(decodeStoredMatchRow({ ...good, confidence: Number.NaN })?.confidence).toBe(0);
+    expect(decodeStoredMatchRow({ ...good, confidence: -5 })?.confidence).toBe(0);
+  });
+
+  it("rejects non-record components instead of casting them into the trace", () => {
+    // `?? {}` only caught null/undefined; these all have `typeof === "object"`
+    // or would otherwise sail through the cast.
+    for (const bad of ["strong", 42, true, [1, 2, 3], []]) {
+      expect(decodeStoredMatchRow({ ...good, components: bad })?.components).toEqual({});
+    }
+  });
+
+  it("keeps only numeric component entries", () => {
+    const out = decodeStoredMatchRow({
+      ...good,
+      components: { categoryRoleFit: 88, payAlignment: "high", broken: Number.NaN, ok: 0 },
+    });
+    expect(out?.components).toEqual({ categoryRoleFit: 88, ok: 0 });
+  });
+
   it("does NOT admit inherited Object.prototype keys as caps", () => {
     // The bug this guards: `cap in MATCH_SCORE_CAPS` walks the prototype chain,
     // so these would have decoded as real caps and then rendered as a blocker
