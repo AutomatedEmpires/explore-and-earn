@@ -3,6 +3,14 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "../client";
+import { mapHostApplicantDisplayNames, unwrapBridgeRows } from "../lib/hostApplicantView";
+
+/**
+ * Matches the cardinality bound migration 084 puts on
+ * get_host_applicant_display_names. Over the bound the RPC returns nothing, so
+ * larger caller lists are chunked rather than silently dropped.
+ */
+const HOST_APPLICANT_NAME_BATCH = 200;
 
 /**
  * Seeker profile data access for onboarding + profile edit.
@@ -304,8 +312,18 @@ export async function getSeekerAvailability(
 }
 
 /**
- * Batch-resolve seeker display names by internal seeker_profiles.id.
- * Missing rows and blank names fall back to "Seeker" at the caller boundary.
+ * Batch-resolve applicant display names for a host, by seeker_profiles.id.
+ *
+ * Routed through migration 084's get_host_applicant_display_names. It used to
+ * SELECT seeker_profiles directly, which cannot work: that table has only the
+ * owner-scoped policies from 013, so a host's read was filtered to zero rows
+ * with no error and every applicant on the list surfaces rendered as the
+ * caller's "Seeker" placeholder.
+ *
+ * Ids the caller is not entitled to are simply absent from the map, and the RPC
+ * is bounded at 200 ids per call so it cannot be used to enumerate seekers.
+ * Callers supply their own placeholder for a missing entry; this function never
+ * invents a name.
  */
 export async function getSeekerDisplayNames(
   clerkToken: string,
@@ -317,15 +335,20 @@ export async function getSeekerDisplayNames(
   if (uniqueIds.length === 0) return new Map();
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data } = await untyped
-    .from(SEEKER_PROFILES)
-    .select("id, display_name")
-    .in("id", uniqueIds);
+  const merged = new Map<string, string>();
 
-  const map = new Map<string, string>();
-  for (const row of (data ?? []) as Array<{ id: string; display_name: string | null }>) {
-    const displayName = row.display_name?.trim();
-    map.set(row.id, displayName && displayName.length > 0 ? displayName : "Seeker");
+  for (let i = 0; i < uniqueIds.length; i += HOST_APPLICANT_NAME_BATCH) {
+    const batch = uniqueIds.slice(i, i + HOST_APPLICANT_NAME_BATCH);
+    const rows = unwrapBridgeRows(
+      "getSeekerDisplayNames",
+      await untyped.rpc("get_host_applicant_display_names", {
+        p_seeker_profile_ids: batch,
+      }),
+    );
+    for (const [id, name] of mapHostApplicantDisplayNames(rows)) {
+      merged.set(id, name);
+    }
   }
-  return map;
+
+  return merged;
 }

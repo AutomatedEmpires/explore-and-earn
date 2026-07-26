@@ -43,6 +43,7 @@ export * from "./lib/seekerListingFit";
 export * from "./lib/storedMatchDecode";
 export * from "./lib/resumeCompleteness";
 export * from "./lib/resumeDraft";
+export * from "./lib/hostApplicantView";
 export * from "./queries/behaviorInteractions";
 export * from "./queries/matchScores";
 export * from "./queries/savedSearchAlerts";

@@ -66,7 +66,7 @@ export default async function HostMessageThreadPage({
   revalidatePath("/host/messages");
   const conversation = conversations.find((entry) => entry.id === id) ?? null;
   const seekerName = conversation
-    ? await getSeekerDisplayName(token, userId, conversation.seekerProfileId)
+    ? await getSeekerDisplayName(token, conversation.seekerProfileId)
     : null;
 
   return (
