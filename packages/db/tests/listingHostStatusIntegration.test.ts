@@ -39,7 +39,7 @@ async function mintToken(sub: string): Promise<string> {
 }
 
 describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () => {
-  it("blocks moderation bypasses while preserving host and service-role transitions", async () => {
+  it("lets a host publish and reopen while keeping the refusals 077 established", async () => {
     const admin = createClient(SUPABASE_URL!, SERVICE_ROLE_KEY!, {
       auth: { persistSession: false },
     });
@@ -83,42 +83,44 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
       const inserted = await host
         .from("listings")
         .insert([
-          { ...completeDraft, title: "Approve path" },
+          { ...completeDraft, title: "Publish path" },
           { ...completeDraft, title: "Hold path" },
           { ...completeDraft, title: "Reject path" },
         ])
         .select("id,status");
       expect(inserted.error).toBeNull();
       expect(inserted.data).toHaveLength(3);
-      const [approveId, holdId, rejectId] = (inserted.data ?? []).map(
+      const [publishId, holdId, rejectId] = (inserted.data ?? []).map(
         (row) => (row as { id: string }).id,
+      );
+
+      // draft -> live is still refused, on a listing that answers everything.
+      const shortcut = await host
+        .from("listings")
+        .update({ status: "live" })
+        .eq("id", publishId);
+      expect(shortcut.error?.code).toBe("23514");
+      expect(shortcut.error?.message).toContain(
+        "listing_host_status_transition_forbidden",
       );
 
       const submitted = await host
         .from("listings")
         .update({ status: "under_review" })
-        .in("id", [approveId, holdId, rejectId])
+        .in("id", [publishId, holdId, rejectId])
         .select("id,status");
       expect(submitted.error).toBeNull();
       expect(submitted.data).toHaveLength(3);
 
-      const bypassApproval = await host
+      // 082: the host publishes their own listing. No admin acts here.
+      const published = await host
         .from("listings")
         .update({ status: "live" })
-        .eq("id", approveId);
-      expect(bypassApproval.error?.code).toBe("23514");
-      expect(bypassApproval.error?.message).toContain(
-        "listing_host_status_transition_forbidden",
-      );
-
-      const approved = await admin
-        .from("listings")
-        .update({ status: "live" })
-        .eq("id", approveId)
+        .eq("id", publishId)
         .select("status")
         .single();
-      expect(approved.error).toBeNull();
-      expect(approved.data?.status).toBe("live");
+      expect(published.error).toBeNull();
+      expect(published.data?.status).toBe("live");
 
       const held = await admin
         .from("listings")
@@ -142,7 +144,7 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
         const transition = await host
           .from("listings")
           .update({ status })
-          .eq("id", approveId)
+          .eq("id", publishId)
           .select("status")
           .single();
         expect(transition.error).toBeNull();
@@ -152,7 +154,7 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
       const archivedToLive = await host
         .from("listings")
         .update({ status: "live" })
-        .eq("id", approveId);
+        .eq("id", publishId);
       expect(archivedToLive.error?.code).toBe("23514");
 
       const closedToLive = await host
@@ -160,6 +162,16 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
         .update({ status: "live" })
         .eq("id", rejectId);
       expect(closedToLive.error?.code).toBe("23514");
+
+      // 082: closed -> draft, so a rejected listing is not an orphan.
+      const reopened = await host
+        .from("listings")
+        .update({ status: "draft" })
+        .eq("id", rejectId)
+        .select("status")
+        .single();
+      expect(reopened.error).toBeNull();
+      expect(reopened.data?.status).toBe("draft");
     } finally {
       const cleanup = await admin.from("host_profiles").delete().eq("id", hostProfileId);
       expect(cleanup.error).toBeNull();

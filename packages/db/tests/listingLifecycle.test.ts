@@ -1,10 +1,11 @@
 /**
  * Unit tests for the host listing lifecycle:
- *  - canTransitionListing pins the full transition map (there is intentionally
- *    NO under_review -> live edge — that's the admin approval flow)
+ *  - canTransitionListing pins the full transition map, INCLUDING the
+ *    under_review -> live edge hosts publish through (founder, 2026-07-26) and
+ *    the closed -> draft edge that stops a rejected listing being an orphan
  *  - updateListingStatus enforces ownership, transition validity, and the
- *    PLAN_ENTITLEMENTS listing cap (feat/enforce-listing-cap) at the one
- *    transition that newly consumes a slot: draft -> under_review
+ *    PLAN_ENTITLEMENTS listing cap at every transition that newly consumes a
+ *    slot: draft -> under_review AND under_review -> live
  *  - status timestamps (published_at / paused_at / archived_at) are stamped
  *
  * All Supabase and server-only I/O is mocked so no DB connection is required.
@@ -59,41 +60,53 @@ beforeEach(() => {
 
 // ── canTransitionListing: pin the whole map ────────────────────────────────
 
+const ALL_STATUSES: readonly ListingStatus[] = [
+  "draft",
+  "under_review",
+  "live",
+  "paused",
+  "closed",
+  "archived",
+];
+
 describe("canTransitionListing", () => {
   const ALLOWED: ReadonlyArray<[ListingStatus, ListingStatus]> = [
     ["draft", "under_review"],
     ["under_review", "draft"],
+    ["under_review", "live"],
     ["live", "paused"],
     ["live", "archived"],
     ["paused", "live"],
     ["paused", "archived"],
+    ["closed", "draft"],
   ];
 
   it.each(ALLOWED)("allows %s -> %s", (from, to) => {
     expect(canTransitionListing(from, to)).toBe(true);
   });
 
-  it("FORBIDS under_review -> live — publishing is the admin approval flow, not a host action", () => {
-    expect(canTransitionListing("under_review", "live")).toBe(false);
+  it("ALLOWS under_review -> live — hosts publish their own listings (founder, 2026-07-26)", () => {
+    expect(canTransitionListing("under_review", "live")).toBe(true);
   });
 
-  it("treats closed and archived as terminal", () => {
-    const statuses: ListingStatus[] = [
-      "draft",
-      "under_review",
-      "live",
-      "paused",
-      "closed",
-      "archived",
-    ];
-    for (const to of statuses) {
-      expect(canTransitionListing("closed", to)).toBe(false);
-      expect(canTransitionListing("archived", to)).toBe(false);
+  // The negative control for the whole change. Publication is a deliberate
+  // second act: it is the transition 070's triad CHECK and 072's housing-photo
+  // trigger are attached to, and skipping straight from the form would skip the
+  // moment the host is shown what is still unanswered.
+  it("STILL forbids draft -> live", () => {
+    expect(canTransitionListing("draft", "live")).toBe(false);
+  });
+
+  it("gives a closed listing exactly ONE exit, and it is not back to public", () => {
+    for (const to of ALL_STATUSES) {
+      expect(canTransitionListing("closed", to)).toBe(to === "draft");
     }
   });
 
-  it("forbids draft -> live (must go through review)", () => {
-    expect(canTransitionListing("draft", "live")).toBe(false);
+  it("treats archived as terminal", () => {
+    for (const to of ALL_STATUSES) {
+      expect(canTransitionListing("archived", to)).toBe(false);
+    }
   });
 });
 
@@ -118,6 +131,9 @@ const ANSWERED_DRAFT = {
   compensation_min_cents: 22_000,
   compensation_max_cents: null,
 } as const;
+
+/** The same listing one step later: complete, staged, not yet public. */
+const ANSWERED_READY = { ...ANSWERED_DRAFT, status: "under_review" } as const;
 
 describe("updateListingStatus", () => {
   it("submits a draft for review when under the plan cap", async () => {
@@ -274,11 +290,88 @@ describe("updateListingStatus", () => {
     }
   });
 
-  it("returns invalid_transition for a forbidden edge (under_review -> live)", async () => {
-    const read = makeChain({ data: { id: "l1", status: "under_review" } });
+  it("returns invalid_transition for a forbidden edge (draft -> live)", async () => {
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
     queueFromResults(HOST_PROFILE, read);
 
     const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: false, error: "invalid_transition" });
+  });
+
+  // ── Host self-publish (founder, 2026-07-26) ──────────────────────────────
+
+  it("PUBLISHES an under_review listing — no admin approval stands in the way", async () => {
+    const read = makeChain({ data: { ...ANSWERED_READY } });
+    const tierRead = makeChain({ data: { subscription_tier: "starter" } });
+    const capCount = makeChain({ count: 0 });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, tierRead, capCount, update);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: true, status: "live" });
+    expect(update.update).toHaveBeenCalledWith({ status: "live" });
+  });
+
+  it("BLOCKS publishing when a benefit went unanswered — the gate moved WITH the edge", async () => {
+    // The publication gate used to be reachable only at draft->under_review and
+    // paused->live. If under_review->live were added without extending it, the
+    // brand-new host path would be the one path that never runs it.
+    const read = makeChain({
+      data: { ...ANSWERED_READY, pay_evidence: "not_stated" },
+    });
+    queueFromResults(HOST_PROFILE, read);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("incomplete_listing");
+    expect(result.blockers?.map((b) => b.field)).toEqual(["pay"]);
+  });
+
+  it("CHARGES the plan cap at publish, not only at submit", async () => {
+    // under_review is not a CAP_COUNTED_STATUS. Charging only draft->under_review
+    // would let a host queue any number of listings at under_review under a cap
+    // of one and then publish every one of them, because the live+paused count
+    // is still zero at each publish.
+    const read = makeChain({ data: { ...ANSWERED_READY } });
+    const tierRead = makeChain({ data: { subscription_tier: "starter" } });
+    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
+    queueFromResults(HOST_PROFILE, read, tierRead, capCount);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  it("REOPENS a closed listing as a draft", async () => {
+    const read = makeChain({
+      data: { id: "l1", status: "closed", provenance: "verified" },
+    });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "draft");
+
+    expect(result).toEqual({ ok: true, status: "draft" });
+    expect(update.update).toHaveBeenCalledWith({ status: "draft" });
+    // No triad check and no cap read: draft is neither a publication status nor
+    // a cap-counted one.
+    expect(mockFrom).toHaveBeenCalledTimes(3);
+  });
+
+  it("REFUSES to reopen a SOURCED closed listing — the origin withdrew that posting", async () => {
+    // sweepStaleSourcedListings and the snapshot reconciliation both close
+    // sourced rows. Reopening one would resurrect, under our own source
+    // attribution, a job the source itself took down. Migration 082 refuses it
+    // too; this is the message the host actually reads.
+    const read = makeChain({
+      data: { id: "l1", status: "closed", provenance: "sourced" },
+    });
+    queueFromResults(HOST_PROFILE, read);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "draft");
 
     expect(result).toEqual({ ok: false, error: "invalid_transition" });
   });

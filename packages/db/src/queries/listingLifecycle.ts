@@ -27,19 +27,34 @@ function asPublicationEvidence(value: unknown): BenefitEvidenceStatus {
 }
 
 /**
- * Host-initiated listing status transitions (Agent 3 / PR 1).
+ * Host-initiated listing status transitions.
  *
  * The server is the authoritative gate; the client mirrors this map only to
- * decide which action buttons to show. Note: there is intentionally NO
- * under_review -> live edge — publishing a reviewed listing to live is a
- * separate approval flow outside this host control set.
+ * decide which action buttons to show. Migration 082 holds the same graph at
+ * the database boundary, where a direct PostgREST write also meets it.
+ *
+ * HOSTS PUBLISH THEIR OWN LISTINGS (founder, 2026-07-26): under_review -> live
+ * is a host edge. There is no admin approval step. What still stands between a
+ * listing and seekers is the publication gate below plus its database backstops
+ * — 070's triad CHECK and 072's housing-photo trigger — which refuse both
+ * under_review and live for a listing that has not answered Housing, Meals and
+ * Pay. draft -> live stays absent on purpose: publication is a deliberate
+ * second act, not a side effect of finishing the form.
+ *
+ * closed -> draft exists so an operator-rejected listing is not a permanent
+ * orphan. `closed` is also written by the sourced freshness sweep and by
+ * snapshot reconciliation; those rows are provenance='sourced' and 082 refuses
+ * the reversal for them, because there the closure records that the ORIGIN
+ * withdrew the posting. This map cannot express that distinction, so a sourced
+ * closed listing that reached here would be rejected by the database rather
+ * than by `canTransitionListing`.
  */
 const LISTING_STATUS_TRANSITIONS: Record<ListingStatus, readonly ListingStatus[]> = {
   draft: ["under_review"],
-  under_review: ["draft"],
+  under_review: ["draft", "live"],
   live: ["paused", "archived"],
   paused: ["live", "archived"],
-  closed: [],
+  closed: ["draft"],
   archived: [],
 };
 
@@ -137,6 +152,16 @@ export async function updateListingStatus(
     return { ok: false, error: "invalid_transition" };
   }
 
+  // closed -> draft reverses an OPERATOR's rejection. On a sourced listing
+  // `closed` means the origin withdrew the posting (the freshness sweep and
+  // snapshot reconciliation both write it), so reopening would resurrect a job
+  // the source took down under our own attribution. Migration 082 refuses this
+  // at the database too; this exists so the host reads a sentence instead of a
+  // constraint name.
+  if (current === "closed" && row.provenance === "sourced") {
+    return { ok: false, error: "invalid_transition" };
+  }
+
   let hostProfile: Record<string, unknown> | null = null;
   let benefitDetails: Record<string, unknown> = {};
   if (
@@ -162,15 +187,15 @@ export async function updateListingStatus(
 
   // ── The publication gate (founder, 2026-07-17) ──────────────────────────────
   // A host-controlled listing may not face seekers while Housing, Meals or Pay
-  // is unanswered. Checked on the transitions that PUBLISH — draft->under_review
-  // and paused->live — never on the ones that retreat, so a host can always pull
-  // a listing down and a draft can always stay half-finished.
+  // is unanswered. Checked on every transition INTO a publication status —
+  // draft->under_review, under_review->live and paused->live — never on the ones
+  // that retreat, so a host can always pull a listing down and a draft can
+  // always stay half-finished.
   //
   // This is not the enforcement; migration 070's listings_publication_triad_chk
-  // is (PostgREST hands `authenticated` full-column UPDATE on listings, so a
-  // determined client never runs this code). This exists so the host is told
-  // WHICH fields are missing, in their own words, instead of meeting a raw
-  // 23514 constraint violation.
+  // is, because a client that talks to PostgREST directly never runs this code.
+  // This exists so the host is told WHICH fields are missing, in their own
+  // words, instead of meeting a raw 23514 constraint violation.
   if (newStatus === "under_review" || newStatus === "live") {
     const housingDetail =
       benefitDetails.housing && typeof benefitDetails.housing === "object"
@@ -199,11 +224,21 @@ export async function updateListingStatus(
     }
   }
 
-  // Enforce PLAN_ENTITLEMENTS.listings at the one host-initiated transition
-  // that can newly consume a slot: submitting a draft for review. (live<->paused
-  // don't need this check — both already count as "active" per
-  // CAP_COUNTED_STATUSES, so pausing/resuming never changes the count.)
-  if (newStatus === "under_review") {
+  // Enforce PLAN_ENTITLEMENTS.listings at every host-initiated transition that
+  // can newly consume a slot. (live<->paused don't need this check — both
+  // already count as "active" per CAP_COUNTED_STATUSES, so pausing/resuming
+  // never changes the count.)
+  //
+  // TWO transitions qualify now that hosts publish their own listings (082).
+  // `under_review` is not a CAP_COUNTED_STATUS, so charging only the submit
+  // step would let a host stage N listings at under_review under a cap of 1 and
+  // then publish every one of them: the count is still 0 at each publish. The
+  // second clause is the one that actually protects the entitlement — entering
+  // a counted status from an uncounted one — and the first keeps the earlier,
+  // friendlier refusal at submit time.
+  const entersCountedStatus =
+    CAP_COUNTED_STATUSES.includes(newStatus) && !CAP_COUNTED_STATUSES.includes(current);
+  if (newStatus === "under_review" || entersCountedStatus) {
     if (!hostProfile || typeof hostProfile.subscription_tier !== "string") {
       const { data, error } = await db
         .from("host_profiles")

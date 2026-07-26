@@ -490,6 +490,66 @@ if (!databaseHardeningMigration) {
   }
 }
 
+// Hosts publish their own listings (founder 2026-07-26). 082 widens 077's
+// role-aware trigger with under_review -> live and closed -> draft. Two things
+// are pinned here rather than only in the connected proof, because
+// `pnpm guardrails` runs without a database while
+// sql/assert_listing_host_status_transitions.sql runs only in db-security.yml:
+// the two new edges must be present with their exact predicates, and 082 must
+// not touch the publication floor it sits on top of.
+const selfPublishMigration = migrationFiles.find((f) => /^082_.*\.sql$/.test(f))
+if (!selfPublishMigration) {
+  hasFailure = true
+  console.error("G-HOST-SELF-PUBLISH: expected migration 082 to be present.")
+} else {
+  const sql = stripSqlComments(fileContents.get(selfPublishMigration))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "create or replace function private.enforce_listing_host_status_transition()",
+    "security invoker",
+    "set search_path = ''",
+    // Everything 077 enforced that 082 must not drop on the way past.
+    "message = 'listing_initial_status_must_be_draft'",
+    "message = 'listing_host_status_transition_forbidden'",
+    "old.status = 'draft' and new.status = 'under_review'",
+    "old.status = 'live' and new.status in ('paused', 'archived')",
+    "old.status = 'paused' and new.status in ('live', 'archived')",
+    // The two new edges, with the provenance split that keeps a sourced
+    // closure (origin withdrew the posting) irreversible.
+    "old.status = 'under_review' and new.status in ('draft', 'live')",
+    "old.status = 'closed' and new.status = 'draft' and old.provenance is distinct from 'sourced' and new.provenance is distinct from 'sourced'",
+    "revoke execute on function private.enforce_listing_host_status_transition() from public, anon, authenticated;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-HOST-SELF-PUBLISH: ${selfPublishMigration} is missing ${needle}`,
+      )
+    }
+  }
+  // Removing the human approver must not relax the quality floor. 070's triad
+  // CHECK and 072's housing-photo trigger are what still stop an unanswered
+  // listing reaching under_review or live, so this migration touches neither.
+  const forbidden = [
+    "listings_publication_triad_chk",
+    "listings_housing_included_evidence_chk",
+    "listings_meals_included_evidence_chk",
+    "drop constraint",
+    "alter table public.listings",
+    "drop trigger if exists trg_listings_housing_photos",
+  ]
+  for (const needle of forbidden) {
+    if (sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-HOST-SELF-PUBLISH: ${selfPublishMigration} touches the publication floor (${needle}).`,
+      )
+    }
+  }
+}
+
 if (hasFailure) {
   process.exit(1)
 }

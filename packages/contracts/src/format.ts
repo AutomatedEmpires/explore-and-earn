@@ -10,13 +10,16 @@
  * ONE locale-ready implementation. `apps/web/lib/format` re-exports these as the
  * app-facing chokepoint the i18n wave builds on.
  *
- * Everything defaults to en-US / USD so today's rendered strings are byte-for-
- * byte identical, but every function accepts an optional `locale` (and money an
- * optional `currency`) so a later i18n wave threads real locales through a
- * single seam. Raw `Intl.*` / literal `"en-US"` / `"USD"` must NOT appear
+ * Everything defaults to en-US / USD — the extraction into this file changed no
+ * rendered string — but every function accepts an optional `locale` (and money
+ * an optional `currency`) so a later i18n wave threads real locales through a
+ * single seam. (formatCompensation's SHAPE has since changed by founder
+ * decision; see its own doc comment.) Raw `Intl.*` / literal `"en-US"` / `"USD"` must NOT appear
  * anywhere else — the tools/scripts/check-locale-literals.mjs ratchet enforces
  * this (this file + apps/web/lib/format are the only allowlisted homes).
  */
+
+import { NOT_STATED_LABEL } from "./provenance"
 
 /** Default display locale until the i18n wave threads a real one through. */
 export const DEFAULT_LOCALE = "en-US";
@@ -25,6 +28,15 @@ export const DEFAULT_CURRENCY = "USD";
 
 /** En-dash used to join ranges ("$1,000–$1,500", "Aug–Oct 2026"). */
 const EN_DASH = "–";
+
+/**
+ * Prefix for a stated ceiling with no stated floor. The mirror of
+ * {@link CompensationFormatOptions.singleValuePrefix}: 070's publication CHECK
+ * accepts a listing that states only `compensation_max_cents`, so this case is
+ * reachable and must read as the bound it is rather than fall through to
+ * "nothing stated".
+ */
+const MAX_ONLY_PREFIX = "Up to ";
 
 export interface MoneyFormatOptions {
   /** ISO 4217 currency code. Omit/undefined → {@link DEFAULT_CURRENCY}. */
@@ -68,9 +80,18 @@ export interface CompensationInput {
 
 export interface CompensationFormatOptions {
   readonly locale?: string;
-  /** Returned when there is no summary and no min amount. Default "Negotiable". */
+  /**
+   * Returned when there is no summary and NO figure at all. Defaults to
+   * {@link NOT_STATED_LABEL} — see the note on {@link formatCompensation} for
+   * why this is deliberately not a friendlier word.
+   */
   readonly fallback?: string;
-  /** Prefix applied to a lone amount only (no max), e.g. "From ". Default "". */
+  /**
+   * Prefix applied to a lone MINIMUM (a floor with no stated ceiling), e.g.
+   * "From ". Default "From " (founder, 2026-07-26: "pay should be defined per
+   * listing. can be from/ or starting at x"). An exact figure — min and max
+   * both stated and equal — is NOT prefixed: it is a number, not a floor.
+   */
   readonly singleValuePrefix?: string;
   /**
    * `exchangeAware` (default): drop the `/unit` suffix for non-cash units
@@ -86,10 +107,33 @@ export interface CompensationFormatOptions {
 }
 
 /**
- * Reproduce the compensation-summary strings the DB row mappers used to build
- * inline. Prefers host-authored `summary`; otherwise derives from cents. See the
- * per-call options for the small variations across surfaces (discovery cards vs
- * the admin console) — all reproduced exactly for the default en-US / USD.
+ * Turn a listing's compensation columns into the one string every surface
+ * shows. Prefers host-authored `summary`; otherwise derives from cents.
+ *
+ * PAY IS PER LISTING AND IT IS EITHER STATED OR IT IS NOT (founder,
+ * 2026-07-26). Four outcomes, and nothing else:
+ *
+ *   floor only        "From $1,500"      min stated, no ceiling
+ *   ceiling only      "Up to $1,500"     max stated, no floor
+ *   range             "$1,200–$1,500"    both stated (equal collapses to one
+ *                                        exact figure, unprefixed)
+ *   nothing stated    {@link NOT_STATED_LABEL}
+ *
+ * The last case used to read "Negotiable". Nobody had negotiated anything —
+ * that word turned an empty column into a claim about what the host would do,
+ * which is the same defect the benefit triad's "absence is never a no" rule
+ * exists to stop. It is deliberately NOT replaced with a friendlier stand-in
+ * like "See listing" or "Ask the host": those are also inventions.
+ *
+ * On a PUBLISHED listing the last case is close to unreachable, and by
+ * construction rather than by hope: 070's listings_publication_triad_chk
+ * refuses `under_review` and `live` unless pay_evidence is 'confirmed' AND at
+ * least one of the two compensation columns is greater than zero. It stays
+ * reachable for a draft (which only its own host sees) and for a sourced
+ * listing whose origin never stated pay — exactly the row that must say so.
+ *
+ * See the per-call options for the variations between surfaces (discovery cards
+ * vs the admin console).
  */
 export function formatCompensation(
   input: CompensationInput,
@@ -97,8 +141,8 @@ export function formatCompensation(
 ): string {
   const {
     locale = DEFAULT_LOCALE,
-    fallback = "Negotiable",
-    singleValuePrefix = "",
+    fallback = NOT_STATED_LABEL,
+    singleValuePrefix = "From ",
     suffixMode = "exchangeAware",
     collapseEqualRange = true,
   } = opts;
@@ -108,18 +152,26 @@ export function formatCompensation(
   }
 
   const minCents = typeof input.minCents === "number" ? input.minCents : null;
-  if (minCents == null) return fallback;
+  const maxCents = typeof input.maxCents === "number" ? input.maxCents : null;
+  if (minCents == null && maxCents == null) return fallback;
 
   const currency = input.currency ?? undefined; // null/undefined → default USD
   const money = (cents: number) => formatMoney(cents, { currency, locale });
 
-  const min = money(minCents);
-  const maxCents = typeof input.maxCents === "number" ? input.maxCents : null;
+  const min = minCents != null ? money(minCents) : null;
   const max = maxCents != null ? money(maxCents) : null;
 
-  const showRange =
-    max != null && (collapseEqualRange ? max !== min : true);
-  const range = showRange ? `${min}${EN_DASH}${max}` : `${singleValuePrefix}${min}`;
+  let range: string;
+  if (min != null && max != null) {
+    // An equal min and max is an EXACT figure. Prefixing it with "From " would
+    // read as a floor the host never described, so the prefix belongs only to
+    // the branch that genuinely has no ceiling.
+    range = collapseEqualRange && min === max ? min : `${min}${EN_DASH}${max}`;
+  } else if (min != null) {
+    range = `${singleValuePrefix}${min}`;
+  } else {
+    range = `${MAX_ONLY_PREFIX}${max}`;
+  }
 
   if (suffixMode === "always") {
     return input.unit ? `${range}/${input.unit}` : range;
