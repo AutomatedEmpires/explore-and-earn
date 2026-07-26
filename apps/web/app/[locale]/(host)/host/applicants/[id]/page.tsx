@@ -57,11 +57,12 @@ export default async function HostApplicantDetailPage({
     notFound();
   }
 
-  // The applicant's name + resume are gated server-side by the same ownership
-  // guard (host must own a listing this seeker applied to). Loaded in parallel.
+  // The applicant's name + resume are entitlement-checked in the database
+  // (migration 084): host identity comes from the JWT, and rows come back only
+  // for a seeker related to this host. Loaded in parallel.
   const [displayName, resume] = await Promise.all([
-    getSeekerDisplayName(token, userId, application.seekerProfileId),
-    getSeekerResumeByProfileId(token, userId, application.seekerProfileId),
+    getSeekerDisplayName(token, application.seekerProfileId),
+    getSeekerResumeByProfileId(token, application.seekerProfileId),
   ]);
 
   const listingsById = new Map<string, DiscoveryListing>(
