@@ -27,7 +27,9 @@ import {
 } from "../../services/stripe";
 import {
   overRefundRefusal,
+  refundExhaustsCharge,
   refundIdempotencyKey,
+  refundLandedDespiteError,
 } from "../../services/stripe/refundVerification";
 
 interface ActionResult {
@@ -188,6 +190,15 @@ async function requestRefundImpl(
     if (match.alreadyRefunded) {
       return { ok: false, error: "That purchase has already been refunded." };
     }
+    // The picker hides a purchase whose refund is already moving, but a server
+    // action is an independently invocable endpoint, so the same annotation is
+    // enforced here rather than trusted to the form that rendered it.
+    if (match.hasOpenRequest) {
+      return {
+        ok: false,
+        error: "You already have an open refund request for this purchase.",
+      };
+    }
     if (!match.stripePaymentIntentId || match.amountCents <= 0) {
       return { ok: false, error: "That purchase has no refundable Stripe charge." };
     }
@@ -306,6 +317,8 @@ async function resolveRefundImpl(
     return { ok: false, error: claimed.error };
   }
 
+  const refundableBeforeCents = refundable.refundableCents;
+
   const refund = await issueRefund(
     paymentIntentId,
     request.amountCents,
@@ -314,19 +327,29 @@ async function resolveRefundImpl(
     refundIdempotencyKey(requestId),
   );
 
-  // Record the Stripe outcome: 'refunded' on success, 'failed' otherwise. Either
-  // way the request leaves the open queue, with the failure reason captured for
-  // the admin to retry or investigate. fromStatus is 'approved' because the row
-  // was claimed above.
+  // An error from refunds.create does NOT mean no money moved: a timeout or a
+  // lost response can follow a refund Stripe already committed. Recording
+  // 'failed' on that outcome skipped revocation entirely — money gone, boost
+  // still running, plan still granted. So an error is not believed until Stripe
+  // has been asked what it still holds.
+  const outcome = await settleRefundOutcome({
+    refund,
+    paymentIntentId,
+    refundableBeforeCents,
+    requestedCents: request.amountCents,
+  });
+
+  // Record the Stripe outcome: 'refunded' when the money is confirmed gone (by
+  // a successful call or by the balance re-read), 'failed' otherwise. Either way
+  // the request leaves the open queue, with the reason captured for the admin to
+  // retry or investigate. fromStatus is 'approved' because the row was claimed
+  // above.
   const resolved = await markRefundResolved(SERVICE_ROLE_KEY, {
     requestId,
-    status: refund.ok ? "refunded" : "failed",
+    status: outcome.moneyLeft ? "refunded" : "failed",
     adminClerkUserId,
     fromStatus: "approved",
-    adminNote: refund.ok
-      ? adminNote ?? null
-      : (adminNote?.trim() ? `${adminNote.trim()} · ` : "") +
-        `Stripe refund failed: ${refund.error ?? "unknown error"}`,
+    adminNote: composeAdminNote(adminNote, outcome.note),
   });
 
   if (!resolved.ok) {
@@ -334,25 +357,27 @@ async function resolveRefundImpl(
     // admin knows the DB and Stripe could be out of sync (do not silently drop).
     return {
       ok: false,
-      error: refund.ok
+      error: outcome.moneyLeft
         ? "Refund issued in Stripe but recording the outcome failed. Reconcile manually."
         : resolved.error,
     };
   }
 
-  // When the refund itself failed, the request is recorded as 'failed' but the
-  // action is "not ok" so the admin sees the error instead of a false success.
-  if (!refund.ok) {
-    return { ok: false, error: refund.error ?? "Stripe refund failed." };
+  // Nothing left the merchant, so there is nothing to take back. The action is
+  // "not ok" so the admin sees the error instead of a false success.
+  if (!outcome.moneyLeft) {
+    return { ok: false, error: outcome.note ?? "Stripe refund failed." };
   }
 
-  // The money is back — now take back what it bought. Without this the refund
-  // was a pure loss: the boost campaign kept running to ends_at, the paid
-  // announcement stayed in the feed, and a refunded subscriber kept their tier.
-  // Reported to the admin rather than thrown: the refund itself SUCCEEDED, and
-  // an admin who is told "refunded but the boost is still live" can act, while
-  // a thrown error would imply the money did not move.
-  const revoked = await revokeRefundedPurchase(request);
+  // The money is back — now take back what it bought, in proportion to what was
+  // actually returned. Without this the refund was a pure loss: the boost
+  // campaign kept running to ends_at and the paid announcement stayed in the
+  // feed. Reported to the admin rather than thrown: the refund itself SUCCEEDED,
+  // and an admin who is told "refunded but the boost is still live" can act,
+  // while a thrown error would imply the money did not move.
+  const revoked = await revokeRefundedPurchase(request, {
+    fullCharge: refundExhaustsCharge(request.amountCents, refundableBeforeCents),
+  });
   if (!revoked.ok) {
     return {
       ok: false,
@@ -360,7 +385,89 @@ async function resolveRefundImpl(
     };
   }
 
+  // A confirmed-by-re-read refund is a real refund, but the admin is told the
+  // call reported an error so the Stripe dashboard and this queue reading
+  // differently is explained rather than discovered.
+  if (!refund.ok) {
+    return { ok: false, error: outcome.note ?? undefined };
+  }
+
   return { ok: true };
+}
+
+/** What the approve path concluded about a Stripe refund attempt. */
+interface RefundOutcome {
+  /** True when money is known to have left the merchant. */
+  readonly moneyLeft: boolean;
+  /** Operator-facing explanation, persisted as the admin note. Null on a clean success. */
+  readonly note: string | null;
+}
+
+/**
+ * Decide whether a refund attempt actually moved money.
+ *
+ * A successful call is taken at its word. A FAILED call is not: the balance
+ * Stripe still holds on the charge is re-read and compared with the reading
+ * taken before the attempt. Three outcomes, all of them recorded rather than
+ * assumed:
+ *
+ *   * the balance dropped by at least the requested amount -> the refund landed
+ *     despite the error; treat it as refunded so revocation still runs.
+ *   * the balance is unchanged -> a real failure; record it as one.
+ *   * the re-read itself failed -> UNKNOWN. Recorded as failed (nothing may be
+ *     revoked on a guess) but the note says the outcome is unverified, because
+ *     "we could not tell" and "it did not happen" are different facts and only
+ *     one of them is safe to leave unreconciled.
+ */
+async function settleRefundOutcome(input: {
+  readonly refund: { ok: boolean; error?: string };
+  readonly paymentIntentId: string;
+  readonly refundableBeforeCents: number;
+  readonly requestedCents: number;
+}): Promise<RefundOutcome> {
+  const { refund, paymentIntentId, refundableBeforeCents, requestedCents } = input;
+
+  if (refund.ok) return { moneyLeft: true, note: null };
+
+  const stripeError = refund.error ?? "unknown error";
+  const recheck = await getRefundableChargeCents(paymentIntentId);
+
+  if (!recheck.ok || recheck.refundableCents === undefined) {
+    return {
+      moneyLeft: false,
+      note:
+        `Stripe refund failed: ${stripeError}. The charge could not be re-read ` +
+        `(${recheck.error ?? "unknown error"}), so it is UNKNOWN whether the refund ` +
+        `landed — reconcile this payment intent in Stripe before retrying.`,
+    };
+  }
+
+  if (
+    refundLandedDespiteError(
+      refundableBeforeCents,
+      recheck.refundableCents,
+      requestedCents,
+    )
+  ) {
+    return {
+      moneyLeft: true,
+      note:
+        `Stripe reported an error (${stripeError}) but the charge shows the refund ` +
+        `landed, so it is recorded as refunded and the purchase was revoked.`,
+    };
+  }
+
+  return { moneyLeft: false, note: `Stripe refund failed: ${stripeError}` };
+}
+
+/** Join the admin's own note with the outcome note, keeping both. */
+function composeAdminNote(
+  adminNote: string | null | undefined,
+  outcomeNote: string | null,
+): string | null {
+  const own = adminNote?.trim() ?? "";
+  if (!outcomeNote) return own || null;
+  return own ? `${own} · ${outcomeNote}` : outcomeNote;
 }
 
 /**
@@ -391,22 +498,38 @@ async function resolveApprovalPaymentIntentId(
 }
 
 /**
- * Take back what a refunded purchase bought.
+ * Take back what a refunded purchase bought, in proportion to what was returned.
  *
  * resolveRefundImpl previously fired the Stripe refund and then only updated
  * refund_requests, so every approved refund was a pure loss: the boost campaign
- * kept running to its ends_at, the paid announcement stayed live in the feed,
- * and a refunded subscriber kept their tier until they chose to cancel.
+ * kept running to its ends_at and the paid announcement stayed live in the feed.
  *
- * Subscription cancellation deliberately goes through Stripe rather than
- * writing the tier directly — cancelling emits customer.subscription.deleted,
- * which the existing webhook path already turns into a tier downgrade, so there
- * is exactly one place that decides what a subscription state means.
+ * SUBSCRIPTIONS ARE NOT ALL-OR-NOTHING JUST BECAUSE CANCELLATION IS. Cancelling
+ * on every approved refund meant a $1 goodwill refund against a $199 plan took
+ * the entire plan away — the host paid $198 for nothing. A plan cannot be
+ * cancelled by a fraction, so the proportional rule is: cancel only when the
+ * charge was handed back in full (`fullCharge`, measured by
+ * refundExhaustsCharge against what Stripe still held). A partial refund leaves
+ * the subscription running, which is what the host is still paying for.
+ *
+ * Cancellation deliberately goes through Stripe rather than writing the tier
+ * directly — cancelling emits customer.subscription.deleted, which the existing
+ * webhook path already turns into a tier downgrade, so there is exactly one
+ * place that decides what a subscription state means.
+ *
+ * announcement / boost rows carry no partial state: their charge is the whole
+ * purchase, and a partial refund on one still leaves the host holding a thing
+ * they only partly paid for, so those are revoked either way.
  */
 async function revokeRefundedPurchase(
   request: RefundRequestRecord,
+  options: { readonly fullCharge: boolean },
 ): Promise<{ ok: boolean; error?: string }> {
   if (request.purchaseType === "subscription") {
+    // A partial refund cancels nothing. This is a real outcome, not a skipped
+    // step: there is nothing proportional to take back from a plan.
+    if (!options.fullCharge) return { ok: true };
+
     // refund_requests stores only the host profile id.
     const clerkUserId = await getHostClerkUserIdByProfileId(
       SERVICE_ROLE_KEY,

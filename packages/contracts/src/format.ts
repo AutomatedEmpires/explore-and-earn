@@ -14,9 +14,16 @@
  * rendered string — but every function accepts an optional `locale` (and money
  * an optional `currency`) so a later i18n wave threads real locales through a
  * single seam. (formatCompensation's SHAPE has since changed by founder
- * decision; see its own doc comment.) Raw `Intl.*` / literal `"en-US"` / `"USD"` must NOT appear
- * anywhere else — the tools/scripts/check-locale-literals.mjs ratchet enforces
- * this (this file + apps/web/lib/format are the only allowlisted homes).
+ * decision; see its own doc comment.)
+ *
+ * New raw `Intl.*` / literal `"en-US"` / `"USD"` must not appear outside this
+ * file and apps/web/lib/format, which are the only allowlisted homes. That is a
+ * RATCHET, not a state the codebase is already in:
+ * tools/scripts/check-locale-literals.mjs baselines each file's current count
+ * and fails only when a file exceeds it, so historic call sites still exist and
+ * are listed in tools/scripts/locale-literal-baseline.json. Migrating one to
+ * these formatters and re-running the script with `--update` is how the number
+ * comes down.
  */
 
 import { NOT_STATED_LABEL } from "./provenance"
@@ -107,8 +114,16 @@ export interface CompensationFormatOptions {
 }
 
 /**
- * Turn a listing's compensation columns into the one string every surface
- * shows. Prefers host-authored `summary`; otherwise derives from cents.
+ * Turn a listing's compensation columns into a pay string. Prefers host-authored
+ * `summary`; otherwise derives from cents.
+ *
+ * This is the SHARED implementation, not a universal one: it is the only place
+ * the rule below is written down, and every surface that renders pay should call
+ * it rather than derive its own. Saying "the one string every surface shows"
+ * would be a claim about call sites that this module cannot enforce — and it was
+ * false when it was written, because the public host-profile card derived pay
+ * inline and printed "See listing" for silence. A surface that skips this
+ * function is a defect to fix, not an exception this comment describes.
  *
  * PAY IS PER LISTING AND IT IS EITHER STATED OR IT IS NOT (founder,
  * 2026-07-26). Four outcomes, and nothing else:

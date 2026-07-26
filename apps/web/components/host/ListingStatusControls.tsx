@@ -11,9 +11,9 @@ import {
   updateListingStatusAction,
 } from "../../app/actions/listings";
 import {
-  HOST_STATUS_HINT,
   HOST_STATUS_LABEL,
   hostListingTransitions,
+  hostStatusHint,
   type HostManageableListingStatus,
 } from "./listingStatusTransitions";
 import styles from "./ListingStatusControls.module.css";
@@ -45,7 +45,8 @@ export interface ListingStatusControlsProps {
   /**
    * The listing's provenance. Withholds the closed -> draft action on sourced
    * inventory, which migration 082 refuses to reopen — see
-   * `hostListingTransitions`.
+   * `hostListingTransitions` — and picks the matching `closed` hint, which for a
+   * sourced listing says the ORIGIN withdrew it rather than promising a reopen.
    */
   readonly provenance?: string | null;
 }
@@ -102,7 +103,7 @@ export function ListingStatusControls({
           variant={STATUS_VARIANT[currentStatus]}
         />
       </div>
-      <p className={styles.hint}>{HOST_STATUS_HINT[currentStatus]}</p>
+      <p className={styles.hint}>{hostStatusHint(currentStatus, provenance)}</p>
       <div className={styles.actions}>
         {transitions.map((transition) => (
           <Button

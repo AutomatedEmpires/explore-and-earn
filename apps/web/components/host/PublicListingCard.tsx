@@ -10,6 +10,10 @@ import {
 } from "@explore-and-earn/ui";
 import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 
+import {
+  publicListingPayProvision,
+  publicListingPaySummary,
+} from "./publicListingCardModel";
 import styles from "./PublicListingCard.module.css";
 
 interface Props {
@@ -20,23 +24,6 @@ interface Props {
   readonly hostAvatarUrl?: string | null;
   /** Above-the-fold cards load the cover eagerly for a clean LCP. */
   readonly priority?: boolean;
-}
-
-function paySummary(listing: PublicHostListing): string {
-  if (listing.compensationSummary) return listing.compensationSummary;
-  if (listing.compensationMinCents != null) {
-    const amount = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: listing.compensationCurrency,
-      maximumFractionDigits: 0,
-    }).format(listing.compensationMinCents / 100);
-    const unit =
-      listing.compensationUnit && listing.compensationUnit !== "other"
-        ? `/${listing.compensationUnit}`
-        : "";
-    return `${amount}${unit}`;
-  }
-  return "See listing";
 }
 
 /**
@@ -70,12 +57,12 @@ export function PublicListingCard({
     triad: {
       housing: listing.housingIncluded ? "Included" : "Not included",
       meals: listing.mealsIncluded ? "Included" : "Not included",
-      pay: paySummary(listing),
+      pay: publicListingPaySummary(listing),
     },
     benefitProvision: {
       housing: listing.housingIncluded ? "provided" : "not_provided",
       meals: listing.mealsIncluded ? "provided" : "not_provided",
-      pay: "provided",
+      pay: publicListingPayProvision(listing),
     },
   };
 

@@ -4,6 +4,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "../client";
 import { adminClient } from "../adminClient";
+import {
+  isUnresolvedRefundStatus,
+  type RefundStatus,
+} from "../lib/refundStatus";
+
+export type { RefundStatus };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Refund request data access — the host-files / admin-reviews loop.
@@ -52,16 +58,21 @@ export const BOOST_CAMPAIGNS_TABLE = "listing_boost_campaigns";
 /** Which purchase a refund targets — mirrors the CHECK in 047. */
 export type RefundPurchaseType = "subscription" | "announcement" | "boost";
 
-/** Refund lifecycle — mirrors the CHECK in 047. */
-export type RefundStatus =
+/**
+ * Coarse queue lane the admin filters by.
+ *
+ * 'approved' is a lane because it is a PERSISTED state in which Stripe may
+ * already have paid out: a row that sits there is an approval that started and
+ * never recorded its outcome. Leaving it out of the lanes made it reachable only
+ * by scrolling the unfiltered queue.
+ */
+export type RefundQueueFilter =
+  | "all"
   | "requested"
   | "approved"
-  | "denied"
   | "refunded"
+  | "denied"
   | "failed";
-
-/** Coarse queue lane the admin filters by. */
-export type RefundQueueFilter = "all" | "requested" | "refunded" | "denied" | "failed";
 
 // ─── Host-side: create + read own ────────────────────────────────────────────
 
@@ -226,7 +237,13 @@ export interface RefundablePurchase {
   readonly amountCents: number;
   readonly label: string;
   readonly purchasedAt: string;
-  /** True when the host already has an OPEN refund request for this purchase. */
+  /**
+   * True when the host already has an UNRESOLVED refund request for this
+   * purchase — 'requested' (awaiting a decision) or 'approved' (claimed, with
+   * the Stripe call in flight). Both mean "a refund on this charge is already
+   * moving"; offering the purchase back as freshly refundable would invite a
+   * second request against money that may already have been returned.
+   */
   readonly hasOpenRequest: boolean;
   /** True when this purchase has already been refunded (any prior request). */
   readonly alreadyRefunded: boolean;
@@ -246,7 +263,11 @@ export interface RefundablePurchase {
  *
  * Only purchases with a stripe_payment_intent_id are returned (there is nothing
  * to refund otherwise), and each is annotated with whether the host already has
- * an open request or a prior refund, so the UI can disable duplicates.
+ * an UNRESOLVED request or a prior refund, so the UI can disable duplicates.
+ * "Unresolved" is both 'requested' and 'approved': the moment 'approved' became
+ * a persisted state that the Stripe call runs inside, treating only 'requested'
+ * as open handed a purchase whose refund was already in flight back to the host
+ * as freshly refundable.
  */
 export async function getHostRefundablePurchases(
   serviceRoleToken: string,
@@ -293,7 +314,7 @@ export async function getHostRefundablePurchases(
     const ref = typeof r.reference_id === "string" ? r.reference_id : "null";
     const status = typeof r.status === "string" ? r.status : "";
     const key = `${type}:${ref}`;
-    if (status === "requested") openKeys.add(key);
+    if (isUnresolvedRefundStatus(status)) openKeys.add(key);
     if (status === "refunded") refundedKeys.add(key);
   }
 
@@ -375,11 +396,24 @@ export interface RefundQueueRow {
 /** Marketplace-wide refund counts for the admin MetricGrid. */
 export interface RefundStats {
   readonly requested: number;
+  /**
+   * Claimed and in flight. Counted because 'approved' is a persisted state that
+   * Stripe may already have paid out against: an approval that started and did
+   * not record its outcome leaves the row here, and until this was counted that
+   * row appeared on no operator or reconciliation surface at all.
+   */
+  readonly approved: number;
   readonly refunded: number;
   readonly denied: number;
   readonly failed: number;
   /** Total cents actually refunded — the honest financial signal. */
   readonly refundedCents: number;
+  /**
+   * Total cents sitting in 'approved'. This is the money at risk: Stripe may
+   * have paid it out with nothing recorded, so it is the number to reconcile
+   * against Stripe, not a number to add to {@link refundedCents}.
+   */
+  readonly approvedCents: number;
 }
 
 /** Input for recording an admin's refund decision. */
@@ -405,9 +439,11 @@ const REFUND_QUEUE_SELECT =
   "host_profiles!host_profile_id(company_name)";
 
 /**
- * Pending-first then newest-first; the optional `filter` narrows to a coarse
- * lane. Open requests ('requested') always sort to the top so the admin sees
- * what needs a decision now. Host identity is surfaced ONLY by company name.
+ * Unresolved-first then newest-first; the optional `filter` narrows to a coarse
+ * lane. Both unresolved statuses sort to the top — 'requested' needs a decision,
+ * and 'approved' is a claimed row whose Stripe outcome was never recorded, which
+ * is the one an operator most needs to see. Host identity is surfaced ONLY by
+ * company name.
  */
 export async function getRefundQueue(
   serviceRoleToken: string,
@@ -454,19 +490,27 @@ export async function getRefundQueue(
   const filtered =
     filter === "all" ? rows : rows.filter((row) => row.status === filter);
 
-  // Open ('requested') first; then newest first. Stable for equal ranks.
+  // Unresolved ('requested' / 'approved') first; then newest first. Stable for
+  // equal ranks.
   return filtered.sort((a, b) => {
     const openRank =
-      (b.status === "requested" ? 1 : 0) - (a.status === "requested" ? 1 : 0);
+      (isUnresolvedRefundStatus(b.status) ? 1 : 0) -
+      (isUnresolvedRefundStatus(a.status) ? 1 : 0);
     if (openRank !== 0) return openRank;
     return b.createdAt.localeCompare(a.createdAt);
   });
 }
 
 /**
- * Refund counts by status for the admin MetricGrid, plus the total cents
- * actually refunded. Counts are head-only exact counts; refundedCents sums the
- * amount of the 'refunded' rows in one small scan (the admin set is small).
+ * Refund counts by status for the admin MetricGrid, plus the cents behind the
+ * two lanes that carry money: what was actually refunded, and what is claimed
+ * and unaccounted for.
+ *
+ * EVERY status 047 declares is counted here. It used to count four of the five
+ * and skip 'approved' — the one state where Stripe may already have paid out —
+ * so a claimed-and-never-resolved row was invisible to the operator, to the
+ * overview, and to reconciliation. Counts are head-only exact counts; the two
+ * cent sums each scan their own small lane.
  */
 export async function getRefundStats(
   serviceRoleToken: string,
@@ -484,27 +528,47 @@ export async function getRefundStats(
     return count ?? 0;
   }
 
-  const [requested, refunded, denied, failed, refundedRows] = await Promise.all([
+  async function centsInStatus(status: RefundStatus): Promise<number> {
+    const { data, error } = await db
+      .from("refund_requests")
+      .select("amount_cents")
+      .eq("status", status);
+    if (error) {
+      throw new Error(`getRefundStats(sum:${status}): ${error.message}`);
+    }
+    return (data ?? []).reduce((sum, raw) => {
+      const cents = (raw as unknown as Record<string, unknown>).amount_cents;
+      return sum + (typeof cents === "number" ? cents : 0);
+    }, 0);
+  }
+
+  const [
+    requested,
+    approved,
+    refunded,
+    denied,
+    failed,
+    refundedCents,
+    approvedCents,
+  ] = await Promise.all([
     countByStatus("requested"),
+    countByStatus("approved"),
     countByStatus("refunded"),
     countByStatus("denied"),
     countByStatus("failed"),
-    db
-      .from("refund_requests")
-      .select("amount_cents")
-      .eq("status", "refunded"),
+    centsInStatus("refunded"),
+    centsInStatus("approved"),
   ]);
 
-  if (refundedRows.error) {
-    throw new Error(`getRefundStats(sum): ${refundedRows.error.message}`);
-  }
-
-  const refundedCents = (refundedRows.data ?? []).reduce((sum, raw) => {
-    const cents = (raw as unknown as Record<string, unknown>).amount_cents;
-    return sum + (typeof cents === "number" ? cents : 0);
-  }, 0);
-
-  return { requested, refunded, denied, failed, refundedCents };
+  return {
+    requested,
+    approved,
+    refunded,
+    denied,
+    failed,
+    refundedCents,
+    approvedCents,
+  };
 }
 
 /**

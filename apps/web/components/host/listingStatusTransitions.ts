@@ -48,9 +48,13 @@ export const HOST_STATUS_LABEL: Record<ListingStatus, string> = {
 
 /**
  * What each state actually means for the host, in their own terms. Every
- * sentence has to survive the question "is that true?" — so `closed` does not
- * promise a reopen that migration 082 refuses for sourced listings, and
- * `archived` does not imply a way back that the transition graph does not have.
+ * sentence has to survive the question "is that true?" — so `archived` does not
+ * imply a way back that the transition graph does not have.
+ *
+ * `closed` is the one status whose meaning depends on the listing: this map
+ * carries the VERIFIED-inventory sentence, and a sourced listing gets a
+ * different one from {@link hostStatusHint}. Reading this map directly on a
+ * sourced closed listing tells the host two false things at once.
  */
 export const HOST_STATUS_HINT: Record<ListingStatus, string> = {
   draft: "Only you can see this. Mark it ready once Housing, Meals and Pay are answered.",
@@ -61,6 +65,36 @@ export const HOST_STATUS_HINT: Record<ListingStatus, string> = {
   closed: "Closed by Explore & Earn. Reopen it as a draft to make changes and publish again.",
   archived: "Archived for good. Duplicate it to start a new listing from this one.",
 };
+
+/**
+ * What a SOURCED listing's `closed` actually means.
+ *
+ * Both clauses of the verified sentence are false here. Explore & Earn did not
+ * close it — the freshness sweep and snapshot reconciliation write `closed` when
+ * the ORIGIN stops carrying the posting. And it cannot be reopened as a draft:
+ * migration 082 refuses closed -> draft for provenance='sourced', which is also
+ * why `hostListingTransitions` draws no button.
+ */
+const SOURCED_CLOSED_HINT =
+  "No longer listed at its original source, so it's closed here too. " +
+  "It can't be reopened — duplicate it to start your own version.";
+
+/**
+ * The hint to show for a listing in `status`.
+ *
+ * `provenance` is not decoration, for the same reason it is not in
+ * {@link hostListingTransitions}: on a SOURCED closed listing the verified
+ * sentence says Explore & Earn closed it (the origin did) and offers a reopen
+ * that migration 082 refuses. The component reads this rather than indexing
+ * {@link HOST_STATUS_HINT} directly.
+ */
+export function hostStatusHint(
+  status: ListingStatus,
+  provenance?: string | null,
+): string {
+  if (status === "closed" && provenance === "sourced") return SOURCED_CLOSED_HINT;
+  return HOST_STATUS_HINT[status];
+}
 
 const TRANSITIONS: Record<ListingStatus, readonly HostListingTransition[]> = {
   draft: [{ target: "under_review", label: "Mark ready to publish", variant: "primary" }],

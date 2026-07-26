@@ -337,6 +337,53 @@ begin
 end;
 $assert_moderation$;
 
+-- ── An operator can take down a LIVE listing ────────────────────────────────
+-- Since 082 made publication a host action, `under_review` is transient and
+-- every listing an operator would moderate is already `live`. The operator
+-- actions in queries/admin.ts run through this same service_role path, so this
+-- proves the database permits the move they now make: live -> closed, and
+-- live -> draft for the reversible hold. 'Self publish path' is the row the HOST
+-- published a few statements above, which is exactly the shape being moderated.
+update public.listings
+   set status = 'closed',
+       closed_at = now()
+ where title = 'Self publish path';
+
+do $assert_live_takedown$
+begin
+  if not exists (
+    select 1 from public.listings
+     where title = 'Self publish path'
+       and status = 'closed'
+       and closed_at is not null
+  ) then
+    raise exception 'listing lifecycle assertion: operator could not take down a live listing';
+  end if;
+
+  -- And back up, so the reversible hold has a live row to act on.
+  update public.listings
+     set status = 'draft', closed_at = null
+   where title = 'Self publish path';
+  update public.listings
+     set status = 'under_review'
+   where title = 'Self publish path';
+  update public.listings
+     set status = 'live'
+   where title = 'Self publish path';
+
+  update public.listings
+     set status = 'draft'
+   where title = 'Self publish path';
+
+  if not exists (
+    select 1 from public.listings
+     where title = 'Self publish path' and status = 'draft'
+  ) then
+    raise exception 'listing lifecycle assertion: operator could not hold a live listing back to draft';
+  end if;
+end;
+$assert_live_takedown$;
+
 reset role;
 set local role authenticated;
 select set_config(

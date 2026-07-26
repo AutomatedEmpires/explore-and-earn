@@ -13,12 +13,23 @@ export interface ReportContext {
 	readonly action?: string;
 	readonly route?: string;
 	readonly userId?: string;
+	/**
+	 * Upstream provider event id (today: the Stripe event). Carried as a tag so a
+	 * message that deliberately omits identifying detail is still traceable back
+	 * to the exact delivery — an error whose text says nothing and whose tags say
+	 * nothing is not traceable at all.
+	 */
+	readonly eventId?: string;
 }
 
 /** Report an unexpected / thrown error to Sentry with structured context. */
 export function reportError(error: unknown, context: ReportContext = {}): void {
 	Sentry.captureException(error, {
-		tags: { action: context.action, route: context.route },
+		tags: {
+			action: context.action,
+			route: context.route,
+			eventId: context.eventId,
+		},
 		user: context.userId ? { id: context.userId } : undefined,
 	});
 }

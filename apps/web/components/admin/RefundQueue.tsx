@@ -17,6 +17,13 @@ import {
   type RefundDecision,
 } from "../../app/actions/refunds";
 import { formatAdminDate, humanizeToken } from "./status";
+import {
+  REFUND_LANES,
+  isActionableRefund,
+  isUnresolvedRefund,
+  refundStatusLabel,
+  type RefundStatusLane,
+} from "./refundQueueLanes";
 import styles from "./RefundQueue.module.css";
 
 type BadgeVariant = NonNullable<BadgeProps["variant"]>;
@@ -39,17 +46,12 @@ export interface RefundQueueRowView {
 /** Refund stat counts from getRefundStats. */
 export interface RefundStatsView {
   readonly requested: number;
+  readonly approved: number;
   readonly refunded: number;
   readonly denied: number;
   readonly failed: number;
   readonly refundedCents: number;
-}
-
-type StatusLane = "all" | "requested" | "refunded" | "denied" | "failed";
-
-/** A request is still actionable when it is awaiting a decision. */
-function isOpen(status: string): boolean {
-  return status === "requested";
+  readonly approvedCents: number;
 }
 
 /** Integer cents -> a clean USD string. */
@@ -102,16 +104,6 @@ function statusIcon(status: string): IconKey {
   return "status.open"; // requested / approved
 }
 
-/**
- * Human label for a refund status. 'approved' is the transient state a row is
- * claimed into before the Stripe call, so it must read as in-flight — the
- * humanized token "Approved" would look like a finished, successful refund.
- */
-function statusLabel(status: string): string {
-  if (status === "approved") return "Processing";
-  return humanizeToken(status);
-}
-
 /** A short, human "age" string from an ISO timestamp (queue triage signal). */
 function requestAge(iso: string): string {
   if (!iso) return "—";
@@ -145,7 +137,7 @@ export function RefundQueue({
   readonly stats: RefundStatsView;
 }) {
   const router = useRouter();
-  const [lane, setLane] = useState<StatusLane>("all");
+  const [lane, setLane] = useState<RefundStatusLane>("all");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -175,21 +167,23 @@ export function RefundQueue({
 
   const total = requests.length;
   const openCount = useMemo(
-    () => requests.filter((r) => isOpen(r.status)).length,
+    () => requests.filter((r) => isActionableRefund(r.status)).length,
     [requests],
   );
 
-  const segments: ReadonlyArray<{
-    readonly key: StatusLane;
-    readonly label: string;
-    readonly count: number;
-  }> = [
-    { key: "all", label: "All", count: total },
-    { key: "requested", label: "Awaiting", count: stats.requested },
-    { key: "refunded", label: "Refunded", count: stats.refunded },
-    { key: "denied", label: "Denied", count: stats.denied },
-    { key: "failed", label: "Failed", count: stats.failed },
-  ];
+  const laneCounts: Record<RefundStatusLane, number> = {
+    all: total,
+    requested: stats.requested,
+    approved: stats.approved,
+    refunded: stats.refunded,
+    denied: stats.denied,
+    failed: stats.failed,
+  };
+
+  const segments = REFUND_LANES.map((seg) => ({
+    ...seg,
+    count: laneCounts[seg.key],
+  }));
 
   const visible = useMemo(() => {
     if (lane === "all") return requests;
@@ -204,6 +198,22 @@ export function RefundQueue({
           value={stats.requested}
           trend={stats.requested > 0 ? "Needs a decision" : "Clear"}
           trendTone={stats.requested > 0 ? "down" : "up"}
+        />
+        {/*
+          Claimed rows. Stripe may already have paid these out, so the amount is
+          shown as money to RECONCILE — it is not part of the refunded total
+          below, and a non-zero count that does not clear is the signal that an
+          approval died between the claim and recording its outcome.
+        */}
+        <MetricCard
+          label="Processing"
+          value={stats.approved}
+          trend={
+            stats.approved > 0
+              ? `${formatCents(stats.approvedCents)} to reconcile`
+              : "None in flight"
+          }
+          trendTone={stats.approved > 0 ? "down" : "neutral"}
         />
         <MetricCard
           label="Refunded"
@@ -276,7 +286,12 @@ export function RefundQueue({
           </span>
           <h3 className={styles.emptyTitle}>Nothing in this lane</h3>
           <p className={styles.emptySub}>
-            No requests match the <strong>{humanizeToken(lane)}</strong> filter.
+            No requests match the{" "}
+            <strong>
+              {REFUND_LANES.find((seg) => seg.key === lane)?.label ??
+                humanizeToken(lane)}
+            </strong>{" "}
+            filter.
             Widen the view to see the rest of the queue.
           </p>
           <Button variant="secondary" icon="action.close" onClick={() => setLane("all")}>
@@ -300,14 +315,17 @@ export function RefundQueue({
           <div className={styles.grid} role="list">
             {visible.map((request) => {
               const busy = isPending && pendingId === request.id;
-              const open = isOpen(request.status);
+              const open = isActionableRefund(request.status);
               const confirming = confirmId === request.id;
               return (
                 <article
                   key={request.id}
                   role="listitem"
                   className={styles.card}
-                  data-resolved={open ? undefined : "true"}
+                  // An in-flight ('approved') card is NOT resolved: dimming it
+                  // would file the one row that may need reconciling under
+                  // "done".
+                  data-resolved={isUnresolvedRefund(request.status) ? undefined : "true"}
                 >
                   <span className={styles.edge} aria-hidden="true" />
 
@@ -322,7 +340,7 @@ export function RefundQueue({
                       {formatCents(request.amountCents)}
                     </span>
                     <Badge
-                      label={statusLabel(request.status)}
+                      label={refundStatusLabel(request.status)}
                       variant={statusVariant(request.status)}
                       icon={statusIcon(request.status)}
                     />
@@ -434,7 +452,7 @@ export function RefundQueue({
                         className={styles.resolvedIcon}
                       />
                       <span>
-                        {humanizeToken(request.status)}
+                        {refundStatusLabel(request.status)}
                         {request.resolvedAt
                           ? ` · ${formatAdminDate(request.resolvedAt)}`
                           : ""}

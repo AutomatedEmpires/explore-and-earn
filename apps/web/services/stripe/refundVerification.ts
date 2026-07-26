@@ -181,6 +181,66 @@ export function overRefundRefusal(
 }
 
 /**
+ * Did the refund actually land, even though the call reported an error?
+ *
+ * `refunds.create` failing does NOT mean no refund was created. A timeout, a
+ * dropped connection, or a 5xx after Stripe committed all produce an error on a
+ * request that moved money. Treating every error as "nothing happened" is what
+ * made the failure path skip revocation: the money left and the boost kept
+ * running / the announcement stayed in the feed / the plan stayed granted.
+ *
+ * The only trustworthy answer comes from Stripe itself, so the caller re-reads
+ * the charge's refundable balance and hands both readings here. If what Stripe
+ * can still give back dropped by at least the requested amount, that money is
+ * gone from the merchant whatever the create call said, and the request must be
+ * recorded as refunded and its purchase revoked.
+ *
+ * Deliberately not symmetric: an unchanged balance is NOT proof the refund
+ * failed either (Stripe could still be settling), which is why the caller keeps
+ * the ambiguity in the admin note rather than claiming a clean failure.
+ */
+export function refundLandedDespiteError(
+  refundableBeforeCents: number,
+  refundableAfterCents: number,
+  requestedCents: number,
+): boolean {
+  if (
+    !Number.isFinite(refundableBeforeCents) ||
+    !Number.isFinite(refundableAfterCents) ||
+    !Number.isInteger(requestedCents) ||
+    requestedCents <= 0
+  ) {
+    return false;
+  }
+  return refundableBeforeCents - refundableAfterCents >= requestedCents;
+}
+
+/**
+ * Does this refund hand back everything Stripe still held on the charge?
+ *
+ * This is the proportionality test for revocation. A subscription refund used to
+ * cancel the host's entire plan unconditionally, so a $1 goodwill refund on a
+ * $199 charge took the whole plan away — the platform kept $198 and delivered
+ * nothing. There is no fractional subscription to cancel, so the honest rule is
+ * all-or-nothing measured against the charge: cancel only when the charge has
+ * been fully handed back, and otherwise leave the plan the host is still paying
+ * for alone.
+ *
+ * Measured against what was still REFUNDABLE rather than the original amount, so
+ * a second partial refund that exhausts the remainder correctly counts as full.
+ */
+export function refundExhaustsCharge(
+  refundedCents: number,
+  refundableBeforeCents: number,
+): boolean {
+  if (!Number.isFinite(refundedCents) || !Number.isFinite(refundableBeforeCents)) {
+    return false;
+  }
+  if (refundableBeforeCents <= 0) return false;
+  return refundedCents >= refundableBeforeCents;
+}
+
+/**
  * Stripe idempotency key for one refund request row.
  *
  * Derived from the refund_requests id and nothing else, so a retry of the same

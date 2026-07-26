@@ -17,6 +17,7 @@ import {
   HOST_STATUS_HINT,
   HOST_STATUS_LABEL,
   hostListingTransitions,
+  hostStatusHint,
 } from "../../components/host/listingStatusTransitions";
 
 const ALL_STATUSES: readonly ListingStatus[] = [
@@ -95,5 +96,46 @@ describe("hostListingTransitions", () => {
     // There is no reviewer. The badge and the hint both have to say so.
     expect(HOST_STATUS_LABEL.under_review).toBe("Ready to publish");
     expect(HOST_STATUS_HINT.under_review).not.toMatch(/review/i);
+  });
+});
+
+/**
+ * The hint under the status badge. `closed` is the one status whose meaning
+ * depends on the listing, and the sourced case got the verified sentence:
+ * "Closed by Explore & Earn. Reopen it as a draft to make changes and publish
+ * again." Explore & Earn did not close it (the freshness sweep and snapshot
+ * reconciliation write `closed` when the ORIGIN drops the posting), and 082
+ * refuses the reopen — which is why the very same module already withholds the
+ * button. Two false clauses, rendered to the host who owns the row.
+ */
+describe("hostStatusHint", () => {
+  it("does not blame Explore & Earn for a sourced closure", () => {
+    const hint = hostStatusHint("closed", "sourced");
+    expect(hint).not.toMatch(/closed by explore ?& ?earn/i);
+    expect(hint).toMatch(/source/i);
+  });
+
+  it("does not offer a reopen the database refuses", () => {
+    const hint = hostStatusHint("closed", "sourced");
+    expect(hint).not.toMatch(/reopen it as a draft/i);
+    // The hint and the buttons must agree: no reopen offered either way.
+    expect(targets("closed", "sourced")).toEqual([]);
+  });
+
+  it("still gives a verified closed listing the reopen sentence", () => {
+    const hint = hostStatusHint("closed", "verified");
+    expect(hint).toBe(HOST_STATUS_HINT.closed);
+    expect(hint).toMatch(/reopen it as a draft/i);
+    expect(hostStatusHint("closed")).toBe(HOST_STATUS_HINT.closed);
+    expect(hostStatusHint("closed", null)).toBe(HOST_STATUS_HINT.closed);
+  });
+
+  /** Negative control: provenance must not leak into any other status. */
+  it("is provenance-blind for every status except closed", () => {
+    for (const status of ALL_STATUSES) {
+      if (status === "closed") continue;
+      expect(hostStatusHint(status, "sourced")).toBe(HOST_STATUS_HINT[status]);
+      expect(hostStatusHint(status, "verified")).toBe(HOST_STATUS_HINT[status]);
+    }
   });
 });
