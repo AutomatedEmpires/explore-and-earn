@@ -91,7 +91,7 @@ function statusVariant(status: string): BadgeVariant {
   if (status === "refunded") return "success";
   if (status === "denied") return "neutral";
   if (status === "failed") return "info";
-  return "featured"; // requested — awaiting a decision
+  return "featured"; // requested — awaiting a decision; approved — in flight
 }
 
 /** Map a refund status to a registry icon key. */
@@ -99,7 +99,17 @@ function statusIcon(status: string): IconKey {
   if (status === "refunded") return "status.accepted";
   if (status === "denied") return "status.declined";
   if (status === "failed") return "system.warning";
-  return "status.open"; // requested
+  return "status.open"; // requested / approved
+}
+
+/**
+ * Human label for a refund status. 'approved' is the transient state a row is
+ * claimed into before the Stripe call, so it must read as in-flight — the
+ * humanized token "Approved" would look like a finished, successful refund.
+ */
+function statusLabel(status: string): string {
+  if (status === "approved") return "Processing";
+  return humanizeToken(status);
 }
 
 /** A short, human "age" string from an ISO timestamp (queue triage signal). */
@@ -312,7 +322,7 @@ export function RefundQueue({
                       {formatCents(request.amountCents)}
                     </span>
                     <Badge
-                      label={humanizeToken(request.status)}
+                      label={statusLabel(request.status)}
                       variant={statusVariant(request.status)}
                       icon={statusIcon(request.status)}
                     />

@@ -17,6 +17,12 @@ import {
   INVITE_CREDIT_PACKS,
   type BoostDuration,
 } from "@explore-and-earn/contracts";
+import {
+  refundableCents,
+  refundedCents,
+  selectLatestSubscriptionCharge,
+  type SubscriptionCharge,
+} from "./refundVerification";
 
 const APP_INFO = {
   name: "Explore & Earn",
@@ -194,18 +200,38 @@ async function resolveCustomerClerkUserId(customerId: string): Promise<string | 
     : null;
 }
 
+/**
+ * Write the tier a host has actually paid for onto their host_profiles row.
+ *
+ * The `.select("id")` is load-bearing, not decoration. Supabase answers a
+ * zero-row UPDATE with `{ data: [], error: null }`, so checking `error` alone
+ * cannot tell "granted the tier" apart from "matched no host_profiles row at
+ * all" — which is exactly what happens when someone pays before their host
+ * profile exists. That host was charged and silently granted nothing. Throwing
+ * on an empty match turns the webhook into a non-2xx, so Stripe redelivers the
+ * event and the grant lands once the profile is there.
+ */
 async function syncHostSubscriptionTier(
   clerkUserId: string,
   subscriptionTier: StoredSubscriptionTier,
 ): Promise<void> {
   const db = adminClient();
-  const { error } = await db
+  const { data, error } = await db
     .from("host_profiles")
     .update({ subscription_tier: subscriptionTier })
-    .eq("clerk_user_id", clerkUserId);
+    .eq("clerk_user_id", clerkUserId)
+    .select("id");
 
   if (error) {
     throw new Error(`Failed to sync host subscription tier: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    // The Clerk id is deliberately NOT in the message — this string reaches
+    // logs and Sentry, and the event id there is enough to trace the payer.
+    throw new Error(
+      "Failed to sync host subscription tier: no host_profiles row matched the paying Clerk user.",
+    );
   }
 }
 
@@ -376,7 +402,7 @@ async function syncInviteCreditPurchase(
  * 'no_payment_required' is a legitimate paid state (a 100% coupon or a zero-
  * amount trial), so it is honoured.
  */
-function checkoutIsPaid(session: Stripe.Checkout.Session): boolean {
+export function checkoutIsPaid(session: Stripe.Checkout.Session): boolean {
   return (
     session.payment_status === "paid" ||
     session.payment_status === "no_payment_required"
@@ -850,6 +876,7 @@ export async function cancelHostSubscription(
 export async function issueRefund(
   paymentIntentId: string,
   amountCents?: number,
+  idempotencyKey?: string,
 ): Promise<{ ok: boolean; refundId?: string; error?: string }> {
   if (!hasStripeServerConfig()) {
     return { ok: false, error: "Stripe is not configured on this environment." };
@@ -862,10 +889,17 @@ export async function issueRefund(
   }
 
   try {
-    const refund = await getStripeClient().refunds.create({
-      payment_intent: paymentIntentId,
-      ...(amountCents !== undefined ? { amount: amountCents } : {}),
-    });
+    // The idempotency key is the only thing standing between a retried approval
+    // and a second real payout: with it Stripe replays the original refund, and
+    // without it an identical request creates a NEW one. Callers derive it from
+    // the refund_requests row id (refundIdempotencyKey).
+    const refund = await getStripeClient().refunds.create(
+      {
+        payment_intent: paymentIntentId,
+        ...(amountCents !== undefined ? { amount: amountCents } : {}),
+      },
+      idempotencyKey ? { idempotencyKey } : undefined,
+    );
     return { ok: true, refundId: refund.id };
   } catch (error) {
     const message =
@@ -876,6 +910,110 @@ export async function issueRefund(
           : "Stripe refund failed.";
     return { ok: false, error: message };
   }
+}
+
+/* ─── Refund verification: what Stripe actually charged ────────────────────── */
+
+export interface SubscriptionChargeLookup {
+  readonly ok: boolean;
+  readonly charge?: SubscriptionCharge;
+  readonly error?: string;
+}
+
+/**
+ * The host's most recent real subscription charge, read from Stripe.
+ *
+ * A subscription refund has no local purchase row — the charge lives on a Stripe
+ * invoice — so before this existed the request recorded a null PaymentIntent and
+ * whatever amount the host typed into the billing form. This resolves the actual
+ * invoice and the PaymentIntent that paid it, which is what makes "we'll verify
+ * the exact charge in Stripe" true.
+ *
+ * Finding nothing is returned as a not-ok result rather than thrown so callers
+ * can refuse the refund with a readable reason instead of crashing.
+ */
+export async function findLatestHostSubscriptionCharge(
+  clerkUserId: string,
+): Promise<SubscriptionChargeLookup> {
+  if (!hasStripeServerConfig()) {
+    return { ok: false, error: "Stripe is not configured on this environment." };
+  }
+  if (!clerkUserId) {
+    return { ok: false, error: "Missing Clerk user id." };
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const customers = await stripe.customers.search({
+      query: `metadata['clerkUserId']:'${searchQueryValue(clerkUserId)}'`,
+      limit: 1,
+    });
+    const customer = customers.data[0];
+    if (!customer) {
+      return { ok: false, error: "No Stripe customer on record for this host." };
+    }
+
+    // `payments` holds the InvoicePayment list that carries the PaymentIntent in
+    // current API versions; expanding it means selectLatestSubscriptionCharge
+    // has something to read instead of always falling through to null.
+    const invoices = await stripe.invoices.list({
+      customer: customer.id,
+      status: "paid",
+      limit: 20,
+      expand: ["data.payments"],
+    });
+
+    const charge = selectLatestSubscriptionCharge(invoices.data as unknown[]);
+    if (!charge) {
+      return { ok: false, error: "No paid subscription invoice found for this host." };
+    }
+
+    return { ok: true, charge };
+  } catch (error) {
+    return { ok: false, error: stripeErrorMessage(error, "Stripe invoice lookup failed.") };
+  }
+}
+
+/**
+ * How much of a charge Stripe can still give back: what it received, minus every
+ * refund on it that is not dead. Used to REFUSE an over-refund before any money
+ * moves, and it is also what stops a second approval of the same purchase from
+ * paying out twice even if the request rows diverge.
+ */
+export async function getRefundableChargeCents(
+  paymentIntentId: string,
+): Promise<{ ok: boolean; refundableCents?: number; error?: string }> {
+  if (!hasStripeServerConfig()) {
+    return { ok: false, error: "Stripe is not configured on this environment." };
+  }
+  if (!paymentIntentId) {
+    return { ok: false, error: "Missing Stripe payment intent id." };
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const received =
+      typeof intent.amount_received === "number" ? intent.amount_received : 0;
+
+    const priorRefunds = await stripe.refunds.list({
+      payment_intent: paymentIntentId,
+      limit: 100,
+    });
+
+    return {
+      ok: true,
+      refundableCents: refundableCents(received, refundedCents(priorRefunds.data as unknown[])),
+    };
+  } catch (error) {
+    return { ok: false, error: stripeErrorMessage(error, "Stripe charge lookup failed.") };
+  }
+}
+
+function stripeErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Stripe.errors.StripeError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
 }
 
 export function verifyStripeWebhookEvent(

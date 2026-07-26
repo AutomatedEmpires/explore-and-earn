@@ -74,6 +74,11 @@ const stripeMocks = vi.hoisted(() => ({
   isBillingInterval: vi.fn(),
   isHostSubscriptionTier: vi.fn(),
   issueRefund: vi.fn(),
+  // A subscription refund request now resolves the real charge in Stripe before
+  // it can be filed, so the pass-through case has to have one to find.
+  findLatestHostSubscriptionCharge: vi.fn(),
+  getRefundableChargeCents: vi.fn(),
+  cancelHostSubscription: vi.fn(),
 }));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
@@ -133,6 +138,15 @@ beforeEach(() => {
     getToken: vi.fn().mockResolvedValue("tok-default"),
   });
   checkRateLimitMock.mockReturnValue({ allowed: true });
+  stripeMocks.findLatestHostSubscriptionCharge.mockResolvedValue({
+    ok: true,
+    charge: {
+      invoiceId: "in_default",
+      paymentIntentId: "pi_default",
+      amountPaidCents: 19900,
+      createdUnix: 900,
+    },
+  });
   // redirect() throws NEXT_REDIRECT in production — the mock mirrors that so
   // Promise<never> actions terminate at the redirect like the real runtime.
   redirectMock.mockImplementation((url: string) => {
