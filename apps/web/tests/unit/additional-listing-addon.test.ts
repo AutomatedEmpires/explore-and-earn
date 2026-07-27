@@ -27,9 +27,13 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
  *
  * Two more, added when the branch was finished:
  *
- *  3. The allowance was only ever taken back on `deleted`. Stripe leaves an
- *     uncollected subscription in 'unpaid' / 'incomplete_expired' / 'paused' and
- *     may never emit deleted, so a host who stopped paying kept their slots.
+ *  3. The allowance was only ever taken back on `deleted`. A subscription that
+ *     expires unfinished ('incomplete_expired') may never emit one, so a host
+ *     who never finished paying kept their slots. TERMINAL statuses therefore
+ *     revoke — and only terminal statuses: revoking on a RECOVERABLE lapse
+ *     ('unpaid' / 'paused' / 'incomplete') swept listings closed over a state
+ *     Stripe can still collect from, which is the #283 review defect. The
+ *     dunning configuration bounds the lapse: when Stripe gives up it cancels.
  *  4. A quantity changed in the billing portal surfaces only on
  *     customer.subscription.updated. The credit path is keyed on the checkout
  *     session, which never fires again, so the allowance never followed it.
@@ -40,6 +44,7 @@ const revokeListingSlotPurchase = vi.fn();
 const syncListingSlotSubscription = vi.fn();
 const createCheckoutSession = vi.fn();
 const syncTier = vi.fn();
+const subscriptionsRetrieve = vi.fn();
 
 vi.mock("server-only", () => ({}));
 
@@ -67,7 +72,7 @@ vi.mock("stripe", () => {
     static errors = { StripeError: class extends Error {} };
     checkout = { sessions: { create: createCheckoutSession } };
     customers = { retrieve: vi.fn(), search: vi.fn(), list: vi.fn(), update: vi.fn() };
-    subscriptions = { list: vi.fn(), cancel: vi.fn() };
+    subscriptions = { list: vi.fn(), cancel: vi.fn(), retrieve: subscriptionsRetrieve };
     billingPortal = { sessions: { create: vi.fn() } };
     refunds = { create: vi.fn() };
     webhooks = { constructEvent: vi.fn() };
@@ -140,12 +145,39 @@ function subscriptionUpdatedEvent(args: {
   } as unknown as WebhookEvent;
 }
 
+/**
+ * What subscriptions.retrieve reports as the CURRENT state. Any non-paying
+ * status is re-read before it is believed — Stripe does not order deliveries,
+ * and for the add-on the stakes are resurrection: a redelivered lapse event
+ * arriving after the deleted event would otherwise reinstate a revoked
+ * purchase (085's sync deliberately supports reinstating a cancelled row).
+ * The retrieved object must carry productType, exactly as the real one does —
+ * without it the re-read would drop the event onto the plan branch.
+ */
+function retrievedAddonSubscription(status: string, quantity?: number) {
+  return {
+    id: "sub_addon_1",
+    status,
+    customer: "cus_1",
+    metadata: {
+      productType: ADDITIONAL_LISTING_PRODUCT_TYPE,
+      clerkUserId: "user_1",
+    },
+    items: { data: [{ price: { id: "price_addon" }, quantity }] },
+  };
+}
+
 beforeEach(() => {
   creditListingSlotPurchase.mockReset();
   revokeListingSlotPurchase.mockReset();
   syncListingSlotSubscription.mockReset();
   createCheckoutSession.mockReset();
   syncTier.mockReset();
+  subscriptionsRetrieve.mockReset();
+  // Default: the re-read agrees with the event the tests send.
+  subscriptionsRetrieve.mockImplementation(async () =>
+    retrievedAddonSubscription("unpaid", 3),
+  );
 });
 
 describe("additional-listing add-on checkout", () => {
@@ -297,12 +329,17 @@ describe("additional-listing add-on cancellation", () => {
 });
 
 describe("additional-listing add-on lifecycle (non-deletion events)", () => {
-  it.each(["unpaid", "incomplete_expired", "paused", "canceled"])(
-    "TAKES THE ALLOWANCE BACK when the subscription is %s — the host stopped paying",
+  it.each(["incomplete_expired", "canceled"])(
+    "TAKES THE ALLOWANCE BACK when the subscription is %s — TERMINAL, it can never collect again",
     async (status) => {
-      // The defect: this branch acted only on `deleted`, and Stripe can leave an
-      // uncollected subscription in these statuses indefinitely without ever
-      // emitting one. The host kept listing slots nobody was paying for.
+      // The original defect: this branch acted only on `deleted`, and a
+      // subscription that expires unfinished may never emit one. The host kept
+      // listing slots nobody was paying for. The quantity is null on purpose:
+      // a non-paying payload's quantity is never believed, and entitled:false
+      // zeroes the contribution regardless.
+      subscriptionsRetrieve.mockResolvedValue(
+        retrievedAddonSubscription(status, 3),
+      );
       syncListingSlotSubscription.mockResolvedValue({
         ok: true,
         found: true,
@@ -314,15 +351,110 @@ describe("additional-listing add-on lifecycle (non-deletion events)", () => {
         subscriptionUpdatedEvent({ status, quantity: 3 }),
       );
 
-      expect(result.action).toBe("revoked_listing_slots_unpaid");
+      expect(result.action).toBe("revoked_listing_slots_terminal");
       expect(syncListingSlotSubscription).toHaveBeenCalledWith({
         stripeSubscriptionId: "sub_addon_1",
-        quantity: 3,
+        quantity: null,
         entitled: false,
       });
       expect(syncTier).not.toHaveBeenCalled();
     },
   );
+
+  /**
+   * THE RESURRECTION SEQUENCE, pinned end to end: an updated(unpaid) event
+   * 500s (db blip) → Stripe queues a redelivery → the subscription is
+   * cancelled and revoked → the redelivered unpaid event arrives LAST. The
+   * event's payload says unpaid (recoverable, entitled), but the subscription
+   * is DEAD — and 085's sync would happily reinstate the cancelled row.
+   * The re-read is what stands between that sequence and a permanently
+   * resurrected free allowance: the branch acts on the CURRENT status.
+   */
+  it("cannot resurrect a revoked purchase from a redelivered lapse event", async () => {
+    subscriptionsRetrieve.mockResolvedValue(
+      retrievedAddonSubscription("canceled", 3),
+    );
+    syncListingSlotSubscription.mockResolvedValue({
+      ok: true,
+      found: true,
+      changed: false,
+      slots: 0,
+    });
+
+    const result = await handleStripeWebhookEvent(
+      subscriptionUpdatedEvent({ status: "unpaid", quantity: 3 }),
+    );
+
+    expect(subscriptionsRetrieve).toHaveBeenCalledWith("sub_addon_1");
+    expect(syncListingSlotSubscription).toHaveBeenCalledWith({
+      stripeSubscriptionId: "sub_addon_1",
+      quantity: null,
+      entitled: false,
+    });
+    expect(result.action).toBe("listing_slots_unchanged");
+  });
+
+  /**
+   * The follow-up defect, found reviewing #283: revoking on RECOVERABLE
+   * statuses swept listings closed over a state Stripe can still collect from —
+   * a retried card, a resumed pause, a paid open invoice — and the SQL sweep
+   * fires the moment the contribution drops, so the harm was immediate and the
+   * recovery manual. A recoverable lapse keeps the allowance; the lapse cannot
+   * park forever because Stripe's dunning cancels when it gives up, which
+   * arrives as `canceled` above or as the deleted event.
+   */
+  it.each(["unpaid", "paused", "incomplete"])(
+    "KEEPS the allowance while the subscription is %s — a recoverable lapse, not a revocation",
+    async (status) => {
+      subscriptionsRetrieve.mockResolvedValue(
+        retrievedAddonSubscription(status, 3),
+      );
+      syncListingSlotSubscription.mockResolvedValue({
+        ok: true,
+        found: true,
+        changed: false,
+        slots: 3,
+      });
+
+      const result = await handleStripeWebhookEvent(
+        subscriptionUpdatedEvent({ status, quantity: 3 }),
+      );
+
+      expect(result.action).toBe("listing_slots_unchanged");
+      // quantity null: the recorded quantity is left alone while nothing is
+      // collecting. The billing portal accepts quantity updates on a
+      // non-collecting subscription, and believing one would grant slots
+      // against an invoice that may never be attempted.
+      expect(syncListingSlotSubscription).toHaveBeenCalledWith({
+        stripeSubscriptionId: "sub_addon_1",
+        quantity: null,
+        entitled: true,
+      });
+      expect(syncTier).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does NOT believe a quantity raised while nothing is collecting", async () => {
+    // A host in `unpaid` raises quantity 1 -> 10 in the billing portal. The
+    // event carries 10; nothing will ever collect for it. The recorded
+    // quantity must stay put until real collection resumes (an active-status
+    // event, which IS believed — see 'FOLLOWS a quantity changed').
+    subscriptionsRetrieve.mockResolvedValue(
+      retrievedAddonSubscription("unpaid", 10),
+    );
+    syncListingSlotSubscription.mockResolvedValue({
+      ok: true,
+      found: true,
+      changed: false,
+      slots: 1,
+    });
+
+    await handleStripeWebhookEvent(
+      subscriptionUpdatedEvent({ status: "unpaid", quantity: 10 }),
+    );
+
+    expect(syncListingSlotSubscription.mock.calls[0][0].quantity).toBeNull();
+  });
 
   it.each(["active", "trialing", "past_due"])(
     "keeps the allowance while the subscription is %s",

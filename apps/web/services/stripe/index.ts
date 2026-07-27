@@ -60,6 +60,27 @@ const ACTIVE_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>([
   "past_due",
 ]);
 
+/**
+ * Statuses this subscription can NEVER collect from again. Everything outside
+ * this set and ACTIVE_SUBSCRIPTION_STATUSES — paused, unpaid, incomplete, and
+ * any status Stripe invents later — is a RECOVERABLE lapse: Stripe may resume,
+ * retry, or complete it with no action from us, and the customer can end it by
+ * simply paying what is owed.
+ *
+ * The distinction is load-bearing for the over-allowance sweep. Closing a
+ * host's listings is durable, and a recoverable status is not durable evidence
+ * — it may even be a STALE event, since Stripe does not guarantee delivery
+ * order. So the sweep runs on terminal states and on paying states (where a
+ * tier downgrade is enforced), never on a recoverable lapse; see
+ * syncHostSubscriptionTier and syncSubscriptionEvent. An unknown future status
+ * deliberately lands on the recoverable side: the reversible reading of an
+ * unrecognised state is the one that cannot destroy anything.
+ */
+const TERMINAL_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>([
+  "canceled",
+  "incomplete_expired",
+]);
+
 let cachedStripeClient: Stripe | null = null;
 
 export type HostSubscriptionTier = keyof typeof FOUNDER_LOCKED_PRICING;
@@ -256,6 +277,14 @@ async function syncHostSubscriptionTier(
     stripeCustomerId?: string | null;
     stripeSubscriptionId?: string | null;
     currentPeriodEnd?: string | null;
+    /**
+     * Whether to bring the host's live inventory back inside the plan
+     * allowance after the tier write. True (the default) everywhere except a
+     * RECOVERABLE payment lapse — paused / unpaid / incomplete — where closing
+     * listings would turn a state Stripe may resume tomorrow into damage only
+     * a human can undo. See the sweep comment below.
+     */
+    sweepOverAllowance?: boolean;
   },
 ): Promise<void> {
   await upsertHostSubscription({
@@ -284,6 +313,27 @@ async function syncHostSubscriptionTier(
   // listings stayed public on a plan that stopped paying for them. On a GRANT
   // this is a no-op, since a host inside their allowance has no excess to close.
   //
+  // EXCEPT on a recoverable lapse (sweepOverAllowance: false). paused / unpaid /
+  // incomplete are states Stripe can still collect from — a retried card, a
+  // resumed pause, a paid open invoice — and the event may not even be current
+  // news, since Stripe does not order deliveries. Closing listings there turned
+  // a reversible billing hiccup into damage only a human could undo. The tier
+  // is still written down (a lapsed host cannot publish anything NEW — 083's
+  // trigger holds that line on its own), but the shopfront stays up, so when
+  // the subscription returns to active the restoration is automatic: the tier
+  // grant lands and nothing was ever taken down.
+  //
+  // TWO HONEST LIMITS of that grace. First, its duration is bounded by Stripe
+  // DASHBOARD configuration, not by this code: dunning must be set to CANCEL
+  // the subscription when retries exhaust (under "mark as unpaid" the lapse
+  // parks forever with the shopfront up at zero revenue), and the billing
+  // portal must not offer pause. Both are launch-gate checks. Second, the
+  // grace holds only until the allowance is next re-evaluated for another
+  // reason: 085's add-on functions run this same sweep, so a host who changes
+  // their add-on mid-lapse meets the honest allowance (plan term 0) at that
+  // moment. That is enforcement of an entitlement change the host initiated,
+  // not the webhook acting on a possibly-stale lapse.
+  //
   // The ADD-ON term is not swept from here and must not be: this function is
   // never reached on the add-on branch of syncSubscriptionEvent. It is swept
   // inside 085's credit / revoke / sync functions, the only writers of
@@ -291,7 +341,9 @@ async function syncHostSubscriptionTier(
   //
   // It runs before the zero-row resolution below on purpose: that path can
   // throw, and a sweep skipped by an early throw is a sweep that never happens.
-  await closeHostListingsOverAllowance(clerkUserId);
+  if (details?.sweepOverAllowance ?? true) {
+    await closeHostListingsOverAllowance(clerkUserId);
+  }
 
   if (!data || data.length === 0) {
     await requireNoHostProfileToUpdate(clerkUserId);
@@ -689,6 +741,28 @@ async function syncSubscriptionEvent(
   subscription: Stripe.Subscription,
   deleted: boolean,
 ): Promise<{ action: string; clerkUserId: string | null; tier: StoredSubscriptionTier | null }> {
+  // ── Re-read before acting on any non-paying status — BOTH branches ─────────
+  // Stripe does not guarantee delivery order, and this codebase deliberately
+  // answers non-2xx to force redelivery — so a non-paying event routinely
+  // lands AFTER the event that superseded it. Acting on the payload has a
+  // failure mode per branch: on the PLAN branch a late created(incomplete)
+  // records a paying host as unentitled with nothing to correct it until the
+  // next billing event; on the ADD-ON branch a redelivered updated(unpaid)
+  // arriving after the deleted event would RESURRECT the revoked purchase,
+  // because 085's sync deliberately supports reinstating a cancelled row and
+  // no further event ever arrives for a dead subscription. So a status that
+  // would act on either branch downward is never believed from the event
+  // alone: the subscription is re-read and the CURRENT state — status,
+  // quantity, metadata alike — is what everything below acts on. This must
+  // run BEFORE the add-on early-return or it protects only the plan half.
+  // The read is skipped for paying statuses (nothing to revoke) and for the
+  // deleted event (a cancellation is terminal by definition), and a read
+  // failure propagates: non-2xx, Stripe redelivers — an unreadable
+  // subscription must not become a revocation.
+  if (!deleted && !ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status)) {
+    subscription = await getStripeClient().subscriptions.retrieve(subscription.id);
+  }
+
   // ── The add-on branch, FIRST ────────────────────────────────────────────────
   // A host who buys the additional-listing add-on holds TWO Stripe
   // subscriptions. `deleted` below hard-codes tier "none" without consulting the
@@ -707,14 +781,31 @@ async function syncSubscriptionEvent(
       //
       // The sync is a delta against what this purchase currently contributes,
       // so a redelivered event changes nothing.
-      // Same verdict the PLAN path uses (resolveSubscriptionTier reads this
-      // exact set): active / trialing / past_due are still paying, everything
-      // else is not. One definition, so a plan and its add-on can never
-      // disagree about whether a host is in good standing.
-      const entitled = ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status);
+      //
+      // Same classification the PLAN path uses, computed from the RE-READ
+      // state above: paying states and RECOVERABLE lapses (paused / unpaid /
+      // incomplete) keep the allowance the host bought; only a status Stripe
+      // can never collect from again takes it back. Revoking on a recoverable
+      // lapse swept listings closed over a state Stripe may resume tomorrow —
+      // and the SQL sweep inside 085's sync function fires the moment the
+      // contribution drops, so "revoke now, re-grant later" was never
+      // reversible. One definition on both branches, so a plan and its add-on
+      // can never disagree about whether a host is in good standing.
+      //
+      // BOUNDED BY DASHBOARD CONFIGURATION, not by this code, and the launch
+      // gate checks both: dunning must be set to CANCEL the subscription when
+      // retries exhaust (under "mark as unpaid" the lapse parks forever and
+      // these slots stay granted at zero revenue), and the billing portal
+      // must not offer pause. A QUANTITY is only believed while the
+      // subscription is actually PAYING: the portal accepts quantity updates
+      // on a non-collecting subscription, and syncing one would grant slots
+      // against an invoice that may never be attempted. null leaves the
+      // recorded quantity alone until real collection resumes.
+      const paying = ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status);
+      const entitled = !TERMINAL_SUBSCRIPTION_STATUSES.has(subscription.status);
       const synced = await syncListingSlotSubscription({
         stripeSubscriptionId: subscription.id,
-        quantity: additionalListingQuantity(subscription),
+        quantity: paying ? additionalListingQuantity(subscription) : null,
         entitled,
       });
       if (!synced.ok) {
@@ -727,7 +818,7 @@ async function syncSubscriptionEvent(
             ? "listing_slots_unchanged"
             : entitled
               ? "synced_listing_slots"
-              : "revoked_listing_slots_unpaid",
+              : "revoked_listing_slots_terminal",
         clerkUserId: subscription.metadata?.clerkUserId ?? null,
         tier: null,
       };
@@ -813,10 +904,21 @@ async function syncSubscriptionEvent(
     await ensureCustomerMetadata(customerId, billingMetadata(clerkUserId, tier));
   }
 
+  // The sweep decision, from the RE-READ status: a deleted or terminal
+  // subscription sweeps (the entitlement is genuinely over), and a paying one
+  // sweeps too (that is how a downgrade between paid tiers is enforced — a
+  // no-op otherwise). A recoverable lapse records the tier but closes nothing;
+  // see the sweep comment inside syncHostSubscriptionTier.
+  const recoverableLapse =
+    !deleted &&
+    !ACTIVE_SUBSCRIPTION_STATUSES.has(subscription.status) &&
+    !TERMINAL_SUBSCRIPTION_STATUSES.has(subscription.status);
+
   await syncHostSubscriptionTier(clerkUserId, tier, {
     billingStatus: deleted ? "cancelled" : toBillingStatus(subscription.status),
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
+    sweepOverAllowance: !recoverableLapse,
   });
 
   return {
@@ -1272,8 +1374,54 @@ export async function cancelHostSubscription(
 
   try {
     const stripe = getStripeClient();
+
+    // Cancel the PLAN only — the add-on is DELIBERATELY LEFT INTACT.
+    //
+    // The additional-listing add-on bills as its own subscription on this same
+    // customer (that sharing is what makes it portal-cancellable), and this
+    // function runs when a FULL PLAN refund is approved — an approval that
+    // named the plan's charge and no other. Cancelling everything on the
+    // customer therefore took a product the host had separately paid for,
+    // refunded none of it, and called that a plan refund. Leaving the add-on
+    // running is the honest converse: it keeps delivering the slots it bills
+    // for, the host can end it themselves in the billing portal, and an admin
+    // can refund it as its own decision.
+    //
+    // The plan is cancelled BY ITS RECORDED ID, not by filtering a customer
+    // listing. Only the plan path writes host_subscriptions.
+    // stripe_subscription_id (the add-on branch of syncSubscriptionEvent
+    // returns before syncHostSubscriptionTier is ever reached), so the
+    // recorded id IS the plan. A customer-wide list is newest-first and
+    // truncatable — a host holding enough add-on subscriptions pushes the
+    // plan off the first page, and a filter over that page would cancel
+    // nothing, report success, and leave the plan billing after the refund
+    // went out. The authority read THROWS on failure and the catch below
+    // surfaces it: an unreadable authority must not become "nothing to
+    // cancel".
+    const recorded = await getHostSubscriptionByClerkUserId(clerkUserId);
+    if (recorded?.stripeSubscriptionId) {
+      try {
+        await stripe.subscriptions.cancel(recorded.stripeSubscriptionId);
+        return { ok: true, cancelled: true };
+      } catch (error) {
+        // Cancelling an already-cancelled (or vanished) subscription answers
+        // StripeInvalidRequestError — the subscription is over either way,
+        // which is the outcome the refund wanted. Anything else (auth,
+        // connection, rate limit) is NOT evidence the plan stopped billing,
+        // so it propagates to the failure path for the admin to see.
+        if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+          return { ok: true, cancelled: false };
+        }
+        throw error;
+      }
+    }
+
+    // No recorded id — a pre-083 row shape. Fall back to the customer's own
+    // subscriptions, across ALL statuses (a lapsed plan is not 'active' but
+    // still needs cancelling), skipping anything productType-stamped (not the
+    // plan) or already terminal.
     const customers = await stripe.customers.search({
-      query: `metadata['clerkUserId']:'${clerkUserId.replace(/'/g, "")}'`,
+      query: `metadata['clerkUserId']:'${searchQueryValue(clerkUserId)}'`,
       limit: 1,
     });
     const customer = customers.data[0];
@@ -1281,12 +1429,17 @@ export async function cancelHostSubscription(
 
     const subs = await stripe.subscriptions.list({
       customer: customer.id,
-      status: "active",
-      limit: 10,
+      status: "all",
+      limit: 100,
     });
-    if (subs.data.length === 0) return { ok: true, cancelled: false };
+    const planSubscriptions = subs.data.filter(
+      (sub) =>
+        !sub.metadata?.productType &&
+        !TERMINAL_SUBSCRIPTION_STATUSES.has(sub.status),
+    );
+    if (planSubscriptions.length === 0) return { ok: true, cancelled: false };
 
-    for (const sub of subs.data) {
+    for (const sub of planSubscriptions) {
       await stripe.subscriptions.cancel(sub.id);
     }
     return { ok: true, cancelled: true };
@@ -1381,6 +1534,21 @@ export async function findLatestHostSubscriptionCharge(
       return { ok: false, error: "No Stripe customer on record for this host." };
     }
 
+    // Scope the search to the PLAN subscription on record. The
+    // additional-listing add-on bills as its own subscription on this SAME
+    // customer, and its invoices carry the same subscription_* billing
+    // reasons — so a customer-wide "latest subscription charge" could resolve
+    // to an ADD-ON charge and hand it plan-refund semantics: recorded as a
+    // plan refund, and a full-charge approval would cancel the plan over money
+    // the plan never collected. The authority row knows which subscription the
+    // plan entitlement came from; when it names one, only that subscription's
+    // invoices are candidates. A row with no recorded id cannot coexist with
+    // an add-on (the add-on checkout requires a paid plan recorded under 083),
+    // so the unscoped fallback below cannot select one. The read THROWS on
+    // failure and the catch below turns that into a not-ok refusal — an
+    // unreadable authority must not widen the candidate set.
+    const recorded = await getHostSubscriptionByClerkUserId(clerkUserId);
+
     // `payments` holds the InvoicePayment list that carries the PaymentIntent in
     // current API versions; expanding it means selectLatestSubscriptionCharge
     // has something to read instead of always falling through to null.
@@ -1389,6 +1557,9 @@ export async function findLatestHostSubscriptionCharge(
       status: "paid",
       limit: 20,
       expand: ["data.payments"],
+      ...(recorded?.stripeSubscriptionId
+        ? { subscription: recorded.stripeSubscriptionId }
+        : {}),
     });
 
     const charge = selectLatestSubscriptionCharge(invoices.data as unknown[]);
@@ -1453,6 +1624,86 @@ export function verifyStripeWebhookEvent(
     signature,
     requireEnv("STRIPE_WEBHOOK_SECRET"),
   );
+}
+
+/** What confirming a checkout session on the return path concluded. */
+export type CheckoutSessionConfirmation =
+  | { outcome: "granted" }
+  | { outcome: "pending_payment" }
+  | { outcome: "not_yours" }
+  | { outcome: "failed" };
+
+/**
+ * Confirm a checkout session on the host's RETURN path and apply what it
+ * bought, without waiting for the webhook.
+ *
+ * Stripe does not guarantee the webhook lands before the browser follows
+ * success_url — so the page a payer returns to used to gate on an entitlement
+ * that might not exist yet, and the first thing a brand-new paying host saw
+ * was a bounce back to plan selection. This closes that race at the source:
+ * the return page retrieves the session BY ID from Stripe (so the payload is
+ * authentic — nothing here trusts the URL beyond the id lookup), checks it
+ * belongs to the signed-in user, and runs the SAME grant path the webhook
+ * runs. Both paths are idempotent (upserts and session-id-keyed credits), so
+ * whichever lands second changes nothing.
+ *
+ * The ownership check refuses to act on another user's session id. The grant
+ * would key off the session's own metadata either way, so a stranger could
+ * not redirect an entitlement — but a surface that processes other people's
+ * sessions on request is an invitation to probe, so it declines.
+ *
+ * 'pending_payment' is a delayed-notification method (bank debit and friends)
+ * still settling — nothing is granted until async_payment_succeeded, exactly
+ * as the webhook path enforces. 'failed' means the session could not be read
+ * or the grant faulted; the webhook remains the safety net for both, so the
+ * caller should present "in progress", never an error that implies the
+ * payment was lost.
+ */
+export async function confirmCheckoutSessionForUser(
+  sessionId: string,
+  clerkUserId: string,
+): Promise<CheckoutSessionConfirmation> {
+  if (!hasStripeServerConfig() || !sessionId || !clerkUserId) {
+    return { outcome: "failed" };
+  }
+
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await getStripeClient().checkout.sessions.retrieve(sessionId);
+  } catch (error) {
+    console.error("[stripe] checkout session confirmation read failed", error);
+    return { outcome: "failed" };
+  }
+
+  const owner =
+    (typeof session.metadata?.clerkUserId === "string" &&
+    session.metadata.clerkUserId.length > 0
+      ? session.metadata.clerkUserId
+      : null) ??
+    (typeof session.client_reference_id === "string" &&
+    session.client_reference_id.length > 0
+      ? session.client_reference_id
+      : null);
+  if (owner !== clerkUserId) {
+    return { outcome: "not_yours" };
+  }
+
+  if (!checkoutIsPaid(session)) {
+    return { outcome: "pending_payment" };
+  }
+
+  try {
+    const result = await syncCheckoutCompleted(session);
+    // An ignored_* action means the session was paid but carried nothing this
+    // code recognises how to grant — the webhook will meet the same payload,
+    // so report it as not-yet-confirmed rather than pretending it landed.
+    return result.action.startsWith("ignored_")
+      ? { outcome: "failed" }
+      : { outcome: "granted" };
+  } catch (error) {
+    console.error("[stripe] checkout session confirmation grant failed", error);
+    return { outcome: "failed" };
+  }
 }
 
 export async function handleStripeWebhookEvent(

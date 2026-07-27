@@ -21,6 +21,7 @@ const getHostSubscriptionMock = vi.hoisted(() => vi.fn());
 const hostProfilesUpdate = vi.hoisted(() => vi.fn());
 const stripeCustomersRetrieve = vi.hoisted(() => vi.fn());
 const stripeCustomersUpdate = vi.hoisted(() => vi.fn());
+const stripeSubscriptionsRetrieve = vi.hoisted(() => vi.fn());
 
 /**
  * What the host_profiles UPDATE reports back. A grant that matches a profile
@@ -85,8 +86,28 @@ vi.mock("stripe", () => ({
       list: vi.fn(),
       search: vi.fn(),
     };
+    subscriptions = {
+      retrieve: stripeSubscriptionsRetrieve,
+    };
   },
 }));
+
+/**
+ * What subscriptions.retrieve reports as the CURRENT state. The plan path
+ * re-reads before acting on any non-paying status — Stripe does not order
+ * deliveries, so a lapse in an event payload may be stale news about a
+ * subscription that has already recovered. Tests that need the re-read to
+ * disagree with the event override this per-test.
+ */
+function retrievedSubscription(status: string) {
+  return {
+    id: "sub_1",
+    status,
+    customer: "cus_1",
+    metadata: { clerkUserId: "user_paid" },
+    items: { data: [{ price: { id: "price_pro_monthly" } }] },
+  };
+}
 
 import { handleStripeWebhookEvent } from "../../services/stripe";
 
@@ -104,6 +125,9 @@ beforeEach(() => {
     deleted: false,
     metadata: { clerkUserId: "user_paid" },
   });
+  // Default: the re-read agrees with the event the tests send (an unpaid
+  // subscription really is unpaid right now).
+  stripeSubscriptionsRetrieve.mockResolvedValue(retrievedSubscription("unpaid"));
 });
 
 function subscriptionEvent(type: string, status: string) {
@@ -511,9 +535,40 @@ describe("listings are brought back inside the allowance", () => {
     expect(closeListingsMock).toHaveBeenCalledWith("user_paid");
   });
 
-  it("sweeps after a downgrade that is not a cancellation", async () => {
+  /**
+   * A RECOVERABLE lapse records the tier but closes NOTHING. paused / unpaid /
+   * incomplete are states Stripe can still collect from — and the event may not
+   * even be current news. Closing listings there turned a reversible billing
+   * hiccup into damage only a human could undo; leaving them up costs nothing,
+   * because 083's trigger stops a lapsed host publishing anything NEW on its
+   * own, and when the subscription returns to active the restoration is
+   * automatic precisely because nothing was taken down.
+   */
+  it.each(["unpaid", "paused", "incomplete"])(
+    "does NOT sweep a recoverable lapse (%s) — Stripe may still collect",
+    async (status) => {
+      stripeSubscriptionsRetrieve.mockResolvedValue(retrievedSubscription(status));
+
+      await handleStripeWebhookEvent(
+        subscriptionEvent("customer.subscription.updated", status),
+      );
+
+      expect(closeListingsMock).not.toHaveBeenCalled();
+      // The tier is still written down — the lapse suspends the entitlement
+      // even though it closes nothing.
+      expect(upsertHostSubscriptionMock).toHaveBeenCalledWith(
+        expect.objectContaining({ tier: "none" }),
+      );
+    },
+  );
+
+  it("sweeps a TERMINAL status that arrives without a deleted event", async () => {
+    stripeSubscriptionsRetrieve.mockResolvedValue(
+      retrievedSubscription("incomplete_expired"),
+    );
+
     await handleStripeWebhookEvent(
-      subscriptionEvent("customer.subscription.updated", "unpaid"),
+      subscriptionEvent("customer.subscription.updated", "incomplete_expired"),
     );
 
     expect(closeListingsMock).toHaveBeenCalledWith("user_paid");
@@ -568,6 +623,79 @@ describe("listings are brought back inside the allowance", () => {
       subscriptionEvent("customer.subscription.deleted", "canceled"),
     );
 
+    expect(closeListingsMock).not.toHaveBeenCalled();
+  });
+});
+
+// ── A non-paying status is re-read before it is believed ────────────────────
+
+/**
+ * Stripe does not guarantee delivery order, and a subscription's
+ * created(incomplete) event routinely races the activation that follows it by
+ * seconds. Acting on the payload lets the late-delivered lapse land LAST and
+ * record a paying host as unentitled — with nothing to correct it until the
+ * next billing event, potentially a month away. So any status that would move
+ * a host DOWN is re-read from Stripe, and the CURRENT status is what the sync
+ * acts on.
+ */
+describe("a lapse event is checked against the subscription's current state", () => {
+  it("GRANTS from the re-read when the subscription has already recovered", async () => {
+    stripeSubscriptionsRetrieve.mockResolvedValue(retrievedSubscription("active"));
+
+    const result = await handleStripeWebhookEvent(
+      subscriptionEvent("customer.subscription.updated", "unpaid"),
+    );
+
+    expect(stripeSubscriptionsRetrieve).toHaveBeenCalledWith("sub_1");
+    expect(result.tier).toBe("professional");
+    expect(upsertHostSubscriptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: "professional", billingStatus: "active" }),
+    );
+    expect(closeListingsMock).toHaveBeenCalledWith("user_paid");
+  });
+
+  it("SWEEPS from the re-read when the lapse turned terminal after the event", async () => {
+    // The downward direction of the same principle: the event says unpaid
+    // (recoverable, no sweep), but the subscription has since been cancelled.
+    // Acting on the payload would leave the shopfront up for a dead plan.
+    stripeSubscriptionsRetrieve.mockResolvedValue(retrievedSubscription("canceled"));
+
+    await handleStripeWebhookEvent(
+      subscriptionEvent("customer.subscription.updated", "unpaid"),
+    );
+
+    expect(closeListingsMock).toHaveBeenCalledWith("user_paid");
+    expect(upsertHostSubscriptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: "none", billingStatus: "cancelled" }),
+    );
+  });
+
+  it("does NOT re-read a paying status — there is nothing to revoke", async () => {
+    await handleStripeWebhookEvent(
+      subscriptionEvent("customer.subscription.updated", "active"),
+    );
+
+    expect(stripeSubscriptionsRetrieve).not.toHaveBeenCalled();
+  });
+
+  it("does NOT re-read a deleted event — a cancellation is terminal by definition", async () => {
+    await handleStripeWebhookEvent(
+      subscriptionEvent("customer.subscription.deleted", "canceled"),
+    );
+
+    expect(stripeSubscriptionsRetrieve).not.toHaveBeenCalled();
+  });
+
+  it("writes NOTHING when the re-read fails — an unreadable subscription must not become a revocation", async () => {
+    stripeSubscriptionsRetrieve.mockRejectedValue(new Error("stripe unreachable"));
+
+    await expect(
+      handleStripeWebhookEvent(
+        subscriptionEvent("customer.subscription.updated", "unpaid"),
+      ),
+    ).rejects.toThrow(/stripe unreachable/);
+
+    expect(upsertHostSubscriptionMock).not.toHaveBeenCalled();
     expect(closeListingsMock).not.toHaveBeenCalled();
   });
 });

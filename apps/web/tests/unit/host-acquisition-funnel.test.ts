@@ -146,6 +146,73 @@ describe("startHostCheckoutAction without a host profile", () => {
     expect(createCheckoutSessionMock).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * A RECOVERABLE lapse is recorded as tier 'none' — the webhook deliberately
+   * suspends the entitlement without ending the Stripe subscription, because
+   * paused / unpaid / past_due can all still collect. A tier-only guard
+   * therefore saw "no plan" and opened checkout, stacking a SECOND concurrent
+   * subscription the moment the first recovered. The way back for a lapsed
+   * host is the billing portal, and the guard says so.
+   */
+  it.each(["unpaid", "paused", "past_due"])(
+    "REFUSES checkout while a lapsed subscription (%s) can still recover",
+    async (billingStatus) => {
+      getHostSubscriptionMock.mockResolvedValue({
+        tier: "none",
+        billingStatus,
+        currentPeriodEnd: null,
+        stripeSubscriptionId: "sub_lapsed",
+      });
+
+      const destination = await redirectedTo(() =>
+        startHostCheckoutAction(planForm()),
+      );
+
+      expect(destination).toContain("subscription_lapsed_use_portal");
+      expect(createCheckoutSessionMock).not.toHaveBeenCalled();
+    },
+  );
+
+  /** A CANCELLED subscription is over — re-subscribing must keep working. */
+  it("still lets a cancelled host buy a new plan", async () => {
+    getHostSubscriptionMock.mockResolvedValue({
+      tier: "none",
+      billingStatus: "cancelled",
+      currentPeriodEnd: null,
+      stripeSubscriptionId: "sub_old",
+    });
+
+    const destination = await redirectedTo(() =>
+      startHostCheckoutAction(planForm()),
+    );
+
+    expect(destination).toBe("https://checkout.stripe.test/s");
+    expect(createCheckoutSessionMock).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * BOTH return paths must be reachable by a payer with NO host profile. The
+   * old success_url was /host/billing, whose (host) layout bounces exactly
+   * that payer to onboarding before the entitlement webhook can land —
+   * /host/checkout/complete confirms the session with Stripe directly. The
+   * {CHECKOUT_SESSION_ID} placeholder is substituted by Stripe and must
+   * survive un-encoded.
+   */
+  it("returns the payer to the ungated confirmation page, not the gated billing page", async () => {
+    await redirectedTo(() => startHostCheckoutAction(planForm()));
+
+    const params = createCheckoutSessionMock.mock.calls[0][0] as {
+      successUrl: string;
+      cancelUrl: string;
+    };
+    expect(params.successUrl).toContain(
+      "/host/checkout/complete?session_id={CHECKOUT_SESSION_ID}",
+    );
+    expect(params.successUrl).not.toContain("%7B");
+    expect(params.cancelUrl).toContain("/host/plans");
+    expect(params.cancelUrl).not.toContain("/host/billing");
+  });
+
   // ── The guard fails CLOSED ───────────────────────────────────────────────
 
   /**
@@ -333,6 +400,19 @@ describe("the plan selection route", () => {
     expect(layout).toContain("optionalAuth");
     expect(layout).not.toContain("getHostProfile");
     expect(layout).not.toContain("cachedHostProfile");
+  });
+
+  /**
+   * The checkout RETURN page has the same constraint as the plans page and for
+   * the same reason: its whole audience is payers who do not have a profile
+   * row yet. Inside (host) it would bounce the payer it exists to catch.
+   */
+  it("keeps the checkout return page in (host-onboard) too", () => {
+    const page = new URL("(host-onboard)/host/checkout/complete/page.tsx", appDir);
+    expect(() => readFileSync(page, "utf8")).not.toThrow();
+
+    const gated = new URL("(host)/host/checkout/complete/page.tsx", appDir);
+    expect(() => readFileSync(gated, "utf8")).toThrow();
   });
 });
 

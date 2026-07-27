@@ -147,6 +147,7 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
   // A read that SUCCEEDS and finds no row is different, and still proceeds — no
   // row is exactly the state of a host who has never paid.
   let subscriptionTier: string | null = null;
+  let billingStatus: string | null = null;
   let hostProfile: Awaited<ReturnType<typeof getHostProfile>> = null;
   let authorityUnavailable = false;
 
@@ -155,6 +156,7 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
       authResult.auth.userId,
     );
     subscriptionTier = subscription?.tier ?? null;
+    billingStatus = subscription?.billingStatus ?? null;
   } catch (error) {
     console.error("[billing] host subscription read failed", error);
     authorityUnavailable = true;
@@ -185,6 +187,28 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
     checkoutRedirect("already_subscribed");
   }
 
+  // A paid tier is not the only thing that refuses. A subscription in a
+  // RECOVERABLE lapse — paused, unpaid, past_due — is recorded as tier 'none'
+  // by the webhook precisely because it is not paying right now, but the
+  // Stripe subscription underneath it is still alive and can resume the moment
+  // the host settles the open invoice. Opening a fresh checkout there stacks a
+  // SECOND concurrent subscription on the same customer the moment the first
+  // recovers, with the upsert overwriting which id backs the entitlement — the
+  // exact double-billing this guard exists to prevent. The path back for a
+  // lapsed host is the billing portal (pay what is owed, or cancel first), not
+  // a second purchase. 'none' and 'cancelled' proceed: those are the states of
+  // a host with no live subscription to stack on.
+  const LIVE_BILLING_STATUSES: ReadonlySet<string> = new Set([
+    "active",
+    "trialing",
+    "past_due",
+    "unpaid",
+    "paused",
+  ]);
+  if (billingStatus && LIVE_BILLING_STATUSES.has(billingStatus)) {
+    checkoutRedirect("subscription_lapsed_use_portal");
+  }
+
   let checkoutUrl: string;
   try {
     const contact = await getClerkContact(authResult.auth.userId);
@@ -198,8 +222,18 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
           : "Explore & Earn host",
       subscriptionTier: tierValue,
       billingInterval: intervalValue,
-      successUrl: absoluteUrl(`${BILLING_PATH}?checkout=success`),
-      cancelUrl: absoluteUrl(`${BILLING_PATH}?checkout=canceled`),
+      // BOTH return paths must be reachable by a payer with NO host profile —
+      // the (host) layout bounces profile-less users, and Stripe does not
+      // guarantee the entitlement webhook lands before the browser follows
+      // success_url. /host/checkout/complete confirms the session with Stripe
+      // directly and applies the same idempotent grant the webhook applies,
+      // so the payer is routed by what is true rather than by which race was
+      // won. The {CHECKOUT_SESSION_ID} placeholder is substituted by Stripe
+      // and must not be URL-encoded.
+      successUrl: absoluteUrl(
+        "/host/checkout/complete?session_id={CHECKOUT_SESSION_ID}",
+      ),
+      cancelUrl: absoluteUrl(`${PLANS_PATH}?error=checkout_canceled`),
     });
     checkoutUrl = session.url ?? `${PLANS_PATH}?error=missing_checkout_url`;
   } catch (error) {

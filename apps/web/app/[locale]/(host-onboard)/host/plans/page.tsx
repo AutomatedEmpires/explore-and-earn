@@ -56,6 +56,12 @@ function resolveFeedback(searchParams: PlansSearchParams): string | null {
       return "Please sign in again, then choose your plan.";
     case "already_subscribed":
       return "You're already on a plan — carry on and create your host profile.";
+    // The guard found a live Stripe subscription in a recoverable lapse
+    // (paused / unpaid / past due). A second checkout would stack a second
+    // subscription the moment the first collects again, so the way back is
+    // the billing portal, not a new purchase.
+    case "subscription_lapsed_use_portal":
+      return "Your existing subscription has a payment issue rather than being over. Settle it from Manage billing on your billing page — starting a new plan here would risk billing you twice.";
     case "rate_limited":
       return "You've started several checkouts just now. Give it a few minutes.";
     // The already-subscribed guard could not read your billing record, so
@@ -66,6 +72,9 @@ function resolveFeedback(searchParams: PlansSearchParams): string | null {
     case "checkout_failed":
     case "missing_checkout_url":
       return "Checkout could not be started. Please try again in a moment.";
+    // Stripe's cancel_url — the host backed out of checkout themselves.
+    case "checkout_canceled":
+      return "Checkout was canceled and nothing was charged. Pick a plan whenever you're ready.";
     default:
       return null;
   }
