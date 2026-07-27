@@ -12,6 +12,9 @@ Stripe account can be made chargeable in one command.
 - **`expected-stripe-manifest.json`** — committed snapshot of `catalog.mjs`.
 - **`catalog.test.mjs`** — drift guard: asserts `catalog.mjs` === the manifest
   === the pricing contracts. Run with `pnpm --filter @explore-and-earn/stripe-seed test`.
+- **`provision.mjs`** — the idempotent create-or-reuse logic, shared by `seed.mjs`
+  and `lifecycle-test.mjs` so the lifecycle prover exercises the catalog the
+  founder actually seeds rather than a fork of it.
 
 ## Usage
 
@@ -35,6 +38,30 @@ existing catalog instead of duplicating it.
 
 `STRIPE_PRICE_BOOST_*` are **optional** — the boost checkout falls back to inline
 `price_data` from the pricing contract when they are unset.
+
+## Verifying the lifecycle (test mode, free)
+
+```bash
+STRIPE_TEST_SECRET_KEY=sk_test_xxx pnpm --filter @explore-and-earn/stripe-seed lifecycle
+```
+
+`lifecycle-test.mjs` provisions the catalog into test mode, then drives a whole
+subscription lifetime through a Stripe **test clock** — subscribe, renew,
+monthly↔yearly with proration, add-on subscribe / quantity change / cancel,
+payment failure to `past_due`, cancel — printing PASS/FAIL with Stripe object ids
+and exiting non-zero on any failure. It **refuses to run against a live key**
+with no override.
+
+## The internal smoke instrument
+
+`internal-smoke.mjs` defines the private **live** $1/month price used by the
+owner-only live smoke (`tools/scripts/billing-live-smoke.mjs`). It is not part of
+the sellable catalog and is never wired to an env var;
+`internal-price-isolation.test.mjs` fails the build if it ever appears in
+`apps/web` or enters the catalog manifest.
+
+Full picture of all three verification layers:
+[`docs/runbooks/billing-verification.md`](../../docs/runbooks/billing-verification.md).
 
 Do not commit the generated `*.env` files. See
 [`docs/runbooks/launch-provisioning.md`](../../docs/runbooks/launch-provisioning.md)
