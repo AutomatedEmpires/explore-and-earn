@@ -66,6 +66,7 @@
 .sectionTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
   color: var(--text-primary);
@@ -419,7 +420,7 @@
 .badgeMark {
   font-family: var(--font-display);
   font-size: 1.2rem;
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   line-height: 1;
   color: var(--palette-ink-warm);
   letter-spacing: 0.04em;
@@ -466,6 +467,7 @@
 
 .employerName {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: 1.15;
   color: var(--palette-ink-warm);

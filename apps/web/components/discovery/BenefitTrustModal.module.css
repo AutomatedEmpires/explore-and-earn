@@ -180,7 +180,7 @@
 	font-family: var(--font-display);
 	font-size: var(--type-label-size);
 	line-height: var(--type-label-lh);
-	font-weight: var(--font-weight-regular);
+	font-weight: var(--font-weight-bold);
 	letter-spacing: 0.03em;
 	text-transform: uppercase;
 	text-align: center;
@@ -224,6 +224,7 @@
 .descriptor {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: clamp(1.1rem, 3.4vw, 1.32rem);
 	line-height: 1.28;
 	letter-spacing: -0.005em;

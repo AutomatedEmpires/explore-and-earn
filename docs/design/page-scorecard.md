@@ -44,7 +44,7 @@ Does the surface land an immediate feeling and a clear focal point? **8+:** one 
 **8+:** framed warm photography, editorial restraint, material honesty (paper/ink/gold), nothing cheap. Could hang in a Patagonia store. **≤5:** flat gray cards, drop-shadow stacks, random gradients, fake-premium decoration, opacity-pulse skeletons.
 
 ### 7. Brand fit (Adventure Paper & Sky)
-**8+:** paper ground + ink borders + sky action + lane atmosphere + Patrick Hand/Inter; unmistakably Explore&Earn. **≤5:** could be any SaaS; off-palette; alpine-only (forgets farm/maritime/remote); wrong fonts/icons.
+**8+:** paper ground + ink borders + sky action + lane atmosphere + Manrope (bold titles/regular body); unmistakably Explore&Earn. **≤5:** could be any SaaS; off-palette; alpine-only (forgets farm/maritime/remote); wrong fonts/icons.
 
 ### 8. Conversion strength
 **8+:** one clear primary action, obvious next step, trust signals (triad + verified) present where the decision happens. **≤5:** no clear CTA, competing primaries, buried action, missing trust at the decision point.

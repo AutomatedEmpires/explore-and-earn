@@ -37,7 +37,7 @@
 	font-family: var(--font-display);
 	font-size: clamp(1.6rem, 5vw, 2.2rem);
 	line-height: 1.1;
-	font-weight: var(--font-weight-regular);
+	font-weight: var(--font-weight-bold);
 	color: var(--text-primary);
 }
 
@@ -176,7 +176,7 @@
 	font-family: var(--font-display);
 	font-size: var(--type-section-size);
 	line-height: 1.2;
-	font-weight: var(--font-weight-regular);
+	font-weight: var(--font-weight-bold);
 	color: var(--text-primary);
 }
 
@@ -268,6 +268,7 @@
 .calloutTitle {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-body-size);
 	line-height: 1.2;
 	color: var(--text-primary);
@@ -331,6 +332,7 @@
 
 .badgeCardValue {
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-body-size);
 	line-height: 1.2;
 	text-align: center;
@@ -364,6 +366,7 @@
 
 .providerName {
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-body-size);
 	line-height: 1.2;
 	color: var(--text-primary);
@@ -459,6 +462,7 @@
 
 .retentionPeriod {
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: 1.4rem;
 	line-height: 1;
 	color: var(--text-primary);

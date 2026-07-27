@@ -59,7 +59,7 @@
   font-family: var(--font-display);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 
@@ -127,6 +127,7 @@
   position: relative;
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-page-size);
   line-height: var(--type-page-lh);
   color: var(--color-cta-text);
@@ -199,6 +200,7 @@ a.host-kpi:hover { border-color: var(--border-ink); box-shadow: var(--elevation-
 .host-kpi__top { display: flex; align-items: center; gap: var(--space-6); color: var(--text-muted); }
 .host-kpi__value {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-page-size);
   line-height: 1;
   color: var(--text-primary);

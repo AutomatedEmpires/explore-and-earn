@@ -49,6 +49,7 @@
 .name {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-page-size);
   line-height: var(--type-page-lh);
   color: var(--text-primary);
@@ -82,6 +83,7 @@
 .sectionTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
   color: var(--text-primary);

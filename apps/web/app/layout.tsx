@@ -1,7 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { getLocale } from "next-intl/server";
 import { cookies } from "next/headers";
-import { Patrick_Hand, Cabin_Sketch, Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
@@ -9,26 +9,17 @@ import "../styles/tokens.css";
 import "../styles/palettes.css";
 import "../styles/primitives.css";
 
-// The locked 3-font stack (visual-system.md §2): Patrick Hand display,
-// Inter UI, Cabin Sketch marketing accents. Nothing else ships.
-const patrickHand = Patrick_Hand({
-	weight: "400",
+// ONE typeface ships: Manrope (commercial redesign, founder directive
+// 2026-07-27 — supersedes visual-system.md §2's Patrick Hand/Cabin Sketch/
+// Inter stack). The three font-role tokens (--font-display/--font-ui/
+// --font-accent) all resolve to it; personality comes from weight, scale,
+// spacing, and contrast — never from a novelty face. Weights 400–800 cover
+// body through display; anything outside this range falls back to the
+// nearest loaded weight, so do not reference 100–300 in styles.
+const manrope = Manrope({
+	weight: ["400", "500", "600", "700", "800"],
 	subsets: ["latin"],
-	variable: "--font-patrick-hand",
-	display: "swap",
-});
-
-const cabinSketch = Cabin_Sketch({
-	weight: ["400", "700"],
-	subsets: ["latin"],
-	variable: "--font-cabin-sketch",
-	display: "swap",
-});
-
-const inter = Inter({
-	weight: ["400", "500", "600"],
-	subsets: ["latin"],
-	variable: "--font-inter",
+	variable: "--font-manrope",
 	display: "swap",
 });
 import { CookieBanner } from "../components/CookieBanner";
@@ -187,7 +178,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 				dir={dirForLocale(locale)}
 				data-theme={themeHtmlAttr(themePref)}
 				suppressHydrationWarning
-				className={`${patrickHand.variable} ${cabinSketch.variable} ${inter.variable}`}
+				className={manrope.variable}
 			>
 				<head>
 					{/* Render-blocking: commit the Glacier day/night theme before paint. */}

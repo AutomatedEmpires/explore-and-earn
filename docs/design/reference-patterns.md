@@ -12,7 +12,7 @@
   │  [ framed scenic photo / lane gradient ]│
   │                                        │
   │     EYEBROW (label, tracked)           │
-  │     Display headline (Patrick Hand)    │
+  │     Display headline (Manrope bold)    │
   │     one supporting line                 │
   │     [ Primary CTA ]                     │  ← scrim fades up behind text
   └──────────────────────────────────────┘
@@ -37,7 +37,7 @@
 
 ## P5 · Peek rail (horizontal scroller)
 - **Solves:** browse many without leaving; signal "there's more." **When:** matched/saved/applied/community rails.
-- **Structure:** `ui-section-head` (Patrick Hand + "See all") → horizontal scroll of cards with a **visible affordance**: edge fade and/or a peek of the next card at the gutter.
+- **Structure:** `ui-section-head` (Manrope bold + "See all") → horizontal scroll of cards with a **visible affordance**: edge fade and/or a peek of the next card at the gutter.
 - **Premium:** the peek/fade. **Mistakes:** content clipped flush at the edge (looks like the row ends), fixed-px widths that don't reflow. **E&E:** `ui-rail` + `DiscoveryCard`; reveal-on-scroll stagger (P12).
 
 ## P6 · Bottom-sheet escalation
@@ -54,7 +54,7 @@
   │  applicants  │  │ new │ │live │ │ fill│      the rest subordinate
   └──────────────┘  └─────┘ └─────┘ └─────┘
   ```
-- **Premium:** one dominant value (Patrick Hand, larger). **Mistakes:** a row of identical flat boxes. **E&E:** `ui-stat`.
+- **Premium:** one dominant value (Manrope bold, larger). **Mistakes:** a row of identical flat boxes. **E&E:** `ui-stat`.
 
 ## P8 · Intent-grouped dashboard
 - **Solves:** kills "generic admin" by grouping by *what the user should do*. **When:** seeker & host dashboards.
@@ -73,7 +73,7 @@
 
 ## P11 · Designed empty state
 - **Solves:** turn "nothing here" into momentum. **When:** every list/rail/feed that can be empty.
-- **Structure:** illustration + Patrick-Hand one-liner + plain supporting line + **one CTA**.
+- **Structure:** illustration + Manrope-bold one-liner + plain supporting line + **one CTA**.
 - **Premium:** an invitation in the product's voice. **Mistakes:** bare placeholder, apology, real-content-worse-than-fixtures. **E&E:** `ui-empty` + `AppIllustration`.
 
 ## P12 · Shimmer skeleton mirroring layout

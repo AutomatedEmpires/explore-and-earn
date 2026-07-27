@@ -73,6 +73,7 @@
 .panelTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
   color: var(--text-primary);
@@ -234,6 +235,7 @@
 
 .planPrice {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(1.75rem, 3vw, 2.25rem);
   line-height: 1;
   color: var(--text-primary);
@@ -356,6 +358,7 @@
 .addonHeading {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(1.25rem, 2vw, 1.5rem);
   line-height: 1.2;
   color: var(--text-primary);
@@ -406,6 +409,7 @@
 
 .addonPrice {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-body-size);
   color: var(--color-cta);
   white-space: nowrap;

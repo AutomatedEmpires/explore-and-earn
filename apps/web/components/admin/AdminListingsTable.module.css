@@ -314,6 +314,7 @@
 .title {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   letter-spacing: -0.01em;
@@ -400,6 +401,7 @@
 .figureValue {
   display: block;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
   line-height: 1;
   letter-spacing: -0.02em;
@@ -462,6 +464,7 @@
 .emptyTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);

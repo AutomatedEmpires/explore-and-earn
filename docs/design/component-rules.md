@@ -16,17 +16,17 @@ Every interactive primitive must support the locked state set (`COMPONENT_STATES
 
 **Default anatomy (borders-first):** warm surface (`--color-surface`) + `--border-ink` + `--radius-card` 24 + `--space-card` 16 padding + **no box-shadow**. Depth = border + warm-on-warm + framed media + layering. A flat gray card with a drop shadow is the rejected default — never produce it.
 
-- **Discovery / listing card = `DiscoveryCard`** (the locked core primitive, reused everywhere). **Preserve its JSX skeleton; change class-level CSS only.** Anatomy: framed scenic photo (atmosphere by lane) → category eyebrow + Patrick-Hand title → **HOUSING/MEALS/PAY triad chips** → pay + location meta → CTA. Never collapse the triad to "Perks."
+- **Discovery / listing card = `DiscoveryCard`** (the locked core primitive, reused everywhere). **Preserve its JSX skeleton; change class-level CSS only.** Anatomy: framed scenic photo (atmosphere by lane) → category eyebrow + Manrope-bold title → **HOUSING/MEALS/PAY triad chips** → pay + location meta → CTA. Never collapse the triad to "Perks."
 - **CTA buttons inside cards:** use `ui-button` classes — **not** inline `style={}` ternaries computing borders/shadows (a documented anti-pattern in `DiscoveryCard`). Style state via classes.
 - **Interactive cards:** hover lift via `--elevation-hover` + 2px rise (`--motion-fast`) + press state on tap. Static cards don't lift.
-- **Content cards** (dashboard modules): a title (Patrick Hand `--type-card-size`), a supporting line in `--text-secondary`, then content. One dominant element each.
+- **Content cards** (dashboard modules): a title (Manrope bold `--type-card-size`), a supporting line in `--text-secondary`, then content. One dominant element each.
 
 ## 2. Dashboards
 
 Antidote to "reads like a generic admin template":
 
 - **Open with a hero or a dominant next-action**, never a stat grid. Give a feeling + a first move (e.g. SeekerHero scrim + readiness; Host: "3 applicants need you").
-- **KPI/stat strip:** promote **one** dominant metric (largest, Patrick Hand value); subordinate the rest. Never a row of identical flat boxes (documented amateur tell). Use `ui-stat`.
+- **KPI/stat strip:** promote **one** dominant metric (largest, Manrope bold value); subordinate the rest. Never a row of identical flat boxes (documented amateur tell). Use `ui-stat`.
 - **Group by intent**, not data type: *Needs me* / *In motion* / *Done*.
 - **People as people, assets as assets:** applicant/seeker review shows faces + story (not table rows); listings show as visual assets.
 - Avoid dense corporate tables as a primary surface; if tabular data is unavoidable (analytics), make it mobile-adaptive (cards on small screens) and never the first thing the user sees.
@@ -35,7 +35,7 @@ Antidote to "reads like a generic admin template":
 ## 3. Headers
 
 - **App header (`GlobalHeader`):** deep-sky (`--color-header-bg`) gradient, scope/role badge, hide-on-scroll, section tabs where relevant. Already polished — preserve, don't rebuild.
-- **Page header:** Patrick-Hand page title (`--type-page-size`) + one-line context in `--text-secondary` + at most one primary action. Don't stack multiple H1-weight elements.
+- **Page header:** Manrope-bold page title (`--type-page-size`) + one-line context in `--text-secondary` + at most one primary action. Don't stack multiple H1-weight elements.
 - **Scenic page hero** (homepage, profile): full-bleed framed photo or lane gradient + `--gradient-hero-scrim` + display headline + single CTA. Reserve image space (no CLS).
 
 ## 4. Modals / overlays / popups
@@ -49,7 +49,7 @@ Antidote to "reads like a generic admin template":
 
 Empty is an **invitation**, never a blank or a bare placeholder (documented defect: generic placeholder rails with no story/CTA).
 
-- Use `ui-empty`: an illustration (`AppIllustration` — framed Phosphor plate) + a one-line Patrick-Hand headline + a plain supporting line + **one clear CTA**.
+- Use `ui-empty`: an illustration (`AppIllustration` — framed Phosphor plate) + a one-line Manrope-bold headline + a plain supporting line + **one clear CTA**.
 - Speak from the user's side ("No saved places yet — start exploring"), action-oriented, in the product's voice.
 - **Real content must never look worse than fixtures** — if real listings/announcements lack images, supply the lane atmosphere gradient + silhouette, never a naked text block.
 
@@ -72,7 +72,7 @@ Mapbox (`mapbox-gl` + `react-map-gl`) is wired. Location is a first-class explor
 
 Profile is a **journey**, not a résumé form (key differentiator from job boards).
 
-- Scrim hero (`--gradient-hero-scrim`) + avatar overlap (`ui-avatar`) + name (Patrick Hand) + readiness state (`--state-ready|soon|later|urgent`).
+- Scrim hero (`--gradient-hero-scrim`) + avatar overlap (`ui-avatar`) + name (Manrope bold) + readiness state (`--state-ready|soon|later|urgent`).
 - Sections as a story: where you've been / where you're headed / readiness / saved & applied rails — not a flat field dump.
 - **Resume builder:** stepper with a per-step "why this matters" intro; progress label legible (not `position:absolute` over the bar); compose `ui-field` (not bespoke `.input/.textarea/.tag`); sticky mobile CTA; ≥44px controls; loading/success states on every save.
 

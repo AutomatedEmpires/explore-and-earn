@@ -127,6 +127,7 @@
 .bucketEmptyTitle {
   margin: var(--space-4) 0 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 1.05rem;
   color: var(--text-primary);
 }
@@ -171,6 +172,7 @@
 .lockedTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 1.05rem;
   color: var(--text-primary);
 }

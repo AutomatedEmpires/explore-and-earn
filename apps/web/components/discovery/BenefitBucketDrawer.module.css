@@ -61,6 +61,7 @@
 .descriptorLead {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: clamp(1.1rem, 3.4vw, 1.32rem);
 	line-height: 1.28;
 	letter-spacing: -0.005em;

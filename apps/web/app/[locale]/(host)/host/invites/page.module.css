@@ -35,7 +35,7 @@
   font-family: var(--font-display);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   letter-spacing: -0.01em;
   color: var(--text-primary);
 }
@@ -93,7 +93,7 @@
   font-family: var(--font-display);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 
@@ -243,7 +243,7 @@
   font-family: var(--font-display);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }

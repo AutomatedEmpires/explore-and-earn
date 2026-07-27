@@ -58,6 +58,7 @@
 .emptyTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-title-size);
   color: var(--text-primary);
 }
@@ -106,6 +107,7 @@
 
 .listingLink {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-title-size);
   color: var(--text-primary);
   text-decoration: none;
@@ -242,6 +244,7 @@
 .decidedTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-title-size);
   color: var(--text-primary);
 }

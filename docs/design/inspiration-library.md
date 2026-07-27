@@ -11,7 +11,7 @@ For each category: **Solves · When to use · What makes it premium · Mistakes 
 ## 1. Premium marketplace cards
 - **Solves:** turning a listing into a desirable place, not a row in a list.
 - **When:** anywhere a listing appears — feed, rails, map sheet, saved, search.
-- **Premium:** large framed photo carries the card; generous padding; one title face (Patrick Hand); trust + price legible at a glance; depth from border + warm surface, not shadow.
+- **Premium:** large framed photo carries the card; generous padding; one title face (Manrope, bold); trust + price legible at a glance; depth from border + warm surface, not shadow.
 - **Mistakes:** text-first cards; tiny thumbnails; "Perks" instead of the triad; inline-style CTAs; equal-weight everything; gray placeholder when no photo.
 - **Apply:** this is `DiscoveryCard` (locked skeleton). Frame the photo, lane atmosphere by category, HOUSING/MEALS/PAY chips first-class, sky CTA. No-photo → lane `--gradient-category-*` + silhouette, never gray.
 
@@ -20,7 +20,7 @@ For each category: **Solves · When to use · What makes it premium · Mistakes 
 - **When:** homepage, category landing, listing detail top, dashboard/profile headers.
 - **Premium:** full-bleed warm golden-hour photography; bottom-weighted scrim for legibility (`--gradient-hero-scrim`); one display headline + one CTA; editorial caption authority (Nat Geo).
 - **Mistakes:** stock-y generic imagery; filter painted on the photo; competing CTAs; centered-everything; text unreadable over the image; CLS from unreserved image.
-- **Apply:** framed scenic hero or lane gradient + scrim + Patrick-Hand display headline + single sky CTA. Balance imagery across all five lanes. `next/image`, reserve space.
+- **Apply:** framed scenic hero or lane gradient + scrim + Manrope-bold display headline + single sky CTA. Balance imagery across all five lanes. `next/image`, reserve space.
 
 ## 3. Seeker profile / dashboard surfaces
 - **Solves:** make the seeker feel *known* and give momentum — "this is mine, here's my next move."

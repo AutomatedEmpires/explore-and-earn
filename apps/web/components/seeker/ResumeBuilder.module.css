@@ -50,6 +50,7 @@
 	gap: var(--space-6);
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-section-size);
 	line-height: 1.15;
 	color: var(--text-primary);
@@ -368,6 +369,7 @@
 .sectionTitle {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-section-size);
 	line-height: var(--type-section-lh, 1.2);
 	color: var(--text-primary);

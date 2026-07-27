@@ -46,6 +46,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   color: var(--text-secondary);
 }

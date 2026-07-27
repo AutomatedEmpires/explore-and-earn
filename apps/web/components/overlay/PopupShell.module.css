@@ -259,6 +259,7 @@
 .title {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: clamp(1.5rem, 3vw, 2rem);
 	line-height: 1.05;
 	text-transform: uppercase;

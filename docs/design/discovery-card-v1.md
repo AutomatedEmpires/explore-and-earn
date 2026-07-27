@@ -24,7 +24,7 @@ Every card answers, as first-class fields with icon + label + value:
 | Identity | host avatar | tap → host profile |
 | Badge | **Verified Host badge (mandatory)** | self-declared qualifier (G22) |
 | Badge | category badge + optional promoted/status badge | never render a second category-style badge; `featured` / `boosted` / match or host-status context can occupy the secondary badge slot |
-| Title | host name + job title | Patrick Hand card title |
+| Title | host name + job title | Manrope-bold card title |
 | Metadata | location | tap → map view |
 | Metadata | begins / ends dates | Inter metadata |
 | Triad | housing / meals / pay | three benefit chips |

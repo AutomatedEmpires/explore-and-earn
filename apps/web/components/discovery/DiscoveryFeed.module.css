@@ -19,7 +19,7 @@
   font-family: var(--font-display);
   font-size: var(--type-page-size);
   line-height: var(--type-page-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 

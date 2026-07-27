@@ -89,6 +89,7 @@
 .title {
   margin: 0 0 var(--space-12);
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-display-size);
   line-height: var(--type-display-lh);
   color: var(--color-cta-text);

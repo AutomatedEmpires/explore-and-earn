@@ -36,6 +36,7 @@
   align-items: center;
   gap: var(--space-8);
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);
@@ -124,6 +125,7 @@
 
 .dayNum {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 15px;
   line-height: 1;
   color: var(--text-primary);
@@ -146,6 +148,7 @@
 
 .tempHi {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 14px;
   line-height: 1;
   color: var(--text-secondary);

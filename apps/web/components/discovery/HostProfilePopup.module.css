@@ -147,6 +147,7 @@ button.role:hover {
 
 .roleTitle {
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-body-size);
 	line-height: 1.2;
 	color: var(--text-primary);
