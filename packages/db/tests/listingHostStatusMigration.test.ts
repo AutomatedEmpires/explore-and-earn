@@ -1,3 +1,12 @@
+/**
+ * Pins the text of migration 077 — the file itself, which is history and does
+ * not change. The LIVE transition graph is wider: migration 082 replaced this
+ * function body to add under_review -> live (hosts publish their own listings)
+ * and closed -> draft. Nothing asserted below is a claim about what the
+ * database permits today; the guard for 082's additions lives in
+ * tools/db-assert/check.mjs and the connected proof in
+ * tools/db-assert/sql/assert_listing_host_status_transitions.sql.
+ */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 

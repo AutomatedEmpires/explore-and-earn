@@ -1,7 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "../client";
-import { getHostApplications } from "./applications";
+import {
+  mapHostApplicantCertifications,
+  mapHostApplicantEducations,
+  mapHostApplicantExperiences,
+  mapHostApplicantProfile,
+  readSeekerNameLookup,
+  unwrapBridgeRows,
+  type HostApplicantProfile,
+  type SeekerNameLookup,
+} from "../lib/hostApplicantView";
 
 /**
  * Seeker resume data access (read + bio write).
@@ -21,10 +30,17 @@ import { getHostApplications } from "./applications";
  * SECURITY: these tables predate generated types (types.gen.ts is a
  * placeholder), so we cast the authed client to an untyped SupabaseClient and
  * scope every query in application code. Seeker-owned reads resolve the
- * `seeker_profile_id` from the caller-supplied, already-verified `clerkUserId`;
- * host-facing reads (by seeker_profile_id) are gated by an ownership guard that
- * confirms the seeker actually applied to one of the host's listings. We never
- * decode the JWT.
+ * `seeker_profile_id` from the caller-supplied, already-verified `clerkUserId`.
+ * We never decode the JWT.
+ *
+ * HOST-FACING READS DO NOT TOUCH THESE TABLES. seeker_profiles and the three
+ * resume tables carry only owner-scoped policies (013), so a host reading them
+ * through the authed client is filtered to zero rows with no error — the exact
+ * silent failure migration 084 exists to fix. Every host-side read below goes
+ * through an 084 SECURITY DEFINER RPC that derives host identity from the JWT
+ * and returns only the entitled projection. That is why none of these functions
+ * takes a host id: there is no host argument for a caller to get wrong, and no
+ * second entitlement check in TypeScript that could disagree with the database's.
  */
 
 /** Untyped Supabase handle for tables not yet in types.gen.ts. */
@@ -276,101 +292,91 @@ export async function getSeekerResume(
 }
 
 /**
- * Host-side ownership guard: true when the seeker applied to one of the host's
- * listings OR when a direct conversation exists between them (host-initiated).
- * `hostClerkUserId` MUST come from auth().userId.
+ * The applicant's resume, for a host reviewing them.
+ *
+ * Entitlement is decided in the database by migration 084: the caller's host
+ * profiles come from the Clerk `sub` claim, and rows come back only when the
+ * seeker applied to one of those hosts' listings, was invited by them, or is
+ * already in conversation with them. An unrelated seeker yields an empty set,
+ * which this function reports as null.
  */
-async function hostCanViewSeeker(
-  clerkToken: string,
-  hostClerkUserId: string,
-  seekerProfileId: string,
-): Promise<boolean> {
-  const applications = await getHostApplications(clerkToken, hostClerkUserId);
-  if (applications.some((a) => a.seekerProfileId === seekerProfileId)) return true;
-
-  const db = untypedClient(clerkToken);
-  const { data: hostRow } = await db
-    .from("host_profiles")
-    .select("id")
-    .eq("clerk_user_id", hostClerkUserId)
-    .limit(1)
-    .maybeSingle();
-  if (!hostRow) return false;
-  const hostProfileId = (hostRow as Record<string, unknown>).id as string;
-
-  const { data: convRow } = await db
-    .from("conversations")
-    .select("id")
-    .eq("host_profile_id", hostProfileId)
-    .eq("seeker_profile_id", seekerProfileId)
-    .limit(1)
-    .maybeSingle();
-  return convRow != null;
-}
-
 export async function getSeekerResumeByProfileId(
   clerkToken: string,
-  hostClerkUserId: string,
   seekerProfileId: string,
 ): Promise<SeekerResume | null> {
-  const allowed = await hostCanViewSeeker(clerkToken, hostClerkUserId, seekerProfileId);
-  if (!allowed) return null;
-
   const db = untypedClient(clerkToken);
 
-  const { data: profileData, error: profileError } = await db
-    .from("seeker_profiles")
-    .select("id, short_bio, display_name, relative_location, seeking_timeline, desired_categories, general_skill_tags")
-    .eq("id", seekerProfileId)
-    .maybeSingle();
+  const [profileResult, experienceResult, educationResult, certResult] = await Promise.all([
+    db.rpc("get_host_applicant_profile", { p_seeker_profile_id: seekerProfileId }),
+    db.rpc("get_host_applicant_experiences", { p_seeker_profile_id: seekerProfileId }),
+    db.rpc("get_host_applicant_educations", { p_seeker_profile_id: seekerProfileId }),
+    db.rpc("get_host_applicant_certifications", { p_seeker_profile_id: seekerProfileId }),
+  ]);
 
-  if (profileError)
-    throw new Error(`getSeekerResumeByProfileId profile: ${profileError.message}`);
-  if (!profileData) return null;
-
-  const profileRow = profileData as SeekerProfileRow;
-  const { experiences, educations, certifications } = await loadResumeRows(db, profileRow.id);
+  // A denied read and a broken read must not look alike — unwrapBridgeRows
+  // raises a fault and reports "not entitled" as an empty set.
+  const profileRows = unwrapBridgeRows("getSeekerResumeByProfileId profile", profileResult);
+  const applicant = mapHostApplicantProfile(profileRows[0]);
+  if (!applicant) return null;
 
   return {
     profile: {
-      seekerProfileId: profileRow.id,
-      bio: profileRow.short_bio ?? null,
+      seekerProfileId: applicant.seekerProfileId,
+      bio: applicant.shortBio,
       headline: null,
-      displayName: profileRow.display_name ?? null,
-      location: profileRow.relative_location ?? null,
-      seekingTimeline: profileRow.seeking_timeline ?? null,
-      desiredCategories: (profileRow.desired_categories ?? []).slice(),
-      generalSkills: (profileRow.general_skill_tags ?? []).slice(),
+      displayName: applicant.displayName,
+      location: applicant.relativeLocation,
+      seekingTimeline: applicant.seekingTimeline,
+      desiredCategories: applicant.desiredCategories,
+      generalSkills: applicant.generalSkills,
     },
-    experiences,
-    educations,
-    certifications,
+    experiences: mapHostApplicantExperiences(
+      unwrapBridgeRows("getSeekerResumeByProfileId experiences", experienceResult),
+    ),
+    educations: mapHostApplicantEducations(
+      unwrapBridgeRows("getSeekerResumeByProfileId educations", educationResult),
+    ),
+    certifications: mapHostApplicantCertifications(
+      unwrapBridgeRows("getSeekerResumeByProfileId certifications", certResult),
+    ),
   };
 }
 
+/**
+ * One applicant's display name, subject to the same 084 entitlement.
+ *
+ * Returns a SeekerNameLookup and never throws, for the reason argued on that
+ * type: unlike the resume above, a name is not the content of any page that
+ * asks for it, so a fault must be reported rather than rendered as a plausible
+ * anonymous applicant and rather than taking the page down. Callers turn the
+ * lookup into a label with resolveSeekerName / singleSeekerName.
+ */
 export async function getSeekerDisplayName(
   clerkToken: string,
-  hostClerkUserId: string,
   seekerProfileId: string,
-): Promise<string | null> {
-  const allowed = await hostCanViewSeeker(clerkToken, hostClerkUserId, seekerProfileId);
-  if (!allowed) return null;
-
-  const db = untypedClient(clerkToken);
+): Promise<SeekerNameLookup> {
+  let db: SupabaseClient;
+  try {
+    db = untypedClient(clerkToken);
+  } catch (caught) {
+    return {
+      status: "unavailable",
+      reason: `getSeekerDisplayName: ${caught instanceof Error ? caught.message : "client unavailable"}`,
+    };
+  }
 
   try {
-    const { data, error } = await db
-      .from("seeker_profiles")
-      .select("display_name")
-      .eq("id", seekerProfileId)
-      .maybeSingle();
-
-    if (error || !data) return null;
-
-    const value = (data as Record<string, unknown>).display_name;
-    return typeof value === "string" && value.trim().length > 0 ? value : null;
-  } catch {
-    return null;
+    return readSeekerNameLookup(
+      "getSeekerDisplayName",
+      await db.rpc("get_host_applicant_display_names", {
+        p_seeker_profile_ids: [seekerProfileId],
+      }),
+    );
+  } catch (caught) {
+    return {
+      status: "unavailable",
+      reason: `getSeekerDisplayName: ${caught instanceof Error ? caught.message : "lookup call failed"}`,
+    };
   }
 }
 
@@ -410,91 +416,35 @@ export async function updateSeekerProfileBio(
 
 /**
  * Seeker profile fields exposed to a host on the /host/seeker/[id] page.
- * Only available when the seeker applied to one of the host's listings.
- * visibility_status is read defensively (column may not exist yet).
+ *
+ * This is the 084 projection, re-exported under the name that page already
+ * uses. `onboardingComplete` was removed with the rewrite: no host surface read
+ * it, so it was privately-held seeker state being shipped for nothing.
  */
-export interface SeekerProfileForHost {
-  readonly seekerProfileId: string;
-  readonly displayName: string | null;
-  readonly shortBio: string | null;
-  readonly locationPref: string | null;
-  readonly housingPreference: string | null;
-  readonly desiredCategories: readonly string[];
-  readonly desiredRoles: readonly string[];
-  readonly onboardingComplete: boolean;
-  readonly visibilityStatus: string | null;
-}
+export type SeekerProfileForHost = HostApplicantProfile;
 
 /**
- * Fetch a seeker's profile for a host viewer. Gated by hostCanViewSeeker
- * (seeker must have applied to one of the host's listings). Reads
- * visibility_status defensively, falling back without the column if PostgREST
- * errors. Returns null when the host is not allowed or the profile is missing.
+ * Fetch a seeker's profile for a host viewer.
  *
- * `hostClerkUserId` MUST come from auth().userId.
+ * Entitlement is the database's decision (see getSeekerResumeByProfileId).
+ * `visibilityStatus` is returned rather than enforced here: the page refuses to
+ * render a seeker who has set themselves to 'hidden', but hiding from discovery
+ * is not withdrawing a submitted application, so the applicant-review path must
+ * still be able to resolve them.
  */
 export async function getSeekerProfileForHost(
   clerkToken: string,
-  hostClerkUserId: string,
   seekerProfileId: string,
 ): Promise<SeekerProfileForHost | null> {
-  const allowed = await hostCanViewSeeker(
-    clerkToken,
-    hostClerkUserId,
-    seekerProfileId,
-  );
-  if (!allowed) return null;
-
   const db = untypedClient(clerkToken);
-  const baseColumns =
-    "id, display_name, short_bio, location_pref, housing_preference, desired_categories, desired_roles, onboarding_complete";
 
-  let row: Record<string, unknown> | null = null;
-  let visibilityStatus: string | null = null;
-
-  // Attempt read with visibility_status; fall back if the column is absent.
-  const withVis = await db
-    .from("seeker_profiles")
-    .select(`${baseColumns}, visibility_status`)
-    .eq("id", seekerProfileId)
-    .maybeSingle();
-
-  if (!withVis.error && withVis.data) {
-    row = withVis.data as Record<string, unknown>;
-    visibilityStatus =
-      typeof row.visibility_status === "string" ? row.visibility_status : null;
-  } else {
-    const base = await db
-      .from("seeker_profiles")
-      .select(baseColumns)
-      .eq("id", seekerProfileId)
-      .maybeSingle();
-    if (base.error || !base.data) return null;
-    row = base.data as Record<string, unknown>;
-  }
-
-  if (!row) return null;
-
-  return {
-    seekerProfileId: String(row.id),
-    displayName:
-      typeof row.display_name === "string" ? row.display_name : null,
-    shortBio: typeof row.short_bio === "string" ? row.short_bio : null,
-    locationPref:
-      typeof row.location_pref === "string" ? row.location_pref : null,
-    housingPreference:
-      typeof row.housing_preference === "string"
-        ? row.housing_preference
-        : null,
-    desiredCategories: (
-      (row.desired_categories as string[] | null) ?? []
-    ).slice(),
-    desiredRoles: (
-      (row.desired_roles as string[] | null) ?? []
-    ).slice(),
-    onboardingComplete: Boolean(row.onboarding_complete),
-    visibilityStatus,
-  };
+  const rows = unwrapBridgeRows(
+    "getSeekerProfileForHost",
+    await db.rpc("get_host_applicant_profile", {
+      p_seeker_profile_id: seekerProfileId,
+    }),
+  );
+  return mapHostApplicantProfile(rows[0]);
 }
 
 /* ========================================================================== */

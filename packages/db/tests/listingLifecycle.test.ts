@@ -1,10 +1,11 @@
 /**
  * Unit tests for the host listing lifecycle:
- *  - canTransitionListing pins the full transition map (there is intentionally
- *    NO under_review -> live edge — that's the admin approval flow)
+ *  - canTransitionListing pins the full transition map, INCLUDING the
+ *    under_review -> live edge hosts publish through (founder, 2026-07-26) and
+ *    the closed -> draft edge that stops a rejected listing being an orphan
  *  - updateListingStatus enforces ownership, transition validity, and the
- *    PLAN_ENTITLEMENTS listing cap (feat/enforce-listing-cap) at the one
- *    transition that newly consumes a slot: draft -> under_review
+ *    PLAN_ENTITLEMENTS listing cap at every transition that newly consumes a
+ *    slot: draft -> under_review AND under_review -> live
  *  - status timestamps (published_at / paused_at / archived_at) are stamped
  *
  * All Supabase and server-only I/O is mocked so no DB connection is required.
@@ -15,7 +16,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const mockFrom = vi.fn();
-const mockClient = { from: mockFrom };
+const mockRpc = vi.fn();
+const mockClient = { from: mockFrom, rpc: mockRpc };
 vi.mock("../src/client.js", () => ({
   authedClient: () => mockClient,
 }));
@@ -55,45 +57,63 @@ const HOST_PROFILE = makeChain({ data: { id: "host-1" } });
 
 beforeEach(() => {
   mockFrom.mockReset();
+  mockRpc.mockReset();
 });
 
+/** Stub public.my_listing_allowance_state(uuid) — migration 083. */
+function allowanceState(tier: string, allowance: number, used: number) {
+  return { data: { tier, allowance, used }, error: null };
+}
+
 // ── canTransitionListing: pin the whole map ────────────────────────────────
+
+const ALL_STATUSES: readonly ListingStatus[] = [
+  "draft",
+  "under_review",
+  "live",
+  "paused",
+  "closed",
+  "archived",
+];
 
 describe("canTransitionListing", () => {
   const ALLOWED: ReadonlyArray<[ListingStatus, ListingStatus]> = [
     ["draft", "under_review"],
     ["under_review", "draft"],
+    ["under_review", "live"],
     ["live", "paused"],
     ["live", "archived"],
     ["paused", "live"],
     ["paused", "archived"],
+    ["closed", "draft"],
   ];
 
   it.each(ALLOWED)("allows %s -> %s", (from, to) => {
     expect(canTransitionListing(from, to)).toBe(true);
   });
 
-  it("FORBIDS under_review -> live — publishing is the admin approval flow, not a host action", () => {
-    expect(canTransitionListing("under_review", "live")).toBe(false);
+  it("ALLOWS under_review -> live — hosts publish their own listings (founder, 2026-07-26)", () => {
+    expect(canTransitionListing("under_review", "live")).toBe(true);
   });
 
-  it("treats closed and archived as terminal", () => {
-    const statuses: ListingStatus[] = [
-      "draft",
-      "under_review",
-      "live",
-      "paused",
-      "closed",
-      "archived",
-    ];
-    for (const to of statuses) {
-      expect(canTransitionListing("closed", to)).toBe(false);
-      expect(canTransitionListing("archived", to)).toBe(false);
+  // The negative control for the whole change. Publication is a deliberate
+  // second act: it is the transition 070's triad CHECK and 072's housing-photo
+  // trigger are attached to, and skipping straight from the form would skip the
+  // moment the host is shown what is still unanswered.
+  it("STILL forbids draft -> live", () => {
+    expect(canTransitionListing("draft", "live")).toBe(false);
+  });
+
+  it("gives a closed listing exactly ONE exit, and it is not back to public", () => {
+    for (const to of ALL_STATUSES) {
+      expect(canTransitionListing("closed", to)).toBe(to === "draft");
     }
   });
 
-  it("forbids draft -> live (must go through review)", () => {
-    expect(canTransitionListing("draft", "live")).toBe(false);
+  it("treats archived as terminal", () => {
+    for (const to of ALL_STATUSES) {
+      expect(canTransitionListing("archived", to)).toBe(false);
+    }
   });
 });
 
@@ -119,40 +139,84 @@ const ANSWERED_DRAFT = {
   compensation_max_cents: null,
 } as const;
 
+/** The same listing one step later: complete, staged, not yet public. */
+const ANSWERED_READY = { ...ANSWERED_DRAFT, status: "under_review" } as const;
+
 describe("updateListingStatus", () => {
-  it("submits a draft for review when under the plan cap", async () => {
+  it("submits a draft for review when under the plan allowance", async () => {
     const read = makeChain({ data: { ...ANSWERED_DRAFT } });
-    const tierRead = makeChain({ data: { subscription_tier: "starter" } });
-    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings - 1 });
     const update = makeChain({ data: { id: "l1" } });
-    queueFromResults(HOST_PROFILE, read, tierRead, capCount, update);
+    queueFromResults(HOST_PROFILE, read, update);
+    mockRpc.mockResolvedValueOnce(
+      allowanceState("starter", PLAN_ENTITLEMENTS.starter.listings, 0),
+    );
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
 
     expect(result).toEqual({ ok: true, status: "under_review" });
     expect(update.update).toHaveBeenCalledWith({ status: "under_review" });
+    // The allowance is read from the database helper the trigger itself uses —
+    // never recomputed here from a tier column.
+    expect(mockRpc).toHaveBeenCalledWith("my_listing_allowance_state", {
+      p_host_profile_id: "host-1",
+    });
   });
 
-  it("returns listing_cap_reached when active listings are at the tier cap", async () => {
+  it("returns listing_cap_reached when active listings are at the allowance", async () => {
     const read = makeChain({ data: { ...ANSWERED_DRAFT } });
-    const tierRead = makeChain({ data: { subscription_tier: "starter" } });
-    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
-    queueFromResults(HOST_PROFILE, read, tierRead, capCount);
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(
+      allowanceState(
+        "starter",
+        PLAN_ENTITLEMENTS.starter.listings,
+        PLAN_ENTITLEMENTS.starter.listings,
+      ),
+    );
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
 
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
   });
 
-  it("floors a host with no subscription (tier null -> 'none') at the starter cap", async () => {
+  it("REFUSES a host with no subscription — 'none' is zero, not a free starter plan", async () => {
+    // The old behaviour floored 'none' at the starter allowance, which was a
+    // free tier: one active listing for a host who had never paid, while the FAQ
+    // said a plan was required. Founder, 2026-07-26: there is no free tier, so
+    // the refusal lands at ZERO active listings, not one. The allowance comes
+    // from the RPC the enforcement trigger shares — see lib/entitlements.ts.
     const read = makeChain({ data: { ...ANSWERED_DRAFT } });
-    const tierRead = makeChain({ data: { subscription_tier: null } });
-    const capCount = makeChain({ count: PLAN_ENTITLEMENTS.starter.listings });
-    queueFromResults(HOST_PROFILE, read, tierRead, capCount);
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(allowanceState("none", 0, 0));
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
 
     expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  it("counts a queued under_review listing against the allowance", async () => {
+    // The slot is committed the moment a draft enters review. Counting only
+    // live + paused let a host queue an unlimited number and have them all
+    // approved; the RPC now reports under_review in `used`.
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(allowanceState("starter", 1, 1));
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  it("does NOT re-check the allowance when moving between two counted statuses", async () => {
+    // paused -> live consumes no new slot, so a host sitting exactly at their
+    // allowance must still be able to resume a listing they already paid for.
+    const read = makeChain({ data: { id: "l1", status: "paused", housing_evidence: "confirmed", provenance: "verified", housing_included: false, meals_evidence: "confirmed", pay_evidence: "confirmed", compensation_min_cents: 22_000 } });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: true, status: "live" });
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   // ── The publication gate (founder, 2026-07-17) ───────────────────────────
@@ -274,11 +338,127 @@ describe("updateListingStatus", () => {
     }
   });
 
-  it("returns invalid_transition for a forbidden edge (under_review -> live)", async () => {
-    const read = makeChain({ data: { id: "l1", status: "under_review" } });
+  it("returns invalid_transition for a forbidden edge (draft -> live)", async () => {
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
     queueFromResults(HOST_PROFILE, read);
 
     const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: false, error: "invalid_transition" });
+  });
+
+  // ── Host self-publish (founder, 2026-07-26) ──────────────────────────────
+
+  it("PUBLISHES an under_review listing — no admin approval stands in the way", async () => {
+    const read = makeChain({ data: { ...ANSWERED_READY } });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: true, status: "live" });
+    expect(update.update).toHaveBeenCalledWith({ status: "live" });
+  });
+
+  it("BLOCKS publishing when a benefit went unanswered — the gate moved WITH the edge", async () => {
+    // The publication gate used to be reachable only at draft->under_review and
+    // paused->live. If under_review->live were added without extending it, the
+    // brand-new host path would be the one path that never runs it.
+    const read = makeChain({
+      data: { ...ANSWERED_READY, pay_evidence: "not_stated" },
+    });
+    queueFromResults(HOST_PROFILE, read);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("incomplete_listing");
+    expect(result.blockers?.map((b) => b.field)).toEqual(["pay"]);
+  });
+
+  /**
+   * THE SLOT IS CHARGED AT SUBMIT, WHICH IS WHY PUBLISH IS FREE.
+   *
+   * This case used to assert the opposite — that under_review -> live is itself
+   * cap-checked — because under_review did not count toward the allowance, so
+   * charging only draft -> under_review would have let a host queue any number
+   * of listings under a cap of one and publish them all. The reconciliation with
+   * the entitlements workstream answers that hole one level down: under_review
+   * IS a counted status now, in the application (lib/entitlements.ts) and in the
+   * database (083's private.host_active_listing_count). Entering review is what
+   * spends the slot.
+   *
+   * So the invariant is the pair below, and BOTH halves are load-bearing: the
+   * host at their allowance is refused at submit, and the host who already spent
+   * a slot is not charged a second time for publishing what they hold. Refusing
+   * the publish edge as well would strand a listing at under_review — paid for,
+   * unpublishable — for every host sitting exactly at their allowance, which is
+   * every starter host with one listing.
+   */
+  it("charges the slot at SUBMIT — a host at their allowance cannot enter review", async () => {
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(
+      allowanceState(
+        "starter",
+        PLAN_ENTITLEMENTS.starter.listings,
+        PLAN_ENTITLEMENTS.starter.listings,
+      ),
+    );
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+  });
+
+  it("does NOT charge again at publish — the slot was spent entering review", async () => {
+    const read = makeChain({ data: { ...ANSWERED_READY } });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+    // Deliberately at the allowance: a starter host with their one listing in
+    // review must still be able to publish it.
+    mockRpc.mockResolvedValue(
+      allowanceState(
+        "starter",
+        PLAN_ENTITLEMENTS.starter.listings,
+        PLAN_ENTITLEMENTS.starter.listings,
+      ),
+    );
+
+    const result = await updateListingStatus("token", "user_1", "l1", "live");
+
+    expect(result).toEqual({ ok: true, status: "live" });
+    // The allowance RPC is not even consulted: both statuses are counted.
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it("REOPENS a closed listing as a draft", async () => {
+    const read = makeChain({
+      data: { id: "l1", status: "closed", provenance: "verified" },
+    });
+    const update = makeChain({ data: { id: "l1" } });
+    queueFromResults(HOST_PROFILE, read, update);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "draft");
+
+    expect(result).toEqual({ ok: true, status: "draft" });
+    expect(update.update).toHaveBeenCalledWith({ status: "draft" });
+    // No triad check and no cap read: draft is neither a publication status nor
+    // a cap-counted one.
+    expect(mockFrom).toHaveBeenCalledTimes(3);
+  });
+
+  it("REFUSES to reopen a SOURCED closed listing — the origin withdrew that posting", async () => {
+    // sweepStaleSourcedListings and the snapshot reconciliation both close
+    // sourced rows. Reopening one would resurrect, under our own source
+    // attribution, a job the source itself took down. Migration 082 refuses it
+    // too; this is the message the host actually reads.
+    const read = makeChain({
+      data: { id: "l1", status: "closed", provenance: "sourced" },
+    });
+    queueFromResults(HOST_PROFILE, read);
+
+    const result = await updateListingStatus("token", "user_1", "l1", "draft");
 
     expect(result).toEqual({ ok: false, error: "invalid_transition" });
   });

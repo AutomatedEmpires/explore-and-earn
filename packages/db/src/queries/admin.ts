@@ -13,6 +13,10 @@ import {
 } from "@explore-and-earn/contracts";
 
 import { adminClient } from "../adminClient";
+import {
+  OPERATOR_LISTING_TRANSITIONS,
+  type OperatorListingAction,
+} from "../lib/operatorListingTransitions";
 import type { SeekerApplicationListing } from "./applications";
 
 /**
@@ -381,63 +385,81 @@ export async function getRecentApplications(
 }
 
 /**
- * Approve a listing that is currently awaiting moderation.
+ * Run one operator listing action against the service-role client.
  *
- * The status predicate is the concurrency/idempotency guard: an already
- * decided, host-controlled, or missing listing must never report success. The
- * database status trigger stamps published_at in the same atomic update.
+ * The status predicate is the concurrency/idempotency guard: a listing in a
+ * status this action does not apply to, or a missing one, must never report
+ * success. Which statuses those are is declared once, in
+ * lib/operatorListingTransitions.ts — the three actions used to inline
+ * `.eq("status", "under_review")` each, which since hosts publish their own
+ * listings meant all three refused every listing anyone would actually moderate.
+ *
+ * Service-role writes are exempt from 082's host transition trigger by
+ * construction (it returns immediately unless the request is `authenticated`),
+ * so this map is the whole gate and it lives here rather than pretending the
+ * database holds it.
  */
-export async function adminApproveListing(
+async function runOperatorListingAction(
   serviceRoleToken: string,
   listingId: string,
+  action: OperatorListingAction,
+  patch: Record<string, unknown> = {},
 ): Promise<{ ok: boolean; error?: string }> {
+  const transition = OPERATOR_LISTING_TRANSITIONS[action];
   const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
 
   const { data, error } = await db
     .from("listings")
-    .update({ status: "live" })
+    .update({ status: transition.to, ...patch })
     .eq("id", listingId)
-    .eq("status", "under_review")
+    .in("status", transition.from as readonly string[])
     .select("id")
     .maybeSingle();
   if (error) {
     return { ok: false, error: error.message };
   }
   if (!data) {
-    return { ok: false, error: "Listing is no longer awaiting review." };
-  }
-
-  return { ok: true };
-}
-
-/** Return a listing to draft so the host can supply missing facts. */
-export async function adminHoldListing(
-  serviceRoleToken: string,
-  listingId: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
-
-  const { data, error } = await db
-    .from("listings")
-    .update({ status: "draft" })
-    .eq("id", listingId)
-    .eq("status", "under_review")
-    .select("id")
-    .maybeSingle();
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-  if (!data) {
-    return { ok: false, error: "Listing is no longer awaiting review." };
+    return { ok: false, error: transition.noMatchMessage };
   }
 
   return { ok: true };
 }
 
 /**
- * Reject a listing that is currently awaiting moderation. `reason` is accepted
- * for API parity with the server action but is not persisted — the listings
- * table has no rejection-reason column (006_listings.sql).
+ * Publish a listing on the operator's behalf.
+ *
+ * Accepts a listing that is already `live` so the action is idempotent rather
+ * than reporting a failure for work already done. The database status trigger
+ * stamps published_at in the same atomic update.
+ */
+export async function adminApproveListing(
+  serviceRoleToken: string,
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return runOperatorListingAction(serviceRoleToken, listingId, "approve");
+}
+
+/**
+ * Return a listing to draft so the host can supply missing facts.
+ *
+ * From `live` this is a reversible takedown: the listing leaves the seeker feed
+ * immediately and the host can republish once it is fixed.
+ */
+export async function adminHoldListing(
+  serviceRoleToken: string,
+  listingId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return runOperatorListingAction(serviceRoleToken, listingId, "hold");
+}
+
+/**
+ * Take a listing down. `reason` is accepted for API parity with the server
+ * action but is not persisted — the listings table has no rejection-reason
+ * column (006_listings.sql).
+ *
+ * Works on a LIVE listing, which is the case that matters: with host
+ * self-publishing, a published listing was previously reachable only through
+ * takeModerationAction's archive path.
  */
 export async function adminCloseListing(
   serviceRoleToken: string,
@@ -445,24 +467,9 @@ export async function adminCloseListing(
   reason?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   void reason;
-  const db = adminClient(serviceRoleToken) as unknown as SupabaseClient;
-  const nowIso = new Date().toISOString();
-
-  const { data, error } = await db
-    .from("listings")
-    .update({ status: "closed", closed_at: nowIso })
-    .eq("id", listingId)
-    .eq("status", "under_review")
-    .select("id")
-    .maybeSingle();
-  if (error) {
-    return { ok: false, error: error.message };
-  }
-  if (!data) {
-    return { ok: false, error: "Listing is no longer awaiting review." };
-  }
-
-  return { ok: true };
+  return runOperatorListingAction(serviceRoleToken, listingId, "close", {
+    closed_at: new Date().toISOString(),
+  });
 }
 
 const ADMIN_LISTING_DETAIL_SELECT =

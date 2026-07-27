@@ -45,7 +45,7 @@ export default async function SeekerPublicProfilePage({ params }: Props) {
   const token = await getToken();
   if (!token) notFound();
 
-  const profile = await getSeekerProfileForHost(token, userId, seekerProfileId);
+  const profile = await getSeekerProfileForHost(token, seekerProfileId);
 
   if (!profile || profile.visibilityStatus === "hidden") notFound();
 

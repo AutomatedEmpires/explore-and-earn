@@ -3,6 +3,13 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "../client";
+import type { SeekerNameLookup } from "../lib/hostApplicantView";
+import {
+  HOST_APPLICANT_NAME_BATCH,
+  emptySeekerNameLookup,
+  mergeSeekerNameLookups,
+  readSeekerNameLookup,
+} from "../lib/hostApplicantView";
 
 /**
  * Seeker profile data access for onboarding + profile edit.
@@ -304,28 +311,65 @@ export async function getSeekerAvailability(
 }
 
 /**
- * Batch-resolve seeker display names by internal seeker_profiles.id.
- * Missing rows and blank names fall back to "Seeker" at the caller boundary.
+ * Batch-resolve applicant display names for a host, by seeker_profiles.id.
+ *
+ * Routed through migration 084's get_host_applicant_display_names. It used to
+ * SELECT seeker_profiles directly, which cannot work: that table has only the
+ * owner-scoped policies from 013, so a host's read was filtered to zero rows
+ * with no error and every applicant on the list surfaces rendered as the
+ * caller's "Seeker" placeholder.
+ *
+ * Ids the caller is not entitled to are simply absent from the resolved map, and
+ * the RPC is bounded at HOST_APPLICANT_NAME_BATCH ids per call so it cannot be
+ * used to enumerate seekers. Longer caller lists are chunked here; the database
+ * raises rather than returning nothing if a caller ever exceeds the bound.
+ *
+ * Returns a SeekerNameLookup, not a bare map, and never throws. See the type's
+ * own documentation for why this path degrades where the resume path does not:
+ * in short, these names decorate list surfaces whose real content is loaded
+ * elsewhere, and an RPC fault must neither take those pages down nor be
+ * laundered into a placeholder that reads like an answer.
  */
 export async function getSeekerDisplayNames(
   clerkToken: string,
   seekerProfileIds: string[],
-): Promise<Map<string, string>> {
-  if (seekerProfileIds.length === 0) return new Map();
+): Promise<SeekerNameLookup> {
+  if (seekerProfileIds.length === 0) return emptySeekerNameLookup();
 
   const uniqueIds = [...new Set(seekerProfileIds.filter(Boolean))];
-  if (uniqueIds.length === 0) return new Map();
+  if (uniqueIds.length === 0) return emptySeekerNameLookup();
 
-  const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data } = await untyped
-    .from(SEEKER_PROFILES)
-    .select("id, display_name")
-    .in("id", uniqueIds);
-
-  const map = new Map<string, string>();
-  for (const row of (data ?? []) as Array<{ id: string; display_name: string | null }>) {
-    const displayName = row.display_name?.trim();
-    map.set(row.id, displayName && displayName.length > 0 ? displayName : "Seeker");
+  let untyped: SupabaseClient;
+  try {
+    untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  } catch (caught) {
+    return {
+      status: "unavailable",
+      reason: `getSeekerDisplayNames: ${caught instanceof Error ? caught.message : "client unavailable"}`,
+    };
   }
-  return map;
+
+  let lookup = emptySeekerNameLookup();
+
+  for (let i = 0; i < uniqueIds.length; i += HOST_APPLICANT_NAME_BATCH) {
+    const batch = uniqueIds.slice(i, i + HOST_APPLICANT_NAME_BATCH);
+    let response;
+    try {
+      response = await untyped.rpc("get_host_applicant_display_names", {
+        p_seeker_profile_ids: batch,
+      });
+    } catch (caught) {
+      return {
+        status: "unavailable",
+        reason: `getSeekerDisplayNames: ${caught instanceof Error ? caught.message : "batch call failed"}`,
+      };
+    }
+    lookup = mergeSeekerNameLookups(
+      lookup,
+      readSeekerNameLookup("getSeekerDisplayNames", response),
+    );
+    if (lookup.status === "unavailable") return lookup;
+  }
+
+  return lookup;
 }

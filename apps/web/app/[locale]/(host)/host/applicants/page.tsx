@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import {
+  analyticsScopeForTier,
   getConversations,
   getHostApplications,
   getHostListings,
@@ -10,7 +11,6 @@ import {
   getSeekerDisplayNames,
   rowToDiscoveryFields,
 } from "@explore-and-earn/db";
-import { PLAN_ENTITLEMENTS } from "@explore-and-earn/contracts";
 import { Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
 import {
@@ -72,11 +72,17 @@ export default async function HostApplicantsPage({
     ]);
   const threadsMap = threadsByApplicationId(conversations);
 
-  // Resolve seeker display names in a single batch query.
+  // Resolve seeker display names in a single batch query. A fault here does not
+  // stop the pipeline rendering — the applications, listings and threads above
+  // are the page — but it is logged and the cards say the names are unavailable
+  // rather than showing the pseudonymous handle as if it were the answer.
   const displayNames = await getSeekerDisplayNames(
     token,
     [...new Set(applications.map((a) => a.seekerProfileId))],
   );
+  if (displayNames.status === "unavailable") {
+    console.error("[host/applicants] applicant name lookup failed:", displayNames.reason);
+  }
 
   const listingsById = new Map<string, DiscoveryListing>(
     listingRows.map((row): [string, DiscoveryListing] => [
@@ -125,12 +131,10 @@ export default async function HostApplicantsPage({
 
   // Tier gate (ADR-039): the matched-seeker bucket is a paid capability. The
   // 'full' analytics entitlement (Professional / Enterprise) unlocks it; Starter
-  // and un-subscribed hosts get the 'basic' tier and a compact upsell instead.
-  // Derived from the host's REAL subscription via the same PLAN_ENTITLEMENTS the
-  // analytics surface gates on — never fabricated.
-  const matchedSeekersUnlocked =
-    subscriptionTier !== "none" &&
-    PLAN_ENTITLEMENTS[subscriptionTier].analytics === "full";
+  // and un-subscribed hosts get the 'basic' scope and a compact upsell instead.
+  // Resolved through analyticsScopeForTier — the SAME function the analytics
+  // surface gates on, so the two can never disagree about what a tier includes.
+  const matchedSeekersUnlocked = analyticsScopeForTier(subscriptionTier) === "full";
 
   return (
     <section className={styles.block}>

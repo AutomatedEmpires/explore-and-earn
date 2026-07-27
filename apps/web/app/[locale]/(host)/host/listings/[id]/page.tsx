@@ -4,13 +4,16 @@ import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 import {
+  emptySeekerNameLookup,
   getHostListings,
   getHostApplications,
   getSeekerDisplayNames,
   getPublicListingById,
+  resolveSeekerName,
   rowToDiscoveryFields,
   type HostApplication,
   type ListingRow,
+  type SeekerNameLookup,
 } from "@explore-and-earn/db";
 
 import {
@@ -92,23 +95,30 @@ export default async function HostListingDetailPage({
   // Real applicant data — host-owned view only. The public read-only view does
   // not expose applicant identities.
   let listingApps: HostApplication[] = [];
-  let displayNames = new Map<string, string>();
+  let displayNames: SeekerNameLookup = emptySeekerNameLookup();
   if (token && userId && owned) {
+    // Two separate reads with two separate failure meanings, so they no longer
+    // share one catch. Losing the applications means there is nothing to show
+    // and an empty list is honest; losing only the NAMES used to blank the whole
+    // applicant table, which told the host they had no applicants when they did.
     try {
       const applications = await getHostApplications(token, userId);
       listingApps = applications.filter((app) => app.listingId === id);
-      displayNames = await getSeekerDisplayNames(
-        token,
-        listingApps.map((app) => app.seekerProfileId),
-      );
     } catch {
       listingApps = [];
+    }
+    displayNames = await getSeekerDisplayNames(
+      token,
+      listingApps.map((app) => app.seekerProfileId),
+    );
+    if (displayNames.status === "unavailable") {
+      console.error("[host/listings/id] applicant name lookup failed:", displayNames.reason);
     }
   }
 
   const applicantItems: HostApplicantItem[] = listingApps.map((app) => ({
     id: app.id,
-    applicantName: displayNames.get(app.seekerProfileId) ?? "Seeker",
+    applicantName: resolveSeekerName(displayNames, app.seekerProfileId, "Seeker"),
     listing: listingFields,
     stage: applicationStageFromStatus(app.status),
     status: app.status,

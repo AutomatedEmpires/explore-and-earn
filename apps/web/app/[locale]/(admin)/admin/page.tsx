@@ -47,7 +47,11 @@ export default async function AdminDashboardPage() {
     countOpenAccountDeletionRequests(serviceRoleToken).catch(() => 0),
   ]);
   const openReports = (moderation?.open ?? 0) + (moderation?.reviewing ?? 0);
-  const openRefunds = refunds?.requested ?? 0;
+  // Both UNRESOLVED refund states count here. 'approved' is a claimed row whose
+  // Stripe outcome was never recorded — money may already have left — so
+  // counting only 'requested' made exactly the row that needs a human the one
+  // the overview never mentioned.
+  const openRefunds = (refunds?.requested ?? 0) + (refunds?.approved ?? 0);
 
   // Presentation-only derivations from the already-fetched stats. No new reads.
   const livePct = pct(stats.liveListings, stats.totalListings);

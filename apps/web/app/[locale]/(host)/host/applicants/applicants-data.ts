@@ -1,5 +1,5 @@
-import type { HostApplication, ListingMatchScore } from "@explore-and-earn/db";
-import { matchScoreKey } from "@explore-and-earn/db";
+import type { HostApplication, ListingMatchScore, SeekerNameLookup } from "@explore-and-earn/db";
+import { matchScoreKey, resolveSeekerName } from "@explore-and-earn/db";
 
 import type { DiscoveryListing } from "../../../../../components/discovery";
 import type { ApplicantStage, HostApplicantItem } from "../../../../../components/host";
@@ -91,7 +91,11 @@ function minimalListing(application: HostApplication): DiscoveryListing {
 export function toApplicantItem(
   application: HostApplication,
   listingsById: ReadonlyMap<string, DiscoveryListing>,
-  displayNames?: ReadonlyMap<string, string>,
+  // A SeekerNameLookup, not a map: when the name RPC faulted there is no map to
+  // consult, and the caller must not be shown the pseudonymous handle as though
+  // it were the answer. resolveSeekerName is the only place that distinction is
+  // turned into a label.
+  displayNames?: SeekerNameLookup,
   threadsByApplicationId?: ReadonlyMap<string, string>,
   matchScores?: ReadonlyMap<string, ListingMatchScore>,
 ): HostApplicantItem {
@@ -101,7 +105,13 @@ export function toApplicantItem(
   );
   return {
     id: application.id,
-    applicantName: displayNames?.get(application.seekerProfileId) ?? applicantLabel(application),
+    applicantName: displayNames
+      ? resolveSeekerName(
+          displayNames,
+          application.seekerProfileId,
+          applicantLabel(application),
+        )
+      : applicantLabel(application),
     listing: listingsById.get(application.listingId) ?? minimalListing(application),
     stage: statusToStage(application.status),
     status: application.status,

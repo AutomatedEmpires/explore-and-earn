@@ -4,17 +4,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   effectiveHousingPhotoMap,
-  PLAN_ENTITLEMENTS,
   sanitizeHostBenefitLibrary,
   sanitizeHousingPhotoMap,
   validateListingForPublication,
   type BenefitEvidenceStatus,
   type ListingStatus,
-  type PlanTier,
   type PublicationBlocker,
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
+import {
+  countsTowardListingAllowance,
+  hasListingCapacity,
+  parseListingAllowanceState,
+} from "../lib/entitlements";
 import { getBenefitDetailsContext } from "./benefitDetails";
 
 /**
@@ -27,42 +30,40 @@ function asPublicationEvidence(value: unknown): BenefitEvidenceStatus {
 }
 
 /**
- * Host-initiated listing status transitions (Agent 3 / PR 1).
+ * Host-initiated listing status transitions.
  *
  * The server is the authoritative gate; the client mirrors this map only to
- * decide which action buttons to show. Note: there is intentionally NO
- * under_review -> live edge — publishing a reviewed listing to live is a
- * separate approval flow outside this host control set.
+ * decide which action buttons to show. Migration 082 holds the same graph at
+ * the database boundary, where a direct PostgREST write also meets it.
+ *
+ * HOSTS PUBLISH THEIR OWN LISTINGS (founder, 2026-07-26): under_review -> live
+ * is a host edge. There is no admin approval step. What still stands between a
+ * listing and seekers is the publication gate below plus its database backstops
+ * — 070's triad CHECK and 072's housing-photo trigger — which refuse both
+ * under_review and live for a listing that has not answered Housing, Meals and
+ * Pay. draft -> live stays absent on purpose: publication is a deliberate
+ * second act, not a side effect of finishing the form.
+ *
+ * closed -> draft exists so an operator-rejected listing is not a permanent
+ * orphan. `closed` is also written by the sourced freshness sweep and by
+ * snapshot reconciliation; those rows are provenance='sourced' and 082 refuses
+ * the reversal for them, because there the closure records that the ORIGIN
+ * withdrew the posting. This map cannot express that distinction, so a sourced
+ * closed listing that reached here would be rejected by the database rather
+ * than by `canTransitionListing`.
  */
 const LISTING_STATUS_TRANSITIONS: Record<ListingStatus, readonly ListingStatus[]> = {
   draft: ["under_review"],
-  under_review: ["draft"],
+  under_review: ["draft", "live"],
   live: ["paused", "archived"],
   paused: ["live", "archived"],
-  closed: [],
+  closed: ["draft"],
   archived: [],
 };
 
 /** True when `from -> to` is a permitted host listing transition. */
 export function canTransitionListing(from: ListingStatus, to: ListingStatus): boolean {
   return (LISTING_STATUS_TRANSITIONS[from] ?? []).includes(to);
-}
-
-/**
- * Statuses that count toward PLAN_ENTITLEMENTS[tier].listings (ADR-039) —
- * "each active (live or paused) listing counts toward your plan limit; you
- * can have unlimited drafts on any plan" per the host-facing FAQ copy
- * (HostSettings.tsx AddOnsSection), which already stated this policy before
- * any code enforced it.
- */
-const CAP_COUNTED_STATUSES: readonly ListingStatus[] = ["live", "paused"];
-
-/** "none" (no active subscription) is floored at the starter entitlement,
- * same policy as the boost-purchase tier fallback — the lowest real paid
- * tier, not zero and not unlimited. */
-function listingCapFor(tier: PlanTier): number {
-  const entitlementTier = tier === "professional" || tier === "enterprise" ? tier : "starter";
-  return PLAN_ENTITLEMENTS[entitlementTier].listings;
 }
 
 /**
@@ -137,6 +138,16 @@ export async function updateListingStatus(
     return { ok: false, error: "invalid_transition" };
   }
 
+  // closed -> draft reverses an OPERATOR's rejection. On a sourced listing
+  // `closed` means the origin withdrew the posting (the freshness sweep and
+  // snapshot reconciliation both write it), so reopening would resurrect a job
+  // the source took down under our own attribution. Migration 082 refuses this
+  // at the database too; this exists so the host reads a sentence instead of a
+  // constraint name.
+  if (current === "closed" && row.provenance === "sourced") {
+    return { ok: false, error: "invalid_transition" };
+  }
+
   let hostProfile: Record<string, unknown> | null = null;
   let benefitDetails: Record<string, unknown> = {};
   if (
@@ -162,15 +173,15 @@ export async function updateListingStatus(
 
   // ── The publication gate (founder, 2026-07-17) ──────────────────────────────
   // A host-controlled listing may not face seekers while Housing, Meals or Pay
-  // is unanswered. Checked on the transitions that PUBLISH — draft->under_review
-  // and paused->live — never on the ones that retreat, so a host can always pull
-  // a listing down and a draft can always stay half-finished.
+  // is unanswered. Checked on every transition INTO a publication status —
+  // draft->under_review, under_review->live and paused->live — never on the ones
+  // that retreat, so a host can always pull a listing down and a draft can
+  // always stay half-finished.
   //
   // This is not the enforcement; migration 070's listings_publication_triad_chk
-  // is (PostgREST hands `authenticated` full-column UPDATE on listings, so a
-  // determined client never runs this code). This exists so the host is told
-  // WHICH fields are missing, in their own words, instead of meeting a raw
-  // 23514 constraint violation.
+  // is, because a client that talks to PostgREST directly never runs this code.
+  // This exists so the host is told WHICH fields are missing, in their own
+  // words, instead of meeting a raw 23514 constraint violation.
   if (newStatus === "under_review" || newStatus === "live") {
     const housingDetail =
       benefitDetails.housing && typeof benefitDetails.housing === "object"
@@ -199,34 +210,48 @@ export async function updateListingStatus(
     }
   }
 
-  // Enforce PLAN_ENTITLEMENTS.listings at the one host-initiated transition
-  // that can newly consume a slot: submitting a draft for review. (live<->paused
-  // don't need this check — both already count as "active" per
-  // CAP_COUNTED_STATUSES, so pausing/resuming never changes the count.)
-  if (newStatus === "under_review") {
-    if (!hostProfile || typeof hostProfile.subscription_tier !== "string") {
-      const { data, error } = await db
-        .from("host_profiles")
-        .select("subscription_tier")
-        .eq("id", hostProfileId)
-        .maybeSingle();
-      if (error) return { ok: false, error: error.message };
-      hostProfile = {
-        ...(hostProfile ?? {}),
-        ...((data as Record<string, unknown> | null) ?? {}),
-      };
-    }
-    const tier = (hostProfile?.subscription_tier ?? "none") as PlanTier;
-    const cap = listingCapFor(tier);
+  // The plan listing allowance.
+  //
+  // This is NOT the enforcement — migration 083's trg_listings_plan_allowance is
+  // (`authenticated` can PATCH `status` through PostgREST, so a determined client
+  // never runs this code). It exists so a host meets "you are at your plan limit"
+  // instead of a raw 23514, and it reads the allowance through the RPC that wraps
+  // the trigger's OWN helpers, so the number it quotes cannot drift from the
+  // number the database enforces.
+  //
+  // Checked only when the target status newly occupies a slot AND the current one
+  // does not. Which edges that covers depends entirely on `under_review` being a
+  // counted status, and it is — that single fact is what closes the hole 082
+  // opened by making under_review -> live a HOST edge. Were under_review
+  // uncounted, a host on a cap of 1 could stage N drafts through review (count
+  // still reads 0 at every step) and then publish every one of them. Counting it
+  // charges the slot at submit time, so:
+  //
+  //   draft -> under_review    uncounted -> counted   CHECKED
+  //   under_review -> live     counted -> counted     already paid for
+  //   live <-> paused          counted -> counted     consumes nothing
+  //
+  // Gating the last two would refuse a host who is legitimately at their
+  // allowance and only wants to pause or resume what they already hold.
+  //
+  // The allowance the RPC returns ALREADY includes every additional-listing
+  // add-on slot the host has paid for: 083's private.host_listing_allowance()
+  // adds private.host_purchased_listing_allowance(), which reads
+  // host_profiles.purchased_listing_slots by name. Adding the purchased term a
+  // second time here — from a separate read — is how the application and the
+  // database came to quote different numbers in the first place.
+  if (
+    countsTowardListingAllowance(newStatus) &&
+    !countsTowardListingAllowance(current)
+  ) {
+    const { data: allowanceData, error: allowanceError } = await db.rpc(
+      "my_listing_allowance_state",
+      { p_host_profile_id: hostProfileId },
+    );
+    if (allowanceError) return { ok: false, error: allowanceError.message };
 
-    const { count: activeCount, error: countError } = await db
-      .from("listings")
-      .select("id", { count: "exact", head: true })
-      .eq("host_profile_id", hostProfileId)
-      .in("status", CAP_COUNTED_STATUSES);
-    if (countError) return { ok: false, error: countError.message };
-
-    if ((activeCount ?? 0) >= cap) {
+    const allowance = parseListingAllowanceState(allowanceData);
+    if (!hasListingCapacity(allowance.used, allowance.allowance)) {
       return { ok: false, error: "listing_cap_reached" };
     }
   }

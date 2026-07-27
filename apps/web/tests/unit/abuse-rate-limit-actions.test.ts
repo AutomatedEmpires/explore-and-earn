@@ -74,6 +74,11 @@ const stripeMocks = vi.hoisted(() => ({
   isBillingInterval: vi.fn(),
   isHostSubscriptionTier: vi.fn(),
   issueRefund: vi.fn(),
+  // A subscription refund request now resolves the real charge in Stripe before
+  // it can be filed, so the pass-through case has to have one to find.
+  findLatestHostSubscriptionCharge: vi.fn(),
+  getRefundableChargeCents: vi.fn(),
+  cancelHostSubscription: vi.fn(),
 }));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: authMock }));
@@ -133,6 +138,15 @@ beforeEach(() => {
     getToken: vi.fn().mockResolvedValue("tok-default"),
   });
   checkRateLimitMock.mockReturnValue({ allowed: true });
+  stripeMocks.findLatestHostSubscriptionCharge.mockResolvedValue({
+    ok: true,
+    charge: {
+      invoiceId: "in_default",
+      paymentIntentId: "pi_default",
+      amountPaidCents: 19900,
+      createdUnix: 900,
+    },
+  });
   // redirect() throws NEXT_REDIRECT in production — the mock mirrors that so
   // Promise<never> actions terminate at the redirect like the real runtime.
   redirectMock.mockImplementation((url: string) => {
@@ -308,7 +322,10 @@ describe("createBoostCheckoutAction", () => {
 // ── hostBilling checkout + portal ────────────────────────────────────────────
 
 describe("startHostCheckoutAction", () => {
-  it("over limit: redirects to the billing page with error=rate_limited before any Stripe work", async () => {
+  // /host/plans, not /host/billing: the latter is inside the (host) layout,
+  // which bounces a profile-less user to onboarding — so the message never
+  // reached the pre-profile payer this action serves.
+  it("over limit: redirects to the plans page with error=rate_limited before any Stripe work", async () => {
     stripeMocks.isHostSubscriptionTier.mockReturnValue(true);
     stripeMocks.isBillingInterval.mockReturnValue(true);
     checkRateLimitMock.mockReturnValueOnce({ allowed: false });
@@ -323,7 +340,7 @@ describe("startHostCheckoutAction", () => {
       10,
       60 * 60 * 1000,
     );
-    expect(redirectMock).toHaveBeenCalledWith("/host/billing?error=rate_limited");
+    expect(redirectMock).toHaveBeenCalledWith("/host/plans?error=rate_limited");
     expect(dbMocks.getHostProfile).not.toHaveBeenCalled();
     expect(stripeMocks.createCheckoutSession).not.toHaveBeenCalled();
   });

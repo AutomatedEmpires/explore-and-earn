@@ -177,11 +177,18 @@ async function createHostProfileActionImpl(
 		primaryLocationName,
 	})
 	if (!result.ok) {
+		// 'subscription_required' is its own outcome, not a generic failure. There
+		// is no free tier (founder, 2026-07-26), so a host arriving here without an
+		// active plan has to be told to choose one — "something went wrong" would
+		// send them round the same loop forever.
+		const reason = result.error ?? ""
 		return {
 			ok: false,
-			error: result.error?.includes("profile_identity_disabled")
-				? "account_unavailable"
-				: "create_failed",
+			error: reason.includes("host_subscription_required")
+				? "subscription_required"
+				: reason.includes("profile_identity_disabled")
+					? "account_unavailable"
+					: "create_failed",
 		}
 	}
 

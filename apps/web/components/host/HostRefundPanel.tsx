@@ -71,20 +71,25 @@ function statusVariant(status: string): BadgeVariant {
   if (status === "refunded") return "success";
   if (status === "denied") return "neutral";
   if (status === "failed") return "info";
-  return "featured"; // requested
+  return "featured"; // requested / approved (in flight)
 }
 
 function statusIcon(status: string): IconKey {
   if (status === "refunded") return "status.accepted";
   if (status === "denied") return "status.declined";
   if (status === "failed") return "system.warning";
-  return "status.open";
+  return "status.open"; // requested / approved (in flight)
 }
 
 function statusLabel(status: string): string {
   switch (status) {
     case "requested":
       return "Under review";
+    // 'approved' is the transient state a request sits in while the Stripe
+    // refund is being issued. It must not read as "done" — the money has not
+    // been confirmed back yet.
+    case "approved":
+      return "Processing refund";
     case "refunded":
       return "Refunded";
     case "denied":

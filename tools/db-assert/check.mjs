@@ -490,6 +490,241 @@ if (!databaseHardeningMigration) {
   }
 }
 
+// Hosts publish their own listings (founder 2026-07-26). 082 widens 077's
+// role-aware trigger with under_review -> live and closed -> draft. Two things
+// are pinned here rather than only in the connected proof, because
+// `pnpm guardrails` runs without a database while
+// sql/assert_listing_host_status_transitions.sql runs only in db-security.yml:
+// the two new edges must be present with their exact predicates, and 082 must
+// not touch the publication floor it sits on top of.
+const selfPublishMigration = migrationFiles.find((f) => /^082_.*\.sql$/.test(f))
+if (!selfPublishMigration) {
+  hasFailure = true
+  console.error("G-HOST-SELF-PUBLISH: expected migration 082 to be present.")
+} else {
+  const sql = stripSqlComments(fileContents.get(selfPublishMigration))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const required = [
+    "create or replace function private.enforce_listing_host_status_transition()",
+    "security invoker",
+    "set search_path = ''",
+    // Everything 077 enforced that 082 must not drop on the way past.
+    "message = 'listing_initial_status_must_be_draft'",
+    "message = 'listing_host_status_transition_forbidden'",
+    "old.status = 'draft' and new.status = 'under_review'",
+    "old.status = 'live' and new.status in ('paused', 'archived')",
+    "old.status = 'paused' and new.status in ('live', 'archived')",
+    // The two new edges, with the provenance split that keeps a sourced
+    // closure (origin withdrew the posting) irreversible.
+    "old.status = 'under_review' and new.status in ('draft', 'live')",
+    "old.status = 'closed' and new.status = 'draft' and old.provenance is distinct from 'sourced' and new.provenance is distinct from 'sourced'",
+    "revoke execute on function private.enforce_listing_host_status_transition() from public, anon, authenticated;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-HOST-SELF-PUBLISH: ${selfPublishMigration} is missing ${needle}`,
+      )
+    }
+  }
+  // Removing the human approver must not relax the quality floor. 070's triad
+  // CHECK and 072's housing-photo trigger are what still stop an unanswered
+  // listing reaching under_review or live, so this migration touches neither.
+  const forbidden = [
+    "listings_publication_triad_chk",
+    "listings_housing_included_evidence_chk",
+    "listings_meals_included_evidence_chk",
+    "drop constraint",
+    "alter table public.listings",
+    "drop trigger if exists trg_listings_housing_photos",
+  ]
+  for (const needle of forbidden) {
+    if (sql.includes(needle)) {
+      hasFailure = true
+      console.error(
+        `G-HOST-SELF-PUBLISH: ${selfPublishMigration} touches the publication floor (${needle}).`,
+      )
+    }
+  }
+}
+
+// The paid listing allowance, checked without a database because `pnpm
+// guardrails` runs without one while the connected proof
+// (sql/assert_listing_allowance_enforcement.sql and
+// assert-listing-slot-concurrency.mjs) runs only in db-security.yml.
+//
+// Four properties, each of which cost real money when it was absent:
+//
+//  * every writer of the purchased allowance must sweep the listings it just put
+//    out of reach. The sweep had one caller, on the plan path, which the add-on
+//    branch never reaches — so a cancelled add-on billed for one slot while the
+//    database served four public listings.
+//  * 083 must READ host_profiles.purchased_listing_slots BY NAME. It once
+//    discovered the column from a list of four guesses, none of which was the
+//    name the add-on shipped, so a host who bought five extra listings was
+//    enforced at one while the application told them six.
+//  * 085's revoke path must decide under the advisory lock. Reading the ledger
+//    row before the lock and issuing an unguarded UPDATE let two overlapping
+//    redeliveries of one cancellation both subtract.
+//  * neither migration may hand the allowance column to a client role.
+const allowanceMigration = migrationFiles.find((f) => /^083_.*\.sql$/.test(f))
+const addOnMigration = migrationFiles.find((f) => /^085_.*\.sql$/.test(f))
+if (!allowanceMigration || !addOnMigration) {
+  hasFailure = true
+  console.error("G-LISTING-ALLOWANCE: expected migrations 083 and 085 to be present.")
+} else {
+  const allowanceSql = stripSqlComments(fileContents.get(allowanceMigration))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  const addOnSql = stripSqlComments(fileContents.get(addOnMigration))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+
+  const required = [
+    [
+      allowanceSql,
+      "add column if not exists purchased_listing_slots integer not null default 0",
+    ],
+    [allowanceSql, "check (purchased_listing_slots >= 0)"],
+    [allowanceSql, "h.purchased_listing_slots"],
+    [allowanceSql, "create trigger trg_listings_plan_allowance"],
+    [allowanceSql, "message = 'listing_allowance_exceeded'"],
+    // Lock, then let the guarded UPDATE be the arbiter, then count the rows it
+    // actually changed.
+    [addOnSql, "where id = v_id and status = 'active'"],
+    [addOnSql, "get diagnostics v_count = row_count;"],
+    [addOnSql, "if v_count <> 1 then"],
+  ]
+  for (const [sql, needle] of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(`G-LISTING-ALLOWANCE: missing ${needle}`)
+    }
+  }
+
+  // THE OVER-ALLOWANCE SWEEP MUST COVER THE ADD-ON TERM, NOT ONLY THE PLAN.
+  //
+  // public.close_host_listings_over_allowance had exactly ONE caller in the
+  // system: syncHostSubscriptionTier, on the plan path. The add-on branch of
+  // syncSubscriptionEvent returns before it, so an add-on that was cancelled,
+  // went unpaid, or had its quantity reduced in the billing portal lowered the
+  // allowance and left every listing above it live indefinitely -- Stripe
+  // billing for one slot while the database served four public listings.
+  //
+  // The three functions below are the only writers of purchased_listing_slots,
+  // which is the whole of the add-on term, so the sweep belongs inside them
+  // rather than at a fourth call site the next branch would miss. Each must call
+  // it, and each must call it AFTER the write that moved the allowance -- a
+  // sweep that runs first reads the allowance the host is leaving.
+  //
+  // The comments are stripped above, so prose about the sweep cannot satisfy
+  // this. The behaviour itself is proved in
+  // sql/assert_listing_allowance_enforcement.sql, which needs a database.
+  const addOnSweepSites = [
+    [
+      "credit_listing_slot_purchase",
+      "purchased_listing_slots = purchased_listing_slots + p_quantity",
+    ],
+    [
+      "revoke_listing_slot_purchase",
+      "greatest(purchased_listing_slots - v_quantity, 0)",
+    ],
+    [
+      "sync_listing_slot_subscription",
+      "greatest(purchased_listing_slots + (v_target - v_current), 0)",
+    ],
+  ]
+  for (const [fn, write] of addOnSweepSites) {
+    const start = addOnSql.indexOf(`create or replace function public.${fn}(`)
+    if (start < 0) {
+      hasFailure = true
+      console.error(`G-LISTING-ALLOWANCE: ${addOnMigration} is missing public.${fn}.`)
+      continue
+    }
+    const end = addOnSql.indexOf("$$;", start)
+    const body = addOnSql.slice(start, end < 0 ? undefined : end)
+    const writeAt = body.indexOf(write)
+    const sweepAt = body.indexOf("perform public.close_host_listings_over_allowance(")
+    if (writeAt < 0) {
+      hasFailure = true
+      console.error(
+        `G-LISTING-ALLOWANCE: public.${fn} no longer moves the purchased allowance.`,
+      )
+    } else if (sweepAt < 0) {
+      hasFailure = true
+      console.error(
+        `G-LISTING-ALLOWANCE: public.${fn} moves the allowance without sweeping the over-allowance listings.`,
+      )
+    } else if (sweepAt < writeAt) {
+      hasFailure = true
+      console.error(
+        `G-LISTING-ALLOWANCE: public.${fn} sweeps BEFORE it moves the allowance.`,
+      )
+    }
+  }
+
+  // Column-name discovery is the shape that failed open on a paid entitlement.
+  // It has no acceptable form, so it is banned outright rather than bounded.
+  //
+  // The names are matched as SQL string literals and as qualified column
+  // references, never as bare substrings: private.host_purchased_listing_allowance
+  // is the function that reads the column CORRECTLY, and its own name contains
+  // one of the guesses.
+  for (const guess of [
+    "purchased_listing_allowance",
+    "additional_listing_allowance",
+    "extra_listing_allowance",
+    "purchased_extra_listings",
+  ]) {
+    const asLiteral = new RegExp(`'${guess}'`)
+    const asColumn = new RegExp(`\\.${guess}\\b`)
+    if (asLiteral.test(allowanceSql) || asColumn.test(allowanceSql)) {
+      hasFailure = true
+      console.error(
+        `G-LISTING-ALLOWANCE: ${allowanceMigration} guesses at the allowance column name (${guess}).`,
+      )
+    }
+  }
+
+  // …and the catalogue lookup that made guessing possible.
+  const readerStart = allowanceSql.indexOf(
+    "create or replace function private.host_purchased_listing_allowance",
+  )
+  if (readerStart >= 0) {
+    const reader = allowanceSql.slice(readerStart, readerStart + 1200)
+    for (const machinery of ["pg_attribute", "attname", "execute format"]) {
+      if (reader.includes(machinery)) {
+        hasFailure = true
+        console.error(
+          `G-LISTING-ALLOWANCE: ${allowanceMigration} discovers the allowance column at run time (${machinery}).`,
+        )
+      }
+    }
+  }
+
+  // 054 revoked UPDATE on host_profiles and 080 revoked table-wide SELECT. A
+  // host who could write this column would grant themselves listings; one who
+  // could read it would read every other host's add-on spend, because
+  // host_profiles_select_public (013) is `to anon, authenticated`.
+  for (const [file, sql] of [
+    [allowanceMigration, allowanceSql],
+    [addOnMigration, addOnSql],
+  ]) {
+    if (
+      /grant\s+(select|update)\s*\([^)]*purchased_listing_slots[^)]*\)\s+on\s+(table\s+)?public\.host_profiles/.test(
+        sql,
+      )
+    ) {
+      hasFailure = true
+      console.error(
+        `G-LISTING-ALLOWANCE: ${file} grants a client role access to purchased_listing_slots.`,
+      )
+    }
+  }
+}
+
 if (hasFailure) {
   process.exit(1)
 }

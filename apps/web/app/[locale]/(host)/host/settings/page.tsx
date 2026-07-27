@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getTranslations } from "next-intl/server";
-import { getHostProfile } from "@explore-and-earn/db";
+import {
+  INVITABLE_TEAM_ROLES,
+  effectiveListingCap,
+  getHostProfile,
+  getHostTeam,
+  getPurchasedListingSlots,
+  includedListingCapFor,
+  seatLimitForTier,
+} from "@explore-and-earn/db";
 
 import { HostSectionHeading } from "../../../../../components/host";
 import { HostSettings } from "../../../../../components/host/HostSettings";
@@ -41,6 +49,16 @@ export default async function HostSettingsPage() {
     getTranslations("Notifications.settings"),
   ]);
 
+  const subscriptionTier = hostProfile?.subscriptionTier ?? "none";
+
+  // Team + add-on state. Both degrade rather than throw: a host must still be
+  // able to reach billing and account settings if migration 085 has not landed
+  // on this environment yet.
+  const [team, purchasedListingSlots] = await Promise.all([
+    getHostTeam(token, userId, subscriptionTier).catch(() => null),
+    getPurchasedListingSlots(token).catch(() => 0),
+  ]);
+
   return (
     <section className={styles.block}>
       <HostSectionHeading
@@ -48,9 +66,22 @@ export default async function HostSettingsPage() {
         description="Manage your plan, team, account, and support options."
       />
       <HostSettings
-        subscriptionTier={hostProfile?.subscriptionTier ?? "none"}
+        subscriptionTier={subscriptionTier}
         companyName={hostProfile?.companyName ?? ""}
         hostProfileId={hostProfile?.id ?? null}
+        teamMembers={team?.members ?? []}
+        teamSeats={
+          team?.seats ?? {
+            limit: seatLimitForTier(subscriptionTier),
+            used: 0,
+            remaining: 0,
+          }
+        }
+        teamAvailable={team?.available ?? false}
+        invitableRoles={INVITABLE_TEAM_ROLES}
+        purchasedListingSlots={purchasedListingSlots}
+        includedListingCap={includedListingCapFor(subscriptionTier)}
+        effectiveListingCap={effectiveListingCap(subscriptionTier, purchasedListingSlots)}
       />
       <HostSectionHeading title={t("heading")} description={t("description")} />
       <EngagementNotificationSettings initial={engineSettings} />

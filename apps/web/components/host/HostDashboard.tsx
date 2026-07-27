@@ -71,7 +71,11 @@ export function HostDashboard({
   // resolver (live listings + applications by status); the month-scoped stats
   // are used only for the "this month" figures, with all-time fallbacks so a
   // stats hiccup never blanks the dashboard to zeros.
-  const totalListings = analytics.perListingStats.length;
+  //
+  // `listingCount`, NOT perListingStats.length: per-listing rows are the paid
+  // "full analytics" entitlement and are absent on the basic scope, so counting
+  // them would tell a Starter host they have no listings.
+  const totalListings = analytics.listingCount;
   const liveCount = analytics.activeListingCount;
   const draftCount =
     stats.listingsByStatus["draft"] ??
@@ -124,6 +128,9 @@ export function HostDashboard({
   ] as const;
 
   const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
+  // Empty on the "basic" analytics scope — per-listing performance is the paid
+  // distinction, so the panel below simply does not render for Starter. The
+  // upsell for it lives on /host/analytics, not here.
   const topListings = analytics.perListingStats.slice(0, 5);
 
   // ── Conversion radar ────────────────────────────────────────────────

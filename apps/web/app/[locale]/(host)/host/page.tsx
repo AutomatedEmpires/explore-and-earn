@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import {
+  emptyHostAnalytics,
   getHostDashboardStats,
   getRecentActivityForHost,
   getHostProfile,
@@ -35,12 +36,9 @@ export default async function HostDashboardPage() {
     })),
     getRecentActivityForHost(token, userId).catch(() => []),
     getHostProfile(token, userId).catch(() => null),
-    getHostAnalytics(token, userId).catch(() => ({
-      totalApplicationsByStatus: {},
-      activeListingCount: 0,
-      inviteAcceptanceRate: 0,
-      perListingStats: [],
-    })),
+    // A read fault falls back to the LEAST entitlement ("basic"), never the
+    // most: an error must not hand out the paid per-listing view.
+    getHostAnalytics(token, userId).catch(() => emptyHostAnalytics()),
   ]);
 
   return (
