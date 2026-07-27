@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type posthogType from "posthog-js";
 
+import { registerAnalyticsClient } from "../lib/analytics";
 import { resolvePostHogConfig } from "../lib/posthogConfig";
 
 const posthogConfig = resolvePostHogConfig(
@@ -42,6 +43,12 @@ export function Providers({ children }: { children: ReactNode }) {
 					enable_recording_console_log: false,
 				});
 				setClient(posthog);
+				// Hand the initialised instance to the event seam so anything
+				// captured while the SDK was still loading is flushed in order
+				// (lib/analytics.ts). Consent is unchanged: the instance above is
+				// opted out until the banner says otherwise, and capture on an
+				// opted-out instance sends nothing.
+				registerAnalyticsClient(posthog);
 			});
 		if (typeof window.requestIdleCallback === "function") {
 			const id = window.requestIdleCallback(() => void load());
