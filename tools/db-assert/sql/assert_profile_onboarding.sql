@@ -384,14 +384,42 @@ reset role;
 -- for this Clerk id, which is the state of every account that has never opened
 -- checkout, and the state the allowance resolves to zero for.
 -- ---------------------------------------------------------------------------
+-- ROLE CONTEXT IS PART OF THE ASSERTION HERE, and the first version of this
+-- block got it wrong: it read private.host_listing_allowance() while still
+-- under `set local role authenticated` and failed with "permission denied for
+-- schema private". That was the hardening working. Schema private is revoked
+-- from anon and authenticated on purpose (083) — a host who could execute the
+-- allowance helpers could read every other host's entitlement — so a diagnostic
+-- that needs them has to speak as the DEFAULT role, exactly as sections 1 and 2
+-- of assert_listing_allowance_enforcement.sql do.
+--
+-- So this splits into three, and the split is not cosmetic:
+--
+--   (1) CREATION, as the host. create_my_host_profile derives identity from the
+--       JWT, so it can only be proved from inside the restricted role.
+--   (2) THE DIAGNOSTICS, as the default role. These exist to make a failure name
+--       its CAUSE ("allowance is 3, expected 0") instead of only its symptom
+--       ("the update was not refused"), and they need both the private helper
+--       and an RLS-free read. Doing the tier read here rather than under
+--       `authenticated` also closes a quieter hole: a prospect's profile row is
+--       not public, so an RLS-filtered read could return NO ROW, leave v_tier
+--       NULL, and make `v_tier <> 'none'` evaluate to NULL — which is not TRUE,
+--       so the check would pass while asserting nothing.
+--   (3) THE REFUSAL PROBES, as the host again, unchanged. These are the part
+--       that has to run as a real client: a refusal proved under a privileged
+--       role proves nothing about what a browser can do.
+--
+-- The profile id crosses (1) -> (3) through create_my_host_profile itself,
+-- which is idempotent and returns the existing id (083 calls it "the one path
+-- the application has onto an existing profile id"). That avoids re-reading
+-- host_profiles under the restricted role, where RLS could hide the row.
+
+-- (1) The prospect builds their workspace, with no subscription row anywhere.
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"user_profile_prospect","role":"authenticated"}';
-do $$
+do $assert_prospect_creates$
 declare
   v_profile_id uuid;
-  v_listing_id uuid;
-  v_tier text;
-  v_allowance integer;
 begin
   v_profile_id := public.create_my_host_profile(
     'Prospect Orchard',
@@ -401,33 +429,69 @@ begin
   if v_profile_id is null then
     raise exception 'profile-onboarding: a prospect could not create a host profile';
   end if;
+end;
+$assert_prospect_creates$;
+reset role;
 
-  -- The copy is seeded honestly rather than left unset or optimistic.
-  select subscription_tier into v_tier
-    from public.host_profiles where id = v_profile_id;
-  if v_tier <> 'none' then
+-- (2) The diagnostics, as the default role.
+do $assert_prospect_is_unentitled$
+declare
+  v_profile_id uuid;
+  v_tier text;
+  v_allowance integer;
+begin
+  select id, subscription_tier
+    into v_profile_id, v_tier
+    from public.host_profiles
+   where clerk_user_id = 'user_profile_prospect';
+  if v_profile_id is null then
+    raise exception 'profile-onboarding: no prospect profile row exists to inspect';
+  end if;
+
+  -- The denormalized copy is seeded honestly rather than left unset or
+  -- optimistic. 'none' is both the true value and the one that makes the
+  -- allowance trigger refuse the publication probed below.
+  if v_tier is distinct from 'none' then
     raise exception
       'profile-onboarding: a prospect profile was born at tier %, expected none', v_tier;
   end if;
 
-  -- And the allowance the trigger will consult is zero. Read explicitly so a
-  -- failure names the CAUSE rather than only the symptom below.
+  -- And the allowance the trigger will actually consult is zero.
   v_allowance := private.host_listing_allowance(v_profile_id);
   if v_allowance <> 0 then
     raise exception
       'profile-onboarding: a prospect holds a listing allowance of %, expected 0', v_allowance;
   end if;
+end;
+$assert_prospect_is_unentitled$;
 
-  -- Drafts are free on every tier, including none.
+-- (3) The refusal probes, as the host.
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"user_profile_prospect","role":"authenticated"}';
+do $assert_prospect_cannot_publish$
+declare
+  v_profile_id uuid;
+  v_listing_id uuid;
+begin
+  -- Idempotent: returns the id created in (1) without touching host_profiles
+  -- through a role that RLS may filter.
+  v_profile_id := public.create_my_host_profile(
+    'Prospect Orchard',
+    array['farm'],
+    'Nowhere'
+  );
+
+  -- Drafts are free on every tier, including none — a draft is not a counted
+  -- status. Column set mirrors the proven authenticated insert in
+  -- assert_listing_allowance_enforcement.sql, so no column outside the client
+  -- INSERT grant is named.
   insert into public.listings (
     host_profile_id, title, category, status,
     housing_included, meals_included,
-    housing_evidence, meals_evidence, pay_evidence,
-    compensation_min_cents, location_display
+    housing_evidence, meals_evidence, pay_evidence, compensation_min_cents
   ) values (
     v_profile_id, 'Prospect draft', 'farm', 'draft',
-    false, false, 'confirmed', 'confirmed', 'confirmed',
-    22000, 'Nowhere'
+    false, false, 'confirmed', 'confirmed', 'confirmed', 22000
   ) returning id into v_listing_id;
 
   -- BOTH edges into the counted set are refused, not just the obvious one. The
@@ -452,7 +516,7 @@ begin
     raise exception 'profile-onboarding: a refused transition still moved the listing';
   end if;
 end;
-$$;
+$assert_prospect_cannot_publish$;
 reset role;
 
 -- POSITIVE CONTROL. Without it, "publication is refused" is equally satisfied by
@@ -464,15 +528,22 @@ on conflict (clerk_user_id) do update set tier = 'starter', billing_status = 'ac
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"user_profile_prospect","role":"authenticated"}';
-do $$
+do $assert_activated_host_publishes$
 declare
   v_profile_id uuid;
   v_listing_id uuid;
 begin
-  select id into v_profile_id
-    from public.host_profiles where clerk_user_id = 'user_profile_prospect';
+  -- Same idempotent resolution as the block above, for the same reason.
+  v_profile_id := public.create_my_host_profile(
+    'Prospect Orchard',
+    array['farm'],
+    'Nowhere'
+  );
   select id into v_listing_id
     from public.listings where host_profile_id = v_profile_id limit 1;
+  if v_listing_id is null then
+    raise exception 'profile-onboarding: the prospect draft is not visible to its own host';
+  end if;
 
   update public.listings set status = 'under_review' where id = v_listing_id;
   update public.listings set status = 'live' where id = v_listing_id;
@@ -481,7 +552,7 @@ begin
     raise exception 'profile-onboarding: an activated host could not publish';
   end if;
 end;
-$$;
+$assert_activated_host_publishes$;
 reset role;
 
 -- An anonymous token cannot invoke either provisioning surface.
