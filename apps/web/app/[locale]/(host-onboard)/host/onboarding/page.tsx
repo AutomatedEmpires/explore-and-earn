@@ -33,7 +33,11 @@ const VALUE_POINTS: ReadonlyArray<{ icon: IconKey; head: string; body: string }>
 	{
 		icon: "action.search",
 		head: "Reach seekers where they search",
-		body: "Your roles surface in the feed, on the map, and in swipe — free to post.",
+		// "free to post" was true when this page was written and is now false:
+		// migration 083 gates profile creation and publication on an active paid
+		// tier, and every host is on one of three plans (founder, 2026-07-26).
+		// Nobody reaches this page without having chosen one.
+		body: "Your roles surface in the feed, on the map, and in swipe — on every plan.",
 	},
 	{
 		icon: "benefit.housing",
@@ -110,6 +114,17 @@ export default function HostOnboardingPage() {
 					router.push("/host")
 					return
 				}
+				// Migration 083 refuses profile creation without a paid tier, so
+				// this is not something the host can correct on THIS form. Send
+				// them to the plans page rather than leaving them re-reading a
+				// sentence they have no way to act on. /host/plans lives in this
+				// same route group precisely so it is reachable without a profile;
+				// every other plan surface sits behind the (host) layout, which
+				// redirects a profile-less host straight back here.
+				if (result.error === "subscription_required") {
+					router.push("/host/plans")
+					return
+				}
 				const message =
 					result.error === "name_required"
 						? "Please enter your company or farm name."
@@ -121,9 +136,11 @@ export default function HostOnboardingPage() {
 									? "Keep your primary location under 200 characters."
 									: result.error === "unauthenticated"
 										? "Please sign in to continue."
-										: result.error === "account_unavailable"
-											? "This account cannot create a host profile. Contact support if this looks wrong."
-											: "Something went wrong. Please try again."
+										: result.error === "subscription_required"
+											? "Choose a plan before creating your host profile. Every host is on one of the three plans."
+											: result.error === "account_unavailable"
+												? "This account cannot create a host profile. Contact support if this looks wrong."
+												: "Something went wrong. Please try again."
 				setState({ status: "error", message })
 			} catch {
 				setState({

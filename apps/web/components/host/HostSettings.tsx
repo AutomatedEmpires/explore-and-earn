@@ -4,17 +4,29 @@ import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 import {
+  ADDITIONAL_LISTING_PRICING,
   ADDON_PRICING,
   ANNUAL_MONTHS_BILLED,
   FOUNDER_LOCKED_PRICING,
   PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
+// TYPE-ONLY. @explore-and-earn/db's entry point pulls in modules that import
+// "server-only", which cannot be bundled into a client component — so the
+// VALUES this panel needs (the invitable role list, the effective listing cap)
+// are computed by the server page and arrive as props. `import type` is erased
+// at compile time and never becomes a runtime import.
+import type { TeamMember, TeamSeatUsage } from "@explore-and-earn/db";
 
 import { requestAccountDeletionAction } from "../../app/actions/accountDeletion";
 import {
   startHostCheckoutAction,
   startHostBillingPortalAction,
 } from "../../app/actions/hostBilling";
+import {
+  inviteTeamMemberAction,
+  revokeTeamMemberAction,
+} from "../../app/actions/hostTeam";
+import { createAdditionalListingCheckoutAction } from "../../app/actions/listingSlots";
 import styles from "./HostSettings.module.css";
 
 const SUPPORT_EMAIL = "jackson@automatedempires.com";
@@ -23,6 +35,20 @@ export interface HostSettingsProps {
   readonly subscriptionTier: "none" | "starter" | "professional" | "enterprise";
   readonly companyName: string;
   readonly hostProfileId: string | null;
+  /** Pending + active team members, resolved server-side. */
+  readonly teamMembers: readonly TeamMember[];
+  /** Seat limit / used / remaining for this host's tier. */
+  readonly teamSeats: TeamSeatUsage;
+  /** False when migration 085 has not reached this environment. */
+  readonly teamAvailable: boolean;
+  /** Roles a colleague may be invited as (INVITABLE_TEAM_ROLES, server-resolved). */
+  readonly invitableRoles: readonly string[];
+  /** Additional-listing add-on slots this host has paid for. */
+  readonly purchasedListingSlots: number;
+  /** Listings the host's PLAN includes — 0 with no subscription (no free tier). */
+  readonly includedListingCap: number;
+  /** Included listings + purchased slots — what the server will actually enforce. */
+  readonly effectiveListingCap: number;
 }
 
 type SettingsTab = "billing" | "team" | "support" | "account";
@@ -69,6 +95,10 @@ function usd(cents: number): string {
 /** Human feature list derived entirely from the locked plan entitlements. */
 function planFeatures(tier: PaidTier): string[] {
   const e = PLAN_ENTITLEMENTS[tier];
+  // Widened from the `as const` literal so the singular/plural test stays a
+  // runtime branch. Every tier is 0 today (see TEAM_SEATS_BY_TIER), which would
+  // otherwise make `=== 1` a compile error instead of a false condition.
+  const teamSeats: number = e.teamSeats;
   const features: (string | null)[] = [
     `${e.listings} active listing${e.listings === 1 ? "" : "s"}`,
     e.analytics === "full"
@@ -80,9 +110,10 @@ function planFeatures(tier: PaidTier): string[] {
     e.includedInviteCredits > 0
       ? `${e.includedInviteCredits} invite credits / month`
       : null,
-    // Team seats intentionally absent: no plan grants any (pricing.ts), because
-    // team membership has no implementation. The typechecker flags this line as
-    // unreachable the moment it is reinstated without one.
+    // Seats are listed only where the plan actually grants one — a zero must not
+    // render as a sold feature. Every tier is 0 today because accepting a team
+    // invitation grants no access; see TEAM_SEATS_BY_TIER.
+    teamSeats > 0 ? `${teamSeats} team seat${teamSeats === 1 ? "" : "s"}` : null,
     "Public host profile",
     "Direct applicant messaging",
   ];
@@ -228,26 +259,113 @@ function PlanCard({
 
 /* ── Add-ons (rendered from the locked add-on pricing) ──────────────────── */
 
-function AddOnsSection({
+/**
+ * The additional-listing add-on — a real purchase, not a price list.
+ *
+ * This card previously quoted three tier prices with no checkout, no Stripe
+ * price, and no per-host allowance column, so the number on screen could not be
+ * honoured even manually. It now starts a Stripe Checkout; the allowance is
+ * credited by the webhook and counted by the publication cap.
+ *
+ * IT IS NOT SOLD TO AN UNSUBSCRIBED HOST. There is no free tier, so a host with
+ * no plan has no included listing count to buy "beyond" and no tier to be priced
+ * by. The card shows the three rates and points at the plans instead — quoting
+ * them the Starter rate is how the settings page came to offer the Starter
+ * allowance without the Starter subscription. The server refuses the same
+ * request (actions/listingSlots.ts returns no_subscription), so this is
+ * presentation, not the gate.
+ */
+function AdditionalListingCard({
   subscriptionTier,
+  purchasedListingSlots,
+  included,
+  cap,
 }: {
   subscriptionTier: HostSettingsProps["subscriptionTier"];
+  purchasedListingSlots: number;
+  included: number;
+  cap: number;
 }) {
-  const addl = ADDON_PRICING.additionalListingMonthly;
+  const [state, setState] = useState<"idle" | "starting" | "error">("idle");
+  const unitPrice =
+    subscriptionTier === "none" ? null : ADDITIONAL_LISTING_PRICING[subscriptionTier];
+
+  function handleBuy() {
+    setState("starting");
+    void createAdditionalListingCheckoutAction(1)
+      .then((result) => {
+        if (result.ok) {
+          window.location.assign(result.sessionUrl);
+          return;
+        }
+        setState("error");
+      })
+      .catch(() => setState("error"));
+  }
+
+  return (
+    <div className={styles.addonCard}>
+      <div className={styles.addonCardHead}>
+        <span className={styles.addonName}>Additional active listing</span>
+        <span className={styles.addonPrice}>
+          {unitPrice === null ? "With a plan" : `${usd(unitPrice)}/mo each`}
+        </span>
+      </div>
+      <p className={styles.addonDesc}>
+        One more active listing beyond your plan&rsquo;s included count, billed monthly.
+        Priced by tier — {usd(ADDITIONAL_LISTING_PRICING.starter)} Starter ·{" "}
+        {usd(ADDITIONAL_LISTING_PRICING.professional)} Pro ·{" "}
+        {usd(ADDITIONAL_LISTING_PRICING.enterprise)} Enterprise.
+      </p>
+      {unitPrice === null ? (
+        <p className={styles.addonDesc}>
+          Extra listings are an add-on to a paid plan, so there&rsquo;s nothing to add
+          on to yet. Choose a plan above and this unlocks at that plan&rsquo;s rate.
+        </p>
+      ) : (
+        <p className={styles.addonDesc}>
+          Your plan includes {included}. You have bought {purchasedListingSlots}, so you
+          can hold {cap} active {cap === 1 ? "listing" : "listings"} at once.
+        </p>
+      )}
+      {unitPrice === null ? null : (
+        <button
+          type="button"
+          className={styles.planCta}
+          onClick={handleBuy}
+          disabled={state === "starting"}
+        >
+          {state === "starting" ? "Opening checkout…" : "Add one listing"}
+        </button>
+      )}
+      {state === "error" ? (
+        <p className={styles.addonDesc}>
+          We couldn&rsquo;t start checkout just now. Try again, or email{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}?subject=Additional%20listing`}>
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function AddOnsSection({
+  subscriptionTier,
+  purchasedListingSlots,
+  includedListingCap,
+  effectiveListingCap,
+}: {
+  subscriptionTier: HostSettingsProps["subscriptionTier"];
+  purchasedListingSlots: number;
+  includedListingCap: number;
+  effectiveListingCap: number;
+}) {
   const ann = ADDON_PRICING.additionalAnnouncement;
   const boost = ADDON_PRICING.boost;
 
-  const listingPrice =
-    subscriptionTier === "none"
-      ? `from ${usd(addl.enterprise)}/mo`
-      : `${usd(addl[subscriptionTier])}/mo`;
-  const listingDesc =
-    subscriptionTier === "none"
-      ? `Add an active listing beyond your plan's included count. Priced by tier — ${usd(addl.starter)} Starter · ${usd(addl.professional)} Pro · ${usd(addl.enterprise)} Enterprise, each per month.`
-      : "Add an active listing beyond your plan's included count, billed monthly per extra active listing.";
-
   const addons: { name: string; price: string; desc: string }[] = [
-    { name: "Additional active listing", price: `${listingPrice} each`, desc: listingDesc },
     {
       name: "Extra community announcement",
       price: `${usd(ann.priceCents)} each`,
@@ -267,6 +385,12 @@ function AddOnsSection({
         Top up any plan as you grow — purchased à la carte, never bundled.
       </p>
       <div className={styles.addonGrid}>
+        <AdditionalListingCard
+          subscriptionTier={subscriptionTier}
+          purchasedListingSlots={purchasedListingSlots}
+          included={includedListingCap}
+          cap={effectiveListingCap}
+        />
         {addons.map((a) => (
           <div key={a.name} className={styles.addonCard}>
             <div className={styles.addonCardHead}>
@@ -281,7 +405,17 @@ function AddOnsSection({
   );
 }
 
-function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProps["subscriptionTier"] }) {
+function BillingPanel({
+  subscriptionTier,
+  purchasedListingSlots,
+  includedListingCap,
+  effectiveListingCap,
+}: {
+  subscriptionTier: HostSettingsProps["subscriptionTier"];
+  purchasedListingSlots: number;
+  includedListingCap: number;
+  effectiveListingCap: number;
+}) {
   const [interval, setInterval] = useState<BillingInterval>("monthly");
 
   return (
@@ -325,14 +459,19 @@ function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProp
         ))}
       </div>
 
-      <AddOnsSection subscriptionTier={subscriptionTier} />
+      <AddOnsSection
+        subscriptionTier={subscriptionTier}
+        purchasedListingSlots={purchasedListingSlots}
+        includedListingCap={includedListingCap}
+        effectiveListingCap={effectiveListingCap}
+      />
 
       <div className={styles.billingNote}>
         <Icon name="system.info" size={16} aria-hidden />
         <span>
           Plans are billed securely through Stripe — choose a plan above, or use
-          Manage billing to update payment details, switch plans, or cancel. For
-          add-on capacity, contact{" "}
+          Manage billing to update payment details, switch plans, or cancel. To
+          cancel an add-on, use Manage billing. Anything else, email{" "}
           <a href={`mailto:${SUPPORT_EMAIL}`} className={styles.inlineLink}>
             {SUPPORT_EMAIL}
           </a>
@@ -343,25 +482,105 @@ function BillingPanel({ subscriptionTier }: { subscriptionTier: HostSettingsProp
   );
 }
 
+const TEAM_ROLE_LABEL: Record<string, string> = {
+  admin: "Admin",
+  hiring_manager: "Hiring manager",
+  analyst: "Analyst",
+  billing: "Billing",
+  viewer: "Viewer",
+  owner: "Owner",
+};
+
+const TEAM_INVITE_ERROR: Record<string, string> = {
+  invalid_email: "That doesn't look like an email address.",
+  invalid_role: "Pick a role from the list.",
+  seat_limit_reached:
+    "Every seat on your plan is taken. Remove someone to free a seat, or upgrade.",
+  already_invited: "There's already a pending invitation for that address.",
+  unavailable: "Team seats aren't switched on for this environment yet.",
+  rate_limited: "Too many invitations in the last hour. Try again shortly.",
+  not_host: "We couldn't find your host profile.",
+  unauthenticated: "Sign in again to invite a colleague.",
+  failed: "We couldn't create that invitation.",
+};
+
 /**
- * Team members — deliberately NOT gated on a plan.
+ * Team members.
  *
- * This panel used to assert "Enterprise plans include a team seat", show
- * Enterprise hosts a disabled button under "coming soon", and show everyone
- * else an "Enterprise plan required" gate with a Contact sales button. So a
- * $749/mo tier was being sold on a capability that has no application code at
- * all, and non-Enterprise hosts were upsold toward it.
+ * NO PLAN GRANTS A SEAT TODAY (TEAM_SEATS_BY_TIER is 0 for every tier), so this
+ * panel shows the owner and says plainly that nobody else can be added. The
+ * reason is not a missing number: accepting an invitation grants no access to
+ * listings, applicants, messages or analytics, because no policy admits a team
+ * membership to any of them. Until it does, a card offering seats would sell
+ * something acceptance does not deliver.
  *
- * Until team membership is built, this states the truth once, for everyone,
- * and sells nothing.
+ * The invite form below is therefore unreachable — seats.remaining is always 0 —
+ * and it is kept, rather than deleted, because the plumbing behind it is real
+ * and tested; it becomes reachable the moment a seat count can honestly rise.
+ * The refusal that matters is server-side either way: the seat limit passed to
+ * migration 085's SQL function is resolved from the host's real tier, so it is
+ * zero even if this component is bypassed.
+ *
+ * DELIVERY IS EXPLICIT. Accepting the invitation needs the link below; nothing
+ * here emails it, and nothing here says it did.
  */
-function TeamPanel({ companyName }: { companyName: string }) {
+function TeamPanel({
+  companyName,
+  members,
+  seats,
+  available,
+  invitableRoles,
+}: {
+  companyName: string;
+  members: readonly TeamMember[];
+  seats: TeamSeatUsage;
+  available: boolean;
+  invitableRoles: readonly string[];
+}) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<string>("viewer");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+
+  const canInvite = available && seats.remaining > 0;
+
+  function handleInvite() {
+    setBusy(true);
+    setError(null);
+    setInviteLink(null);
+    void inviteTeamMemberAction(email, role)
+      .then((result) => {
+        if (result.ok) {
+          setInviteLink(result.acceptUrl);
+          setEmail("");
+          return;
+        }
+        setError(TEAM_INVITE_ERROR[result.reason] ?? TEAM_INVITE_ERROR.failed);
+      })
+      .catch(() => setError(TEAM_INVITE_ERROR.failed))
+      .finally(() => setBusy(false));
+  }
+
+  function handleRemove(membershipId: string) {
+    setBusy(true);
+    setError(null);
+    void revokeTeamMemberAction(membershipId)
+      .then((result) => {
+        if (!result.ok) setError("We couldn't remove that person.");
+      })
+      .catch(() => setError("We couldn't remove that person."))
+      .finally(() => setBusy(false));
+  }
+
   return (
     <div className={styles.panel} id="panel-team" role="tabpanel" aria-label="Team">
       <div className={styles.panelHead}>
         <h2 className={styles.panelTitle}>Team members</h2>
         <p className={styles.panelDesc}>
-          Your host account has a single owner today.
+          {seats.limit === 0
+            ? "Team accounts aren't available yet — no plan includes a seat, so the account owner is the only person who can sign in."
+            : `Your plan includes ${seats.limit} team seat${seats.limit === 1 ? "" : "s"} alongside the owner — ${seats.used} in use, ${seats.remaining} free.`}
         </p>
       </div>
 
@@ -376,15 +595,99 @@ function TeamPanel({ companyName }: { companyName: string }) {
           </div>
           <span className={styles.teamOwnerBadge}>You</span>
         </div>
-        <p className={styles.teamNote}>
-          Adding other people to your account isn&apos;t available yet, on any plan. If you
-          need a colleague to help manage listings or review applicants in the meantime,
-          email{" "}
-          <a href={`mailto:${SUPPORT_EMAIL}?subject=Host%20account%20access`}>
-            {SUPPORT_EMAIL}
-          </a>
-          .
-        </p>
+
+        {members.map((member) => (
+          <div key={member.id} className={styles.teamMember}>
+            <div className={styles.teamAvatar}>
+              <Icon name="nav.profile" size={20} aria-hidden />
+            </div>
+            <div className={styles.teamMemberInfo}>
+              <span className={styles.teamMemberName}>
+                {member.invitedEmail ?? "Team member"}
+              </span>
+              <span className={styles.teamMemberRole}>
+                {TEAM_ROLE_LABEL[member.rolePreset] ?? member.rolePreset}
+                {member.status === "invited" ? " · invitation pending" : ""}
+              </span>
+            </div>
+            <button
+              type="button"
+              className={styles.dangerBtn}
+              onClick={() => handleRemove(member.id)}
+              disabled={busy}
+            >
+              {member.status === "invited" ? "Withdraw" : "Remove"}
+            </button>
+          </div>
+        ))}
+
+        {!available ? (
+          <p className={styles.teamNote}>
+            Team seats aren&rsquo;t switched on for this environment yet, so nothing can be
+            invited from here. Email{" "}
+            <a href={`mailto:${SUPPORT_EMAIL}?subject=Host%20account%20access`}>
+              {SUPPORT_EMAIL}
+            </a>{" "}
+            if you need a colleague added in the meantime.
+          </p>
+        ) : canInvite ? (
+          <div className={styles.teamNote}>
+            <label htmlFor="team-invite-email">Invite a colleague by email</label>
+            <input
+              id="team-invite-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="colleague@example.com"
+            />
+            <label htmlFor="team-invite-role">Role</label>
+            <select
+              id="team-invite-role"
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+            >
+              {invitableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {TEAM_ROLE_LABEL[r] ?? r}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={styles.planCta}
+              onClick={handleInvite}
+              disabled={busy || email.trim().length === 0}
+            >
+              {busy ? "Creating invitation…" : "Create invitation"}
+            </button>
+          </div>
+        ) : seats.limit > 0 ? (
+          <p className={styles.teamNote}>
+            Every seat on your plan is in use. Remove someone above to free a seat.
+          </p>
+        ) : (
+          <p className={styles.teamNote}>
+            No plan includes a team seat right now, and upgrading won&rsquo;t add
+            one. If you need a colleague to help manage listings or review
+            applicants, email{" "}
+            <a href={`mailto:${SUPPORT_EMAIL}?subject=Host%20account%20access`}>
+              {SUPPORT_EMAIL}
+            </a>{" "}
+            and we&rsquo;ll work it out with you directly.
+          </p>
+        )}
+
+        {error ? <p className={styles.teamNote}>{error}</p> : null}
+
+        {inviteLink ? (
+          <p className={styles.teamNote}>
+            Invitation created. We have <strong>not</strong> emailed it — send this
+            single-use link to your colleague yourself. They will need to sign in to
+            accept it.
+            <br />
+            <code>{inviteLink}</code>
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -617,15 +920,35 @@ export function HostSettings({
   subscriptionTier,
   companyName,
   hostProfileId,
+  teamMembers,
+  teamSeats,
+  teamAvailable,
+  invitableRoles,
+  purchasedListingSlots,
+  includedListingCap,
+  effectiveListingCap,
 }: HostSettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>("billing");
 
   return (
     <div className={styles.root}>
       <TabBar active={activeTab} onChange={setActiveTab} />
-      {activeTab === "billing" && <BillingPanel subscriptionTier={subscriptionTier} />}
+      {activeTab === "billing" && (
+        <BillingPanel
+          subscriptionTier={subscriptionTier}
+          purchasedListingSlots={purchasedListingSlots}
+          includedListingCap={includedListingCap}
+          effectiveListingCap={effectiveListingCap}
+        />
+      )}
       {activeTab === "team" && (
-        <TeamPanel companyName={companyName} />
+        <TeamPanel
+          companyName={companyName}
+          members={teamMembers}
+          seats={teamSeats}
+          available={teamAvailable}
+          invitableRoles={invitableRoles}
+        />
       )}
       {activeTab === "support" && <SupportPanel />}
       {activeTab === "account" && (

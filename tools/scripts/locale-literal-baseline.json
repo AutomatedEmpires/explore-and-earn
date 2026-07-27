@@ -22,7 +22,6 @@
   "apps/web/components/host/HostReviews.tsx": 2,
   "apps/web/components/host/HostSettings.tsx": 2,
   "apps/web/components/host/ListingForm.tsx": 4,
-  "apps/web/components/host/PublicListingCard.tsx": 2,
   "apps/web/components/host/WeatherWidget.tsx": 2,
   "apps/web/components/listing/SourcedNotice.tsx": 2,
   "apps/web/components/listing/TrueValue.tsx": 3,

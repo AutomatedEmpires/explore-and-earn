@@ -24,8 +24,9 @@ import { checkRateLimit } from "../../lib/rateLimit";
  * Identity ({ token, userId }) is CLOSED OVER at construction. Every tool acts
  * only as the authenticated host via the same RLS-scoped services the host
  * dashboard uses, so it can only ever see this host's own listings/applicants;
- * applicant resume access additionally passes the hostCanViewSeeker gate (an
- * application or conversation must exist). All tools are read-only —
+ * applicant resume access is additionally gated in the database by migration
+ * 084, which derives the host from the JWT and returns rows only for a seeker
+ * who applied to, was invited by, or converses with them. All tools are read-only —
  * screening is ASSISTIVE: the Guide summarizes, compares, and prioritizes for
  * review; it never decides, never rejects, and never reveals anything to the
  * candidate. Protected characteristics play no role anywhere: every signal is
@@ -155,10 +156,10 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
         );
         if (!application) return { error: "applicant_not_found" as const };
 
-        // Resume read passes the hostCanViewSeeker gate inside the db layer —
-        // defense in depth on top of the application check above.
+        // The resume read is entitlement-checked again inside the database
+        // (084) — defense in depth on top of the application check above.
         const [resume, requirements, scores] = await Promise.all([
-          getSeekerResumeByProfileId(ctx.token, ctx.userId, seekerProfileId),
+          getSeekerResumeByProfileId(ctx.token, seekerProfileId),
           getListingMatchRequirements(listingId),
           getMatchScoresForHost(ctx.token),
         ]);

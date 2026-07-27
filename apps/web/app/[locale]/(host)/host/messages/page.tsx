@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import {
   getConversations,
   getSeekerDisplayNames,
+  resolveSeekerName,
 } from "@explore-and-earn/db";
 
 import { EmptyState } from "../../../../../components/discovery";
@@ -86,13 +87,24 @@ export default async function HostMessagesPage() {
     getSeekerDisplayNames(token, seekerProfileIds),
   ]);
 
+  // The transcript list is the page; names decorate it. A lookup fault is logged
+  // and labelled, never allowed to take the list down and never laundered into
+  // the "Seeker" placeholder, which would be indistinguishable from the bug
+  // migration 084 fixed.
+  if (seekerDisplayNames.status === "unavailable") {
+    console.error("[host/messages] applicant name lookup failed:", seekerDisplayNames.reason);
+  }
+
   const threads: HostMessageThread[] = conversations.map((conversation) => {
     const context = contexts.get(conversation.id) ?? null;
     const lastMessage = lastMessages.get(conversation.id) ?? null;
     return {
       id: conversation.id,
-      applicantName:
-        seekerDisplayNames.get(conversation.seekerProfileId) ?? "Seeker",
+      applicantName: resolveSeekerName(
+        seekerDisplayNames,
+        conversation.seekerProfileId,
+        "Seeker",
+      ),
       listingTitle: context?.listingTitle || "Conversation",
       preview: lastMessage?.body ?? "No messages yet",
       unread: lastMessage

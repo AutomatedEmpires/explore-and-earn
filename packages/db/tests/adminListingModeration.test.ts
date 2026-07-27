@@ -1,152 +1,227 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+/**
+ * Operator listing actions must be able to act on a LIVE listing.
+ *
+ * The defect this pins: adminApproveListing / adminHoldListing /
+ * adminCloseListing each filtered `.eq("status", "under_review")`. Since the
+ * founder's 2026-07-26 decision hosts publish their own listings, so
+ * `under_review` is a state a listing passes through in seconds and every
+ * listing an operator would ever look at is `live`. All three therefore answered
+ * "Listing is no longer awaiting review." and the only way to take a published
+ * listing down was takeModerationAction's archive path.
+ *
+ * The fake below is a small row store rather than a call recorder: it applies
+ * the status filter the way PostgREST would, so narrowing the permitted sources
+ * back to `under_review` fails the LIVE cases instead of merely changing an
+ * argument the assertions happen to quote.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const mocks = vi.hoisted(() => ({
-  adminClient: vi.fn(),
-  from: vi.fn(),
-  update: vi.fn(),
-  eq: vi.fn(),
-  select: vi.fn(),
-  maybeSingle: vi.fn(),
-}));
+interface Row {
+  id: string;
+  status: string;
+  closed_at?: string | null;
+}
+
+/** The one row every case operates on. */
+let row: Row | null = null;
+/** Forced database error, when a case is about failure handling. */
+let forcedError: { message: string } | null = null;
+/** Every update patch the code sent, in order. */
+const patches: Record<string, unknown>[] = [];
+
+function makeBuilder() {
+  let patch: Record<string, unknown> = {};
+  let idFilter: string | null = null;
+  let statusFilter: readonly string[] | null = null;
+
+  const builder: Record<string, unknown> = {
+    update(next: Record<string, unknown>) {
+      patch = next;
+      patches.push(next);
+      return builder;
+    },
+    eq(column: string, value: string) {
+      if (column === "id") idFilter = value;
+      if (column === "status") statusFilter = [value];
+      return builder;
+    },
+    in(column: string, values: readonly string[]) {
+      if (column === "status") statusFilter = values;
+      return builder;
+    },
+    select() {
+      return builder;
+    },
+    async maybeSingle() {
+      if (forcedError) return { data: null, error: forcedError };
+      if (!row) return { data: null, error: null };
+      if (idFilter !== null && row.id !== idFilter) {
+        return { data: null, error: null };
+      }
+      if (statusFilter !== null && !statusFilter.includes(row.status)) {
+        return { data: null, error: null };
+      }
+      row = { ...row, ...(patch as Partial<Row>) };
+      return { data: { id: row.id }, error: null };
+    },
+  };
+
+  return builder;
+}
 
 vi.mock("../src/adminClient", () => ({
-  adminClient: mocks.adminClient,
+  adminClient: () => ({ from: () => makeBuilder() }),
 }));
 
 const { adminApproveListing, adminCloseListing, adminHoldListing } =
   await import("../src/queries/admin");
+const { OPERATOR_LISTING_TRANSITIONS } = await import(
+  "../src/lib/operatorListingTransitions"
+);
 
-function buildChain(result: {
-  data: { id: string } | null;
-  error: { message: string } | null;
-}) {
-  const chain = {
-    update: mocks.update,
-    eq: mocks.eq,
-    select: mocks.select,
-    maybeSingle: mocks.maybeSingle,
-  };
+const NO_MATCH = OPERATOR_LISTING_TRANSITIONS.close.noMatchMessage;
 
-  mocks.adminClient.mockReturnValue({ from: mocks.from });
-  mocks.from.mockReturnValue(chain);
-  mocks.update.mockReturnValue(chain);
-  mocks.eq.mockReturnValue(chain);
-  mocks.select.mockReturnValue(chain);
-  mocks.maybeSingle.mockResolvedValue(result);
-}
+beforeEach(() => {
+  row = null;
+  forcedError = null;
+  patches.length = 0;
+});
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.clearAllMocks();
 });
 
-describe("admin listing moderation transitions", () => {
-  it("atomically approves only a listing that is under review", async () => {
-    buildChain({ data: { id: "listing-1" }, error: null });
-
-    const result = await adminApproveListing("service-key", "listing-1");
-
-    expect(result).toEqual({ ok: true });
-    expect(mocks.from).toHaveBeenCalledWith("listings");
-    expect(mocks.update).toHaveBeenCalledOnce();
-    expect(mocks.update).toHaveBeenCalledWith({ status: "live" });
-    expect(mocks.eq.mock.calls).toEqual([
-      ["id", "listing-1"],
-      ["status", "under_review"],
-    ]);
-    expect(mocks.select).toHaveBeenCalledWith("id");
-    expect(mocks.maybeSingle).toHaveBeenCalledOnce();
-  });
-
-  it("does not report approval success when no reviewable row changed", async () => {
-    buildChain({ data: null, error: null });
+describe("operator moderation of a LIVE listing", () => {
+  /**
+   * The case the whole change exists for. A published listing is what an
+   * operator actually has in front of them, and before this it could not be
+   * taken down through the close action at all.
+   */
+  it("closes a LIVE listing", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-26T12:34:56.000Z"));
+    row = { id: "listing-live", status: "live" };
 
     await expect(
-      adminApproveListing("service-key", "listing-1"),
-    ).resolves.toEqual({
-      ok: false,
-      error: "Listing is no longer awaiting review.",
+      adminCloseListing("service-key", "listing-live", "Misleading pay claim"),
+    ).resolves.toEqual({ ok: true });
+
+    expect(row).toMatchObject({
+      status: "closed",
+      closed_at: "2026-07-26T12:34:56.000Z",
     });
   });
 
-  it("returns the database error when approval fails", async () => {
-    buildChain({ data: null, error: { message: "database unavailable" } });
+  it("holds a LIVE listing back to draft", async () => {
+    row = { id: "listing-live", status: "live" };
+
+    await expect(
+      adminHoldListing("service-key", "listing-live"),
+    ).resolves.toEqual({ ok: true });
+
+    expect(row).toMatchObject({ status: "draft" });
+  });
+
+  /** Already published: the action reports success rather than a false failure. */
+  it("approving an already-live listing is idempotent", async () => {
+    row = { id: "listing-live", status: "live" };
+
+    await expect(
+      adminApproveListing("service-key", "listing-live"),
+    ).resolves.toEqual({ ok: true });
+
+    expect(row).toMatchObject({ status: "live" });
+  });
+});
+
+describe("operator moderation of an under-review listing", () => {
+  it("approves an under-review listing", async () => {
+    row = { id: "listing-1", status: "under_review" };
+
+    await expect(
+      adminApproveListing("service-key", "listing-1"),
+    ).resolves.toEqual({ ok: true });
+
+    expect(row).toMatchObject({ status: "live" });
+    expect(patches).toEqual([{ status: "live" }]);
+  });
+
+  it("holds an under-review listing back to draft", async () => {
+    row = { id: "listing-3", status: "under_review" };
+
+    await expect(
+      adminHoldListing("service-key", "listing-3"),
+    ).resolves.toEqual({ ok: true });
+
+    expect(row).toMatchObject({ status: "draft" });
+  });
+
+  it("closes an under-review listing", async () => {
+    row = { id: "listing-2", status: "under_review" };
+
+    await expect(
+      adminCloseListing("service-key", "listing-2"),
+    ).resolves.toEqual({ ok: true });
+
+    expect(row).toMatchObject({ status: "closed" });
+  });
+});
+
+describe("operator moderation refusals", () => {
+  /**
+   * The negative control: widening the sources must not turn these into a
+   * blanket write. A draft is the host's private workspace and an archived
+   * listing is terminal — neither is an operator action's business.
+   */
+  it.each(["draft", "paused", "archived", "closed"])(
+    "changes nothing on a %s listing",
+    async (status) => {
+      row = { id: "listing-x", status };
+
+      await expect(
+        adminCloseListing("service-key", "listing-x"),
+      ).resolves.toEqual({ ok: false, error: NO_MATCH });
+      await expect(
+        adminHoldListing("service-key", "listing-x"),
+      ).resolves.toEqual({ ok: false, error: NO_MATCH });
+      await expect(
+        adminApproveListing("service-key", "listing-x"),
+      ).resolves.toEqual({ ok: false, error: NO_MATCH });
+
+      expect(row).toMatchObject({ status });
+    },
+  );
+
+  /** The message has to be true: "awaiting review" was not. */
+  it("says what the listing actually has to be, not 'awaiting review'", () => {
+    for (const transition of Object.values(OPERATOR_LISTING_TRANSITIONS)) {
+      expect(transition.noMatchMessage).not.toMatch(/awaiting review\.$/);
+      expect(transition.noMatchMessage).toMatch(/live/i);
+      expect([...transition.from].sort()).toEqual(["live", "under_review"]);
+    }
+  });
+
+  it("reports no success when the listing does not exist", async () => {
+    row = null;
+
+    await expect(
+      adminApproveListing("service-key", "missing"),
+    ).resolves.toEqual({ ok: false, error: NO_MATCH });
+  });
+
+  it("returns the database error instead of swallowing it", async () => {
+    forcedError = { message: "database unavailable" };
 
     await expect(
       adminApproveListing("service-key", "listing-1"),
     ).resolves.toEqual({ ok: false, error: "database unavailable" });
-  });
-
-  it("closes only a listing that is under review", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-07-21T12:34:56.000Z"));
-    buildChain({ data: { id: "listing-2" }, error: null });
-
-    const result = await adminCloseListing(
-      "service-key",
-      "listing-2",
-      "Incomplete listing",
-    );
-
-    expect(result).toEqual({ ok: true });
-    expect(mocks.update).toHaveBeenCalledOnce();
-    expect(mocks.update).toHaveBeenCalledWith({
-      status: "closed",
-      closed_at: "2026-07-21T12:34:56.000Z",
-    });
-    expect(mocks.eq.mock.calls).toEqual([
-      ["id", "listing-2"],
-      ["status", "under_review"],
-    ]);
-    expect(mocks.select).toHaveBeenCalledWith("id");
-    expect(mocks.maybeSingle).toHaveBeenCalledOnce();
-  });
-
-  it("does not report rejection success when no reviewable row changed", async () => {
-    buildChain({ data: null, error: null });
-
     await expect(
-      adminCloseListing("service-key", "listing-2"),
-    ).resolves.toEqual({
-      ok: false,
-      error: "Listing is no longer awaiting review.",
-    });
-  });
-
-  it("returns the database error when rejection fails", async () => {
-    buildChain({ data: null, error: { message: "write failed" } });
-
+      adminHoldListing("service-key", "listing-1"),
+    ).resolves.toEqual({ ok: false, error: "database unavailable" });
     await expect(
-      adminCloseListing("service-key", "listing-2"),
-    ).resolves.toEqual({ ok: false, error: "write failed" });
-  });
-
-  it("returns an under-review listing to draft when held", async () => {
-    buildChain({ data: { id: "listing-3" }, error: null });
-
-    const result = await adminHoldListing("service-key", "listing-3");
-
-    expect(result).toEqual({ ok: true });
-    expect(mocks.update).toHaveBeenCalledOnce();
-    expect(mocks.update).toHaveBeenCalledWith({ status: "draft" });
-    expect(mocks.eq.mock.calls).toEqual([
-      ["id", "listing-3"],
-      ["status", "under_review"],
-    ]);
-    expect(mocks.select).toHaveBeenCalledWith("id");
-    expect(mocks.maybeSingle).toHaveBeenCalledOnce();
-  });
-
-  it("does not report hold success when no reviewable row changed", async () => {
-    buildChain({ data: null, error: null });
-
-    await expect(
-      adminHoldListing("service-key", "listing-3"),
-    ).resolves.toEqual({
-      ok: false,
-      error: "Listing is no longer awaiting review.",
-    });
+      adminCloseListing("service-key", "listing-1"),
+    ).resolves.toEqual({ ok: false, error: "database unavailable" });
   });
 });

@@ -1,6 +1,8 @@
 /**
  * Connected proof for migration 077. Opt-in because it creates and removes
  * rows in a real local/staging Supabase database; production is hard-disabled.
+ * Opt-in means it does not run in CI: the always-on authorization coverage is
+ * `tools/db-assert/sql/assert_authorization_matrix.sql`.
  *
  * Run against `supabase start` after a local reset:
  *   SUPABASE_RLS_INTEGRATION=1 NEXT_PUBLIC_SUPABASE_URL=... \
@@ -12,23 +14,30 @@ import { createClient } from "@supabase/supabase-js";
 import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 
+import {
+  announceIntegrationGate,
+  resolveIntegrationGate,
+} from "./support/integrationGate.js";
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
-const isLoopback = (() => {
-  try {
-    const hostname = new URL(SUPABASE_URL ?? "").hostname;
-    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
-  } catch {
-    return false;
-  }
-})();
 
-const enabled =
-  process.env.SUPABASE_RLS_INTEGRATION === "1" &&
-  Boolean(SUPABASE_URL && ANON_KEY && SERVICE_ROLE_KEY && JWT_SECRET) &&
-  isLoopback;
+const GATE_LABEL = "listingHostStatusIntegration (migration 077/082)";
+const gate = resolveIntegrationGate(
+  { label: GATE_LABEL, requiresOptIn: true },
+  process.env,
+);
+const enabled = gate.enabled;
+
+// ALWAYS RUNS — see support/integrationGate.ts. A skipped connected suite must
+// not be indistinguishable from a passing one.
+describe(`${GATE_LABEL} — coverage gate`, () => {
+  it("either runs against a database or says out loud that it did not", () => {
+    expect(announceIntegrationGate(GATE_LABEL, gate)).toBe(gate.enabled);
+  });
+});
 
 async function mintToken(sub: string): Promise<string> {
   return new SignJWT({ role: "authenticated", aud: "authenticated", sub })
@@ -39,7 +48,7 @@ async function mintToken(sub: string): Promise<string> {
 }
 
 describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () => {
-  it("blocks moderation bypasses while preserving host and service-role transitions", async () => {
+  it("lets a host publish and reopen while keeping the refusals 077 established", async () => {
     const admin = createClient(SUPABASE_URL!, SERVICE_ROLE_KEY!, {
       auth: { persistSession: false },
     });
@@ -49,6 +58,18 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
       auth: { persistSession: false },
       global: { headers: { Authorization: `Bearer ${token}` } },
     });
+
+    // Migration 083: there is no free tier, so a host cannot be created without
+    // a recorded subscription, and three listings in review need an allowance of
+    // at least three. Enterprise is the fixture's plan for that reason, not for
+    // any behaviour under test here.
+    const subscribed = await admin
+      .from("host_subscriptions")
+      .upsert(
+        { clerk_user_id: clerkUserId, tier: "enterprise", billing_status: "active" },
+        { onConflict: "clerk_user_id" },
+      );
+    expect(subscribed.error).toBeNull();
 
     const profile = await host.rpc("create_my_host_profile", {
       p_company_name: "Lifecycle Integration Host",
@@ -83,42 +104,44 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
       const inserted = await host
         .from("listings")
         .insert([
-          { ...completeDraft, title: "Approve path" },
+          { ...completeDraft, title: "Publish path" },
           { ...completeDraft, title: "Hold path" },
           { ...completeDraft, title: "Reject path" },
         ])
         .select("id,status");
       expect(inserted.error).toBeNull();
       expect(inserted.data).toHaveLength(3);
-      const [approveId, holdId, rejectId] = (inserted.data ?? []).map(
+      const [publishId, holdId, rejectId] = (inserted.data ?? []).map(
         (row) => (row as { id: string }).id,
+      );
+
+      // draft -> live is still refused, on a listing that answers everything.
+      const shortcut = await host
+        .from("listings")
+        .update({ status: "live" })
+        .eq("id", publishId);
+      expect(shortcut.error?.code).toBe("23514");
+      expect(shortcut.error?.message).toContain(
+        "listing_host_status_transition_forbidden",
       );
 
       const submitted = await host
         .from("listings")
         .update({ status: "under_review" })
-        .in("id", [approveId, holdId, rejectId])
+        .in("id", [publishId, holdId, rejectId])
         .select("id,status");
       expect(submitted.error).toBeNull();
       expect(submitted.data).toHaveLength(3);
 
-      const bypassApproval = await host
+      // 082: the host publishes their own listing. No admin acts here.
+      const published = await host
         .from("listings")
         .update({ status: "live" })
-        .eq("id", approveId);
-      expect(bypassApproval.error?.code).toBe("23514");
-      expect(bypassApproval.error?.message).toContain(
-        "listing_host_status_transition_forbidden",
-      );
-
-      const approved = await admin
-        .from("listings")
-        .update({ status: "live" })
-        .eq("id", approveId)
+        .eq("id", publishId)
         .select("status")
         .single();
-      expect(approved.error).toBeNull();
-      expect(approved.data?.status).toBe("live");
+      expect(published.error).toBeNull();
+      expect(published.data?.status).toBe("live");
 
       const held = await admin
         .from("listings")
@@ -142,7 +165,7 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
         const transition = await host
           .from("listings")
           .update({ status })
-          .eq("id", approveId)
+          .eq("id", publishId)
           .select("status")
           .single();
         expect(transition.error).toBeNull();
@@ -152,7 +175,7 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
       const archivedToLive = await host
         .from("listings")
         .update({ status: "live" })
-        .eq("id", approveId);
+        .eq("id", publishId);
       expect(archivedToLive.error?.code).toBe("23514");
 
       const closedToLive = await host
@@ -160,9 +183,20 @@ describe.skipIf(!enabled)("listing host status transitions (connected RLS)", () 
         .update({ status: "live" })
         .eq("id", rejectId);
       expect(closedToLive.error?.code).toBe("23514");
+
+      // 082: closed -> draft, so a rejected listing is not an orphan.
+      const reopened = await host
+        .from("listings")
+        .update({ status: "draft" })
+        .eq("id", rejectId)
+        .select("status")
+        .single();
+      expect(reopened.error).toBeNull();
+      expect(reopened.data?.status).toBe("draft");
     } finally {
       const cleanup = await admin.from("host_profiles").delete().eq("id", hostProfileId);
       expect(cleanup.error).toBeNull();
+      await admin.from("host_subscriptions").delete().eq("clerk_user_id", clerkUserId);
     }
   });
 });

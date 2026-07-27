@@ -6,13 +6,13 @@ import { revalidatePath } from "next/cache";
 import { checkRateLimitDistributed } from "../../lib/rateLimit";
 
 import {
-  ANNOUNCEMENT_FREE_DURATION_DAYS,
   ANNOUNCEMENT_MONTHLY_QUOTA,
   type AnnouncementKind,
 } from "@explore-and-earn/contracts";
 import {
   activateHostAnnouncement,
   countHostAnnouncementsThisMonth,
+  createHostAnnouncement,
   deleteCommunityPhoto,
   getComments,
   getCommenterName,
@@ -22,7 +22,6 @@ import {
   insertComment,
   insertCommunityPhoto,
   insertCommunityPhotoReport,
-  insertHostAnnouncement,
   softDeleteComment,
   toggleAnnouncementReaction,
   togglePhotoReaction,
@@ -181,6 +180,11 @@ export async function postHostAnnouncementAction(fd: FormData): Promise<PostAnno
   const host = await getHostTierAndProfile(session.token, session.userId);
   if (!host) return { ok: false, reason: "not_host" };
 
+  // Pre-flight only, so the host sees the upsell instead of a raw database
+  // error. The refusal that counts is migration 083's create_my_host_announcement,
+  // which takes the per-host advisory lock and re-counts inside the transaction —
+  // `authenticated` no longer holds INSERT on host_announcements at all, so
+  // skipping this block would change nothing about what is allowed.
   const quota = ANNOUNCEMENT_MONTHLY_QUOTA[host.subscriptionTier] ?? 0;
   if (quota === 0) {
     return { ok: false, reason: "quota_exceeded", purchaseRequired: true };
@@ -199,20 +203,23 @@ export async function postHostAnnouncementAction(fd: FormData): Promise<PostAnno
     return { ok: false, reason: "invalid_input" };
   }
 
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + ANNOUNCEMENT_FREE_DURATION_DAYS);
-
-  const { id: announcementId } = await insertHostAnnouncement({
-    hostProfileId: host.hostProfileId,
+  const created = await createHostAnnouncement(session.token, {
     title,
     body,
     kind: kind as AnnouncementKind,
-    expiresAt: expiresAt.toISOString(),
-    status: "active",
   });
+  if (!created.ok) {
+    if (created.error.includes("announcement_quota_exceeded")) {
+      return { ok: false, reason: "quota_exceeded", purchaseRequired: true };
+    }
+    if (created.error.includes("host_profile_required")) {
+      return { ok: false, reason: "not_host" };
+    }
+    return { ok: false, reason: "invalid_input" };
+  }
 
   revalidatePath(COMMUNITY_PATH);
-  return { ok: true, announcementId };
+  return { ok: true, announcementId: created.id };
 }
 
 // ─── Activate purchased draft ─────────────────────────────────────────────────

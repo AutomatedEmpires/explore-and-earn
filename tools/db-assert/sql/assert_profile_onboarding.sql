@@ -104,6 +104,19 @@ end;
 $$;
 reset role;
 
+-- Migration 083 (founder, 2026-07-26: "no host can create a profile or publish
+-- for free") gates create_my_host_profile on an active paid tier recorded
+-- against the Clerk identity. The two hosts this suite creates successfully are
+-- therefore given one; every case that expects a REFUSAL below still fails for
+-- its own reason, because 083 places the tier gate after the input validation
+-- and after the soft-delete check. That the gate itself works is proved in
+-- packages/db/tests/entitlementEnforcementIntegration.test.ts, not here — this
+-- suite is about identity derivation, completeness and idempotency.
+insert into public.host_subscriptions (clerk_user_id, tier, billing_status)
+values
+  ('user_profile_host_one', 'starter', 'active'),
+  ('user_profile_host_two', 'starter', 'active');
+
 -- Host creation is JWT-derived, complete, and idempotent.
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"user_profile_host_one","role":"authenticated"}';
@@ -169,7 +182,12 @@ begin
      or v_host.primary_location_name <> 'Wenatchee, Washington'
      or v_host.slug !~ '^glacier-orchard-[0-9a-f-]{36}$'
      or v_host.attestation_status <> 'not_attested'
-     or v_host.subscription_tier <> 'none'
+     -- Seeded from the resolved tier, not left at 'none'. 083 made
+     -- host_subscriptions the authority and host_profiles.subscription_tier the
+     -- denormalized read copy that listing, search and badge queries join; a
+     -- copy born at 'none' for a host who has already paid would render them as
+     -- unsubscribed until the next webhook happened to touch the row.
+     or v_host.subscription_tier <> 'starter'
      or v_host.public_status <> 'draft' then
     raise exception 'profile-onboarding: host row did not preserve canonical defaults/input: %',
       row_to_json(v_host);

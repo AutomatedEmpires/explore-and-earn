@@ -104,12 +104,14 @@ export function HostListingDetail({
         <section className={styles.section}>
           <h3 className={styles.sectionTitle}>Listing status</h3>
           <p className={styles.hint}>
-            A draft is only visible to you. Submit it for review to publish it
-            to seekers.
+            You publish this listing yourself — there is no approval queue. A
+            draft stays private until Housing, Meals and Pay are answered and
+            you publish it.
           </p>
           <ListingStatusControls
             listingId={listing.id}
             currentStatus={listing.status}
+            provenance={listing.provenanceInfo?.provenance}
           />
         </section>
       ) : null}

@@ -3,10 +3,37 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "./client";
+import {
+  analyticsScopeForTier,
+  applyAnalyticsScope,
+  emptyHostAnalytics,
+  type ApplicationsByStage,
+  type HostAnalytics,
+  type HostPerListingStats,
+} from "./lib/hostAnalyticsScope";
 
 /** Untyped Supabase handle (same pattern used across queries/*). */
 function untypedClient(clerkToken: string): SupabaseClient {
   return authedClient(clerkToken) as unknown as SupabaseClient;
+}
+
+/**
+ * The host's stored subscription tier, read on the SAME authed client as the
+ * analytics themselves. Returns "none" on any fault: an unreadable tier must
+ * resolve to the least entitlement, never the most.
+ */
+async function resolveStoredTier(
+  db: SupabaseClient,
+  clerkUserId: string,
+): Promise<string> {
+  const { data, error } = await db
+    .from("host_profiles")
+    .select("subscription_tier")
+    .eq("clerk_user_id", clerkUserId)
+    .maybeSingle();
+  if (error || !data) return "none";
+  const tier = (data as { subscription_tier?: unknown }).subscription_tier;
+  return typeof tier === "string" ? tier : "none";
 }
 
 async function resolveHostProfileIds(
@@ -27,36 +54,20 @@ export interface ListingStatusCounts {
   readonly [status: string]: number;
 }
 
-export interface ApplicationsByStage {
-  readonly [status: string]: number;
-}
-
 export interface HostDashboardStats {
   readonly listingsByStatus: ListingStatusCounts;
   readonly applicationsThisMonth: ApplicationsByStage;
   readonly pendingActions: number;
 }
 
-export interface HostPerListingStats {
-  readonly listingId: string;
-  readonly listingTitle: string;
-  readonly listingStatus: string;
-  readonly applicationsByStatus: ApplicationsByStage;
-  readonly totalApplications: number;
-  readonly invitesSent: number;
-  readonly invitesAccepted: number;
-}
-
-export interface HostAnalytics {
-  readonly totalApplicationsByStatus: ApplicationsByStage;
-  readonly activeListingCount: number;
-  /** Accepted invites divided by total sent, from 0 to 1. */
-  readonly inviteAcceptanceRate: number;
-  readonly perListingStats: HostPerListingStats[];
-}
-
 /**
- * Full host analytics for dashboard UI wiring.
+ * Host analytics for dashboard UI wiring, ALREADY SCOPED to what the host's
+ * plan includes (ADR-039 / founder decision 2026-07-26: analytics depth is
+ * included per tier).
+ *
+ * The gate is applied here rather than in a page so no surface can accidentally
+ * hand a basic-tier host the per-listing breakdown that Professional and
+ * Enterprise pay for. See lib/hostAnalyticsScope.ts for what each scope covers.
  *
  * `clerkUserId` MUST come from auth().userId — never decoded from a token.
  * Returns zeroed analytics when the host has no profile row yet.
@@ -69,13 +80,10 @@ export async function getHostAnalytics(
   const hostProfileIds = await resolveHostProfileIds(db, clerkUserId);
 
   if (hostProfileIds.length === 0) {
-    return {
-      totalApplicationsByStatus: {},
-      activeListingCount: 0,
-      inviteAcceptanceRate: 0,
-      perListingStats: [],
-    };
+    return emptyHostAnalytics();
   }
+
+  const scope = analyticsScopeForTier(await resolveStoredTier(db, clerkUserId));
 
   const { data: listingRows } = await db
     .from("listings")
@@ -90,12 +98,7 @@ export async function getHostAnalytics(
   const listingIds = listings.map((listing) => listing.id);
 
   if (listingIds.length === 0) {
-    return {
-      totalApplicationsByStatus: {},
-      activeListingCount: 0,
-      inviteAcceptanceRate: 0,
-      perListingStats: [],
-    };
+    return emptyHostAnalytics(scope);
   }
 
   const [appResult, inviteResult] = await Promise.all([
@@ -152,12 +155,16 @@ export async function getHostAnalytics(
     } satisfies HostPerListingStats;
   });
 
-  return {
-    totalApplicationsByStatus,
-    activeListingCount: listings.filter((listing) => listing.status === "live").length,
-    inviteAcceptanceRate: totalInvites > 0 ? acceptedInvites / totalInvites : 0,
-    perListingStats,
-  };
+  return applyAnalyticsScope(
+    {
+      totalApplicationsByStatus,
+      activeListingCount: listings.filter((listing) => listing.status === "live").length,
+      listingCount: listings.length,
+      inviteAcceptanceRate: totalInvites > 0 ? acceptedInvites / totalInvites : 0,
+      perListingStats,
+    },
+    scope,
+  );
 }
 
 export async function getHostDashboardStats(

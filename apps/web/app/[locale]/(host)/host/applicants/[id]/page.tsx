@@ -10,6 +10,7 @@ import {
   getSeekerDisplayName,
   getSeekerResumeByProfileId,
   rowToDiscoveryFields,
+  singleSeekerName,
 } from "@explore-and-earn/db";
 
 import {
@@ -57,12 +58,23 @@ export default async function HostApplicantDetailPage({
     notFound();
   }
 
-  // The applicant's name + resume are gated server-side by the same ownership
-  // guard (host must own a listing this seeker applied to). Loaded in parallel.
-  const [displayName, resume] = await Promise.all([
-    getSeekerDisplayName(token, userId, application.seekerProfileId),
-    getSeekerResumeByProfileId(token, userId, application.seekerProfileId),
+  // The applicant's name + resume are entitlement-checked in the database
+  // (migration 084): host identity comes from the JWT, and rows come back only
+  // for a seeker related to this host. Loaded in parallel.
+  //
+  // The two reads fail differently on purpose. The RESUME is this page: if that
+  // read faults, getSeekerResumeByProfileId throws and the request fails loudly,
+  // because a blank resume shown as though it were the applicant's is the exact
+  // lie 084 exists to remove. The NAME is a heading, so its lookup reports a
+  // fault as data and the heading falls back to the pseudonymous handle below.
+  const [nameLookup, resume] = await Promise.all([
+    getSeekerDisplayName(token, application.seekerProfileId),
+    getSeekerResumeByProfileId(token, application.seekerProfileId),
   ]);
+  if (nameLookup.status === "unavailable") {
+    console.error("[host/applicants/id] applicant name lookup failed:", nameLookup.reason);
+  }
+  const displayName = singleSeekerName(nameLookup, application.seekerProfileId);
 
   const listingsById = new Map<string, DiscoveryListing>(
     listingRows.map((row): [string, DiscoveryListing] => [

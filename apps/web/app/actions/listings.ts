@@ -27,9 +27,10 @@ import { parseListingCoordinateSubmission } from "../../lib/listingCoordinates";
 import { isAllowedStorageUrl } from "../../lib/storageUrl";
 
 // Host-controllable transitions. The authoritative gate is canTransitionListing
-// in @explore-and-earn/db (draft↔under_review, live↔paused, →archived); this
-// union just lets the host UI submit a draft for review and withdraw it. Going
-// under_review → live remains an admin-only approval (adminApproveListing).
+// in @explore-and-earn/db (draft↔under_review, under_review→live, live↔paused,
+// closed→draft, →archived), backed at the database by migration 082's trigger;
+// this union just names the statuses the host UI may ask for. `closed` is
+// absent because no host action produces it.
 type HostManageableListingStatus =
   | "draft"
   | "under_review"

@@ -14,8 +14,8 @@ import { authedClient } from "../client";
  * photo) — the same fields the invite search drawer already exposes — plus the
  * numeric match result the host is entitled to read (match_scores host-read
  * RLS). No availability windows, pay expectations, contact data, or resume
- * content pre-application; those unlock only through hostCanViewSeeker (an
- * application or conversation). Sourcing NEVER surfaces hidden/restricted or
+ * content pre-application; those unlock only through the migration 084
+ * applicant bridge, which requires an application, invite or conversation. Sourcing NEVER surfaces hidden/restricted or
  * deleted profiles.
  *
  * HONESTY: this is a bounded, ranked SHORTLIST over the persisted ADR-040

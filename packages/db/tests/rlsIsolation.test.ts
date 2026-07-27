@@ -1,6 +1,16 @@
 /**
- * RLS isolation — integration test (the highest-risk gap: no DB-backed RLS test
- * existed). It runs ONLY when real Supabase credentials are present, and SKIPS
+ * RLS isolation — integration test through PostgREST.
+ *
+ * NOT the primary RLS coverage. This file self-skips whenever its Supabase
+ * credentials are absent, which is every run of the credential-less unit-test
+ * job, so it cannot be relied on as a gate. The suite that actually runs on
+ * every pull request against a database rebuilt from migration 001 is
+ * `tools/db-assert/sql/assert_authorization_matrix.sql`, driven by
+ * `tools/db-assert/assert-authorization.mjs` from the Database Security
+ * workflow. Add new refusals there; keep this file for what it uniquely
+ * exercises — the anon key and the PostgREST layer above the policies.
+ *
+ * It runs ONLY when real Supabase credentials are present, and SKIPS
  * cleanly otherwise — so it never gives false-green in a credential-less CI, but
  * gives the founder / a secret-injected CI a real cross-tenant regression guard.
  *
@@ -28,12 +38,29 @@ import { createClient } from "@supabase/supabase-js";
 import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 
+import {
+  announceIntegrationGate,
+  resolveIntegrationGate,
+} from "./support/integrationGate.js";
+
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 
-const enabled = Boolean(SUPABASE_URL && ANON_KEY && SERVICE_ROLE_KEY && JWT_SECRET);
+const GATE_LABEL = "rlsIsolation";
+const gate = resolveIntegrationGate(
+  { label: GATE_LABEL, requiresOptIn: false },
+  process.env,
+);
+const enabled = gate.enabled;
+
+// ALWAYS RUNS — see support/integrationGate.ts.
+describe(`${GATE_LABEL} — coverage gate`, () => {
+  it("either runs against a database or says out loud that it did not", () => {
+    expect(announceIntegrationGate(GATE_LABEL, gate)).toBe(gate.enabled);
+  });
+});
 
 /** Mint a Supabase-compatible HS256 JWT (role=authenticated, given sub). */
 async function mintToken(sub: string): Promise<string> {

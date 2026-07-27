@@ -10,19 +10,15 @@ import {
   duplicateListingAction,
   updateListingStatusAction,
 } from "../../app/actions/listings";
+import {
+  HOST_STATUS_LABEL,
+  hostListingTransitions,
+  hostStatusHint,
+  type HostManageableListingStatus,
+} from "./listingStatusTransitions";
 import styles from "./ListingStatusControls.module.css";
 
 type StatusBadgeVariant = "neutral" | "info" | "success" | "seasonal";
-type HostManageableListingStatus = Parameters<typeof updateListingStatusAction>[1];
-
-const STATUS_LABEL: Record<ListingStatus, string> = {
-  draft: "Draft",
-  under_review: "Under review",
-  live: "Live",
-  paused: "Paused",
-  closed: "Closed",
-  archived: "Archived",
-};
 
 // Registry-valid Icon keys only — there is intentionally no `status.live` key.
 const STATUS_ICON: Record<ListingStatus, IconKey> = {
@@ -43,44 +39,28 @@ const STATUS_VARIANT: Record<ListingStatus, StatusBadgeVariant> = {
   archived: "neutral",
 };
 
-// Mirrors the authoritative server gate in @explore-and-earn/db
-// (canTransitionListing). Buttons render only for these target states.
-// draft → under_review is the host's self-serve "submit for review" path; an
-// admin then approves under_review → live (adminApproveListing), so there is
-// intentionally no host button out of under_review except withdrawing to draft.
-const NEXT_STATES: Record<ListingStatus, readonly HostManageableListingStatus[]> = {
-  draft: ["under_review"],
-  under_review: ["draft"],
-  live: ["paused", "archived"],
-  paused: ["live", "archived"],
-  closed: [],
-  archived: [],
-};
-
-// Label shown on the button that transitions TO the given status.
-const TRANSITION_LABEL: Record<ListingStatus, string> = {
-  draft: "Move back to draft",
-  under_review: "Submit for review",
-  live: "Resume",
-  paused: "Pause",
-  closed: "Close",
-  archived: "Archive",
-};
-
 export interface ListingStatusControlsProps {
   readonly listingId: string;
   readonly currentStatus: ListingStatus;
+  /**
+   * The listing's provenance. Withholds the closed -> draft action on sourced
+   * inventory, which migration 082 refuses to reopen — see
+   * `hostListingTransitions` — and picks the matching `closed` hint, which for a
+   * sourced listing says the ORIGIN withdrew it rather than promising a reopen.
+   */
+  readonly provenance?: string | null;
 }
 
 export function ListingStatusControls({
   listingId,
   currentStatus,
+  provenance,
 }: ListingStatusControlsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const nextStates = NEXT_STATES[currentStatus] ?? [];
+  const transitions = hostListingTransitions(currentStatus, provenance);
 
   function changeStatus(target: HostManageableListingStatus) {
     setError(null);
@@ -118,25 +98,22 @@ export function ListingStatusControls({
     <div className={styles.controls}>
       <div className={styles.statusRow}>
         <Badge
-          label={STATUS_LABEL[currentStatus]}
+          label={HOST_STATUS_LABEL[currentStatus]}
           icon={STATUS_ICON[currentStatus]}
           variant={STATUS_VARIANT[currentStatus]}
         />
       </div>
+      <p className={styles.hint}>{hostStatusHint(currentStatus, provenance)}</p>
       <div className={styles.actions}>
-        {nextStates.map((target) => (
+        {transitions.map((transition) => (
           <Button
-            key={target}
+            key={transition.target}
             type="button"
-            variant={
-              target === "archived" || target === "draft"
-                ? "secondary"
-                : "primary"
-            }
+            variant={transition.variant}
             disabled={isPending}
-            onClick={() => changeStatus(target)}
+            onClick={() => changeStatus(transition.target)}
           >
-            {TRANSITION_LABEL[target]}
+            {transition.label}
           </Button>
         ))}
         <Button

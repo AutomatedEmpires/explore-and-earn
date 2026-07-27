@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
+  emptySeekerNameLookup,
   getConversations,
   getMessages,
   getSeekerDisplayName,
   markMessagesRead,
+  singleSeekerName,
 } from "@explore-and-earn/db";
 import { EmptyState } from "../../../../../../components/discovery";
 import { HostSectionHeading } from "../../../../../../components/host";
@@ -65,8 +67,17 @@ export default async function HostMessageThreadPage({
   ]);
   revalidatePath("/host/messages");
   const conversation = conversations.find((entry) => entry.id === id) ?? null;
+  // The transcript is this page. The counterpart's name is a heading detail, so
+  // a failed lookup is logged and falls through to the generic phrasing below
+  // instead of failing the render.
+  const nameLookup = conversation
+    ? await getSeekerDisplayName(token, conversation.seekerProfileId)
+    : emptySeekerNameLookup();
+  if (nameLookup.status === "unavailable") {
+    console.error("[host/messages/id] applicant name lookup failed:", nameLookup.reason);
+  }
   const seekerName = conversation
-    ? await getSeekerDisplayName(token, userId, conversation.seekerProfileId)
+    ? singleSeekerName(nameLookup, conversation.seekerProfileId)
     : null;
 
   return (
