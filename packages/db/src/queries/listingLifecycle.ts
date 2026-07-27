@@ -16,6 +16,7 @@ import { authedClient } from "../client";
 import {
   countsTowardListingAllowance,
   hasListingCapacity,
+  isPaidPlanTier,
   parseListingAllowanceState,
 } from "../lib/entitlements";
 import { getBenefitDetailsContext } from "./benefitDetails";
@@ -252,7 +253,21 @@ export async function updateListingStatus(
 
     const allowance = parseListingAllowanceState(allowanceData);
     if (!hasListingCapacity(allowance.used, allowance.allowance)) {
-      return { ok: false, error: "listing_cap_reached" };
+      // TWO DIFFERENT REFUSALS, and conflating them started telling hosts to do
+      // something impossible. Commercial redesign D6 (migration 086) lets a host
+      // with NO plan hold a workspace, so this path is now reached routinely by
+      // someone whose allowance is zero and whose listing count is also zero.
+      // "You've reached your plan's limit — pause or close another listing" is
+      // advice they cannot take: there is no other listing, and no plan.
+      //
+      // The tier comes from the same RPC payload, so this costs no extra read
+      // and cannot drift from the allowance it is explaining.
+      return {
+        ok: false,
+        error: isPaidPlanTier(allowance.tier)
+          ? "listing_cap_reached"
+          : "listing_plan_required",
+      };
     }
   }
 

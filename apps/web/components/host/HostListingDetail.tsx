@@ -43,6 +43,12 @@ export interface HostListingDetailProps {
    * surfaced to a non-owner), the edit affordance is hidden.
    */
   readonly canEdit?: boolean;
+  /**
+   * The host's billing state, from hostAccountState() in @explore-and-earn/db.
+   * Passed straight through to the status controls, which use it to explain the
+   * plan requirement rather than to enforce it. See ListingStatusControls.
+   */
+  readonly accountState?: string | null;
 }
 
 const PIPELINE_ORDER: readonly ApplicantStage[] = [
@@ -64,6 +70,7 @@ export function HostListingDetail({
   item,
   applicants,
   canEdit = true,
+  accountState,
 }: HostListingDetailProps) {
   const { listing, state } = item;
   const stages = countByStage(applicants);
@@ -112,6 +119,7 @@ export function HostListingDetail({
             listingId={listing.id}
             currentStatus={listing.status}
             provenance={listing.provenanceInfo?.provenance}
+            accountState={accountState}
           />
         </section>
       ) : null}

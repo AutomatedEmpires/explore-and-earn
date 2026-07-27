@@ -24,6 +24,7 @@ import {
   type HostApplicantItem,
   type HostListingItem,
 } from "../../../../../../components/host";
+import { cachedHostAccountState } from "../../../../../../lib/serverCache";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Listing" };
@@ -139,6 +140,11 @@ export default async function HostListingDetailPage({
 
   const recentApplicantItems = applicantItems.slice(0, 5);
 
+  // For the status controls' copy only — the (host) layout already resolved this
+  // for the same request, so `cache()` makes this free. A non-owner viewing the
+  // read-only record has no status controls to explain anything to.
+  const accountState = canEdit && userId ? await cachedHostAccountState(userId) : null;
+
   return (
     <section className={styles.block}>
       <HostSectionHeading
@@ -147,7 +153,12 @@ export default async function HostListingDetailPage({
         actionLabel="All listings"
         actionHref="/host/listings"
       />
-      <HostListingDetail item={item} applicants={applicantItems} canEdit={canEdit} />
+      <HostListingDetail
+        item={item}
+        applicants={applicantItems}
+        canEdit={canEdit}
+        accountState={accountState}
+      />
 
       {recentApplicantItems.length > 0 ? (
         <div className={styles.recentApplicants}>

@@ -1,4 +1,6 @@
 export { HostHeader } from "./HostHeader";
+export { HostActivationBanner } from "./HostActivationBanner";
+export type { HostActivationBannerProps } from "./HostActivationBanner";
 export { HostSectionHeading } from "./HostSectionHeading";
 export type { HostSectionHeadingProps } from "./HostSectionHeading";
 export { HostListingCard } from "./HostListingCard";

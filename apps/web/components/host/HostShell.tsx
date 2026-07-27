@@ -8,6 +8,7 @@ import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { ScopeShellNav, SCOPE_RAIL_WIDTH, type ScopeNavItem } from "../shell";
 import { ThemeSwitcher } from "../global/ThemeSwitcher";
 import { OnboardingWalkthrough, HOST_TOUR_STEPS } from "../onboarding";
+import { HostActivationBanner } from "./HostActivationBanner";
 import styles from "./HostShell.module.css";
 
 /**
@@ -55,6 +56,19 @@ export interface HostShellProps {
   readonly companyName: string | null;
   readonly photoUrl?: string | null;
   readonly tier?: string | null;
+  /**
+   * The host's billing state, from hostAccountState() in @explore-and-earn/db.
+   *
+   * NOT derived from `tier` here, and the difference matters: 'none' cannot tell
+   * a host who never subscribed apart from one whose card is failing, and those
+   * two are owed opposite sentences. The layout resolves it from the
+   * subscription authority and passes the answer down.
+   *
+   * `null` means the authority could not be consulted. Nothing is shown in that
+   * case — an activation banner in front of a paying host is worse than a
+   * missing one in front of a prospect.
+   */
+  readonly accountState?: string | null;
   readonly unread?: number;
   readonly children: ReactNode;
 }
@@ -65,7 +79,13 @@ function isActive(pathname: string, def: NavDef): boolean {
     : pathname === def.href || pathname.startsWith(`${def.href}/`);
 }
 
-export function HostShell({ companyName, photoUrl, unread = 0, children }: HostShellProps) {
+export function HostShell({
+  companyName,
+  photoUrl,
+  accountState,
+  unread = 0,
+  children,
+}: HostShellProps) {
   const pathname = usePathname();
 
   const toItem = (def: NavDef): ScopeNavItem => ({
@@ -139,6 +159,9 @@ export function HostShell({ companyName, photoUrl, unread = 0, children }: HostS
             </Link>
           </div>
         </header>
+        {/* Between the bar and the content on purpose: in the reading order a
+            host meets it once, above their work, and it scrolls away. */}
+        <HostActivationBanner accountState={accountState} />
         <div className={styles.content}>{children}</div>
       </div>
 

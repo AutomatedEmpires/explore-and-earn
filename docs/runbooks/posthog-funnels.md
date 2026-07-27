@@ -11,8 +11,23 @@ Project: `exploreandearn` (id `291166`), org `AutomatedEmpires`, region
   wired in `apps/web/app/providers.tsx` behind `NEXT_PUBLIC_POSTHOG_KEY` /
   `NEXT_PUBLIC_POSTHOG_HOST`.
 - CSP already allowlists `https://us.posthog.com` (`next.config.ts`, `vercel.ts`).
-- The only first-party PostHog usage today is `components/CookieBanner.tsx`
-  (consent opt-in/opt-out). **No product funnel events are captured anywhere.**
+- Consent opt-in/opt-out lives in `components/CookieBanner.tsx`.
+- **The pre-billing host funnel is captured; nothing else is.** Commercial
+  redesign D15 added the first product events in the codebase, and with them the
+  capture seam every later event should use:
+  - `apps/web/lib/analytics/events.ts` — the event-name constants. Add new names
+    here, never as a literal at a call site.
+  - `apps/web/lib/analytics/capture.ts` — `captureFunnelEvent(name, props)`.
+    Dynamic-imports `posthog-js` (a static import welds ~200 kB into the first
+    load of every route that captures), swallows every failure, and is a no-op
+    when PostHog is unconfigured or the visitor has not consented.
+  - `apps/web/components/analytics/FunnelEvents.tsx` — `CaptureOnMount`,
+    `FunnelLink` and `FunnelSubmitButton`, so a **server** component can carry an
+    event without becoming a client component.
+  - Captured today: `host_plans_viewed`, `host_browse_first_selected`,
+    `host_profile_created`, `host_listing_draft_started`,
+    `host_activation_banner_clicked`, `host_checkout_started`.
+- Every event in section 2 that is not in that list is still UNIMPLEMENTED.
 - PostHog autocapture covers pageviews/clicks, but the funnel below needs
   explicit, stable event names to be reliable.
 

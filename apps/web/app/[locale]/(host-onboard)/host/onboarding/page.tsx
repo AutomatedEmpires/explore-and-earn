@@ -14,6 +14,8 @@ import type {
 import { useRouter } from "next/navigation"
 import { useMemo, useState, useTransition, type FormEvent } from "react"
 import { createHostProfileAction } from "../../../../actions/hostProfile"
+import { captureFunnelEvent } from "../../../../../lib/analytics/capture"
+import { HOST_FUNNEL_EVENTS } from "../../../../../lib/analytics/events"
 import styles from "./page.module.css"
 
 type Step = "welcome" | "essentials" | "preview"
@@ -33,10 +35,12 @@ const VALUE_POINTS: ReadonlyArray<{ icon: IconKey; head: string; body: string }>
 	{
 		icon: "action.search",
 		head: "Reach seekers where they search",
-		// "free to post" was true when this page was written and is now false:
-		// migration 083 gates profile creation and publication on an active paid
-		// tier, and every host is on one of three plans (founder, 2026-07-26).
-		// Nobody reaches this page without having chosen one.
+		// "free to post" was true when this page was written and is still false:
+		// publication requires one of the three plans. What changed with migration
+		// 086 (commercial redesign D6) is that a host reaching this page may not
+		// have chosen one yet — building and previewing are free, PUBLISHING is
+		// what a plan buys. The sentence stays true either way and deliberately
+		// does not promise a free listing.
 		body: "Your roles surface in the feed, on the map, and in swipe — on every plan.",
 	},
 	{
@@ -111,18 +115,18 @@ export default function HostOnboardingPage() {
 					primaryLocationName: location,
 				})
 				if (result.ok) {
+					captureFunnelEvent(HOST_FUNNEL_EVENTS.profileCreated)
+					// COMMERCIAL REDESIGN D6: straight into the workspace, always.
+					//
+					// This used to fork. Migration 083 refused creation without a
+					// paid tier, so a 'subscription_required' result was routed to
+					// /host/plans — the host was sent to checkout before they had
+					// seen anything they were being asked to buy. Migration 086
+					// removed that refusal, so there is one destination: the thing
+					// they just made. The plan ask is now carried by the activation
+					// banner in the host shell, at a moment when the host has
+					// something to activate.
 					router.push("/host")
-					return
-				}
-				// Migration 083 refuses profile creation without a paid tier, so
-				// this is not something the host can correct on THIS form. Send
-				// them to the plans page rather than leaving them re-reading a
-				// sentence they have no way to act on. /host/plans lives in this
-				// same route group precisely so it is reachable without a profile;
-				// every other plan surface sits behind the (host) layout, which
-				// redirects a profile-less host straight back here.
-				if (result.error === "subscription_required") {
-					router.push("/host/plans")
 					return
 				}
 				const message =
@@ -136,11 +140,9 @@ export default function HostOnboardingPage() {
 									? "Keep your primary location under 200 characters."
 									: result.error === "unauthenticated"
 										? "Please sign in to continue."
-										: result.error === "subscription_required"
-											? "Choose a plan before creating your host profile. Every host is on one of the three plans."
-											: result.error === "account_unavailable"
-												? "This account cannot create a host profile. Contact support if this looks wrong."
-												: "Something went wrong. Please try again."
+										: result.error === "account_unavailable"
+											? "This account cannot create a host profile. Contact support if this looks wrong."
+											: "Something went wrong. Please try again."
 				setState({ status: "error", message })
 			} catch {
 				setState({

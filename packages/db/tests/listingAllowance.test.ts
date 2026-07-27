@@ -290,6 +290,12 @@ describe("updateListingStatus honours the purchased allowance", () => {
    * No free tier, at the enforcement point rather than in the arithmetic: a host
    * with no subscription and NOT ONE listing is still refused their first. The
    * allowance the RPC reports for tier 'none' is 0, and 0 used is not below 0.
+   *
+   * This is the case commercial redesign D6 made ORDINARY. Migration 086 lets
+   * that host own a workspace, so the refusal is now the paid line itself rather
+   * than an edge nobody could reach — and it is named 'listing_plan_required' so
+   * the sentence they read offers activation instead of telling them to pause a
+   * listing they do not have.
    */
   it("REFUSES an unsubscribed host with no listings at all — no free tier", async () => {
     mockRpc.mockResolvedValue(allowanceState("none", 0, 0));
@@ -298,7 +304,7 @@ describe("updateListingStatus honours the purchased allowance", () => {
       .mockReturnValueOnce(makeChain({ data: { ...ANSWERED_DRAFT } }));
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
-    expect(result).toEqual({ ok: false, error: "listing_cap_reached" });
+    expect(result).toEqual({ ok: false, error: "listing_plan_required" });
   });
 
   it("treats an unreadable allowance as zero — a fault must not widen the cap", async () => {

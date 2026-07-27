@@ -8,7 +8,8 @@
  *
  *   * the Stripe webhook records subscription state against the Clerk identity,
  *     which is the only place it can live before a host profile exists;
- *   * a host with no plan is told to choose one, not "something went wrong";
+ *   * a host with no plan gets a WORKSPACE (commercial redesign D6, migration
+ *     086) — the paid line is publication, and it is enforced in the database;
  *   * announcements are created through the counted RPC, never by an insert.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -102,12 +103,29 @@ beforeEach(() => {
   dbMocks.createHostAnnouncement.mockResolvedValue({ ok: true, id: "ann-1" });
 });
 
-// ── No free tier, reported honestly ────────────────────────────────────────
+// ── Creation is free; publication is not ───────────────────────────────────
 
-describe("createHostProfileAction — no free tier", () => {
-  it("reports a missing plan as its own outcome, not a generic failure", async () => {
-    // "Something went wrong. Please try again." would send the host round the
-    // same loop for ever: retrying cannot produce a subscription.
+describe("createHostProfileAction — the pre-billing host (D6)", () => {
+  it("creates a profile for a host with no plan at all", async () => {
+    // THE INVERSION. Under migration 083 this call was refused and the host was
+    // sent to checkout before seeing anything. Migration 086 removed that
+    // refusal: a signed-in prospect gets a workspace at tier 'none'. The paid
+    // line did not vanish — it moved to publication, which is pinned in
+    // packages/db/tests/entitlementEnforcement*.test.ts.
+    const result = await createHostProfileAction({
+      companyName: "Glacier Orchard",
+      categoryScopes: ["farm"],
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(dbMocks.createHostProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it("no longer has a subscription_required outcome to report", async () => {
+    // The mapping was DELETED, not left as an unreachable branch. If migration
+    // 086 were reverted, this refusal would surface as a generic failure rather
+    // than silently re-routing a host to checkout — and the db tests that pin
+    // creation-allowed-unpaid would fail first and name the real cause.
     dbMocks.createHostProfile.mockResolvedValueOnce({
       ok: false,
       error: "host_subscription_required",
@@ -118,7 +136,8 @@ describe("createHostProfileAction — no free tier", () => {
       categoryScopes: ["farm"],
     });
 
-    expect(result).toEqual({ ok: false, error: "subscription_required" });
+    expect(result.error).not.toBe("subscription_required");
+    expect(result).toEqual({ ok: false, error: "create_failed" });
   });
 
   it("still distinguishes a disabled account from an unpaid one", async () => {

@@ -16,10 +16,17 @@ import styles from "./page.module.css";
  *
  * The old success_url was /host/billing, which sits in the (host) group: its
  * layout redirects any user without a host_profiles row to onboarding, and
- * onboarding sends the un-entitled back to plan selection. Stripe does not
- * guarantee the entitlement webhook finishes before the browser follows
- * success_url — so the first thing a brand-new PAYING host could see was a
- * bounce back to "choose a plan", seconds after choosing one.
+ * onboarding — while migration 083's creation gate stood — sent the un-entitled
+ * back to plan selection. Stripe does not guarantee the entitlement webhook
+ * finishes before the browser follows success_url, so the first thing a
+ * brand-new PAYING host could see was a bounce back to "choose a plan", seconds
+ * after choosing one.
+ *
+ * Migration 086 (commercial redesign D6) removed that second hop — onboarding no
+ * longer bounces anyone — but this page is NOT redundant. The race it closes is
+ * the entitlement one, not the routing one: a host who pays and lands before the
+ * webhook still needs their grant applied, and confirming the session here is
+ * what applies it.
  *
  * This page sits in (host-onboard) — signed-in is its only gate, exactly like
  * /host/plans — and does not wait for the webhook: it confirms the session

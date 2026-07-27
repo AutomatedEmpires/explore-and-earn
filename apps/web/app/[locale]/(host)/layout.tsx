@@ -4,7 +4,11 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { cachedHostProfile, getSupabaseToken } from "../../../lib/serverCache";
+import {
+  cachedHostAccountState,
+  cachedHostProfile,
+  getSupabaseToken,
+} from "../../../lib/serverCache";
 import { HostShell } from "../../../components/host/HostShell";
 import { devHostProfile, isDevBenchEnabled } from "../../../lib/devBench";
 import { readDevRole } from "../../../lib/devBench/server";
@@ -75,9 +79,13 @@ export default async function HostLayout({
       `/sign-in?role=host&redirect_url=${encodeURIComponent("/host")}`,
     );
   }
-  const [hostProfile, unreadMessages] = await Promise.all([
+  // The account state rides along in the same fan-out rather than after it: it
+  // is one indexed primary-key read, and serializing it behind the profile would
+  // add a round trip to every host page for a banner.
+  const [hostProfile, unreadMessages, accountState] = await Promise.all([
     cachedHostProfile(token, userId),
     getUnreadMessageCount(token, userId),
+    cachedHostAccountState(userId),
   ]);
   if (!hostProfile) {
     redirect("/host/onboarding");
@@ -89,6 +97,7 @@ export default async function HostLayout({
         companyName={hostProfile.companyName ?? null}
         photoUrl={hostProfile.photoUrl ?? null}
         tier={hostProfile.subscriptionTier ?? null}
+        accountState={accountState}
         unread={unreadMessages}
       >
         {children}

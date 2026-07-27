@@ -8,6 +8,9 @@ import {
   getHomepageFallbackListings,
   getHomepageFeaturedEmployers,
   getHostProfile,
+  getHostSubscriptionByClerkUserId,
+  hostAccountState,
+  type HostAccountState,
   getListingDetailPublic,
   getPublicHostProfile,
   getPublicListings,
@@ -61,6 +64,36 @@ export const cachedSeekerProfile = cache(
 /** Request-scoped authed host profile — same rationale as the seeker variant. */
 export const cachedHostProfile = cache(
   (token: string, clerkUserId: string) => getHostProfile(token, clerkUserId),
+);
+
+/**
+ * Request-scoped host billing state, for COPY DECISIONS ONLY.
+ *
+ * Commercial redesign D6 created a host who has a workspace and no plan. Telling
+ * that host something useful, and telling a host whose card merely failed
+ * something different, needs `billing_status` — which lives on
+ * public.host_subscriptions and not on the denormalized
+ * host_profiles.subscription_tier the layout already holds. Hence a second read,
+ * memoized per request so the (host) layout and a page beneath it share one.
+ *
+ * RETURNS `null` WHEN THE AUTHORITY COULD NOT BE CONSULTED, and that is not the
+ * same value as `prospect`. getHostSubscriptionByClerkUserId throws rather than
+ * returning null on a read failure, precisely so callers can tell "no
+ * subscription" from "no answer"; flattening the two here would put an
+ * activation banner in front of a paying host every time Postgres hiccupped. A
+ * missing banner is a missed nudge; a wrong one is an insult to a customer.
+ *
+ * NOT A GATE. Every refusal that matters is the database's — see
+ * hostAccountState's own header.
+ */
+export const cachedHostAccountState = cache(
+  async (clerkUserId: string): Promise<HostAccountState | null> => {
+    try {
+      return hostAccountState(await getHostSubscriptionByClerkUserId(clerkUserId));
+    } catch {
+      return null;
+    }
+  },
 );
 
 /**

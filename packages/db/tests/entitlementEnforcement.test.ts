@@ -34,20 +34,41 @@ import {
   totalListingAllowance,
 } from "../src/lib/entitlements.js";
 
-const MIGRATION = readFileSync(
-  new URL(
-    "../../../supabase/migrations/083_entitlement_enforcement.sql",
-    import.meta.url,
-  ),
-  "utf8",
+/**
+ * Executable SQL only — every header in this repository explains the OLD
+ * behaviour at length, and a negative assertion that reads a comment is worse
+ * than no assertion. The `--` strip is what makes "the gate is gone" mean the
+ * gate is gone rather than "nobody mentions it".
+ */
+function executableSql(path: string): string {
+  return readFileSync(new URL(path, import.meta.url), "utf8")
+    .split("\n")
+    .map((line) => line.replace(/--.*$/, ""))
+    .join(" ")
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+const EXECUTABLE = executableSql(
+  "../../../supabase/migrations/083_entitlement_enforcement.sql",
 );
 
-/** Executable SQL only — the header explains the OLD behaviour at length. */
-const EXECUTABLE = MIGRATION.split("\n")
-  .map((line) => line.replace(/--.*$/, ""))
-  .join(" ")
-  .toLowerCase()
-  .replace(/\s+/g, " ");
+/**
+ * Migration 086 — the pre-billing host mode (commercial redesign D6).
+ *
+ * READ SEPARATELY AND ASSERTED SEPARATELY, because 086 REDEFINES
+ * public.create_my_host_profile. 083's text still contains the paid-tier
+ * refusal and always will; what runs is the last definition applied. Any
+ * assertion about how profile creation behaves TODAY must therefore be made
+ * against this file, and the ones below are.
+ *
+ * The allowance trigger is the other half and is deliberately NOT redefined
+ * here — those assertions stay pointed at 083, and one below proves 086 leaves
+ * it alone.
+ */
+const EXECUTABLE_086 = executableSql(
+  "../../../supabase/migrations/086_prospect_hosts.sql",
+);
 
 /**
  * The body of one SQL function, bounded by its own dollar quotes.
@@ -57,14 +78,33 @@ const EXECUTABLE = MIGRATION.split("\n")
  * draft read the announcement quotas as the listing allowances and still pass
  * three of its five drift assertions.
  */
-function sqlFunctionBody(schema: string, functionName: string): string {
-  const start = EXECUTABLE.indexOf(`function ${schema}.${functionName}`);
-  expect(start, `${schema}.${functionName} must exist in migration 083`).toBeGreaterThan(-1);
-  const bodyStart = EXECUTABLE.indexOf("as $$", start);
-  const bodyEnd = EXECUTABLE.indexOf("$$", bodyStart + "as $$".length);
+function sqlFunctionBodyIn(
+  source: string,
+  label: string,
+  schema: string,
+  functionName: string,
+): string {
+  const start = source.indexOf(`function ${schema}.${functionName}`);
+  expect(start, `${schema}.${functionName} must exist in ${label}`).toBeGreaterThan(-1);
+  const bodyStart = source.indexOf("as $$", start);
+  const bodyEnd = source.indexOf("$$", bodyStart + "as $$".length);
   expect(bodyStart, `${functionName} must have a dollar-quoted body`).toBeGreaterThan(-1);
   expect(bodyEnd).toBeGreaterThan(bodyStart);
-  return EXECUTABLE.slice(bodyStart, bodyEnd);
+  return source.slice(bodyStart, bodyEnd);
+}
+
+function sqlFunctionBody(schema: string, functionName: string): string {
+  return sqlFunctionBodyIn(EXECUTABLE, "migration 083", schema, functionName);
+}
+
+/** The live definition of the profile-creation RPC — 086, not 083. */
+function createProfileBody(): string {
+  return sqlFunctionBodyIn(
+    EXECUTABLE_086,
+    "migration 086",
+    "public",
+    "create_my_host_profile",
+  );
 }
 
 /** Pull `when 'tier' then N` pairs out of a named SQL function body. */
@@ -273,21 +313,12 @@ describe("migration 083 shape", () => {
     );
   });
 
-  it("gates host profile creation on a paid tier", () => {
+  it("083 gated host profile creation on a paid tier — the state 086 supersedes", () => {
+    // Kept as the historical record, and as the thing the assertions in
+    // "migration 086 shape" are the counterpart to. 083's file is immutable
+    // history; what it says about creation is no longer what runs.
     expect(EXECUTABLE).toContain("create or replace function public.create_my_host_profile");
     expect(EXECUTABLE).toContain("message = 'host_subscription_required'");
-    expect(EXECUTABLE).toContain(
-      "v_tier <> all(array['starter', 'professional', 'enterprise']::text[])",
-    );
-  });
-
-  it("keeps profile creation reachable for an already-created host whose plan lapsed", () => {
-    // The gate has to sit AFTER the "you already have a profile" early return:
-    // this RPC is how the application resolves a host's own id.
-    const earlyReturn = EXECUTABLE.indexOf("message = 'profile_identity_disabled'");
-    const gate = EXECUTABLE.indexOf("message = 'host_subscription_required'");
-    expect(earlyReturn).toBeGreaterThan(-1);
-    expect(gate).toBeGreaterThan(earlyReturn);
   });
 
   /**
@@ -307,7 +338,8 @@ describe("migration 083 shape", () => {
    * only path onto an existing profile id.
    */
   it("reconciles the denormalized tier copy whenever the profile is resolved", () => {
-    const body = sqlFunctionBody("public", "create_my_host_profile");
+    // Read from 086, which holds the LIVE definition of this function.
+    const body = createProfileBody();
 
     const reconcile = body.indexOf(
       "update public.host_profiles set subscription_tier = v_tier " +
@@ -315,14 +347,14 @@ describe("migration 083 shape", () => {
     );
     expect(reconcile).toBeGreaterThan(-1);
 
-    // Inside the "you already have a profile" arm: after the disabled check and
-    // before the gate, so a LAPSED host is reconciled too rather than refused.
+    // Inside the "you already have a profile" arm, after the disabled check.
     const disabled = body.indexOf("message = 'profile_identity_disabled'");
-    const gate = body.indexOf("message = 'host_subscription_required'");
+    expect(disabled).toBeGreaterThan(-1);
     expect(reconcile).toBeGreaterThan(disabled);
-    expect(gate).toBeGreaterThan(reconcile);
 
-    // Read through the one resolver 083 declares, never recomputed here.
+    // Read through the one resolver 083 declares, never recomputed here. Both
+    // arms still resolve it — removing the gate must not remove the READ, or a
+    // prospect's row would be born with a stale tier.
     expect(
       body.split("v_tier := public.host_subscription_tier_for_clerk_user(v_clerk_user_id);")
         .length - 1,
@@ -335,7 +367,7 @@ describe("migration 083 shape", () => {
   });
 
   it("still seeds the copy on the INSERT, so it is never born stale", () => {
-    const body = sqlFunctionBody("public", "create_my_host_profile");
+    const body = createProfileBody();
     const insert = body.indexOf("insert into public.host_profiles");
     expect(insert).toBeGreaterThan(-1);
     expect(body.slice(insert)).toContain("subscription_tier");
@@ -592,5 +624,135 @@ describe("migration 083 shape", () => {
     expect(EXECUTABLE).toContain("on conflict (clerk_user_id) do nothing");
     expect(EXECUTABLE).toContain("begin;");
     expect(EXECUTABLE.trimEnd().endsWith("commit;")).toBe(true);
+  });
+});
+
+// ── The pre-billing host mode (commercial redesign D6) ─────────────────────
+//
+// THE CONTRACT THIS PINS, in one sentence: creation is ALLOWED unpaid,
+// publication is REFUSED unpaid. The second half is the one the founder cares
+// about, and it is asserted here twice over — once that 086 does not touch the
+// enforcement, and once that the enforcement still says what it said.
+
+describe("migration 086 shape — build first, pay to publish", () => {
+  it("redefines create_my_host_profile and drops the paid-tier refusal", () => {
+    expect(EXECUTABLE_086).toContain(
+      "create or replace function public.create_my_host_profile",
+    );
+    // The negative assertion is made against COMMENT-STRIPPED sql, which is why
+    // executableSql() exists: 086's header discusses the removed gate at length,
+    // and a naive `toContain` on the raw file would pass while the gate stood.
+    expect(EXECUTABLE_086).not.toContain("message = 'host_subscription_required'");
+    expect(EXECUTABLE_086).not.toContain(
+      "v_tier <> all(array['starter', 'professional', 'enterprise']::text[])",
+    );
+  });
+
+  /**
+   * REMOVING THE GATE MUST NOT REMOVE THE CHECKS AROUND IT. 086 restates the
+   * whole function, so every validation is retyped and every one of them could
+   * have been lost in the retyping. These are the ones a client could otherwise
+   * drive: identity, bounds, lane membership, and the soft-delete refusal.
+   */
+  it("keeps every other refusal the function had", () => {
+    const body = createProfileBody();
+    for (const refusal of [
+      "message = 'profile_identity_required'",
+      "message = 'host_company_name_required'",
+      "message = 'host_company_name_too_long'",
+      "message = 'host_primary_location_too_long'",
+      "message = 'host_category_scopes_required'",
+      "message = 'host_category_scope_invalid'",
+      "message = 'profile_identity_disabled'",
+      "message = 'host_profile_create_conflict'",
+    ]) {
+      expect(body, `086 must keep ${refusal}`).toContain(refusal);
+    }
+    expect(body).toContain(
+      "array['farm', 'maritime', 'remote', 'seasonal']::text[]",
+    );
+    expect(body).toContain("cardinality(p_category_scopes) > 4");
+    expect(body).toContain("length(v_company_name) > 160");
+    expect(body).toContain("length(v_primary_location_name) > 200");
+  });
+
+  it("keeps the grants exactly as 083 left them", () => {
+    expect(EXECUTABLE_086).toContain(
+      "revoke execute on function public.create_my_host_profile(text, text[], text) " +
+        "from public, anon",
+    );
+    expect(EXECUTABLE_086).toContain(
+      "grant execute on function public.create_my_host_profile(text, text[], text) " +
+        "to authenticated, service_role",
+    );
+    // The locked-function guardrail says the same thing statically; this says it
+    // where the rest of the migration's contract is stated.
+    for (const match of EXECUTABLE_086.matchAll(
+      /grant execute on function public\.[a-z_]+\([^)]*\) to ([^;]*);/g,
+    )) {
+      expect(match[1]).not.toMatch(/\banon\b/);
+      expect(match[1]).not.toMatch(/\bpublic\b/);
+    }
+  });
+
+  /**
+   * THE REGRESSION PIN. 086 must not weaken publication, and the cheapest way
+   * for it to do so would be to restate any part of the allowance machinery
+   * "while it was in there" — a redefinition that drops a status from the count,
+   * or a re-grant, would move the paid line without anything else noticing.
+   *
+   * So the assertion is absence: 086 mentions none of it, and the enforcement
+   * that 083 installed is the enforcement that still runs.
+   */
+  it("does not touch the allowance trigger, its helpers, or the sweep", () => {
+    for (const untouched of [
+      "private.enforce_listing_allowance",
+      "private.host_listing_allowance",
+      "private.host_active_listing_count",
+      "private.plan_listing_allowance",
+      "private.plan_announcement_quota",
+      "public.close_host_listings_over_allowance",
+      "trg_listings_plan_allowance",
+      "public.host_subscriptions",
+    ]) {
+      expect(
+        EXECUTABLE_086,
+        `086 must leave ${untouched} alone — publication is the paid line`,
+      ).not.toContain(untouched);
+    }
+    expect(EXECUTABLE_086).not.toContain("create trigger");
+    expect(EXECUTABLE_086).not.toContain("alter table");
+  });
+
+  /**
+   * And the enforcement itself, restated here rather than only in the 083 block,
+   * because THIS is the file a reviewer opens to ask "what stops a prospect
+   * publishing?". A prospect resolves to tier 'none'; 'none' is not in the case
+   * map, so plan_listing_allowance returns its else branch of 0; the trigger
+   * refuses at used >= allowance, which for 0 is every entry into the counted
+   * set — including the draft -> under_review step, one BEFORE publish.
+   */
+  it("leaves tier none at an allowance of zero, so a prospect publishes nothing", () => {
+    expect(planListingAllowance("none")).toBe(0);
+    expect(sqlCaseMap("plan_listing_allowance").none).toBeUndefined();
+    expect(sqlFunctionBody("private", "plan_listing_allowance")).toContain("else 0");
+
+    expect(EXECUTABLE).toContain("l.status in ('live', 'paused', 'under_review')");
+    expect(EXECUTABLE).toContain("if v_used >= v_allowance then");
+    expect(EXECUTABLE).toContain("message = 'listing_allowance_exceeded'");
+    expect(EXECUTABLE).toContain(
+      "create trigger trg_listings_plan_allowance before insert or update on public.listings",
+    );
+  });
+
+  it("rebuilds idempotently from 001", () => {
+    expect(EXECUTABLE_086).toContain("create or replace function");
+    expect(EXECUTABLE_086).toContain("begin;");
+    expect(EXECUTABLE_086.trimEnd().endsWith("commit;")).toBe(true);
+  });
+
+  it("pins search_path on the function it defines", () => {
+    expect(EXECUTABLE_086).toContain("set search_path = ''");
+    expect(EXECUTABLE_086).toContain("security definer");
   });
 });

@@ -115,6 +115,13 @@ async function cleanupReplacedHousingPhotos(
  * is minted via Clerk's native Supabase integration and handed to migration
  * 073's narrow RPC. The RPC derives identity from the JWT; the client cannot
  * choose a Clerk id, trust state, subscription tier, or lifecycle field.
+ *
+ * NO PLAN IS REQUIRED TO REACH THIS. Migration 086 (commercial redesign D6)
+ * removed the paid-tier refusal from create_my_host_profile, so a signed-in
+ * prospect gets a workspace at tier 'none'. The paid line did not disappear — it
+ * moved to PUBLICATION, where private.enforce_listing_allowance still refuses
+ * every entry into live / paused / under_review for a host whose plan allowance
+ * is zero.
  */
 export interface CreateHostProfileActionInput {
 	readonly companyName: string
@@ -177,18 +184,23 @@ async function createHostProfileActionImpl(
 		primaryLocationName,
 	})
 	if (!result.ok) {
-		// 'subscription_required' is its own outcome, not a generic failure. There
-		// is no free tier (founder, 2026-07-26), so a host arriving here without an
-		// active plan has to be told to choose one — "something went wrong" would
-		// send them round the same loop forever.
+		// COMMERCIAL REDESIGN D6: there is no longer a 'subscription_required'
+		// outcome here, because migration 086 removed the refusal that produced it.
+		// A signed-in prospect creates their workspace at tier 'none' and meets the
+		// paid line later, at PUBLICATION, where the allowance trigger enforces it.
+		//
+		// The mapping is deleted rather than left as an unreachable branch. A dead
+		// arm reads as a live guarantee to the next person, and this one would have
+		// sent a host who hit an unrelated failure to a checkout page they do not
+		// need. If 086 were ever reverted the raw db message would surface as
+		// 'create_failed' — honest, if unhelpful — and the db tests that pin
+		// creation-allowed-unpaid would fail first.
 		const reason = result.error ?? ""
 		return {
 			ok: false,
-			error: reason.includes("host_subscription_required")
-				? "subscription_required"
-				: reason.includes("profile_identity_disabled")
-					? "account_unavailable"
-					: "create_failed",
+			error: reason.includes("profile_identity_disabled")
+				? "account_unavailable"
+				: "create_failed",
 		}
 	}
 
