@@ -51,7 +51,7 @@ it cannot evidence); database-enforced business rules rather than app-layer-only
 coverage; a real matching engine; a genuinely complete notification engine awaiting a switch.
 
 **Weaknesses.** No operator console reachable in production; a supply pipeline with no terminus;
-payment code with three confirmed money-losing defects downstream of the 503; entitlements sold but
+payment code with four confirmed money-losing defects downstream of the 503; entitlements sold but
 not enforced at the database; zero authorization test coverage at the layer that holds the
 authorization; and repository documentation that describes a different, much earlier product.
 
@@ -401,8 +401,18 @@ in front of the deterministic re-ranker, so explainability survives.
 
 ## J. Security, privacy and trust
 
-**Headline: no critical or high-severity externally exploitable vulnerability was found.** That is a
-genuinely strong result and deserves to be stated plainly.
+**Headline: no *unauthenticated* critical or high-severity vulnerability was found — but two
+**authenticated** privilege bypasses were, and they are rated Critical below.**
+
+An earlier draft of this section claimed no critical or high externally exploitable vulnerability at
+all. That was wrong, and it contradicted this document's own findings table two screens further down.
+The announcement-quota bypass is reachable by any registered host using the public anon key (which
+ships in the client bundle) plus their own JWT — no privileged access, no insider position. "Requires
+an account" is not the same as "not externally exploitable", and a report that applies a
+no-empty-promises rule to the product has to apply it to itself.
+
+What *is* genuinely strong, and stands: the unauthenticated perimeter. No anonymous path was found
+into any tenant's data, every webhook verifies its signature, and RLS coverage is complete.
 
 Verified positives:
 - Every route handler and all 37 server actions authenticate.
