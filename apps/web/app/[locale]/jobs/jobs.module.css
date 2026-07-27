@@ -27,6 +27,7 @@
 .hubTitle {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-title-size);
 	line-height: var(--type-title-line);
 	color: var(--text-primary);
@@ -100,6 +101,7 @@
 	align-items: center;
 	gap: var(--space-8);
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-section-size);
 }
 
@@ -158,6 +160,7 @@
 .heroTitle {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-title-size);
 	line-height: var(--type-title-line);
 }

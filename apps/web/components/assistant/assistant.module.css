@@ -20,6 +20,7 @@
 
 .title {
   font-family: var(--font-display, serif);
+  font-weight: var(--font-weight-bold);
   font-size: 1.5rem;
   line-height: 1.1;
   color: var(--palette-ink, #17130d);
@@ -67,6 +68,7 @@
 
 .emptyTitle {
   font-family: var(--font-display, serif);
+  font-weight: var(--font-weight-bold);
   font-size: 1.15rem;
   color: var(--palette-ink, #17130d);
   margin: 0;
@@ -244,6 +246,7 @@
 
 .toolCardTitle {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-body-size);
   color: var(--text-primary);
 }
@@ -300,6 +303,7 @@
   align-items: center;
   gap: var(--space-4);
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-body-size);
   color: var(--text-primary);
 }

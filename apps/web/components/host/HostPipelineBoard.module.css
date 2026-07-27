@@ -54,6 +54,7 @@
   gap: var(--space-8);
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);
@@ -118,6 +119,7 @@
 .emptyTitle {
   margin: var(--space-4) 0 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size, 1.375rem);
   line-height: 1.2;
   color: var(--text-primary);

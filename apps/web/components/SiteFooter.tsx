@@ -5,14 +5,15 @@ import styles from "./SiteFooter.module.css";
 const FOOTER_COLUMNS = [
 	{
 		title: "Explore",
+		// Categories are ATTRIBUTES, not products (redesign 2026-07-27): the
+		// four category pages stay live for SEO under /jobs, reached through
+		// one door here instead of four sibling rows that made farm/maritime/
+		// remote/seasonal read as separate sites.
 		links: [
 			{ label: "Seek",  href: "/seek"  },
 			{ label: "Swipe", href: "/swipe" },
 			{ label: "Map",   href: "/map"   },
-			{ label: "Farm jobs",     href: "/jobs/farm"     },
-			{ label: "Maritime jobs", href: "/jobs/maritime" },
-			{ label: "Remote jobs",   href: "/jobs/remote"   },
-			{ label: "Seasonal jobs", href: "/jobs/seasonal" },
+			{ label: "Browse by category", href: "/jobs" },
 		],
 	},
 	{

@@ -74,6 +74,7 @@
 .panelTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 1.25rem;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -241,6 +242,7 @@
 
 .radialValue {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 2.1rem;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -385,6 +387,7 @@
 .diagTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 1.15rem;
   line-height: 1.05;
   letter-spacing: -0.02em;

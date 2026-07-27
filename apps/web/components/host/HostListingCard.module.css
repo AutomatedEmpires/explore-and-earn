@@ -100,6 +100,7 @@
 
 .title {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);
@@ -170,6 +171,7 @@
 
 .applicantCount strong {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   color: var(--text-primary);
   margin-right: var(--space-2);

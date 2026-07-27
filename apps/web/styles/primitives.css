@@ -14,12 +14,12 @@
   --ui-focus-ring: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--status-match-fg);
   /* modal scrim -- derived from the live ink token (was a stale V1 rgb) */
   --ui-scrim: color-mix(in srgb, var(--palette-ink) 48%, transparent);
-  /* Wire next/font CSS variables into token system so Patrick Hand & Inter
-     self-host correctly. The var() fallback keeps tokens resolving even if
+  /* Wire the next/font CSS variable into the token system so Manrope
+     self-hosts correctly. The var() fallback keeps tokens resolving even if
      the font variable hasn't been applied yet (e.g. during SSR). */
-  --font-display: var(--font-patrick-hand, "Patrick Hand", ui-rounded, cursive);
-  --font-ui: var(--font-inter, "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
-  --font-accent: var(--font-cabin-sketch, "Cabin Sketch", "Patrick Hand", cursive);
+  --font-display: var(--font-manrope, "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-ui: var(--font-manrope, "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-accent: var(--font-manrope, "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
 }
 
 /* Global page reset. Zero the UA default body margin (8px on every side) so the
@@ -91,7 +91,7 @@ html {
   font-family: var(--font-display);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 
@@ -145,7 +145,7 @@ html {
   font-family: var(--font-display);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
 }
 
 /* =================================================================== */
@@ -298,6 +298,7 @@ html {
 
 .ui-meter__value {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
 }
@@ -579,7 +580,7 @@ html {
   font-family: var(--font-display);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 
@@ -619,6 +620,7 @@ html {
 .ui-empty__title {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);
@@ -648,6 +650,7 @@ html {
 
 .ui-stat__value {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);
@@ -729,6 +732,7 @@ html {
   background: var(--gradient-progress);
   color: var(--color-cta-text);
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: calc(var(--ui-avatar-size) * 0.4);
   line-height: 1;
   text-transform: uppercase;

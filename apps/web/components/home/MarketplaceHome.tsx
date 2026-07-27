@@ -446,8 +446,15 @@ const DISCOVER_MODES: ReadonlyArray<{
 ];
 
 function DiscoverModes({ listings }: { listings: readonly DiscoveryListing[] }) {
-  const pins = listings.filter((l) => l.coordinates).slice(0, 5);
-  const shownPins = pins.length > 0 ? pins : listings.slice(0, 5);
+  // Honest map preview (D5, commercial redesign 2026-07-27): real listing
+  // rows instead of a decorative fake-map canvas. Prefer listings that carry
+  // real coordinates (what /map would actually plot); fall back to the same
+  // listings the rest of the homepage already shows so the card never lies
+  // by going empty when there's real inventory, just uncoordinated inventory.
+  const pinnable = listings.filter((l) => l.coordinates);
+  const mapListings = pinnable.length > 0 ? pinnable : listings;
+  const shownPins = mapListings.slice(0, 4);
+  const totalOnMap = mapListings.length;
 
   return (
     <section className={styles.section} aria-labelledby="discover-title">
@@ -466,19 +473,27 @@ function DiscoverModes({ listings }: { listings: readonly DiscoveryListing[] }) 
             style={{ "--reveal-index": i } as CSSProperties}
           >
             {m.key === "map" ? (
-              <span className={styles.mapCanvas} aria-hidden="true">
-                <span className={styles.mapLand} />
-                <span className={styles.mapLand2} />
-                <span className={styles.mapGrid} />
-                {shownPins.map((l, pi) => (
-                  <span
-                    key={l.id}
-                    className={`${styles.mapPin} ${styles[`pin_${l.category}`]}`}
-                    style={{ "--pin-x": `${[18, 38, 55, 72, 84][pi] ?? 50}%`, "--pin-y": `${[42, 26, 58, 34, 66][pi] ?? 50}%` } as CSSProperties}
-                  >
-                    <Icon name="nav.map" size={16} aria-hidden />
-                  </span>
-                ))}
+              <span className={styles.mapPreview} aria-hidden="true">
+                {shownPins.length > 0 ? (
+                  <>
+                    {shownPins.map((l) => (
+                      <span key={l.id} className={styles.mapPreviewRow}>
+                        <span className={`${styles.mapPreviewPin} ${styles[`pin_${l.category}`]}`}>
+                          <Icon name="nav.map" size={12} aria-hidden />
+                        </span>
+                        <span className={styles.mapPreviewText}>
+                          <span className={styles.mapPreviewLocation}>{l.location}</span>
+                          <span className={styles.mapPreviewTitle}>{l.title}</span>
+                        </span>
+                      </span>
+                    ))}
+                    <span className={styles.mapPreviewCount}>
+                      {totalOnMap} location{totalOnMap === 1 ? "" : "s"} on the map
+                    </span>
+                  </>
+                ) : (
+                  <span className={styles.mapPreviewEmpty}>Locations will appear here as hosts publish.</span>
+                )}
               </span>
             ) : null}
             <span className={styles.modeBody}>

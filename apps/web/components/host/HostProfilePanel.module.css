@@ -109,6 +109,7 @@
 .name {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(1.9rem, 4vw, 3rem);
   line-height: 0.95;
   letter-spacing: -0.04em;
@@ -234,6 +235,7 @@
 .checklistTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
   letter-spacing: -0.02em;

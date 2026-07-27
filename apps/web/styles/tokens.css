@@ -178,10 +178,18 @@
   --icon-chip-compact: 36px;
 
   /* typography */
-  /* Patrick Hand = display/title; Inter = UI/body; Cabin Sketch = marketing accent only */
-  --font-display: var(--font-patrick-hand, "Patrick Hand", ui-rounded, cursive);
-  --font-ui:      var(--font-inter, "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
-  --font-accent:  var(--font-cabin-sketch, "Cabin Sketch", "Patrick Hand", cursive);
+  /* ONE typeface: Manrope (founder directive 2026-07-27). The three ROLES
+     survive so no component changes: display = extrabold/tight for heroes and
+     page titles, ui = the working voice, accent = semibold labels/eyebrows.
+     Personality lives in weight/scale/tracking, never in a novelty face. */
+  --font-display: var(--font-manrope, "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-ui:      var(--font-manrope, "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-accent:  var(--font-manrope, "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+
+  /* Role weights — display type must opt into weight now that the display
+     face is no longer inherently decorative. Consumers of --font-display
+     pair it with --font-weight-display; accent pairs with semibold. */
+  --font-weight-display: 800;
 
   --type-display-size: 30px;  --type-display-lh: 1.15;
   --type-page-size:    26px;  --type-page-lh:    1.2;
@@ -203,6 +211,16 @@
   --font-weight-medium:   500;
   --font-weight-semibold: 600;
   --font-weight-bold:     700;
+  --font-weight-extrabold: 800;
+
+  /* Completing the commercial type scale (redesign 2026-07): named roles the
+     brief requires that the scale above did not yet name. Metric/price are
+     tabular by intent — pair them with font-variant-numeric: tabular-nums. */
+  --type-body-lg-size: 18px;  --type-body-lg-lh: 1.5;
+  --type-metric-size:  28px;  --type-metric-lh:  1.1;
+  --type-price-size:   34px;  --type-price-lh:   1.05;
+  --type-helper-size:  13px;  --type-helper-lh:  1.45;
+  --type-error-size:   13px;  --type-error-lh:   1.45;
 
   /* =============================================================== */
   /* V3 — INTERACTIVE / CHROME TOKENS                                */

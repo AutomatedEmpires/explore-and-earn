@@ -83,6 +83,7 @@
 .heroTitle {
   margin: 0 0 var(--space-12);
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(2rem, 6vw, 3.25rem);
   line-height: 1.05;
   color: var(--palette-white);
@@ -221,6 +222,7 @@
 .previewTitle {
   margin: var(--space-2) 0 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
   color: var(--text-primary);
@@ -254,6 +256,7 @@
 
 .kpiValue {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-page-size);
   line-height: var(--type-page-lh);
   color: var(--text-primary);
@@ -332,6 +335,7 @@
   margin: 0 0 var(--space-20);
   text-align: center;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(1.6rem, 4vw, 2.25rem);
   color: var(--text-primary);
 }
@@ -489,7 +493,7 @@
   font-family: var(--font-display);
   font-size: var(--type-display-size);
   line-height: 1;
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 
@@ -577,6 +581,7 @@
 .finalTitle {
   margin: 0 0 var(--space-10);
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(1.6rem, 4vw, 2.25rem);
   color: var(--text-primary);
 }

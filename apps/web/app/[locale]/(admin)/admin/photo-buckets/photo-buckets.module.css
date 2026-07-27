@@ -49,6 +49,7 @@
 .title {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: clamp(2rem, 4.8vw, 3rem);
 	line-height: 1.04;
 	letter-spacing: -0.01em;
@@ -137,6 +138,7 @@
 .bucketTitle {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-h3-size, 1.25rem);
 	color: var(--text-primary);
 }

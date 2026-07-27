@@ -8,27 +8,36 @@ Tokens are two-tier: **primitives** (`--paper-100`) → **semantic** (`--color-s
 
 Feature code references **semantic tokens only** — never raw hex.
 
-## Typography (locked)
+## Typography (superseded by the commercial redesign — see note)
 
-Three self-hosted fonts (OFL):
+> **⚠️ Font family below is V1-era and SUPERSEDED.** The founder directed a
+> one-typeface stack on 2026-07-27 (commercial redesign, D1 — see
+> [`commercial-redesign-2026-07.md`](./commercial-redesign-2026-07.md) and
+> [`visual-system.md` §2](./visual-system.md#2-typography-hierarchy), which
+> wins). Patrick Hand and Cabin Sketch no longer ship; **Manrope** is the only
+> loaded font, consumed through the same `--font-display` / `--font-ui` /
+> `--font-accent` role tokens. Display and accent roles now pair with an
+> explicit weight (bold / semibold) instead of relying on a novelty face for
+> hierarchy. The role/size/line-height columns below are still current — only
+> the Family/Weight columns are stale.
 
-- **Patrick Hand** — display/brand. Hero, page/section/card titles. Weight 400; hierarchy by size. **Min 18px**; never body/metadata/long copy.
-- **Inter** (variable) — UI/text. Body, metadata, captions, buttons, labels, badges, inputs, tables, data viz. Weights 400/500/600.
-- **Cabin Sketch** — hero/logo accent for marketing only; **not** in product UI.
+- **Manrope** (variable, weights 400–800) — the only self-hosted font (OFL).
+  Display/brand titles use it at `--font-weight-bold`; body/UI/data uses it
+  at regular/medium; marketing accent uses it at `--font-weight-semibold`.
 
-Rules: uppercase only on labels + badges (Inter, +0.06em tracking); titles + metadata sentence case; hand-drawn font respects user font-scaling + minimum contrast.
+Rules: uppercase only on labels + badges (+0.06em tracking); titles + metadata sentence case; display type respects user font-scaling + minimum contrast.
 
 | Role | Size (px) | Line height | Family | Weight |
 | --- | --- | --- | --- | --- |
-| Display / Hero | 30 | 1.15 | Patrick Hand | 400 |
-| Page Title | 26 | 1.2 | Patrick Hand | 400 |
-| Section Title | 22 | 1.2 | Patrick Hand | 400 |
-| Card Title | 20 | 1.25 | Patrick Hand | 400 |
-| Body | 16 | 1.5 | Inter | 400 |
-| Metadata | 14 | 1.45 | Inter | 400 / 500 |
-| Caption | 12 | 1.4 | Inter | 400 |
-| Button | 15 | 1.0 | Inter | 600 |
-| Label / Badge | 12 | 1.0 | Inter | 600 (uppercase, +0.06em) |
+| Display / Hero | 30 | 1.15 | Manrope | 700 |
+| Page Title | 26 | 1.2 | Manrope | 700 |
+| Section Title | 22 | 1.2 | Manrope | 700 |
+| Card Title | 20 | 1.25 | Manrope | 700 |
+| Body | 16 | 1.5 | Manrope | 400 |
+| Metadata | 14 | 1.45 | Manrope | 400 / 500 |
+| Caption | 12 | 1.4 | Manrope | 400 |
+| Button | 15 | 1.0 | Manrope | 600 |
+| Label / Badge | 12 | 1.0 | Manrope | 600 (uppercase, +0.06em) |
 
 ## Color (superseded by V2 — see note)
 

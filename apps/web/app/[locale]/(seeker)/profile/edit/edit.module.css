@@ -14,6 +14,7 @@
 .heading {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-section-size);
 	line-height: var(--type-section-lh);
 	color: var(--text-primary);

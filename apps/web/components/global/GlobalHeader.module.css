@@ -102,11 +102,11 @@
   color: var(--hdr-chrome); /* silver shimmer on hover */
 }
 
-/* Patrick Hand wordmark */
+/* Manrope wordmark */
 .wordmark {
   font-family: var(--font-display);
   font-size: clamp(1.2rem, 2vw, 1.45rem);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   line-height: 1;
   letter-spacing: -0.01em;
   color: var(--palette-white);
@@ -576,6 +576,7 @@
   background: color-mix(in srgb, var(--hdr-chrome) 22%, transparent);
   color: var(--palette-white);
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 0.75rem;
   line-height: 1;
 }

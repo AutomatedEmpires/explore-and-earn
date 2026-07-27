@@ -29,7 +29,7 @@
   font-family: var(--font-display);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 

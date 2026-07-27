@@ -117,6 +117,7 @@
 .title {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-section-size);
 	line-height: var(--type-section-lh);
 	color: var(--text-primary);
@@ -186,6 +187,7 @@
 .stepTitle {
 	margin: 0 0 var(--space-6);
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-card-size);
 	line-height: var(--type-card-lh);
 	color: var(--text-primary);

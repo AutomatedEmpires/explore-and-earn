@@ -43,6 +43,7 @@
 
 .quotaNum {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
   line-height: 1;
   color: var(--text-primary);
@@ -167,7 +168,7 @@
   font-family: var(--font-display);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
-  font-weight: var(--font-weight-regular);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }

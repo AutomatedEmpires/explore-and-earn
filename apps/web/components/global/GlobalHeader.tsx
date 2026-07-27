@@ -7,7 +7,6 @@ import { useTranslations } from "next-intl";
 import { Icon } from "@explore-and-earn/ui";
 
 import { UnreadBadge } from "../seeker/UnreadBadge";
-import { ThemeSwitcher } from "./ThemeSwitcher";
 import styles from "./GlobalHeader.module.css";
 
 const IMMERSIVE_ROUTES = ["/map", "/swipe"];
@@ -208,17 +207,31 @@ export function GlobalHeader({
             >
               {t("community")}
             </Link>
-            {/* Host flow is separate (reached via sign-in → "I'm a host"), not a
-                primary nav destination — so "For Hosts" is intentionally not here. */}
+            {/* For Hosts joined the public nav (redesign 2026-07-27): the
+                host funnel is now build-first, so the acquisition page is a
+                primary destination for signed-out visitors — hiding the
+                commercial door behind a sign-in menu cost discovery. Hidden
+                for authenticated seekers, whose nav stays seeker-shaped. */}
+            {!isAuthenticated && (
+              <Link
+                className={`${styles.navLink}${sectionActive === "hosts" ? ` ${styles.navLinkActive}` : ""}`}
+                href="/for-hosts"
+                aria-current={sectionActive === "hosts" ? "page" : undefined}
+              >
+                {t("forHosts")}
+              </Link>
+            )}
           </nav>
         )}
 
-        {/* ── Col 3: theme + auth ──────────────────────────────────────── */}
+        {/* ── Col 3: auth ──────────────────────────────────────────────── */}
+        {/* The theme switcher left the PUBLIC header (commercial redesign,
+            founder 2026-07-27): a marketing surface sells one intentional
+            brand, it does not offer to recolor itself. Theme preference
+            lives on in seeker Settings → Appearance and in the authenticated
+            workspace shells; the Light-default contract in lib/theme.ts is
+            unchanged. */}
         <div className={styles.authArea}>
-          {/* Light/Dark/System — retinted for the deep-sky bar via .themeSlot. */}
-          <span className={styles.themeSlot}>
-            <ThemeSwitcher />
-          </span>
           {isAuthenticated ? (
             <>
               <Link
@@ -279,9 +292,10 @@ export function GlobalHeader({
                   <Link className={styles.authMenuGhost} role="menuitem" href="/sign-up">
                     {t("createAccount")}
                   </Link>
-                  <Link className={styles.authMenuAdmin} role="menuitem" href="/sign-in?role=admin">
-                    {t("becomeAdmin")}
-                  </Link>
+                  {/* The admin entry left this menu (redesign 2026-07-27):
+                      operators reach /sign-in?role=admin directly — a public
+                      marketing menu advertising an admin door reads as
+                      clutter at best and an attack invitation at worst. */}
                 </div>
               ) : null}
             </div>

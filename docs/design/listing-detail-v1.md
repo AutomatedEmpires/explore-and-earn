@@ -9,7 +9,7 @@ The Listing Detail is where a seeker decides to apply. It expands the card's com
 ## Section order (mobile-first, top to bottom)
 
 1. **Hero media** — framed scenic photo(s); horizontally swipeable gallery; `3:2`. Badge stack overlaid (Verified Host mandatory, category, seasonal/featured, boosted/match if relevant).
-2. **Title block** — job title (Patrick Hand), host name + avatar (tap → host profile), location (tap → map), begins/ends dates.
+2. **Title block** — job title (Manrope bold), host name + avatar (tap → host profile), location (tap → map), begins/ends dates.
 3. **Triad summary** — HOUSING / MEALS / PAY as three prominent blocks; each expandable:
    - **Housing** → housing details + photo bucket.
    - **Meals** → meals details + photo bucket.

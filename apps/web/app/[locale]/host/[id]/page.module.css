@@ -66,6 +66,7 @@
 
 .factValue {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: 15px;
   line-height: 1;
   color: var(--text-primary);
@@ -182,6 +183,7 @@
 
 .sectionHeading {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);
@@ -260,6 +262,7 @@
 
 .emptyTitle {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);
@@ -341,6 +344,7 @@
 
 .mapTitle {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-body-size);
   line-height: 1;
   color: var(--text-primary);
@@ -385,6 +389,7 @@
 
 .benefitCardTitle {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-body-size);
   line-height: 1;
   color: var(--text-primary);
@@ -536,6 +541,7 @@
 
 .teamName {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-body-size);
   line-height: 1.2;
   color: var(--text-primary);

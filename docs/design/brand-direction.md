@@ -20,7 +20,7 @@ Five traits. Everything we ship should be locatable on this list. If a screen ex
 |---|---|---|
 | **Adventurous** | The work is somewhere real — a coast, an orchard, a ridge. We sell the *place* as much as the job. | Lead with large, warm, scenic imagery. Use map and location surfaces as first-class, not afterthoughts. |
 | **Trustworthy** | Real people, real housing, honest pay. We earn belief, we don't decorate it. | Make Verified-Host, the HOUSING/MEALS/PAY triad, and "Self-Declared by Host" qualifiers visible and legible. Never fake premium with decoration. |
-| **Crafted (field-journal)** | Hand-drawn edges, paper surfaces, ink lines, Patrick Hand display. It feels made by hand, by people who do this. | Honor borders-first + the hand-drawn frame language. Resist clean corporate flatness *and* random gradient gloss. |
+| **Crafted (field-journal)** | Hand-drawn edges, paper surfaces, ink lines, Manrope-bold display. It feels made by hand, by people who do this. | Honor borders-first + the hand-drawn frame language. Resist clean corporate flatness *and* random gradient gloss. |
 | **Warm** | People sleep, eat, and earn here. It's human and seasonal, not a transaction log. | Warm paper base, golden-hour imagery, plain human copy. Avoid gray-on-gray admin coldness. |
 | **Operationally serious** | Seekers and hosts make money and life decisions here. It must be fast, clear, and dependable. | Strong hierarchy, scannable blocks, honest empty/error/loading states. Premium ≠ slow or precious. |
 

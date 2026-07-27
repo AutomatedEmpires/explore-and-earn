@@ -56,7 +56,7 @@ Notion = product truth; GitHub = implementation truth. Do **not** invent visual 
 | Category Seasonal | bg `#DCEBD6` · text `#41663A` |
 | Category Mix | bg `#E7E2EE` · text `#5B5172` |
 | Radius | card 24 · image 16 · chips/badges full pill |
-| Type | titles: hand-drawn display (Patrick Hand) · UI/body: Inter |
+| Type | titles: Manrope bold · UI/body: Manrope regular |
 | Photo | 3:2, cover, framed (never filtered) |
 
 ## Phase 1 — TEST PROMPT (run first, one card)
@@ -68,7 +68,7 @@ Build a SINGLE mobile UI card called "Discovery Card" (mobile width 390px), one 
 
 AESTHETIC: hybrid sketchbook + product UI. Warm, premium, organic "Warm Working Landscape." Soft hand-drawn card edges, paper-like surfaces, calm, high-trust, fast to scan, zero clutter.
 
-TOKENS (exact): page bg #F6F3EC; card #FBF9F3; raised #FFFFFF; ink border #33312B 1px; soft divider #E7E1D3; text primary #24221E, secondary #6E685D, muted #9A9486. Card radius 24, image radius 16, chips/badges full pill. ELEVATION: borders-first — NO drop shadows. Titles in a hand-drawn display font (Patrick Hand); UI/body in Inter.
+TOKENS (exact): page bg #F6F3EC; card #FBF9F3; raised #FFFFFF; ink border #33312B 1px; soft divider #E7E1D3; text primary #24221E, secondary #6E685D, muted #9A9486. Card radius 24, image radius 16, chips/badges full pill. ELEVATION: borders-first — NO drop shadows. Titles in Manrope, bold weight; UI/body in Manrope, regular weight.
 
 CARD STRUCTURE (top to bottom):
 1. Hero photo 3:2, a warm golden-hour FARM/ORCHARD working landscape (barn, produce, wood, baskets), inside a thin hand-drawn ink frame with a small paper mat — frame AROUND the photo, never a filter ON it.

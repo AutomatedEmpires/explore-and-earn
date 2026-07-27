@@ -29,11 +29,13 @@ The palette is **"Adventure Paper & Sky"**: a warm paper-and-ink base (the field
 
 ## 2. Typography hierarchy
 
-Three families, locked roles — **never** add a fourth or repurpose:
+**One typeface, three roles** (commercial redesign, founder directive 2026-07-27 — see [`commercial-redesign-2026-07.md`](./commercial-redesign-2026-07.md) D1; supersedes the three-family stack this section used to lock):
 
-- `--font-display` = **Patrick Hand** (hand-drawn) → display/page/section/card *titles*. The journal voice.
-- `--font-ui` = **Inter** → all body, UI, data, forms, buttons, meta. The product voice.
-- `--font-accent` = **Cabin Sketch** → marketing accent **only**. Never in app chrome or data.
+- `--font-display` = **Manrope**, paired with `--font-weight-bold` (700) → display/page/section/card *titles*.
+- `--font-ui` = **Manrope**, regular/medium → all body, UI, data, forms, buttons, meta. The product voice.
+- `--font-accent` = **Manrope**, paired with `--font-weight-semibold` (600) → marketing accent **only**. Never in app chrome or data.
+
+All three role tokens now resolve to the same loaded family — they survive as *roles*, not typefaces, so nothing that already references `var(--font-display)` / `var(--font-ui)` / `var(--font-accent)` needed to change. Personality moved from typeface novelty to weight, scale, and spacing. **Any rule that sets `font-family: var(--font-display)` or `var(--font-accent)` must also set a weight in the same declaration block** — Manrope's default (regular, 400) reads as plain body text at display sizes, which the old hand-drawn face never did.
 
 Locked scale (use the role tokens, never raw px):
 
@@ -49,9 +51,9 @@ Locked scale (use the role tokens, never raw px):
 | button | `--type-button-size` 15 / 1 | Button labels |
 | label | `--type-label-size` 12 / 1 + `--type-label-tracking` 0.06em | Eyebrows, chip labels (uppercase) |
 
-Weights: `--font-weight-regular|medium|semibold` (400/500/600). **No 700+** — hierarchy comes from the display face, size, and color, not heavy weights. **No body text below 14px**; 16px is the body floor on mobile (also prevents iOS input zoom). The founder explicitly dislikes "tiny text everywhere."
+Weights: `--font-weight-regular|medium|semibold|bold|extrabold` (400/500/600/700/800). Display titles pair with `--font-weight-bold`; accent pairs with `--font-weight-semibold`; body/UI stays regular/medium. The old "no 700+" rule is retired — it existed to stop a decorative hand-drawn face from competing with itself at heavy weights, and Manrope has no such conflict; heavy weight is now how display type earns its hierarchy. **No body text below 14px**; 16px is the body floor on mobile (also prevents iOS input zoom). The founder explicitly dislikes "tiny text everywhere."
 
-**Hierarchy recipe (every module):** one display/page title → one supporting line in `--text-secondary` → content. Patrick Hand title + Inter body is the signature pairing; lean on it instead of stacking bold Inter.
+**Hierarchy recipe (every module):** one display/page title (Manrope bold) → one supporting line in `--text-secondary` (Manrope regular) → content. Weight and scale now carry the hierarchy a second typeface used to.
 
 ## 3. Spacing rhythm
 
@@ -94,9 +96,9 @@ Hover/active depth is allowed via the locked `--elevation-hover` lift **on inter
 
 These are the repeating "rooms" of the product. Detailed component contracts live in [`component-rules.md`](./component-rules.md); this is the visual intent.
 
-- **Discovery / listing card** (`DiscoveryCard`, locked skeleton — preserve JSX, class-CSS only): framed scenic photo → category eyebrow + Patrick-Hand title → HOUSING/MEALS/PAY triad → pay/location meta → CTA. Atmosphere by lane. The product's core primitive; reused everywhere.
+- **Discovery / listing card** (`DiscoveryCard`, locked skeleton — preserve JSX, class-CSS only): framed scenic photo → category eyebrow + Manrope-bold title → HOUSING/MEALS/PAY triad → pay/location meta → CTA. Atmosphere by lane. The product's core primitive; reused everywhere.
 - **Scenic hero** (homepage, dashboard, profile): full-bleed framed photography or lane gradient + scrim, display headline, one primary action. Sells the *place* first.
-- **Rails** (matched / saved / applied / community): horizontal card scrollers with a **visible scroll affordance** (edge fade or peek of the next card) — a documented gap to never repeat. Section head (Patrick Hand) + "see all" link.
+- **Rails** (matched / saved / applied / community): horizontal card scrollers with a **visible scroll affordance** (edge fade or peek of the next card) — a documented gap to never repeat. Section head (Manrope bold) + "see all" link.
 - **Map surface** (`/map`, saved): Mapbox is wired. Map is a first-class explore surface — custom ink/paper pins (`--elevation-pin`), bottom-sheet detail on mobile, list+map split on desktop. Location is a feeling, not a filter.
 - **Profile / journey**: profile is a *journey* (been / headed / readiness), not a résumé form. Scrim hero + avatar overlap + readiness state + rails of saved/applied.
 - **Stat / KPI strip** (dashboards): **one promoted dominant metric**, the rest subordinate. Never a row of identical flat boxes (a documented amateur tell).

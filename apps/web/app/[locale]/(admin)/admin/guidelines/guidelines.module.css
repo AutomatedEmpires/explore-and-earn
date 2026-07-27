@@ -50,6 +50,7 @@
   margin: 0;
   max-width: 22ch;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: clamp(2rem, 4.8vw, 3rem);
   line-height: 1.04;
   letter-spacing: -0.01em;
@@ -78,6 +79,7 @@
 .blockTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
   color: var(--text-primary);
@@ -154,6 +156,7 @@
 .decisionTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);
@@ -205,6 +208,7 @@
 
 .triadLabel {
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   letter-spacing: -0.01em;
   color: var(--text-primary);
@@ -247,6 +251,7 @@
   border: 1px solid color-mix(in srgb, var(--color-cta) 34%, transparent);
   background: color-mix(in srgb, var(--color-cta) 14%, transparent);
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: 1;
   color: var(--color-cta);
@@ -261,6 +266,7 @@
 .ladderTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
   font-size: var(--type-card-size);
   line-height: var(--type-card-lh);
   color: var(--text-primary);

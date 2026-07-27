@@ -48,6 +48,7 @@
 .name {
 	margin: 0;
 	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
 	font-size: var(--type-card-size);
 	line-height: 1.1;
 	color: #fff;
