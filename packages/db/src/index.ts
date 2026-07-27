@@ -24,6 +24,7 @@ export * from "./queries/inviteEntitlements";
 export * from "./queries/hostSourcing";
 export * from "./queries/hostProfiles";
 export * from "./queries/hostSubscriptions";
+export * from "./queries/foundingHostProgram";
 export * from "./lib/entitlements";
 export * from "./lib/hostAccountState";
 export * from "./queries/seekerResume";

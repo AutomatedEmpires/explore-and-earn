@@ -1,0 +1,122 @@
+/* Add-on presentation (commercial redesign P4).
+
+   Tokens only — no raw colour literals (G50). Every padded container declares
+   box-sizing so a gutter added outside the width cannot scroll the page
+   sideways on a phone. */
+
+.section {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--type-heading-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.lead {
+  margin: 0;
+  max-width: 48rem;
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-sm);
+}
+
+.groups {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 48rem) {
+  .groups {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 72rem) {
+  .groups {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.group {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: var(--type-body-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.groupMeta {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowLabel {
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.rowPrice {
+  font-size: var(--type-body-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.rowUnit {
+  font-size: var(--type-body-sm);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.groupNote {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}

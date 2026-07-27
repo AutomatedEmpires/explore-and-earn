@@ -394,7 +394,54 @@ describe("the plan selection route", () => {
     );
     expect(source).not.toContain("getHostProfile");
     expect(source).not.toContain("cachedHostProfile");
+  });
+
+  /**
+   * D12 MOVED THE CHECKOUT POST ONE SCREEN LATER, and this assertion moved with
+   * it. The property being pinned has not changed — a signed-in host with no
+   * profile must be able to reach Stripe — but the page that posts the action is
+   * now /host/plans/activate, where the exact amount, the renewal, the
+   * cancellation terms and what activates are stated first.
+   *
+   * The plans page is checked for the ROUTE rather than for the action name. It
+   * still explains the move in its header comment, and a `toContain` on the
+   * action name would be satisfied by that prose — a source pin that a comment
+   * can satisfy is testing the comment.
+   */
+  it("hands the choice to the activation summary rather than straight to Stripe", () => {
+    const source = readFileSync(
+      new URL("(host-onboard)/host/plans/page.tsx", appDir),
+      "utf8",
+    );
+    expect(source).toContain("/host/plans/activate?tier=");
+    // The import is gone, not merely unused: the POST happens one page later.
+    expect(source).not.toContain(
+      'import { startHostCheckoutAction } from "../../../../actions/hostBilling"',
+    );
+  });
+
+  it("posts the checkout action from the activation page, still with no profile read", () => {
+    const source = readFileSync(
+      new URL("(host-onboard)/host/plans/activate/page.tsx", appDir),
+      "utf8",
+    );
     expect(source).toContain("startHostCheckoutAction");
+    expect(source).toContain("action={startHostCheckoutAction}");
+    expect(source).not.toContain("getHostProfile");
+    expect(source).not.toContain("cachedHostProfile");
+  });
+
+  /**
+   * Same route-group constraint as the plans page, for the same reason: the
+   * audience is people who may have no host profile row, and the (host) layout
+   * bounces exactly them.
+   */
+  it("keeps the activation page in (host-onboard), outside the profile gate", () => {
+    const page = new URL("(host-onboard)/host/plans/activate/page.tsx", appDir);
+    expect(() => readFileSync(page, "utf8")).not.toThrow();
+
+    const gated = new URL("(host)/host/plans/activate/page.tsx", appDir);
+    expect(() => readFileSync(gated, "utf8")).toThrow();
   });
 
   /**

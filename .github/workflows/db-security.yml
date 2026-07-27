@@ -94,6 +94,20 @@ jobs:
           PGDATABASE: postgres
         run: node tools/db-assert/assert-listing-slot-concurrency.mjs
 
+      # Migration 087's founding-host program. This is the only surface that
+      # publishes a scarcity claim ("N of CAPACITY remain, until DATE"), so the
+      # numbers a visitor reads and the numbers the database enforces have to be
+      # the same numbers. Kept separate so a failure reads as "the scarcity claim
+      # stopped being true" rather than as general authorization drift.
+      - name: Verify founding-host program
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: node tools/db-assert/assert-founding-host-program.mjs
+
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup

@@ -29,6 +29,18 @@ export const HOST_FUNNEL_EVENTS = {
   hostDemoOpened: "host_demo_opened",
   /** The product tour was walked to the end on every demo surface. */
   hostDemoTourCompleted: "host_demo_tour_completed",
+  /**
+   * The pricing area was actually SEEN — scrolled into the viewport, not merely
+   * present in a page the visitor left at the hero. That distinction is the
+   * whole reason this is a separate event from host_landing_viewed: on a page
+   * built to show the product before the price, "did they reach the price" is
+   * the question, and a page-view event cannot answer it.
+   */
+  hostPricingViewed: "host_pricing_viewed",
+  /** The activation summary was opened, one step before Stripe. */
+  hostActivationPageViewed: "host_activation_page_viewed",
+  /** The early-host programme section was scrolled into view. */
+  foundingSectionViewed: "founding_section_viewed",
 } as const;
 
 export type HostFunnelEvent =

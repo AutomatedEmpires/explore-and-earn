@@ -4,10 +4,12 @@ import {
   FOUNDER_LOCKED_PRICING,
   PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
+import { getFoundingHostProgram } from "@explore-and-earn/db";
 import { Card } from "@explore-and-earn/ui";
 
+import { FoundingHostSection } from "../../../../../components/founding/FoundingHostSection";
+import { resolveFoundingProgramView } from "../../../../../components/founding/program";
 import { formatMoney } from "../../../../../lib/format";
-import { startHostCheckoutAction } from "../../../../actions/hostBilling";
 import {
   hasStripeCheckoutConfig,
   type HostSubscriptionTier,
@@ -15,7 +17,6 @@ import {
 import {
   CaptureOnMount,
   FunnelLink,
-  FunnelSubmitButton,
 } from "../../../../../components/analytics/FunnelEvents";
 import { HOST_FUNNEL_EVENTS } from "../../../../../lib/analytics/events";
 import styles from "./page.module.css";
@@ -51,6 +52,15 @@ import styles from "./page.module.css";
  *
  * /host/billing keeps the same three plans plus the portal and refund surfaces
  * for hosts who are already through onboarding. Both post to the same action.
+ *
+ * D12 MOVED THE CHECKOUT POST ONE SCREEN LATER. This page used to submit
+ * startHostCheckoutAction directly from each card, which meant the last thing a
+ * host saw before Stripe was three prices and a button — no total, no renewal
+ * amount, no cancellation terms, and no statement of what activating actually
+ * turns on. Those facts now live on /host/plans/activate, which posts the same
+ * action with the same fields. This page selects a tier and an interval; it
+ * still reads no host profile, and every ?error= the action can raise still
+ * lands here as a sentence.
  */
 export const metadata: Metadata = { title: "Choose your plan" };
 export const dynamic = "force-dynamic";
@@ -85,6 +95,13 @@ function resolveFeedback(searchParams: PlansSearchParams): string | null {
       return "Your existing subscription has a payment issue rather than being over. Settle it from Manage billing on your billing page — starting a new plan here would risk billing you twice.";
     case "rate_limited":
       return "You've started several checkouts just now. Give it a few minutes.";
+    // The early-host rate was requested but the programme is not open, the last
+    // place went while the tab was open, or the discounted prices are not
+    // provisioned on this environment. Checkout is REFUSED rather than quietly
+    // reopened at the standard rate — being shown one price and charged another
+    // is the one outcome that is never acceptable here.
+    case "founding_unavailable":
+      return "The early-host rate isn't available right now, so nothing was started and nothing was charged. The standard plans below are unchanged.";
     // The already-subscribed guard could not read your billing record, so
     // checkout was refused rather than risk starting a second subscription
     // alongside one you may already have.
@@ -109,6 +126,11 @@ export default async function HostPlansPage({
   const params = await searchParams;
   const feedback = resolveFeedback(params);
   const checkoutConfigured = hasStripeCheckoutConfig();
+  // Reads the programme row, NOT a host profile — the topology test forbids the
+  // latter and this page must still render for someone with no profile at all.
+  // Unconfigured (the shipped state), a read fault, or a draft row all resolve
+  // to the view that shows one qualitative sentence and no figure.
+  const foundingView = resolveFoundingProgramView(await getFoundingHostProgram());
 
   return (
     <main className={styles.page}>
@@ -150,7 +172,7 @@ export default async function HostPlansPage({
           </p>
         ) : null}
 
-        <div className={styles.planGrid}>
+        <div id="plans" className={styles.planGrid}>
           {HOST_PLAN_TIERS.map((tier) => {
             const pricing = FOUNDER_LOCKED_PRICING[tier];
             const entitlements = PLAN_ENTITLEMENTS[tier];
@@ -184,38 +206,48 @@ export default async function HostPlansPage({
                 </ul>
 
                 <div className={styles.actionGroup}>
-                  {/* Still a plain form posting to the server action — the
-                      button only adds the funnel event on click and takes no
-                      part in submission. */}
-                  <form action={startHostCheckoutAction}>
-                    <input type="hidden" name="tier" value={tier} />
-                    <input type="hidden" name="interval" value="monthly" />
-                    <FunnelSubmitButton
-                      event={HOST_FUNNEL_EVENTS.checkoutStarted}
-                      properties={{ tier, interval: "monthly" }}
-                      className={styles.primaryButton}
-                      disabled={!checkoutConfigured}
-                    >
-                      Start monthly
-                    </FunnelSubmitButton>
-                  </form>
-                  <form action={startHostCheckoutAction}>
-                    <input type="hidden" name="tier" value={tier} />
-                    <input type="hidden" name="interval" value="yearly" />
-                    <FunnelSubmitButton
-                      event={HOST_FUNNEL_EVENTS.checkoutStarted}
-                      properties={{ tier, interval: "yearly" }}
-                      className={styles.secondaryButton}
-                      disabled={!checkoutConfigured}
-                    >
-                      Start annual
-                    </FunnelSubmitButton>
-                  </form>
+                  {/* Both actions carry the choice to the activation summary,
+                      which states the exact amount due today, what renews and
+                      when, what activates the moment the payment lands, and how
+                      to cancel — and posts the same checkout action from there.
+                      The funnel event still fires on this click, because this is
+                      where the host chose. */}
+                  {checkoutConfigured ? (
+                    <>
+                      <FunnelLink
+                        event={HOST_FUNNEL_EVENTS.checkoutStarted}
+                        properties={{ tier, interval: "monthly" }}
+                        href={`/host/plans/activate?tier=${tier}&interval=monthly`}
+                        className={styles.primaryButton}
+                      >
+                        Continue monthly
+                      </FunnelLink>
+                      <FunnelLink
+                        event={HOST_FUNNEL_EVENTS.checkoutStarted}
+                        properties={{ tier, interval: "yearly" }}
+                        href={`/host/plans/activate?tier=${tier}&interval=yearly`}
+                        className={styles.secondaryButton}
+                      >
+                        Continue annual
+                      </FunnelLink>
+                    </>
+                  ) : (
+                    <p className={styles.unavailable}>
+                      Checkout isn&apos;t available on this environment yet.
+                    </p>
+                  )}
                 </div>
               </Card>
             );
           })}
         </div>
+
+        {/* The early-host programme, in whatever state it is genuinely in. Its
+            call to action points BACK at the cards above rather than forward:
+            the discount is not a separate product, it is the same three plans at
+            a different rate, applied on the activation summary when the row says
+            a place is claimable. */}
+        <FoundingHostSection view={foundingView} ctaHref="#plans" />
       </section>
     </main>
   );

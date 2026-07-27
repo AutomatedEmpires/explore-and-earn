@@ -4,10 +4,12 @@ import Stripe from "stripe";
 import {
   adminClient,
   activateBoostCampaignFromCheckout,
+  claimFoundingHostSeat,
   closeHostListingsOverAllowance,
   creditListingSlotPurchase,
   getHostSubscriptionByClerkUserId,
   insertHostAnnouncement,
+  recordFoundingClaimDiscrepancy,
   recordInvitePackPurchase,
   revokeListingSlotPurchase,
   syncListingSlotSubscription,
@@ -32,6 +34,11 @@ import {
   selectLatestSubscriptionCharge,
   type SubscriptionCharge,
 } from "./refundVerification";
+import {
+  resolveFoundingPriceId,
+  resolveTierFromFoundingPriceId,
+} from "./foundingPrices";
+import { reportError } from "../../lib/sentry";
 
 const APP_INFO = {
   name: "Explore & Earn",
@@ -123,11 +130,22 @@ function normalizeMetadata(
 function billingMetadata(
   clerkUserId: string,
   subscriptionTier: HostSubscriptionTier,
+  founding = false,
 ): Record<string, string> {
   return {
     clerkUserId,
     subscriptionTier,
+    // Present ONLY on a founding checkout. The grant path reads it to decide
+    // whether a seat should be consumed, so it must never be written
+    // speculatively — an absent key is the ordinary purchase, and the ordinary
+    // purchase must never consume a seat.
+    ...(founding ? { foundingHost: "true" } : {}),
   };
+}
+
+/** True when a Checkout Session was opened against the founding rate. */
+function isFoundingCheckout(session: Stripe.Checkout.Session): boolean {
+  return session.metadata?.foundingHost === "true";
 }
 
 function maybeResolveStripePriceId(
@@ -155,7 +173,13 @@ function resolveTierFromPriceId(
     }
   }
 
-  return null;
+  // THE FOUNDING PRICES ARE THE SAME PLANS AT A DIFFERENT RATE, and this lookup
+  // is how every subscription event decides what a host is entitled to. Omitting
+  // them would answer "ignored_unmapped_subscription_price" for a founding
+  // host's renewal, lapse and cancellation alike — an entitlement frozen at
+  // whatever the checkout wrote, for ever. A discount changes the amount, never
+  // the tier.
+  return resolveTierFromFoundingPriceId(priceId);
 }
 
 async function findStripeCustomer(params: {
@@ -710,7 +734,7 @@ async function syncCheckoutCompleted(
   if (typeof session.customer === "string" && clerkUserId && subscriptionTier) {
     await ensureCustomerMetadata(
       session.customer,
-      billingMetadata(clerkUserId, subscriptionTier),
+      billingMetadata(clerkUserId, subscriptionTier, isFoundingCheckout(session)),
     );
   }
 
@@ -730,11 +754,74 @@ async function syncCheckoutCompleted(
       typeof session.subscription === "string" ? session.subscription : null,
   });
 
+  if (isFoundingCheckout(session)) {
+    const claimAction = await claimFoundingSeatForPaidCheckout(
+      clerkUserId,
+      session.id,
+    );
+    return { action: claimAction, clerkUserId, tier: subscriptionTier };
+  }
+
   return {
     action: "synced_checkout_session",
     clerkUserId,
     tier: subscriptionTier,
   };
+}
+
+/**
+ * Consume the founding seat a paid checkout was opened against.
+ *
+ * RUNS AFTER THE TIER IS GRANTED, NEVER BEFORE, and never throws. Both of those
+ * are the same decision. The money has arrived against a price that is a valid
+ * plan price, so the host is entitled to the plan whatever the program has done
+ * in the meantime; a throw here would answer Stripe non-2xx and force it to
+ * redeliver a grant that already succeeded, which is how an endpoint gets
+ * disabled and every later grant AND revocation silently stops.
+ *
+ * SO WHAT HAPPENS WHEN THE SEAT IS GONE. Between opening a checkout and the
+ * money landing — instant for a card, days for a bank debit — the last seat can
+ * go to somebody else, or the founder can end the program. Three answers were
+ * available and two of them are wrong: refusing the entitlement takes the
+ * customer's money and gives them nothing, and incrementing past capacity breaks
+ * the count the public page is quoting to everybody else. So the plan is granted
+ * and the over-subscription is recorded in two places that different people
+ * read: Sentry, where it pages, and the discrepancy table the admin console
+ * shows. The one answer that is never available is silence.
+ *
+ * An ALREADY-CLAIMED result is not a discrepancy. That is Stripe's at-least-once
+ * delivery meeting an idempotent claim, which is the system working.
+ */
+async function claimFoundingSeatForPaidCheckout(
+  clerkUserId: string,
+  sessionId: string,
+): Promise<string> {
+  const claim = await claimFoundingHostSeat(clerkUserId);
+
+  if (claim.ok) {
+    return claim.alreadyClaimed
+      ? "founding_seat_already_claimed"
+      : "claimed_founding_seat";
+  }
+
+  await recordFoundingClaimDiscrepancy({
+    clerkUserId,
+    reason: claim.reason,
+    stripeCheckoutSessionId: sessionId,
+  });
+
+  // reportError, not reportMessage: this is money that arrived against an offer
+  // the program could not honour, and it needs the same urgency as a thrown
+  // fault. The Clerk id is deliberately not in the message — the tag carries the
+  // traceable id and the discrepancy row carries the identity.
+  reportError(
+    new Error(
+      `Founding seat claim refused after payment (${claim.reason}); the paid tier was granted and the over-subscription recorded.`,
+    ),
+    { action: "claimFoundingSeatForPaidCheckout", eventId: sessionId },
+  );
+
+  return `founding_seat_refused_${claim.reason}`;
 }
 
 async function syncSubscriptionEvent(
@@ -928,6 +1015,14 @@ async function syncSubscriptionEvent(
   };
 }
 
+// One import surface for the surfaces that need to know whether the founding
+// rate can be charged at all. The module itself stays thin and separate; this is
+// only the barrel.
+export {
+  hasFoundingCheckoutConfig,
+  resolveFoundingPriceId,
+} from "./foundingPrices";
+
 export function isHostSubscriptionTier(value: string): value is HostSubscriptionTier {
   return HOST_SUBSCRIPTION_TIERS.includes(value as HostSubscriptionTier);
 }
@@ -975,13 +1070,38 @@ export async function createCheckoutSession(params: {
   billingInterval: BillingInterval;
   successUrl: string;
   cancelUrl: string;
+  /**
+   * Charge the founding rate instead of the standard one.
+   *
+   * The CALLER decides this, and the caller is the only place that can: the
+   * server action re-reads the program row and refuses unless it is open and a
+   * seat is actually claimable. This function's contribution is that it THROWS
+   * when the founding price is unprovisioned rather than falling back to the
+   * standard price — a host who was shown the founding rate must never be
+   * charged the full one.
+   */
+  founding?: boolean;
 }): Promise<Stripe.Checkout.Session> {
   const stripe = getStripeClient();
   const customer = await findStripeCustomer({
     clerkUserId: params.clerkUserId,
     customerEmail: params.customerEmail,
   });
-  const metadata = billingMetadata(params.clerkUserId, params.subscriptionTier);
+  const founding = params.founding === true;
+  const metadata = billingMetadata(
+    params.clerkUserId,
+    params.subscriptionTier,
+    founding,
+  );
+
+  const foundingPriceId = founding
+    ? resolveFoundingPriceId(params.subscriptionTier, params.billingInterval)
+    : null;
+  if (founding && !foundingPriceId) {
+    throw new Error(
+      "Founding checkout requested but the founding Stripe price is not provisioned.",
+    );
+  }
 
   if (customer) {
     await ensureCustomerMetadata(customer.id, metadata);
@@ -997,10 +1117,9 @@ export async function createCheckoutSession(params: {
     metadata,
     line_items: [
       {
-        price: resolveStripePriceId(
-          params.subscriptionTier,
-          params.billingInterval,
-        ),
+        price:
+          foundingPriceId ??
+          resolveStripePriceId(params.subscriptionTier, params.billingInterval),
         quantity: 1,
       },
     ],

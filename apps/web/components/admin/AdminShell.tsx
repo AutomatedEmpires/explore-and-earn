@@ -49,6 +49,9 @@ const SECTIONS: readonly AdminNavDef[] = [
 
 // Reference-y tools, TUCKED into the pinned rail footer (settings-shaped).
 const FOOTER: readonly AdminNavDef[] = [
+  // Configuration rather than a queue: the early-host programme is off until a
+  // founder sets a capacity and a closing date here.
+  { href: "/admin/founding", label: "Early-host programme", icon: "benefit.pay" },
   { href: "/admin/guidelines", label: "Guidelines", icon: "nav.help" },
   { href: "/admin/email-preview", label: "Email templates", icon: "nav.messages" },
 ];
