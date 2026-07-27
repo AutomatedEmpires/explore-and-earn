@@ -118,7 +118,7 @@ its production effect verified before 280 was brought up to date and merged.
 
 Queried directly against production:
 
-```
+```text
 ledger_rows              = 79
 latest_migration         = 081
 inline_policies_remaining= 0
@@ -183,15 +183,20 @@ philosophy — the honesty rule is a CHECK constraint, not a lint.
 |---|---|---|---|---|---|---|---|
 | Starter | $199 | $1,990 | 1 | 3 | 0 | 0 | basic |
 | Professional | $399 | $3,990 | 5 | 10 | 1 | 0 | full |
-| Enterprise | $749 | $7,490 | 10 | 20 | **0** | 0 | full |
+| Enterprise | $749 | $7,490 | 10 | 20 | **3** | 0 | full |
 
 Annual = exactly 10 monthly payments ("two months free"; percentage-discount language is forbidden).
 
-**Founding Host program** — lifetime-locked pricing at $149 / $299 / $599, hard cap of **100 seats**,
-host-scoped so it survives tier changes, forfeited permanently on cancellation
-(`FOUNDING_LOCKED_PRICING`, `FOUNDING_SEAT_CAP`). A prior audit recorded this as pure marketing with
-no code path; that has since been implemented and the pricing constants are now real. **It remains
-unexercisable** for the same reason as everything else commercial — Stripe is unconfigured.
+**Founding Host program is priced constants, not a shipped program.**
+`packages/contracts/src/pricing.ts` defines lifetime-locked pricing at $149 / $299 / $599 and a hard
+cap of **100 seats** (`FOUNDING_LOCKED_PRICING`, `FOUNDING_SEAT_CAP`), and `packages/ui` has an unused
+`FoundingCountdown` component — but nothing in `apps/web` assigns a seat, enforces the cap, or offers a
+founding-rate checkout path. `tools/scripts/check-founding-host-claims.mjs` (guardrail G53) actively
+forbids `FOUNDING_LOCKED_PRICING`, `FOUNDING_SEAT_CAP`, `FoundingCountdown`, and any "founding
+host/rate/pricing/program", first-N-hosts, locked-price, tier-survival or cancellation-forfeiture
+language from appearing anywhere in `apps/web/{app,components,messages}` — confirmed empty by search.
+The guard exists because the promise cannot yet be honoured; selling it now, ahead of Stripe, would
+create an irreversible pricing commitment with no code behind it.
 
 **Note the Enterprise `teamSeats: 0`.** This is deliberate and is the single best illustration of the
 project's standard. The comment in `pricing.ts:57-63` records that team seats were Enterprise's
@@ -456,10 +461,15 @@ The two DB-backed tests that exist (`rlsIsolation`, `listingHostStatusIntegratio
 **SEO — one finding dominates.** `packages/ui/src/DiscoveryCard.tsx` contains **zero `href`
 attributes** (author-verified). The card title is
 `<button onClick={() => onOpen(data.id)}>`, and the default `onOpen` opens a client-side quick-view.
-**There is not one crawlable link to a listing on any discovery surface.** Combined with a sitemap
-that currently contains only ~20 static URLs, Explore & Earn has **no organic-acquisition
-architecture today** — regardless of how good the per-page metadata is (and it is good: JobPosting and
-BreadcrumbList JSON-LD, canonicals, OG images, honest fallback descriptions).
+**The reusable `DiscoveryCard` — the primary unit rendered on `/seek`, `/search` and `/map` — has no
+crawlable link to a listing.** This is narrower than a total absence: `app/sitemap.ts` already emits
+`/listing/{id}` for up to 5,000 public listings (plus host and category-landing URLs), and
+`MarketplaceHome` renders one real `<Link href="/listing/...">` for its hero-peek listing. But the
+grid and map surfaces that do the actual browsing still route every card through
+`onClick={() => onOpen(data.id)}`, so a crawler cannot reach a listing from where seekers actually find
+it — the sitemap is undiscoverable without a linked path in, and with 0 production listings it is also
+currently empty. The organic-acquisition architecture is partially built, not absent, and is good where
+it exists (JobPosting and BreadcrumbList JSON-LD, canonicals, OG images, honest fallback descriptions).
 
 This is the highest-leverage non-blocking fix in the audit: making cards real anchors is a small
 change that converts an entire well-built content surface into an acquisition channel.
@@ -544,7 +554,7 @@ without SQL. PostHog is wired and consent-gated, but no funnel/dashboard definit
 |---|---|---|---|---|---|---|---|
 | 1 | No path from `under_review` to `live` | Critical | All supply | Founder policy decision: self-publish, auto-approve, or staffed review — then wire it | Founder + eng | 1–2 d | No |
 | 2 | `ADMIN_CLERK_USER_ID` unset | Critical | All operations | Set env var; generalize to a list | Founder | 1 h | Yes |
-| 3 | Stripe unconfigured (503) | Critical | All revenue | Provision 8 vars **together**; seed 6 prices; register webhook | Founder | 1 d | Yes |
+| 3 | Stripe unconfigured (503) | Critical | All revenue | Provision 9 vars **together**; seed 7 prices; register webhook | Founder | 1 d | Yes |
 | 4 | Notification engine not at `enabled` | Critical | Every comms path | Walk the ladder per runbook | Founder | 1–2 d | Yes |
 | 5 | Announcement quota bypass | Critical | Monetization integrity | Move quota to a SECURITY DEFINER RPC (copy 062) | Eng | 2–3 d | Yes |
 | 6 | Host cannot read applicant résumé | Critical | Core host workflow | Add host-facing SECURITY DEFINER bridge | Eng | 2–3 d | Yes |
@@ -575,8 +585,10 @@ without SQL. PostHog is wired and consent-gated, but no funnel/dashboard definit
    approves a listing.
 3. **Provision Stripe fully and atomically.** *Acceptance:* one test-mode subscription completes; the
    webhook returns 200; `subscription_tier` updates; the billing portal opens. **Do not partially
-   provision** — `hasStripeServerConfig()` checks only 2 of the 8 vars, so a partial provision yields
-   a webhook that accepts events and lands every subscription as unmapped: a silent revenue hole
+   provision** — the atomic required set is the secret key, the webhook secret, and seven price vars
+   (`STRIPE_PRICE_{STARTER,PROFESSIONAL,ENTERPRISE}_{MONTHLY,YEARLY}` + `STRIPE_PRICE_ANNOUNCEMENT`) —
+   nine variables total — but `hasStripeServerConfig()` checks only 2 of them, so a partial provision
+   yields a webhook that accepts events and lands every subscription as unmapped: a silent revenue hole
    worse than the current honest 503.
 4. **Fix the four money defects** (blockers 7–10) before the first charge.
 5. **Close the two entitlement bypasses** (announcements, listing cap) before charging for them.
@@ -673,7 +685,8 @@ hides them. The 503 is the only thing preventing them from causing damage.
 **What can be demonstrated confidently today?** The full seeker and host UX against seeded local data;
 the honesty architecture (triad gate, provenance, benefit evidence); the matching engine and its
 explainability; the security posture (100% RLS, signed webhooks, no critical vulnerabilities); the
-notification engine in `ledger_only` with real delivery rows.
+notification engine in `ledger_only`, confirmed against seeded local data to write real delivery rows
+— production itself has zero, consistent with zero users (see caveats).
 
 **What cannot yet be promised?** That anyone can list, pay, be notified, be moderated, or be removed.
 
@@ -710,8 +723,9 @@ payments in **5 weeks**. A commercially credible public launch in **12 weeks**, 
   the engine *runs* the full pipeline and writes `suppressed` delivery rows; under `disabled` it
   no-ops entirely. With 0 users, 0 delivery rows is consistent with both. The user-visible outcome
   is identical — **nothing is delivered** — but the remediation path and the monitoring signal differ.
-- **Nothing was executed against production.** No build, no load test, no Lighthouse, no browser
-  session. Performance, Core Web Vitals and real-device responsive behaviour are **unmeasured**.
+- **No build, load test, Lighthouse run, or browser session was executed against production** — direct
+  database queries and HTTP status checks were (§B), but nothing further. Performance, Core Web Vitals
+  and real-device responsive behaviour are **unmeasured**.
 - **Provider-side registration is unverified.** Code proves the Clerk and Resend webhook handlers are
   correct; nothing in the repo proves the endpoints are registered in those dashboards, or that the
   Resend sending domain is verified.
