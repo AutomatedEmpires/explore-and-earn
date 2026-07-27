@@ -222,6 +222,24 @@
   --type-helper-size:  13px;  --type-helper-lh:  1.45;
   --type-error-size:   13px;  --type-error-lh:   1.45;
 
+  /* P6 verification fix — the commercial surfaces (host plans, the activation
+     summary, the early-host section, the add-on tables) were authored against
+     these four role names, which no stylesheet ever defined. An undefined
+     custom property makes the whole `font-size` declaration invalid at
+     computed-value time, so every one of those rules silently did nothing and
+     the pages rendered at a flat inherited 16px with no hierarchy at all — the
+     activation page measured 69 of 69 text nodes at one size. Aliases onto the
+     scale above rather than new magic numbers, so there is still exactly one
+     source of truth for the step values.
+       heading-md = page and section titles      (section step)
+       heading-sm = prominent figures on a card  (card step)
+       body-md    = the working voice            (body step)
+       body-sm    = secondary and supporting     (meta step) */
+  --type-heading-md: var(--type-section-size);
+  --type-heading-sm: var(--type-card-size);
+  --type-body-md:    var(--type-body-size);
+  --type-body-sm:    var(--type-meta-size);
+
   /* =============================================================== */
   /* V3 — INTERACTIVE / CHROME TOKENS                                */
   /* Glacier blue, teal, ice, chrome/graphite. Header, CTAs, badges. */

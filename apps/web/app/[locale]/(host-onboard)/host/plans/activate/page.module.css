@@ -30,8 +30,15 @@
   gap: var(--space-2);
 }
 
+/* A standalone navigation link, not a word inside a sentence, so WCAG 2.2
+   SC 2.5.8 applies with no inline exception: it measured 19px tall. The
+   inline-flex + min-height raises the hit area to the 24px floor without
+   changing where the text sits or how the column above it lays out. */
 .back {
   align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   font-size: var(--type-body-sm);
   color: var(--color-text-secondary);
   text-decoration: none;

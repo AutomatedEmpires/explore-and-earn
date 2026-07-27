@@ -24,9 +24,19 @@
 
 /* Global page reset. Zero the UA default body margin (8px on every side) so the
    page frame starts flush at the viewport edge — without this the whole page is
-   shifted 8px and full-bleed sections read as off-center. */
+   shifted 8px and full-bleed sections read as off-center.
+
+   The font-family is the OTHER half of D1 "one typeface". next/font only
+   defines a CSS variable; something has to consume it, and nothing did — body
+   carried no font-family at all, so every element whose own rule did not name
+   one inherited the user-agent default serif. That is why production rendered
+   the add-on price table, the early-host section and both MetricCard label
+   rows in Times New Roman while the headings beside them were Manrope. Setting
+   it here makes inheritance the default and each explicit rule an override,
+   which is what the token system already assumed. */
 body {
   margin: 0;
+  font-family: var(--font-ui);
 }
 
 /* Belt-and-braces horizontal overflow guard: full-bleed breakouts that use

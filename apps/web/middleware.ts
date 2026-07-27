@@ -66,6 +66,17 @@ const isPublicRoute = createRouteMatcher([
   // public — they MUST be reachable without a login or the funnel dead-ends.
   "/seek",
   "/map",
+  // /swipe is the third of those modes and was the one omitted. The footer's
+  // Explore column, the homepage "three ways in" section and the for-hosts
+  // discovery section have all linked it the whole time, so every signed-out
+  // visitor who chose Swipe met a 404 (Clerk's protect() rewrites rather than
+  // redirects — the response carried x-clerk-auth-reason: protect-rewrite,
+  // which is why this looked like a missing route rather than an auth wall).
+  // The page itself was always written for this visitor: with no userId it
+  // skips the personalized batch and falls back to the public feed on purpose.
+  // Same class of miss as the /for-hosts/demo 404 — a prerender proves the
+  // route builds, never that middleware lets a stranger reach it.
+  "/swipe",
   // Indexable category landing pages (/jobs + /jobs/{lane}) — advertised in
   // the sitemap and footer; MUST be reachable without a login or they cannot
   // be crawled. Bare path + "/(.*)" pair per the /sign-in convention below.
