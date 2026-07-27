@@ -11,9 +11,14 @@
 //
 // stdout = the STRIPE_PRICE_*=price_... block to paste into Vercel.
 // stderr = human progress. See docs/runbooks/launch-provisioning.md.
+//
+// The create/reuse logic itself lives in provision.mjs, shared with
+// lifecycle-test.mjs so the lifecycle prover exercises the SAME catalog the
+// founder seeds rather than a fork of it.
 import Stripe from "stripe";
 
-import { CATALOG, CATALOG_CURRENCY } from "./catalog.mjs";
+import { CATALOG } from "./catalog.mjs";
+import { isLiveModeKey, provisionCatalog, STRIPE_API_VERSION } from "./provision.mjs";
 
 const secretKey = process.env.STRIPE_SECRET_KEY;
 if (!secretKey) {
@@ -23,48 +28,13 @@ if (!secretKey) {
   process.exit(1);
 }
 
-const stripe = new Stripe(secretKey, { apiVersion: "2026-05-27.dahlia" });
-const live = secretKey.startsWith("sk_live_");
+const stripe = new Stripe(secretKey, { apiVersion: STRIPE_API_VERSION });
+const live = isLiveModeKey(secretKey);
 console.error(`[stripe-seed] mode: ${live ? "LIVE" : "TEST"} — ${CATALOG.length} products`);
 
-async function findOrCreateProduct(product) {
-  // Catalog is tiny; one list call is simpler and more reliable than search
-  // (which is eventually consistent). Match on our own stable metadata key.
-  const existing = await stripe.products.list({ limit: 100, active: true });
-  const match = existing.data.find((p) => p.metadata?.ee_catalog_key === product.key);
-  if (match) return match;
-  return stripe.products.create({
-    name: product.name,
-    description: product.description,
-    metadata: { ee_catalog_key: product.key },
-  });
-}
-
-async function findOrCreatePrice(productId, price) {
-  const found = await stripe.prices.list({ lookup_keys: [price.lookupKey], limit: 1 });
-  if (found.data[0]) return found.data[0];
-  return stripe.prices.create({
-    product: productId,
-    currency: CATALOG_CURRENCY,
-    unit_amount: price.unitAmountCents,
-    lookup_key: price.lookupKey,
-    transfer_lookup_key: true,
-    ...(price.type === "recurring" ? { recurring: { interval: price.interval } } : {}),
-    metadata: { ee_env_var: price.envVar },
-  });
-}
-
-const envLines = [];
-for (const product of CATALOG) {
-  const stripeProduct = await findOrCreateProduct(product);
-  for (const price of product.prices) {
-    const stripePrice = await findOrCreatePrice(stripeProduct.id, price);
-    envLines.push(`${price.envVar}=${stripePrice.id}`);
-    const dollars = (price.unitAmountCents / 100).toFixed(2);
-    const tag = price.optional ? " (optional)" : "";
-    console.error(`  ✓ ${price.lookupKey} → ${stripePrice.id}  $${dollars}${tag}`);
-  }
-}
+const { envLines } = await provisionCatalog(stripe, {
+  log: (line) => console.error(line),
+});
 
 console.error("\n[stripe-seed] done. Paste the block below into Vercel (Production) env:\n");
 console.log(envLines.join("\n"));
