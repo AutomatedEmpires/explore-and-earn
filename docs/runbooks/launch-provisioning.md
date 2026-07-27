@@ -74,8 +74,7 @@ load, the template is correct.
 
 ## 4. Vercel env matrix (Production + Preview)
 
-Beyond the Supabase/Clerk/Stripe vars above, set: `CLOUDINARY_URL` +
-`NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` (+ API key/secret), `NEXT_PUBLIC_MAPBOX_TOKEN`
+Beyond the Supabase/Clerk/Stripe vars above, set: `NEXT_PUBLIC_MAPBOX_TOKEN`
 (+ `MAPBOX_ACCESS_TOKEN`), `NEXT_PUBLIC_POSTHOG_KEY` + `NEXT_PUBLIC_POSTHOG_HOST`,
 `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` (+ `SENTRY_ORG`/`SENTRY_PROJECT`/
 `SENTRY_AUTH_TOKEN` for source maps), `RESEND_API_KEY`, **`CRON_SECRET`** (the

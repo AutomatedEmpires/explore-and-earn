@@ -3,12 +3,13 @@
 import { useRef } from "react";
 import Image from "next/image";
 
-import { Icon, type PhotoSize } from "@explore-and-earn/ui";
+import { Icon } from "@explore-and-earn/ui";
 import {
 	bucketPhotos,
 	bucketPhotoUrl,
 	getBucket,
 	type BucketId,
+	type PhotoSize,
 	type ResolvedBucketPhoto,
 } from "../../lib/photoBuckets";
 import styles from "./BucketPhotoPicker.module.css";
@@ -18,10 +19,10 @@ const UPLOAD_ACCEPT = "image/jpeg,image/png,image/webp";
 export interface BucketPhotoPickerProps {
 	/** Which of the nine buckets to offer as presets. */
 	readonly bucketId: BucketId;
-	/** Currently-selected value — a Cloudinary public ID or an upload URL. */
+	/** Currently-selected value — a bucket object path or an upload URL. */
 	readonly value?: string | null;
-	/** Called when the user picks a preset (passes the Cloudinary public ID). */
-	readonly onSelectPreset?: (publicId: string) => void;
+	/** Called when the user picks a preset (passes the bucket object path). */
+	readonly onSelectPreset?: (path: string) => void;
 	/** Called when the user uploads their own — the PRIMARY path. */
 	readonly onUpload?: (file: File) => void;
 	/** Called to clear the current selection, if removable. */
@@ -29,7 +30,7 @@ export interface BucketPhotoPickerProps {
 	readonly uploading?: boolean;
 	readonly uploadLabel?: string;
 	readonly presetLabel?: string;
-	/** Named Cloudinary size for the preset tiles (default "card"). */
+	/** Named delivery size for the preset tiles (default "card"). */
 	readonly size?: PhotoSize;
 }
 
@@ -39,9 +40,10 @@ export interface BucketPhotoPickerProps {
  *
  * Upload-your-own is the PRIMARY affordance; picking from the relevant bucket is
  * the fallback. It reads presets from the typed `photoBuckets` config (the single
- * source of truth) and NEVER renders a fabricated image — "to populate" slots are
- * simply absent from the preset grid, so an empty bucket shows only the upload
- * path plus an honest "presets coming soon" hint.
+ * source of truth) and NEVER renders a fabricated image — a bucket only ever
+ * lists objects that really exist in storage. Every bucket is currently empty
+ * (see photoBuckets.ts), so this renders the upload path plus the honest
+ * "presets coming soon" hint on every surface today.
  *
  * Presentational + role-agnostic: it emits `onUpload` / `onSelectPreset` and lets
  * the caller own persistence, so it drops into a modal (cover/logo pickers) or a
@@ -115,23 +117,23 @@ export function BucketPhotoPicker({
 							) : null}
 							<div className={styles.grid}>
 								{items.map((opt) => {
-									// `value` may be a raw public ID or a full delivery URL
-									// (any transform) — match either so the selected ring
+									// `value` may be a raw object path or a full delivery URL
+									// (any size) — match either so the selected ring
 									// shows regardless of which the caller stores.
 									const selected =
 										value != null &&
-										(value === opt.publicId || value.includes(opt.publicId));
+										(value === opt.path || value.includes(opt.path));
 									return (
 										<button
 											key={opt.id}
 											type="button"
 											className={`${styles.swatch} ${selected ? styles.swatchSelected : ""}`}
-											onClick={() => onSelectPreset?.(opt.publicId)}
+											onClick={() => onSelectPreset?.(opt.path)}
 											aria-label={opt.label}
 											aria-pressed={selected}
 										>
 											<Image
-												src={bucketPhotoUrl(opt.publicId, size)}
+												src={bucketPhotoUrl(opt.path, size)}
 												alt=""
 												fill
 												sizes="(max-width: 640px) 33vw, 170px"

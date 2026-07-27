@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
 import { FOUNDER_LOCKED_PRICING } from "@explore-and-earn/contracts";
-import { cloudinaryPhoto, Icon, type IconKey } from "@explore-and-earn/ui";
+import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import styles from "./page.module.css";
 
@@ -21,9 +20,6 @@ export const metadata: Metadata = {
     type: "website",
   },
 };
-
-/** The same scenic Cloudinary hero pattern the homepage uses — a real place, framed. */
-const HERO_IMAGE = cloudinaryPhoto("seasonal", "vojtech-bruzek-yrxr3bspds0", "hero");
 
 /** Representative figures for the labelled dashboard PREVIEW (clearly not live data). */
 const PREVIEW_KPIS: ReadonlyArray<{ value: string; label: string }> = [
@@ -103,18 +99,12 @@ export default function ForHostsPage() {
   return (
     <div className={styles.page}>
 
-      {/* ── Hero — framed working landscape, homepage register ──── */}
+      {/* ── Hero — the seasonal lane gradient, homepage register. The framed
+          working-landscape photograph came from an image CDN we no longer use
+          and we hold no replacement, so the frame paints its own gradient
+          (page.module.css .heroFrame) rather than a missing asset. ──── */}
       <section className={styles.hero} aria-labelledby="hosts-hero-title">
         <div className={styles.heroFrame}>
-          <Image
-            className={styles.heroImage}
-            src={HERO_IMAGE}
-            alt=""
-            aria-hidden="true"
-            fill
-            priority
-            sizes="100vw"
-          />
           <div className={styles.heroScrim} aria-hidden="true" />
           <div className={styles.heroInner}>
             <p className={styles.eyebrow}>For hosts</p>

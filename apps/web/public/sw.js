@@ -13,9 +13,11 @@
  *     Any OTHER /api/*    → network only, never cached (authed/dynamic).
  *   • Same-origin static assets (/_next/static, /icons, fonts, css, js) →
  *     cache-first (they are content-hashed / immutable).
- *   • Cloudinary images → bounded cache-first (heavy, repeat, public).
- *   • All other cross-origin (Clerk, Supabase, Sentry, PostHog, Mapbox tiles) →
- *     passthrough, so their own auth/caching is untouched.
+ *   • PUBLIC Supabase Storage images → bounded cache-first (heavy, repeat, and
+ *     public by definition — the /public/ path segment is what makes this safe).
+ *   • All other cross-origin (Clerk, Sentry, PostHog, Mapbox tiles, the Supabase
+ *     REST/Realtime API and any authed storage path) → passthrough, so their own
+ *     auth/caching is untouched.
  *
  * Bump CACHE_VERSION to invalidate every cache on the next activate.
  */
@@ -222,9 +224,17 @@ self.addEventListener("fetch", (event) => {
 		return;
 	}
 
-	// Cross-origin: only bounded caching of public Cloudinary imagery. Everything
-	// else (Clerk, Supabase, Sentry, PostHog, Mapbox) passes through untouched.
-	if (url.hostname === "res.cloudinary.com") {
+	// Cross-origin: bounded caching of PUBLIC Supabase Storage imagery only.
+	// The `/public/` path segment is the whole safety argument — Supabase serves
+	// those objects to anyone without a token, so nothing user-scoped can land in
+	// a shared device cache. Authed storage paths (/object/sign, /object/authed)
+	// and every other cross-origin host (Clerk, Sentry, PostHog, Mapbox, the
+	// Supabase REST/Realtime API) pass through untouched.
+	if (
+		url.hostname.endsWith(".supabase.co") &&
+		(url.pathname.startsWith("/storage/v1/object/public/") ||
+			url.pathname.startsWith("/storage/v1/render/image/public/"))
+	) {
 		event.respondWith(cacheFirst(request, IMAGE_CACHE, IMAGE_CACHE_LIMIT));
 	}
 });

@@ -31,11 +31,18 @@ export interface CategoryLandingCopy {
 	readonly title: string;
 	/** Meta description — triad-forward, zero invented numbers or claims. */
 	readonly description: string;
-	/** Curated Cloudinary lane-photo slug (same curated set the homepage uses). */
-	readonly heroSlug: string;
 	/** On-page H1. */
 	readonly heading: string;
 }
+
+/**
+ * There is deliberately NO hero-image field. The lane heroes were curated
+ * marketing photographs served by an image CDN we no longer use, and we hold no
+ * replacement photography — so the hero band paints the lane's own cover
+ * gradient (jobs.module.css, keyed by `data-category`) rather than pointing at
+ * an asset that is not there. A `heroPhotoPath` returns here when curated lane
+ * photography lands in the `site-photos` bucket (docs/design/site-photos.md).
+ */
 
 const TRIAD = "housing, meals & pay upfront";
 
@@ -47,7 +54,6 @@ export const CATEGORY_LANDING: Record<LandingCategory, CategoryLandingCopy> = {
 		heading: `Farm jobs with ${TRIAD}`,
 		description:
 			"Orchards, ranches, harvests & greenhouses — seasonal farm work where every listing answers the three questions that matter before you apply: where you'll sleep, what you'll eat, and what you'll earn.",
-		heroSlug: "young-sung-jang-7-6pulwb1d0",
 	},
 	maritime: {
 		label: "Maritime",
@@ -56,7 +62,6 @@ export const CATEGORY_LANDING: Record<LandingCategory, CategoryLandingCopy> = {
 		heading: `Maritime jobs with ${TRIAD}`,
 		description:
 			"Boats, docks, fisheries & processing — maritime work where every listing answers the three questions that matter before you apply: where you'll sleep, what you'll eat, and what you'll earn.",
-		heroSlug: "vidar-nordli-mathisen-pjiv1ekevzk",
 	},
 	remote: {
 		label: "Remote",
@@ -65,7 +70,6 @@ export const CATEGORY_LANDING: Record<LandingCategory, CategoryLandingCopy> = {
 		heading: `Remote jobs with ${TRIAD}`,
 		description:
 			"Cabins, backcountry ops, guiding & off-grid — remote-place work where every listing answers the three questions that matter before you apply: where you'll sleep, what you'll eat, and what you'll earn.",
-		heroSlug: "justin-kauffman-fpohihximhg",
 	},
 	seasonal: {
 		label: "Seasonal",
@@ -74,7 +78,6 @@ export const CATEGORY_LANDING: Record<LandingCategory, CategoryLandingCopy> = {
 		heading: `Seasonal jobs with ${TRIAD}`,
 		description:
 			"Lodges, resorts, parks & hospitality — seasonal work where every listing answers the three questions that matter before you apply: where you'll sleep, what you'll eat, and what you'll earn.",
-		heroSlug: "vojtech-bruzek-yrxr3bspds0",
 	},
 };
 

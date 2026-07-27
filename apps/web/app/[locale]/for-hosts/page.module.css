@@ -53,12 +53,8 @@
   align-items: flex-end;
 }
 
-.heroImage {
-  object-fit: cover;
-  z-index: -2;
-}
-
-/* Legibility only — frame-not-filter: the sanctioned bottom-weighted scrim. */
+/* Legibility only — frame-not-filter: the sanctioned bottom-weighted scrim.
+   The frame above paints the seasonal lane gradient; there is no hero photo. */
 .heroScrim {
   position: absolute;
   inset: 0;

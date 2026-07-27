@@ -8,7 +8,7 @@
   end with `ae finish explore-and-earn`. Work counts as done ONLY when pushed and remote-SHA-verified.
 - **Deploys:** merging `main` auto-deploys production via Vercel.
 - **Validate before merge:** `pnpm typecheck && pnpm guardrails` (CI must be green; squash merges).
-- **Providers (fixed — never swap or cross-wire):** db=supabase, auth=clerk, email=resend (+ webhooks: bounces/complaints -> suppressions), payments=stripe, storage=cloudinary (9-bucket photo system), ai=anthropic (Guide/assistant surfaces), analytics=posthog (project exploreandearn / 291166).
+- **Providers (fixed — never swap or cross-wire):** db=supabase, auth=clerk, email=resend (+ webhooks: bounces/complaints -> suppressions), payments=stripe, storage=supabase (host uploads + the 9-bucket `site-photos` system; there is NO image CDN — see docs/design/site-photos.md), ai=anthropic (Guide/assistant surfaces), analytics=posthog (project exploreandearn / 291166).
 - **LOCKED:** MARKETPLACE_CATEGORIES locked: farm|maritime|remote|seasonal (+mix); MIX_DOMAIN is DR-B6 LOCKED
 - **LOCKED:** Value triad is Housing/Meals/Pay — OpportunityTriad must never gain a 'perks' key (guardrail 2b). 'Perks & benefits' is allowed only as a SEPARATE section (founder, 2026-07-15)
 - **LOCKED:** Design ratchets are law: raw-color (G50), tokenization (G51), locale-literal (G52) baselines only tighten
@@ -93,7 +93,7 @@ The founder's biggest concern is **visual quality**. Do not ship generic, ugly, 
 - Read [`docs/design/design-system-v1.md`](./docs/design/design-system-v1.md) and use the **locked tokens** verbatim. Never hardcode colors, type, spacing, or radius that bypass tokens.
 - Use **one unified component system** across all lifestyle categories (Farm, Maritime, Remote, Seasonal). Vary imagery + accent color, never the component system.
 - **One icon system only: Phosphor** (free MIT `@phosphor-icons/react`), via the `<Icon name="domain.name"/>` registry in `packages/ui`. No Lucide / Heroicons / Font Awesome / Material / react-icons / ad-hoc inline SVG in feature code (CI guardrail **G30**, a `no-restricted-imports` eslint rule). Re-map an icon by editing one registry entry; the whole set is swappable from `registry.ts` alone.
-- Icons ship as a normal dependency — **nothing fetched at runtime, no icon assets committed**. (The separate `visual-assets` illustration system still uses Cloudinary; that migration is a tracked follow-up.) See [`docs/design/icon-system.md`](./docs/design/icon-system.md).
+- Icons ship as a normal dependency — **nothing fetched at runtime, no icon assets committed**. The `visual-assets` illustration system is likewise self-contained; no runtime asset fetch remains anywhere. See [`docs/design/icon-system.md`](./docs/design/icon-system.md).
 - Photos get a **hand-drawn frame + paper mat around them** — never filters/overlays *on* host photos. See [`docs/design/photo-language.md`](./docs/design/photo-language.md) and [`docs/design/media-buckets.md`](./docs/design/media-buckets.md).
 
 ## 7. Setup & commands

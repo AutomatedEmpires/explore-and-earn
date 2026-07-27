@@ -6,8 +6,8 @@
  * Every icon in the product renders through <Icon name="domain.name"/>, which
  * looks the name up here. Provider: **Phosphor Icons** (@phosphor-icons/react,
  * MIT) — free, self-contained in node_modules, no runtime fetch, no committed
- * assets. This replaced the paid Streamline Freehand set + its Cloudinary
- * runtime-fetch delivery (founder-relaxed 2026-07-02; see
+ * assets. This replaced the paid Streamline Freehand set and the runtime CDN
+ * fetch that delivered it (founder-relaxed 2026-07-02; see
  * docs/superpowers/specs/2026-07-02-phosphor-icon-swap-design.md).
  *
  * INTERCHANGEABLE BY DESIGN:

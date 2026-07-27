@@ -3,68 +3,111 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Every surface that lets a user pick a predefined image (rather than uploading
  * their own) draws from one of the NINE buckets defined here. This file is the
- * single source of truth: a typed, ordered list of Cloudinary public IDs per
- * bucket, editable in ONE place (or from the admin Photo Buckets manager).
+ * single source of truth: a typed, ordered list of storage object paths per
+ * bucket, editable in ONE place (and readable from the admin Photo Buckets
+ * manager).
  *
- * ── CLOUDINARY FOLDER CONVENTION ─────────────────────────────────────────────
- * The founder uploads real photos into a documented, per-bucket folder so the
- * library stays organized and each bucket maps 1:1 to a Cloudinary folder:
+ * ── STORAGE LAYOUT ───────────────────────────────────────────────────────────
+ * Bucket photos live in the PUBLIC Supabase Storage bucket `site-photos`, in a
+ * documented per-bucket folder so each app bucket maps 1:1 to a storage folder:
  *
- *     ee/buckets/{bucket}/{slug}                      (flat buckets)
- *     ee/buckets/{bucket}/{category}/{slug}           (category-partitioned buckets)
+ *     buckets/{bucket}/{slug}                      (flat buckets)
+ *     buckets/{bucket}/{category}/{slug}           (category-partitioned buckets)
  *
  * where {bucket} is the BucketId (e.g. `hostCover`, `housing`) and {category} is
  * the sub-bucket key (e.g. `farm`, `bedrooms`). Examples:
  *
- *     ee/buckets/homepageCover/coast-sunrise
- *     ee/buckets/hostProfile/maritime/harbor-dawn
- *     ee/buckets/housing/bedrooms/bunkroom-01
- *     ee/buckets/meals/dining/mess-hall-01
+ *     buckets/homepageCover/coast-sunrise
+ *     buckets/hostProfile/maritime/harbor-dawn
+ *     buckets/housing/bedrooms/bunkroom-01
+ *     buckets/meals/dining/mess-hall-01
  *
- * A bucket ENTRY holds the FULL Cloudinary public ID in `publicId`. Seeded
- * entries currently reference the EXISTING curated library at
- * `explore-and-earn/photos/{category}/landscape/{slug}` (the real IDs already in
- * curatedPhotos.ts) so nothing looks empty on day one. As the founder uploads
- * into `ee/buckets/…`, swap the seeded publicId (or add entries) to the new IDs.
+ * A bucket ENTRY holds the object path (relative to the bucket root) in `path`.
+ *
+ * ── CURRENT STATE: EVERY BUCKET IS EMPTY, ON PURPOSE ─────────────────────────
+ * These buckets were previously seeded from a curated stock library delivered by
+ * an image CDN this product no longer uses. That library is gone, and we hold no
+ * replacement photography — so rather than repoint the old public IDs at storage
+ * objects that do not exist (a fabricated URL by any other name), the seeded
+ * entries were REMOVED along with the reserved "to populate" slots. A bucket
+ * with nothing in it renders its honest empty state: the pickers show only the
+ * upload path, and the admin manager reports 0 photos.
+ *
+ * To populate a bucket: run `node scripts/seed-site-photos.mjs` (Unsplash →
+ * `site-photos`, needs UNSPLASH_ACCESS_KEY), review the generated fragment, then
+ * paste the entries into the relevant `entries: []` below. See
+ * docs/design/site-photos.md.
  *
  * ── LAWS ─────────────────────────────────────────────────────────────────────
- *  - NEVER fabricate a URL. An entry with no real image yet has `publicId: null`
- *    (a reserved "to populate" slot) — it renders as an empty placeholder, never
- *    a fake photo. Only real, uploaded IDs get a non-null publicId.
+ *  - NEVER fabricate a URL. An entry exists ONLY when a real object exists at
+ *    that path in `site-photos`. There are no placeholder or reserved entries.
  *  - Covers are ALWAYS separate from logos/icons; the three scopes (seeker /
  *    host / admin) keep DISTINCT buckets.
  *  - Uploading your own is always the PRIMARY path; bucket-pick is the fallback
  *    (see BucketPhotoPicker).
  */
 
-import { type PhotoSize } from "@explore-and-earn/ui";
-
 // ── URL resolution ────────────────────────────────────────────────────────────
 
-// Matches the cloud the curated library is delivered from (see cloudinary.ts),
-// overridable via env without diverging from the seeded real IDs.
-const CLOUD = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dwiwyt9vi";
+/** The public Supabase Storage bucket that holds app-managed site photography. */
+export const SITE_PHOTOS_BUCKET = "site-photos";
 
 /**
- * Delivery URL for a bucket entry's Cloudinary public ID at a named size.
- * Public IDs are stored raw (folder + slug); this applies the `t_ee-{size}`
- * named transformation, exactly like `cloudinaryPhoto`.
+ * Named delivery sizes. These map onto Supabase Storage's image transformation
+ * endpoint (`/storage/v1/render/image/public/...`), which is a Pro-plan feature;
+ * `full` is served as the original object so the system still delivers something
+ * real on a plan without transformations.
  */
-export function bucketPhotoUrl(publicId: string, size: PhotoSize = "card"): string {
-	return `https://res.cloudinary.com/${CLOUD}/image/upload/t_ee-${size}/${publicId}`;
+export type PhotoSize = "thumb" | "card" | "hero" | "full" | "og" | "sq-sm" | "sq-md";
+
+interface SizeSpec {
+	readonly width: number;
+	readonly height?: number;
 }
 
-/** Full public ID for a photo in the EXISTING curated library (seed source). */
-function curatedId(
-	category: "farm" | "maritime" | "remote" | "seasonal",
-	slug: string,
-): string {
-	return `explore-and-earn/photos/${category}/landscape/${slug}`;
+/** Pixel budget per named size (mirrors the sizes the surfaces actually request). */
+const SIZE_SPECS: Record<Exclude<PhotoSize, "full">, SizeSpec> = {
+	thumb: { width: 320 },
+	card: { width: 640 },
+	hero: { width: 1280 },
+	og: { width: 1200, height: 630 },
+	"sq-sm": { width: 320, height: 320 },
+	"sq-md": { width: 640, height: 640 },
+};
+
+const RENDER_QUALITY = 80;
+
+function storageOrigin(): string {
+	return (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/+$/, "");
 }
 
-/** The documented upload folder for a bucket (+ optional category). */
+/**
+ * Public delivery URL for a bucket entry's object path at a named size.
+ *
+ * `full` (and anything unmapped) resolves to the raw public object; every other
+ * size resolves through the render/image endpoint with an explicit width/height
+ * and `resize=cover`, which is the direct translation of the old named
+ * transformations. Returns "" when NEXT_PUBLIC_SUPABASE_URL is unset, so a
+ * misconfigured environment renders nothing rather than a broken host.
+ */
+export function bucketPhotoUrl(path: string, size: PhotoSize = "card"): string {
+	const origin = storageOrigin();
+	if (!origin) return "";
+	const object = path.replace(/^\/+/, "");
+	if (size === "full") {
+		return `${origin}/storage/v1/object/public/${SITE_PHOTOS_BUCKET}/${object}`;
+	}
+	const spec = SIZE_SPECS[size];
+	const params = new URLSearchParams({ width: String(spec.width) });
+	if (spec.height) params.set("height", String(spec.height));
+	params.set("resize", "cover");
+	params.set("quality", String(RENDER_QUALITY));
+	return `${origin}/storage/v1/render/image/public/${SITE_PHOTOS_BUCKET}/${object}?${params.toString()}`;
+}
+
+/** The documented storage folder for a bucket (+ optional category). */
 export function bucketFolder(bucket: BucketId, category?: string): string {
-	return category ? `ee/buckets/${bucket}/${category}` : `ee/buckets/${bucket}`;
+	return category ? `buckets/${bucket}/${category}` : `buckets/${bucket}`;
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -81,15 +124,13 @@ export type BucketId =
 	| "adminProfile";
 
 /**
- * One ordered slot in a bucket.
- *  - `publicId` non-null → a real Cloudinary image (seeded or founder-uploaded).
- *  - `publicId` null     → a reserved "to populate" slot (empty placeholder,
- *                          NEVER a fabricated URL).
+ * One ordered slot in a bucket. `path` is the object path inside `site-photos`
+ * and is ALWAYS a real, uploaded object — there is no null/placeholder variant.
  */
 export interface BucketEntry {
 	readonly id: string;
 	readonly label: string;
-	readonly publicId: string | null;
+	readonly path: string;
 }
 
 /**
@@ -100,7 +141,7 @@ export interface BucketEntry {
 export interface BucketSection {
 	readonly key: string;
 	readonly label: string;
-	/** Sub-folder under the bucket, i.e. ee/buckets/{bucket}/{folderKey}. */
+	/** Sub-folder under the bucket, i.e. buckets/{bucket}/{folderKey}. */
 	readonly folderKey: string | null;
 	readonly entries: readonly BucketEntry[];
 }
@@ -116,79 +157,31 @@ export interface PhotoBucket {
 
 // ── Entry helpers ───────────────────────────────────────────────────────────
 
-/** A seeded entry pointing at a REAL existing curated public ID. */
-const seed = (
-	id: string,
-	label: string,
-	category: "farm" | "maritime" | "remote" | "seasonal",
-	slug: string,
-): BucketEntry => ({ id, label, publicId: curatedId(category, slug) });
-
-/** A reserved slot the founder still needs to populate (no fabricated URL). */
-const todo = (id: string, label: string): BucketEntry => ({
-	id,
-	label,
-	publicId: null,
-});
-
-/**
- * A REAL, uploaded bucket photo whose public ID lives under `ee/buckets/…`
- * (seeded via scripts/seed-photo-buckets.mjs → Cloudinary). Distinct from
- * `seed()`, which points back at the older curated library.
- */
-const real = (id: string, label: string, publicId: string): BucketEntry => ({
-	id,
-	label,
-	publicId,
-});
-
 const flat = (entries: readonly BucketEntry[]): readonly BucketSection[] => [
 	{ key: "default", label: "All", folderKey: null, entries },
 ];
 
 // ── The NINE buckets ──────────────────────────────────────────────────────────
 
-/**
- * NOTE ON SEEDING: cover buckets reference the older curated library via
- * `seed()`. Housing + meals now carry a first batch of REAL uploads under
- * `ee/buckets/…` (via `real()`, from scripts/seed-photo-buckets.mjs — Unsplash,
- * people-safe: zero detected faces, delivery-verified through t_ee-*). A few
- * thin sections keep a `todo()` slot for expansion. Seeker icons + admin imagery
- * stay `todo()` (identity buckets are intentionally NOT photo-seeded — no model
- * release; they use the abstract monogram/gradient fallback).
- */
 export const PHOTO_BUCKETS: Record<BucketId, PhotoBucket> = {
 	// 1 ── Homepage hero — rotates per landing (see design rules). Landscape mix.
 	homepageCover: {
 		id: "homepageCover",
 		label: "Homepage cover",
 		description:
-			"Rotating homepage hero. A landscape mix across the four categories.",
+			"Rotating homepage hero. A landscape mix across the four categories. Empty — the homepage hero currently paints the lane cover gradient.",
 		partitioned: false,
-		sections: flat([
-			seed("home-fields", "Golden fields", "seasonal", "yuhan-du-zi9z-e8cxge"),
-			seed("home-coast", "Open coast", "seasonal", "vincent-guth-62v7ntlkgl8"),
-			seed("home-harbor", "Harbor", "maritime", "rasmus-andersen-nmzzl8lzkuu"),
-			seed("home-farm", "Working farm", "farm", "annie-spratt-jmjnnq2xfoy"),
-			seed("home-trail", "Remote trail", "remote", "kevin-schmid-mta8r0bxhbo"),
-			todo("home-04", "To populate"),
-		]),
+		sections: flat([]),
 	},
 
 	// 2 ── Host public-profile COVER (separate from the host logo).
 	hostCover: {
 		id: "hostCover",
 		label: "Host cover",
-		description: "Host public-profile cover band — the working landscape.",
+		description:
+			"Host public-profile cover band — the working landscape. Empty — gradient covers (curatedCovers) are the fallback until populated.",
 		partitioned: false,
-		sections: flat([
-			seed("host-farm", "Working farm", "farm", "annie-spratt-jmjnnq2xfoy"),
-			seed("host-orchard", "Orchard rows", "farm", "sokmean-nou-mjeqdrpwefc"),
-			seed("host-harbor", "Harbor", "maritime", "rasmus-andersen-nmzzl8lzkuu"),
-			seed("host-vessel", "On the water", "maritime", "venti-views-asmavys4azm"),
-			todo("host-cover-05", "To populate"),
-			todo("host-cover-06", "To populate"),
-		]),
+		sections: flat([]),
 	},
 
 	// 3 ── Host PROFILE imagery, partitioned by host type (four categories).
@@ -199,46 +192,10 @@ export const PHOTO_BUCKETS: Record<BucketId, PhotoBucket> = {
 			"Host-type imagery for the profile showcase — one set per category.",
 		partitioned: true,
 		sections: [
-			{
-				key: "farm",
-				label: "Farm",
-				folderKey: "farm",
-				entries: [
-					seed("hp-farm-1", "Working farm", "farm", "annie-spratt-jmjnnq2xfoy"),
-					seed("hp-farm-2", "Orchard rows", "farm", "sokmean-nou-mjeqdrpwefc"),
-					todo("hp-farm-3", "To populate"),
-				],
-			},
-			{
-				key: "maritime",
-				label: "Maritime",
-				folderKey: "maritime",
-				entries: [
-					seed("hp-mar-1", "Harbor", "maritime", "rasmus-andersen-nmzzl8lzkuu"),
-					seed("hp-mar-2", "On the water", "maritime", "venti-views-asmavys4azm"),
-					todo("hp-mar-3", "To populate"),
-				],
-			},
-			{
-				key: "remote",
-				label: "Remote",
-				folderKey: "remote",
-				entries: [
-					seed("hp-rem-1", "Remote trail", "remote", "kevin-schmid-mta8r0bxhbo"),
-					todo("hp-rem-2", "To populate"),
-					todo("hp-rem-3", "To populate"),
-				],
-			},
-			{
-				key: "seasonal",
-				label: "Seasonal",
-				folderKey: "seasonal",
-				entries: [
-					seed("hp-sea-1", "Golden fields", "seasonal", "yuhan-du-zi9z-e8cxge"),
-					seed("hp-sea-2", "Open coast", "seasonal", "vincent-guth-62v7ntlkgl8"),
-					todo("hp-sea-3", "To populate"),
-				],
-			},
+			{ key: "farm", label: "Farm", folderKey: "farm", entries: [] },
+			{ key: "maritime", label: "Maritime", folderKey: "maritime", entries: [] },
+			{ key: "remote", label: "Remote", folderKey: "remote", entries: [] },
+			{ key: "seasonal", label: "Seasonal", folderKey: "seasonal", entries: [] },
 		],
 	},
 
@@ -250,41 +207,10 @@ export const PHOTO_BUCKETS: Record<BucketId, PhotoBucket> = {
 			"Meal evidence photos. Categories mirror the meals popup (meals · kitchens · dining · misc).",
 		partitioned: true,
 		sections: [
-			{
-				key: "meals",
-				label: "Prepared meals",
-				folderKey: "meals",
-				entries: [
-					real("meal-meals-ella-olsson", "Prepared meal", "ee/buckets/meals/meals/ella-olsson-ZjEeMnDiq00"),
-					todo("meal-meals-2", "To populate"),
-				],
-			},
-			{
-				key: "kitchens",
-				label: "Kitchens",
-				folderKey: "kitchens",
-				entries: [
-					real("meal-kit-zhang-ziyu", "Kitchen", "ee/buckets/meals/kitchens/zhang-ziyu-2VX0f47Z5NA"),
-					real("meal-kit-luk-parnican", "Farmhouse kitchen", "ee/buckets/meals/kitchens/luk-parni-an-HZgSvndfakc"),
-				],
-			},
-			{
-				key: "dining",
-				label: "Dining",
-				folderKey: "dining",
-				entries: [
-					real("meal-din-bruno-ngarukiye", "Dining table", "ee/buckets/meals/dining/bruno-ngarukiye-OqFZPMeufYQ"),
-					todo("meal-din-2", "To populate"),
-				],
-			},
-			{
-				key: "misc",
-				label: "Misc",
-				folderKey: "misc",
-				entries: [
-					real("meal-misc-vije", "Fresh produce", "ee/buckets/meals/misc/vije-vijendranath-26LFdL8exMo"),
-				],
-			},
+			{ key: "meals", label: "Prepared meals", folderKey: "meals", entries: [] },
+			{ key: "kitchens", label: "Kitchens", folderKey: "kitchens", entries: [] },
+			{ key: "dining", label: "Dining", folderKey: "dining", entries: [] },
+			{ key: "misc", label: "Misc", folderKey: "misc", entries: [] },
 		],
 	},
 
@@ -296,39 +222,10 @@ export const PHOTO_BUCKETS: Record<BucketId, PhotoBucket> = {
 			"Housing evidence photos. Categories mirror the housing popup (bedrooms · bathrooms · exteriors · misc).",
 		partitioned: true,
 		sections: [
-			{
-				key: "bedrooms",
-				label: "Bedrooms",
-				folderKey: "bedrooms",
-				entries: [
-					real("house-bed-marcus-loke", "Bunk room", "ee/buckets/housing/bedrooms/marcus-loke-WQJvWU_HZFo"),
-					real("house-bed-zoshua-colah", "Simple bedroom", "ee/buckets/housing/bedrooms/zoshua-colah-TzMGehZmocI"),
-				],
-			},
-			{
-				key: "bathrooms",
-				label: "Bathrooms",
-				folderKey: "bathrooms",
-				entries: [
-					real("house-bath-carlos-masias", "Shared bathroom", "ee/buckets/housing/bathrooms/carlos-masias-yg8zkwBS30Q"),
-					real("house-bath-steven-ungermann", "Washroom", "ee/buckets/housing/bathrooms/steven-ungermann-Aac7IlKnYX8"),
-				],
-			},
-			{
-				key: "exteriors",
-				label: "Exteriors",
-				folderKey: "exteriors",
-				entries: [
-					real("house-ext-troy-mortier", "Lodge exterior", "ee/buckets/housing/exteriors/troy-mortier-AmGQi4pF_lE"),
-					real("house-ext-dmytro-koplyk", "Housing exterior", "ee/buckets/housing/exteriors/dmytro-koplyk-8xAu_SSpMPQ"),
-				],
-			},
-			{
-				key: "misc",
-				label: "Misc",
-				folderKey: "misc",
-				entries: [todo("house-misc-1", "To populate")],
-			},
+			{ key: "bedrooms", label: "Bedrooms", folderKey: "bedrooms", entries: [] },
+			{ key: "bathrooms", label: "Bathrooms", folderKey: "bathrooms", entries: [] },
+			{ key: "exteriors", label: "Exteriors", folderKey: "exteriors", entries: [] },
+			{ key: "misc", label: "Misc", folderKey: "misc", entries: [] },
 		],
 	},
 
@@ -336,53 +233,43 @@ export const PHOTO_BUCKETS: Record<BucketId, PhotoBucket> = {
 	seekerCover: {
 		id: "seekerCover",
 		label: "Seeker cover",
-		description: "Seeker profile cover — aspirational, on-the-move landscapes.",
+		description:
+			"Seeker profile cover — aspirational, on-the-move landscapes. Empty — gradient covers (curatedCovers) are the fallback until populated.",
 		partitioned: false,
-		sections: flat([
-			seed("seeker-fields", "Golden fields", "seasonal", "yuhan-du-zi9z-e8cxge"),
-			seed("seeker-coast", "Open coast", "seasonal", "vincent-guth-62v7ntlkgl8"),
-			seed("seeker-trail", "Remote trail", "remote", "kevin-schmid-mta8r0bxhbo"),
-			todo("seeker-cover-04", "To populate"),
-		]),
+		sections: flat([]),
 	},
 
-	// 7 ── Seeker ICON/avatar. No curated icon photography exists yet; the
-	// abstract monogram fallback lives in curatedPhotos.curatedLogos("seeker").
+	// 7 ── Seeker ICON/avatar. No curated icon photography exists; the abstract
+	// monogram fallback lives in curatedPhotos.curatedLogos("seeker").
 	seekerIcon: {
 		id: "seekerIcon",
 		label: "Seeker icon",
 		description:
-			"Seeker avatar/icon photos. No curated photography yet — abstract monogram tiles (curatedLogos) are the fallback until populated.",
+			"Seeker avatar/icon photos. Deliberately never stock-seeded — a stock face has no model release, so presenting one as a person's identity would misrepresent a real human. Abstract monogram tiles (curatedLogos) are the fallback.",
 		partitioned: false,
-		sections: flat([
-			todo("seeker-icon-1", "To populate"),
-			todo("seeker-icon-2", "To populate"),
-		]),
+		sections: flat([]),
 	},
 
 	// 8 ── Admin COVER. Brand-neutral chrome; gradient covers (curatedCovers
-	// "admin") are the fallback until any photography is uploaded.
+	// "admin") are the fallback.
 	adminCover: {
 		id: "adminCover",
 		label: "Admin cover",
 		description:
-			"Admin surface cover. Calm, brand-neutral — gradient covers (curatedCovers) are the fallback until populated.",
+			"Admin surface cover. Calm, brand-neutral — gradient covers (curatedCovers) are the fallback by design; no photography is planned.",
 		partitioned: false,
-		sections: flat([
-			todo("admin-cover-1", "To populate"),
-			todo("admin-cover-2", "To populate"),
-		]),
+		sections: flat([]),
 	},
 
 	// 9 ── Admin PROFILE icon. Neutral system marks (curatedLogos "admin") are
-	// the fallback until populated.
+	// the fallback.
 	adminProfile: {
 		id: "adminProfile",
 		label: "Admin profile",
 		description:
-			"Admin profile icon photos. Neutral system marks (curatedLogos) are the fallback until populated.",
+			"Admin profile icon photos. Never stock-seeded (no model release). Neutral system marks (curatedLogos) are the fallback.",
 		partitioned: false,
-		sections: flat([todo("admin-profile-1", "To populate")]),
+		sections: flat([]),
 	},
 };
 
@@ -411,14 +298,14 @@ export function getBucket(id: BucketId): PhotoBucket {
 }
 
 /**
- * Flattened, real (non-null) entries of a bucket — what a picker offers as
- * ready-to-choose options. "To populate" slots are omitted so a chooser never
- * shows an empty tile as if it were selectable.
+ * Flattened entries of a bucket — what a picker offers as ready-to-choose
+ * options. Every entry is a real object, so this is simply the flattening; an
+ * empty result means the bucket has no photos and the picker must say so.
  */
 export interface ResolvedBucketPhoto {
 	readonly id: string;
 	readonly label: string;
-	readonly publicId: string;
+	readonly path: string;
 	readonly section: string;
 }
 
@@ -427,31 +314,24 @@ export function bucketPhotos(id: BucketId): readonly ResolvedBucketPhoto[] {
 	const out: ResolvedBucketPhoto[] = [];
 	for (const section of bucket.sections) {
 		for (const entry of section.entries) {
-			if (entry.publicId) {
-				out.push({
-					id: entry.id,
-					label: entry.label,
-					publicId: entry.publicId,
-					section: section.label,
-				});
-			}
+			out.push({
+				id: entry.id,
+				label: entry.label,
+				path: entry.path,
+				section: section.label,
+			});
 		}
 	}
 	return out;
 }
 
-/** Count of populated vs reserved slots — surfaced in the admin manager. */
-export function bucketFill(id: BucketId): { readonly filled: number; readonly total: number } {
-	const bucket = PHOTO_BUCKETS[id];
+/** How many photos a bucket holds — surfaced in the admin manager. */
+export function bucketFill(id: BucketId): { readonly filled: number } {
 	let filled = 0;
-	let total = 0;
-	for (const section of bucket.sections) {
-		for (const entry of section.entries) {
-			total += 1;
-			if (entry.publicId) filled += 1;
-		}
+	for (const section of PHOTO_BUCKETS[id].sections) {
+		filled += section.entries.length;
 	}
-	return { filled, total };
+	return { filled };
 }
 
 // Cross-check: curatedPhotos.ts remains the fallback source for gradient covers

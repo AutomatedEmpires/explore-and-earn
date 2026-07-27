@@ -17,8 +17,10 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 // CSP is sent in REPORT-ONLY mode: it logs violations to /api/csp-report
 // (→ Sentry) without blocking, so we can confirm every third party loads before
 // switching to enforcing. The allowlist below is the full production set —
-// Clerk, Supabase, Mapbox, Cloudinary, PostHog, Sentry, Google OAuth, and
-// Cloudflare Turnstile (Clerk bot protection).
+// Clerk, Supabase, Mapbox, PostHog, Sentry, Google OAuth, and Cloudflare
+// Turnstile (Clerk bot protection). All product imagery — host uploads and
+// app-managed site photography alike — is served from Supabase Storage, so
+// there is no third-party image host in the allowlist.
 //
 // TO PROMOTE TO ENFORCING (Phase 2, do NOT do blindly):
 //   1. Deploy report-only, then watch /api/csp-report (Sentry) for a real
@@ -28,12 +30,8 @@ const CSP_DIRECTIVES = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://clerk.exploreandearn.com https://*.clerk.com https://*.clerk.accounts.dev https://js.clerk.dev https://challenges.cloudflare.com https://browser.sentry-cdn.com https://us.posthog.com https://us-assets.i.posthog.com",
   "style-src 'self' 'unsafe-inline' https://api.tiles.mapbox.com https://api.mapbox.com",
-  "img-src 'self' blob: data: https://img.clerk.com https://*.supabase.co https://*.mapbox.com https://res.cloudinary.com",
-  // res.cloudinary.com: the visual-assets layer fetch()es illustration SVGs at
-  // runtime (packages/ui/src/visual-assets/useStreamlineSvg.ts) — img-src alone
-  // does not cover fetch(), so without this the illustrations break the moment
-  // CSP switches from report-only to enforcing.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.exploreandearn.com https://*.clerk.com https://*.clerk.accounts.dev https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://eu.posthog.com https://sentry.io https://*.ingest.sentry.io https://res.cloudinary.com",
+  "img-src 'self' blob: data: https://img.clerk.com https://*.supabase.co https://*.mapbox.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://clerk.exploreandearn.com https://*.clerk.com https://*.clerk.accounts.dev https://api.mapbox.com https://events.mapbox.com https://us.posthog.com https://us.i.posthog.com https://eu.posthog.com https://sentry.io https://*.ingest.sentry.io",
   "font-src 'self' data:",
   "frame-src 'self' https://*.clerk.accounts.dev https://accounts.clerk.dev https://challenges.cloudflare.com https://accounts.google.com",
   "worker-src 'self' blob:",
@@ -118,21 +116,22 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        // Supabase Storage (avatars, listing media, etc.)
+        // Supabase Storage (avatars, listing media, site photography)
         protocol: "https",
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/**"
       },
       {
+        // Supabase Storage image transformations — the sized variants the photo
+        // buckets request (see lib/photoBuckets.ts bucketPhotoUrl).
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/render/image/**"
+      },
+      {
         // Clerk-hosted user avatars
         protocol: "https",
         hostname: "img.clerk.com",
-        pathname: "/**"
-      },
-      {
-        // Cloudinary — curated photo library, icon CDN, transformed assets
-        protocol: "https",
-        hostname: "res.cloudinary.com",
         pathname: "/**"
       },
       {

@@ -89,11 +89,10 @@ export default async function HomePage() {
 	}
 
 	// Hero rotation is picked SERVER-side (the page stays force-dynamic): the
-	// SSR priority-preload then fetches the image that actually stays on
-	// screen. The old post-mount random pick threw away the preloaded hero and
-	// re-downloaded a different full-viewport image on 4/5 of visits (review
-	// 2026-07-22). The pick is a deterministic 3-minute time window — the
-	// founder's spec ("rotates per landing or every 3–5 min") verbatim, no
+	// band that renders on the server is the one that stays on screen. The old
+	// post-mount random pick swapped the hero after hydration on 4/5 of visits
+	// (review 2026-07-22). The pick is a deterministic 3-minute time window —
+	// the founder's spec ("rotates per landing or every 3–5 min") verbatim, no
 	// randomness (CodeQL js/insecure-randomness stays quiet), and consecutive
 	// requests within a window agree, which plays well with any edge caching.
 	const HERO_ROTATION_WINDOW_MS = 3 * 60 * 1000;

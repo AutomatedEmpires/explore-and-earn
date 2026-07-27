@@ -14,7 +14,7 @@ Three apps — **Explore&Earn (E&E)**, **BidSpace**, **Sweepza** — are built b
 - **Auth = Clerk** (all three apps).
 - **Maps = Mapbox** (any app that needs maps).
 - **Runtime:** Node **24.16.0** (`.nvmrc`, exact) · pnpm **10.12.4** (`packageManager`) · TypeScript **^5.8.3** · Turborepo.
-- Spine: Doppler (secrets) · Vercel (hosting) · Supabase Postgres (**DB/storage only**) · Stripe · Cloudinary · PostHog + Sentry · Streamline icons · TypeScript · Next.js.
+- Spine: Doppler (secrets) · Vercel (hosting) · Supabase Postgres + Storage (**all imagery; no image CDN**) · Stripe · PostHog + Sentry · Phosphor icons · TypeScript · Next.js.
 
 ## What changed in THIS repo (and why)
 1. **`package.json`** — added `engines.node: "24.16.0"`. E&E was the only app with no `engines` pin; it now matches BidSpace + Sweepza exactly.

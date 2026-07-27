@@ -19,7 +19,21 @@ import { HOME_CATEGORIES } from "../../components/home/home-data";
  *  3. Copy PARITY with the founder source (HOME_CATEGORIES labels + blurbs) so
  *     the landing pages can't drift from approved language.
  *  4. Metadata honesty: canonical per lane, bare title, explicit robots.
+ *  5. NO image field. The lane heroes were curated stock photos on an image CDN
+ *     this product no longer uses; the hero band paints the lane's own cover
+ *     gradient instead. This pins that the contract is copy-only, so a future
+ *     re-add has to be deliberate (and has to ship the asset with it) rather
+ *     than a resurrected slug pointing at nothing.
  */
+
+/** Exactly the fields a landing entry may carry. */
+const LANDING_COPY_KEYS = [
+  "blurb",
+  "description",
+  "heading",
+  "label",
+  "title",
+] as const;
 
 describe("category landing contract", () => {
   it("covers exactly the founder-locked lanes (MARKETPLACE_LANES)", () => {
@@ -56,6 +70,18 @@ describe("category landing contract", () => {
       expect(landing.blurb).toBe(home.blurb);
     }
   });
+
+  it.each([...MARKETPLACE_LANES])(
+    "%s carries copy only — no image field, no asset slug",
+    (lane) => {
+      const copy = CATEGORY_LANDING[lane];
+      expect(Object.keys(copy).sort()).toEqual([...LANDING_COPY_KEYS]);
+      // Nothing in the copy may smuggle in an asset reference.
+      for (const value of Object.values(copy)) {
+        expect(value).not.toMatch(/https?:\/\//);
+      }
+    },
+  );
 
   it.each([...MARKETPLACE_LANES])("metadata for %s is honest and canonical", (lane) => {
     const meta = buildCategoryLandingMetadata(lane);

@@ -1,5 +1,4 @@
 import type { DiscoveryListing } from "./listing";
-import { cloudinaryPhoto } from "@explore-and-earn/ui";
 
 /**
  * Typed Discovery fixtures — NO backend (Sprint Zero). Every entry conforms to
@@ -11,6 +10,13 @@ import { cloudinaryPhoto } from "@explore-and-earn/ui";
  * only to place a marker on the /map Mapbox surface. The "Remote · Worldwide"
  * listing intentionally has no coordinates — it is discoverable in the feed but
  * omitted from the map.
+ *
+ * No fixture carries a `coverImageUrl`. The covers were curated stock photos
+ * served by an image CDN this product no longer uses; rather than point at
+ * objects that are not there, every fixture now exercises the card's real
+ * NO-COVER path — the category watermark (see DiscoveryCard, and the
+ * "coverless listings render the category watermark" test). That is also what a
+ * host's listing looks like before they upload, so the bench is honest.
  */
 export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
   {
@@ -41,7 +47,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
         alt: "Sunlit apple orchard rows at harvest time",
       },
     },
-    coverImageUrl: cloudinaryPhoto("farm", "sokmean-nou-mjeqdrpwefc", "hero"),
     matchScore: 88,
     founding: true,
     payInsight: {
@@ -82,7 +87,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     conditionalBadges: ["boosted"],
-    coverImageUrl: cloudinaryPhoto("maritime", "rasmus-andersen-nmzzl8lzkuu", "hero"),
     founding: false,
     visaSupport: true,
     payInsight: {
@@ -121,7 +125,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     matchScore: 72,
-    coverImageUrl: cloudinaryPhoto("remote", "kevin-schmid-mta8r0bxhbo", "hero"),
     visaSupport: true,
     payInsight: {
       meterValue: 73,
@@ -161,7 +164,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       },
     },
     conditionalBadges: ["boosted"],
-    coverImageUrl: cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"),
     founding: false,
     payInsight: {
       meterValue: 71,
@@ -232,7 +234,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       currency: "USD",
       note: "Strong hourly pay, but food and full housing are not included.",
     },
-    coverImageUrl: cloudinaryPhoto("farm", "tim-hufner-6-ktk6b8mq8", "hero"),
   },
   {
     // A SOURCED fixture (dev/preview only) so the sourced-card journey renders
@@ -254,7 +255,6 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
       meals: { provision: "not_provided", summary: "Not stated" },
       pay: { provision: "provided", summary: "$21/hr" },
     },
-    coverImageUrl: cloudinaryPhoto("maritime", "joseph-barrientos-8mdls-a3o8q", "hero"),
     provenanceInfo: {
       provenance: "sourced",
       claimStatus: "unclaimed",

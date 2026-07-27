@@ -9,7 +9,6 @@ export * from "./MetricCard";
 export * from "./Modal";
 export * from "./Skeleton";
 export * from "./VerifiedHostBadge";
-export * from "./cloudinary";
 export * from "./icons";
 export * from "./tokens";
 export * from "./visual-assets";
