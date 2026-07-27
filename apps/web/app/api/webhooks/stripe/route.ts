@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { STRIPE_WEBHOOK_ROUTE } from "../../../../lib/routePaths";
 import { reportError } from "../../../../lib/sentry";
 import {
   handleStripeWebhookEvent,
@@ -8,8 +9,6 @@ import {
 } from "../../../../services/stripe";
 
 export const runtime = "nodejs";
-
-export const STRIPE_WEBHOOK_ROUTE = "/api/webhooks/stripe";
 
 /**
  * Stripe webhook receiver.

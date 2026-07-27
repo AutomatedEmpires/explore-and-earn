@@ -30,7 +30,8 @@ const stripeMocks = vi.hoisted(() => ({
 vi.mock("../../lib/sentry", () => ({ reportError: reportErrorMock }));
 vi.mock("../../services/stripe", () => stripeMocks);
 
-const { POST, STRIPE_WEBHOOK_ROUTE } = await import(
+const { STRIPE_WEBHOOK_ROUTE } = await import("../../lib/routePaths");
+const { POST } = await import(
   "../../app/api/webhooks/stripe/route"
 );
 
