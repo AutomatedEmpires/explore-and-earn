@@ -207,10 +207,13 @@ export const ADDITIONAL_LISTING_PRICING = {
 
 // Upper bound on how many extra listing slots a SINGLE checkout may buy.
 //
-// ⚠ AWAITS FOUNDER CONFIRMATION. This is not a founder-given number and it is
-// not a price. It exists only so a crafted request cannot mint an unbounded
-// allowance in one call; a host who needs more buys again. Raise or remove it
-// on founder instruction.
+// An ABUSE CEILING, not a price and not an entitlement: it exists so a crafted
+// request cannot mint an unbounded allowance in one call. A host who genuinely
+// needs more simply buys again — the cap costs a legitimate buyer one extra
+// checkout at most. 10 shipped at launch (2026-07-27) as a deliberately
+// conservative value; the founder was asked and had not ruled by launch, so
+// per the launch charter the safe bound ships rather than an open question.
+// Raising it is a one-line change with no consequence for prior purchases.
 export const ADDITIONAL_LISTING_MAX_PER_CHECKOUT = 10
 
 // Service credits expire 12 months after issuance; redemption is FIFO
