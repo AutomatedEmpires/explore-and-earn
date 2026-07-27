@@ -725,6 +725,117 @@ if (!allowanceMigration || !addOnMigration) {
   }
 }
 
+// The founding-host program (087) is the only surface in the product that
+// publishes a SCARCITY CLAIM, and a scarcity claim is the easiest thing in a
+// codebase to make dishonest by accident. `pnpm guardrails` runs without a
+// database while the connected proof (sql/assert_founding_host_program.sql) runs
+// only in db-security.yml, so the four properties that make the claim true are
+// pinned here as well:
+//
+//   * NO SEEDED ROW. Absence is the dark state the product ships in; a row
+//     inserted by the migration would put a capacity and a deadline on the
+//     public page that no founder ever chose.
+//   * anon and authenticated may read the four offer columns and MUST NOT hold
+//     a table-wide SELECT — the count is public, the row's operational columns
+//     are not.
+//   * neither client role may execute the claim function. A visitor who could
+//     call it could exhaust the program without paying for a single seat.
+//   * the claim must gate on all three terms (open, in date, below capacity) and
+//     be idempotent per identity, because Stripe delivers at least once.
+//
+// Comments are stripped first: this migration's header explains each rule in
+// prose, and a scan of the raw text would be satisfied by the documentation
+// rather than by the SQL.
+const foundingMigration = migrationFiles.find((f) => /^087_.*\.sql$/.test(f))
+if (!foundingMigration) {
+  hasFailure = true
+  console.error("G-FOUNDING-HOST: expected migration 087 to be present.")
+} else {
+  const sql = stripSqlComments(fileContents.get(foundingMigration))
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+
+  const required = [
+    "create table if not exists public.founding_host_program",
+    "check (id = 1)",
+    "check (claimed <= capacity)",
+    "check (status in ('draft', 'open', 'full', 'ended'))",
+    "revoke all on table public.founding_host_program from anon, authenticated;",
+    "grant select (capacity, claimed, enrollment_deadline, status) on public.founding_host_program to anon, authenticated;",
+    "alter table public.founding_host_program enable row level security;",
+    "create table if not exists public.founding_host_claims",
+    "create unique index if not exists uq_founding_host_claims_clerk_user on public.founding_host_claims (clerk_user_id);",
+    "revoke all on table public.founding_host_claims from anon, authenticated;",
+    "revoke all on table public.founding_host_claim_discrepancies from anon, authenticated;",
+    "create or replace function public.claim_founding_host_seat( p_clerk_user_id text ) returns jsonb",
+    "security definer",
+    "set search_path = ''",
+    "perform pg_advisory_xact_lock(hashtextextended('founding_host_seat', 0));",
+    "for update",
+    "'reason', 'not_configured'",
+    "'already_claimed', true",
+    "if v_row.status <> 'open' then",
+    "if v_row.enrollment_deadline is null or now() >= v_row.enrollment_deadline then",
+    "if v_row.claimed >= v_row.capacity then",
+    "'reason', 'full'",
+    "set claimed = claimed + 1, status = case when claimed + 1 >= capacity then 'full' else status end",
+    "revoke execute on function public.claim_founding_host_seat(text) from public, anon, authenticated;",
+    "grant execute on function public.claim_founding_host_seat(text) to service_role;",
+    "revoke execute on function public.record_founding_claim_discrepancy(text, text, text) from public, anon, authenticated;",
+    "grant execute on function public.record_founding_claim_discrepancy(text, text, text) to service_role;",
+  ]
+  for (const needle of required) {
+    if (!sql.includes(needle)) {
+      hasFailure = true
+      console.error(`G-FOUNDING-HOST: ${foundingMigration} is missing ${needle}`)
+    }
+  }
+
+  // A seeded row would publish numbers nobody chose. The dark state is the
+  // shipped state, and it is the absence of a row that produces it.
+  if (/insert\s+into\s+public\.founding_host_program/.test(sql)) {
+    hasFailure = true
+    console.error(
+      `G-FOUNDING-HOST: ${foundingMigration} seeds a program row — the unconfigured state must ship dark.`,
+    )
+  }
+
+  // A table-wide grant would hand anon the row's operational columns as well as
+  // the offer, and a column revoke afterwards would be a silent no-op.
+  if (
+    /grant\s+select\s+on\s+(?:table\s+)?public\.founding_host_program/.test(sql) ||
+    /grant\s+all\s+on\s+(?:table\s+)?public\.founding_host_program/.test(sql)
+  ) {
+    hasFailure = true
+    console.error(
+      `G-FOUNDING-HOST: ${foundingMigration} grants a client role table-wide access to the program row.`,
+    )
+  }
+
+  // The claim function must stay unreachable from PostgREST, and the ledger must
+  // stay unreadable: a claim count a visitor can enumerate per identity is a
+  // list of who is paying what.
+  for (const [pattern, message] of [
+    [
+      /grant\s+execute\s+on\s+function\s+public\.claim_founding_host_seat\s*\([^)]*\)\s+to\s+[^;]*\b(?:anon|authenticated|public)\b/,
+      "grants EXECUTE on the claim function to a client role",
+    ],
+    [
+      /grant\s+(?:select|all)\s*(?:\([^)]*\))?\s+on\s+(?:table\s+)?public\.founding_host_claims/,
+      "grants a client role access to the claim ledger",
+    ],
+    [
+      /create\s+policy[^;]*on\s+public\.founding_host_claims/,
+      "opens a policy on the claim ledger",
+    ],
+  ]) {
+    if (pattern.test(sql)) {
+      hasFailure = true
+      console.error(`G-FOUNDING-HOST: ${foundingMigration} ${message}.`)
+    }
+  }
+}
+
 if (hasFailure) {
   process.exit(1)
 }

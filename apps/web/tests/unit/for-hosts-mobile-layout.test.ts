@@ -39,8 +39,28 @@ describe("for-hosts mobile layout", () => {
     ".compare",
     ".faq",
     ".finalCta",
+    // P4 added two more full-bleed bands: the early-host programme and the
+    // add-on table. Both are shared components, so the page supplies only the
+    // gutter — which is exactly the shape that overflows without box-sizing.
+    ".foundingWrap",
+    ".addonsWrap",
   ])("keeps the padded %s container inside the viewport", (selector) => {
     expect(ruleFor(forHosts, selector)).toContain("box-sizing: border-box");
+  });
+
+  /**
+   * The two shared components carry their own padding, so their own containers
+   * need the same declaration — a band that is safe on /for-hosts and overflows
+   * on the activation page is the same bug in a second place.
+   */
+  it.each([
+    ["../../components/founding/founding.module.css", ".section"],
+    ["../../components/founding/founding.module.css", ".rate"],
+    ["../../components/pricing/addons.module.css", ".section"],
+    ["../../components/pricing/addons.module.css", ".group"],
+  ])("keeps the padded %s %s inside the viewport", (stylesheet, selector) => {
+    const source = readFileSync(new URL(stylesheet, import.meta.url), "utf8");
+    expect(ruleFor(source, selector)).toContain("box-sizing: border-box");
   });
 
   /** The one wide element on the page scrolls inside its own box, not the body. */

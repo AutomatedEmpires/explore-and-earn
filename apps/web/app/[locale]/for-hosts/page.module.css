@@ -463,6 +463,26 @@
   text-align: center;
 }
 
+/* The early-host programme and the add-on table are shared components with
+   their own internal padding, so these wrappers only supply the page's gutter
+   and rhythm. Both declare box-sizing for the same reason every other band on
+   this page does: a gutter added outside the width scrolls the phone sideways. */
+.foundingWrap {
+  box-sizing: border-box;
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-48) var(--space-gutter) 0;
+}
+
+.addonsWrap {
+  box-sizing: border-box;
+  max-width: 1120px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-48) var(--space-gutter) 0;
+}
+
 .pricingSub {
   margin: var(--space-12) auto var(--space-24);
   max-width: 62ch;

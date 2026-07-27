@@ -8,15 +8,20 @@ import {
   FOUNDER_LOCKED_PRICING,
   PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
+import { getFoundingHostProgram } from "@explore-and-earn/db";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import { CaptureOnMount } from "../../../components/analytics/CaptureOnMount";
+import { SectionViewed } from "../../../components/analytics/SectionViewed";
 import {
   DEMO_DATA_LABEL,
   DEMO_ORG,
   DemoJobCard,
   DemoMetricTiles,
 } from "../../../components/demo";
+import { FoundingHostSection } from "../../../components/founding/FoundingHostSection";
+import { resolveFoundingProgramView } from "../../../components/founding/program";
+import { AddOnTable } from "../../../components/pricing/AddOnTable";
 import { HOST_FUNNEL_EVENTS } from "../../../lib/analytics";
 import { formatMoney } from "../../../lib/format";
 import styles from "./page.module.css";
@@ -35,6 +40,22 @@ export const metadata: Metadata = {
     type: "website",
   },
 };
+
+/**
+ * This page reads the early-host programme row, so it can no longer be a
+ * build-time artefact for ever: a capacity the founder sets after a deploy, or a
+ * place claimed by a paid checkout, has to reach the page without one.
+ *
+ * ISR RATHER THAN force-dynamic, deliberately. This is the highest-traffic
+ * marketing surface in the product and almost all of it is static; rendering it
+ * per request to keep one figure fresh would be paying for the whole page to
+ * chase a number that changes a hundred times in the programme's entire life.
+ * The admin console additionally calls revalidatePath('/for-hosts') the moment
+ * the configuration changes, so the window below only ever bounds the CLAIMED
+ * count — and a stale count can never sell a place that does not exist, because
+ * the checkout action re-reads the row and refuses.
+ */
+export const revalidate = 300;
 
 // ─── Content data ──────────────────────────────────────────────────────────
 
@@ -240,7 +261,14 @@ const FAQ: readonly { readonly q: string; readonly a: string }[] = [
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 
-export default function ForHostsPage() {
+export default async function ForHostsPage() {
+  // The early-host programme, read from the database on every request. Null —
+  // no row, a draft row, or a read fault — resolves to the view that renders one
+  // qualitative sentence and no figure of any kind. This page never invents a
+  // capacity, a remainder or a deadline, and the guardrail fails the build if a
+  // count reaches it from anywhere but the program module.
+  const foundingView = resolveFoundingProgramView(await getFoundingHostProgram());
+
   return (
     <div className={styles.page}>
       <CaptureOnMount event={HOST_FUNNEL_EVENTS.hostLandingViewed} />
@@ -423,6 +451,11 @@ export default function ForHostsPage() {
 
       {/* ── Plans ─────────────────────────────────────────────────── */}
       <section id="plans" className={styles.pricing} aria-labelledby="plans-title">
+        {/* Fired when the pricing band is actually scrolled into view, not on
+            page load. On a page built to show the product before the price,
+            "did they reach the price" is the question a page-view event cannot
+            answer. */}
+        <SectionViewed event={HOST_FUNNEL_EVENTS.hostPricingViewed} />
         <h2 id="plans-title" className={styles.sectionTitle}>
           Plans
         </h2>
@@ -458,10 +491,19 @@ export default function ForHostsPage() {
           ))}
         </div>
         <p className={styles.pricingFoot}>
-          Add-ons sit on top of any plan: boosts, extra active listings, extra
-          announcement runs and invite credit packs.
+          Add-ons sit on top of any plan, and every one of them is priced below.
         </p>
       </section>
+
+      {/* ── Early-host programme ──────────────────────────────────── */}
+      <div className={styles.foundingWrap}>
+        <FoundingHostSection view={foundingView} />
+      </div>
+
+      {/* ── Add-ons ───────────────────────────────────────────────── */}
+      <div className={styles.addonsWrap}>
+        <AddOnTable />
+      </div>
 
       {/* ── Comparison ────────────────────────────────────────────── */}
       <section className={styles.compare} aria-labelledby="compare-title">

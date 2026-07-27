@@ -132,14 +132,27 @@
   gap: var(--space-2);
 }
 
+/* Both are links now, not submit buttons: the choice made here is carried to
+   /host/plans/activate, which is where the exact amount is stated and where the
+   checkout action is actually posted (D12). */
 .primaryButton,
 .secondaryButton {
+  box-sizing: border-box;
+  display: block;
   width: 100%;
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   font-size: var(--type-body-sm);
   font-weight: 600;
+  text-align: center;
+  text-decoration: none;
   cursor: pointer;
+}
+
+.unavailable {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
 }
 
 .primaryButton {

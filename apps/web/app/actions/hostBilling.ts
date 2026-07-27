@@ -3,13 +3,19 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getHostProfile, getHostSubscriptionByClerkUserId } from "@explore-and-earn/db";
+import {
+  getFoundingHostProgram,
+  getHostProfile,
+  getHostSubscriptionByClerkUserId,
+} from "@explore-and-earn/db";
 
+import { resolveFoundingProgramView } from "../../components/founding/program";
 import { getClerkContact } from "../../lib/clerkUser";
 import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import {
   createBillingPortalSession,
   createCheckoutSession,
+  hasFoundingCheckoutConfig,
   isBillingInterval,
   isHostSubscriptionTier,
 } from "../../services/stripe";
@@ -75,6 +81,11 @@ function billingRedirect(error: string): never {
 export async function startHostCheckoutAction(formData: FormData): Promise<never> {
   const tierValue = formData.get("tier");
   const intervalValue = formData.get("interval");
+  // The activation page renders this field only when a seat is genuinely
+  // claimable. That is a rendering decision and therefore not a guard — a form
+  // field is whatever the sender says it is — so the request is re-checked
+  // below against the same row the page read.
+  const foundingRequested = formData.get("founding") === "1";
 
   if (typeof tierValue !== "string" || !isHostSubscriptionTier(tierValue)) {
     checkoutRedirect("invalid_plan");
@@ -211,6 +222,30 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
     checkoutRedirect("subscription_lapsed_use_portal");
   }
 
+  // THE EARLY-HOST RATE IS RE-AUTHORISED HERE, AGAINST THE DATABASE.
+  //
+  // Three things have to be true at the moment checkout OPENS, and the page that
+  // rendered the button cannot vouch for any of them: a tab left open for an
+  // hour, a bookmarked URL, or a hand-built POST all reach this line with the
+  // form field set. So the program row is re-read and the same view logic the
+  // page used decides again — status open, deadline in the future, a seat
+  // actually remaining — and the six Stripe prices must all be provisioned.
+  //
+  // A REFUSAL IS A REFUSAL, NOT A FALLBACK. The alternative considered and
+  // rejected was to quietly open a standard-rate checkout instead: the host was
+  // shown one price, would be charged another, and would find out on their card
+  // statement. Nothing about a closed programme entitles us to that.
+  //
+  // The read FAILS CLOSED for the same reason every entitlement read in this
+  // file does — getFoundingHostProgram answers null on a fault, which resolves
+  // to the unconfigured view, which is not claimable.
+  if (foundingRequested) {
+    const view = resolveFoundingProgramView(await getFoundingHostProgram());
+    if (!view.claimable || !hasFoundingCheckoutConfig()) {
+      checkoutRedirect("founding_unavailable");
+    }
+  }
+
   let checkoutUrl: string;
   try {
     const contact = await getClerkContact(authResult.auth.userId);
@@ -224,6 +259,12 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
           : "Explore & Earn host",
       subscriptionTier: tierValue,
       billingInterval: intervalValue,
+      // Carried into the session metadata as foundingHost, which is what the
+      // grant path reads before consuming a seat. createCheckoutSession THROWS
+      // rather than falling back if the founding price is unprovisioned, so the
+      // catch below sends the host to a readable failure instead of a surprise
+      // charge at the standard rate.
+      founding: foundingRequested,
       // BOTH return paths must be reachable by a payer with NO host profile —
       // the (host) layout bounces profile-less users, and Stripe does not
       // guarantee the entitlement webhook lands before the browser follows

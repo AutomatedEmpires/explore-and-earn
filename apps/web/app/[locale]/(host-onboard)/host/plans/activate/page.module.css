@@ -1,0 +1,256 @@
+/* Activation summary (commercial redesign D12).
+
+   Two columns on desktop, one on a phone with the total pinned to the bottom of
+   the viewport — the amount is the fact a buyer scrolls back up to re-check, so
+   on the surface where scrolling costs most it stays put.
+
+   Tokens only, no raw colour literals (G50). Every padded container declares
+   box-sizing: a gutter added outside the width is one declaration away from
+   scrolling the whole page sideways. */
+
+.page {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+}
+
+.shell {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 72rem;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.back {
+  align-self: flex-start;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--type-heading-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-sm);
+}
+
+.columns {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* Two columns only when there is genuinely room for two readable ones. Below
+   that the summary reads top to bottom and the total is pinned instead. */
+@media (min-width: 64rem) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    align-items: start;
+  }
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.block {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: var(--type-body-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.capabilities,
+.afterList {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-sm);
+}
+
+.terms {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.termRow {
+  display: grid;
+  gap: var(--space-1);
+}
+
+@media (min-width: 40rem) {
+  .termRow {
+    grid-template-columns: 10rem minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+}
+
+.termRow dt {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.termRow dd {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.inlineLink {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+}
+
+/* ── The total column ─────────────────────────────────────────────── */
+
+.checkout {
+  min-width: 0;
+}
+
+@media (min-width: 64rem) {
+  .checkout {
+    position: sticky;
+    top: var(--space-5);
+  }
+}
+
+.totalCard {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* On a phone the card is pinned to the bottom of the viewport: the amount is
+   what a buyer scrolls back to re-check, and the checkout control travels with
+   it so the decision is never more than a thumb away. */
+@media (max-width: 63.999rem) {
+  .checkout {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+  }
+
+  .totalCard {
+    box-shadow: var(--shadow-md, none);
+  }
+}
+
+.totalLabel {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.totalWas {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.total {
+  margin: 0;
+  font-size: var(--type-heading-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.totalNote {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.form {
+  margin: var(--space-2) 0 0;
+}
+
+.primaryButton {
+  box-sizing: border-box;
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-text-primary);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-text-primary);
+  color: var(--color-surface);
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primaryButton:hover {
+  opacity: 0.9;
+}
+
+.secondaryLink {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+.secondaryLink:hover {
+  border-color: var(--color-text-primary);
+}
+
+.unavailable,
+.reassurance {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}

@@ -1,0 +1,167 @@
+/* Early-host programme section (commercial redesign D10).
+
+   Tokens only — no raw colour literals anywhere in this file (G50). The section
+   is a full-bleed band on /for-hosts and a panel on the activation page, so it
+   declares box-sizing on every padded container: a gutter added outside the
+   width is one declaration away from scrolling the whole page sideways on a
+   phone. */
+
+.section {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--type-heading-md);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.lead {
+  margin: 0;
+  max-width: 48rem;
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-sm);
+}
+
+/* The scarcity line. Present only when the server supplied real figures. */
+.scarcity {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: var(--type-body-md);
+}
+
+.deadline {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-sm);
+}
+
+.countdown {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.countdownUnit {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.countdownUnit strong {
+  font-size: var(--type-heading-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.countdownNote {
+  color: var(--color-text-secondary);
+}
+
+.rates {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 48rem) {
+  .rates {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.rate {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised, var(--color-surface));
+}
+
+.rateName {
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.rateMonthly {
+  font-size: var(--type-heading-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.ratePer {
+  font-size: var(--type-body-sm);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.rateAnnual {
+  font-size: var(--type-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.annualNote,
+.terms {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--type-body-sm);
+}
+
+.terms {
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cta {
+  align-self: flex-start;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-text-primary);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-text-primary);
+  color: var(--color-surface);
+  font-size: var(--type-body-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.cta:hover {
+  opacity: 0.9;
+}
