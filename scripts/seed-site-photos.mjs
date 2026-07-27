@@ -1,24 +1,31 @@
 #!/usr/bin/env node
 /**
- * Explore & Earn — Photo Bucket Seeder (Unsplash → Cloudinary)
+ * Explore & Earn — Site Photo Seeder (Unsplash → Supabase Storage)
  * ─────────────────────────────────────────────────────────────────────────────
- * Seeds the app-managed PHOTO BUCKETS (see apps/web/lib/photoBuckets.ts) with
- * real Unsplash imagery, uploaded into our own Cloudinary under the documented
- * `ee/buckets/{bucket}[/{category}]/{slug}` folder convention. This backfills the
- * `todo()` "to populate" slots (housing, meals, extra covers) with genuine photos
- * so the pickers offer a real library on day one — without ever fabricating a URL.
+ * Populates the app-managed PHOTO BUCKETS (see apps/web/lib/photoBuckets.ts)
+ * with real Unsplash imagery, uploaded into the PUBLIC Supabase Storage bucket
+ * `site-photos` under the documented folder convention:
+ *
+ *     buckets/{bucket}[/{category}]/{slug}.jpg
+ *
+ * Every bucket ships EMPTY today: the previous library lived on an image CDN
+ * this product no longer uses, and we do not fabricate a URL to an object that
+ * is not there. This script is how photography comes back — it is complete and
+ * runnable, and it is inert until the founder supplies an Unsplash key.
  *
  * ── WHAT IT DOES ─────────────────────────────────────────────────────────────
  *   1. For each SCENERY/OBJECT bucket, runs the curated Unsplash search queries.
- *   2. Uploads each result to Cloudinary by REMOTE URL (Cloudinary fetches it),
- *      idempotent via a deterministic public_id (overwrite=true).
+ *   2. Downloads each result and uploads the bytes to Supabase Storage,
+ *      idempotent via a deterministic object path (upsert=true).
  *   3. Triggers Unsplash's download endpoint per used photo (API ToS requirement).
- *   4. Records full attribution (photographer + Unsplash links) in the manifest
- *      and in each asset's Cloudinary `context` — attribution is not required by
- *      the Unsplash License but we keep it anyway (cheap goodwill, keeps us clean).
- *   5. Writes scripts/photo-buckets.manifest.json and a paste-ready TS fragment
- *      (scripts/photo-buckets.seed-fragment.ts) with the resulting BucketEntry[]
- *      so a human can wire the winners into photoBuckets.ts (the source of truth).
+ *   4. Records full attribution (photographer + Unsplash links) in a manifest
+ *      that is ALSO uploaded next to the images at `buckets/manifest.json`, so
+ *      the credit for an object always travels with the object.
+ *   5. Writes scripts/site-photos.manifest.json plus two paste-ready fragments:
+ *        scripts/site-photos.entries.ts   → BucketEntry[] for photoBuckets.ts
+ *        scripts/site-photos.credits.ts   → PhotoCredit[] for photoBucketCredits.ts
+ *      A human reviews and wires them in; those two files stay the source of
+ *      truth, and a photo is only ever listed once it really exists.
  *
  * ── PEOPLE SAFETY (honesty rule) ─────────────────────────────────────────────
  * The Unsplash License grants NO model or property release. A recognizable face
@@ -29,9 +36,9 @@
  * They are listed in SEED_PLAN with `skip` + a reason and logged, not silently
  * dropped. Scenery/interior/food queries below are also written to avoid faces.
  *
- * ── LICENSING (answer to "do we need to upgrade Unsplash?") ──────────────────
- * No upgrade needed for these buckets. The free Unsplash License already permits
- * commercial use with NO required backlink. Unsplash+ mainly removes the
+ * ── LICENSING ────────────────────────────────────────────────────────────────
+ * No paid tier needed for these buckets. The free Unsplash License already
+ * permits commercial use with NO required backlink. Unsplash+ mainly removes the
  * (already-optional) attribution ask — it does NOT add model releases, so it does
  * not unlock people-as-identities either. Released people imagery, if ever wanted,
  * must come from a licensed stock library (Getty/iStock), not Unsplash at any tier.
@@ -45,26 +52,29 @@
  *
  * ── CREDENTIALS ──────────────────────────────────────────────────────────────
  * Reads from process.env first, then .env.local (repo root). Works under Doppler:
- *     doppler run -- node scripts/seed-photo-buckets.mjs
+ *     doppler run -- node scripts/seed-site-photos.mjs
  * or with a local .env.local containing:
  *     UNSPLASH_ACCESS_KEY=...          (Unsplash app "Access Key")
- *     CLOUDINARY_API_KEY=...           (same creds as upload-assets.mjs)
- *     CLOUDINARY_API_SECRET=...
+ *     NEXT_PUBLIC_SUPABASE_URL=...     (the project the bucket lives in)
+ *     SUPABASE_SERVICE_ROLE_KEY=...    (write access to Storage)
  *
  * ── USAGE ────────────────────────────────────────────────────────────────────
- *   node scripts/seed-photo-buckets.mjs                 # seed all scenery buckets
- *   node scripts/seed-photo-buckets.mjs --dry-run       # search only, no uploads
- *   node scripts/seed-photo-buckets.mjs --bucket=housing
- *   node scripts/seed-photo-buckets.mjs --limit=12      # cap photos per bucket
+ *   node scripts/seed-site-photos.mjs                 # seed all scenery buckets
+ *   node scripts/seed-site-photos.mjs --dry-run       # search only, no uploads
+ *   node scripts/seed-site-photos.mjs --bucket=housing
+ *   node scripts/seed-site-photos.mjs --limit=12      # cap photos per bucket
  */
 
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
+
+const STORAGE_BUCKET = "site-photos";
+/** Where the attribution manifest lands INSIDE the storage bucket. */
+const MANIFEST_OBJECT = "buckets/manifest.json";
 
 // ── Credentials (process.env → .env.local fallback) ─────────────────────────────
 
@@ -84,9 +94,8 @@ function loadEnvFile(filePath) {
 const fileEnv = loadEnvFile(path.join(ROOT, ".env.local"));
 const readEnv = (k) => process.env[k] ?? fileEnv[k];
 
-const CLOUD = readEnv("NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME") || "dwiwyt9vi";
-const API_KEY = readEnv("CLOUDINARY_API_KEY");
-const API_SECRET = readEnv("CLOUDINARY_API_SECRET");
+const SUPABASE_URL = (readEnv("NEXT_PUBLIC_SUPABASE_URL") || "").replace(/\/+$/, "");
+const SERVICE_ROLE_KEY = readEnv("SUPABASE_SERVICE_ROLE_KEY");
 const UNSPLASH_KEY = readEnv("UNSPLASH_ACCESS_KEY");
 
 // ── CLI flags ───────────────────────────────────────────────────────────────
@@ -99,13 +108,14 @@ const PER_BUCKET_LIMIT = Number((args.find((a) => a.startsWith("--limit=")) || "
 // Credentials are required for a real run (dry-run only needs the Unsplash key).
 const missing = [];
 if (!UNSPLASH_KEY) missing.push("UNSPLASH_ACCESS_KEY");
-if (!DRY_RUN && !API_KEY) missing.push("CLOUDINARY_API_KEY");
-if (!DRY_RUN && !API_SECRET) missing.push("CLOUDINARY_API_SECRET");
+if (!DRY_RUN && !SUPABASE_URL) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+if (!DRY_RUN && !SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
 if (missing.length) {
   console.error(
-    `\n❌  Missing credential(s): ${missing.join(", ")}\n` +
-      `   Add them to .env.local or provide via env (e.g. doppler run -- …).\n` +
-      `   Get an Unsplash Access Key at https://unsplash.com/oauth/applications\n`,
+    `\nMissing credential(s): ${missing.join(", ")}\n` +
+      `   Add them to .env.local or provide via env (e.g. doppler run -- ...).\n` +
+      `   Get an Unsplash Access Key at https://unsplash.com/oauth/applications\n` +
+      `   The service-role key is Supabase project settings -> API -> service_role.\n`,
   );
   process.exit(1);
 }
@@ -204,7 +214,7 @@ async function unsplash(pathname, params = {}) {
   const remaining = res.headers.get("x-ratelimit-remaining");
   if (remaining != null) rateRemaining = Number(remaining);
   if (res.status === 403 && rateRemaining === 0) {
-    console.warn("   ⏳  Unsplash hourly rate limit hit — sleeping 60s before retry…");
+    console.warn("   Unsplash hourly rate limit hit — sleeping 60s before retry...");
     await sleep(60_000);
     return unsplash(pathname, params);
   }
@@ -231,7 +241,8 @@ async function searchPhotos(query, orientation, want) {
     photographerUrl: p.user?.links?.html || "https://unsplash.com",
     unsplashUrl: p.links?.html || "https://unsplash.com",
     downloadLocation: p.links?.download_location,
-    // Prefer a large but bounded source; Cloudinary re-derives sizes via t_ee-*.
+    // A large but bounded source; Supabase Storage re-derives sizes on read via
+    // the render/image endpoint (see lib/photoBuckets.ts bucketPhotoUrl).
     srcUrl: p.urls?.raw ? `${p.urls.raw}&w=1920&q=80&fm=jpg` : p.urls?.full || p.urls?.regular,
   }));
 }
@@ -246,35 +257,38 @@ async function triggerDownload(downloadLocation) {
   }
 }
 
-// ── Cloudinary (remote-URL upload, signed — mirrors upload-assets.mjs) ──────────
+// ── Supabase Storage (service-role upload) ────────────────────────────────────
 
-function sign(params) {
-  const str =
-    Object.keys(params)
-      .sort()
-      .filter((k) => !["file", "api_key"].includes(k))
-      .map((k) => `${k}=${Array.isArray(params[k]) ? params[k].join(",") : params[k]}`)
-      .join("&") + API_SECRET;
-  return crypto.createHash("sha1").update(str).digest("hex");
+async function storageUpload(objectPath, body, contentType) {
+  const res = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${objectPath}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        apikey: SERVICE_ROLE_KEY,
+        "Content-Type": contentType,
+        // Idempotent: a re-run overwrites the same deterministic path.
+        "x-upsert": "true",
+        "cache-control": "public, max-age=31536000, immutable",
+      },
+      body,
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Storage ${res.status}: ${text}`);
+  }
+  return res.json().catch(() => ({}));
 }
 
-async function cloudinaryUploadRemote(srcUrl, publicId, context, tags) {
-  const timestamp = Math.floor(Date.now() / 1000);
-  const params = { public_id: publicId, timestamp, overwrite: true, context, tags: tags.join(",") };
-  params.signature = sign(params);
-
-  const form = new FormData();
-  form.append("file", srcUrl); // Cloudinary fetches the remote URL server-side
-  form.append("api_key", API_KEY);
-  for (const [k, v] of Object.entries(params)) form.append(k, String(v));
-
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD}/image/upload`, {
-    method: "POST",
-    body: form,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || JSON.stringify(data));
-  return data;
+/** Fetch the Unsplash bytes, then push them into Storage. */
+async function uploadRemote(srcUrl, objectPath) {
+  const src = await fetch(srcUrl);
+  if (!src.ok) throw new Error(`source fetch ${src.status}`);
+  const contentType = src.headers.get("content-type") || "image/jpeg";
+  const bytes = Buffer.from(await src.arrayBuffer());
+  return storageUpload(objectPath, bytes, contentType);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -288,14 +302,24 @@ function slugify(s) {
 }
 
 function bucketFolder(bucket, folderKey) {
-  return folderKey ? `ee/buckets/${bucket}/${folderKey}` : `ee/buckets/${bucket}`;
+  return folderKey ? `buckets/${bucket}/${folderKey}` : `buckets/${bucket}`;
 }
+
+function titleCase(s) {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const attributionOf = (p) => ({
+  photographer: p.photographer,
+  photographerUrl: p.photographerUrl,
+  unsplashUrl: p.unsplashUrl,
+});
 
 // ── Run ─────────────────────────────────────────────────────────────────────
 
 const manifest = {
-  generated: null, // stamped after the run (Date.now is fine outside a workflow)
-  cloud: CLOUD,
+  generated: null, // stamped after the run
+  storageBucket: STORAGE_BUCKET,
   dryRun: DRY_RUN,
   buckets: {},
   skipped: {},
@@ -318,7 +342,7 @@ async function seedSection(bucket, orientation, perSection, section) {
       results = await searchPhotos(query, orientation, want);
     } catch (e) {
       manifest.errors.push({ bucket, section: section.key, query, error: e.message });
-      process.stdout.write(`   ✗  search "${query}": ${e.message}\n`);
+      process.stdout.write(`   x  search "${query}": ${e.message}\n`);
       continue;
     }
     for (const photo of results) {
@@ -326,57 +350,37 @@ async function seedSection(bucket, orientation, perSection, section) {
       if (seenIds.has(photo.id)) continue;
       seenIds.add(photo.id);
 
-      const publicId = `${folder}/${photo.slug}`;
-      const label = titleCase(query);
-      const context =
-        `source=unsplash|unsplash_id=${photo.id}|photographer=${photo.photographer}` +
-        `|photographer_url=${photo.photographerUrl}|unsplash_url=${photo.unsplashUrl}`;
-      const tags = ["bucket", bucket, section.key, "unsplash"];
-
-      // Full record — carries everything an out-of-band uploader (the Cloudinary
-      // MCP path) needs, plus attribution. In --dry-run/collect we write these
-      // without uploading; the real (raw-cred) path uploads then keeps the record.
+      const objectPath = `${folder}/${photo.slug}.jpg`;
       const entry = {
         id: photo.slug,
-        label,
-        publicId,
+        label: titleCase(query),
+        // `path` is exactly what a BucketEntry stores (relative to the bucket).
+        path: objectPath,
         srcUrl: photo.srcUrl,
-        context,
-        tags,
         downloadLocation: photo.downloadLocation,
         attribution: attributionOf(photo),
       };
 
       if (DRY_RUN) {
-        process.stdout.write(`   ·  [dry] ${publicId}  ← ${photo.photographer}\n`);
+        process.stdout.write(`   .  [dry] ${objectPath}  <- ${photo.photographer}\n`);
         entries.push(entry);
         continue;
       }
 
       try {
-        await cloudinaryUploadRemote(photo.srcUrl, publicId, context, tags);
+        await uploadRemote(photo.srcUrl, objectPath);
         await triggerDownload(photo.downloadLocation);
         uploaded++;
-        process.stdout.write(`   ✓  ${publicId}  ← ${photo.photographer}\n`);
+        process.stdout.write(`   +  ${objectPath}  <- ${photo.photographer}\n`);
         entries.push(entry);
       } catch (e) {
         failed++;
-        manifest.errors.push({ bucket, publicId, error: e.message });
-        process.stdout.write(`   ✗  ${publicId}: ${e.message}\n`);
+        manifest.errors.push({ bucket, objectPath, error: e.message });
+        process.stdout.write(`   x  ${objectPath}: ${e.message}\n`);
       }
     }
   }
   return { key: section.key, folderKey: section.folderKey, entries };
-}
-
-const attributionOf = (p) => ({
-  photographer: p.photographer,
-  photographerUrl: p.photographerUrl,
-  unsplashUrl: p.unsplashUrl,
-});
-
-function titleCase(s) {
-  return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 for (const plan of SEED_PLAN) {
@@ -384,11 +388,11 @@ for (const plan of SEED_PLAN) {
 
   if (plan.skip) {
     manifest.skipped[plan.bucket] = plan.skip;
-    console.log(`\n⊘  ${plan.bucket} — SKIPPED: ${plan.skip}`);
+    console.log(`\n-  ${plan.bucket} — SKIPPED: ${plan.skip}`);
     continue;
   }
 
-  console.log(`\n── ${plan.bucket} ${"─".repeat(Math.max(2, 56 - plan.bucket.length))}`);
+  console.log(`\n-- ${plan.bucket} ${"-".repeat(Math.max(2, 56 - plan.bucket.length))}`);
   seenIds.clear();
   const sections = [];
   for (const section of plan.sections) {
@@ -398,49 +402,89 @@ for (const plan of SEED_PLAN) {
   manifest.buckets[plan.bucket] = { sections };
 }
 
-// ── Emit manifest + paste-ready TS fragment ───────────────────────────────────
+// ── Emit manifest + paste-ready fragments ─────────────────────────────────────
 
 manifest.generated = new Date().toISOString().split("T")[0];
 
-const manifestPath = path.join(__dirname, "photo-buckets.manifest.json");
-fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+fs.writeFileSync(
+  path.join(__dirname, "site-photos.manifest.json"),
+  JSON.stringify(manifest, null, 2),
+);
+fs.writeFileSync(path.join(__dirname, "site-photos.entries.ts"), buildEntriesFragment(manifest));
+fs.writeFileSync(path.join(__dirname, "site-photos.credits.ts"), buildCreditsFragment(manifest));
 
-const fragment = buildTsFragment(manifest);
-const fragmentPath = path.join(__dirname, "photo-buckets.seed-fragment.ts");
-fs.writeFileSync(fragmentPath, fragment);
+// Attribution travels WITH the objects: the same manifest is uploaded next to
+// them, so a credit can never drift away from the photo it belongs to.
+if (!DRY_RUN) {
+  try {
+    await storageUpload(
+      MANIFEST_OBJECT,
+      Buffer.from(JSON.stringify(manifest, null, 2)),
+      "application/json",
+    );
+    console.log(`\nAttribution manifest uploaded -> ${STORAGE_BUCKET}/${MANIFEST_OBJECT}`);
+  } catch (e) {
+    console.warn(`\nCould not upload the attribution manifest: ${e.message}`);
+  }
+}
 
 console.log(`
-────────────────────────────────────────────
- ${DRY_RUN ? "DRY RUN — no uploads" : `✓  ${uploaded} uploaded   ✗  ${failed} failed`}
+--------------------------------------------
+ ${DRY_RUN ? "DRY RUN — no uploads" : `${uploaded} uploaded   ${failed} failed`}
  Rate remaining (Unsplash, approx): ${Number.isFinite(rateRemaining) ? rateRemaining : "n/a"}
-────────────────────────────────────────────
- Manifest → scripts/photo-buckets.manifest.json
- Fragment → scripts/photo-buckets.seed-fragment.ts   (review, then wire into
+--------------------------------------------
+ Manifest → scripts/site-photos.manifest.json
+ Entries  → scripts/site-photos.entries.ts    (review, then wire into
             apps/web/lib/photoBuckets.ts — the source of truth)
+ Credits  → scripts/site-photos.credits.ts    (review, then wire into
+            apps/web/lib/photoBucketCredits.ts)
 `);
 if (manifest.errors.length) {
   console.log("Failures:");
-  manifest.errors.slice(0, 20).forEach((e) => console.log(`  • ${e.publicId || e.query}: ${e.error}`));
+  manifest.errors.slice(0, 20).forEach((e) => console.log(`  - ${e.objectPath || e.query}: ${e.error}`));
 }
 
 /** Build a human-reviewable TS fragment of BucketEntry[] per bucket/section. */
-function buildTsFragment(m) {
+function buildEntriesFragment(m) {
   const lines = [
-    "// GENERATED by scripts/seed-photo-buckets.mjs — review, then paste the",
+    "// GENERATED by scripts/seed-site-photos.mjs — review, then paste the",
     "// relevant entries into apps/web/lib/photoBuckets.ts (the source of truth).",
-    "// Each entry is a real, uploaded Cloudinary public ID. Attribution is kept",
-    "// in the manifest + Cloudinary context; surface it on a /credits page.",
+    "// Each `path` is a real, uploaded object in the public `site-photos` bucket.",
     "",
   ];
   for (const [bucket, data] of Object.entries(m.buckets)) {
-    lines.push(`// ── ${bucket} ──`);
+    lines.push(`// -- ${bucket} --`);
     for (const section of data.sections) {
       lines.push(`//   section: ${section.key}`);
       for (const e of section.entries) {
-        lines.push(`{ id: "${e.id}", label: "${e.label}", publicId: "${e.publicId}" },`);
+        lines.push(`{ id: ${JSON.stringify(e.id)}, label: ${JSON.stringify(e.label)}, path: ${JSON.stringify(e.path)} },`);
       }
     }
     lines.push("");
   }
+  return lines.join("\n");
+}
+
+/** Build a human-reviewable TS fragment of PhotoCredit[] for every seeded photo. */
+function buildCreditsFragment(m) {
+  const lines = [
+    "// GENERATED by scripts/seed-site-photos.mjs — review, then paste into",
+    "// apps/web/lib/photoBucketCredits.ts. A credit must only ever exist for a",
+    "// photo we actually show, so add these in the SAME change that adds the",
+    "// matching entries to photoBuckets.ts.",
+    "",
+  ];
+  for (const data of Object.values(m.buckets)) {
+    for (const section of data.sections) {
+      for (const e of section.entries) {
+        lines.push(
+          `{ path: ${JSON.stringify(e.path)}, photographer: ${JSON.stringify(e.attribution.photographer)}, ` +
+            `photographerUrl: ${JSON.stringify(e.attribution.photographerUrl)}, ` +
+            `unsplashUrl: ${JSON.stringify(e.attribution.unsplashUrl)}, source: "unsplash" },`,
+        );
+      }
+    }
+  }
+  lines.push("");
   return lines.join("\n");
 }

@@ -26,7 +26,8 @@ const data: DiscoveryCardData = {
   location: "Wenatchee, WA",
   opportunityWindow: "Jun – Sep",
   triad: { housing: "Included", meals: "Included", pay: "$18/hr" },
-  coverImageUrl: "https://res.cloudinary.com/demo/t_ee-card/cover.jpg",
+  coverImageUrl:
+    "https://project.supabase.co/storage/v1/object/public/site-photos/buckets/hostCover/cover.jpg",
 };
 
 // Typed helper (review 2026-07-23): the props object stays compile-checked, so

@@ -47,11 +47,16 @@ describe("buildDestinations — no dead ends", () => {
     expect(all.every((d) => typeof d.jobCount === "number")).toBe(true);
   });
 
-  it("every destination links somewhere and carries an image + season", () => {
+  it("every destination links somewhere and carries a lane + season", () => {
+    // No image URL: the destination cards paint the lane cover gradient rather
+    // than a curated photograph (that library left with the image CDN, and a
+    // seed pointing at a missing object is a fabricated URL). The lane key is
+    // what the card needs, so THAT is what must always be present.
     for (const d of buildDestinations([])) {
       expect(d.href).toMatch(/^\/seek\?location=/);
-      expect(d.imageUrl.length).toBeGreaterThan(0);
+      expect(d.imageCategory.length).toBeGreaterThan(0);
       expect(d.season.length).toBeGreaterThan(0);
+      expect(d).not.toHaveProperty("imageUrl");
     }
   });
 

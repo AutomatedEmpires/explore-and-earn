@@ -160,7 +160,7 @@ Grounded in the current app (Next 15 App Router on Vercel, mobile-first):
 - Route-level first-load JS ≤ **250 kB** gzip for public discovery routes; no
   new third-party scripts on public pages (current set: PostHog only).
 - LCP ≤ **2.5 s** (p75 mobile), CLS ≤ **0.1**, INP ≤ **200 ms** — Vercel Web
-  Vitals defaults; images via the existing Cloudinary/responsive pipeline.
+  Vitals defaults; images via Supabase Storage + the responsive pipeline.
 - Public API: p95 ≤ **500 ms** per call at the default page size (24); max page
   size 100; list payload ≤ **100 kB** typical.
 - MCP tool results bounded: ≤ 20 listings per search result, text fields

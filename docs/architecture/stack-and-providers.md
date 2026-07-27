@@ -22,7 +22,7 @@
 | Product analytics | PostHog | Locked |
 | Error monitoring | Sentry | Locked |
 | Transactional email | Resend | Locked |
-| Public image delivery | Cloudinary | Locked (2026-06-01) |
+| Public image delivery | Supabase Storage (no image CDN — see `docs/design/site-photos.md`) | Locked (2026-07-27) |
 | Private / protected media | Supabase Storage | Reserved (later phase) |
 | Search | PostgreSQL full-text (pgvector later if needed) | Locked (initial) |
 | Secrets manager | Doppler | Locked (2026-06-01) |

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type CSSProperties, type FormEvent } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -101,12 +100,12 @@ function HomeHero({
   const [category, setCategory] = useState("");
 
   // Dynamic hero — rotation index is picked SERVER-side per landing and passed
-  // down (review 2026-07-22): the priority-preloaded image is the one that
-  // stays on screen. The previous post-mount random pick threw the preload
-  // away and re-downloaded a different full-viewport hero on most visits.
-  // Server value rides the RSC payload, so SSR and hydration always agree.
+  // down (review 2026-07-22): the band that renders on the server is the one
+  // that stays on screen. The previous post-mount random pick swapped the hero
+  // after hydration on most visits. Server value rides the RSC payload, so SSR
+  // and hydration always agree. Each entry paints its lane cover gradient —
+  // there is no hero photograph (see home-data.ts HOME_HERO_ROTATION).
   const hero = HOME_HERO_ROTATION[heroIndex % HOME_HERO_ROTATION.length] ?? HOME_HERO_ROTATION[0];
-  const heroImage = hero.imageUrl;
   const heroCategory = hero.category;
 
   const onSearch = (e: FormEvent) => {
@@ -123,17 +122,6 @@ function HomeHero({
   return (
     <section className={styles.hero} aria-labelledby="home-hero-title">
       <div className={`${styles.heroFrame} ${styles[`cover_${heroCategory}`]}`}>
-        {heroImage ? (
-          <Image
-            className={styles.heroImage}
-            src={heroImage}
-            alt=""
-            aria-hidden="true"
-            fill
-            priority
-            sizes="100vw"
-          />
-        ) : null}
         <div className={styles.heroScrim} aria-hidden="true" />
 
         <div className={styles.heroInner}>
@@ -532,14 +520,6 @@ function CategoryGrid() {
             style={{ "--reveal-index": i % 4 } as CSSProperties}
           >
             <span className={styles.categoryImageWrap}>
-              <Image
-                className={styles.categoryImage}
-                src={c.imageUrl}
-                alt=""
-                aria-hidden="true"
-                fill
-                sizes="(min-width: 1024px) 24vw, 45vw"
-              />
               <span className={styles.categoryScrim} aria-hidden="true" />
             </span>
             <span className={styles.categoryBody}>
@@ -578,19 +558,13 @@ function DestinationGrid({ destinations }: { destinations: readonly HomeDestinat
         {destinations.map((d, i) => (
           <Link
             key={d.slug}
-            className={`${styles.destinationCard} ${styles[`cover_${d.imageCategory}`]} ${styles.reveal}`}
+            className={`${styles.destinationCard} ${styles.reveal}`}
             href={d.href}
             style={{ "--reveal-index": i % 3 } as CSSProperties}
           >
-            <span className={styles.destinationImageWrap}>
-              <Image
-                className={styles.destinationImage}
-                src={d.imageUrl}
-                alt=""
-                aria-hidden="true"
-                fill
-                sizes="(min-width: 1024px) 32vw, 90vw"
-              />
+            <span
+              className={`${styles.destinationImageWrap} ${styles[`cover_${d.imageCategory}`]}`}
+            >
               <span className={styles.destinationScrim} aria-hidden="true" />
               <span className={styles.destinationSeason}>
                 <Icon name="status.seasonal" size={16} aria-hidden />

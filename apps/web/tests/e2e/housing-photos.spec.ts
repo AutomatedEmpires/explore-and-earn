@@ -6,52 +6,46 @@ function housingEvidence(page: Page) {
   return page.locator('section[aria-labelledby="housing-evidence-title"]');
 }
 
+/**
+ * COVERAGE NOTE (2026-07-27, image-CDN removal).
+ *
+ * Two tests used to live here: "shows the four generic roles in contract order"
+ * and "adapts the same four roles for maritime listings". They drove the
+ * rendered evidence section off DEV FIXTURE photos, and those fixtures were
+ * curated stock images served by an image CDN this product no longer uses. With
+ * the provider gone we hold no replacement bytes, and pointing the fixtures at
+ * storage objects that do not exist would have kept these tests green off
+ * fabricated URLs — a test passing on a photo nobody can load is worse than no
+ * test. So the fixtures were emptied and those two tests were removed.
+ *
+ * What they actually protected — the fixed role order and the per-category
+ * label vocabulary (Sleeping area/Bathroom/Kitchen/Dining-common vs
+ * Cabin/berth/Head/Galley/Mess) — is pinned at the contract level and runs on
+ * every `pnpm test`: packages/db/tests/housingPhotoLibrary.test.ts, over
+ * HOUSING_PHOTO_ROLES + housingPhotoLabel(). The resolver's
+ * profile-defaults-then-listing-overrides precedence is pinned there too.
+ *
+ * What is NOT covered right now is the DOM rendering of the evidence section
+ * with real photos present. Restore it by seeding the `site-photos` bucket
+ * (scripts/seed-site-photos.mjs) or by pointing the fixtures at real uploaded
+ * objects — then re-add the two role-order tests above them.
+ */
 test.describe("public housing evidence", () => {
-  test("shows the four generic roles in contract order", async ({ page }) => {
-    await page.goto("/listing/lst_orchard_wenatchee");
-    const evidence = housingEvidence(page);
-
-    await expect(evidence.locator("figcaption")).toHaveText([
-      "Sleeping area",
-      "Bathroom",
-      "Kitchen",
-      "Dining/common area",
-    ]);
-    await expect(evidence.getByRole("img")).toHaveCount(4);
-    for (const name of [
-      "Sleeping area provided by the host",
-      "Bathroom provided by the host",
-      "Kitchen provided by the host",
-      "Dining/common area provided by the host",
-    ]) {
-      await expect(evidence.getByRole("img", { name, exact: true })).toHaveCount(1);
-    }
-  });
-
-  test("adapts the same four roles for maritime listings", async ({ page }) => {
-    await page.goto("/listing/lst_deckhand_sitka");
-    const evidence = housingEvidence(page);
-
-    await expect(evidence.locator("figcaption")).toHaveText([
-      "Cabin/berth",
-      "Head",
-      "Galley",
-      "Mess",
-    ]);
-    await expect(evidence.getByRole("img")).toHaveCount(4);
-    for (const name of [
-      "Cabin/berth provided by the host",
-      "Head provided by the host",
-      "Galley provided by the host",
-      "Mess provided by the host",
-    ]) {
-      await expect(evidence.getByRole("img", { name, exact: true })).toHaveCount(1);
-    }
-  });
-
-  test("suppresses photo evidence when housing is absent or the listing is sourced", async ({
+  test("renders no evidence section when a listing has no housing photos", async ({
     page,
   }) => {
+    // NOTE: with fixture media removed this now holds for EVERY fixture, so it
+    // no longer distinguishes "housing absent / listing sourced" from "no
+    // photos uploaded". It still guards the thing that would actually hurt a
+    // user — a broken or empty evidence frame rendering where there is nothing
+    // to show — but do not read it as proof of the suppression rule. That rule
+    // is the resolver's, and it is unit-tested.
+    await page.goto("/listing/lst_orchard_wenatchee");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Orchard Harvest Hand", exact: true }),
+    ).toBeVisible();
+    await expect(housingEvidence(page)).toHaveCount(0);
+
     await page.goto("/listing/lst_remote_community");
     await expect(
       page.getByRole("heading", {

@@ -3,9 +3,7 @@ import type {
 	OpportunityCategory,
 } from "@explore-and-earn/contracts";
 import type { PublicListingDetail } from "@explore-and-earn/db";
-import { cloudinaryPhoto } from "@explore-and-earn/ui";
 
-import { bucketPhotoUrl } from "../../lib/photoBuckets";
 import type { DiscoveryListing } from "./listing";
 import { DISCOVERY_FIXTURES } from "./fixtures";
 
@@ -31,94 +29,27 @@ function toIso(display: string | undefined): string | null {
 }
 
 /**
- * DEV/PREVIEW-ONLY sample gallery. Every URL is built from a curated
- * (category, photographer-slug) pair that is ALREADY used elsewhere in the repo
- * (apps/web/lib/curatedPhotos.ts + components/discovery/fixtures.ts) so no new
- * external image host is introduced. `cloudinaryPhoto` has no "mix" bucket, so
- * mix listings borrow the neutral seasonal/landscape set.
+ * DEV/PREVIEW-ONLY listing media.
+ *
+ * There is none, and that is deliberate. The sample gallery and the housing /
+ * meals evidence photos were built from a curated stock library delivered by an
+ * image CDN this product no longer uses. We hold no replacement imagery, and a
+ * fixture URL pointing at an object that does not exist is a fabricated URL —
+ * so the dev bench now renders exactly what a listing with no uploaded media
+ * looks like: the category watermark on the card, and the honest "no photos
+ * yet" state on the detail page. That is the same state a real host sees before
+ * they upload, so the preview journey is MORE representative, not less.
+ *
+ * Host-uploaded listing media is unaffected — it lives in Supabase Storage and
+ * flows through `coverPhotoUrl` / `housingPhotos` from the DB as it always has.
+ * Seeded sample media returns here when the `site-photos` bucket is populated
+ * (scripts/seed-site-photos.mjs; docs/design/site-photos.md).
  */
-const GALLERY_BY_CATEGORY: Record<OpportunityCategory, readonly string[]> = {
-	farm: [
-		cloudinaryPhoto("farm", "annie-spratt-jmjnnq2xfoy", "hero"),
-		cloudinaryPhoto("farm", "sokmean-nou-mjeqdrpwefc", "hero"),
-		cloudinaryPhoto("farm", "tim-hufner-6-ktk6b8mq8", "hero"),
-	],
-	maritime: [
-		cloudinaryPhoto("maritime", "rasmus-andersen-nmzzl8lzkuu", "hero"),
-		cloudinaryPhoto("maritime", "venti-views-asmavys4azm", "hero"),
-	],
-	remote: [
-		cloudinaryPhoto("remote", "kevin-schmid-mta8r0bxhbo", "hero"),
-		cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"),
-	],
-	seasonal: [
-		cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"),
-		cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"),
-	],
-	mix: [
-		cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"),
-		cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"),
-	],
-};
+const GALLERY_PHOTO_URLS: readonly string[] = [];
 
-const FARM_HOUSING_PHOTOS: readonly EffectiveHousingPhoto[] = [
-	{
-		role: "sleeping_area",
-		url: bucketPhotoUrl("ee/buckets/housing/bedrooms/marcus-loke-WQJvWU_HZFo"),
-		source: "listing",
-	},
-	{
-		role: "bathroom",
-		url: bucketPhotoUrl("ee/buckets/housing/bathrooms/carlos-masias-yg8zkwBS30Q"),
-		source: "listing",
-	},
-	{
-		role: "kitchen",
-		url: bucketPhotoUrl("ee/buckets/meals/kitchens/luk-parni-an-HZgSvndfakc"),
-		source: "listing",
-	},
-	{
-		role: "dining_common",
-		url: bucketPhotoUrl("ee/buckets/meals/dining/bruno-ngarukiye-OqFZPMeufYQ"),
-		source: "listing",
-	},
-];
-
-const MARITIME_HOUSING_PHOTOS: readonly EffectiveHousingPhoto[] = [
-	{
-		role: "sleeping_area",
-		url: bucketPhotoUrl("ee/buckets/housing/bedrooms/zoshua-colah-TzMGehZmocI"),
-		source: "listing",
-	},
-	{
-		role: "bathroom",
-		url: bucketPhotoUrl("ee/buckets/housing/bathrooms/steven-ungermann-Aac7IlKnYX8"),
-		source: "listing",
-	},
-	{
-		role: "kitchen",
-		url: bucketPhotoUrl("ee/buckets/meals/kitchens/zhang-ziyu-2VX0f47Z5NA"),
-		source: "listing",
-	},
-	{
-		role: "dining_common",
-		url: bucketPhotoUrl("ee/buckets/meals/dining/bruno-ngarukiye-OqFZPMeufYQ"),
-		source: "listing",
-	},
-];
-
-/**
- * Detail-only evidence fixtures. The negative cases intentionally carry
- * "poison" photos so E2E proves the public visibility gates suppress them.
- */
 const HOUSING_PHOTOS_BY_LISTING: Readonly<
 	Partial<Record<string, readonly EffectiveHousingPhoto[]>>
-> = {
-	lst_orchard_wenatchee: FARM_HOUSING_PHOTOS,
-	lst_deckhand_sitka: MARITIME_HOUSING_PHOTOS,
-	lst_remote_community: FARM_HOUSING_PHOTOS,
-	lst_sourced_kelp_farm: MARITIME_HOUSING_PHOTOS,
-};
+> = {};
 
 /** Immersive-detail sample content for the dev fixtures, by category. */
 interface DetailEnrichment {
@@ -333,7 +264,6 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 	const housingIncluded = provided(f.benefits.housing.provision);
 	const mealsIncluded = provided(f.benefits.meals.provision);
 	const enrich = DETAIL_ENRICHMENT_BY_CATEGORY[f.category];
-	const gallery = GALLERY_BY_CATEGORY[f.category];
 	// A sourced fixture has NO host block (structural) — mirror the real
 	// getListingDetailPublic behavior so the preview journey matches production.
 	const isSourced = f.provenanceInfo?.provenance === "sourced";
@@ -367,7 +297,7 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 		endsAt: toIso(f.ends),
 		publishedAt: toIso(f.begins),
 		coverPhotoUrl: f.coverImageUrl ?? null,
-		galleryPhotoUrls: gallery ? [...gallery] : [],
+		galleryPhotoUrls: [...GALLERY_PHOTO_URLS],
 		hostProfileId: null,
 		host: isSourced
 			? null

@@ -235,22 +235,6 @@
 	object-fit: cover;
 }
 
-.thumbEmpty {
-	position: absolute;
-	inset: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--text-muted);
-	background: repeating-linear-gradient(
-		45deg,
-		color-mix(in srgb, var(--palette-ink) 6%, transparent),
-		color-mix(in srgb, var(--palette-ink) 6%, transparent) 6px,
-		transparent 6px,
-		transparent 12px
-	);
-}
-
 .entryMeta {
 	display: flex;
 	flex-direction: column;

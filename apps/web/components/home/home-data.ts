@@ -12,7 +12,6 @@
  * discovery + seeker data seams.
  */
 
-import { cloudinaryPhoto, type PhotoCategory } from "@explore-and-earn/ui";
 import {
   FOUNDER_LOCKED_PRICING,
   PLAN_ENTITLEMENTS,
@@ -24,53 +23,45 @@ import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 
 const IS_PREVIEW = process.env.NODE_ENV !== "production";
 
-/** cloudinaryPhoto only serves the four lane folders; map generic lanes onto them. */
-function lanePhoto(category: PhotoCategory, slug: string, size: "card" | "hero" = "card") {
-  return cloudinaryPhoto(category, slug, size);
-}
-
 // ─── Hero ───────────────────────────────────────────────────────────────────
 
-export interface HomeHeroImage {
-  readonly imageUrl: string;
-  /** Drives the cover-gradient fallback class if the hero photo is missing. */
+export interface HomeHeroScene {
+  /** Selects the lane cover gradient the hero band paints (--cat-{lane}-cover). */
   readonly category: OpportunityCategory;
 }
 
 /**
  * HOME_HERO_ROTATION — the controllable hero "bucket". The homepage picks ONE of
- * these per landing (client-side, after mount) so the first impression feels
- * alive without a hydration mismatch. This is the single place the founder edits
- * to control which images can appear: add, remove, or reorder entries here.
+ * these per landing (server-picked index, see HomeHero) so the first impression
+ * varies without a hydration mismatch. This is the single place the founder edits
+ * to control what can appear: add, remove, or reorder entries here.
  *
- * All entries are cool/scenic, mixed lanes (coastal · mountain · farm-at-dusk) so
- * the hero sits with the Glacier palette — a warm cover fights the ice-and-chrome
- * UI. Slugs are the same curated lane photos referenced by DESTINATION_SEEDS; if a
- * hero-size variant is missing, the category cover gradient shows underneath.
+ * The hero was a curated marketing PHOTOGRAPH. That library was delivered by an
+ * image CDN we no longer use, and we do not hold replacement photography — so
+ * rather than ship a broken <Image> or a stand-in that misrepresents a place, the
+ * hero is now the design system's own lane gradient. Each entry names a different
+ * lane so the rotation still reads as five distinct first impressions. Curated
+ * photography returns as a `coverUrl` field here the day the `site-photos` bucket
+ * is seeded (scripts/seed-site-photos.mjs).
  */
-export const HOME_HERO_ROTATION: readonly HomeHeroImage[] = [
-  // Alaska — coastal maritime
-  { imageUrl: cloudinaryPhoto("maritime", "venti-views-asmavys4azm", "hero"), category: "maritime" },
-  // Colorado — alpine, winter & summer
-  { imageUrl: cloudinaryPhoto("seasonal", "yuhan-du-zi9z-e8cxge", "hero"), category: "seasonal" },
-  // Wyoming — parks & high country
-  { imageUrl: cloudinaryPhoto("seasonal", "vincent-guth-62v7ntlkgl8", "hero"), category: "seasonal" },
-  // Maine — summer coast
-  { imageUrl: cloudinaryPhoto("maritime", "werner-hilversum-vfljehs-y5w", "hero"), category: "maritime" },
-  // Montana — ranch land at dusk
-  { imageUrl: cloudinaryPhoto("farm", "annie-spratt-jmjnnq2xfoy", "hero"), category: "farm" },
+export const HOME_HERO_ROTATION: readonly HomeHeroScene[] = [
+  { category: "maritime" },
+  { category: "seasonal" },
+  { category: "farm" },
+  { category: "remote" },
+  { category: "mix" },
 ];
 
 /** Stable SSR default — the first entry of the rotation renders on the server and
  * on the first client paint, then the client advances to a rotated pick on mount. */
-export const HOME_HERO: HomeHeroImage = HOME_HERO_ROTATION[0];
+export const HOME_HERO: HomeHeroScene = HOME_HERO_ROTATION[0];
 
 // ─── Destinations ("Where will you go next?") ──────────────────────────────
 
 export interface HomeDestination {
   readonly slug: string;
   readonly name: string;
-  readonly imageUrl: string;
+  /** Selects the lane cover gradient the card's image band paints. */
   readonly imageCategory: OpportunityCategory;
   readonly season: string;
   readonly categories: readonly string[];
@@ -84,7 +75,6 @@ interface DestinationSeed {
   readonly slug: string;
   readonly name: string;
   readonly imageCategory: OpportunityCategory;
-  readonly imageSlug: string;
   readonly season: string;
   readonly categories: readonly string[];
   /** Strong seasonal-market demo figures — preview only, never shipped to prod. */
@@ -93,12 +83,12 @@ interface DestinationSeed {
 }
 
 const DESTINATION_SEEDS: readonly DestinationSeed[] = [
-  { slug: "alaska", name: "Alaska", imageCategory: "maritime", imageSlug: "venti-views-asmavys4azm", season: "Summer salmon season", categories: ["Lodges", "Fishing", "Parks", "Remote"], demoJobs: 148, demoHosts: 32 },
-  { slug: "colorado", name: "Colorado", imageCategory: "seasonal", imageSlug: "yuhan-du-zi9z-e8cxge", season: "Winter & summer", categories: ["Resorts", "Ranches", "Guiding"], demoJobs: 96, demoHosts: 24 },
-  { slug: "montana", name: "Montana", imageCategory: "farm", imageSlug: "annie-spratt-jmjnnq2xfoy", season: "Spring–Fall", categories: ["Ranch", "Lodges", "Trail crews"], demoJobs: 74, demoHosts: 19 },
-  { slug: "wyoming", name: "Wyoming", imageCategory: "seasonal", imageSlug: "vincent-guth-62v7ntlkgl8", season: "Park season", categories: ["Parks", "Ranch", "Hospitality"], demoJobs: 61, demoHosts: 15 },
-  { slug: "maine", name: "Maine", imageCategory: "maritime", imageSlug: "werner-hilversum-vfljehs-y5w", season: "Summer coast", categories: ["Camps", "Coastal", "Hospitality"], demoJobs: 53, demoHosts: 14 },
-  { slug: "california", name: "California", imageCategory: "farm", imageSlug: "meric-tuna-ce1ovmrzumq", season: "Harvest season", categories: ["Vineyards", "Farms", "Parks"], demoJobs: 88, demoHosts: 21 },
+  { slug: "alaska", name: "Alaska", imageCategory: "maritime", season: "Summer salmon season", categories: ["Lodges", "Fishing", "Parks", "Remote"], demoJobs: 148, demoHosts: 32 },
+  { slug: "colorado", name: "Colorado", imageCategory: "seasonal", season: "Winter & summer", categories: ["Resorts", "Ranches", "Guiding"], demoJobs: 96, demoHosts: 24 },
+  { slug: "montana", name: "Montana", imageCategory: "farm", season: "Spring–Fall", categories: ["Ranch", "Lodges", "Trail crews"], demoJobs: 74, demoHosts: 19 },
+  { slug: "wyoming", name: "Wyoming", imageCategory: "seasonal", season: "Park season", categories: ["Parks", "Ranch", "Hospitality"], demoJobs: 61, demoHosts: 15 },
+  { slug: "maine", name: "Maine", imageCategory: "maritime", season: "Summer coast", categories: ["Camps", "Coastal", "Hospitality"], demoJobs: 53, demoHosts: 14 },
+  { slug: "california", name: "California", imageCategory: "farm", season: "Harvest season", categories: ["Vineyards", "Farms", "Parks"], demoJobs: 88, demoHosts: 21 },
 ];
 
 /** US-state token → slug, for parsing freeform `location_display` ("Sitka, Alaska"). */
@@ -155,7 +145,6 @@ export function buildDestinations(
     return {
       slug: seed.slug,
       name: seed.name,
-      imageUrl: lanePhoto(seed.imageCategory as PhotoCategory, seed.imageSlug, "card"),
       imageCategory: seed.imageCategory,
       season: seed.season,
       categories: seed.categories,
@@ -173,8 +162,8 @@ export function buildDestinations(
 export interface HomeCategory {
   readonly key: string;
   readonly label: string;
+  /** Selects the lane cover gradient the tile paints. */
   readonly imageCategory: OpportunityCategory;
-  readonly imageUrl: string;
   readonly href: string;
   readonly blurb: string;
 }
@@ -191,10 +180,10 @@ export interface HomeCategory {
 // crawlable category surface. Each landing page carries a "Filter & sort in
 // Seek" CTA, so the /seek?category= path is one click deeper, not gone.
 export const HOME_CATEGORIES: readonly HomeCategory[] = [
-  { key: "farm", label: "Farm", imageCategory: "farm", imageUrl: lanePhoto("farm", "young-sung-jang-7-6pulwb1d0"), href: "/jobs/farm", blurb: "Orchards, ranches, harvests & greenhouses" },
-  { key: "maritime", label: "Maritime", imageCategory: "maritime", imageUrl: lanePhoto("maritime", "vidar-nordli-mathisen-pjiv1ekevzk"), href: "/jobs/maritime", blurb: "Boats, docks, fisheries & processing" },
-  { key: "remote", label: "Remote", imageCategory: "remote", imageUrl: lanePhoto("remote", "justin-kauffman-fpohihximhg"), href: "/jobs/remote", blurb: "Cabins, backcountry ops, guiding & off-grid" },
-  { key: "seasonal", label: "Seasonal", imageCategory: "seasonal", imageUrl: lanePhoto("seasonal", "vojtech-bruzek-yrxr3bspds0"), href: "/jobs/seasonal", blurb: "Lodges, resorts, parks & hospitality" },
+  { key: "farm", label: "Farm", imageCategory: "farm", href: "/jobs/farm", blurb: "Orchards, ranches, harvests & greenhouses" },
+  { key: "maritime", label: "Maritime", imageCategory: "maritime", href: "/jobs/maritime", blurb: "Boats, docks, fisheries & processing" },
+  { key: "remote", label: "Remote", imageCategory: "remote", href: "/jobs/remote", blurb: "Cabins, backcountry ops, guiding & off-grid" },
+  { key: "seasonal", label: "Seasonal", imageCategory: "seasonal", href: "/jobs/seasonal", blurb: "Lodges, resorts, parks & hospitality" },
 ];
 
 // ─── Rolling announcements (monetized rail) ────────────────────────────────

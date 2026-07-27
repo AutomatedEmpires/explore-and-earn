@@ -48,7 +48,7 @@ try {
     });
     // Full-page shots don't fire IntersectionObserver, so lazy covers render
     // as blank frames unless we scroll them into load first — then wait for
-    // every image to decode (first-hit Cloudinary transforms can take ~2s).
+    // every image to decode (a first-hit storage image transform can take ~2s).
     await page.evaluate(async () => {
       const step = window.innerHeight;
       for (let y = 0; y <= document.body.scrollHeight; y += step) {

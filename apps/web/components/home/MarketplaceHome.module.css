@@ -140,12 +140,8 @@
 	align-items: flex-end;
 }
 
-.heroImage {
-	object-fit: cover;
-	z-index: -2;
-}
-
-/* Legibility only — frame-not-filter: a bottom-weighted ink scrim, no wash. */
+/* Legibility only — frame-not-filter: a bottom-weighted ink scrim, no wash.
+   The frame paints the lane cover gradient; there is no hero photograph. */
 .heroScrim {
 	position: absolute;
 	inset: 0;
@@ -762,8 +758,9 @@
 	transition: transform var(--motion-base) var(--ease-standard);
 }
 
+/* The card itself paints the lane cover gradient (.cover_*); this wrap just
+   carries the scrim that keeps the label legible over it. */
 .categoryImageWrap { position: absolute; inset: 0; z-index: 0; }
-.categoryImage { object-fit: cover; }
 .categoryScrim {
 	position: absolute; inset: 0;
 	background: linear-gradient(180deg, rgba(26, 30, 34, 0.05) 0%, rgba(26, 30, 34, 0.28) 46%, rgba(26, 30, 34, 0.78) 100%);
@@ -822,7 +819,6 @@
 	overflow: hidden;
 }
 
-.destinationImage { object-fit: cover; }
 .destinationScrim {
 	position: absolute; inset: 0;
 	background: linear-gradient(180deg, rgba(26, 30, 34, 0.02) 0%, rgba(26, 30, 34, 0.12) 60%, rgba(26, 30, 34, 0.42) 100%);

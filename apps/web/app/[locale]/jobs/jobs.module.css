@@ -76,10 +76,8 @@
 .laneCard[data-category="remote"] { background: var(--cat-remote-cover); }
 .laneCard[data-category="seasonal"] { background: var(--cat-seasonal-cover); }
 
-.laneImage {
-	object-fit: cover;
-}
-
+/* No lane photograph: the card background above IS the lane treatment. The
+   scrim stays so the white label/blurb keeps its contrast over the gradient. */
 .laneScrim {
 	position: absolute;
 	inset: 0;
@@ -127,10 +125,8 @@
 .hero[data-category="remote"] { background: var(--cat-remote-cover); }
 .hero[data-category="seasonal"] { background: var(--cat-seasonal-cover); }
 
-.heroImage {
-	object-fit: cover;
-}
-
+/* Same here: the hero band's own gradient is the treatment; min-height above
+   holds the layout, and the scrim below holds the contrast. */
 .heroScrim {
 	position: absolute;
 	inset: 0;

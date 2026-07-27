@@ -72,8 +72,8 @@ export function HeroPhotoPickerModal({
     };
   }, [open, handleKeyDown]);
 
-  // One handler for any predefined cover value — a Cloudinary photo URL or a
-  // gradient token. SeekerHero renders either (isPhotoUrl decides).
+  // One handler for any predefined cover value — a photo URL or a gradient
+  // token. SeekerHero renders either (isPhotoUrl decides).
   const handleSelectCover = useCallback(
     async (value: string) => {
       const result = await saveHeroCoverAction(value);

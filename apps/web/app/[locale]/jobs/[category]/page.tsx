@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { rowToDiscoveryFields } from "@explore-and-earn/db";
-import { cloudinaryPhoto, Icon } from "@explore-and-earn/ui";
+import { Icon } from "@explore-and-earn/ui";
 
 import {
 	DISCOVERY_FIXTURES,
@@ -131,16 +130,10 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
 				dangerouslySetInnerHTML={{ __html: collectionJsonLd }}
 			/>
 			<div className={styles.page}>
+				{/* The hero band paints the lane's OWN cover gradient (keyed by
+				    data-category in jobs.module.css). There is no lane photograph -- see
+				    lib/categoryLanding.ts. */}
 				<header className={styles.hero} data-category={category}>
-					<Image
-						className={styles.heroImage}
-						src={cloudinaryPhoto(category, copy.heroSlug, "hero")}
-						alt=""
-						aria-hidden
-						fill
-						priority
-						sizes="100vw"
-					/>
 					<span className={styles.heroScrim} aria-hidden />
 					<div className={styles.heroBody}>
 						<p className={styles.heroEyebrow}>

@@ -1,15 +1,15 @@
 # Icon System — Phosphor (via the `<Icon>` registry)
 
 > Provider changed **2026-07-02** (founder-relaxed): the paid Streamline Freehand
-> set + its Cloudinary runtime-fetch delivery were replaced by **free MIT Phosphor
-> icons**. See [`../superpowers/specs/2026-07-02-phosphor-icon-swap-design.md`](../superpowers/specs/2026-07-02-phosphor-icon-swap-design.md).
+> set and the runtime CDN fetch that delivered it were replaced by **free MIT
+> Phosphor icons**. See [`../superpowers/specs/2026-07-02-phosphor-icon-swap-design.md`](../superpowers/specs/2026-07-02-phosphor-icon-swap-design.md).
 > Enforced by CI guardrail **G30** (a `no-restricted-imports` eslint rule).
 
 ## Decision
 
 Explore&Earn's sole icon provider is **Phosphor Icons** ([phosphoricons.com](https://phosphoricons.com/)), consumed via the MIT-licensed **`@phosphor-icons/react`** package (~9,000 icons, 24px grid, six weights). Default weight **`regular`**; **`fill`** for the active nav tab; **`duotone`** for the category map pins (`mappin.*`). **No other icon library may be mixed in** — no Lucide, Heroicons, Font Awesome, Material, react-icons, or ad-hoc inline SVG in feature code.
 
-Phosphor is free (MIT), so — unlike the old paid set — the icons ship as a normal `node_modules` dependency: **nothing is fetched at runtime, and no icon assets are committed to the repo.** This removed the per-icon Cloudinary `fetch()` + client-side `DOMPurify` that made card grids fire N network requests on mount.
+Phosphor is free (MIT), so — unlike the old paid set — the icons ship as a normal `node_modules` dependency: **nothing is fetched at runtime, and no icon assets are committed to the repo.** This removed the per-icon runtime `fetch()` + client-side `DOMPurify` that made card grids fire N network requests on mount.
 
 ## Registry = single source of truth AND single swap-point
 
@@ -17,7 +17,7 @@ Phosphor is free (MIT), so — unlike the old paid set — the icons ship as a n
 - Feature code renders **only** via `<Icon name="domain.name"/>` and never imports an icon library directly (G30). This indirection means: re-map one icon → change one registry entry; swap the whole provider again → rewrite `registry.ts` only (`Icon.tsx` is provider-agnostic); restyle globally → `DEFAULT_ICON_WEIGHT` in `Icon.tsx`.
 - The old concept→Streamline mapping (`streamline-freehand-map.md`) is **superseded** by the registry + the swap-design spec.
 
-> Note: the separate **illustration/element** system (`packages/ui/src/visual-assets/*`) still uses Streamline art via Cloudinary at runtime. Migrating or retiring that is a tracked follow-up (spec §9); it is out of scope for the `<Icon>` swap.
+> Note: the separate **illustration/element** system (`packages/ui/src/visual-assets/*`) is self-contained too — the follow-up to retire its runtime CDN fetch has since landed, so nothing in the visual layer fetches an asset at runtime.
 
 ## Usage rules (V1)
 

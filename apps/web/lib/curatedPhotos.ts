@@ -14,17 +14,21 @@
  *  - We NEVER fabricate a real business logo. Logo presets are generic/abstract
  *    monogram tiles (a glacier-token gradient the consumer can stamp an initial
  *    onto) — not imitation brand marks.
- *  - Cover photos come from the curated Cloudinary library via `cloudinaryPhoto`
- *    (framed, never filtered). Gradient covers reference tokens from tokens.css.
+ *  - Every preset below is a GRADIENT drawn from tokens.css. The curated photo
+ *    presets were removed with the image CDN they were delivered from: we serve
+ *    no marketing photography we do not hold, and a preset must never point at
+ *    an asset that is not there. `kind: "photo"` stays a first-class case
+ *    because a user's OWN uploaded cover (Supabase Storage) renders through it,
+ *    and photo presets return here the moment curated photography lands in the
+ *    `site-photos` bucket (see scripts/seed-site-photos.mjs +
+ *    docs/design/site-photos.md).
  */
-
-import { cloudinaryPhoto } from "@explore-and-earn/ui";
 
 export type CuratedScope = "seeker" | "host" | "admin";
 
 /**
  * A predefined cover option. `kind` tells the consumer how to render `value`:
- *  - "photo"    → an <Image src={value}> (Cloudinary delivery URL, framed).
+ *  - "photo"    → an <Image src={value}> (a real image URL, framed).
  *  - "gradient" → a background of `value` (a `var(--gradient-*)` token).
  */
 export interface CuratedCover {
@@ -48,18 +52,6 @@ export interface CuratedLogo {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const photo = (
-  key: string,
-  label: string,
-  category: Parameters<typeof cloudinaryPhoto>[0],
-  slug: string,
-): CuratedCover => ({
-  key,
-  label,
-  kind: "photo",
-  value: cloudinaryPhoto(category, slug, "hero"),
-});
-
 const gradientCover = (key: string, label: string, token: string): CuratedCover => ({
   key,
   label,
@@ -71,22 +63,21 @@ const gradientCover = (key: string, label: string, token: string): CuratedCover 
 
 /** Seeker covers: aspirational, on-the-move, "where I want to be." */
 const SEEKER_COVERS: readonly CuratedCover[] = [
-  photo("seeker-fields", "Golden fields", "seasonal", "yuhan-du-zi9z-e8cxge"),
-  photo("seeker-coast", "Open coast", "seasonal", "vincent-guth-62v7ntlkgl8"),
-  photo("seeker-trail", "Remote trail", "remote", "kevin-schmid-mta8r0bxhbo"),
   gradientCover("seeker-adventure", "Adventure", "var(--gradient-cover-adventure)"),
   gradientCover("seeker-coastal", "Coastal", "var(--gradient-cover-coastal)"),
   gradientCover("seeker-sunset", "Sunset", "var(--gradient-cover-sunset)"),
+  gradientCover("seeker-golden", "Golden hour", "var(--gradient-gold)"),
+  gradientCover("seeker-backcountry", "Backcountry", "var(--gradient-category-remote)"),
 ];
 
 /** Host covers: the working landscape — farm, water, the place seekers arrive. */
 const HOST_COVERS: readonly CuratedCover[] = [
-  photo("host-farm", "Working farm", "farm", "annie-spratt-jmjnnq2xfoy"),
-  photo("host-orchard", "Orchard rows", "farm", "sokmean-nou-mjeqdrpwefc"),
-  photo("host-harbor", "Harbor", "maritime", "rasmus-andersen-nmzzl8lzkuu"),
-  photo("host-vessel", "On the water", "maritime", "venti-views-asmavys4azm"),
   gradientCover("host-wilderness", "Wilderness", "var(--gradient-cover-wilderness)"),
   gradientCover("host-mountain", "Mountain", "var(--gradient-cover-mountain)"),
+  gradientCover("host-farm", "Farmland", "var(--gradient-category-farm)"),
+  gradientCover("host-harbor", "Harbor", "var(--gradient-category-maritime)"),
+  gradientCover("host-season", "Season", "var(--gradient-category-seasonal)"),
+  gradientCover("host-mixed", "Mixed lanes", "var(--gradient-category-mix)"),
 ];
 
 /** Admin covers: calm, systemic, brand-neutral chrome — no photography. */

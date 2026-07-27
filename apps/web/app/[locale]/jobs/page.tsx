@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 
-import { cloudinaryPhoto, Icon } from "@explore-and-earn/ui";
+import { Icon } from "@explore-and-earn/ui";
 
 import {
 	CATEGORY_LANDING,
@@ -31,7 +30,8 @@ const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://exploreandearn.com"
  * /jobs — the category hub. Four tiles, one per founder-locked lane, each
  * linking its landing page. Copy comes from the categoryLanding contract
  * (founder-approved labels + blurbs); no counts here — the landing pages show
- * real live counts.
+ * real live counts. Each tile paints its lane's own cover gradient (keyed by
+ * data-category in jobs.module.css); there is no lane photograph.
  */
 export default function JobsHubPage() {
 	const breadcrumbJsonLd = generateBreadcrumbJsonLd([
@@ -63,14 +63,6 @@ export default function JobsHubPage() {
 									data-category={category}
 									href={categoryLandingPath(category)}
 								>
-									<Image
-										className={styles.laneImage}
-										src={cloudinaryPhoto(category, copy.heroSlug, "card")}
-										alt=""
-										aria-hidden
-										fill
-										sizes="(max-width: 768px) 100vw, 50vw"
-									/>
 									<span className={styles.laneScrim} aria-hidden />
 									<span className={styles.laneBody}>
 										<span className={styles.laneLabel}>
