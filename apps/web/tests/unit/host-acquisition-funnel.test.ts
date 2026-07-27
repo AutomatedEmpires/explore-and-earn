@@ -15,7 +15,14 @@
  * place to choose a plan -> onboarding. Production holds zero hosts and payments
  * switch on, so this was new-host revenue at zero on day one.
  *
- * The three properties below are what make the funnel open, and each is asserted
+ * COMMERCIAL REDESIGN D6 REMOVED THE FIRST OF THE THREE. Migration 086 lets a
+ * signed-in prospect create a workspace with no plan, so the loop cannot form
+ * from that end any more. Properties 2 and 3 are still load-bearing and still
+ * asserted: paying must work for a host with no profile, because under D6 a host
+ * may arrive at checkout from either direction — with a profile they built
+ * first, or without one.
+ *
+ * The properties below are what make the funnel open, and each is asserted
  * against the thing that would close it again.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -416,15 +423,85 @@ describe("the plan selection route", () => {
   });
 });
 
-// ── 3. Onboarding sends an unpaid host somewhere they can act ──────────────
+// ── 3. Onboarding has no dead end left to route around ─────────────────────
 
-describe("host onboarding's dead end", () => {
-  it("routes a subscription_required refusal to the plans page", () => {
-    const source = readFileSync(
-      new URL("../../app/[locale]/(host-onboard)/host/onboarding/page.tsx", import.meta.url),
-      "utf8",
+describe("host onboarding after the pre-billing host mode (D6)", () => {
+  const onboardingUrl = new URL(
+    "../../app/[locale]/(host-onboard)/host/onboarding/page.tsx",
+    import.meta.url,
+  );
+
+  /**
+   * THE REPLACED ASSERTION. This used to pin that a 'subscription_required'
+   * refusal was routed to /host/plans — the best available answer while
+   * migration 083 refused creation without a paid tier, because the host
+   * genuinely could not proceed on that form.
+   *
+   * Migration 086 removed the refusal, so the fork is gone rather than
+   * redirected. What is pinned now is the absence: a re-introduced bounce to
+   * checkout at profile creation is exactly the regression D6 exists to prevent,
+   * and it would otherwise land silently.
+   */
+  it("does not bounce a profile-creating host to checkout", () => {
+    const source = readFileSync(onboardingUrl, "utf8");
+    expect(source).not.toContain('result.error === "subscription_required"');
+    expect(source).not.toContain('router.push("/host/plans")');
+  });
+
+  it("lands a newly created profile in the workspace", () => {
+    const source = readFileSync(onboardingUrl, "utf8");
+    expect(source).toContain('router.push("/host")');
+  });
+});
+
+// ── 4. The build-first door (D6 / D7) ──────────────────────────────────────
+
+describe("the browse-first path", () => {
+  const appDir = new URL("../../app/[locale]/", import.meta.url);
+  const plansSource = () =>
+    readFileSync(new URL("(host-onboard)/host/plans/page.tsx", appDir), "utf8");
+
+  /**
+   * The conversion principle in one assertion: a host who wants to look before
+   * paying must be able to, FROM the page that asks them to pay. Without this
+   * the plans page is still a tollgate, whatever the database now permits.
+   */
+  it("offers a way past the plans page without paying", () => {
+    const source = plansSource();
+    expect(source).toContain("I just want to browse first");
+  });
+
+  /**
+   * ONE href, not a fork, and the target is deliberate. /host is the (host)
+   * layout, which redirects a profile-less user to /host/onboarding and renders
+   * the workspace for everyone else — so this single link already means
+   * "onboarding if you have none, your workspace if you do", without the plans
+   * page reading a host profile (which the topology test above forbids).
+   */
+  it("points at /host so the (host) layout picks onboarding or the workspace", () => {
+    const source = plansSource();
+    expect(source).toContain('href="/host"');
+
+    // Still true, and the reason the single href works at all.
+    const layout = readFileSync(new URL("(host)/layout.tsx", appDir), "utf8");
+    expect(layout).toContain('redirect("/host/onboarding")');
+  });
+
+  it("says the profile can be built before a plan is chosen", () => {
+    const source = plansSource();
+    expect(source).toContain(
+      "You can build and preview your employer profile before choosing a",
     );
-    expect(source).toContain('result.error === "subscription_required"');
-    expect(source).toContain('router.push("/host/plans")');
+  });
+
+  /**
+   * The stale promise. "you'll set up your host profile straight after checkout"
+   * described an order migration 086 removed; leaving it would tell a host that
+   * paying is a prerequisite for the thing they can already do.
+   */
+  it("no longer claims the profile comes after checkout", () => {
+    const source = plansSource();
+    expect(source).not.toContain("straight after checkout");
+    expect(source).not.toContain("Pick one to continue");
   });
 });

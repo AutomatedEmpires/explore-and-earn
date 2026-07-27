@@ -133,3 +133,48 @@ export function hostListingTransitions(
   if (status === "closed" && provenance === "sourced") return [];
   return TRANSITIONS[status] ?? [];
 }
+
+/**
+ * Statuses that occupy a plan listing slot.
+ *
+ * The same three private.enforce_listing_allowance counts (migration 083), in
+ * the same order, for the same reason: the slot is committed the moment a draft
+ * enters review, not when it goes public.
+ */
+const COUNTED_STATUSES: readonly ListingStatus[] = [
+  "live",
+  "paused",
+  "under_review",
+];
+
+/**
+ * Whether moving from `current` to `target` needs an active plan.
+ *
+ * MIRRORS THE TRIGGER, and mirrors its exemptions exactly — this is the same
+ * relationship {@link hostListingTransitions} has to canTransitionListing. It
+ * decides which sentence to draw. It authorizes nothing, and the server action
+ * behind the button does not consult it.
+ *
+ * WHY THIS IS NOT JUST "target === 'live'". The allowance counts under_review
+ * too, so a prospect is refused at "Mark ready to publish", one step BEFORE the
+ * publish button they were told about. Gating only the publish edge would let a
+ * host click into a raw `listing_allowance_exceeded` from the database — which
+ * is precisely the leak this exists to close.
+ *
+ * The two exemptions are the trigger's own, and both matter:
+ *   * a move between two already-counted statuses consumes no new slot, so
+ *     nothing is gated unless it ENTERS 'live' (the trigger refuses that edge
+ *     specifically, so that an over-allowance host cannot pause and resume
+ *     forever);
+ *   * every route OUT of a counted status is free. A host who cannot publish
+ *     must still be able to pause and archive their own work — a refusal must
+ *     never trap someone reducing their own footprint.
+ */
+export function transitionRequiresActivePlan(
+  current: ListingStatus,
+  target: HostManageableListingStatus,
+): boolean {
+  if (!COUNTED_STATUSES.includes(target)) return false;
+  if (COUNTED_STATUSES.includes(current)) return target === "live";
+  return true;
+}

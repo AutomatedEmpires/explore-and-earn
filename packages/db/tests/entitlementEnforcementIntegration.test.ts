@@ -1,6 +1,7 @@
 /**
- * Connected proof for migration 083. Opt-in, because it creates and removes rows
- * in a real local Supabase database; a non-loopback URL hard-disables it.
+ * Connected proof for migrations 083 and 086. Opt-in, because it creates and
+ * removes rows in a real local Supabase database; a non-loopback URL hard-
+ * disables it.
  *
  * Run against `supabase start` after a local reset:
  *   SUPABASE_RLS_INTEGRATION=1 NEXT_PUBLIC_SUPABASE_URL=... \
@@ -17,6 +18,13 @@
  * host_subscriptions — and asserts the REFUSAL. Every refusal is paired with a
  * positive control that must still succeed, because a gate that refuses
  * everything is indistinguishable from a broken table.
+ *
+ * COMMERCIAL REDESIGN D6 MOVED ONE OF THOSE REFUSALS AND KEPT THE REST.
+ * Migration 086 removed the paid-tier refusal from create_my_host_profile, so
+ * creation now SUCCEEDS unpaid and the publication refusal is what carries the
+ * paid line. Both are asserted below on the same host, in that order — the
+ * "build first, pay to publish" block is the one that fails if the founder's
+ * rule is ever weakened by accident.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SignJWT } from "jose";
@@ -134,30 +142,136 @@ afterAll(async () => {
   await db.from("host_subscriptions").delete().like("clerk_user_id", `user_ent_${RUN}_%`);
 });
 
-// ── No free tier ───────────────────────────────────────────────────────────
+// ── Build first, pay to publish (migrations 083 + 086) ─────────────────────
+//
+// THE CONTRACT, AND WHY IT IS PROVED HERE RATHER THAN ANYWHERE ELSE. These
+// requests go through raw PostgREST holding the anon key and a real Clerk-shaped
+// JWT — the shape a host actually has, since the anon key ships in the client
+// bundle. No application code runs. What refuses here is the database or nothing
+// refuses at all.
+//
+// Creation is ALLOWED with no plan (086). Publication is REFUSED with no plan
+// (083's trigger, untouched). Both halves are asserted, in that order, on ONE
+// host — because "creation works" and "publication is refused" are only
+// reassuring together. Either alone describes a different product.
 
-describe.skipIf(!enabled)("no free tier (migration 083)", () => {
-  it("REFUSES host profile creation for a user with no subscription", async () => {
-    const sub = clerkId("unpaid");
+describe.skipIf(!enabled)("pre-billing host mode (migrations 083 + 086)", () => {
+  it("ALLOWS host profile creation for a user with no subscription", async () => {
+    const sub = clerkId("prospect");
     const host = await asHost(sub);
 
     const created = await host.rpc("create_my_host_profile", {
-      p_company_name: "Unpaid Farm",
+      p_company_name: "Prospect Farm",
       p_category_scopes: ["farm"],
       p_primary_location_name: "Nowhere",
     });
 
-    expect(created.error).not.toBeNull();
-    expect(created.error?.message).toContain("host_subscription_required");
+    expect(created.error).toBeNull();
+    expect(typeof created.data).toBe("string");
 
     const { data: rows } = await admin()
       .from("host_profiles")
-      .select("id")
+      .select("id, subscription_tier")
       .eq("clerk_user_id", sub);
-    expect(rows ?? []).toHaveLength(0);
+    expect(rows ?? []).toHaveLength(1);
+    // Born honest: the denormalized copy says 'none', which is exactly what
+    // makes the allowance trigger refuse the publication asserted below.
+    expect((rows as { subscription_tier: string }[])[0].subscription_tier).toBe("none");
   });
 
-  it("ALLOWS it once a paid tier is recorded (positive control)", async () => {
+  /**
+   * THE REGRESSION PIN THE WHOLE CHANGE RESTS ON.
+   *
+   * A prospect may hold drafts without limit and may publish nothing. Both edges
+   * into the counted set are asserted, not just the obvious one: the allowance
+   * counts under_review as well as live, so the refusal lands at "mark ready",
+   * one step BEFORE publish. A test that only tried `live` would still pass if
+   * under_review were quietly exempted, and a prospect could then park listings
+   * in review indefinitely.
+   */
+  it("REFUSES publication for that same prospect, at BOTH counted edges", async () => {
+    const sub = clerkId("prospectpub");
+    const host = await asHost(sub);
+    const created = await host.rpc("create_my_host_profile", {
+      p_company_name: "Prospect Publisher",
+      p_category_scopes: ["farm"],
+      p_primary_location_name: "Integration",
+    });
+    expect(created.error).toBeNull();
+    const profileId = created.data as string;
+
+    // Drafts are free on every tier, including 'none' — a draft is not a
+    // counted status. Seeded under the service role because a host's own INSERT
+    // path is not what is under test here; the transitions below are.
+    const draftId = await seedDraft(profileId, "Prospect draft");
+    const secondDraft = await seedDraft(profileId, "Prospect draft two");
+    expect(typeof draftId).toBe("string");
+    expect(typeof secondDraft).toBe("string");
+
+    for (const target of ["under_review", "live"] as const) {
+      const moved = await host
+        .from("listings")
+        .update({ status: target })
+        .eq("id", draftId);
+      expect(
+        moved.error,
+        `a prospect must not move a listing to ${target}`,
+      ).not.toBeNull();
+      expect(moved.error?.message).toContain("listing_allowance_exceeded");
+    }
+
+    // Nothing became public as a side effect of trying.
+    const { data: after } = await admin()
+      .from("listings")
+      .select("status")
+      .eq("host_profile_id", profileId);
+    for (const row of (after ?? []) as { status: string }[]) {
+      expect(row.status).toBe("draft");
+    }
+  });
+
+  /**
+   * The positive control for the pair above: the SAME host, once paid, publishes.
+   * Without this, "publication is refused" is satisfied by a database that
+   * refuses everyone.
+   */
+  it("PUBLISHES once that prospect activates a plan (positive control)", async () => {
+    const sub = clerkId("activates");
+    const host = await asHost(sub);
+    const created = await host.rpc("create_my_host_profile", {
+      p_company_name: "Activating Farm",
+      p_category_scopes: ["farm"],
+      p_primary_location_name: "Integration",
+    });
+    expect(created.error).toBeNull();
+    const profileId = created.data as string;
+    const draftId = await seedDraft(profileId, "Draft that will go live");
+
+    const blocked = await host
+      .from("listings")
+      .update({ status: "under_review" })
+      .eq("id", draftId);
+    expect(blocked.error).not.toBeNull();
+
+    await grantSubscription(sub, "starter");
+
+    for (const target of ["under_review", "live"] as const) {
+      const moved = await host
+        .from("listings")
+        .update({ status: target })
+        .eq("id", draftId);
+      expect(moved.error, `a paid host must reach ${target}`).toBeNull();
+    }
+
+    const { data: row } = await admin()
+      .from("listings")
+      .select("status")
+      .eq("id", draftId)
+      .single();
+    expect((row as { status: string }).status).toBe("live");
+  });
+
+  it("ALLOWS creation with a paid tier recorded first (the other order)", async () => {
     const sub = clerkId("paid");
     const profileId = await provisionHost(sub, "starter");
     expect(typeof profileId).toBe("string");
@@ -180,17 +294,17 @@ describe.skipIf(!enabled)("no free tier (migration 083)", () => {
       .insert({ clerk_user_id: sub, tier: "enterprise", billing_status: "active" });
     expect(inserted.error).not.toBeNull();
 
-    // ...and the refusal is what it appears to be: with the row present, the
-    // very same RPC succeeds.
+    // The refusal is real, not an artefact of the table being unreachable: the
+    // service role writes the same row and it lands. (Under 086 this is checked
+    // by reading the row back rather than by whether profile creation succeeds —
+    // creation now succeeds either way, so it proves nothing about entitlement.)
     await grantSubscription(sub, "starter");
-    const created = await asHost(sub).then((c) =>
-      c.rpc("create_my_host_profile", {
-        p_company_name: "Now Paid",
-        p_category_scopes: ["farm"],
-        p_primary_location_name: "Integration",
-      }),
-    );
-    expect(created.error).toBeNull();
+    const { data: row } = await admin()
+      .from("host_subscriptions")
+      .select("tier")
+      .eq("clerk_user_id", sub)
+      .single();
+    expect((row as { tier: string }).tier).toBe("starter");
   });
 
   it("REFUSES a direct update that would upgrade the caller's own tier", async () => {

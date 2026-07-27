@@ -104,14 +104,11 @@ end;
 $$;
 reset role;
 
--- Migration 083 (founder, 2026-07-26: "no host can create a profile or publish
--- for free") gates create_my_host_profile on an active paid tier recorded
--- against the Clerk identity. The two hosts this suite creates successfully are
--- therefore given one; every case that expects a REFUSAL below still fails for
--- its own reason, because 083 places the tier gate after the input validation
--- and after the soft-delete check. That the gate itself works is proved in
--- packages/db/tests/entitlementEnforcementIntegration.test.ts, not here — this
--- suite is about identity derivation, completeness and idempotency.
+-- These two hosts are given a paid tier so the assertions further down can read
+-- a PAID denormalized copy back (see the subscription_tier check below). It is
+-- no longer a precondition for creating them: migration 086 (commercial redesign
+-- D6) removed the paid-tier refusal from create_my_host_profile, and the
+-- prospect case is asserted at the end of this file.
 insert into public.host_subscriptions (clerk_user_id, tier, billing_status)
 values
   ('user_profile_host_one', 'starter', 'active'),
@@ -372,6 +369,117 @@ begin
       raise;
     end if;
   end;
+end;
+$$;
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- THE PRE-BILLING HOST (migration 086, commercial redesign D6).
+--
+-- Creation is ALLOWED with no plan; PUBLICATION is not. Asserted here, in the
+-- database, on one host, in that order — the two halves only mean anything
+-- together. Migration 083 used to refuse the first of them.
+--
+-- Note what this host is given: nothing. No host_subscriptions row is inserted
+-- for this Clerk id, which is the state of every account that has never opened
+-- checkout, and the state the allowance resolves to zero for.
+-- ---------------------------------------------------------------------------
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"user_profile_prospect","role":"authenticated"}';
+do $$
+declare
+  v_profile_id uuid;
+  v_listing_id uuid;
+  v_tier text;
+  v_allowance integer;
+begin
+  v_profile_id := public.create_my_host_profile(
+    'Prospect Orchard',
+    array['farm'],
+    'Nowhere'
+  );
+  if v_profile_id is null then
+    raise exception 'profile-onboarding: a prospect could not create a host profile';
+  end if;
+
+  -- The copy is seeded honestly rather than left unset or optimistic.
+  select subscription_tier into v_tier
+    from public.host_profiles where id = v_profile_id;
+  if v_tier <> 'none' then
+    raise exception
+      'profile-onboarding: a prospect profile was born at tier %, expected none', v_tier;
+  end if;
+
+  -- And the allowance the trigger will consult is zero. Read explicitly so a
+  -- failure names the CAUSE rather than only the symptom below.
+  v_allowance := private.host_listing_allowance(v_profile_id);
+  if v_allowance <> 0 then
+    raise exception
+      'profile-onboarding: a prospect holds a listing allowance of %, expected 0', v_allowance;
+  end if;
+
+  -- Drafts are free on every tier, including none.
+  insert into public.listings (
+    host_profile_id, title, category, status,
+    housing_included, meals_included,
+    housing_evidence, meals_evidence, pay_evidence,
+    compensation_min_cents, location_display
+  ) values (
+    v_profile_id, 'Prospect draft', 'farm', 'draft',
+    false, false, 'confirmed', 'confirmed', 'confirmed',
+    22000, 'Nowhere'
+  ) returning id into v_listing_id;
+
+  -- BOTH edges into the counted set are refused, not just the obvious one. The
+  -- allowance counts under_review, so the refusal lands at "mark ready" — one
+  -- step before publish. Asserting only the live edge would still pass if
+  -- under_review were exempted, and a prospect could park listings in review.
+  begin
+    update public.listings set status = 'under_review' where id = v_listing_id;
+    raise exception 'profile-onboarding: a prospect moved a listing into review';
+  exception when check_violation then
+    if sqlerrm <> 'listing_allowance_exceeded' then raise; end if;
+  end;
+
+  begin
+    update public.listings set status = 'live' where id = v_listing_id;
+    raise exception 'profile-onboarding: a prospect published a listing';
+  exception when check_violation then
+    if sqlerrm <> 'listing_allowance_exceeded' then raise; end if;
+  end;
+
+  if (select status from public.listings where id = v_listing_id) <> 'draft' then
+    raise exception 'profile-onboarding: a refused transition still moved the listing';
+  end if;
+end;
+$$;
+reset role;
+
+-- POSITIVE CONTROL. Without it, "publication is refused" is equally satisfied by
+-- a database that refuses everyone, and the assertions above would survive the
+-- trigger being broken outright.
+insert into public.host_subscriptions (clerk_user_id, tier, billing_status)
+values ('user_profile_prospect', 'starter', 'active')
+on conflict (clerk_user_id) do update set tier = 'starter', billing_status = 'active';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"user_profile_prospect","role":"authenticated"}';
+do $$
+declare
+  v_profile_id uuid;
+  v_listing_id uuid;
+begin
+  select id into v_profile_id
+    from public.host_profiles where clerk_user_id = 'user_profile_prospect';
+  select id into v_listing_id
+    from public.listings where host_profile_id = v_profile_id limit 1;
+
+  update public.listings set status = 'under_review' where id = v_listing_id;
+  update public.listings set status = 'live' where id = v_listing_id;
+
+  if (select status from public.listings where id = v_listing_id) <> 'live' then
+    raise exception 'profile-onboarding: an activated host could not publish';
+  end if;
 end;
 $$;
 reset role;

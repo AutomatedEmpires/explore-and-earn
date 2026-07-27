@@ -386,16 +386,23 @@ export async function updateListingStatusAction(
     newStatus,
   );
   if (!result.ok) {
-    // The canonical lifecycle fn rejects disallowed edges with 'invalid_transition'
-    // and a plan-capacity block with 'listing_cap_reached'.
+    // The canonical lifecycle fn rejects disallowed edges with
+    // 'invalid_transition', a host who has no plan at all with
+    // 'listing_plan_required', and a host who has one and has spent it with
+    // 'listing_cap_reached'. The last two are separate because the advice is:
+    // a prospect (commercial redesign D6) has nothing to pause and no plan to
+    // upgrade, so the cap sentence would send them looking for a listing that
+    // does not exist.
     const error =
       result.error === "invalid_transition"
         ? "That status change isn't allowed from the listing's current state."
-        : result.error === "listing_cap_reached"
-          ? "You've reached your plan's active listing limit. Pause or close another listing, or upgrade your plan, to publish this one."
-          : result.error === "incomplete_listing" && result.blockers?.length
-            ? result.blockers.map((blocker) => blocker.reason).join(" ")
-          : result.error;
+        : result.error === "listing_plan_required"
+          ? "Publishing requires an active plan — your draft is saved. Activate a plan from /host/plans to put this in front of seekers."
+          : result.error === "listing_cap_reached"
+            ? "You've reached your plan's active listing limit. Pause or close another listing, or upgrade your plan, to publish this one."
+            : result.error === "incomplete_listing" && result.blockers?.length
+              ? result.blockers.map((blocker) => blocker.reason).join(" ")
+              : result.error;
     return { ok: false, error };
   }
 

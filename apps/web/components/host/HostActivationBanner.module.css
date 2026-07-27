@@ -1,0 +1,77 @@
+/* Prospect activation banner — sits between the host topbar and the content.
+   Informational, never alarming: it uses the soft action surface rather than a
+   warning or error treatment, because nothing is wrong. Tokens only. */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-10) var(--space-14);
+  background: var(--color-action-soft);
+  border-block-end: 1px solid var(--border-soft);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--color-cta);
+}
+
+.copy {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-primary);
+}
+
+.cta {
+  flex: 0 0 auto;
+  padding: var(--space-6) var(--space-12);
+  border-radius: var(--radius-pill);
+  background: var(--gradient-action);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.dismiss:hover {
+  color: var(--text-primary);
+}
+
+/* Stack on narrow viewports so the copy is never squeezed to two words. */
+@media (max-width: 640px) {
+  .banner {
+    flex-wrap: wrap;
+  }
+
+  .copy {
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .cta {
+    order: 3;
+  }
+}

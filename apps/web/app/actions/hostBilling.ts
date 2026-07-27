@@ -102,16 +102,18 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
 
   // NO HOST PROFILE IS REQUIRED TO PAY, and demanding one closed the funnel.
   //
-  // 083 gates create_my_host_profile on an active paid tier (founder: "no host
-  // can create a profile or publish for free"), so the order is now sign up ->
-  // choose a plan -> pay -> create the profile. This action used to resolve
-  // getHostProfile() first and redirect ?error=host_profile_missing when there
-  // was none, while the (host) layout redirected every profile-less user to
-  // /host/onboarding — and onboarding answered "choose a plan first". Both
-  // checkout surfaces lived inside that layout, so the only way to choose a plan
-  // sent the host back to the page telling them to choose a plan. With zero
-  // hosts in production and payments switching on, that is new-host revenue at
-  // zero from the first day.
+  // The original defect: this action resolved getHostProfile() first and
+  // redirected ?error=host_profile_missing when there was none, while the (host)
+  // layout redirected every profile-less user to /host/onboarding — and, under
+  // 083's creation gate, onboarding answered "choose a plan first". Both checkout
+  // surfaces lived inside that layout, so the only way to choose a plan sent the
+  // host back to the page telling them to choose a plan.
+  //
+  // COMMERCIAL REDESIGN D6 changed the order but not this requirement. Migration
+  // 086 removed the creation gate, so a host may now arrive here having ALREADY
+  // built a profile — and may equally arrive with none, straight from /host/plans
+  // or from the pricing page. Both orders are supported, which is exactly why
+  // this action must not require a profile in either direction.
   //
   // Nothing here ever needed the profile. createCheckoutSession is keyed by
   // clerkUserId, host_subscriptions is keyed by clerkUserId, and the Stripe
@@ -119,8 +121,8 @@ export async function startHostCheckoutAction(formData: FormData): Promise<never
   // display string for Stripe's submit button.
   //
   // /host/plans (in the (host-onboard) group, outside the profile gate) is the
-  // pre-profile entry point; /host/billing remains the one for hosts who already
-  // have a profile.
+  // entry point that works with or without a profile; /host/billing remains the
+  // in-workspace one.
 
   // A host who ALREADY pays must never be sent through checkout again: Stripe
   // would happily create a second concurrent subscription and bill for both.

@@ -184,9 +184,27 @@ describe("updateListingStatus", () => {
     // said a plan was required. Founder, 2026-07-26: there is no free tier, so
     // the refusal lands at ZERO active listings, not one. The allowance comes
     // from the RPC the enforcement trigger shares — see lib/entitlements.ts.
+    //
+    // THE REASON IS NOW NAMED SEPARATELY. Commercial redesign D6 (migration 086)
+    // lets a host with no plan hold a workspace, so this is a routine path rather
+    // than an impossible one, and 'listing_cap_reached' told them to pause a
+    // listing they do not have and upgrade a plan they never bought.
     const read = makeChain({ data: { ...ANSWERED_DRAFT } });
     queueFromResults(HOST_PROFILE, read);
     mockRpc.mockResolvedValueOnce(allowanceState("none", 0, 0));
+
+    const result = await updateListingStatus("token", "user_1", "l1", "under_review");
+
+    expect(result).toEqual({ ok: false, error: "listing_plan_required" });
+  });
+
+  it("keeps the two refusals apart — a paid host at their cap is not planless", async () => {
+    // The negative control for the split above. A starter host who has spent
+    // their allowance gets the CAP sentence, because pausing or upgrading is
+    // advice they can actually act on.
+    const read = makeChain({ data: { ...ANSWERED_DRAFT } });
+    queueFromResults(HOST_PROFILE, read);
+    mockRpc.mockResolvedValueOnce(allowanceState("starter", 1, 1));
 
     const result = await updateListingStatus("token", "user_1", "l1", "under_review");
 

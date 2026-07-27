@@ -31,3 +31,20 @@
   line-height: 1.4;
   color: var(--status-error-fg);
 }
+
+/* The prospect's plan explanation. Informational, NOT an error treatment —
+   nothing failed and nothing was lost, which is the whole point of the
+   sentence. */
+.planNotice {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-primary);
+}
+
+.planLink {
+  color: var(--color-cta);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+}
