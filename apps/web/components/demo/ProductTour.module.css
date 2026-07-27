@@ -1,0 +1,195 @@
+/*
+ * Product tour — contextual coachmarks for the demo workspace.
+ *
+ * ONE panel at a time, non-blocking (no scrim): the visitor can still read the
+ * surface the stop is describing, which is the whole point of a coachmark.
+ * Tokens only.
+ */
+
+.launcher {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  align-self: flex-start;
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-ink);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.launcher:hover {
+  background: var(--color-paper);
+}
+
+.launcher:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-cta);
+}
+
+.panel {
+  box-sizing: border-box;
+  position: fixed;
+  z-index: var(--z-overlay);
+  left: var(--space-12);
+  right: var(--space-12);
+  bottom: calc(var(--size-bottom-nav) + var(--space-12));
+  max-width: 30rem;
+  margin-left: auto;
+  padding: var(--space-20);
+  border: 1.5px solid var(--border-ink-warm);
+  border-radius: var(--radius-modal);
+  background: var(--color-surface);
+  box-shadow: var(--elevation-overlay);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.panel:focus-visible {
+  outline: none;
+  box-shadow: var(--elevation-overlay), 0 0 0 3px var(--color-cta);
+}
+
+.panelTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.step {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-8)) 0 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--color-paper);
+  color: var(--text-primary);
+}
+
+.close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-cta);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: 1.2;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.plans {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  align-self: flex-start;
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  background: var(--status-match-bg);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.next {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-20);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-ink-warm);
+  background: var(--gradient-gold);
+  color: var(--color-gold-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  cursor: pointer;
+}
+
+.next:focus-visible,
+.back:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-cta);
+}
+
+/* The highlight for the element a stop is about lives in demoChrome.module.css,
+   anchored under .workspace. It cannot live here: the target belongs to another
+   module, so the selector would have to be a bare :global(), and CSS Modules
+   rejects a rule with no local class or id in it ("not pure"). .workspace is
+   the shared local ancestor of every tour target, which makes the rule pure
+   without inventing a class the target components would have to opt into. */
+
+@media (min-width: 720px) {
+  .panel {
+    right: var(--space-24);
+    bottom: var(--space-24);
+    left: auto;
+    width: 26rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launcher,
+  .next,
+  .back {
+    transition: none;
+  }
+}
