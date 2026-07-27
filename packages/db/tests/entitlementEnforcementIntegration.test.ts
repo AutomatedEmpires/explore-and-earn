@@ -182,14 +182,28 @@ describe.skipIf(!enabled)("pre-billing host mode (migrations 083 + 086)", () => 
   /**
    * THE REGRESSION PIN THE WHOLE CHANGE RESTS ON.
    *
-   * A prospect may hold drafts without limit and may publish nothing. Both edges
-   * into the counted set are asserted, not just the obvious one: the allowance
-   * counts under_review as well as live, so the refusal lands at "mark ready",
-   * one step BEFORE publish. A test that only tried `live` would still pass if
-   * under_review were quietly exempted, and a prospect could then park listings
-   * in review indefinitely.
+   * A prospect may hold drafts without limit and may publish nothing. TWO
+   * DIFFERENT FENCES enforce that, and naming them apart is the correction: an
+   * earlier version of this test expected `listing_allowance_exceeded` on both
+   * edges and was wrong about the second.
+   *
+   * Both are BEFORE triggers on `listings`, and BEFORE triggers fire in NAME
+   * order — trg_listings_host_status_transition (082) before
+   * trg_listings_plan_allowance (083), which is exactly what 083's header says
+   * it arranged, so that a forbidden transition reports as forbidden rather
+   * than as an allowance failure checked first.
+   *
+   *   draft -> under_review  legal edge, so the ALLOWANCE answers. This is the
+   *                          real entitlement gate: the slot is charged at
+   *                          submit time, so the refusal lands one step BEFORE
+   *                          the publish button. Asserting only `live` would
+   *                          pass while under_review was quietly exempted, and
+   *                          a prospect could park listings in review forever.
+   *   draft -> live          NOT a legal host edge under 082 at all, so the
+   *                          TRANSITION trigger refuses it first and the
+   *                          allowance is never consulted.
    */
-  it("REFUSES publication for that same prospect, at BOTH counted edges", async () => {
+  it("REFUSES publication for that same prospect, at both fences", async () => {
     const sub = clerkId("prospectpub");
     const host = await asHost(sub);
     const created = await host.rpc("create_my_host_profile", {
@@ -208,17 +222,22 @@ describe.skipIf(!enabled)("pre-billing host mode (migrations 083 + 086)", () => 
     expect(typeof draftId).toBe("string");
     expect(typeof secondDraft).toBe("string");
 
-    for (const target of ["under_review", "live"] as const) {
-      const moved = await host
-        .from("listings")
-        .update({ status: target })
-        .eq("id", draftId);
-      expect(
-        moved.error,
-        `a prospect must not move a listing to ${target}`,
-      ).not.toBeNull();
-      expect(moved.error?.message).toContain("listing_allowance_exceeded");
-    }
+    // The entitlement fence.
+    const review = await host
+      .from("listings")
+      .update({ status: "under_review" })
+      .eq("id", draftId);
+    expect(review.error, "a prospect must not move a listing into review").not.toBeNull();
+    expect(review.error?.message).toContain("listing_allowance_exceeded");
+
+    // The transition fence. Pinned by its own name: accepting any error here
+    // would let the allowance stop firing above while this still passed.
+    const live = await host
+      .from("listings")
+      .update({ status: "live" })
+      .eq("id", draftId);
+    expect(live.error, "a prospect must not skip review to publish").not.toBeNull();
+    expect(live.error?.message).toContain("listing_host_status_transition_forbidden");
 
     // Nothing became public as a side effect of trying.
     const { data: after } = await admin()
@@ -247,14 +266,21 @@ describe.skipIf(!enabled)("pre-billing host mode (migrations 083 + 086)", () => 
     const profileId = created.data as string;
     const draftId = await seedDraft(profileId, "Draft that will go live");
 
+    // Refused for the entitlement reason specifically, before the plan exists.
     const blocked = await host
       .from("listings")
       .update({ status: "under_review" })
       .eq("id", draftId);
     expect(blocked.error).not.toBeNull();
+    expect(blocked.error?.message).toContain("listing_allowance_exceeded");
 
     await grantSubscription(sub, "starter");
 
+    // THE LEGAL PATH, in full. Not a shortcut: draft -> live is refused for a
+    // PAID host too (082 has no such edge), so publishing is always two steps.
+    // The draft's preconditions are real, not faked — seedDraft states the
+    // whole benefit triad with a pay figure (070) and leaves housing_included
+    // false, so 072's photo gate does not apply.
     for (const target of ["under_review", "live"] as const) {
       const moved = await host
         .from("listings")

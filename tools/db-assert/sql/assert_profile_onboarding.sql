@@ -494,10 +494,29 @@ begin
     false, false, 'confirmed', 'confirmed', 'confirmed', 22000
   ) returning id into v_listing_id;
 
-  -- BOTH edges into the counted set are refused, not just the obvious one. The
-  -- allowance counts under_review, so the refusal lands at "mark ready" — one
-  -- step before publish. Asserting only the live edge would still pass if
-  -- under_review were exempted, and a prospect could park listings in review.
+  -- TWO FENCES STAND BETWEEN A PROSPECT AND A SEEKER, AND THEY ARE DIFFERENT
+  -- FENCES. Asserting the same error on both edges is what failed CI here: it
+  -- described an idealized system rather than the one that exists.
+  --
+  -- Both are BEFORE triggers on public.listings, and BEFORE triggers fire in
+  -- NAME order:
+  --
+  --     trg_listings_host_status_transition   (082, supersedes 077)  <- first
+  --     trg_listings_plan_allowance           (083)                  <- second
+  --
+  -- 083's own header states that ordering and its reason: a forbidden
+  -- transition should report as forbidden rather than as an allowance failure
+  -- that happened to be checked first. So which error a prospect meets depends
+  -- on whether the edge is legal at all.
+  --
+  -- 082's legal host edges are: draft->under_review, under_review->{draft,live},
+  -- live->{paused,archived}, paused->{live,archived}, closed->draft
+  -- (non-sourced). draft->live is NOT among them.
+
+  -- EDGE 1 - draft -> under_review. Legal, so it reaches the allowance, and the
+  -- allowance is the real entitlement gate. THIS is the assertion that proves a
+  -- prospect cannot publish: the slot is charged at submit time, so the refusal
+  -- lands here, one step BEFORE the publish button.
   begin
     update public.listings set status = 'under_review' where id = v_listing_id;
     raise exception 'profile-onboarding: a prospect moved a listing into review';
@@ -505,11 +524,17 @@ begin
     if sqlerrm <> 'listing_allowance_exceeded' then raise; end if;
   end;
 
+  -- EDGE 2 - draft -> live. Refused by the TRANSITION trigger before the
+  -- allowance is ever consulted, so the allowance error can never be observed
+  -- on this edge from draft. Still a refusal, and still worth pinning: it is
+  -- the fence that stops a prospect skipping review entirely. Naming the exact
+  -- error is the point -- accepting any check_violation here would let the
+  -- allowance silently stop firing on edge 1 while this still passed.
   begin
     update public.listings set status = 'live' where id = v_listing_id;
-    raise exception 'profile-onboarding: a prospect published a listing';
+    raise exception 'profile-onboarding: a prospect skipped review to publish';
   exception when check_violation then
-    if sqlerrm <> 'listing_allowance_exceeded' then raise; end if;
+    if sqlerrm <> 'listing_host_status_transition_forbidden' then raise; end if;
   end;
 
   if (select status from public.listings where id = v_listing_id) <> 'draft' then
@@ -545,6 +570,16 @@ begin
     raise exception 'profile-onboarding: the prospect draft is not visible to its own host';
   end if;
 
+  -- THE LEGAL PATH, walked in full: draft -> under_review -> live. Not a
+  -- shortcut, because there is no legal shortcut -- draft -> live is refused
+  -- for a PAID host too (082), so a positive control that tried it would fail
+  -- for a reason that has nothing to do with entitlement.
+  --
+  -- Every publication precondition is already satisfied by the draft this host
+  -- created above, and none of them is faked: 070's triad CHECK is met because
+  -- housing/meals/pay evidence are all stated and a pay figure is present, and
+  -- 072's photo gate does not apply because housing_included is false. That is
+  -- the same fixture shape assert_listing_allowance_enforcement.sql publishes.
   update public.listings set status = 'under_review' where id = v_listing_id;
   update public.listings set status = 'live' where id = v_listing_id;
 

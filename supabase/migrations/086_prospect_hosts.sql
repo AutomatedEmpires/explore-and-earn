@@ -53,7 +53,10 @@
 --     listing_allowance_exceeded;
 --   * packages/db/tests/entitlementEnforcementIntegration.test.ts drives real
 --     PostgREST as a real unpaid host: profile creation SUCCEEDS, a draft
---     SUCCEEDS, and both under_review and live are REFUSED;
+--     SUCCEEDS, and publication is REFUSED at both fences - draft to
+--     under_review by the ALLOWANCE (the entitlement gate, and the one that
+--     matters here), draft to live by 082's TRANSITION trigger, which fires
+--     first by trigger-name ordering and never lets the allowance be asked;
 --   * tools/db-assert/sql/assert_profile_onboarding.sql proves the same pair
 --     in-database, with a positive control either side.
 --
