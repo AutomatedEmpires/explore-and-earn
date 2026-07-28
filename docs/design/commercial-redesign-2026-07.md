@@ -142,6 +142,107 @@ Each phase is its own PR. P2/P3 parallelize; P4 follows P2; P6 last.
 ## Externally blocked
 
 - Photography: needs UNSPLASH_ACCESS_KEY (or a founder-supplied asset pack).
+  → SUPERSEDED by V2 D16: Wikimedia Commons pipeline needs no key.
 - Founding Host go-live: needs founder-set capacity + deadline (D10).
 - New brand assets (logo/wordmark beyond the in-repo mark): founder-supplied.
 - Live-smoke execution: needs a real card at ~$1–2 once (owner).
+
+# ═══════════════════════════════════════════════════════════════════
+# V2 — FULL PRODUCT REDESIGN (founder directive, 2026-07-27 late)
+# ═══════════════════════════════════════════════════════════════════
+
+The founder rejected the V1-era surfaces wholesale via a 20-screenshot
+baseline (screenshots not received; the directive's verbal per-screen findings
+are the operative baseline) and an 85-criterion acceptance list. V1 decisions
+that still stand: D1 (Manrope), D2/D3 (no public switcher/admin entry), D6/D7
+(build-first, browse-first), D10 (Founding Host dark-until-configured), D13
+(no seat claims), D14 (billing verification), honesty rules, ratchets, money
+invariants. Explicitly SUPERSEDED:
+
+- D9 gradient-first imagery → D16 photography is a REQUIRED product layer.
+- P3's three-step tour modal → D19 anchored coachmark tour.
+- The V1 plans page presentation → D21 commercial decision surface.
+- Public Community as a role-neutral top-level destination → D18.
+
+## V2 decisions
+
+D16. PHOTOGRAPHY PIPELINE, no key required: scripts/seed-site-photos.mjs gains
+     a Wikimedia Commons source (API needs no credential). Each asset records
+     author, license (CC-BY/CC-BY-SA/PD only), source URL, and license URL in
+     a manifest stored beside the images in the public `site-photos` bucket
+     and mirrored in-repo; attribution rendered where the license requires it
+     (a /credits surface + alt-text discipline). Curated queries: Coeur
+     d'Alene lake, lake cabins/lodges, paddleboarding, docks, trail work,
+     commercial kitchens, seasonal crews. EXIF location stripped on ingest.
+     If the founder later supplies an Unsplash/Pexels key the same manifest
+     shape absorbs those sources.
+D17. ROLE-SCOPED CHROME: role pill (Seeker/Host/Admin) beside the wordmark;
+     no pill signed-out; host top bar reduced to search/notifications/
+     messages/create/account (no rail duplication); host rail regrouped
+     primary (Overview, Listings, Applicants, Outreach, Messages,
+     Announcements, Analytics) / business (Employer profile, Team, Billing) /
+     support (Coach, Settings, Help). "Invites" → **Outreach** (invites remain
+     a state within it; routes get redirects). "Assistant" → **Recruiting
+     Coach**.
+D18. Community becomes an authenticated SEEKER space. Signed-out header: For
+     Seekers / For Hosts / Sign in / Get started. Community reachable via the
+     For Seekers menu → /sign-in?role=seeker&returnTo=/community with safe
+     return handling; no pre-auth profile creation anywhere (verify server
+     truth, not just nav). Route-access matrix tested for guest/seeker/host/
+     team/admin/demo.
+D19. TOUR: anchored, one-at-a-time, persistent-progress coachmarks attached to
+     real controls (the P3 ProductTour foundation evolves; the blocking modal
+     dies). Resumable from Help.
+D20. DEMO V2: the /for-hosts/demo becomes an immersive read-only Enterprise
+     workspace mid-season: 7 roles (5 live incl. one closing-soon, 2 drafts),
+     96 applications reconciling exactly across stages (21 new / 18 reviewing
+     / 12 saved / 9 interviews / 7 offers / 5 accepted / remainder
+     not-selected+withdrawn), 34 outreach invitations (19 accepted), message
+     threads, 3 published + 1 scheduled + 1 draft announcements, populated
+     analytics, team + plan usage, weather labeled "Sample data", view-as-
+     seeker, session-local stage moves + reset, noindex, zero production
+     writes. Aggregates MUST derive from records (single fixture source with
+     derivation functions, not parallel constants).
+D21. Plans/billing surfaces dedup: ONE commercial decision surface pattern
+     (previews → comparison → add-ons → founding → terms) feeding /host/plans
+     and the activation page; Billing = subscription/account-value center
+     (usage, invoices, add-ons, honest value summary), never a second plans
+     page; Settings links to Billing, never re-renders it.
+D22. SURFACE SYSTEM: retire "white rounded card on pale blue" as the default.
+     Warm off-white canvas token, three surface levels, selective borders/
+     shadows, radius hierarchy (controls 8–12 / cards 14–18 / feature 20–24),
+     desktop type scale enlarged (product page titles 32–40), tabular
+     numerals for metrics/prices, full-bleed where photography leads. Palette
+     direction: ink/navy text, lake-teal action, alpine-green identity,
+     sky demoted to status, gold = premium only. Token re-valuing over
+     renaming (Tier-1 primitives re-valued; semantic names stable).
+D23. EMPTY/LOADING/ERROR/GATED discipline: every major route ships all four,
+     with empty states that teach (template/example/demo links), no
+     zero-value donut, no giant empty slabs. Demo never shows empty surfaces.
+D24. Host overview = recruiting command center (identity/season band incl.
+     sample-labeled weather, hiring-pulse KPI strip with comparisons, Needs
+     Attention queue, pipeline, rich listing-performance cards, calendar,
+     communications, plan usage) — deduplicated tasks, evidence-linked
+     diagnoses only.
+D25. Analytics: real workspace (controls, trends, funnel, sources, listing
+     comparison, plain-language diagnoses linked to evidence); accessible
+     table equivalents; sample data always labeled.
+D26. Coach: context-embedded assistance + a workspace summarizing real state;
+     never invents data; confirms before mutations; useful without the model.
+
+## V2 phases (each = PR(s); agents execute; orchestrator merges)
+
+- A  Photography pipeline + asset ingestion + credits surface  [critical path]
+- B  Design-system v2 (tokens/surfaces/type) + role shells + nav (D17/D22)
+- C  Public IA + Community auth correction + homepage v2 (D18)
+- D  Demo v2 (D20) + coachmark tour (D19)
+- E  Host onboarding v2 (welcome, previews) + plans surface v2 (D21)
+- F  Host workspace v2 (overview D24, listings, applicants, outreach,
+    messages, announcements, analytics D25, coach D26, billing/settings D21)
+- G  Seeker surfaces v2 (For Seekers, Seek/Swipe/Map polish, dashboard,
+    community-as-seeker-space)
+- H  Admin v2 + final QA (visual regression, route-access matrix, a11y,
+    perf, screenshots at 390/768/1440)
+
+Sequencing: A ∥ B first; C after B; D after A+B; E/F after B (D fixtures
+feed F empty-state examples); G after C; H last.
