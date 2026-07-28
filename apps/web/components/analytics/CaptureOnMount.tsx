@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from "react";
 
-import { captureEvent, type HostFunnelEvent } from "../../lib/analytics";
+import { captureEvent, type AnalyticsEvent } from "../../lib/analytics";
 
 export interface CaptureOnMountProps {
-  readonly event: HostFunnelEvent;
+  readonly event: AnalyticsEvent;
   readonly properties?: Record<string, unknown>;
 }
 

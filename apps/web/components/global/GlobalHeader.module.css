@@ -322,6 +322,45 @@
   transform: translateY(-1px);
 }
 
+/* Sign in — DEMOTED to a ghost control (D18). The signed-out header now carries
+   two actions, and only one of them can be the primary: "Get started" is what
+   a first-time visitor needs, while "Sign in" serves people who already have an
+   account and do not need to be sold. Two filled buttons side by side would
+   have made neither of them the answer. Same geometry as .signInBtn so the pair
+   sits on one baseline. */
+.signInGhost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  height: 2.25rem;
+  padding: 0 var(--space-14);
+  border-radius: var(--radius-pill);
+  border: 1.5px solid color-mix(in srgb, var(--hdr-chrome) 30%, transparent);
+  background: color-mix(in srgb, var(--hdr-chrome) 9%, transparent);
+  color: color-mix(in srgb, var(--hdr-text) 88%, transparent);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background   var(--motion-fast) var(--ease-standard);
+}
+
+.signInGhost:hover {
+  border-color: color-mix(in srgb, var(--hdr-chrome) 55%, transparent);
+  background: color-mix(in srgb, var(--hdr-chrome) 16%, transparent);
+}
+
+.signInGhost:focus-visible {
+  box-shadow: var(--hdr-focus);
+}
+
 /* ─── Sign-in chooser popup — light paper panel over the deep-sky shell ───── */
 
 .authMenu {
@@ -670,7 +709,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .header,
-  .navLink, .signInBtn, .iconBtn, .avatarBtn, .pinMark {
+  .navLink, .signInBtn, .signInGhost, .iconBtn, .avatarBtn, .pinMark {
     transition: none;
   }
   .signInBtn:hover, .iconBtn:hover, .avatarBtn:hover {
