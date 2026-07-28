@@ -8,12 +8,14 @@ import {
 import { formatMoney } from "../../../../../lib/format";
 import {
   DEMO_ORG,
+  DemoAnnouncementComposerPreview,
   DemoAnnouncementList,
+  DemoAnnouncementPerformance,
   DemoSurfaceHeader,
 } from "../../../../../components/demo";
 import styles from "../../../../../components/demo/demoChrome.module.css";
 
-/** Demo workspace — announcements: drafts, scheduled runs, and results. */
+/** Demo workspace — announcements: composer preview, history, and one result. */
 export default function DemoAnnouncementsPage() {
   const monthly = PLAN_ENTITLEMENTS[DEMO_ORG.planTier].monthlyAnnouncements;
 
@@ -26,20 +28,17 @@ export default function DemoAnnouncementsPage() {
         lede="A hiring push, a housing update, a closing date. Announcements go out across the marketplace, which is how a season opens with a queue instead of a silence."
       />
 
-      <div className={styles.panel} id="tour-announcements">
-        <div className={styles.panelHead}>
-          <div>
-            <h2 className={styles.panelTitle}>How the allowance works</h2>
-          </div>
-        </div>
-        <p className={styles.panelNote}>
+      <div className={styles.callout}>
+        <p className={styles.calloutTitle}>How the allowance works</p>
+        <p className={styles.calloutBody}>
           The {DEMO_ORG.planName} plan includes {monthly} announcement runs a
-          month. Beyond the allowance, a single{" "}
-          {ANNOUNCEMENT_RUN_DAYS}-day run is{" "}
-          {formatMoney(ANNOUNCEMENT_PRICE_CENTS)} — one flat price, no duration
-          options to weigh up.
+          month. Beyond the allowance, a single {ANNOUNCEMENT_RUN_DAYS}-day run
+          is {formatMoney(ANNOUNCEMENT_PRICE_CENTS)} — one flat price, no
+          duration options to weigh up.
         </p>
       </div>
+
+      <DemoAnnouncementComposerPreview />
 
       <div className={styles.panel}>
         <div className={styles.panelHead}>
@@ -51,8 +50,10 @@ export default function DemoAnnouncementsPage() {
             </p>
           </div>
         </div>
-        <DemoAnnouncementList id="tour-announce-list" />
+        <DemoAnnouncementList id="tour-announcement-list" />
       </div>
+
+      <DemoAnnouncementPerformance />
 
       <div className={styles.linkRow}>
         <Link className={styles.primaryCta} href="/sign-up?role=host">

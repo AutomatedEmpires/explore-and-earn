@@ -1,56 +1,50 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { ANALYTICS_ENTITLEMENT, PLAN_ENTITLEMENTS } from "@explore-and-earn/contracts";
+import { PLAN_ENTITLEMENTS } from "@explore-and-earn/contracts";
 
 import {
-  DEMO_ANALYTICS,
+  DEMO_ACCOUNT_PEOPLE,
   DEMO_ANALYTICS_LABEL,
   DEMO_ANNOUNCEMENTS,
   DEMO_APPLICANTS,
   DEMO_BANNER_TEXT,
+  DEMO_CAMPAIGNS,
   DEMO_DATA_LABEL,
   DEMO_DISCOVERY_SOURCES,
-  DEMO_JOB,
   DEMO_LABELS,
   DEMO_LISTING,
   DEMO_METRICS,
-  DEMO_OPPORTUNITY_VIEWS,
   DEMO_ORG,
   DEMO_PERFORMANCE_LABEL,
   DEMO_PLAN_USAGE,
-  DEMO_SURFACES,
+  DEMO_ROLES,
   DEMO_THREADS,
-  DEMO_TOTAL_APPLICATIONS,
+  demoApplicant,
+  initialsOf,
 } from "../../components/demo/enterpriseDemo";
-import {
-  DEMO_TOUR,
-  DEMO_TOUR_STOP_COUNT,
-  plansIncluding,
-} from "../../components/demo/tourStops";
+import { plansIncluding } from "../../components/demo/tourStops";
 
 /**
  * THE DEMO MUST NEVER BE MISTAKEN FOR THE MARKETPLACE.
  *
  * The Enterprise demo workspace exists so a host can want the product before
- * they are billed for it, which puts a page full of invented numbers on the
+ * they are billed for it, which puts a page full of invented records on the
  * public internet. Two failure modes make that dishonest rather than useful:
  *
  *   1. A demo surface renders a figure with no "this is sample data" label. The
  *      label lives on the FIXTURE, not in a page's JSX, precisely so a later
  *      edit cannot quietly drop it — and these tests fail if an item ever
  *      arrives without one.
- *   2. The figures contradict each other. A dashboard whose per-listing rows do
- *      not add up to its own headline is not "plausible sample data", it is
- *      evidence that nobody checked — and a host who spots it stops believing
- *      the real numbers too.
+ *   2. The demo asserts something the product cannot do, or something a plan
+ *      does not grant.
  *
- * The source scans at the bottom guard the claims the page is allowed to make:
- * no team seats (the entitlement is zero), no named competitor, no invented
- * program.
+ * Reconciliation of the numbers has its own file (demo-derivations.test.ts) and
+ * the isolation guards have theirs (demo-isolation.test.ts). This file is the
+ * labelling and claim contract.
  */
 
 const APPS_WEB = fileURLToPath(new URL("../../", import.meta.url));
@@ -59,28 +53,21 @@ function readSource(relativePath: string): string {
   return readFileSync(join(APPS_WEB, relativePath), "utf8");
 }
 
-function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, out);
-    else if (/\.(ts|tsx)$/.test(name)) out.push(full);
-  }
-  return out;
-}
-
 // ── 1. Every demo item is labelled ─────────────────────────────────────────
 
 describe("every demo fixture carries the label its component renders", () => {
-  it("labels the organisation and the job", () => {
+  it("labels the organisation", () => {
     expect(DEMO_LABELS).toContain(DEMO_ORG.demoLabel);
-    expect(DEMO_LABELS).toContain(DEMO_JOB.demoLabel);
   });
 
   it.each([
+    ["roles", DEMO_ROLES],
     ["metrics", DEMO_METRICS],
     ["announcements", DEMO_ANNOUNCEMENTS],
     ["applicants", DEMO_APPLICANTS],
     ["threads", DEMO_THREADS],
+    ["campaigns", DEMO_CAMPAIGNS],
+    ["account people", DEMO_ACCOUNT_PEOPLE],
     ["discovery sources", DEMO_DISCOVERY_SOURCES],
     ["plan usage", DEMO_PLAN_USAGE],
   ])("labels every item in %s", (_name, collection) => {
@@ -107,81 +94,52 @@ describe("every demo fixture carries the label its component renders", () => {
     expect(DEMO_BANNER_TEXT.toLowerCase()).toContain("sample data");
     expect(DEMO_BANNER_TEXT).toContain(DEMO_ORG.planName);
   });
+
+  it("references no remote host anywhere in the fixture module", () => {
+    const source = readSource("components/demo/enterpriseDemo.ts");
+    expect(source).not.toMatch(/https?:\/\//);
+  });
 });
 
-// ── 2. The numbers agree with each other ───────────────────────────────────
+// ── 2. Fictional people get initials, never a photograph ───────────────────
 
-function sum(values: Iterable<number>): number {
-  let total = 0;
-  for (const value of values) total += value;
-  return total;
-}
-
-describe("the demo analytics are internally consistent", () => {
-  it("account-wide stage counts add up to the headline application total", () => {
-    expect(sum(Object.values(DEMO_ANALYTICS.totalApplicationsByStatus))).toBe(
-      DEMO_TOTAL_APPLICATIONS,
-    );
+describe("invented people", () => {
+  it("derives an initials avatar for every applicant", () => {
+    for (const applicant of DEMO_APPLICANTS) {
+      expect(applicant.initials, applicant.id).toBe(initialsOf(applicant.name));
+      expect(applicant.initials.length, applicant.id).toBeGreaterThan(0);
+      expect(applicant.initials.length, applicant.id).toBeLessThanOrEqual(2);
+    }
   });
 
-  it("per-listing stage counts add up to the account-wide counts", () => {
-    const rolled: Record<string, number> = {};
-    for (const stat of DEMO_ANALYTICS.perListingStats) {
-      for (const [stage, count] of Object.entries(stat.applicationsByStatus)) {
-        rolled[stage] = (rolled[stage] ?? 0) + count;
+  it("derives an initials avatar for every person on the account", () => {
+    for (const person of DEMO_ACCOUNT_PEOPLE) {
+      expect(person.initials, person.id).toBe(initialsOf(person.name));
+    }
+  });
+
+  /**
+   * The rule that matters: a person record must have no photograph field at
+   * all, so there is nothing for a future component to reach for. Scene
+   * photography belongs to ROLES and to the organisation, never to a name.
+   */
+  it("gives no invented person a photo field of any kind", () => {
+    const people = [...DEMO_APPLICANTS, ...DEMO_ACCOUNT_PEOPLE];
+    for (const person of people) {
+      for (const key of Object.keys(person)) {
+        expect(key.toLowerCase(), `${person.id}.${key}`).not.toMatch(
+          /photo|avatarurl|image|headshot/,
+        );
       }
     }
-    expect(rolled).toEqual(DEMO_ANALYTICS.totalApplicationsByStatus);
   });
 
-  it("each listing's own total matches its own stage counts", () => {
-    for (const stat of DEMO_ANALYTICS.perListingStats) {
-      expect(sum(Object.values(stat.applicationsByStatus))).toBe(
-        stat.totalApplications,
-      );
+  it("gives every role a photo slug, because roles are scenes", () => {
+    for (const role of DEMO_ROLES) {
+      expect(role.photoSlug, role.id).toMatch(/^[a-z0-9-]+$/);
     }
-  });
-
-  it("the invite acceptance rate is the per-listing invites, not a separate claim", () => {
-    const sent = sum(DEMO_ANALYTICS.perListingStats.map((s) => s.invitesSent));
-    const accepted = sum(
-      DEMO_ANALYTICS.perListingStats.map((s) => s.invitesAccepted),
-    );
-    expect(accepted).toBeLessThanOrEqual(sent);
-    expect(DEMO_ANALYTICS.inviteAcceptanceRate).toBeCloseTo(accepted / sent, 10);
-  });
-
-  it("never claims more live listings than listings", () => {
-    expect(DEMO_ANALYTICS.activeListingCount).toBeLessThanOrEqual(
-      DEMO_ANALYTICS.listingCount,
-    );
-    expect(DEMO_ANALYTICS.perListingStats.length).toBeLessThanOrEqual(
-      DEMO_ANALYTICS.listingCount,
-    );
-  });
-
-  it("shows the analytics depth the demo plan actually grants", () => {
-    expect(DEMO_ANALYTICS.analyticsScope).toBe(
-      ANALYTICS_ENTITLEMENT[DEMO_ORG.planTier],
-    );
-  });
-
-  it("discovery-source views add up to the opportunity-view total", () => {
-    expect(sum(DEMO_DISCOVERY_SOURCES.map((s) => s.views))).toBe(
-      DEMO_OPPORTUNITY_VIEWS,
-    );
-  });
-
-  it("discovery-source shares add up to a whole", () => {
-    const shares = DEMO_DISCOVERY_SOURCES.map((s) => Number(s.share.replace("%", "")));
-    expect(sum(shares)).toBe(100);
-  });
-
-  it("never uses more of an allowance than the plan includes", () => {
-    const entitlement = PLAN_ENTITLEMENTS[DEMO_ORG.planTier];
-    for (const row of DEMO_PLAN_USAGE) {
-      expect(row.used).toBeLessThanOrEqual(entitlement[row.entitlementKey]);
-    }
+    expect(DEMO_ORG.coverPhotoSlug).toBeTruthy();
+    expect(DEMO_ORG.seasonPhotoSlug).toBeTruthy();
   });
 });
 
@@ -214,9 +172,18 @@ describe("demo announcements", () => {
       }
     }
   });
+
+  it("never claims more applications than opens for a run", () => {
+    for (const announcement of DEMO_ANNOUNCEMENTS) {
+      if (!announcement.engagement) continue;
+      const { views, opens, applications } = announcement.engagement;
+      expect(opens).toBeLessThanOrEqual(views);
+      expect(applications).toBeLessThanOrEqual(opens);
+    }
+  });
 });
 
-// ── 4. The demo listing is a real listing shape with no remote assets ──────
+// ── 4. The demo listing is a real listing shape ────────────────────────────
 
 describe("the demo listing", () => {
   it("states all three triad benefits, which is what publication requires", () => {
@@ -226,9 +193,8 @@ describe("the demo listing", () => {
     }
   });
 
-  it("carries no cover image — the card's no-cover path is the honest one", () => {
-    expect(DEMO_LISTING.coverImageUrl).toBeUndefined();
-    expect(DEMO_LISTING.cover).toBeUndefined();
+  it("carries a LOCAL cover from the site-photo catalog, never a remote", () => {
+    expect(DEMO_LISTING.coverImageUrl).toMatch(/^\/photos\//);
   });
 
   it("belongs to the demo organisation and shows its verified, paid state", () => {
@@ -240,41 +206,53 @@ describe("the demo listing", () => {
   it("never sets the founding flag, which would render a program that does not exist", () => {
     expect(DEMO_LISTING.founding).toBeUndefined();
   });
+});
 
-  it("references no remote host anywhere in the fixture module", () => {
-    const source = readSource("components/demo/enterpriseDemo.ts");
-    expect(source).not.toMatch(/https?:\/\//);
+// ── 5. Threads join to real application records ────────────────────────────
+
+describe("demo message threads", () => {
+  it("attaches every thread to an applicant that exists", () => {
+    for (const thread of DEMO_THREADS) {
+      expect(demoApplicant(thread.applicantId), thread.id).toBeTruthy();
+    }
+  });
+
+  it("gives every thread at least one message, and a mix of read state", () => {
+    for (const thread of DEMO_THREADS) {
+      expect(thread.messages.length, thread.id).toBeGreaterThan(0);
+    }
+    const unread = DEMO_THREADS.filter((t) => t.unread).length;
+    expect(unread).toBeGreaterThan(0);
+    expect(unread).toBeLessThan(DEMO_THREADS.length);
+  });
+
+  it("never names a candidate the thread is not about", () => {
+    for (const thread of DEMO_THREADS) {
+      const applicant = demoApplicant(thread.applicantId);
+      expect(applicant, thread.id).toBeTruthy();
+      // The thread stores an id, not a name — the name is looked up. This
+      // asserts the record shape rather than the copy, which is what stops the
+      // two drifting apart.
+      expect(Object.keys(thread)).not.toContain("name");
+    }
   });
 });
 
-// ── 5. The tour ────────────────────────────────────────────────────────────
+// ── 6. The colleague-seat claim ────────────────────────────────────────────
 
-describe("the product tour", () => {
-  it("only tours surfaces the workspace actually has", () => {
-    const surfaceIds = new Set(DEMO_SURFACES.map((s) => s.id));
-    for (const key of Object.keys(DEMO_TOUR)) {
-      expect(surfaceIds.has(key)).toBe(true);
-    }
-  });
-
-  it("gives every stop a title, a reason, and a plan statement", () => {
-    expect(DEMO_TOUR_STOP_COUNT).toBeGreaterThanOrEqual(12);
-    for (const stops of Object.values(DEMO_TOUR)) {
-      for (const stop of stops) {
-        expect(stop.title.length).toBeGreaterThan(0);
-        expect(stop.body.length).toBeGreaterThan(40);
-        expect(stop.plans.length).toBeGreaterThan(0);
-      }
-    }
-  });
-
-  /**
-   * The team-seat class of defect, in miniature: an entitlement nothing grants
-   * must render as "nobody has this", never as an unqualified feature claim.
-   */
-  it("says so plainly when no plan includes something", () => {
-    expect(plansIncluding(() => false)).toMatch(/not included/i);
+describe("the account-people surface", () => {
+  it("says plainly that no plan includes colleague access yet", () => {
+    expect(PLAN_ENTITLEMENTS.enterprise.teamSeats).toBe(0);
     expect(plansIncluding((e) => e.teamSeats > 0)).toMatch(/not included/i);
+  });
+
+  it("records invitations without claiming they grant access", () => {
+    for (const person of DEMO_ACCOUNT_PEOPLE) {
+      if (person.kind === "owner") continue;
+      expect(person.accessNote.toLowerCase(), person.id).toMatch(
+        /not granted|does not open/,
+      );
+    }
   });
 
   it("derives plan statements from the contract, so every plan is named correctly", () => {
@@ -283,17 +261,9 @@ describe("the product tour", () => {
     expect(plansIncluding((e) => e.analytics === "full")).toContain("Enterprise");
     expect(plansIncluding((e) => e.analytics === "full")).not.toContain("Starter");
   });
-
-  it("points every stop at an element id, so the coachmark has something to show", () => {
-    for (const stops of Object.values(DEMO_TOUR)) {
-      for (const stop of stops) {
-        expect(stop.targetId, `${stop.id} has no target`).toBeTruthy();
-      }
-    }
-  });
 });
 
-// ── 6. Claim guards on the acquisition page ────────────────────────────────
+// ── 7. Claim guards on the acquisition page ────────────────────────────────
 
 const FOR_HOSTS = readSource("app/[locale]/for-hosts/page.tsx");
 
@@ -317,7 +287,7 @@ const COMPETITOR_NAMES = [
 ];
 
 describe("the /for-hosts page", () => {
-  it("sells no team seat, because accepting an invitation grants no access", () => {
+  it("sells no colleague seat, because accepting an invitation grants no access", () => {
     expect(PLAN_ENTITLEMENTS.enterprise.teamSeats).toBe(0);
     expect(FOR_HOSTS).not.toMatch(/team seat/i);
     expect(FOR_HOSTS).not.toMatch(/teamSeats/);
@@ -365,67 +335,16 @@ describe("the /for-hosts page", () => {
   });
 });
 
-// ── 7. Claim guards across the demo workspace ──────────────────────────────
+// ── 8. The card cannot reach a real write path ─────────────────────────────
 
-describe("the demo workspace", () => {
-  const demoRoutes = walk(join(APPS_WEB, "app/[locale]/for-hosts/demo"));
-  const demoComponents = walk(join(APPS_WEB, "components/demo"));
-
-  it("has a page for every advertised surface", () => {
-    for (const surface of DEMO_SURFACES) {
-      const suffix = surface.href.replace("/for-hosts/demo", "");
-      const expected = join(
-        APPS_WEB,
-        "app/[locale]/for-hosts/demo",
-        suffix,
-        "page.tsx",
-      );
-      expect(demoRoutes, `${surface.href} has no page`).toContain(expected);
-    }
-  });
-
-  it("renders the persistent disclosure from the layout, not from each page", () => {
-    const layout = readSource("app/[locale]/for-hosts/demo/layout.tsx");
-    expect(layout).toContain("DemoBanner");
-  });
-
-  it("keeps sample data out of the search index", () => {
-    const layout = readSource("app/[locale]/for-hosts/demo/layout.tsx");
-    expect(layout).toMatch(/robots:\s*\{\s*index:\s*false/);
-  });
-
-  it("sells no team seat anywhere in the workspace", () => {
-    for (const file of [...demoRoutes, ...demoComponents]) {
-      expect(readFileSync(file, "utf8"), file).not.toMatch(/team seat/i);
-    }
-  });
-
-  it("loads no remote asset anywhere in the workspace", () => {
-    for (const file of [...demoRoutes, ...demoComponents]) {
-      const source = readFileSync(file, "utf8");
-      // The lone allowed absolute URL is the SVG namespace on the brand mark.
-      const remotes = (source.match(/https?:\/\/[^"'\s)]+/g) ?? []).filter(
-        (url) => url !== "http://www.w3.org/2000/svg",
-      );
-      expect(remotes, file).toEqual([]);
-    }
-  });
-
-  it("renders the real analytics dashboard rather than a lookalike", () => {
-    const dashboard = readSource(
-      "app/[locale]/for-hosts/demo/dashboard/page.tsx",
-    );
-    expect(dashboard).toContain("HostAnalyticsDashboard");
-    expect(dashboard).toContain("DEMO_ANALYTICS");
-  });
-
+describe("the demo job card", () => {
   it("renders the real discovery card rather than a lookalike", () => {
     const card = readSource("components/demo/DemoJobCard.tsx");
     expect(card).toContain("ListingCardGrid");
     expect(card).toContain("DEMO_LISTING");
   });
 
-  it("keeps a demo fixture out of every real write path", () => {
+  it("overrides every handler that would touch a real row or route", () => {
     const card = readSource("components/demo/DemoJobCard.tsx");
     // The card's default handlers open drawers that read the database for the
     // id they are given, navigate to routes that do not exist for a fixture, or
@@ -440,6 +359,21 @@ describe("the demo workspace", () => {
       "onReport",
     ]) {
       expect(card, `${handler} is not overridden`).toContain(`${handler}:`);
+    }
+  });
+
+  it("does the same for the seeker preview's card grids", () => {
+    const preview = readSource("components/demo/DemoSeekerPreview.tsx");
+    for (const handler of [
+      "onOpen",
+      "onHostClick",
+      "onHousingClick",
+      "onMealsClick",
+      "onPayClick",
+      "onLocationClick",
+      "onReport",
+    ]) {
+      expect(preview, `${handler} is not overridden`).toContain(`${handler}:`);
     }
   });
 });
