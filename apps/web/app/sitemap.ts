@@ -31,6 +31,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/privacy`, changeFrequency: "monthly", priority: 0.3 },
     { url: `${baseUrl}/cookies`, changeFrequency: "monthly", priority: 0.2 },
     { url: `${baseUrl}/refunds`, changeFrequency: "monthly", priority: 0.2 },
+    { url: `${baseUrl}/credits`, changeFrequency: "monthly", priority: 0.2 },
   ];
 
   const blogEntries: MetadataRoute.Sitemap = getEditorialPosts().map((post) => ({

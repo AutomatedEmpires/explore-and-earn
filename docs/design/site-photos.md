@@ -1,8 +1,102 @@
 # Site photography — Explore & Earn
 
 > Supersedes the retired image-CDN asset-management doc (deleted 2026-07-27).
-> There is no image CDN in this product any more. **All imagery — host uploads
-> and app-managed site photography alike — lives in Supabase Storage.**
+> There is no image CDN in this product any more. **Host uploads live in
+> Supabase Storage; the canonical marketing photography set ships IN-REPO.**
+
+## Two libraries, two homes
+
+| Library | Home | Written by |
+|---|---|---|
+| **Canonical site photography** (marketing surfaces) | `apps/web/public/photos/` — in-repo, optimized WebP | `scripts/fetch-unsplash-photos.mjs` (primary) + `scripts/fetch-commons-photos.mjs` (fallback) |
+| **Photo buckets** (host/seeker/housing/meals pickers) | Supabase Storage bucket `site-photos` | `scripts/seed-site-photos.mjs` |
+| **Host uploads** (listing + housing media) | Their own Supabase Storage buckets | The product itself |
+
+The rest of this document describes the **photo buckets**, which are still
+empty and still awaiting a key. The canonical in-repo set is described
+immediately below and has **no runtime dependency** on Supabase Storage.
+
+---
+
+## Canonical site photography (in-repo)
+
+24 photographs ship in `apps/web/public/photos/`, each as two WebP renditions
+(`{slug}-1600.webp` hero, `{slug}-800.webp` card) beside
+`manifest.json`, the licence + attribution record for the set.
+
+### Reading it
+
+```ts
+import { SitePhoto } from "@/components/media/SitePhoto";
+
+<SitePhoto slug="cda-lake-01" size="hero" priority />
+```
+
+`apps/web/lib/sitePhotos.ts` is the typed catalog; `SitePhoto` is the only way
+these assets should be rendered. An unknown slug throws at render — deliberately
+loud, so a typo surfaces at prerender instead of leaving a silent hole.
+
+### The licence bar (never lower it)
+
+Accepted: **Unsplash License · CC0 · Public domain · CC BY · CC BY-SA**.
+Rejected: anything NonCommercial, anything NoDerivatives, GFDL-only, non-free /
+fair-use, and anything whose licence cannot be determined from the provider API.
+A CC-BY/CC-BY-SA file with no parseable author is rejected too — attribution is
+a licence condition, and a credit we cannot render is a credit we do not have.
+
+`tests/unit/site-photo-manifest.test.ts` enforces this against the shipped
+bytes, so a hand-edited manifest or a swapped asset fails CI.
+
+### Attribution
+
+`/credits` renders **every** manifest entry with photographer, licence and
+source link, and is linked from the Legal column of the footer on every page.
+That page is how the CC-BY / CC-BY-SA attribution condition is satisfied and how
+the Unsplash API guideline on crediting photographers is honoured — it is a
+licence obligation, not decoration. `tests/unit/credits-page.test.ts` fails if a
+manifest entry does not reach it.
+
+### People safety
+
+A licence is not a model release. People in these frames are incidental and not
+identifiable, files flagged with Commons `Restrictions` (personality rights,
+trademark) are rejected outright, and **no caption, alt text, or surrounding
+copy may present a photographed person as an Explore & Earn host, worker, staff
+member, or named individual.** Alt text describes the scene only.
+
+### EXIF / GPS
+
+Every output is re-encoded from decoded pixels and `sharp.withMetadata()` is
+never called, so no EXIF block, GPS tag, or camera serial reaches the repo. The
+manifest test walks each shipped file's RIFF chunk table and asserts no `EXIF`
+or `XMP ` chunk exists — proven against bytes, not asserted in a comment.
+
+### Weight budget
+
+Each rendition is encoded down a quality ladder until it fits a 400 KB budget
+(`MAX_ASSET_BYTES` in `scripts/site-photo-pipeline.mjs`). One frame
+(`trail-03`, wall-to-wall conifer detail) does not compress under the budget
+without visible degradation and ships at ~485 KB; the whole set is ~7.6 MB.
+
+### Re-running acquisition
+
+```
+doppler run --project explore-and-earn --config prd -- \
+  node scripts/fetch-unsplash-photos.mjs --discover
+node scripts/fetch-commons-photos.mjs --discover     # no key needed
+node scripts/fetch-commons-photos.mjs --verify-only  # re-audit licences
+```
+
+Both scripts pin an exact provider-side id/title per asset, so a rebuild is
+reproducible and a file whose licence changed FAILS the run instead of shipping.
+Unsplash demo keys allow 50 requests/hour; the client sleeps until the window
+resets rather than writing a partial manifest. Pass `--no-trigger` **only** when
+re-encoding already-acquired photos — the download endpoint records a *use*, and
+firing it for a local re-compress would inflate a photographer's download count.
+
+---
+
+## Photo buckets (Supabase Storage) — still empty
 
 ## What changed, and why
 

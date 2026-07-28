@@ -83,6 +83,11 @@
 	border: 1px solid color-mix(in srgb, var(--status-success-fg) 18%, transparent);
 }
 
+.heroCredits {
+	background: linear-gradient(135deg, color-mix(in srgb, var(--palette-sky) 11%, transparent) 0%, color-mix(in srgb, var(--palette-amber) 9%, transparent) 100%);
+	border: 1px solid color-mix(in srgb, var(--palette-sky) 18%, transparent);
+}
+
 /* ── Badge pills ─────────────────────────────────────────────────────────── */
 
 .badge {
@@ -490,4 +495,85 @@
 	color: var(--color-cta);
 	text-decoration: underline;
 	text-underline-offset: 2px;
+}
+
+/* ── Photo credits (/credits) ────────────────────────────────────────────── */
+
+.creditList {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-10);
+}
+
+.creditCard {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-12);
+	padding: var(--space-10);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface-raised);
+}
+
+.creditThumb {
+	flex: 0 0 auto;
+	width: 8rem;
+	height: 5.5rem;
+	object-fit: cover;
+	border-radius: var(--radius-input);
+	background: var(--color-surface);
+}
+
+.creditBody {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	min-width: 0;
+}
+
+.creditAuthor {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.creditMeta {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	color: var(--text-secondary);
+}
+
+.creditAlt {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-muted);
+}
+
+.creditLink {
+	color: inherit;
+	text-decoration: underline;
+	text-underline-offset: 0.15em;
+}
+
+.creditLink:hover {
+	color: var(--text-primary);
+}
+
+@media (max-width: 30rem) {
+	.creditCard {
+		flex-direction: column;
+	}
+
+	.creditThumb {
+		width: 100%;
+		height: 9rem;
+	}
 }
