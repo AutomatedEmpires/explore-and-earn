@@ -114,6 +114,12 @@ const isPublicRoute = createRouteMatcher([
   "/cookies",
   "/refunds",
   "/sourced-listings", // Policy §6 disclosure page — linked from every sourced band.
+  // Photo attribution page — linked from the footer on every page and listed in
+  // the sitemap. It carries the CC-BY / CC-BY-SA credit for shipped photography,
+  // so an anonymous reader (and a crawler) MUST be able to reach it. Same class
+  // of miss as /swipe and /for-hosts/demo: a prerender proves the route builds,
+  // never that middleware lets a stranger through.
+  "/credits",
   "/about",
   "/faq", // Advertised in sitemap + llms.txt; legal/marketing content, no auth.
   "/for-hosts(.*)", // Prospect-facing host preview + the public demo workspace — MUST be reachable without a login. (Exact-match here 404d /for-hosts/demo in prod while the branch build passed: SSG prerender never runs middleware, so only production traffic could reveal it.)

@@ -39,6 +39,10 @@ const FOOTER_COLUMNS = [
 			{ label: "Privacy", href: "/privacy" },
 			{ label: "Cookies", href: "/cookies" },
 			{ label: "Refunds", href: "/refunds" },
+			// Attribution surface for site photography. This link is how the
+			// CC-BY / CC-BY-SA credit reaches a reader from every page, so it is
+			// a licence obligation, not a nicety — do not drop it while photos ship.
+			{ label: "Photo credits", href: "/credits" },
 		],
 	},
 ] as const;
