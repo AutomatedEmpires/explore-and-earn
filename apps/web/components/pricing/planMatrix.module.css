@@ -1,0 +1,209 @@
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+}
+
+.head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
+	color: var(--text-primary);
+}
+
+.lead {
+	margin: 0;
+	max-width: 60ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+/* Wide content scrolls inside its own container; the page never does. */
+.scroller {
+	width: 100%;
+	overflow-x: auto;
+	border-radius: var(--radius-feature);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+}
+
+.table {
+	width: 100%;
+	min-width: 46rem;
+	border-collapse: collapse;
+	font-family: var(--font-ui);
+}
+
+.caption {
+	padding: var(--space-12) var(--space-14);
+	text-align: left;
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-muted);
+}
+
+.table th,
+.table td {
+	padding: var(--space-14);
+	border-top: 1px solid var(--border-soft);
+	vertical-align: top;
+	text-align: left;
+}
+
+.rowHead {
+	display: table-cell;
+	width: 34%;
+	background: var(--color-paper);
+}
+
+.rowLabel {
+	display: block;
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.rowNote {
+	display: block;
+	margin-top: var(--space-4);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	font-weight: var(--font-weight-regular);
+	color: var(--text-secondary);
+}
+
+.tierHead {
+	width: 22%;
+}
+
+.tierName {
+	display: block;
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
+	font-size: var(--type-card-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
+.tierPrice {
+	display: block;
+	margin-top: var(--space-4);
+	font-size: var(--type-price-size);
+	font-weight: var(--font-weight-bold);
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+}
+
+.tierUnit {
+	margin-left: var(--space-2);
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-regular);
+	color: var(--text-muted);
+}
+
+.tierAnnual {
+	display: block;
+	margin-top: var(--space-2);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	font-weight: var(--font-weight-regular);
+	font-variant-numeric: tabular-nums;
+	color: var(--text-secondary);
+}
+
+.cell {
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-variant-numeric: tabular-nums;
+	color: var(--text-primary);
+}
+
+.actions {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.primaryButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--tap-min);
+	padding: var(--space-10) var(--space-14);
+	border-radius: var(--radius-button);
+	background: var(--gradient-action);
+	color: var(--color-cta-text);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	text-align: center;
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.secondaryButton {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--tap-min);
+	padding: var(--space-10) var(--space-14);
+	border-radius: var(--radius-button);
+	border: 1px solid var(--border-default);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	text-align: center;
+}
+
+.unavailable {
+	display: block;
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-muted);
+}
+
+.everyPlan {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding: var(--space-16);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-paper);
+}
+
+.everyPlanTitle {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.everyPlanList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+	margin: 0;
+	padding-left: var(--space-18);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
