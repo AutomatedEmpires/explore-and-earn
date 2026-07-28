@@ -1,14 +1,20 @@
 import { PLAN_ENTITLEMENTS } from "@explore-and-earn/contracts";
 
 /**
- * Product-tour content (spec D8).
+ * Anchored product-tour content (spec D19).
  *
- * Every stop says three things: what the feature DOES, why it MATTERS, and
- * which plans INCLUDE it. The third one is never typed as a literal — it is
+ * TWO THINGS CHANGED FROM THE P3 TOUR. First, the tour is now ONE ordered walk
+ * across the whole workspace rather than a per-page popup: a host evaluating
+ * the product wants a route through it, not a leaflet on every screen. Second,
+ * every stop names the element it is about, because a coachmark that points at
+ * nothing is just a modal with extra steps.
+ *
+ * Every stop still says three things: what the feature DOES, why it MATTERS,
+ * and which plans INCLUDE it. The third is never typed as a literal — it is
  * derived from PLAN_ENTITLEMENTS, the same contract the server enforces, so a
  * tour stop cannot outlive the entitlement it describes. That is the exact
- * failure mode the team-seat entitlement documents: marketing copy asserting a
- * capability the plan does not grant.
+ * failure mode the colleague-seat entitlement documents: marketing copy
+ * asserting a capability the plan does not grant.
  */
 
 type PaidTier = keyof typeof PLAN_ENTITLEMENTS;
@@ -50,133 +56,131 @@ export interface TourStop {
   readonly body: string;
   /** Which plans include it — always derived from PLAN_ENTITLEMENTS. */
   readonly plans: string;
-  /** The id of the element this stop is about; scrolled to and outlined. */
-  readonly targetId?: string;
+  /** The DEMO_SURFACES id this stop lives on. */
+  readonly surfaceId: string;
+  /** The route the stop lives on; the tour navigates there if needed. */
+  readonly href: string;
+  /** The id of the element the coachmark anchors to and outlines. */
+  readonly targetId: string;
+  /**
+   * Dim the rest of the page for this stop.
+   *
+   * Used SPARINGLY, and never as a way to force attention: a scrim on a stop
+   * whose target is one card among many hides the context that makes the card
+   * make sense. It is on only where the point of the stop is a single control
+   * the eye would otherwise have to hunt for.
+   */
+  readonly spotlight: boolean;
 }
 
-/** Stops per demo surface, keyed by the surface ids in DEMO_SURFACES. */
-export const DEMO_TOUR: Readonly<Record<string, readonly TourStop[]>> = {
-  overview: [
-    {
-      id: "overview_workspace",
-      title: "This is the workspace, not a brochure",
-      body: "Everything on this page is a real product surface fed with sample figures. You can build the same workspace — profile, drafts, previews — before you pay for anything; a plan is what makes a role publishable and discoverable.",
-      plans: "Building is free · publishing needs a plan",
-      targetId: "tour-overview-head",
-    },
-    {
-      id: "overview_metrics",
-      title: "The numbers that tell you to act",
-      body: "Views, saves, applications, and time-to-first-application sit together so you can tell a quiet listing from a slow week. A role with views and no saves has a copy problem; one with saves and no applications has a pay or housing problem.",
-      plans: plansIncluding(() => true),
-      targetId: "tour-overview-metrics",
-    },
-    {
-      id: "overview_allowance",
-      title: "What your plan lets you run",
-      body: "Active listings, invite credits, and announcement runs are counted against the plan, and the workspace shows the count next to the allowance so you are never surprised at publish time.",
-      plans: perPlanCounts("listings", "active listings"),
-      targetId: "tour-plan-usage",
-    },
-  ],
-  profile: [
-    {
-      id: "profile_page",
-      title: "One employer profile, every role hangs off it",
-      body: "Seekers judge the place before the posting. Your profile carries the season, the crew size, the housing, and the meals once — then every listing you publish inherits that context instead of restating it.",
-      plans: plansIncluding(() => true),
-      targetId: "tour-profile-cover",
-    },
-    {
-      id: "profile_facts",
-      title: "Facts, not adjectives",
-      body: "Housing and meals are structured fields with evidence behind them, not a sentence in a paragraph. That is why seekers can filter on them — and why a role that states them outranks one that leaves them blank.",
-      plans: plansIncluding(() => true),
-      targetId: "tour-profile-facts",
-    },
-  ],
-  job: [
-    {
-      id: "job_card",
-      title: "The card a seeker actually sees",
-      body: "This is the same component that renders in Seek, Swipe, and Map — not a mock-up of it. Housing, meals, and pay are on the face of the card, so nobody has to open a listing to find out whether they can afford to take it.",
-      plans: plansIncluding(() => true),
-      targetId: "tour-job-card",
-    },
-    {
-      id: "job_triad",
-      title: "Housing · Meals · Pay decide everything",
-      body: "The triad is the product's first law. Stating all three is what makes a role publishable, and a stated benefit is what a seeker filters on when they are choosing between your season and someone else's.",
-      plans: plansIncluding(() => true),
-      targetId: "tour-job-triad",
-    },
-    {
-      id: "job_match",
-      title: "Match scores you can read",
-      body: "The score is computed once and stored with the application, so the number on the card is the number in your pipeline. It is availability, benefits, and stated preferences — never a black box, and never sold to raise a listing's rank.",
-      plans: plansIncluding(() => true),
-      targetId: "tour-job-match",
-    },
-  ],
-  applicants: [
-    {
-      id: "applicants_pipeline",
-      title: "A pipeline, not an inbox",
-      body: "New, reviewing, offered. Each applicant carries their match score and the signals behind it, so a season's worth of applications stays a decision instead of a pile of email.",
-      plans: plansIncluding(() => true),
-      targetId: "tour-pipeline",
-    },
-    {
-      id: "applicants_invites",
-      title: "Go and get the seeker you want",
-      body: "When nobody has applied yet you are not stuck waiting. Search seekers by availability and benefits needs, and spend an invite credit to put your role in front of one.",
-      plans: perPlanCounts("includedInviteCredits", "invites a month"),
-      targetId: "tour-invites",
-    },
-    {
-      id: "applicants_messages",
-      title: "Messaging in the same place",
-      body: "The thread lives beside the application, so the answer to 'is the cabin a private room?' is attached to the person asking it and does not disappear into a personal inbox.",
-      plans: plansIncluding(() => true),
-      targetId: "tour-threads",
-    },
-  ],
-  announcements: [
-    {
-      id: "announcements_reach",
-      title: "Reach seekers who are not on your listing yet",
-      body: "An announcement goes out across the marketplace — a hiring push, a housing update, a deadline. It is how a season opens with a queue instead of a silence.",
-      plans: perPlanCounts("monthlyAnnouncements", "runs a month"),
-      targetId: "tour-announcements",
-    },
-    {
-      id: "announcements_states",
-      title: "Draft, schedule, publish",
-      body: "Write it now, send it when it matters. A draft has no engagement figures because it has not run — the workspace shows results only for announcements that actually went out.",
-      plans: plansIncluding((entitlement) => entitlement.monthlyAnnouncements > 0),
-      targetId: "tour-announce-list",
-    },
-  ],
-  dashboard: [
-    {
-      id: "dashboard_account",
-      title: "Account-wide performance",
-      body: "Applications by stage, live listing count, and invite acceptance — the figures that tell you whether the season is on track, on every plan.",
-      plans: plansIncluding((entitlement) => entitlement.analytics === "basic" || entitlement.analytics === "full"),
-      targetId: "tour-analytics",
-    },
-    {
-      id: "dashboard_per_listing",
-      title: "Per-listing diagnosis",
-      body: "Which role is pulling and which one is stalling, with applications by stage and invite acceptance for each. This is the paid depth: it turns 'hiring is slow' into 'the kitchen role is slow'.",
-      plans: plansIncluding((entitlement) => entitlement.analytics === "full"),
-      targetId: "tour-analytics-listings",
-    },
-  ],
-};
+/** The ordered walk. Ten stops, one route through the workspace. */
+export const DEMO_TOUR: readonly TourStop[] = [
+  {
+    id: "tour_profile",
+    title: "One employer profile, every role hangs off it",
+    body: "Seekers judge the place before the posting. Your profile carries the season, the crew size, the housing, and the meals once — then every role you publish inherits that context instead of restating it.",
+    plans: plansIncluding(() => true),
+    surfaceId: "profile",
+    href: "/for-hosts/demo/profile",
+    targetId: "tour-profile-identity",
+    spotlight: false,
+  },
+  {
+    id: "tour_listing",
+    title: "Seven roles, and the two that are not live say so",
+    body: "Five roles are published and taking applications, one closes in under a week, and two are drafts. A draft costs nothing, is not discoverable, and takes no applications — publishing is what a plan buys.",
+    plans: perPlanCounts("listings", "active listings"),
+    surfaceId: "listings",
+    href: "/for-hosts/demo/listings",
+    targetId: "tour-listing-inventory",
+    spotlight: false,
+  },
+  {
+    id: "tour_seeker_view",
+    title: "See exactly what a seeker sees",
+    body: "This is your profile and your role rendered by the seeker's own components — the same card that appears in Seek, Swipe and Map. Nothing is redrawn for the preview, so there is no gap between the preview and the real thing.",
+    plans: plansIncluding(() => true),
+    surfaceId: "seeker",
+    href: "/for-hosts/demo/seeker-view",
+    targetId: "tour-seeker-preview",
+    spotlight: false,
+  },
+  {
+    id: "tour_pipeline",
+    title: "A pipeline, not an inbox",
+    body: "Ninety-six applications across eight stages, each carrying the match score computed when the application was made. Move a candidate and every number on the page moves with them, because the totals are folds over the applications, not figures stored beside them.",
+    plans: plansIncluding(() => true),
+    surfaceId: "applicants",
+    href: "/for-hosts/demo/applicants",
+    targetId: "tour-pipeline",
+    spotlight: false,
+  },
+  {
+    id: "tour_outreach",
+    title: "Go and get the seeker you want",
+    body: "When nobody has applied yet you are not stuck waiting. Search seekers by availability and by the benefits they need, then spend an invite credit to put your role in front of one. Each campaign shows what it returned, so a weak audience is visible rather than expensive.",
+    plans: perPlanCounts("includedInviteCredits", "invites a month"),
+    surfaceId: "outreach",
+    href: "/for-hosts/demo/outreach",
+    targetId: "tour-outreach-campaigns",
+    spotlight: false,
+  },
+  {
+    id: "tour_messages",
+    title: "The answer stays attached to the person who asked",
+    body: "Threads live beside the application, with the candidate's stage, availability and housing need in the rail next to them. 'Is the cabin a private room?' is answered once, in the place the decision gets made, instead of disappearing into a personal inbox.",
+    plans: plansIncluding(() => true),
+    surfaceId: "messages",
+    href: "/for-hosts/demo/messages",
+    targetId: "tour-message-thread",
+    spotlight: false,
+  },
+  {
+    id: "tour_announcements",
+    title: "Reach seekers who have not found your listing yet",
+    body: "An announcement goes out across the marketplace — a hiring push, a housing update, a closing date. Drafts and scheduled runs carry no engagement figures, because they have not run: numbers appear only against announcements that actually went out.",
+    plans: perPlanCounts("monthlyAnnouncements", "runs a month"),
+    surfaceId: "announcements",
+    href: "/for-hosts/demo/announcements",
+    targetId: "tour-announcement-list",
+    spotlight: false,
+  },
+  {
+    id: "tour_analytics",
+    title: "Numbers that name the role, not the mood",
+    body: "Trends, funnel, discovery sources, and a role-by-role comparison with a plain-language diagnosis under each one. This is the paid depth: it turns 'hiring is slow' into 'the kitchen role is slow, and here is the ratio that says so'.",
+    plans: plansIncluding((entitlement) => entitlement.analytics === "full"),
+    surfaceId: "dashboard",
+    href: "/for-hosts/demo/dashboard",
+    targetId: "tour-analytics-comparison",
+    spotlight: false,
+  },
+  {
+    id: "tour_plan_usage",
+    title: "What your plan lets you run, counted before you hit it",
+    body: "Active listings, invite credits, and announcement runs are counted against the allowance and shown next to it. You find out you are at the limit here, not at publish time.",
+    plans: perPlanCounts("listings", "active listings"),
+    surfaceId: "plan",
+    href: "/for-hosts/demo/plan",
+    targetId: "tour-plan-usage",
+    spotlight: true,
+  },
+  {
+    id: "tour_activation",
+    title: "Build it all first; pay when you want to publish",
+    body: "An account, a profile, branding, drafts and previews cost nothing. A plan is what makes a role publishable and discoverable, and what opens applications, messaging, announcements and real analytics. That is the whole line.",
+    plans: "Building is free · publishing needs a plan",
+    surfaceId: "plan",
+    href: "/for-hosts/demo/plan",
+    targetId: "tour-activation",
+    spotlight: true,
+  },
+];
 
 /** Total stops across the workspace — pinned by the fixture-integrity test. */
-export const DEMO_TOUR_STOP_COUNT = Object.values(DEMO_TOUR).reduce(
-  (total, stops) => total + stops.length,
-  0,
-);
+export const DEMO_TOUR_STOP_COUNT = DEMO_TOUR.length;
+
+/** Stops that live on a given surface, for the per-surface "start here" hint. */
+export function tourStopsForSurface(surfaceId: string): readonly TourStop[] {
+  return DEMO_TOUR.filter((stop) => stop.surfaceId === surfaceId);
+}

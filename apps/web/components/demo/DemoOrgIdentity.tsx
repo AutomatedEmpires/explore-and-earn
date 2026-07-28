@@ -1,43 +1,69 @@
 import { Icon } from "@explore-and-earn/ui";
 
-import { DEMO_ORG } from "./enterpriseDemo";
+import { SitePhoto } from "../media/SitePhoto";
+import { DEMO_LIVE_ROLES, DEMO_ORG } from "./enterpriseDemo";
 import { DemoBrandMark } from "./DemoBrandMark";
 import { DemoLabel } from "./DemoLabel";
 import styles from "./demoChrome.module.css";
 
 /**
- * The demo employer's identity block.
+ * The demo employer's identity band.
  *
- * The cover is a LANE GRADIENT and the logo is the in-repo brand mark (spec
- * D9) — no stock photography, no invented brand. The gradient frame is also the
- * photography SLOT: when the founder supplies an asset pack, a real cover drops
- * into this element with no layout change.
+ * The cover is a REAL PHOTOGRAPH from the site-photo catalog (spec D16
+ * supersedes D9's gradient-first rule). Alt text comes from the catalog and
+ * describes the scene; nothing here captions a photographed person as staff of
+ * this product, and the org "logo" remains the in-repo brand mark rather than
+ * an invented one.
  */
 export function DemoOrgIdentity({ id }: { readonly id?: string }) {
+  const openings = DEMO_LIVE_ROLES.reduce(
+    (total, role) => total + role.openPositions,
+    0,
+  );
+
   return (
-    <div id={id}>
-      <div className={styles.orgCover}>
-        <div className={styles.orgCoverArt} aria-hidden="true" />
-        <div className={styles.orgCoverScrim} aria-hidden="true" />
-        <div className={styles.orgCoverInner}>
-          <span className={styles.orgLogo}>
+    <div className={styles.identityBand} id={id}>
+      <div className={styles.identityPhoto}>
+        <SitePhoto
+          slug={DEMO_ORG.coverPhotoSlug}
+          size="hero"
+          priority
+          sizes="(min-width: 1120px) 1120px, 100vw"
+        />
+        <div className={styles.identityScrim} aria-hidden="true" />
+      </div>
+
+      <div className={styles.identityBody}>
+        <div className={styles.identityTop}>
+          <span className={styles.identityMark}>
             <DemoBrandMark size={26} />
           </span>
-          <div>
-            <h2 className={styles.orgName}>{DEMO_ORG.name}</h2>
-            <div className={styles.orgMeta}>
-              <span>{DEMO_ORG.location}</span>
-              <span className={styles.orgBadge}>
-                <Icon name="trust.verified_host" size={14} aria-hidden />
-                Verified host
-              </span>
-              <span className={styles.orgBadge}>{DEMO_ORG.planName} plan</span>
-            </div>
-          </div>
+          <h2 className={styles.identityName}>{DEMO_ORG.name}</h2>
+          <span className={styles.orgBadge}>
+            <Icon name="trust.verified_host" size={14} aria-hidden />
+            Verified host
+          </span>
+          <span className={styles.orgBadge}>{DEMO_ORG.planName} plan</span>
+          <DemoLabel text={DEMO_ORG.demoLabel} />
         </div>
+
+        <div className={styles.seasonStrip}>
+          <span className={styles.seasonChip}>
+            <Icon name="nav.map" size={14} aria-hidden />
+            {DEMO_ORG.location}
+          </span>
+          <span className={styles.seasonChip}>
+            <Icon name="status.seasonal" size={14} aria-hidden />
+            {DEMO_ORG.seasonLabel}
+          </span>
+          <span className={styles.seasonChip}>
+            <Icon name="status.open" size={14} aria-hidden />
+            {openings} positions open across {DEMO_LIVE_ROLES.length} live roles
+          </span>
+        </div>
+
+        <p className={styles.lede}>{DEMO_ORG.tagline}</p>
       </div>
-      <p className={`${styles.panelNote} ${styles.spacedNote}`}>{DEMO_ORG.tagline}</p>
-      <DemoLabel text={DEMO_ORG.demoLabel} />
     </div>
   );
 }
@@ -59,11 +85,14 @@ export function DemoOrgFacts({ id }: { readonly id?: string }) {
           </li>
         ))}
       </ul>
-      <div className={styles.photoSlot}>
-        <span className={styles.photoSlotLabel}>
-          Photo slot — your own photography sits here
-        </span>
+      <div className={styles.detailHero}>
+        <SitePhoto
+          slug={DEMO_ORG.seasonPhotoSlug}
+          size="hero"
+          sizes="(min-width: 1120px) 1080px, 100vw"
+        />
       </div>
     </div>
   );
 }
+

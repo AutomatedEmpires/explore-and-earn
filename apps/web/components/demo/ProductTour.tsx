@@ -1,30 +1,67 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@explore-and-earn/ui";
 
 import { HOST_FUNNEL_EVENTS, captureEvent } from "../../lib/analytics";
-import { DEMO_SURFACES } from "./enterpriseDemo";
 import { DEMO_TOUR, type TourStop } from "./tourStops";
 import styles from "./ProductTour.module.css";
 
-const STORAGE_KEY = "ee_demo_tour_v1";
+/**
+ * The anchored product tour (spec D19).
+ *
+ * WHAT THIS REPLACED, AND WHY. The P3 tour was a panel that opened itself on a
+ * visitor's first demo surface and described the page in the abstract. D19
+ * replaces it with coachmarks attached to real controls, walked one at a time
+ * across the whole workspace. Three consequences follow, and all three are
+ * deliberate:
+ *
+ *   · NOTHING AUTO-OPENS. A tour that starts itself is an obstruction on a page
+ *     built to make a product desirable. The launcher is always visible in the
+ *     demo toolbar and says whether the tour is new, resumable, or finished.
+ *
+ *   · NOTHING IS TRAPPED. The panel is a non-modal dialog: the page underneath
+ *     stays scrollable and clickable, because the whole point is to read the
+ *     thing the stop describes while the stop describes it. Focus MOVES into
+ *     the panel when the visitor opens or advances it and RETURNS to the
+ *     launcher when it closes — but it is not trapped, because trapping the
+ *     page behind a non-blocking panel would be a lie about what the panel is.
+ *     The one exception is a `spotlight` stop, where a scrim is drawn; even
+ *     there the scrim is click-through-to-dismiss rather than a wall.
+ *
+ *   · PROGRESS SURVIVES NAVIGATION. Stops live on different routes, so the tour
+ *     pushes the route and re-anchors on arrival, and the current index is
+ *     written to localStorage after every move. Closing the tour on stop six
+ *     and coming back later resumes at stop six.
+ *
+ * ACCESSIBILITY. The panel is labelled and described by its own heading and
+ * body, the step counter is announced through a polite live region, Escape
+ * closes and restores focus, and every control is a real button. The target
+ * element gets `data-tour-target="active"`, which the workspace stylesheet
+ * turns into a visible outline — an outline rather than only a colour so the
+ * highlight survives a high-contrast or forced-colours mode.
+ */
+
+const STORAGE_KEY = "ee_demo_tour_v2";
 
 interface TourMemory {
-  /** Surface ids whose tour has been walked to the end. */
-  readonly done: readonly string[];
-  /** True once host_demo_tour_completed has fired — it fires at most once. */
+  /** Index the visitor last reached. Resumed from, never silently skipped. */
+  readonly index: number;
+  /** True once the last stop has been reached — the event fires at most once. */
   readonly completed: boolean;
-  /** True once the tour has auto-opened, so it never auto-opens again. */
-  readonly greeted: boolean;
 }
 
-const EMPTY_MEMORY: TourMemory = { done: [], completed: false, greeted: false };
-
-/** Surfaces that actually have stops — the set "completed" is measured against. */
-const TOURED_SURFACES = DEMO_SURFACES.filter(
-  (surface) => (DEMO_TOUR[surface.id]?.length ?? 0) > 0,
-).map((surface) => surface.id);
+const EMPTY_MEMORY: TourMemory = { index: 0, completed: false };
 
 function readMemory(): TourMemory {
   if (typeof window === "undefined") return EMPTY_MEMORY;
@@ -32,13 +69,11 @@ function readMemory(): TourMemory {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return EMPTY_MEMORY;
     const parsed = JSON.parse(raw) as Partial<TourMemory>;
-    return {
-      done: Array.isArray(parsed.done)
-        ? parsed.done.filter((id): id is string => typeof id === "string")
-        : [],
-      completed: parsed.completed === true,
-      greeted: parsed.greeted === true,
-    };
+    const index =
+      typeof parsed.index === "number" && Number.isFinite(parsed.index)
+        ? Math.min(Math.max(0, Math.trunc(parsed.index)), DEMO_TOUR.length - 1)
+        : 0;
+    return { index, completed: parsed.completed === true };
   } catch {
     // Private mode, quota, or a value someone else wrote. Start clean rather
     // than throwing inside a marketing page.
@@ -60,77 +95,110 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export interface ProductTourProps {
-  /** A key of DEMO_TOUR — the surface whose stops this instance walks. */
-  readonly surfaceId: string;
+/** Does this pathname sit on the stop's route (locale prefix tolerated)? */
+function onRoute(pathname: string, href: string): boolean {
+  return pathname === href || pathname.endsWith(href);
 }
 
-/**
- * Contextual product tour (spec D8).
- *
- * ONE popup at a time and no scrim: this is a coachmark, not a modal, so the
- * visitor can read the thing the stop is describing while the stop describes
- * it. That choice drives the accessibility model — focus MOVES into the panel
- * when the visitor opens it and RETURNS to the launcher when it closes, but
- * focus is not trapped, because trapping the page behind a non-blocking panel
- * would be a lie about what the panel is.
- *
- * The tour auto-opens once, ever, on a visitor's first demo surface. After that
- * it is launcher-only: a tour that reopens itself on every page is an
- * obstruction, and the founder's brief is to make the product desirable, not
- * unavoidable.
- */
-export function ProductTour({ surfaceId }: ProductTourProps) {
-  const stops: readonly TourStop[] = DEMO_TOUR[surfaceId] ?? [];
+interface TourController {
+  readonly open: boolean;
+  readonly index: number;
+  readonly completed: boolean;
+  readonly start: (index?: number) => void;
+  readonly close: () => void;
+}
+
+const TourContext = createContext<TourController | null>(null);
+
+export function ProductTourProvider({
+  children,
+}: {
+  readonly children: ReactNode;
+}) {
+  const router = useRouter();
+  const pathname = usePathname() ?? "";
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
-  const [walked, setWalked] = useState(false);
-  const launcherRef = useRef<HTMLButtonElement | null>(null);
+  const [completed, setCompleted] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const restoreFocus = useRef(false);
+  const wantsFocus = useRef(false);
 
-  // First visit ever: greet once, without stealing focus (an unrequested focus
-  // jump on page load is disorienting for screen-reader and keyboard users).
   useEffect(() => {
-    if (stops.length === 0) return;
     const memory = readMemory();
-    setWalked(memory.done.includes(surfaceId));
-    if (!memory.greeted) {
-      writeMemory({ ...memory, greeted: true });
-      setOpen(true);
-    }
-  }, [surfaceId, stops.length]);
+    setIndex(memory.index);
+    setCompleted(memory.completed);
+  }, []);
 
-  // Highlight + reveal the element this stop is about.
+  const stop: TourStop | undefined = DEMO_TOUR[index];
+  const isLast = index === DEMO_TOUR.length - 1;
+  const needsNavigation = stop ? !onRoute(pathname, stop.href) : false;
+  const targetId = stop ? stop.targetId : null;
+
+  // ── Anchoring ────────────────────────────────────────────────────────────
+  // The target may not be in the DOM yet (a route push is in flight, or the
+  // page is still streaming), so measurement retries on an animation frame
+  // until it lands rather than giving up and drawing a floating box.
   useEffect(() => {
-    if (!open) return;
-    const targetId = stops[index]?.targetId;
-    if (!targetId) return;
-    const element = document.getElementById(targetId);
-    if (!element) return;
-    element.setAttribute("data-tour-target", "active");
-    element.scrollIntoView({
-      block: "center",
-      behavior: prefersReducedMotion() ? "auto" : "smooth",
-    });
+    if (!open || !targetId) {
+      setRect(null);
+      return;
+    }
+
+    let frame = 0;
+    let cancelled = false;
+    let element: HTMLElement | null = null;
+    // Last committed geometry. The loop only calls setRect when the numbers
+    // actually move: getBoundingClientRect returns a fresh object every frame,
+    // so committing it unconditionally would re-render the whole workspace
+    // sixty times a second for a panel that is standing still.
+    let last = "";
+
+    function measure() {
+      if (cancelled) return;
+      const found = targetId ? document.getElementById(targetId) : null;
+      if (found) {
+        if (found !== element) {
+          element?.removeAttribute("data-tour-target");
+          element = found;
+          element.setAttribute("data-tour-target", "active");
+          element.scrollIntoView({
+            block: "center",
+            behavior: prefersReducedMotion() ? "auto" : "smooth",
+          });
+        }
+        const next = found.getBoundingClientRect();
+        const key = `${Math.round(next.top)}:${Math.round(next.left)}:${Math.round(next.width)}:${Math.round(next.height)}`;
+        if (key !== last) {
+          last = key;
+          setRect(next);
+        }
+      } else if (last !== "") {
+        last = "";
+        setRect(null);
+      }
+      frame = window.requestAnimationFrame(measure);
+    }
+
+    frame = window.requestAnimationFrame(measure);
     return () => {
-      element.removeAttribute("data-tour-target");
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      element?.removeAttribute("data-tour-target");
     };
-  }, [open, index, stops]);
+  }, [open, targetId, pathname]);
 
   // Move focus into the panel only when the visitor asked for it.
   useEffect(() => {
-    if (open && restoreFocus.current) {
+    if (open && wantsFocus.current) {
+      wantsFocus.current = false;
       panelRef.current?.focus();
     }
-  }, [open]);
+  }, [open, index]);
 
   const close = useCallback(() => {
     setOpen(false);
-    if (restoreFocus.current) {
-      launcherRef.current?.focus();
-      restoreFocus.current = false;
-    }
+    setRect(null);
   }, []);
 
   useEffect(() => {
@@ -145,112 +213,181 @@ export function ProductTour({ surfaceId }: ProductTourProps) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, close]);
 
-  const finish = useCallback(() => {
-    const memory = readMemory();
-    const done = memory.done.includes(surfaceId)
-      ? memory.done
-      : [...memory.done, surfaceId];
-    const allWalked = TOURED_SURFACES.every((id) => done.includes(id));
-    const completed = memory.completed || allWalked;
-    writeMemory({ done, completed, greeted: true });
-    setWalked(true);
-    // Fire once, and only when every toured surface has actually been walked.
-    if (allWalked && !memory.completed) {
-      captureEvent(HOST_FUNNEL_EVENTS.hostDemoTourCompleted, {
-        surfaces: TOURED_SURFACES.length,
-      });
-    }
-    close();
-  }, [surfaceId, close]);
+  const goTo = useCallback(
+    (next: number) => {
+      const clamped = Math.min(Math.max(0, next), DEMO_TOUR.length - 1);
+      const target = DEMO_TOUR[clamped];
+      setIndex(clamped);
+      wantsFocus.current = true;
+      const nowCompleted = completed || clamped === DEMO_TOUR.length - 1;
+      if (nowCompleted && !completed) {
+        setCompleted(true);
+        captureEvent(HOST_FUNNEL_EVENTS.demoTourCompleted, {
+          stops: DEMO_TOUR.length,
+        });
+      }
+      writeMemory({ index: clamped, completed: nowCompleted });
+      if (!onRoute(pathname, target.href)) router.push(target.href);
+    },
+    [completed, pathname, router],
+  );
 
-  if (stops.length === 0) return null;
+  const start = useCallback(
+    (at?: number) => {
+      const memory = readMemory();
+      const startIndex =
+        typeof at === "number" ? at : memory.completed ? 0 : memory.index;
+      wantsFocus.current = true;
+      setOpen(true);
+      goTo(startIndex);
+    },
+    [goTo],
+  );
 
-  const stop = stops[index];
-  const isLast = index === stops.length - 1;
-  const titleId = `tour-title-${surfaceId}`;
-  const bodyId = `tour-body-${surfaceId}`;
+  const controller = useMemo<TourController>(
+    () => ({ open, index, completed, start, close }),
+    [open, index, completed, start, close],
+  );
+
+  const anchorStyle = useMemo(() => {
+    if (!rect) return undefined;
+    return {
+      "--anchor-top": `${Math.round(rect.top)}px`,
+      "--anchor-left": `${Math.round(rect.left)}px`,
+      "--anchor-width": `${Math.round(rect.width)}px`,
+      "--anchor-height": `${Math.round(rect.height)}px`,
+    } as React.CSSProperties;
+  }, [rect]);
 
   return (
-    <>
-      <button
-        type="button"
-        ref={launcherRef}
-        className={styles.launcher}
-        aria-expanded={open}
-        onClick={() => {
-          restoreFocus.current = true;
-          setIndex(0);
-          setOpen(true);
-        }}
-      >
-        <Icon name="system.info" size={16} aria-hidden />
-        {walked ? "Replay this tour" : "Show me around"}
-      </button>
+    <TourContext.Provider value={controller}>
+      {children}
 
-      {open ? (
-        <div
-          ref={panelRef}
-          className={styles.panel}
-          role="dialog"
-          aria-labelledby={titleId}
-          aria-describedby={bodyId}
-          tabIndex={-1}
-        >
-          <div className={styles.panelTop}>
-            <span className={styles.step}>
-              Step {index + 1} of {stops.length}
-            </span>
+      {open && stop ? (
+        <>
+          {stop.spotlight ? (
             <button
               type="button"
-              className={styles.close}
+              className={styles.scrim}
+              style={anchorStyle}
               onClick={close}
-              aria-label="Close the tour"
-            >
-              <Icon name="action.close" size={18} aria-hidden />
-            </button>
-          </div>
+              aria-label="Close the product tour"
+              tabIndex={-1}
+            />
+          ) : null}
 
-          <h2 id={titleId} className={styles.title}>
-            {stop.title}
-          </h2>
-          <p id={bodyId} className={styles.body}>
-            {stop.body}
-          </p>
-          <span className={styles.plans}>
-            <Icon name="system.success" size={14} aria-hidden />
-            {stop.plans}
-          </span>
+          <div
+            ref={panelRef}
+            className={styles.panel}
+            data-placement={rect ? "anchored" : "docked"}
+            style={anchorStyle}
+            role="dialog"
+            aria-modal="false"
+            aria-labelledby="tour-panel-title"
+            aria-describedby="tour-panel-body"
+            tabIndex={-1}
+          >
+            <div className={styles.panelTop}>
+              <p className={styles.step} aria-live="polite">
+                Step {index + 1} of {DEMO_TOUR.length}
+                {needsNavigation ? " — opening the page…" : ""}
+              </p>
+              <button
+                type="button"
+                className={styles.close}
+                onClick={close}
+                aria-label="Close the product tour"
+              >
+                <Icon name="action.close" size={18} aria-hidden />
+              </button>
+            </div>
 
-          <div className={styles.actions}>
-            {index > 0 ? (
+            <h2 id="tour-panel-title" className={styles.title}>
+              {stop.title}
+            </h2>
+            <p id="tour-panel-body" className={styles.body}>
+              {stop.body}
+            </p>
+            <span className={styles.plans}>
+              <Icon name="system.success" size={14} aria-hidden />
+              {stop.plans}
+            </span>
+
+            <ol className={styles.progress} aria-hidden="true">
+              {DEMO_TOUR.map((entry, entryIndex) => (
+                <li
+                  key={entry.id}
+                  className={styles.pip}
+                  data-state={
+                    entryIndex === index
+                      ? "current"
+                      : entryIndex < index
+                        ? "done"
+                        : "todo"
+                  }
+                />
+              ))}
+            </ol>
+
+            <div className={styles.actions}>
               <button
                 type="button"
                 className={styles.back}
-                onClick={() => setIndex((current) => Math.max(0, current - 1))}
+                onClick={() => goTo(index - 1)}
+                disabled={index === 0}
               >
                 Back
               </button>
-            ) : null}
-            {isLast ? (
-              <button type="button" className={styles.next} onClick={finish}>
-                Done
-                <Icon name="system.success" size={16} aria-hidden />
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={styles.next}
-                onClick={() =>
-                  setIndex((current) => Math.min(stops.length - 1, current + 1))
-                }
-              >
-                Next
-                <Icon name="action.forward" size={16} aria-hidden />
-              </button>
-            )}
+              {isLast ? (
+                <button type="button" className={styles.next} onClick={close}>
+                  Done
+                  <Icon name="system.success" size={16} aria-hidden />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.next}
+                  onClick={() => goTo(index + 1)}
+                >
+                  Next
+                  <Icon name="action.forward" size={16} aria-hidden />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       ) : null}
-    </>
+    </TourContext.Provider>
+  );
+}
+
+/**
+ * The always-visible tour affordance.
+ *
+ * Its label is the tour's state: a visitor who left at stop six is told they
+ * can resume rather than being silently dropped back at stop one.
+ */
+export function TourLauncher({ className }: { readonly className?: string }) {
+  const tour = useContext(TourContext);
+  const [label, setLabel] = useState("Product tour");
+
+  useEffect(() => {
+    const memory = readMemory();
+    if (memory.completed) setLabel("Replay product tour");
+    else if (memory.index > 0) setLabel(`Resume tour · step ${memory.index + 1}`);
+  }, [tour?.open]);
+
+  if (!tour) return null;
+
+  return (
+    <button
+      type="button"
+      className={[styles.launcher, className].filter(Boolean).join(" ")}
+      onClick={() => tour.start()}
+      aria-expanded={tour.open}
+    >
+      <Icon name="system.info" size={16} aria-hidden />
+      {label}
+    </button>
   );
 }

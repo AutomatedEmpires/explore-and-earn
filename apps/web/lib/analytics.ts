@@ -27,8 +27,25 @@ export const HOST_FUNNEL_EVENTS = {
   hostLandingViewed: "host_landing_viewed",
   /** A demo workspace surface was opened. */
   hostDemoOpened: "host_demo_opened",
-  /** The product tour was walked to the end on every demo surface. */
-  hostDemoTourCompleted: "host_demo_tour_completed",
+  /**
+   * A specific demo surface was viewed, carrying `{ surface }`.
+   *
+   * Deliberately separate from host_demo_opened: that event answers "did the
+   * demo get opened at all", which is the funnel question, while this one
+   * answers "which surfaces did they actually walk", which is the product
+   * question. Collapsing them would make the second unanswerable.
+   */
+  demoSurfaceViewed: "demo_surface_viewed",
+  /** A candidate detail view was opened from the demo pipeline. */
+  demoCandidateOpened: "demo_candidate_opened",
+  /** A candidate was moved between stages in the demo (session-local only). */
+  demoStageMoved: "demo_stage_moved",
+  /** The seeker-side preview of the demo workspace was opened. */
+  demoViewAsSeeker: "demo_view_as_seeker",
+  /** The demo was reset to its canonical state. */
+  demoReset: "demo_reset",
+  /** The anchored product tour was walked to its last stop. */
+  demoTourCompleted: "demo_tour_completed",
   /**
    * The pricing area was actually SEEN — scrolled into the viewport, not merely
    * present in a page the visitor left at the hero. That distinction is the

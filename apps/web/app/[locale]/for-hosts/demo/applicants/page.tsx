@@ -1,69 +1,47 @@
 import Link from "next/link";
-import { PLAN_ENTITLEMENTS } from "@explore-and-earn/contracts";
 
 import {
-  DEMO_ORG,
-  DemoApplicantPipeline,
+  DEMO_APPLICANTS,
+  DEMO_LIVE_ROLES,
+  DEMO_QUALIFIED_MATCHES,
+  DemoApplicantWorkspace,
   DemoSurfaceHeader,
-  DemoThreadList,
+  QUALIFIED_MATCH_THRESHOLD,
 } from "../../../../../components/demo";
 import styles from "../../../../../components/demo/demoChrome.module.css";
 
-/** Demo workspace — applicants, invites and messaging. */
+/** Demo workspace — the applicant pipeline, the list, and the detail view. */
 export default function DemoApplicantsPage() {
-  const inviteCredits =
-    PLAN_ENTITLEMENTS[DEMO_ORG.planTier].includedInviteCredits;
-
   return (
     <div className={styles.surface}>
       <DemoSurfaceHeader
         surfaceId="applicants"
         eyebrow="Applicants"
         title="A season of applications, as a decision"
-        lede="Stages, stored match scores, and the signals behind them. The message thread sits beside the application, so the answer to a question stays attached to the person who asked it."
+        lede={`All ${DEMO_APPLICANTS.length} applications across ${DEMO_LIVE_ROLES.length} live roles, each carrying the match score computed when it was made. Open anyone, move them between stages, and watch every total on the page move with them.`}
       />
 
-      <div className={styles.panel}>
-        <div className={styles.panelHead}>
-          <div>
-            <h2 className={styles.panelTitle}>Pipeline</h2>
-            <p className={styles.panelNote}>
-              New, reviewing, offered — with the score that was computed when the
-              application was made, not recomputed to flatter the card.
-            </p>
-          </div>
-        </div>
-        <DemoApplicantPipeline id="tour-pipeline" />
+      <div className={styles.callout}>
+        <p className={styles.calloutTitle}>
+          {DEMO_QUALIFIED_MATCHES} of {DEMO_APPLICANTS.length} applications
+          score {QUALIFIED_MATCH_THRESHOLD} or above
+        </p>
+        <p className={styles.calloutBody}>
+          That figure is not stored anywhere — it is a count of the applications
+          on this page whose score clears the threshold. Every other number here
+          works the same way, which is why the pipeline, the funnel and the
+          analytics dashboard cannot disagree about the same season.
+        </p>
       </div>
 
-      <div className={styles.twoCol}>
-        <div className={styles.panel} id="tour-invites">
-          <div className={styles.panelHead}>
-            <h2 className={styles.panelTitle}>Invite seekers directly</h2>
-          </div>
-          <p className={styles.panelNote}>
-            When nobody has applied yet you are not stuck waiting. Search seekers
-            by availability and by the benefits they need, then spend an invite
-            credit to put your role in front of one. The{" "}
-            {DEMO_ORG.planName} plan includes {inviteCredits} invites a month,
-            and credit packs extend beyond the monthly allowance.
-          </p>
-        </div>
-
-        <div className={styles.panel}>
-          <div className={styles.panelHead}>
-            <h2 className={styles.panelTitle}>Messages</h2>
-          </div>
-          <DemoThreadList id="tour-threads" />
-        </div>
-      </div>
+      <DemoApplicantWorkspace id="tour-pipeline" />
 
       <div className={styles.linkRow}>
         <Link className={styles.primaryCta} href="/sign-up?role=host">
           Build your host profile
         </Link>
-        <Link className={styles.ghostCta} href="/for-hosts/demo/announcements">
-          Next: announcements
+        <Link className={styles.ghostCta} href="/for-hosts/demo/outreach">
+          Next: outreach
         </Link>
       </div>
     </div>

@@ -1,26 +1,29 @@
 /*
- * Product tour — contextual coachmarks for the demo workspace.
+ * Anchored product-tour coachmark (spec D19).
  *
- * ONE panel at a time, non-blocking (no scrim): the visitor can still read the
- * surface the stop is describing, which is the whole point of a coachmark.
- * Tokens only.
+ * Tokens only. The panel is FIXED and positioned from four custom properties
+ * the component writes after measuring the target, so the layout math lives in
+ * one place and the stylesheet stays declarative. When no target has been
+ * measured yet the panel docks to the bottom of the viewport instead of
+ * jumping to the top-left corner.
  */
 
+/* ── Launcher ──────────────────────────────────────────────────────────── */
 .launcher {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-8);
-  align-self: flex-start;
+  gap: var(--space-6);
   min-height: var(--tap-min);
-  padding: var(--space-8) var(--space-16);
+  padding: var(--space-6) var(--space-14);
   border-radius: var(--radius-pill);
-  border: 1.5px solid var(--border-ink);
+  border: 1px solid var(--border-ink-warm);
   background: var(--color-surface);
   color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .launcher:hover {
@@ -32,23 +35,51 @@
   box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-cta);
 }
 
-.panel {
-  box-sizing: border-box;
+/* ── Spotlight scrim ───────────────────────────────────────────────────── */
+/*
+ * Drawn ONLY for stops flagged `spotlight`. It is a button so that a click or
+ * an Enter press dismisses the tour, and it is removed from the tab order so
+ * it never sits between the visitor and the panel's own controls.
+ */
+.scrim {
   position: fixed;
+  inset: 0;
   z-index: var(--z-overlay);
-  left: var(--space-12);
-  right: var(--space-12);
-  bottom: calc(var(--size-bottom-nav) + var(--space-12));
-  max-width: 30rem;
-  margin-left: auto;
-  padding: var(--space-20);
-  border: 1.5px solid var(--border-ink-warm);
-  border-radius: var(--radius-modal);
-  background: var(--color-surface);
-  box-shadow: var(--elevation-overlay);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: var(--gradient-hero-scrim);
+  opacity: 0.55;
+  animation: tourFade var(--motion-base) var(--ease-standard);
+}
+
+@keyframes tourFade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim {
+    animation: none;
+  }
+}
+
+/* ── Panel ─────────────────────────────────────────────────────────────── */
+.panel {
+  position: fixed;
+  z-index: var(--z-lightbox);
+  box-sizing: border-box;
+  width: min(24rem, calc(100vw - var(--space-32)));
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
+  gap: var(--space-8);
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-ink-warm);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  box-shadow: var(--elevation-overlay);
 }
 
 .panel:focus-visible {
@@ -56,16 +87,42 @@
   box-shadow: var(--elevation-overlay), 0 0 0 3px var(--color-cta);
 }
 
+/*
+ * Docked placement — no target measured yet. Bottom-centre keeps the panel out
+ * of the way of a page that is still arriving.
+ */
+.panel[data-placement="docked"] {
+  left: 50%;
+  bottom: var(--space-24);
+  transform: translateX(-50%);
+}
+
+/*
+ * Anchored placement — below the target, clamped into the viewport.
+ * `max()` keeps the panel off the left edge; `min()` keeps it off the right.
+ */
+.panel[data-placement="anchored"] {
+  top: min(
+    calc(var(--anchor-top) + var(--anchor-height) + var(--space-12)),
+    calc(100vh - 20rem)
+  );
+  left: max(
+    var(--space-16),
+    min(var(--anchor-left), calc(100vw - min(24rem, 100vw) - var(--space-16)))
+  );
+}
+
 .panelTop {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--space-12);
+  gap: var(--space-8);
 }
 
 .step {
+  margin: 0;
   font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
+  font-size: var(--type-label-size);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--type-label-tracking);
   text-transform: uppercase;
@@ -76,11 +133,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--tap-min);
-  height: var(--tap-min);
-  margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-8)) 0 0;
-  border: none;
+  width: var(--icon-chip-compact);
+  height: var(--icon-chip-compact);
   border-radius: var(--radius-pill);
+  border: 1px solid transparent;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
@@ -99,17 +155,17 @@
 .title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--type-section-size);
+  font-size: var(--type-heading-sm);
+  font-weight: var(--font-weight-bold);
   line-height: 1.2;
   color: var(--text-primary);
-  font-weight: var(--font-weight-bold);
 }
 
 .body {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  line-height: 1.6;
+  font-size: var(--type-body-sm);
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 
@@ -118,78 +174,94 @@
   align-items: center;
   gap: var(--space-6);
   align-self: flex-start;
-  padding: var(--space-4) var(--space-10);
+  padding: var(--space-3) var(--space-10);
   border-radius: var(--radius-pill);
-  background: var(--status-match-bg);
-  color: var(--text-primary);
+  background: var(--status-success-bg);
+  color: var(--tone-success);
   font-family: var(--font-ui);
   font-size: var(--type-caption-size);
   font-weight: var(--font-weight-semibold);
 }
 
+/* ── Progress pips ─────────────────────────────────────────────────────── */
+/*
+ * aria-hidden in the markup: the step counter above already announces
+ * position, and a second announcement of the same fact is noise.
+ */
+.progress {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pip {
+  height: 4px;
+  flex: 1 1 auto;
+  border-radius: var(--radius-pill);
+  background: var(--border-soft);
+}
+
+.pip[data-state="done"] {
+  background: var(--color-teal);
+}
+
+.pip[data-state="current"] {
+  background: var(--color-cta);
+}
+
+/* ── Actions ───────────────────────────────────────────────────────────── */
 .actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-8);
-  flex-wrap: wrap;
+  margin-top: var(--space-4);
 }
 
+.back,
 .next {
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
   min-height: var(--tap-min);
-  padding: var(--space-8) var(--space-20);
+  padding: var(--space-6) var(--space-16);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border-ink-warm);
-  background: var(--gradient-gold);
-  color: var(--color-gold-text);
   font-family: var(--font-ui);
-  font-size: var(--type-button-size);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
 }
 
 .back {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-min);
-  padding: var(--space-8) var(--space-16);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-soft);
-  background: var(--color-surface);
-  color: var(--text-primary);
-  font-family: var(--font-ui);
-  font-size: var(--type-button-size);
-  cursor: pointer;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--text-secondary);
 }
 
-.next:focus-visible,
-.back:focus-visible {
+.back:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.back:not(:disabled):hover {
+  color: var(--text-primary);
+  background: var(--color-paper);
+}
+
+.next {
+  border: 1px solid transparent;
+  background: var(--gradient-action);
+  color: var(--color-cta-text);
+}
+
+.next:hover {
+  background: var(--gradient-action-hover);
+}
+
+.back:focus-visible,
+.next:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-cta);
-}
-
-/* The highlight for the element a stop is about lives in demoChrome.module.css,
-   anchored under .workspace. It cannot live here: the target belongs to another
-   module, so the selector would have to be a bare :global(), and CSS Modules
-   rejects a rule with no local class or id in it ("not pure"). .workspace is
-   the shared local ancestor of every tour target, which makes the rule pure
-   without inventing a class the target components would have to opt into. */
-
-@media (min-width: 720px) {
-  .panel {
-    right: var(--space-24);
-    bottom: var(--space-24);
-    left: auto;
-    width: 26rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .launcher,
-  .next,
-  .back {
-    transition: none;
-  }
 }
