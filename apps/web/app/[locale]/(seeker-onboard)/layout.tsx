@@ -24,16 +24,6 @@ export const metadata: Metadata = {
  * matcher (required to break the (seeker) layout's redirect loop). Unauthenticated
  * users are redirected to /sign-in before any onboarding page renders.
  */
-/**
- * DYNAMIC BY DECLARATION, not by accident. auth() below already forces it, but
- * the wizard's steps now read the return path with useSearchParams() (D18), and
- * a page that Next decides to prerender statically fails the build for exactly
- * that call unless it is wrapped in a Suspense boundary. Stating the segment's
- * rendering mode is cheaper and clearer than a boundary per step whose only job
- * is to satisfy a prerender that must never happen on an auth-gated wizard.
- */
-export const dynamic = "force-dynamic";
-
 export default async function SeekerOnboardLayout({
   children,
 }: {

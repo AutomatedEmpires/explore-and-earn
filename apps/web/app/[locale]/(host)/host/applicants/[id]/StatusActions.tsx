@@ -10,6 +10,8 @@ import {
 import { Button } from "@explore-and-earn/ui";
 
 import { updateApplicationStatusAction } from "../../../../../actions/applicationStatus";
+import { captureFunnelEvent } from "../../../../../../lib/analytics/capture";
+import { HOST_WORKSPACE_EVENTS } from "../../../../../../lib/analytics/events";
 import styles from "./StatusActions.module.css";
 
 type HostSettable =
@@ -94,6 +96,13 @@ export function StatusActions({ applicationId, status }: StatusActionsProps) {
       try {
         const result = await updateApplicationStatusAction(applicationId, target);
         if (result.ok) {
+          // After the server accepted the edge, never before. Stage names
+          // only — no candidate, no listing, no score.
+          captureFunnelEvent(HOST_WORKSPACE_EVENTS.candidateStageChanged, {
+            from: status,
+            to: target,
+            surface: "detail",
+          });
           setMessage({ ok: true, text: "Status updated." });
           router.refresh();
           return; // inFlight clears when the fresh status prop arrives

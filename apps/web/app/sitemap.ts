@@ -22,12 +22,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily" as const,
       priority: 0.8,
     })),
-    // The two role gateways (V2 D18). /for-seekers is the seeker door and the
-    // canonical answer to "what is this for me", so it belongs in the index
-    // alongside its host counterpart. /community is deliberately ABSENT: it
-    // became an authenticated seeker space and now redirects a crawler to
-    // sign-in, so listing it would advertise a URL no bot can read.
-    { url: `${baseUrl}/for-seekers`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${baseUrl}/for-hosts`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${baseUrl}/blog`, changeFrequency: "weekly", priority: 0.6 },
     { url: `${baseUrl}/about`, changeFrequency: "monthly", priority: 0.5 },

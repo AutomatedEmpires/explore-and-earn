@@ -3,18 +3,24 @@ import { getTranslations } from "next-intl/server";
 import {
 	HOMEPAGE_LISTING_SLOTS,
 	HOMEPAGE_EMPLOYER_SLOTS,
+	HOMEPAGE_MIN_BOOSTED_THRESHOLD,
 	type HomepageFeaturedEmployer,
 } from "@explore-and-earn/db";
 
+import {
+	getHomepageBoostedListingsCached,
+	getHomepageFeaturedEmployersCached,
+	getHomepageFallbackListingsCached,
+} from "../../lib/serverCache";
 import { HOME_HERO_ROTATION } from "../../components/home/home-data";
 
 import { MarketplaceHome } from "../../components/home/MarketplaceHome";
 import { buildDestinations, buildAnnouncements } from "../../components/home/home-data";
-import { DISCOVERY_FIXTURES } from "../../components/discovery";
+import { DISCOVERY_FIXTURES, type DiscoveryListing } from "../../components/discovery";
 import {
-	getLandingEmployers,
-	getLandingListings,
-} from "../../lib/landingInventory";
+	canUseDiscoveryFixtureFallback,
+	hasDiscoveryPublicDataConfig,
+} from "../../components/discovery/data";
 import { PublicShell } from "../../components/public/PublicShell";
 import type { FeaturedEmployer } from "../../components/public/FeaturedEmployersRail";
 import { buildFeaturedEmployers } from "../../lib/employer-utils";
@@ -65,17 +71,22 @@ function toRailEmployer(e: HomepageFeaturedEmployer): FeaturedEmployer {
 export default async function HomePage() {
 	// Cached anon reads (60s, tag-busted on publish/edit — lib/serverCache.ts):
 	// the homepage was the one hot public surface still running its full query
-	// chain per request (review 2026-07-22). The listing resolution — boosted,
-	// then fallback, then the non-production example fixtures — moved to
-	// lib/landingInventory so /for-seekers cannot drift from it.
-	const [inventory, featuredEmployerCampaigns] = await Promise.all([
-		getLandingListings(HOMEPAGE_LISTING_SLOTS),
-		getLandingEmployers(HOMEPAGE_EMPLOYER_SLOTS),
+	// chain per request (review 2026-07-22).
+	const [boostedListings, featuredEmployerCampaigns] = await Promise.all([
+		getHomepageBoostedListingsCached(HOMEPAGE_LISTING_SLOTS),
+		getHomepageFeaturedEmployersCached(HOMEPAGE_EMPLOYER_SLOTS),
 	]);
 
 	let featuredEmployers: readonly FeaturedEmployer[] =
 		featuredEmployerCampaigns.map(toRailEmployer);
-	const feedListings = inventory.listings;
+
+	const hasBoostedInventory = boostedListings.length >= HOMEPAGE_MIN_BOOSTED_THRESHOLD;
+	let feedListings: readonly DiscoveryListing[];
+	if (hasBoostedInventory) {
+		feedListings = boostedListings.slice(0, HOMEPAGE_LISTING_SLOTS) as DiscoveryListing[];
+	} else {
+		feedListings = await getHomepageFallbackListingsCached(HOMEPAGE_LISTING_SLOTS);
+	}
 
 	// Hero rotation is picked SERVER-side (the page stays force-dynamic): the
 	// band that renders on the server is the one that stays on screen. The old
@@ -90,16 +101,27 @@ export default async function HomePage() {
 			? Math.floor(Date.now() / HERO_ROTATION_WINDOW_MS) % HOME_HERO_ROTATION.length
 			: 0;
 
-	// Preview-only visual fullness for the RAILS: a configured-but-empty dev DB
-	// still renders a populated homepage. Production never shows fixture
-	// employers — an empty marketplace falls through to the honest empty states.
-	// (The listing half of this now lives in lib/landingInventory, which applies
-	// the same NODE_ENV gate.)
-	if (featuredEmployers.length === 0 && process.env.NODE_ENV !== "production") {
-		featuredEmployers = buildFeaturedEmployers(DISCOVERY_FIXTURES);
+	if (!hasDiscoveryPublicDataConfig() && canUseDiscoveryFixtureFallback()) {
+		if (featuredEmployers.length === 0) {
+			featuredEmployers = buildFeaturedEmployers(DISCOVERY_FIXTURES);
+		}
+		if (feedListings.length === 0) {
+			feedListings = DISCOVERY_FIXTURES.slice(0, HOMEPAGE_LISTING_SLOTS);
+		}
 	}
-	const landingListings = feedListings;
-	const landingEmployers = featuredEmployers;
+
+	// Preview-only visual fullness: a configured-but-empty dev DB still renders a
+	// populated homepage. Production never shows fixture inventory — an empty
+	// marketplace falls through to the honest founding-season empty states.
+	const isPreview = process.env.NODE_ENV !== "production";
+	const landingListings =
+		feedListings.length === 0 && isPreview
+			? DISCOVERY_FIXTURES.slice(0, HOMEPAGE_LISTING_SLOTS)
+			: feedListings;
+	const landingEmployers =
+		featuredEmployers.length === 0 && isPreview
+			? buildFeaturedEmployers(DISCOVERY_FIXTURES)
+			: featuredEmployers;
 
 	// Destination + announcement view-models. Real, derived values win; curated
 	// demo figures only fill in outside production (see home-data honesty rules).

@@ -13,18 +13,30 @@ import styles from "./HostPipelineBoard.module.css";
 
 export interface HostPipelineBoardProps {
   readonly applicants: readonly HostApplicantItem[];
+  /** Pass through to the cards — the plan's match entitlement (ADR-039). */
+  readonly showMatch?: boolean;
 }
 
 /**
  * Applicant pipeline board. Groups applicants into their stage sections in
  * funnel order, each with a live count derived from countByStage.
  *
- * Presentation ONLY — this is a read-only overview: there is no drag-and-drop
- * and no control that changes an applicant's stage (the hiring pipeline is
- * founder-gated and out of scope). Cards reuse the canonical HostApplicantCard,
- * which links into the applicant detail view.
+ * STAGE MOVES ARE EXPLICIT BUTTONS, NOT DRAG-AND-DROP. Each card carries the
+ * host-side controls, and `legalCardActions` renders only the edges
+ * APPLICATION_TRANSITIONS permits from that row's stored status — an accepted
+ * application shows none. A drop target cannot express that: it would accept a
+ * gesture the database is about to refuse, and the host would learn the move was
+ * illegal only from the error that followed it. The server remains the
+ * authority either way (updateApplicationStatus re-checks every edge).
+ *
+ * On narrow screens the columns scroll horizontally with scroll-snap rather than
+ * collapsing into one list — the whole point of the board is seeing the stages
+ * side by side.
  */
-export function HostPipelineBoard({ applicants }: HostPipelineBoardProps) {
+export function HostPipelineBoard({
+  applicants,
+  showMatch = false,
+}: HostPipelineBoardProps) {
   const counts = countByStage(applicants);
 
   // Whole-board empty → one designed state, not five repeated "no applicants".
@@ -69,13 +81,15 @@ export function HostPipelineBoard({ applicants }: HostPipelineBoardProps) {
             {stageApplicants.length > 0 ? (
               <div className={styles.stack}>
                 {stageApplicants.map((applicant) => (
-                  <HostApplicantCard key={applicant.id} applicant={applicant} />
+                  <HostApplicantCard
+                    key={applicant.id}
+                    applicant={applicant}
+                    showMatch={showMatch}
+                  />
                 ))}
               </div>
             ) : (
-              <p className={styles.empty} aria-hidden>
-                —
-              </p>
+              <p className={styles.empty}>Nobody here yet</p>
             )}
           </section>
         );

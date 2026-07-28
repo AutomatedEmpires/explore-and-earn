@@ -1,0 +1,204 @@
+/* Applicant workspace controls. Semantic tokens only — no literal colour value
+   in this file, comments included (the G50 ratchet reads comments). */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+/* ── Mode toggle ────────────────────────────────────────────────────── */
+
+.modes {
+  display: inline-flex;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+}
+
+.mode {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-4) var(--space-14);
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.mode:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+.mode[data-active="true"] {
+  background: var(--color-surface-raised);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--elevation-card);
+}
+
+/* ── Search ─────────────────────────────────────────────────────────── */
+
+.search {
+  flex: 1 1 240px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-pill);
+  background: var(--field-bg);
+  color: var(--text-muted);
+}
+.search:focus-within {
+  border-color: var(--field-border-focus);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--text-primary);
+}
+.searchInput:focus { outline: none; }
+.searchInput::placeholder { color: var(--field-placeholder); }
+
+/* ── Filters ────────────────────────────────────────────────────────── */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-12);
+}
+
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.filterLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.select {
+  max-width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+  background: var(--field-bg);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+}
+.select:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+.clear {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  padding: var(--space-4) var(--space-12);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.clear:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+.resultCount {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  color: var(--text-muted);
+}
+
+/* ── List mode ──────────────────────────────────────────────────────── */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-12);
+}
+
+@media (min-width: 1024px) {
+  .list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── No results ─────────────────────────────────────────────────────── */
+
+.noResults {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-10);
+  padding: var(--space-20);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.noResultsTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.noResultsActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-8);
+}
+
+.noResultsBtn {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: var(--space-6) var(--space-16);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+.noResultsBtn:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }

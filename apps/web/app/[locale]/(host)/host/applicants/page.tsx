@@ -7,27 +7,63 @@ import {
   getHostApplications,
   getHostListings,
   getHostSubscriptionTier,
+  getLastMessagesForConversations,
   getMatchScoresForHost,
   getSeekerDisplayNames,
   rowToDiscoveryFields,
 } from "@explore-and-earn/db";
-import { Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
+import { Icon } from "@explore-and-earn/ui";
 
 import {
-  APPLICANT_STAGE_LABEL,
-  HostApplicantCard,
-  HostPipelineBoard,
+  HostApplicantWorkspace,
   HostSectionHeading,
-  countByStage,
 } from "../../../../../components/host";
-import { EmptyState, type DiscoveryListing } from "../../../../../components/discovery";
-import { toApplicantItem, threadsByApplicationId } from "./applicants-data";
+import type { DiscoveryListing } from "../../../../../components/discovery";
+import {
+  toApplicantItem,
+  threadsByApplicationId,
+  type LastMessageSummary,
+} from "./applicants-data";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Applicants" };
 
 // Applicants are per-host (app-level scoped) and must never be statically cached.
 export const dynamic = "force-dynamic";
+
+/**
+ * The first-applicant state (D23): teach what will happen, and offer the two
+ * things that actually cause it — outreach, and a look at a full pipeline.
+ */
+function NoApplicantsYet({ hasListings }: { readonly hasListings: boolean }) {
+  return (
+    <div className={styles.firstRun}>
+      <h2 className={styles.firstRunTitle}>No applications yet</h2>
+      <p className={styles.firstRunLede}>
+        {hasListings
+          ? "Applications land at “New”. From there you move people through review, shortlist, and offer — every move is a button, and the database enforces which ones are legal."
+          : "Nobody can apply until a listing is live. Publish one, or invite seekers directly."}
+      </p>
+      <div className={styles.firstRunActions}>
+        {hasListings ? (
+          <Link className={styles.firstRunCta} href="/host/outreach">
+            <Icon name="action.share" size={16} aria-hidden />
+            Invite seekers to apply
+          </Link>
+        ) : (
+          <Link className={styles.firstRunCta} href="/host/listings/new">
+            <Icon name="status.open" size={16} aria-hidden />
+            Create a listing
+          </Link>
+        )}
+        <Link className={styles.firstRunGhost} href="/for-hosts/demo/applicants">
+          <Icon name="action.view" size={16} aria-hidden />
+          See a full pipeline
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 export default async function HostApplicantsPage({
   searchParams,
@@ -44,33 +80,34 @@ export default async function HostApplicantsPage({
     return (
       <section className={styles.block}>
         <HostSectionHeading
+          level={1}
           title="Applicants"
           description="Sign in as a host to review the people applying to your opportunities."
         />
-        <EmptyState
-          title="Sign in to review applicants"
-          message="You need to be signed in as a host to see who has applied to your listings."
-          actionLabel="Invite seekers"
-          actionHref="/host/outreach"
-        />
+        <NoApplicantsYet hasListings={false} />
       </section>
     );
   }
 
-  // Applications carry only listingId/listingTitle; load the host's listings to
-  // resolve each application's full DiscoveryListing for the canonical card.
   const [applications, listingRows, conversations, matchScores, subscriptionTier] =
     await Promise.all([
       getHostApplications(token, userId),
       getHostListings(token, userId).catch(() => []),
       getConversations(token, userId, "host").catch(() => []),
-      // Real ADR-040 fit for the host's applicants (populated on apply). Resilient:
-      // an empty map when no scores exist yet, so the bucket shows its empty state.
+      // Real ADR-040 fit for the host's applicants (populated on apply), now
+      // carrying the per-component breakdown so the card can say WHY.
       getMatchScoresForHost(token).catch(() => new Map()),
-      // Real subscription tier — gates the Matched-seekers bucket (never fabricated).
+      // Real subscription tier — gates the match reading (never fabricated).
       getHostSubscriptionTier(token, userId).catch(() => "none" as const),
     ]);
   const threadsMap = threadsByApplicationId(conversations);
+
+  // Last message per thread, in ONE batched query. This is what turns "they
+  // applied nine days ago" into "they wrote four days ago and are waiting".
+  const lastMessages = await getLastMessagesForConversations(
+    token,
+    [...threadsMap.values()],
+  ).catch(() => new Map<string, LastMessageSummary>());
 
   // Resolve seeker display names in a single batch query. A fault here does not
   // stop the pipeline rendering — the applications, listings and threads above
@@ -98,7 +135,8 @@ export default async function HostApplicantsPage({
     hostListingIds.has(application.listingId),
   );
 
-  // Optional listingId query param — filter to a single listing.
+  // Optional listingId query param — a deep link from a listing card. The
+  // in-page listing filter covers the same ground once you are here.
   const filteredApplications = filterListingId
     ? ownedApplications.filter(
         (application) => application.listingId === filterListingId,
@@ -106,157 +144,49 @@ export default async function HostApplicantsPage({
     : ownedApplications;
 
   const applicants = filteredApplications.map((application) =>
-    toApplicantItem(application, listingsById, displayNames, threadsMap, matchScores),
+    toApplicantItem(
+      application,
+      listingsById,
+      displayNames,
+      threadsMap,
+      matchScores,
+      lastMessages,
+    ),
   );
 
-  const filterListing = filterListingId
-    ? listingsById.get(filterListingId)
-    : undefined;
+  const filterListing = filterListingId ? listingsById.get(filterListingId) : undefined;
   const filterTitle = filterListing?.title ?? filterListingId;
 
-  // Command row figures — derived from the SAME applicants array rendered in the
-  // board, so the metric strip can never drift from the pipeline below it.
-  const counts = countByStage(applicants);
-  const total = applicants.length;
+  // ADR-039: the match READING is a paid capability, resolved through the SAME
+  // function the analytics surface gates on so the two can never disagree about
+  // what a tier includes.
+  const showMatch = analyticsScopeForTier(subscriptionTier) === "full";
 
-  // "Matched seekers" bucket — REAL ADR-040 fit only. Applicants that carry a
-  // genuine match score (populated on apply; see getMatchScoresForHost), ranked
-  // highest-first. A discovery aid, never a gate: unscored or already-declined
-  // seekers are simply not prioritised here — never locked out of applying. No
-  // fabricated seekers, scores, or counts.
-  const matchedSeekers = applicants
-    .filter((a) => a.matchScore != null && a.stage !== "declined")
-    .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
-    .slice(0, 6);
-
-  // Tier gate (ADR-039): the matched-seeker bucket is a paid capability. The
-  // 'full' analytics entitlement (Professional / Enterprise) unlocks it; Starter
-  // and un-subscribed hosts get the 'basic' scope and a compact upsell instead.
-  // Resolved through analyticsScopeForTier — the SAME function the analytics
-  // surface gates on, so the two can never disagree about what a tier includes.
-  const matchedSeekersUnlocked = analyticsScopeForTier(subscriptionTier) === "full";
+  const listingOptions = listingRows.map((row) => ({
+    id: row.id,
+    title: row.title || "Untitled listing",
+  }));
 
   return (
     <section className={styles.block}>
       <HostSectionHeading
+        level={1}
+        eyebrow="Recruiting"
         title={filterListingId ? `Applicants — ${filterTitle}` : "Applicants"}
-        description={
-          filterListingId
-            ? "Applicants for this listing, grouped by stage."
-            : "Your applicant pipeline across all listings, grouped by stage."
-        }
+        description="Everyone who has applied, and where they are. Move people with the buttons on each card — the database enforces which moves are legal."
         {...(filterListingId
           ? { actionLabel: "All applicants", actionHref: "/host/applicants" }
           : {})}
       />
 
       {applicants.length > 0 ? (
-        <>
-          <MetricGrid>
-            <MetricCard
-              label={APPLICANT_STAGE_LABEL.new}
-              value={counts.new}
-              trend="Review"
-              trendTone="neutral"
-            />
-            <MetricCard
-              label={APPLICANT_STAGE_LABEL.reviewing}
-              value={counts.reviewing}
-              trend="In flight"
-              trendTone="neutral"
-            />
-            <MetricCard
-              label={APPLICANT_STAGE_LABEL.offered}
-              value={counts.offered}
-              trend={counts.offered > 0 ? "Open" : "—"}
-              trendTone={counts.offered > 0 ? "up" : "down"}
-            />
-            <MetricCard
-              label="In pipeline"
-              value={total}
-              trend="Active"
-              trendTone="up"
-            />
-          </MetricGrid>
-
-          <section
-            className={styles.bucket}
-            aria-labelledby="matched-seekers-heading"
-          >
-            <header className={styles.bucketHead}>
-              <div>
-                <span className={styles.bucketKicker}>Matched seekers</span>
-                <h2 id="matched-seekers-heading" className={styles.bucketTitle}>
-                  Seekers who fit your listings
-                </h2>
-                <p className={styles.bucketSub}>
-                  Ranked by real match on résumé, availability, and experience —
-                  a discovery aid, never a gate. Anyone can still apply.
-                </p>
-              </div>
-              {matchedSeekersUnlocked && matchedSeekers.length > 0 ? (
-                <Link className={styles.bucketAction} href="/host/outreach">
-                  Invite seekers
-                  <Icon name="action.forward" size={16} aria-hidden />
-                </Link>
-              ) : null}
-            </header>
-
-            {!matchedSeekersUnlocked ? (
-              <div className={styles.locked}>
-                <span className={styles.lockedIcon} aria-hidden>
-                  <Icon name="system.lock" size={20} />
-                </span>
-                <div className={styles.lockedText}>
-                  <p className={styles.lockedTitle}>
-                    Matched seekers is a Professional feature
-                  </p>
-                  <p className={styles.lockedSub}>
-                    Upgrade to Professional to see the seekers who best fit your
-                    open listings, ranked by their real match score.
-                  </p>
-                </div>
-                <Link className={styles.lockedCta} href="/host/billing">
-                  View plans
-                  <Icon name="action.forward" size={16} aria-hidden />
-                </Link>
-              </div>
-            ) : matchedSeekers.length > 0 ? (
-              <ul className={styles.bucketGrid}>
-                {matchedSeekers.map((item) => (
-                  <li key={item.id} className={styles.bucketItem}>
-                    <HostApplicantCard applicant={item} showMatch />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className={styles.bucketEmpty}>
-                <span className={styles.bucketEmptyIcon} aria-hidden>
-                  <Icon name="status.match" size={20} />
-                </span>
-                <p className={styles.bucketEmptyTitle}>No matched seekers yet</p>
-                <p className={styles.bucketEmptySub}>
-                  As seekers apply to your listings, the strongest fits surface
-                  here, ranked by their real match score.
-                </p>
-              </div>
-            )}
-          </section>
-
-          <HostPipelineBoard applicants={applicants} />
-        </>
-      ) : (
-        <EmptyState
-          illustration="empty.hostApplicants"
-          title="No applicants yet"
-          message={
-            filterListingId
-              ? "No applicants for this listing yet."
-              : "When seekers apply to your listings, their applications will appear here, grouped by stage for review."
-          }
-          actionLabel="Invite seekers"
-          actionHref="/host/outreach"
+        <HostApplicantWorkspace
+          applicants={applicants}
+          listings={listingOptions}
+          showMatch={showMatch}
         />
+      ) : (
+        <NoApplicantsYet hasListings={listingRows.length > 0} />
       )}
     </section>
   );

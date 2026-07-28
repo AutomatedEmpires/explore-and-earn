@@ -3,14 +3,7 @@ import createIntlMiddleware from "next-intl/middleware";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { routing } from "./i18n/routing";
-import {
-  REDIRECT_PARAM,
-  RETURN_PARAM,
-  RETURN_PARAM_NAMES,
-  safeInternalRedirect,
-  type ReturnParamName,
-} from "./lib/authRedirect";
-import { isCommunityPath } from "./lib/communityRoutes";
+import { safeInternalRedirect } from "./lib/authRedirect";
 import { DEV_ROLE_COOKIE, isDevBenchEnabled } from "./lib/devBench";
 import { isPrivateHostDashboardPath } from "./lib/hostRoutes";
 
@@ -130,12 +123,6 @@ const isPublicRoute = createRouteMatcher([
   "/about",
   "/faq", // Advertised in sitemap + llms.txt; legal/marketing content, no auth.
   "/for-hosts(.*)", // Prospect-facing host preview + the public demo workspace — MUST be reachable without a login. (Exact-match here 404d /for-hosts/demo in prod while the branch build passed: SSG prerender never runs middleware, so only production traffic could reveal it.)
-  // The seeker half of the two-door IA (D18). Same wildcard shape as
-  // /for-hosts above, and for the same reason: an exact match here is how
-  // /for-hosts/demo 404'd in production while every prerender passed. This
-  // page is the signed-out door to the seeker product — an auth wall on it
-  // dead-ends the entire seeker funnel.
-  "/for-seekers(.*)",
   "/blog", // Editorial marketing surface (PublicBottomNav-chrome'd).
   "/blog/(.*)",
   "/sitemap.xml",
@@ -156,96 +143,52 @@ const isPublicRoute = createRouteMatcher([
 
 type FunnelRole = "host" | "seeker";
 
-interface ProtectedFunnel {
-  readonly role: FunnelRole;
-  /**
-   * Which query name carries the return path. Existing funnels keep Clerk's
-   * `redirect_url`; the Community correction emits the spec-named `returnTo`
-   * (D18). Both are validated by the same function — see lib/authRedirect.
-   */
-  readonly param: ReturnParamName;
-}
-
 /**
- * Routes whose signed-out response must be a ROLE-SHAPED REDIRECT, decided
- * here rather than left to Clerk's auth.protect().
- *
- * WHY THESE CANNOT JUST BE "not public". auth.protect() has two very different
- * signed-out behaviours and neither is what any of these funnels want:
- *
- *   * A document request (a real browser) is sent to `signInUrl`, which — with
- *     no NEXT_PUBLIC_CLERK_SIGN_IN_URL configured — is Clerk's hosted Account
- *     Portal, OFF this domain. The visitor loses the role, loses the seeker
- *     framing, and returns to a page that has no idea why they arrived.
- *   * Anything else (a crawler, a link unfurler, curl, a fetch) gets
- *     notFound() — the internal rewrite that carries
- *     `x-clerk-auth-reason: protect-rewrite` and reads to the caller as a plain
- *     404. That is exactly how /swipe and /for-hosts/demo looked "missing" in
- *     production while their branch builds passed: a prerender proves a route
- *     builds, never that middleware lets a stranger reach it.
- *
- * Community (D18) is in this list because it stopped being public in V2: it is
- * an authenticated SEEKER space, so a signed-out visitor must be handed a
- * seeker sign-in that knows where to send them back to — not a 404, and not an
- * off-site portal.
+ * Some auth-required funnels intentionally sit inside the broad public matcher
+ * to avoid colliding with public /host/{id} pages or onboarding layout gates.
+ * Preserve their role and exact return path before the request reaches a layout.
  */
-function protectedFunnel(pathname: string): ProtectedFunnel | null {
+function protectedFunnelRole(pathname: string): FunnelRole | null {
   if (
     isPrivateHostDashboardPath(pathname) ||
     pathname === "/claim" ||
     pathname.startsWith("/claim/")
   ) {
-    return { role: "host", param: REDIRECT_PARAM };
+    return "host";
   }
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) {
-    return { role: "seeker", param: REDIRECT_PARAM };
-  }
-  if (isCommunityPath(pathname)) {
-    return { role: "seeker", param: RETURN_PARAM };
+    return "seeker";
   }
   return null;
 }
 
 function redirectToRoleSignIn(
   request: NextRequest,
-  funnel: ProtectedFunnel,
+  role: FunnelRole,
 ): NextResponse {
   const requestedPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
   const url = request.nextUrl.clone();
   url.pathname = "/sign-in";
   url.search = "";
-  url.searchParams.set("role", funnel.role);
-  // The path is ours (it is the URL the visitor just asked for), but it goes
-  // through the same validator as an attacker-supplied one so there is exactly
-  // one definition of "safe return path" in the product. A value that somehow
-  // fails is dropped, not passed through: the visitor lands on the role default.
-  const safePath = safeInternalRedirect(requestedPath);
-  if (safePath) url.searchParams.set(funnel.param, safePath);
+  url.searchParams.set("role", role);
+  url.searchParams.set("redirect_url", requestedPath);
   return NextResponse.redirect(url);
 }
 
-/**
- * Scrub an unsafe (or duplicated) return path off the auth entry URLs.
- *
- * Runs for BOTH accepted names. A single valid value passes through untouched;
- * anything else — an absolute URL, a protocol-relative host, a backslash trick,
- * or two copies of the parameter so a later reader picks the other one — is
- * deleted and the visitor is redirected to the cleaned URL.
- */
 function stripUnsafeAuthRedirect(request: NextRequest): NextResponse | null {
   const { pathname, searchParams } = request.nextUrl;
   if (pathname !== "/sign-in" && pathname !== "/sign-up") return null;
-
-  const unsafe = RETURN_PARAM_NAMES.filter((name) => {
-    const candidates = searchParams.getAll(name);
-    if (candidates.length === 0) return false;
-    if (candidates.length > 1) return true;
-    return !safeInternalRedirect(candidates[0] ?? undefined);
-  });
-  if (unsafe.length === 0) return null;
+  const candidates = searchParams.getAll("redirect_url");
+  if (candidates.length === 0) return null;
+  if (
+    candidates.length === 1 &&
+    safeInternalRedirect(candidates[0] ?? undefined)
+  ) {
+    return null;
+  }
 
   const url = request.nextUrl.clone();
-  for (const name of unsafe) url.searchParams.delete(name);
+  url.searchParams.delete("redirect_url");
   return NextResponse.redirect(url);
 }
 
@@ -283,10 +226,10 @@ export default hasClerkMiddlewareConfig
         // /[locale]/ route (just without the Clerk gate).
         return localize ? intlMiddleware(request) : undefined;
       }
-      const funnel = protectedFunnel(request.nextUrl.pathname);
-      if (funnel) {
+      const funnelRole = protectedFunnelRole(request.nextUrl.pathname);
+      if (funnelRole) {
         const { userId } = await auth();
-        if (!userId) return redirectToRoleSignIn(request, funnel);
+        if (!userId) return redirectToRoleSignIn(request, funnelRole);
       }
       if (!isPublicRoute(request)) {
         await auth.protect();
@@ -310,8 +253,8 @@ export default hasClerkMiddlewareConfig
       if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
         return localize ? intlMiddleware(request) : NextResponse.next();
       }
-      const funnel = protectedFunnel(request.nextUrl.pathname);
-      if (funnel) return redirectToRoleSignIn(request, funnel);
+      const funnelRole = protectedFunnelRole(request.nextUrl.pathname);
+      if (funnelRole) return redirectToRoleSignIn(request, funnelRole);
       // Fail closed: when Clerk is not configured (local/dev only, since
       // production and preview throw above), protected routes are denied
       // rather than silently opened.

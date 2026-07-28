@@ -1,10 +1,11 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { MatchBand } from "@explore-and-earn/contracts";
+import type { MatchBand, MatchComponentScores } from "@explore-and-earn/contracts";
 
 import {
   decodeStoredMatchRow,
+  toComponentScores,
   type StoredMatchResult,
 } from "../lib/storedMatchDecode";
 
@@ -26,6 +27,19 @@ export interface ListingMatchScore {
   readonly score: number;
   readonly band: MatchBand;
   readonly confidence: number;
+  /**
+   * The persisted per-component sub-scores (migration 052's `components` JSONB).
+   *
+   * Carried because a bare number is not an answer a host can act on: "84" says
+   * nothing about WHY, and the founder's V2 requirement for the applicant
+   * surfaces is an explanation, not a score. The explanation itself is NOT
+   * stored (G34) — matchReasonPhrase/topMatchReasons derive it from these
+   * numbers at render time, so the copy can change without a migration.
+   *
+   * An empty record is the honest "no components stored" answer; callers must
+   * render no reason at all rather than inventing one.
+   */
+  readonly components: MatchComponentScores;
 }
 
 /** Key an applicant's score by listing + seeker. */
@@ -156,7 +170,7 @@ export async function getMatchScoresForHost(
     const db = authedClient(clerkToken) as unknown as SupabaseClient;
     const { data, error } = await db
       .from("match_scores")
-      .select("seeker_profile_id, listing_id, score, band, confidence");
+      .select("seeker_profile_id, listing_id, score, band, confidence, components");
     if (error || !data) return map;
 
     for (const raw of data as Array<Record<string, unknown>>) {
@@ -168,6 +182,10 @@ export async function getMatchScoresForHost(
         score: typeof raw.score === "number" ? raw.score : 0,
         band: (typeof raw.band === "string" ? raw.band : "needs_attention") as MatchBand,
         confidence: typeof raw.confidence === "number" ? raw.confidence : 0,
+        // Decoded, not cast: the JSONB is shaped by whatever wrote it, and a
+        // string or array would otherwise flow into topMatchReasons and render
+        // as a reason nobody computed.
+        components: toComponentScores(raw.components),
       });
     }
   } catch {

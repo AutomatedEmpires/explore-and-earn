@@ -1,217 +1,65 @@
+/* Applicants surface layout. Semantic tokens only — no literal colour value in
+   this file, comments included (the G50 ratchet reads comments). */
+
 .block {
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
-}
-
-.stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-}
-
-/* ── Matched seekers bucket ─────────────────────────────────────────────────
-   Intelligent, tier-gated talent discovery above the pipeline. Surfaces seekers
-   whose REAL ADR-040 match score fits the host's listings — never a fabricated
-   signal, never a gate. Mobile-first; borders-first surface off Glacier tokens. */
-
-.bucket {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-16);
+}
+
+/* ── First-applicant state (D23) ────────────────────────────────────── */
+
+.firstRun {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
   padding: var(--space-20);
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
+  border-radius: var(--radius-feature);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-card);
 }
 
-.bucketHead {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-16);
-  flex-wrap: wrap;
-}
-
-.bucketKicker {
-  display: inline-block;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--color-cta);
-}
-
-.bucketTitle {
-  margin: var(--space-4) 0 0;
+.firstRunTitle {
+  margin: 0;
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 1.6rem;
-  line-height: 1;
-  letter-spacing: -0.02em;
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
 
-.bucketSub {
-  margin: var(--space-8) 0 0;
-  max-width: 52ch;
-  font-size: 0.92rem;
-  line-height: 1.45;
+.firstRunLede {
+  margin: 0;
+  max-width: 62ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.bucketAction {
-  flex: none;
+.firstRunActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-4);
+}
+
+.firstRunCta,
+.firstRunGhost {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-8);
-  min-height: 44px;
-  padding: 0 var(--space-16);
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-18);
   border-radius: var(--radius-pill);
-  border: 1px solid transparent;
-  background: var(--color-cta);
-  color: var(--color-cta-text);
-  font-size: 0.9rem;
-  font-weight: 700;
-  white-space: nowrap;
-  transition: transform 0.18s var(--ease-standard, ease);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
 }
 
-.bucketAction:hover {
-  transform: translateY(-2px);
-}
-
-/* Grid of full seeker cards (HostApplicantCard, host_applicant_review surface).
-   Single column on mobile, widening to multi-column on roomier viewports. */
-.bucketGrid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-16);
-  grid-template-columns: 1fr;
-}
-
-.bucketItem {
-  min-width: 0;
-}
-
-@media (min-width: 768px) {
-  .bucketGrid {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  }
-}
-
-/* Honest empty state — no fabricated seekers, scores, or counts. */
-.bucketEmpty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-24) var(--space-16);
-  border: 1px dashed var(--border-soft);
-  border-radius: var(--radius-card);
-  text-align: center;
-}
-
-.bucketEmptyIcon {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-pill);
-  color: var(--status-match-fg);
-  background: var(--status-match-bg);
-}
-
-.bucketEmptyTitle {
-  margin: var(--space-4) 0 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: 1.05rem;
-  color: var(--text-primary);
-}
-
-.bucketEmptySub {
-  margin: 0;
-  max-width: 44ch;
-  font-size: 0.9rem;
-  line-height: 1.45;
-  color: var(--text-secondary);
-}
-
-/* Tier-gated upsell — Starter / un-subscribed hosts. Gold (paid) accent, honest
-   copy, links to plans. Never shows any seeker data behind the gate. */
-.locked {
-  display: flex;
-  align-items: center;
-  gap: var(--space-16);
-  flex-wrap: wrap;
-  padding: var(--space-16);
-  border: 1px solid color-mix(in srgb, var(--color-gold) 40%, var(--border-soft));
-  border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--color-gold) 8%, transparent);
-}
-
-.lockedIcon {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-pill);
-  color: var(--color-gold-text);
-  background: var(--color-gold);
-}
-
-.lockedText {
-  flex: 1 1 220px;
-  min-width: 0;
-}
-
-.lockedTitle {
-  margin: 0;
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: 1.05rem;
-  color: var(--text-primary);
-}
-
-.lockedSub {
-  margin: var(--space-4) 0 0;
-  max-width: 52ch;
-  font-size: 0.9rem;
-  line-height: 1.45;
-  color: var(--text-secondary);
-}
-
-.lockedCta {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-8);
-  min-height: 44px;
-  padding: 0 var(--space-16);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-gold);
-  background: transparent;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  font-weight: 700;
-  white-space: nowrap;
-  transition:
-    transform 0.18s var(--ease-standard, ease),
-    background 0.18s var(--ease-standard, ease);
-}
-
-.lockedCta:hover {
-  transform: translateY(-2px);
-  background: color-mix(in srgb, var(--color-gold) 16%, transparent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .bucketAction:hover,
-  .lockedCta:hover {
-    transform: none;
-  }
-}
+.firstRunCta { background: var(--gradient-action); color: var(--color-cta-text); }
+.firstRunGhost { border: 1px solid var(--border-default); color: var(--text-primary); }
+.firstRunCta:focus-visible,
+.firstRunGhost:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }

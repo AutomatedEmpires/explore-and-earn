@@ -26,14 +26,8 @@ const IS_PREVIEW = process.env.NODE_ENV !== "production";
 // ─── Hero ───────────────────────────────────────────────────────────────────
 
 export interface HomeHeroScene {
-  /** Lane the scene belongs to — still used for the cover fallback tint. */
+  /** Selects the lane cover gradient the hero band paints (--cat-{lane}-cover). */
   readonly category: OpportunityCategory;
-  /**
-   * Catalogue slug of the hero PHOTOGRAPH (apps/web/lib/sitePhotos.ts). Every
-   * entry must name a real slug; getSitePhoto throws at render on a typo, which
-   * is deliberate — a marketing hero fails loudly rather than shipping a hole.
-   */
-  readonly photoSlug: string;
 }
 
 /**
@@ -42,45 +36,25 @@ export interface HomeHeroScene {
  * varies without a hydration mismatch. This is the single place the founder edits
  * to control what can appear: add, remove, or reorder entries here.
  *
- * THE HERO IS A PHOTOGRAPH AGAIN (V2 D16/§16). Between the Cloudinary removal
- * and the Wikimedia/Unsplash pipeline landing, this rotation painted the design
- * system's lane GRADIENT because there was no photograph to show and a broken
- * <Image> is worse than an honest colour field. There is photography now — a
- * licensed, attributed, in-repo catalogue with a /credits page — so the biggest
- * surface on the site shows the places the work happens in rather than a
- * 52rem-tall colour wash. Each entry still names a different lane so the
- * rotation reads as five distinct first impressions.
+ * The hero was a curated marketing PHOTOGRAPH. That library was delivered by an
+ * image CDN we no longer use, and we do not hold replacement photography — so
+ * rather than ship a broken <Image> or a stand-in that misrepresents a place, the
+ * hero is now the design system's own lane gradient. Each entry names a different
+ * lane so the rotation still reads as five distinct first impressions. Curated
+ * photography returns as a `coverUrl` field here the day the `site-photos` bucket
+ * is seeded (scripts/seed-site-photos.mjs).
  */
 export const HOME_HERO_ROTATION: readonly HomeHeroScene[] = [
-  { category: "maritime", photoSlug: "cda-lake-01" },
-  { category: "seasonal", photoSlug: "lodge-01" },
-  { category: "farm", photoSlug: "crew-02" },
-  { category: "remote", photoSlug: "idaho-01" },
-  { category: "mix", photoSlug: "paddle-02" },
+  { category: "maritime" },
+  { category: "seasonal" },
+  { category: "farm" },
+  { category: "remote" },
+  { category: "mix" },
 ];
 
 /** Stable SSR default — the first entry of the rotation renders on the server and
  * on the first client paint, then the client advances to a rotated pick on mount. */
 export const HOME_HERO: HomeHeroScene = HOME_HERO_ROTATION[0];
-
-/**
- * Lane → catalogue photograph, for the tiles that used to paint a lane
- * gradient and nothing else.
- *
- * WHY A MAP AND NOT A FIELD PER TILE. The category tiles and the destination
- * cards both key off a lane, and both were rendering a 12rem-tall colour wash
- * where an image belongs. One map means a lane's photograph is chosen once; it
- * also means adding a lane fails at the type level rather than silently
- * rendering an empty band. (V2 §16 — "gradients only where photography is
- * intentionally absent AND small".)
- */
-export const LANE_PHOTO: Record<OpportunityCategory, string> = {
-  farm: "idaho-02",
-  maritime: "dock-02",
-  remote: "idaho-03",
-  seasonal: "lodge-01",
-  mix: "trail-02",
-};
 
 // ─── Destinations ("Where will you go next?") ──────────────────────────────
 

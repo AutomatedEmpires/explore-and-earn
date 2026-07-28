@@ -11,12 +11,12 @@ import {
   ListingCardProvider,
   type DiscoveryListing,
 } from "../discovery";
-import { SitePhoto } from "../media/SitePhoto";
 import { FeaturedEmployersRail, type FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import {
   HOME_CATEGORIES,
+  HOME_PLANS,
   HOME_HERO_ROTATION,
-  LANE_PHOTO,
+  formatUsd,
   type HomeAnnouncement,
   type HomeDestination,
   type AnnouncementLabel,
@@ -85,7 +85,13 @@ const TRIAD_BADGES: ReadonlyArray<{ key: string; labelKey: "triadHousing" | "tri
 
 // ─── Hero ──────────────────────────────────────────────────────────────────
 
-function HomeHero({ heroIndex = 0 }: { heroIndex?: number }) {
+function HomeHero({
+  peek,
+  heroIndex = 0,
+}: {
+  peek?: DiscoveryListing;
+  heroIndex?: number;
+}) {
   const router = useRouter();
   const t = useTranslations("Home");
   const tc = useTranslations("Common");
@@ -97,7 +103,8 @@ function HomeHero({ heroIndex = 0 }: { heroIndex?: number }) {
   // down (review 2026-07-22): the band that renders on the server is the one
   // that stays on screen. The previous post-mount random pick swapped the hero
   // after hydration on most visits. Server value rides the RSC payload, so SSR
-  // and hydration always agree.
+  // and hydration always agree. Each entry paints its lane cover gradient —
+  // there is no hero photograph (see home-data.ts HOME_HERO_ROTATION).
   const hero = HOME_HERO_ROTATION[heroIndex % HOME_HERO_ROTATION.length] ?? HOME_HERO_ROTATION[0];
   const heroCategory = hero.category;
 
@@ -115,25 +122,6 @@ function HomeHero({ heroIndex = 0 }: { heroIndex?: number }) {
   return (
     <section className={styles.hero} aria-labelledby="home-hero-title">
       <div className={`${styles.heroFrame} ${styles[`cover_${heroCategory}`]}`}>
-        {/* THE PHOTOGRAPH IS THE HERO (V2 §16). It sits behind the scrim as a
-            real <Image> with its catalogue dimensions, priority-loaded because
-            it is unambiguously the LCP element. The lane cover gradient stays
-            on the frame beneath it as the paint-before-decode ground, so the
-            band is never a white hole while the photo loads. */}
-        <div className={styles.heroMedia}>
-          {/* ALT COMES FROM THE CATALOGUE, not alt="". This is a photograph of
-              a real place and the page is about places to work in — describing
-              the scene is content, not noise. The small lane tiles below stay
-              decorative, because there the label beside the image already says
-              what it is. */}
-          <SitePhoto
-            slug={hero.photoSlug}
-            size="hero"
-            priority
-            className={styles.heroPhoto}
-            sizes="100vw"
-          />
-        </div>
         <div className={styles.heroScrim} aria-hidden="true" />
 
         <div className={styles.heroInner}>
@@ -141,17 +129,14 @@ function HomeHero({ heroIndex = 0 }: { heroIndex?: number }) {
             <span className={styles.liveDot} aria-hidden="true" />
             {t("eyebrow")}
           </p>
-          {/* ONE dominant message. The anthem carried a "promise" line and a
-              "sub" line beneath it, which made three competing statements in
-              the first screen and left the search field below the fold on a
-              phone. The promise is now the single supporting line and the
-              free-forever claim moved to the band that explains it. */}
+          {/* The anthem — the loudest thing after the photo. */}
           <h1 id="home-hero-title" className={styles.heroAnthem}>
             {t("anthemLine1")}
             <br />
             {t("anthemLine2")}
           </h1>
           <p className={styles.heroPromise}>{t("promise")}</p>
+          <p className={styles.heroSub}>{t("sub")}</p>
 
           <form className={styles.searchBar} onSubmit={onSearch} role="search" aria-label="Search opportunities">
             <label className={styles.searchField}>
@@ -224,11 +209,38 @@ function HomeHero({ heroIndex = 0 }: { heroIndex?: number }) {
             </Link>
           </div>
         </div>
-        {/* The floating "peek" card is GONE. It duplicated the opportunity row
-            that now sits directly beneath the fold, competed with the anthem
-            for the first look, and — being absolutely positioned over the
-            photograph — was the one element that made the hero unreadable at
-            tablet widths. Real cards, at full size, one scroll down. */}
+
+        {peek ? (
+          <Link className={styles.heroPeek} href={`/listing/${peek.id}`} aria-label={`${peek.title} — ${peek.location}`}>
+            <span className={styles.heroPeekTop}>
+              {peek.conditionalBadges?.includes("boosted") ? (
+                <span className={styles.heroPeekBoost}>
+                  <Icon name="status.boosted" size={16} aria-hidden />
+                  Boosted
+                </span>
+              ) : peek.matchScore ? (
+                <span className={styles.heroPeekMatch}>
+                  <Icon name="status.match" size={16} aria-hidden />
+                  {peek.matchScore}% fit
+                </span>
+              ) : null}
+              {peek.host.verified ? (
+                <span className={styles.heroPeekVerified} aria-label="Verified host">
+                  <Icon name="trust.verified_host" size={16} aria-hidden />
+                </span>
+              ) : null}
+            </span>
+            <strong className={styles.heroPeekTitle}>{peek.title}</strong>
+            <span className={styles.heroPeekMeta}>
+              <Icon name="nav.map" size={16} aria-hidden />
+              {peek.location}
+            </span>
+            <span className={styles.heroPeekTriad}>
+              <span><Icon name="benefit.housing" size={16} aria-hidden />{peek.benefits.housing.summary ?? "Housing"}</span>
+              <span><Icon name="benefit.pay" size={16} aria-hidden />{peek.benefits.pay.summary ?? "Pay"}</span>
+            </span>
+          </Link>
+        ) : null}
       </div>
     </section>
   );
@@ -359,17 +371,15 @@ function AnnouncementRail({ items }: { items: readonly HomeAnnouncement[] }) {
 
 function FeaturedJobs({ listings }: { listings: readonly DiscoveryListing[] }) {
   const router = useRouter();
-  // THREE cards, not six (V2 §16). Six filled the first scroll with a wall of
-  // inventory before the page had explained what makes a listing here
-  // different; three is a sample, and "browse all" is one click away.
-  const shown = listings.slice(0, 3);
+  // Six cards on desktop (3-up grid); the module CSS caps mobile at four.
+  const shown = listings.slice(0, 6);
 
   return (
     <section className={styles.section} aria-labelledby="featured-jobs-title">
       <SectionHead
         id="featured-jobs-title"
         eyebrow="Open now"
-        title="Real roles, open right now"
+        title="Featured jobs"
         sub="Housing, meals, and pay on every card — no digging."
         seeAllHref="/seek"
         seeAllLabel="Browse all jobs"
@@ -525,17 +535,6 @@ function CategoryGrid() {
             style={{ "--reveal-index": i % 4 } as CSSProperties}
           >
             <span className={styles.categoryImageWrap}>
-              {/* A real photograph, decorative because the label beside it
-                  carries the meaning. This band used to be the lane gradient
-                  and nothing else — four coloured slabs where the work should
-                  have been. */}
-              <SitePhoto
-                slug={LANE_PHOTO[c.imageCategory]}
-                size="card"
-                decorative
-                className={styles.categoryPhoto}
-                sizes="(min-width: 900px) 18rem, 50vw"
-              />
               <span className={styles.categoryScrim} aria-hidden="true" />
             </span>
             <span className={styles.categoryBody}>
@@ -581,13 +580,6 @@ function DestinationGrid({ destinations }: { destinations: readonly HomeDestinat
             <span
               className={`${styles.destinationImageWrap} ${styles[`cover_${d.imageCategory}`]}`}
             >
-              <SitePhoto
-                slug={LANE_PHOTO[d.imageCategory]}
-                size="card"
-                decorative
-                className={styles.destinationPhoto}
-                sizes="(min-width: 900px) 24rem, 100vw"
-              />
               <span className={styles.destinationScrim} aria-hidden="true" />
               <span className={styles.destinationSeason}>
                 <Icon name="status.seasonal" size={16} aria-hidden />
@@ -618,321 +610,146 @@ function DestinationGrid({ destinations }: { destinations: readonly HomeDestinat
   );
 }
 
-// ─── How it works — seeker ─────────────────────────────────────────────────
+// ─── Free forever for seekers (dashboard + community, one band) ────────────
 
-const SEEKER_STEPS: ReadonlyArray<{ title: string; body: string; icon: IconKey }> = [
-  {
-    icon: "nav.seek",
-    title: "Browse before you commit to anything",
-    body: "Seek, Swipe and Map are open without an account. Every card carries housing, meals and pay whether you are signed in or not.",
-  },
-  {
-    icon: "nav.profile",
-    title: "Build a profile when you want to apply",
-    body: "Say when you are free, what you can do, and what a season has to provide. Three short steps, every one of them skippable.",
-  },
-  {
-    icon: "status.match",
-    title: "See why you matched",
-    body: "The score comes from what both sides stated — your dates against theirs, the benefits you need against the ones offered. The reasons are always shown, including the ones that say a field was left blank.",
-  },
-  {
-    icon: "status.applied",
-    title: "Track it in one place",
-    body: "Saved roles, applications, invitations and messages live in your dashboard. A host messages you inside the application they are messaging you about.",
-  },
+// Capability statements, not fabricated live numbers (no-mock-data rule).
+const SEEKER_MODULES: ReadonlyArray<{ label: string; value: string; icon: IconKey }> = [
+  { label: "Saved places", value: "Watch roles across seasons", icon: "nav.saved" },
+  { label: "Applications", value: "Track every application, end to end", icon: "status.applied" },
+  { label: "Recommended", value: "Matched to your skills & timing", icon: "status.match" },
+  { label: "Profile readiness", value: "Tell hosts exactly when you're free", icon: "system.success" },
 ];
-
-function HowItWorksSeeker() {
-  return (
-    <section className={styles.section} aria-labelledby="how-seeker-title">
-      <SectionHead
-        id="how-seeker-title"
-        eyebrow="How it works — seekers"
-        title="Four steps, and the first one asks nothing of you"
-        sub="Free forever. Seekers never pay on Explore & Earn; hosts fund the marketplace."
-      />
-      <ol className={styles.stepGrid}>
-        {SEEKER_STEPS.map((step, index) => (
-          <li key={step.title} className={styles.stepCard}>
-            <span className={styles.stepNumber} aria-hidden>{index + 1}</span>
-            <span className={styles.stepText}>
-              <span className={styles.stepTitle}>
-                <Icon name={step.icon} size={18} aria-hidden />
-                {step.title}
-              </span>
-              <span className={styles.stepBody}>{step.body}</span>
-            </span>
-          </li>
-        ))}
-      </ol>
-      <div className={styles.stepActions}>
-        <Link className={styles.solidCta} href="/for-seekers">
-          What seekers get
-          <Icon name="action.forward" size={16} aria-hidden />
-        </Link>
-        <Link className={styles.quietCta} href="/seek">
-          Or just start browsing
-        </Link>
-      </div>
-    </section>
-  );
-}
-
-// ─── Employer profile preview ──────────────────────────────────────────────
-
-/**
- * A SNIPPET, not a copy of the host page's profile card. It shows the SHAPE of
- * an employer profile — the fields every listing inherits — and links to the
- * demo workspace where the real thing is rendered by the real components. No
- * organisation is named here and no figure is quoted, because a homepage
- * illustration is exactly the place a fabricated employer would go unnoticed.
- */
-const PROFILE_FIELDS: ReadonlyArray<{ label: string; value: string }> = [
-  { label: "Season", value: "Stated by the host" },
-  { label: "Crew size", value: "Stated by the host" },
-  { label: "Housing", value: "Structured field" },
-  { label: "Meals", value: "Structured field" },
-];
-
-function EmployerProfilePreview() {
-  return (
-    <section className={styles.section} aria-labelledby="employer-title">
-      <div className={styles.splitBand}>
-        <div className={styles.splitCopy}>
-          <p className={styles.eyebrow}>Employer profiles</p>
-          <h2 id="employer-title" className={styles.splitTitle}>
-            You are looking at a place, not just a posting
-          </h2>
-          <p className={styles.splitSub}>
-            Every role hangs off one employer profile carrying the season, the
-            crew, the housing and the meals. Open any listing and you can reach
-            the organisation behind it — which is how you tell a real operation
-            from a job title.
-          </p>
-          <Link className={styles.quietCta} href="/for-hosts/demo/profile">
-            See a profile in the demo workspace
-            <Icon name="action.forward" size={16} aria-hidden />
-          </Link>
-        </div>
-        <div className={styles.profileSnippet}>
-          <div className={styles.profileSnippetMedia}>
-            <SitePhoto
-              slug="lodge-03"
-              size="card"
-              decorative
-              className={styles.profileSnippetPhoto}
-              sizes="(min-width: 900px) 24rem, 100vw"
-            />
-          </div>
-          <dl className={styles.profileSnippetFacts}>
-            {PROFILE_FIELDS.map((field) => (
-              <div key={field.label} className={styles.profileSnippetRow}>
-                <dt className={styles.profileSnippetLabel}>{field.label}</dt>
-                <dd className={styles.profileSnippetValue}>{field.value}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className={styles.profileSnippetNote}>
-            The shape of an employer profile. Real ones are filled in by the
-            host.
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Community value ───────────────────────────────────────────────────────
 
 const COMMUNITY_TOPICS: ReadonlyArray<{ label: string; icon: IconKey }> = [
-  { label: "Photos from the season", icon: "nav.photos" },
+  { label: "Destination discussions", icon: "nav.feed" },
   { label: "Housing & meals intel", icon: "benefit.housing" },
   { label: "Gear & road-trip advice", icon: "benefit.transport" },
-  { label: "Announcements from hiring hosts", icon: "nav.announcements" },
+  { label: "Host transparency & reviews", icon: "trust.verified_host" },
 ];
 
-function CommunityValue() {
+function FreeForeverBand() {
   return (
-    <section className={styles.section} aria-labelledby="community-title">
-      {/* Copy first in the DOM so the heading leads the reading order; the
-          photograph is raised above it on a phone by .splitMedia's `order`,
-          and sits in the band's narrow second column on desktop. */}
-      <div className={styles.splitBand}>
-        <div className={styles.splitCopy}>
-          <p className={styles.eyebrow}>Community</p>
-          <h2 id="community-title" className={styles.splitTitle}>
-            The listing says what&rsquo;s open. Seekers say what it&rsquo;s like.
-          </h2>
-          <p className={styles.splitSub}>
-            Community is a seeker space, behind a sign-in. The people posting are
-            sharing where they live and work for a season, and that is not
-            something to publish to the open web.
+    <section className={styles.section} aria-labelledby="free-title">
+      <SectionHead
+        id="free-title"
+        eyebrow="Free forever for seekers"
+        title="You never pay to find work"
+        sub="The job board tells you what's open. The community tells you what it's actually like."
+      />
+      <div className={styles.freeBand}>
+        <div className={styles.freeCol}>
+          <p className={styles.surfaceKicker}>
+            <Icon name="nav.dashboard" size={16} aria-hidden />
+            Seeker dashboard
           </p>
-          <ul className={styles.topicList} role="list">
-            {COMMUNITY_TOPICS.map((topic) => (
-              <li key={topic.label} className={styles.topicRow}>
-                <Icon name={topic.icon} size={16} aria-hidden />
-                {topic.label}
+          <ul className={styles.freeList} role="list">
+            {SEEKER_MODULES.map((m) => (
+              <li key={m.label} className={styles.freeRow}>
+                <Icon name={m.icon} size={16} aria-hidden />
+                <strong>{m.label}</strong>
+                <small>{m.value}</small>
               </li>
             ))}
           </ul>
-          <Link className={styles.quietCta} href="/community">
-            Sign in to open Community
+          <Link className={styles.freeCta} href="/seek">
+            Start exploring
             <Icon name="action.forward" size={16} aria-hidden />
           </Link>
         </div>
-        <div className={styles.splitMedia}>
-          <SitePhoto
-            slug="crew-03"
-            size="card"
-            className={styles.splitPhoto}
-            sizes="(min-width: 900px) 28rem, 100vw"
-          />
+        <div className={styles.freeCol}>
+          <p className={styles.surfaceKicker}>
+            <Icon name="nav.feed" size={16} aria-hidden />
+            Community
+          </p>
+          <ul className={styles.freeList} role="list">
+            {COMMUNITY_TOPICS.map((t) => (
+              <li key={t.label} className={styles.freeRow}>
+                <Icon name={t.icon} size={16} aria-hidden />
+                <strong>{t.label}</strong>
+              </li>
+            ))}
+          </ul>
+          <Link className={styles.freeCta} href="/community">
+            Join the community
+            <Icon name="action.forward" size={16} aria-hidden />
+          </Link>
         </div>
       </div>
     </section>
   );
 }
 
-// ─── Trust & safety ────────────────────────────────────────────────────────
+// ─── Host pitch + tiers ────────────────────────────────────────────────────
 
-/**
- * Every line here is a MECHANISM that exists in the product, phrased as what it
- * refuses rather than what it promises. Nothing on this band is a statistic, a
- * testimonial or a badge count — those are the three things a trust section
- * reaches for when it has nothing real to say.
- */
-const TRUST_POINTS: ReadonlyArray<{ title: string; body: string; icon: IconKey }> = [
-  {
-    icon: "system.lock",
-    title: "A listing that dodges the question cannot go live",
-    body: "Housing, meals and pay are publication requirements for a host-posted role, enforced by the database rather than by a reviewer's patience.",
-  },
-  {
-    icon: "trust.verified_host",
-    title: "The verified badge is earned, not declared",
-    body: "It tracks an active host subscription. A host cannot switch it on by typing their own company name into a field.",
-  },
-  {
-    icon: "system.info",
-    title: "“Not stated” instead of a guess",
-    body: "Some listings are sourced from elsewhere and say so. Where a fact is missing, the card says it is missing — we never estimate a wage or invent a housing arrangement on your behalf.",
-  },
-  {
-    icon: "action.report",
-    title: "Messaging and reporting stay on the platform",
-    body: "Conversations sit beside the application they belong to, and any listing or post can be reported from the surface you found it on.",
-  },
+const HOST_FEATURES: ReadonlyArray<{ label: string; icon: IconKey }> = [
+  { label: "Boosted listings", icon: "status.boosted" },
+  { label: "Featured employer placement", icon: "trust.featured_employer" },
+  { label: "Homepage announcements", icon: "nav.announcements" },
+  { label: "Applicant pipeline", icon: "analytics.funnel" },
+  { label: "Analytics", icon: "analytics.trend" },
+  { label: "Multi-location hiring", icon: "nav.map" },
 ];
 
-function TrustSafety() {
+function HostPitch() {
   return (
-    <section className={styles.section} aria-labelledby="trust-title">
-      <SectionHead
-        id="trust-title"
-        eyebrow="Trust & safety"
-        title="What we refuse to do"
-        sub="The rules below are enforced in the product, not stated in a policy nobody reads."
-      />
-      <div className={styles.trustGrid}>
-        {TRUST_POINTS.map((point) => (
-          <article key={point.title} className={styles.trustCard}>
-            <span className={styles.trustIcon} aria-hidden>
-              <Icon name={point.icon} size={20} />
-            </span>
-            <h3 className={styles.trustTitle}>{point.title}</h3>
-            <p className={styles.trustBody}>{point.body}</p>
-          </article>
-        ))}
-      </div>
-      <Link className={styles.quietCta} href="/sourced-listings">
-        How sourced listings are labelled
-        <Icon name="action.forward" size={16} aria-hidden />
-      </Link>
-    </section>
-  );
-}
-
-// ─── Host CTA band (build-first) ───────────────────────────────────────────
-
-/**
- * BUILD-FIRST COPY (D6/D7). The plan grid that used to live here is gone from
- * the homepage: it made billing the third thing a prospective host saw, which
- * is the funnel the founder rejected, and it was a second pricing surface to
- * keep in step with /for-hosts and /host/plans (D21 wants ONE). What remains
- * says what a host can do before paying anything, and links to the page that
- * shows it.
- */
-const HOST_BUILD_STEPS: ReadonlyArray<{ title: string; body: string; icon: IconKey }> = [
-  {
-    icon: "nav.host",
-    title: "Build your profile",
-    body: "Create an account and brand your employer profile. No card, no plan.",
-  },
-  {
-    icon: "status.draft",
-    title: "Draft your roles",
-    body: "Write the listings and preview exactly what a seeker will see, including the triad.",
-  },
-  {
-    icon: "action.view",
-    title: "Walk the whole workspace",
-    body: "The demo runs the real product on sample data — pipeline, messages, analytics.",
-  },
-  {
-    icon: "system.success",
-    title: "Activate when you want to publish",
-    body: "A plan is what makes a role publishable and discoverable. Prices are published; annual is ten monthly payments.",
-  },
-];
-
-function HostCtaBand() {
-  return (
-    <section
-      id="plans"
-      className={`${styles.section} ${styles.hostSection}`}
-      aria-labelledby="host-title"
-    >
+    <section id="plans" className={`${styles.section} ${styles.hostSection}`} aria-labelledby="host-title">
       <div className={styles.hostHead}>
         <p className={styles.eyebrow}>For hosts &amp; employers</p>
-        <h2 id="host-title" className={styles.hostTitle}>
-          Build it first. Pay when you publish.
-        </h2>
+        <h2 id="host-title" className={styles.hostTitle}>Hire seasonal workers where they actually search.</h2>
         <p className={styles.hostSub}>
-          Seekers never pay to find work — hosts fund the marketplace. You can
-          create your profile, draft every role and tour the whole workspace
-          before a plan is involved.
+          Seekers never pay to find work. You pay for visibility — boosted placement, featured
+          spots, and homepage reach in front of people ready to move.
         </p>
       </div>
 
-      <ol className={styles.hostSteps}>
-        {HOST_BUILD_STEPS.map((step, index) => (
-          <li key={step.title} className={styles.hostStep}>
-            <span className={styles.hostStepNumber} aria-hidden>{index + 1}</span>
-            <span className={styles.hostStepTitle}>
-              <Icon name={step.icon} size={18} aria-hidden />
-              {step.title}
-            </span>
-            <span className={styles.hostStepBody}>{step.body}</span>
+      <ul className={styles.hostFeatures} aria-label="What hosts get">
+        {HOST_FEATURES.map((f) => (
+          <li key={f.label} className={styles.hostFeature}>
+            <Icon name={f.icon} size={20} aria-hidden />
+            {f.label}
           </li>
         ))}
-      </ol>
+      </ul>
+
+      <div className={styles.planGrid}>
+        {HOME_PLANS.map((p) => (
+          <div key={p.key} className={`${styles.planCard}${p.featured ? ` ${styles.planFeatured}` : ""}`}>
+            {p.featured ? <span className={styles.planRibbon}>Most popular</span> : null}
+            <p className={styles.planName}>{p.name}</p>
+            <p className={styles.planPrice}>
+              <strong>{formatUsd(p.priceMonthlyCents)}</strong>
+              <span>/mo</span>
+            </p>
+            <p className={styles.planBlurb}>{p.blurb}</p>
+            <ul className={styles.planFeatures} role="list">
+              {p.features.map((f) => (
+                <li key={f} className={styles.planFeatureRow}>
+                  <Icon name="system.success" size={16} aria-hidden />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <Link className={p.featured ? styles.planCtaPrimary : styles.planCta} href="/for-hosts">
+              {p.cta}
+            </Link>
+          </div>
+        ))}
+      </div>
 
       <div className={styles.hostActions}>
         <Link className={styles.heroPrimary} href="/for-hosts">
-          See the host product
+          Post a job
           <Icon name="action.forward" size={16} aria-hidden />
         </Link>
-        <Link className={styles.heroSecondary} href="/for-hosts/demo">
-          Explore the live demo
+        <Link className={styles.heroSecondary} href="/for-hosts">
+          View host plans
         </Link>
       </div>
     </section>
   );
 }
 
-// ─── Final CTA (seeker) ────────────────────────────────────────────────────
+// ─── Final CTA ─────────────────────────────────────────────────────────────
 
 function FinalCta() {
   return (
@@ -948,8 +765,8 @@ function FinalCta() {
             Explore jobs
             <Icon name="action.forward" size={16} aria-hidden />
           </Link>
-          <Link className={styles.finalGhost} href="/for-seekers">
-            What seekers get
+          <Link className={styles.finalGhost} href="/for-hosts">
+            Post a job
           </Link>
         </div>
       </div>
@@ -966,25 +783,19 @@ export function MarketplaceHome({
   announcements,
   heroIndex,
 }: MarketplaceHomeProps) {
-  /*
-   * V2 §16 sequence: photograph + one message + search → what makes a listing
-   * different → real inventory → how to find it → how it works for a seeker →
-   * what an employer profile is → paid rails → community → trust → the host
-   * door → the seeker door.
-   *
-   * The plan grid left this page with HostPitch (see HostCtaBand). The floating
-   * hero "peek" left with the hero photograph. Category and destination tiles
-   * survive — they are the crawlable route into /jobs/{lane} — but they paint
-   * photographs now instead of the lane gradient.
-   */
+  // The hero photo rotates through the controllable HOME_HERO_ROTATION bucket
+  // (index picked server-side per landing) so first impression always sells the
+  // place; the floating peek is a real listing.
+  const heroListing = listings.find((l) => l.conditionalBadges?.includes("boosted")) ?? listings[0];
+
+  // Organic-first sequence: promise → inventory → discovery story → browse
+  // lanes → paid rails → free-forever → host conversion arc.
   return (
     <div className={styles.home}>
-      <HomeHero heroIndex={heroIndex} />
+      <HomeHero peek={heroListing} heroIndex={heroIndex} />
       <ThreeQuestions />
       <FeaturedJobs listings={listings} />
       <DiscoverModes listings={listings} />
-      <HowItWorksSeeker />
-      <EmployerProfilePreview />
       <CategoryGrid />
       <DestinationGrid destinations={destinations} />
 
@@ -994,9 +805,8 @@ export function MarketplaceHome({
       <AnnouncementRail items={announcements} />
       {employers.length > 0 ? <FeaturedEmployersRail employers={employers} /> : null}
 
-      <CommunityValue />
-      <TrustSafety />
-      <HostCtaBand />
+      <FreeForeverBand />
+      <HostPitch />
       <FinalCta />
     </div>
   );

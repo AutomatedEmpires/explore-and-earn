@@ -1,494 +1,670 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { Badge, Icon } from "@explore-and-earn/ui";
+import Image from "next/image";
+import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui";
 
 import type {
   HostAnalytics,
-  HostDashboardStats,
+  HostHiringPulse,
+  HostListingSignal,
   RecentActivity,
 } from "@explore-and-earn/db";
-import { HostSetupChecklist } from "./HostSetupChecklist";
-import styles from "./HostDashboard.module.css";
+import { CATEGORY_ICON, CATEGORY_LABEL } from "../discovery";
+import { formatDate } from "../../lib/format";
+import {
+  needsAttention,
+  opportunityPerformance,
+  pipelineFunnel,
+  pulseTiles,
+  upcomingEntries,
+  type AttentionItem,
+  type HostProfileCompleteness,
+} from "./workspaceModel";
 import { StaggerReveal } from "./StaggerReveal";
-
-export interface HostDashboardProps {
-  readonly stats: HostDashboardStats;
-  readonly recentActivity: readonly RecentActivity[];
-  /** Company name for the greeting. */
-  readonly companyName: string | null;
-  /** Host's primary marketplace lane (farm/maritime/remote/seasonal/mix) — drives the hero atmosphere. */
-  readonly primaryLane: string | null;
-  /** Full host analytics for the performance cards. */
-  readonly analytics: HostAnalytics;
-  /** Unread message count — surfaced as a "needs attention" row when > 0. */
-  readonly unread?: number;
-}
-
-/** Map activity type to an icon key from the registry. */
-const ACTIVITY_ICON: Record<RecentActivity["type"], string> = {
-  application: "action.apply",
-  invite_sent: "action.forward",
-  listing_published: "status.open",
-} as const;
+import styles from "./HostDashboard.module.css";
 
 /**
- * Format an ISO timestamp relative to now using Intl.RelativeTimeFormat.
- * Shows "just now" within 60 s, then minutes/hours/days.
+ * The host overview — a recruiting command centre (spec D24).
+ *
+ * WHAT CHANGED, AND WHY IT HAD TO. The surface this replaces stacked a
+ * "Getting started" checklist directly above a "What to do next" panel, and the
+ * two disagreed on the same screen: the checklist could read 0/3 while the panel
+ * said "You're all caught up." Beside them sat a "conversion radar" whose
+ * headline percentage was the mean of three unrelated ratios, one of which
+ * awarded a host 40 points for owning a draft. And the KPI figures carried the
+ * literal strings "All-time" and "Review" where a trend belongs.
+ *
+ * So: ONE prioritised queue (workspaceModel.needsAttention), fed by real
+ * records, with the evidence for each item printed under it. The composite score
+ * is gone — it is replaced by the four counts that actually moved, each against
+ * the same window a month earlier (getHostHiringPulse), which is the first real
+ * comparison this product has ever been able to draw.
+ *
+ * NO WEATHER. The demo's weather panel is labelled "Sample data" because no
+ * feed is wired. A real host's workspace does not get a sample-labelled forecast
+ * where a real one would go.
  */
+
+export interface PlanUsageRow {
+  readonly id: string;
+  readonly label: string;
+  readonly used: number;
+  /** Null when the entitlement could not be read — the row then says so. */
+  readonly allowance: number | null;
+  readonly note: string;
+}
+
+export interface HostDashboardProps {
+  readonly companyName: string | null;
+  readonly hostName: string | null;
+  readonly location: string | null;
+  /** The host's OWN cover photo. Never a stock scene standing in for one. */
+  readonly coverPhotoUrl: string | null;
+  readonly verified: boolean;
+  readonly planLabel: string;
+  /** hostAccountState() — 'prospect' | 'lapsed' | 'active' | 'cancelled' | null. */
+  readonly accountState: string | null;
+  readonly primaryLane: string | null;
+  readonly profile: HostProfileCompleteness;
+  readonly analytics: HostAnalytics;
+  readonly pulse: HostHiringPulse;
+  readonly signals: readonly HostListingSignal[];
+  readonly applicationCounts: Readonly<Record<string, number>>;
+  readonly newApplicationCounts: Readonly<Record<string, number>>;
+  readonly unread: number;
+  readonly planUsage: readonly PlanUsageRow[];
+  readonly recentActivity: readonly RecentActivity[];
+  /** The public employer page, when the profile exists. */
+  readonly publicProfileHref: string | null;
+}
+
+const TONE_ICON = {
+  urgent: "system.error",
+  soon: "system.info",
+  later: "system.info",
+} as const;
+
 function relativeTime(iso: string): string {
-  const now = Date.now();
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
-  const diffSeconds = Math.round((then - now) / 1000);
-  const absSeconds = Math.abs(diffSeconds);
-
-  if (absSeconds < 60) return "just now";
-
+  const diffSeconds = Math.round((then - Date.now()) / 1000);
+  const abs = Math.abs(diffSeconds);
+  if (abs < 60) return "just now";
   const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-  if (absSeconds < 3600) {
-    return rtf.format(Math.round(diffSeconds / 60), "minute");
-  }
-  if (absSeconds < 86400) {
-    return rtf.format(Math.round(diffSeconds / 3600), "hour");
-  }
+  if (abs < 3600) return rtf.format(Math.round(diffSeconds / 60), "minute");
+  if (abs < 86400) return rtf.format(Math.round(diffSeconds / 3600), "hour");
   return rtf.format(Math.round(diffSeconds / 86400), "day");
 }
 
 /**
- * Host dashboard — a premium marketplace command center composed from live
- * analytics data. Uses the global host-* design-system layer (host.css).
- * No data is fabricated; panels conditionally render on the data that exists.
+ * Short calendar date for the upcoming rail. Goes through the formatter
+ * chokepoint (`@/lib/format`) rather than an inline `toLocaleDateString`, which
+ * is what guardrail G52 exists to keep true — the i18n wave needs ONE place to
+ * thread a real locale through.
  */
+function shortDate(iso: string): string {
+  return Number.isNaN(new Date(iso).getTime())
+    ? iso
+    : formatDate(iso, { month: "short", day: "numeric" });
+}
+
+const ACTIVITY_ICON: Record<RecentActivity["type"], string> = {
+  application: "action.apply",
+  invite_sent: "action.forward",
+  listing_published: "status.open",
+};
+
+function isCategoryKey(value: string): value is keyof typeof CATEGORY_LABEL {
+  return Object.prototype.hasOwnProperty.call(CATEGORY_LABEL, value);
+}
+
 export function HostDashboard({
-  stats,
-  recentActivity,
   companyName,
+  hostName,
+  location,
+  coverPhotoUrl,
+  verified,
+  planLabel,
+  accountState,
   primaryLane,
+  profile,
   analytics,
-  unread = 0,
+  pulse,
+  signals,
+  applicationCounts,
+  newApplicationCounts,
+  unread,
+  planUsage,
+  recentActivity,
+  publicProfileHref,
 }: HostDashboardProps) {
-  // Primary counts come from analytics — getHostAnalytics is the reliable host
-  // resolver (live listings + applications by status); the month-scoped stats
-  // are used only for the "this month" figures, with all-time fallbacks so a
-  // stats hiccup never blanks the dashboard to zeros.
-  //
-  // `listingCount`, NOT perListingStats.length: per-listing rows are the paid
-  // "full analytics" entitlement and are absent on the basic scope, so counting
-  // them would tell a Starter host they have no listings.
-  const totalListings = analytics.listingCount;
-  const liveCount = analytics.activeListingCount;
-  const draftCount =
-    stats.listingsByStatus["draft"] ??
-    analytics.perListingStats.filter((l) => l.listingStatus === "draft").length;
+  const liveCount = signals.filter((signal) => signal.status === "live").length;
+  const funnel = pipelineFunnel(analytics.totalApplicationsByStatus);
+  const newApplicants = analytics.totalApplicationsByStatus["applied"] ?? 0;
+  const offersOutstanding = analytics.totalApplicationsByStatus["offered"] ?? 0;
 
-  const totalApplicationsAllTime = Object.values(
-    analytics.totalApplicationsByStatus,
-  ).reduce((sum, n) => sum + n, 0);
-  const pendingReview = analytics.totalApplicationsByStatus["applied"] ?? 0;
+  const attention = needsAttention({
+    newApplicants,
+    offersOutstanding,
+    unreadMessages: unread,
+    listings: signals,
+    accountState,
+    profile,
+  });
 
-  const newApps = stats.applicationsThisMonth["applied"] ?? pendingReview;
-
-  // "Pipeline fill" — share of applications moved past "applied".
-  const reviewed = totalApplicationsAllTime - pendingReview;
-  const pipelineFill =
-    totalApplicationsAllTime > 0
-      ? Math.round((reviewed / totalApplicationsAllTime) * 100)
-      : 0;
-
-  // ── Pipeline stage breakdown ────────────────────────────────────────
-  // Group the host's REAL all-time application counts (the same source the
-  // radar reads) into three honest funnel stages so the pipeline panel is as
-  // explainable as the radar — never a single mystery meter. Counts come
-  // straight from analytics.totalApplicationsByStatus (no fabrication); the
-  // denominator is the all-time total so the bars always sum to the pipeline.
-  const appsByStatus = analytics.totalApplicationsByStatus;
-  const stageNew = appsByStatus["applied"] ?? 0;
-  const stageReview =
-    (appsByStatus["reviewing"] ?? 0) + (appsByStatus["saved_by_host"] ?? 0);
-  const stageAdvanced =
-    (appsByStatus["offered"] ?? 0) +
-    (appsByStatus["accepted"] ?? 0) +
-    (appsByStatus["active"] ?? 0) +
-    (appsByStatus["completed"] ?? 0);
-  const pipelineTotal = totalApplicationsAllTime;
-  const pipelineStages = [
-    { label: "New", hint: "Awaiting first look", count: stageNew, tone: "new" },
-    {
-      label: "In review",
-      hint: "Reviewing & shortlisted",
-      count: stageReview,
-      tone: "review",
-    },
-    {
-      label: "Advanced",
-      hint: "Offered & onward",
-      count: stageAdvanced,
-      tone: "advanced",
-    },
-  ] as const;
-
-  const acceptancePct = Math.round(analytics.inviteAcceptanceRate * 100);
-  // Empty on the "basic" analytics scope — per-listing performance is the paid
-  // distinction, so the panel below simply does not render for Starter. The
-  // upsell for it lives on /host/analytics, not here.
-  const topListings = analytics.perListingStats.slice(0, 5);
-
-  // ── Conversion radar ────────────────────────────────────────────────
-  // A composite "operational health" score, computed only from data that
-  // already exists on this dashboard — never fabricated. Three real signals,
-  // each surfaced individually in the legend so the headline % is explainable:
-  //   • Pipeline   — share of applications moved past "applied" (responsiveness)
-  //   • Outreach   — invite acceptance rate (recruiting effectiveness)
-  //   • Inventory  — whether the host has live listings collecting demand
-  const inventoryPct = totalListings > 0 ? (liveCount > 0 ? 100 : 40) : 0;
-  const radarInputs = [
-    { label: "Pipeline movement", value: pipelineFill },
-    { label: "Invite acceptance", value: acceptancePct },
-    { label: "Listing inventory", value: inventoryPct },
-  ] as const;
-  const conversionScore = Math.round(
-    radarInputs.reduce((sum, s) => sum + s.value, 0) / radarInputs.length,
+  const opportunities = opportunityPerformance(
+    signals,
+    analytics,
+    applicationCounts,
+    newApplicationCounts,
   );
-  const radarTone =
-    conversionScore >= 70 ? "Healthy" : conversionScore >= 40 ? "Building" : "Needs work";
+  const upcoming = upcomingEntries(signals);
+  const tiles = pulseTiles(pulse);
 
-  const pending = stats.pendingActions > 0 ? stats.pendingActions : pendingReview;
-  const isNewHost = totalListings === 0;
-  // The single strongest next action drives the hero CTA.
-  const heroPrimary =
-    pending > 0
-      ? { href: "/host/applicants", label: `Review ${pending} applicant${pending === 1 ? "" : "s"}`, icon: "action.apply" as const }
-      : { href: "/host/listings/new", label: "Create a listing", icon: "status.open" as const };
+  // The strongest next action IS the top of the queue — the two cannot disagree
+  // because they are the same list.
+  const primary: AttentionItem | undefined = attention[0];
 
   return (
-    <StaggerReveal className={`host-page ${styles.dashboard}`}>
-      {/* ── Identity hero + strongest next action ──────────────────── */}
-      <section className="host-hero" data-lane={primaryLane ?? undefined}>
-        <div>
-          <p className="host-hero__eyebrow">Hosting command center</p>
-          <h1 className="host-hero__title">
-            {companyName ? `Welcome back, ${companyName}` : "Host dashboard"}
-          </h1>
-          <p className="host-hero__sub">
-            {isNewHost
-              ? "Post your first opportunity to start reaching work-travelers."
-              : "Your listings, applicants, and activity at a glance."}
-          </p>
+    <StaggerReveal className={`host-page ${styles.overview}`}>
+      {/* ── Identity & season band ───────────────────────────────────── */}
+      <section
+        className={styles.identity}
+        data-lane={primaryLane ?? undefined}
+        aria-labelledby="host-identity-heading"
+      >
+        <div className={styles.identityCover}>
+          {coverPhotoUrl ? (
+            <Image
+              src={coverPhotoUrl}
+              alt=""
+              fill
+              sizes="(max-width: 1023px) 100vw, 320px"
+              className={styles.identityCoverImg}
+              unoptimized
+            />
+          ) : (
+            // No stand-in scene. A stock photograph here would read as this
+            // host's own place, which is the one thing the photo catalog's
+            // honesty rule forbids.
+            <div className={styles.coverEmpty}>
+              <Icon name="action.edit" size={20} aria-hidden />
+              <p className={styles.coverEmptyText}>
+                No cover photo yet — seekers see your operation here.
+              </p>
+              <Link className={styles.coverEmptyCta} href="/host/profile/edit">
+                Add one
+              </Link>
+            </div>
+          )}
         </div>
-        <div className="host-hero__actions">
-          <Link className="host-hero__cta" href={heroPrimary.href}>
-            <Icon name={heroPrimary.icon} size={20} aria-hidden />
-            {heroPrimary.label}
-          </Link>
-          {!isNewHost ? (
-            <Link className="host-hero__cta host-hero__cta--ghost" href="/host/listings/new">
-              <Icon name="action.forward" size={20} aria-hidden />
-              New listing
-            </Link>
+
+        <div className={styles.identityBody}>
+          <div className={styles.identityMarks}>
+            {verified ? <VerifiedHostBadge /> : null}
+            <span className={styles.planPill}>{planLabel}</span>
+            {accountState === "lapsed" ? (
+              <span className={styles.lapsedPill}>Payment overdue</span>
+            ) : null}
+          </div>
+
+          <h1 id="host-identity-heading" className={styles.identityTitle}>
+            {companyName ?? "Your workspace"}
+          </h1>
+
+          <p className={styles.identityMeta}>
+            {[hostName, location].filter(Boolean).join(" · ") ||
+              "Add your name and home base so seekers know who is hiring."}
+          </p>
+
+          <dl className={styles.identityFacts}>
+            <div className={styles.identityFact}>
+              <dt>Live listings</dt>
+              <dd className="ui-tabular">{liveCount}</dd>
+            </div>
+            <div className={styles.identityFact}>
+              <dt>Profile</dt>
+              <dd className="ui-tabular">
+                {profile.filled}/{profile.total}
+              </dd>
+            </div>
+            <div className={styles.identityFact}>
+              <dt>In pipeline</dt>
+              <dd className="ui-tabular">{funnel.total}</dd>
+            </div>
+          </dl>
+
+          <div className={styles.identityActions}>
+            {primary ? (
+              <Link className={styles.primaryCta} href={primary.href}>
+                <Icon name="action.forward" size={18} aria-hidden />
+                {primary.title}
+              </Link>
+            ) : (
+              <Link className={styles.primaryCta} href="/host/listings/new">
+                <Icon name="status.open" size={18} aria-hidden />
+                Post another opportunity
+              </Link>
+            )}
+            {publicProfileHref ? (
+              <Link className={styles.ghostCta} href={publicProfileHref}>
+                <Icon name="action.view" size={18} aria-hidden />
+                View public profile
+              </Link>
+            ) : null}
+          </div>
+
+          {!profile.complete ? (
+            <p className={styles.identityHint}>
+              Still blank: {profile.missing.join(", ")}.{" "}
+              <Link href="/host/profile/edit">Finish your profile</Link>
+            </p>
           ) : null}
         </div>
-        {!isNewHost ? (
-          <div className="hostos-herokpi" aria-hidden>
-            <div><b>{liveCount}</b><span>live listings</span></div>
-            <div><b>{totalApplicationsAllTime}</b><span>applicants</span></div>
-            <div><b>{pipelineFill}%</b><span>reviewed</span></div>
-          </div>
-        ) : null}
       </section>
 
-      {/* ── First-run setup checklist — until the host has a live listing ─ */}
-      {liveCount === 0 ? (
-        <HostSetupChecklist
-          hasProfile={companyName !== null}
-          listingCount={totalListings}
-          liveCount={liveCount}
-        />
-      ) : null}
+      {/* ── Hiring pulse ─────────────────────────────────────────────── */}
+      <section className="host-panel host-panel--raised" aria-labelledby="pulse-heading">
+        <div className="host-panel__head">
+          <div className="host-panel__titles">
+            <span className="host-panel__eyebrow">Last {pulse.windowDays} days</span>
+            <h2 id="pulse-heading" className="host-panel__title">
+              Hiring pulse
+            </h2>
+          </div>
+          <Link className="host-panel__action" href="/host/analytics">
+            Full analytics
+            <Icon name="action.forward" size={16} aria-hidden />
+          </Link>
+        </div>
 
-      {/* ── Needs attention — the primary, content-first at-a-glance ──
-          What this host must act on RIGHT NOW: applicants to review, fresh
-          interest, drafts to publish, unread threads. Counts are real (no
-          fabrication); each row deep-links to the surface that resolves it. */}
-      <section className="host-panel host-panel--raised">
+        {pulse.measurable ? (
+          <ul className={styles.pulseGrid}>
+            {tiles.map((tile) => (
+              <li key={tile.id} className={styles.pulseTile}>
+                <Link className={styles.pulseLink} href={tile.href}>
+                  <span className={styles.pulseLabel}>{tile.label}</span>
+                  <span className={`${styles.pulseValue} ui-tabular`}>{tile.value}</span>
+                  {tile.trend ? (
+                    <span className={styles.pulseTrend} data-tone={tile.trendTone}>
+                      {tile.trend}
+                    </span>
+                  ) : (
+                    // Two empty windows in a row. "0%" would imply a measured
+                    // ratio; there was nothing to measure.
+                    <span className={styles.pulseTrendMuted}>No activity either period</span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className={styles.teach}>
+            <p className={styles.teachTitle}>Nothing to compare yet</p>
+            <p className={styles.teachBody}>
+              Your pulse starts the moment a listing goes live — applications,
+              invites, and take-up, each against the month before. Until then
+              there is no period to measure.
+            </p>
+            <div className={styles.teachLinks}>
+              <Link className={styles.teachCta} href="/host/listings/new">
+                Create a listing
+              </Link>
+              <Link className={styles.teachGhost} href="/for-hosts/demo">
+                See a season in progress
+              </Link>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ── Needs attention — THE single prioritised queue ───────────── */}
+      <section className="host-panel host-panel--raised" aria-labelledby="attention-heading">
         <div className="host-panel__head">
           <div className="host-panel__titles">
             <span className="host-panel__eyebrow">Needs attention</span>
-            <h2 className="host-panel__title">What to do next</h2>
+            <h2 id="attention-heading" className="host-panel__title">
+              {attention.length > 0
+                ? `${attention.length} thing${attention.length === 1 ? "" : "s"} to handle`
+                : "Nothing waiting on you"}
+            </h2>
           </div>
         </div>
-        <div className={styles.attentionList}>
-          {pending > 0 ? (
-            <Link className="host-attention" href="/host/applicants">
-              <span className="host-attention__count">{pending}</span>
-              <span className="host-attention__text">
-                <span className="host-attention__title">Applicants awaiting review</span>
-                <span className="host-attention__sub">Respond quickly to win great seekers</span>
-              </span>
-              <Icon name="action.forward" size={20} aria-hidden />
-            </Link>
-          ) : null}
-          {newApps > 0 ? (
-            <Link className="host-attention" href="/host/applicants">
-              <span className="host-attention__count">{newApps}</span>
-              <span className="host-attention__text">
-                <span className="host-attention__title">New applications this month</span>
-                <span className="host-attention__sub">Fresh interest in your listings</span>
-              </span>
-              <Icon name="action.forward" size={20} aria-hidden />
-            </Link>
-          ) : null}
-          {unread > 0 ? (
-            <Link className="host-attention" href="/host/messages">
-              <span className="host-attention__count">{unread}</span>
-              <span className="host-attention__text">
-                <span className="host-attention__title">Unread messages</span>
-                <span className="host-attention__sub">Seekers waiting to hear back from you</span>
-              </span>
-              <Icon name="action.forward" size={20} aria-hidden />
-            </Link>
-          ) : null}
-          {draftCount > 0 ? (
-            <Link className="host-attention" href="/host/listings">
-              <span className="host-attention__count">{draftCount}</span>
-              <span className="host-attention__text">
-                <span className="host-attention__title">Draft listings to publish</span>
-                <span className="host-attention__sub">Publish to start receiving applicants</span>
-              </span>
-              <Icon name="action.forward" size={20} aria-hidden />
-            </Link>
-          ) : null}
-          {pending === 0 && newApps === 0 && unread === 0 && draftCount === 0 ? (
-            isNewHost ? (
-              // A brand-new host is NOT "caught up" — the next action is the
-              // setup path (saying otherwise contradicted the 0/3 checklist
-              // rendered above it).
-              <Link className="host-attention" href="/host/listings/new">
-                <span className="host-attention__count">1</span>
-                <span className="host-attention__text">
-                  <span className="host-attention__title">Get your first opportunity live</span>
-                  <span className="host-attention__sub">Post a role with Housing, Meals &amp; Pay to start reaching seekers</span>
-                </span>
-                <Icon name="action.forward" size={20} aria-hidden />
-              </Link>
-            ) : (
-              <p className={styles.allClear}>
-                <Icon name="system.success" size={20} aria-hidden />
-                You&rsquo;re all caught up.
-              </p>
-            )
-          ) : null}
-        </div>
+
+        {attention.length > 0 ? (
+          <ol className={styles.attentionList}>
+            {attention.map((item) => (
+              <li key={item.id}>
+                <Link className={styles.attentionItem} href={item.href} data-tone={item.tone}>
+                  {typeof item.count === "number" ? (
+                    <span className={`${styles.attentionCount} ui-tabular`}>{item.count}</span>
+                  ) : (
+                    <span className={styles.attentionMark} aria-hidden>
+                      <Icon name={TONE_ICON[item.tone]} size={18} />
+                    </span>
+                  )}
+                  <span className={styles.attentionText}>
+                    <span className={styles.attentionTitle}>{item.title}</span>
+                    {/* The record this was counted from — never advice. */}
+                    <span className={styles.attentionEvidence}>{item.evidence}</span>
+                  </span>
+                  <Icon name="action.forward" size={18} aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className={styles.clear}>
+            <Icon name="system.success" size={18} aria-hidden />
+            Every applicant has been looked at, every message answered, and no
+            deadline is inside two weeks.
+          </p>
+        )}
       </section>
 
-      {/* ── Pipeline + invite performance (2-col on desktop) ────────── */}
       <div className={styles.twoCol}>
-        <section className="host-panel host-panel--raised">
+        {/* ── Pipeline funnel ────────────────────────────────────────── */}
+        <section className="host-panel host-panel--raised" aria-labelledby="funnel-heading">
           <div className="host-panel__head">
             <div className="host-panel__titles">
-              <span className="host-panel__eyebrow">This month</span>
-              <h2 className="host-panel__title">Application pipeline</h2>
+              <span className="host-panel__eyebrow">All time</span>
+              <h2 id="funnel-heading" className="host-panel__title">
+                Applicant pipeline
+              </h2>
             </div>
             <Link className="host-panel__action" href="/host/applicants">
-              View pipeline
+              Open pipeline
               <Icon name="action.forward" size={16} aria-hidden />
             </Link>
           </div>
-          {pipelineTotal > 0 ? (
-            <div className={styles.pipeline}>
-              <div className={styles.pipelineLede}>
-                <span className={styles.pipelinePct}>{pipelineFill}%</span>
-                <span className={styles.pipelineLedeText}>
-                  moved past first review
-                  <span className={styles.pipelineLedeSub}>
-                    {reviewed} of {pipelineTotal} applicants
+
+          {funnel.total > 0 ? (
+            <>
+              <p className={styles.funnelLede}>
+                <span className={`${styles.funnelPct} ui-tabular`}>
+                  {funnel.advancedPercent}%
+                </span>
+                <span>
+                  moved past the first look
+                  <span className={styles.funnelSub}>
+                    {funnel.total - funnel.steps[0]!.count} of {funnel.total} applications
                   </span>
                 </span>
-              </div>
-              <ul className={styles.pipelineStages}>
-                {pipelineStages.map((stage) => {
-                  const pct =
-                    pipelineTotal > 0
-                      ? Math.round((stage.count / pipelineTotal) * 100)
-                      : 0;
-                  return (
-                    <li
-                      key={stage.label}
-                      className={styles.pipelineStage}
-                      data-tone={stage.tone}
-                      style={{ "--pct": `${pct}%` } as CSSProperties}
-                    >
-                      <span className={styles.pipelineStageLabel}>
-                        {stage.label}
-                        <span className={styles.pipelineStageHint}>
-                          {stage.hint}
-                        </span>
-                      </span>
-                      <span className={styles.pipelineStageCount}>
-                        {stage.count}
-                      </span>
-                      <span className={styles.pipelineStageTrack} aria-hidden>
-                        <span />
-                      </span>
-                    </li>
-                  );
-                })}
+              </p>
+              <ul className={styles.funnel}>
+                {funnel.steps.map((step) => (
+                  <li
+                    key={step.id}
+                    className={styles.funnelRow}
+                    style={
+                      {
+                        "--pct": `${
+                          funnel.total > 0
+                            ? Math.round((step.count / funnel.total) * 100)
+                            : 0
+                        }%`,
+                      } as CSSProperties
+                    }
+                  >
+                    <span className={styles.funnelLabel}>{step.label}</span>
+                    <span className={`${styles.funnelCount} ui-tabular`}>{step.count}</span>
+                    <span className={styles.funnelTrack} aria-hidden>
+                      <span />
+                    </span>
+                  </li>
+                ))}
               </ul>
-            </div>
+              {funnel.closed > 0 ? (
+                <p className={styles.funnelFoot}>
+                  {funnel.closed} closed (not selected, withdrawn, or expired) — counted
+                  in the total, not a stage.
+                </p>
+              ) : null}
+            </>
           ) : (
-            <p className={styles.muted}>No applications yet.</p>
+            <div className={styles.teach}>
+              <p className={styles.teachTitle}>No applications yet</p>
+              <p className={styles.teachBody}>
+                Applicants arrive at &ldquo;Applied&rdquo; and move through review,
+                shortlist, and offer. You can also invite seekers directly.
+              </p>
+              <div className={styles.teachLinks}>
+                <Link className={styles.teachCta} href="/host/outreach">
+                  Invite seekers
+                </Link>
+                <Link className={styles.teachGhost} href="/for-hosts/demo/applicants">
+                  See a full pipeline
+                </Link>
+              </div>
+            </div>
           )}
         </section>
 
-        <section className="host-panel host-panel--raised">
+        {/* ── Upcoming ───────────────────────────────────────────────── */}
+        <section className="host-panel host-panel--raised" aria-labelledby="upcoming-heading">
           <div className="host-panel__head">
             <div className="host-panel__titles">
-              <span className="host-panel__eyebrow">Reach</span>
-              <h2 className="host-panel__title">Conversion radar</h2>
+              <span className="host-panel__eyebrow">Ahead</span>
+              <h2 id="upcoming-heading" className="host-panel__title">
+                Dates coming up
+              </h2>
             </div>
-            {!isNewHost ? (
-              <Badge
-                variant={conversionScore >= 70 ? "success" : "neutral"}
-                label={radarTone}
-              />
-            ) : null}
           </div>
-          {isNewHost ? (
-            // Pre-launch: there is nothing to measure yet — a punishing
-            // "0% NEEDS WORK" on day one misreads setup as failure.
-            <p className={styles.allClear}>
-              <Icon name="system.info" size={20} aria-hidden />
-              Health tracking starts once your first listing is live.
-            </p>
-          ) : (
-          <div className={styles.radarSplit}>
-            <div
-              className={styles.radar}
-              style={{ "--pct": conversionScore } as CSSProperties}
-              role="meter"
-              aria-valuenow={conversionScore}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={`Operational health ${conversionScore} percent — ${radarTone}`}
-            >
-              <span className={styles.radarCore} aria-hidden>
-                <span className={styles.radarValue}>{conversionScore}%</span>
-                <span className={styles.radarCaption}>Health</span>
-              </span>
-            </div>
-            <ul className={styles.radarLegend}>
-              {radarInputs.map((input) => (
-                <li
-                  key={input.label}
-                  className={styles.radarLegendRow}
-                  style={{ "--pct": `${input.value}%` } as CSSProperties}
-                >
-                  <span className={styles.radarLegendLabel}>{input.label}</span>
-                  <span className={styles.radarLegendValue}>{input.value}%</span>
-                  <span className={styles.radarTrack} aria-hidden>
-                    <span />
-                  </span>
+          {upcoming.length > 0 ? (
+            <ol className={styles.upcoming}>
+              {upcoming.map((entry) => (
+                <li key={entry.id}>
+                  <Link className={styles.upcomingRow} href={entry.href} data-tone={entry.tone}>
+                    <time className={`${styles.upcomingDate} ui-tabular`} dateTime={entry.at}>
+                      {shortDate(entry.at)}
+                    </time>
+                    <span className={styles.upcomingText}>
+                      <span className={styles.upcomingTitle}>{entry.title}</span>
+                      <span className={styles.upcomingDetail}>{entry.detail}</span>
+                    </span>
+                  </Link>
                 </li>
               ))}
-            </ul>
-          </div>
+            </ol>
+          ) : (
+            <p className={styles.muted}>
+              Nothing dated ahead. Application deadlines and season start dates
+              appear here once a listing is live.
+            </p>
           )}
         </section>
       </div>
 
-      {/* ── Per-listing performance ─────────────────────────────────── */}
-      {topListings.length > 0 ? (
-        <section className="host-panel host-panel--raised">
+      {/* ── Opportunity performance ──────────────────────────────────── */}
+      {opportunities.length > 0 ? (
+        <section className="host-panel host-panel--raised" aria-labelledby="performance-heading">
           <div className="host-panel__head">
             <div className="host-panel__titles">
               <span className="host-panel__eyebrow">Performance</span>
-              <h2 className="host-panel__title">Top listings</h2>
+              <h2 id="performance-heading" className="host-panel__title">
+                Your open opportunities
+              </h2>
             </div>
-            <Link className="host-panel__action" href="/host/analytics">
-              Analytics
+            <Link className="host-panel__action" href="/host/listings">
+              All listings
               <Icon name="action.forward" size={16} aria-hidden />
             </Link>
           </div>
-          <ul className={styles.listingStatsList}>
-            {topListings.map((listing) => (
-              <li key={listing.listingId} className={styles.listingStatsItem}>
-                <div className={styles.listingStatsTitle}>{listing.listingTitle}</div>
-                <div className={styles.listingStatsMeta}>
-                  <span className={styles.listingStatsMetric}>{listing.totalApplications} applications</span>
-                  <span className={styles.listingStatsMetric}>{listing.invitesSent} invites</span>
-                  <span className={styles.listingStatsMetric}>{listing.invitesAccepted} accepted</span>
-                </div>
-              </li>
-            ))}
+
+          <ul className={styles.opportunityGrid}>
+            {opportunities.map(
+              ({ signal, applications, newApplications, invitesSent, invitesAccepted }) => {
+                const cat = isCategoryKey(signal.category) ? signal.category : null;
+                return (
+                  <li key={signal.listingId} className={styles.opportunity}>
+                    <div className={styles.opportunityCover} data-lane={signal.category}>
+                      {signal.coverPhotoUrl ? (
+                        <Image
+                          src={signal.coverPhotoUrl}
+                          alt=""
+                          fill
+                          sizes="(max-width: 767px) 100vw, 320px"
+                          className={styles.opportunityCoverImg}
+                          unoptimized
+                        />
+                      ) : (
+                        <span className={styles.opportunityWatermark} aria-hidden>
+                          <Icon name={cat ? CATEGORY_ICON[cat] : "category.mix"} size={22} />
+                        </span>
+                      )}
+                      <span className="host-status" data-state={signal.status === "live" ? "open" : "closed"}>
+                        {signal.status === "live" ? "Live" : "Paused"}
+                      </span>
+                    </div>
+
+                    <div className={styles.opportunityBody}>
+                      <h3 className={styles.opportunityTitle}>
+                        <Link href={`/host/listings/${signal.listingId}`}>{signal.title}</Link>
+                      </h3>
+                      <p className={styles.opportunityMeta}>
+                        {[
+                          cat ? CATEGORY_LABEL[cat] : null,
+                          signal.locationDisplay,
+                          signal.readiness.daysUntilDeadline !== null
+                            ? `closes in ${signal.readiness.daysUntilDeadline}d`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+
+                      <dl className={styles.opportunityStats}>
+                        <div>
+                          <dt>Applications</dt>
+                          <dd className="ui-tabular">{applications}</dd>
+                        </div>
+                        <div>
+                          <dt>New</dt>
+                          <dd className="ui-tabular">{newApplications}</dd>
+                        </div>
+                        {/* Invite figures are the paid analytics scope. Absent
+                            means "your plan does not include this", which is not
+                            the same as zero — so the columns simply do not render. */}
+                        {invitesSent !== null ? (
+                          <div>
+                            <dt>Invites</dt>
+                            <dd className="ui-tabular">{invitesSent}</dd>
+                          </div>
+                        ) : null}
+                        {invitesAccepted !== null ? (
+                          <div>
+                            <dt>Taken up</dt>
+                            <dd className="ui-tabular">{invitesAccepted}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+
+                      {signal.readiness.gaps.length > 0 ? (
+                        <p className={styles.opportunityGap}>
+                          <Icon name="system.info" size={14} aria-hidden />
+                          {signal.readiness.gaps[0]!.reason}
+                        </p>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              },
+            )}
           </ul>
         </section>
       ) : null}
 
-      {/* ── Recent activity ─────────────────────────────────────────── */}
-      {recentActivity.length > 0 ? (
-        <section className="host-panel host-panel--raised">
+      <div className={styles.twoCol}>
+        {/* ── Communications ─────────────────────────────────────────── */}
+        <section className="host-panel host-panel--raised" aria-labelledby="comms-heading">
           <div className="host-panel__head">
             <div className="host-panel__titles">
-              <span className="host-panel__eyebrow">Activity</span>
-              <h2 className="host-panel__title">Recent activity</h2>
+              <span className="host-panel__eyebrow">Conversations</span>
+              <h2 id="comms-heading" className="host-panel__title">
+                Messages
+              </h2>
             </div>
+            <Link className="host-panel__action" href="/host/messages">
+              Open inbox
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
           </div>
-          <ol className={styles.activityList}>
-            {recentActivity.map((item) => (
-              <li key={item.id} className={styles.activityItem}>
-                <span className={styles.activityIcon}>
-                  <Icon
-                    name={
-                      ACTIVITY_ICON[item.type] as Parameters<typeof Icon>[0]["name"]
-                    }
-                    size={16}
-                    aria-hidden
-                  />
+          <p className={styles.commsLede}>
+            {unread > 0 ? (
+              <>
+                <span className={`${styles.commsCount} ui-tabular`}>{unread}</span>
+                <span>
+                  unread {unread === 1 ? "message" : "messages"} from seekers
                 </span>
-                <span className={styles.activityDesc}>{item.description}</span>
-                <time
-                  className={styles.activityTime}
-                  dateTime={item.timestamp}
-                  title={new Date(item.timestamp).toLocaleString()}
-                >
-                  {relativeTime(item.timestamp)}
-                </time>
+              </>
+            ) : (
+              <span className={styles.muted}>
+                No unread messages. Replies you send show up in the applicant&rsquo;s
+                thread.
+              </span>
+            )}
+          </p>
+
+          {recentActivity.length > 0 ? (
+            <ol className={styles.activity}>
+              {recentActivity.slice(0, 5).map((item) => (
+                <li key={item.id} className={styles.activityRow}>
+                  <span className={styles.activityIcon} aria-hidden>
+                    <Icon
+                      name={ACTIVITY_ICON[item.type] as Parameters<typeof Icon>[0]["name"]}
+                      size={14}
+                    />
+                  </span>
+                  <span className={styles.activityText}>{item.description}</span>
+                  <time className={styles.activityTime} dateTime={item.timestamp}>
+                    {relativeTime(item.timestamp)}
+                  </time>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </section>
+
+        {/* ── Plan usage ─────────────────────────────────────────────── */}
+        <section className="host-panel host-panel--raised" aria-labelledby="plan-heading">
+          <div className="host-panel__head">
+            <div className="host-panel__titles">
+              <span className="host-panel__eyebrow">{planLabel}</span>
+              <h2 id="plan-heading" className="host-panel__title">
+                Plan usage
+              </h2>
+            </div>
+            <Link className="host-panel__action" href="/host/billing">
+              Billing
+              <Icon name="action.forward" size={16} aria-hidden />
+            </Link>
+          </div>
+          <ul className={styles.usage}>
+            {planUsage.map((row) => (
+              <li key={row.id} className={styles.usageRow}>
+                <span className={styles.usageLabel}>{row.label}</span>
+                <span className={`${styles.usageValue} ui-tabular`}>
+                  {row.allowance === null ? row.used : `${row.used} / ${row.allowance}`}
+                </span>
+                {row.allowance !== null && row.allowance > 0 ? (
+                  <span
+                    className={styles.usageTrack}
+                    style={
+                      {
+                        "--pct": `${Math.min(100, Math.round((row.used / row.allowance) * 100))}%`,
+                      } as CSSProperties
+                    }
+                    aria-hidden
+                  >
+                    <span />
+                  </span>
+                ) : null}
+                <span className={styles.usageNote}>{row.note}</span>
               </li>
             ))}
-          </ol>
+          </ul>
         </section>
-      ) : null}
-
-      {/* ── Resources / help ────────────────────────────────────────── */}
-      <section className={styles.resources} aria-labelledby="resources-heading">
-        <div className={styles.resourcesIntro}>
-          <span className={styles.resourcesIcon} aria-hidden>
-            <Icon name="nav.help" size={20} aria-hidden />
-          </span>
-          <div>
-            <h2 id="resources-heading" className={styles.resourcesTitle}>
-              Hosting resources
-            </h2>
-            <p className={styles.resourcesNote}>
-              New here, or stuck on a step? Answers for posting, boosting,
-              applicants, billing, and trust.
-            </p>
-          </div>
-        </div>
-        <div className={styles.resourcesLinks}>
-          <Link className={styles.resourceChip} href="/host/help">
-            <Icon name="nav.help" size={16} aria-hidden />
-            Help &amp; FAQ
-          </Link>
-          <Link className={styles.resourceChip} href="/host/help">
-            <Icon name="status.boosted" size={16} aria-hidden />
-            Boosting guide
-          </Link>
-          <Link className={styles.resourceChip} href="/host/help">
-            <Icon name="trust.verified_host" size={16} aria-hidden />
-            Get verified
-          </Link>
-        </div>
-      </section>
+      </div>
     </StaggerReveal>
   );
 }

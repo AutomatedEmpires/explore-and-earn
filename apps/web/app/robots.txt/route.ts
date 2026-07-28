@@ -20,10 +20,6 @@ export function GET(): Response {
 		// Seeker-specific surfaces that require sign-in
 		// Note: /seek and /map are public discovery surfaces — intentionally allowed and indexed.
 		"Disallow: /accepted",
-		// Community became an authenticated seeker space in V2 (D18). A crawler
-		// asking for it is redirected to sign-in, so it is a wasted fetch at best
-		// and an indexed login page at worst.
-		"Disallow: /community",
 		"Disallow: /applied",
 		"Disallow: /home",
 		"Disallow: /invites",

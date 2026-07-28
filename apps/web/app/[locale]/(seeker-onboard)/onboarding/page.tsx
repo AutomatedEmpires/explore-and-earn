@@ -4,13 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { saveOnboardingStep } from "../../../actions/seekerOnboarding";
-import { stepHref, useOnboardingReturnTo } from "./returnTo";
 import styles from "./onboarding.module.css";
 
 export default function OnboardingStartPage() {
   const router = useRouter();
-  // Carried forward so a seeker sent here from Community lands back there.
-  const returnTo = useOnboardingReturnTo();
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -25,7 +22,7 @@ export default function OnboardingStartPage() {
           setSaveError("We couldn’t save your profile. Please try again.");
           return;
         }
-        router.push(stepHref("/onboarding/prefs", returnTo));
+        router.push("/onboarding/prefs");
       } catch {
         setSaveError("We couldn’t save your profile. Please try again.");
       }
@@ -82,7 +79,7 @@ export default function OnboardingStartPage() {
         <button
           type="button"
           className={styles.linkButton}
-          onClick={() => router.push(stepHref("/onboarding/prefs", returnTo))}
+          onClick={() => router.push("/onboarding/prefs")}
           disabled={pending}
         >
           Skip

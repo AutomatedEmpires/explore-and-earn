@@ -60,56 +60,8 @@ export const HOST_FUNNEL_EVENTS = {
   foundingSectionViewed: "founding_section_viewed",
 } as const;
 
-/**
- * Public information-architecture events (V2 D18 — the two-door header).
- *
- * These answer questions the host funnel above structurally cannot: the signed-
- * out visitor now chooses a DOOR before they choose an action, and until this
- * release there was no way to see which door was taken, what it led to, or how
- * many people met the Community auth wall on the way.
- *
- * NO PII, same rule as the host funnel: properties describe the DOOR and the
- * DESTINATION, never the person.
- */
-export const PUBLIC_IA_EVENTS = {
-  /**
-   * A role gateway page was viewed. Carries a `role` property so the seeker
-   * door and (later) the host door report through one event name rather than
-   * two that have to be unioned in every funnel query.
-   */
-  roleGatewayViewed: "role_gateway_viewed",
-  /**
-   * A visitor acted on the /for-seekers page. The `cta` property names WHICH
-   * action — account creation and "browse without an account" are opposite
-   * commitments, and a single click count that merged them would hide the one
-   * fact the page exists to reveal.
-   */
-  forSeekersCtaSelected: "for_seekers_cta_selected",
-  /**
-   * Community was requested by someone who was not signed in, and the seeker
-   * sign-in was shown instead. D18 made Community an authenticated seeker
-   * space; this is the measure of what that costs at the door.
-   */
-  communityAuthRedirected: "community_auth_redirected",
-} as const;
-
-export type PublicIaEvent =
-  (typeof PUBLIC_IA_EVENTS)[keyof typeof PUBLIC_IA_EVENTS];
-
 export type HostFunnelEvent =
   (typeof HOST_FUNNEL_EVENTS)[keyof typeof HOST_FUNNEL_EVENTS];
-
-/**
- * Every event name this seam will carry.
- *
- * The two catalogues stay SEPARATE constants — a host-funnel call site should
- * not be able to reach for a public-IA name by autocomplete, and the runbook
- * documents them as two funnels — but the transport is one, so the transport's
- * type is the union. Widening happened here rather than by stuffing the new
- * names into HOST_FUNNEL_EVENTS, which would have made "host funnel" a lie the
- * next reader has to discover.
- */
-export type AnalyticsEvent = HostFunnelEvent | PublicIaEvent;
 
 type QueuedEvent = {
   readonly name: string;
@@ -138,7 +90,7 @@ export function registerAnalyticsClient(instance: AnalyticsClient): void {
 
 /** Fire a funnel event. Safe on the server (no-op) and before the SDK loads. */
 export function captureEvent(
-  name: AnalyticsEvent,
+  name: HostFunnelEvent,
   properties?: Record<string, unknown>,
 ): void {
   if (typeof window === "undefined") return;

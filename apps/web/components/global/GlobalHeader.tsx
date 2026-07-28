@@ -7,47 +7,10 @@ import { useTranslations } from "next-intl";
 import { Icon } from "@explore-and-earn/ui";
 
 import { UnreadBadge } from "../seeker/UnreadBadge";
-import { NavMenu, type NavMenuItem } from "./NavMenu";
 import { RolePill, type ChromeRole } from "./RolePill";
 import styles from "./GlobalHeader.module.css";
 
 const IMMERSIVE_ROUTES = ["/map", "/swipe"];
-
-/**
- * THE TWO DOORS (V2 D18).
- *
- * A signed-out visitor is either looking for work or looking for workers, and
- * the old header made them infer that from a flat Explore/Community/For Hosts
- * row. These are the two sides, each carrying its own destinations.
- *
- * COMMUNITY LIVES IN THE SEEKER MENU, NOT THE TOP LEVEL. It stopped being a
- * public destination in V2 — it is an authenticated seeker space, so a
- * signed-out visitor who picks it is sent to a seeker sign-in that returns them
- * to it. Leaving it in the top bar advertised a room the visitor could not
- * enter, which is the same defect class as a nav item that 404s.
- *
- * PRICING POINTS AT THE PUBLIC PAGE, NOT /host/plans. /host/plans is a private
- * dashboard segment (lib/hostRoutes) — a prospect who clicks "Pricing" there
- * meets a sign-in wall before ever seeing a number, which is precisely the
- * pay-before-you-look funnel D6/D7 removed. /for-hosts#plans publishes the same
- * founder-locked prices and its cards lead into /host/plans for anyone ready to
- * activate.
- */
-const SEEKER_MENU: readonly NavMenuItem[] = [
-  { href: "/seek", label: "Explore jobs", description: "Browse every open role", icon: "nav.seek" },
-  { href: "/swipe", label: "Swipe", description: "One role at a time", icon: "nav.swipe" },
-  { href: "/map", label: "Map", description: "Find work by place", icon: "nav.map" },
-  { href: "/community", label: "Community", description: "Seeker space — sign in to join", icon: "nav.feed" },
-  { href: "/for-seekers#how-it-works", label: "How it works", description: "What a listing promises", icon: "system.info" },
-];
-
-const HOST_MENU: readonly NavMenuItem[] = [
-  { href: "/for-hosts", label: "Host product", description: "What hiring here looks like", icon: "nav.host" },
-  { href: "/for-hosts/demo", label: "Live demo", description: "Walk a real workspace", icon: "action.view" },
-  { href: "/for-hosts#plans", label: "Pricing", description: "Three published prices", icon: "benefit.pay" },
-  { href: "/for-hosts#profile-title", label: "Employer profiles", description: "One profile, every role", icon: "trust.verified_host" },
-  { href: "/for-hosts#faq-title", label: "Host FAQ", description: "Questions hosts ask", icon: "nav.help" },
-];
 
 function PinMark() {
   return (
@@ -182,15 +145,6 @@ export function GlobalHeader({
     pathname === "/for-hosts" || pathname.startsWith("/for-hosts/") ? "hosts" :
     pathname === exploreHref ? "explore" :
     null;
-  // Which DOOR the signed-out visitor is standing in. The seeker door owns the
-  // discovery surfaces and the gateway; the host door owns /for-hosts.
-  const seekerDoorActive =
-    pathname === "/for-seekers" ||
-    pathname.startsWith("/for-seekers/") ||
-    ["/seek", "/swipe", "/map", "/community"].some(
-      (r) => pathname === r || pathname.startsWith(`${r}/`),
-    );
-  const hostDoorActive = sectionActive === "hosts";
   const profileHref = scope === "host" ? "/host/profile" : "/profile";
   const userInitial =
     userName?.trim().charAt(0).toUpperCase() ??
@@ -247,11 +201,7 @@ export function GlobalHeader({
               {t("announcements")}
             </Link>
           </nav>
-        ) : isAuthenticated ? (
-          /* AUTHENTICATED NAV IS UNCHANGED (D18 changes the signed-out door,
-             not the signed-in workspace): a seeker who is already in keeps
-             Explore + Community as top-level links, because for them Community
-             is a room they can walk into rather than a sign-in prompt. */
+        ) : (
           <nav className={styles.sectionNav} aria-label="Primary sections">
             <Link
               className={`${styles.navLink}${sectionActive === "explore" ? ` ${styles.navLinkActive}` : ""}`}
@@ -267,24 +217,20 @@ export function GlobalHeader({
             >
               {t("community")}
             </Link>
-          </nav>
-        ) : (
-          /* SIGNED OUT — the two doors (D18). Community is inside the seeker
-             menu, not out here: it is an authenticated seeker space now, so a
-             top-level entry would advertise a room this visitor cannot enter. */
-          <nav className={styles.sectionNav} aria-label="Primary sections">
-            <NavMenu
-              id="seekers"
-              label={t("forSeekers")}
-              items={SEEKER_MENU}
-              active={seekerDoorActive}
-            />
-            <NavMenu
-              id="hosts"
-              label={t("forHosts")}
-              items={HOST_MENU}
-              active={hostDoorActive}
-            />
+            {/* For Hosts joined the public nav (redesign 2026-07-27): the
+                host funnel is now build-first, so the acquisition page is a
+                primary destination for signed-out visitors — hiding the
+                commercial door behind a sign-in menu cost discovery. Hidden
+                for authenticated seekers, whose nav stays seeker-shaped. */}
+            {!isAuthenticated && (
+              <Link
+                className={`${styles.navLink}${sectionActive === "hosts" ? ` ${styles.navLinkActive}` : ""}`}
+                href="/for-hosts"
+                aria-current={sectionActive === "hosts" ? "page" : undefined}
+              >
+                {t("forHosts")}
+              </Link>
+            )}
           </nav>
         )}
 
@@ -318,11 +264,10 @@ export function GlobalHeader({
               </Link>
             </>
           ) : (
-            <>
             <div className={styles.authMenuWrap} ref={authMenuRef}>
               <button
                 type="button"
-                className={styles.signInGhost}
+                className={styles.signInBtn}
                 aria-haspopup="menu"
                 aria-expanded={authMenuOpen}
                 onClick={() => setAuthMenuOpen((open) => !open)}
@@ -364,15 +309,6 @@ export function GlobalHeader({
                 </div>
               ) : null}
             </div>
-            {/* The primary signed-out action. "Sign in" is for people who
-                already have an account and demoted to a ghost control to say
-                so; this is the one filled button in the header, and it goes to
-                the account chooser rather than assuming a role for someone who
-                has not picked a door yet. */}
-            <Link className={styles.signInBtn} href="/sign-up">
-              {t("getStarted")}
-            </Link>
-            </>
           )}
         </div>
       </div>

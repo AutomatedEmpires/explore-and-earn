@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button, Icon } from "@explore-and-earn/ui";
 
 import { createInviteAction } from "../../app/actions/invites";
+import { captureFunnelEvent } from "../../lib/analytics/capture";
+import { HOST_WORKSPACE_EVENTS } from "../../lib/analytics/events";
 import { CATEGORY_ICON, CATEGORY_LABEL } from "../discovery";
 import { BuyMoreInvitesPopup } from "./BuyMoreInvitesPopup";
 import { SourcedSeekerCard, type SourcedSeekerVM } from "./SourcedSeekerCard";
@@ -96,6 +98,14 @@ export function MatchedSeekerSourcing({ buckets, entitlement }: MatchedSeekerSou
       });
       void createInviteAction(seeker.seekerProfileId, bucketId).then((result) => {
         if (result.ok) {
+          // Only after the server debited a credit and wrote the invite. The
+          // band tells us whether hosts invite the matches we rank highest;
+          // the seeker is never identified.
+          captureFunnelEvent(HOST_WORKSPACE_EVENTS.inviteSent, {
+            band: seeker.band,
+            metered,
+            surface: "matched_seekers",
+          });
           setInvited((prev) => new Set(prev).add(key));
           if (metered) setRemaining((r) => Math.max(0, r - 1));
           // Reconcile the "Sent invites" list + entitlement from the server.

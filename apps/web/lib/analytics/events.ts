@@ -70,5 +70,32 @@ export const HOST_FUNNEL_EVENTS = {
   seekerPreviewOpened: "host_seeker_preview_opened",
 } as const;
 
+/**
+ * Redesign V2-F1 — the host WORKSPACE loop.
+ *
+ * The six above end at activation. These four begin where that funnel stops:
+ * they measure whether an activated host actually works their season, which is
+ * the question renewal turns on and which nothing currently answers.
+ *
+ * Same no-PII rule, and it bites harder here because every one of these events
+ * happens next to a named person. Properties carry ids and shapes — a stage, a
+ * count, a listing id — never a candidate's name, location, or match score. A
+ * score attached to a person is a judgement about them leaving the product.
+ */
+export const HOST_WORKSPACE_EVENTS = {
+  /** A candidate's detail view was opened. The "did they actually look" signal. */
+  candidateReviewed: "host_candidate_reviewed",
+  /** A candidate was moved between pipeline stages. Carries `{ to }` only. */
+  candidateStageChanged: "host_candidate_stage_changed",
+  /** An invite was sent from the outreach surface. */
+  inviteSent: "host_invite_sent",
+  /** A listing's health/gap detail was expanded. Tells us whether the diagnosis lands. */
+  listingHealthViewed: "listing_health_viewed",
+} as const;
+
+export type HostWorkspaceEventName =
+  (typeof HOST_WORKSPACE_EVENTS)[keyof typeof HOST_WORKSPACE_EVENTS];
+
 export type HostFunnelEventName =
-  (typeof HOST_FUNNEL_EVENTS)[keyof typeof HOST_FUNNEL_EVENTS];
+  | (typeof HOST_FUNNEL_EVENTS)[keyof typeof HOST_FUNNEL_EVENTS]
+  | HostWorkspaceEventName;

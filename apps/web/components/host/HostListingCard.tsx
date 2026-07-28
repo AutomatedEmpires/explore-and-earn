@@ -12,8 +12,13 @@ import {
   archiveListingAction,
 } from "../../app/actions/listings";
 import { CATEGORY_LABEL, CATEGORY_ICON } from "../discovery";
+import { captureFunnelEvent } from "../../lib/analytics/capture";
+import { HOST_WORKSPACE_EVENTS } from "../../lib/analytics/events";
 import {
   HOST_LISTING_STATE_LABEL,
+  isListingLifecycleStatus,
+  LISTING_LIFECYCLE_ICON,
+  LISTING_LIFECYCLE_LABEL,
   type HostListingItem,
 } from "./models";
 import { BoostListingPopup } from "./BoostListingPopup";
@@ -24,11 +29,39 @@ export interface HostListingCardProps {
 }
 
 export function HostListingCard({ item }: HostListingCardProps) {
-  const { listing, state, applicantCount, newApplicantCount } = item;
+  const { listing, state, applicantCount, newApplicantCount, readiness } = item;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [boostOpen, setBoostOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [healthOpen, setHealthOpen] = useState(false);
+
+  // The stored status, not the folded display state: a paused listing must not
+  // wear the same chip as an archived one.
+  const statusLabel = isListingLifecycleStatus(listing.status)
+    ? LISTING_LIFECYCLE_LABEL[listing.status]
+    : HOST_LISTING_STATE_LABEL[state];
+  const statusIcon = isListingLifecycleStatus(listing.status)
+    ? LISTING_LIFECYCLE_ICON[listing.status]
+    : undefined;
+
+  const gaps = readiness?.gaps ?? [];
+  const blocking = readiness?.blockingCount ?? 0;
+
+  function toggleHealth() {
+    const next = !healthOpen;
+    setHealthOpen(next);
+    // Only the open is interesting, and it carries the SHAPE of the problem —
+    // how many gaps, whether any block publication — never the listing's title
+    // or the host's identity.
+    if (next) {
+      captureFunnelEvent(HOST_WORKSPACE_EVENTS.listingHealthViewed, {
+        gaps: gaps.length,
+        blocking,
+        status: listing.status,
+      });
+    }
+  }
 
   const isLive = listing.status === "live";
   const isPaused = listing.status === "paused";
@@ -114,8 +147,16 @@ export function HostListingCard({ item }: HostListingCardProps) {
                 : listing.opportunityWindow}
             </span>
           </div>
-          <span className="host-status" data-state={state}>
-            {HOST_LISTING_STATE_LABEL[state]}
+          <span className={styles.statusStack}>
+            <span className="host-status" data-state={state}>
+              {statusIcon ? <Icon name={statusIcon} size={14} aria-hidden /> : null}
+              {statusLabel}
+            </span>
+            {readiness?.closingSoon && readiness.daysUntilDeadline !== null ? (
+              <span className={styles.closingSoon}>
+                Closes in {readiness.daysUntilDeadline}d
+              </span>
+            ) : null}
           </span>
         </div>
 
@@ -144,6 +185,67 @@ export function HostListingCard({ item }: HostListingCardProps) {
             </span>
           ) : null}
         </div>
+
+        {/* ── Listing health — a diagnosis with a fix, never a score ────
+            Only rendered when the workspace loaded the signals; a card that
+            cannot see the readiness verdict shows no chip rather than an
+            optimistic "looks good". */}
+        {readiness ? (
+          gaps.length > 0 ? (
+            <div className={styles.health} data-blocking={blocking > 0 ? "true" : undefined}>
+              <button
+                type="button"
+                className={styles.healthToggle}
+                aria-expanded={healthOpen}
+                onClick={toggleHealth}
+              >
+                <Icon
+                  name={blocking > 0 ? "system.error" : "system.info"}
+                  size={16}
+                  aria-hidden
+                />
+                <span>
+                  {blocking > 0
+                    ? `${blocking} thing${blocking === 1 ? "" : "s"} to fix before publishing`
+                    : `${gaps.length} way${gaps.length === 1 ? "" : "s"} to strengthen this listing`}
+                </span>
+                <Icon name={healthOpen ? "action.close" : "action.forward"} size={14} aria-hidden />
+              </button>
+              {healthOpen ? (
+                <ul className={styles.healthList}>
+                  {gaps.map((gap) => (
+                    <li key={`${gap.field}-${gap.reason}`} className={styles.healthItem}>
+                      <span className={styles.healthField} data-blocking={gap.blocksPublication ? "true" : undefined}>
+                        {gap.field}
+                      </span>
+                      <span className={styles.healthReason}>{gap.reason}</span>
+                    </li>
+                  ))}
+                  <li className={styles.healthFix}>
+                    <Link href={`/host/listings/${listing.id}/edit`}>
+                      Fix these in the editor
+                      <Icon name="action.forward" size={14} aria-hidden />
+                    </Link>
+                  </li>
+                </ul>
+              ) : null}
+            </div>
+          ) : readiness.photoEvidencePending ? (
+            // Housing is included, so the gate also demands four evidence
+            // photos — which live behind a per-listing RPC this list cannot
+            // call. Saying "ready to publish" here would be a promise the
+            // publish button might refuse to keep.
+            <p className={styles.healthNote}>
+              <Icon name="system.info" size={14} aria-hidden />
+              Housing evidence photos are checked when you publish.
+            </p>
+          ) : (
+            <p className={styles.healthOk}>
+              <Icon name="system.success" size={14} aria-hidden />
+              Nothing missing.
+            </p>
+          )
+        ) : null}
 
         {actionError ? (
           <p className={styles.errorMsg} role="alert">
