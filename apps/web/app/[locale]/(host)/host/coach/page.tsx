@@ -12,7 +12,7 @@ import {
 } from "../../../../../services/assistant/persistence";
 
 export const metadata: Metadata = {
-  title: "Assistant",
+  title: "Recruiting Coach",
 };
 
 // Auth-gated by the (host) layout + middleware; render fresh per host.
@@ -26,12 +26,17 @@ const HOST_SUGGESTIONS = [
 ] as const;
 
 /**
- * Host AI assistant — a grounded coach over the host's own listings and
+ * Recruiting Coach — a grounded coach over the host's own listings and
  * applicants. It sharpens copy against the HOUSING/MEALS/PAY triad and ranks
  * applicants by real ADR-040 fit. Gates on AI_GATEWAY_API_KEY so environments
  * without AI configured show a graceful "not available" state.
+ *
+ * NAMING (D17): "Assistant" said nothing about what it helps you do, and the
+ * seeker scope has an assistant of its own — two unrelated surfaces wearing one
+ * word. The host's is a RECRUITING coach; the route moved to /host/coach with a
+ * permanent redirect from /host/assistant.
  */
-export default async function HostAssistantPage() {
+export default async function HostCoachPage() {
   const configured = Boolean(process.env.AI_GATEWAY_API_KEY);
 
   let initialMessages: PersistedAssistantMessage[] = [];
@@ -47,7 +52,7 @@ export default async function HostAssistantPage() {
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <h1 className={styles.title}>Listing coach</h1>
+        <h1 className={styles.title}>Recruiting Coach</h1>
         <p className={styles.subtitle}>
           Grounded in your listings and applicants — sharpen your copy and see who fits best.
         </p>
@@ -57,14 +62,14 @@ export default async function HostAssistantPage() {
         <AssistantChat
           context="host"
           initialMessages={initialMessages}
-          emptyTitle="Ask your listing coach"
+          emptyTitle="Ask your Recruiting Coach"
           emptySub="Sharpen your listings against Housing / Meals / Pay, and rank applicants by real fit."
           suggestions={HOST_SUGGESTIONS}
           placeholder="Ask about your listings, copy, or applicants…"
         />
       ) : (
         <div className={styles.unavailable}>
-          <p>The assistant isn’t available in this environment yet.</p>
+          <p>The Recruiting Coach isn’t available in this environment yet.</p>
           <p className={styles.unavailableSub}>Check back once it’s switched on.</p>
         </div>
       )}

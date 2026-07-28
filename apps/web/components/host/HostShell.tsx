@@ -3,12 +3,18 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Icon, type IconKey } from "@explore-and-earn/ui";
+import { Icon } from "@explore-and-earn/ui";
 
-import { ScopeShellNav, SCOPE_RAIL_WIDTH, type ScopeNavItem } from "../shell";
-import { ThemeSwitcher } from "../global/ThemeSwitcher";
+import {
+  ScopeShellNav,
+  SCOPE_RAIL_WIDTH,
+  type ScopeNavItem,
+  type ScopeNavGroup,
+} from "../shell";
+import { RolePill } from "../global/RolePill";
 import { OnboardingWalkthrough, HOST_TOUR_STEPS } from "../onboarding";
 import { HostActivationBanner } from "./HostActivationBanner";
+import { HOST_NAV_GROUPS, type HostNavItem } from "./hostNav";
 import styles from "./HostShell.module.css";
 
 /**
@@ -20,37 +26,28 @@ import styles from "./HostShell.module.css";
  *   - **≥1024px** → a persistent LEFT rail (content is offset by SCOPE_RAIL_WIDTH).
  *   - **<1024px** → a top-left HAMBURGER that opens a focus-trapped drawer.
  * There is NO mobile bottom dock here (that pattern is reserved for the founder-
- * locked SEEKER dock). The top bar stays minimal: brand + scope + the host's key
- * affordances (new listing, messages, account).
+ * locked SEEKER dock).
+ *
+ * D17 (redesign V2) does two things to this shell:
+ *
+ * 1. THE TOP BAR REDUCES. It now carries only what the rail cannot: the create
+ *    action, messages, and the account. The theme switcher left entirely —
+ *    appearance is a preference, and preferences live in Settings, not in the
+ *    bar a host looks at while working. (It survives in seeker Settings →
+ *    Appearance, which is now its single home across the product.)
+ *
+ * 2. THE RAIL GROUPS. Ten flat items gave "Billing" the same visual weight as
+ *    "Applicants". They now cluster by what a host is doing:
+ *      Primary  — the recruiting loop, in the order the work happens
+ *      Business — the company and the money
+ *      Support  — help getting it done
+ *
+ * NOT SHIPPED HERE, deliberately: a workspace search box. There is no host-side
+ * query surface to submit to yet, and a search field that goes nowhere is worse
+ * than no search field. It belongs with the workspace rebuild.
  */
 
-interface NavDef {
-  readonly href: string;
-  readonly label: string;
-  readonly icon: IconKey;
-  readonly exact?: boolean;
-  /** When set, the item shows the live unread-messages count as a badge. */
-  readonly badgeKey?: "unread";
-}
-
-// Primary sections (rail body / drawer body).
-const SECTIONS: readonly NavDef[] = [
-  { href: "/host", label: "Overview", icon: "nav.dashboard", exact: true },
-  { href: "/host/listings", label: "Listings", icon: "category.mix" },
-  { href: "/host/applicants", label: "Applicants", icon: "nav.seekers" },
-  { href: "/host/invites", label: "Invites", icon: "action.share" },
-  { href: "/host/messages", label: "Messages", icon: "nav.messages", badgeKey: "unread" },
-  { href: "/host/announcements", label: "Announcements", icon: "nav.announcements" },
-  { href: "/host/assistant", label: "Assistant", icon: "status.match" },
-  { href: "/host/analytics", label: "Analytics", icon: "analytics.trend" },
-];
-
-// Reference-y links pinned to the rail/drawer footer.
-const FOOTER: readonly NavDef[] = [
-  { href: "/host/billing", label: "Billing", icon: "benefit.pay" },
-  { href: "/host/settings", label: "Settings", icon: "nav.settings" },
-  { href: "/host/help", label: "Help", icon: "nav.help" },
-];
+type NavDef = HostNavItem;
 
 export interface HostShellProps {
   readonly companyName: string | null;
@@ -96,6 +93,11 @@ export function HostShell({
     badge: def.badgeKey === "unread" && unread > 0 ? unread : undefined,
   });
 
+  const navGroups: ScopeNavGroup[] = HOST_NAV_GROUPS.map((group) => ({
+    heading: group.heading,
+    items: group.items.map(toItem),
+  }));
+
   const initial = (companyName ?? "H").charAt(0).toUpperCase();
   const avatarStyle: CSSProperties | undefined = photoUrl
     ? { backgroundImage: `url(${photoUrl})` }
@@ -122,8 +124,7 @@ export function HostShell({
       <ScopeShellNav
         scopeLabel="Host"
         brand={brand}
-        items={SECTIONS.map(toItem)}
-        footerItems={FOOTER.map(toItem)}
+        groups={navGroups}
         userName={companyName ?? "Your farm"}
         userHref="/host/profile"
         avatar={avatar}
@@ -136,15 +137,14 @@ export function HostShell({
             <span className={styles.topMark} aria-hidden>E</span>
             <span className={styles.topScope}>
               <b>Explore&amp;Earn</b>
-              <s>Host</s>
             </span>
           </Link>
+          <RolePill role="host" />
           <span className={styles.spacer} />
           <div className={styles.topActions}>
-            <ThemeSwitcher />
             <Link className={styles.newBtn} href="/host/listings/new">
               <span aria-hidden>+</span>
-              <span className={styles.newLabel}>New listing</span>
+              <span className={styles.newLabel}>Create listing</span>
             </Link>
             <Link className={styles.bell} href="/host/messages" aria-label="Messages">
               <Icon name="nav.messages" size={20} aria-hidden />

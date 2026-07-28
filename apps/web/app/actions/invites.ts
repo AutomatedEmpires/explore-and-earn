@@ -74,7 +74,7 @@ export async function withdrawInviteAction(
 				// Idempotent (one restore per invite, enforced in SQL); false pre-061.
 				await restoreInviteCreditForInvite(inviteId)
 			}
-			revalidatePath("/host/invites")
+			revalidatePath("/host/outreach")
 		}
 		return result
 	} catch (error) {
@@ -247,7 +247,7 @@ async function createInviteForCurrentHost(
 		return { ok: false, error: result.error }
 	}
 
-	revalidatePath("/host/invites")
+	revalidatePath("/host/outreach")
 
 	// Persist the real invite event: the notification engine derives the
 	// seeker's in-app/email/push notification from it (localized, deduped per

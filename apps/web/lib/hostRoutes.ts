@@ -14,13 +14,20 @@ export const HOST_DASHBOARD_SEGMENTS = [
   "analytics",
   "announcements",
   "applicants",
+  // Legacy aliases (renamed by D17 to outreach/coach). Retained deliberately:
+  // the next.config redirects mean nothing RENDERS at these paths any more, but
+  // a crawler working from a cached index still REQUESTS them, and this list is
+  // what robots.txt and HideOnHost use to decide "private". Dropping them would
+  // briefly advertise two host-dashboard URLs as public.
   "assistant",
   "billing",
+  "coach",
   "help",
   "invites",
   "listings",
   "messages",
   "onboarding",
+  "outreach",
   // Plan selection before a host profile exists. Sits in the (host-onboard)
   // group with onboarding — outside the profile gate — but it is still a
   // signed-in surface, not the public /host/{id} profile, so it belongs here.

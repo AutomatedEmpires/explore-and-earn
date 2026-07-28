@@ -80,6 +80,26 @@
 	gap: var(--space-2);
 }
 
+/* ─── Grouped rail (D17) ─────────────────────────────────────────────────────
+   Primary / Business / Support. The heading is quiet on purpose — it labels a
+   cluster, it is not a destination, so it must never compete with the items
+   under it. Spacing does most of the grouping work; the label just names it. */
+.group + .group {
+	margin-block-start: var(--space-18);
+}
+
+.groupHeading {
+	margin: 0 0 var(--space-6);
+	padding-inline: var(--space-12);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
 .navItem {
 	position: relative;
 	display: flex;

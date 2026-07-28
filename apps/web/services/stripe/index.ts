@@ -1423,7 +1423,7 @@ export async function createInviteCreditCheckoutSession(params: {
   return stripe.checkout.sessions.create({
     mode: "payment",
     client_reference_id: params.clerkUserId,
-    success_url: absoluteAppUrl("/host/invites?credits=1"),
+    success_url: absoluteAppUrl("/host/outreach?credits=1"),
     cancel_url:  absoluteAppUrl("/host/billing"),
     metadata,
     line_items: [lineItem],

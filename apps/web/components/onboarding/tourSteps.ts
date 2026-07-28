@@ -10,12 +10,15 @@ import type { WalkthroughStep } from "./OnboardingWalkthrough";
  */
 
 // HOST — three steps, shown prominently (auto-start). Post listings → the
-// housing·meals·pay fields and their popups → applicants/invites/dashboard.
+// housing·meals·pay fields and their popups → applicants/outreach/dashboard.
+// The copy names the rail's CURRENT labels (D17 renamed Invites → Outreach and
+// the top bar's "New listing" → "Create listing"); a tour that points at a
+// control by a name the control no longer has is worse than no tour.
 export const HOST_TOUR_STEPS: readonly WalkthroughStep[] = [
 	{
 		icon: "category.mix",
 		title: "Post & manage your listings",
-		body: "Everything you offer lives under Listings in the left rail. Hit “New listing” up top to publish a role — add a cover photo, the work, and where it is.",
+		body: "Everything you offer lives under Listings in the left rail. Hit “Create listing” up top to publish a role — add a cover photo, the work, and where it is.",
 		href: "/host/listings/new",
 		hrefLabel: "Create a listing",
 	},
@@ -29,7 +32,7 @@ export const HOST_TOUR_STEPS: readonly WalkthroughStep[] = [
 	{
 		icon: "nav.seekers",
 		title: "Review applicants & send invites",
-		body: "Applications land under Applicants; use Invites to reach out directly. Your Overview dashboard tracks it all — views, applicants, and messages in one place.",
+		body: "Applications land under Applicants; use Outreach to invite seekers directly. Your Overview dashboard tracks it all — views, applicants, and messages in one place.",
 		href: "/host",
 		hrefLabel: "Go to Overview",
 	},

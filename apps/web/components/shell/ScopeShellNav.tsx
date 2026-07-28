@@ -51,11 +51,31 @@ export interface ScopeNavItem {
 	readonly hideInDrawer?: boolean;
 }
 
+/**
+ * A titled cluster of nav items.
+ *
+ * D17 regroups the host rail into Primary / Business / Support because a flat
+ * ten-item list makes every destination look equally likely — "Billing" sat the
+ * same distance from the eye as "Applicants". Headings are real `<h2>`s inside
+ * the nav landmark, so the grouping is announced, not just drawn.
+ */
+export interface ScopeNavGroup {
+	/** Heading text (e.g. "Primary"). Rendered visibly and to assistive tech. */
+	readonly heading: string;
+	readonly items: ReadonlyArray<ScopeNavItem>;
+}
+
 export interface ScopeShellNavProps {
 	/** Uppercase scope label shown at the top of the rail/drawer (e.g. "Host"). */
 	readonly scopeLabel: string;
-	/** Primary section links for this scope. */
-	readonly items: ReadonlyArray<ScopeNavItem>;
+	/**
+	 * Primary section links for this scope, as ONE flat list.
+	 * Mutually exclusive with {@link groups} — pass whichever shape the scope
+	 * wants. Seeker and Admin stay flat; Host is grouped.
+	 */
+	readonly items?: ReadonlyArray<ScopeNavItem>;
+	/** Grouped section links with headings. Takes precedence over `items`. */
+	readonly groups?: ReadonlyArray<ScopeNavGroup>;
 	/** Optional brand/logo node shown above the scope label. */
 	readonly brand?: ReactNode;
 	/** Optional signed-in user name, rendered in the pinned footer. */
@@ -173,6 +193,45 @@ function NavList({
 	);
 }
 
+/**
+ * The rail/drawer body: either one flat list or the grouped form.
+ *
+ * `inDrawer` drops items marked `hideInDrawer` (destinations the mobile bottom
+ * dock already carries) — and, if that empties a group, the group's heading
+ * goes with it rather than leaving a title over nothing.
+ */
+function NavBody({
+	items,
+	groups,
+	inDrawer,
+	onNavigate,
+}: {
+	readonly items?: ReadonlyArray<ScopeNavItem>;
+	readonly groups?: ReadonlyArray<ScopeNavGroup>;
+	readonly inDrawer?: boolean;
+	readonly onNavigate?: () => void;
+}) {
+	const visible = (list: ReadonlyArray<ScopeNavItem>) =>
+		inDrawer ? list.filter((item) => !item.hideInDrawer) : list;
+
+	if (groups && groups.length > 0) {
+		return (
+			<>
+				{groups
+					.map((group) => ({ ...group, items: visible(group.items) }))
+					.filter((group) => group.items.length > 0)
+					.map((group) => (
+						<section key={group.heading} className={styles.group}>
+							<h2 className={styles.groupHeading}>{group.heading}</h2>
+							<NavList items={group.items} onNavigate={onNavigate} />
+						</section>
+					))}
+			</>
+		);
+	}
+	return <NavList items={visible(items ?? [])} onNavigate={onNavigate} />;
+}
+
 function ScopeHead({
 	brand,
 	scopeLabel,
@@ -191,6 +250,7 @@ function ScopeHead({
 export function ScopeShellNav({
 	scopeLabel,
 	items,
+	groups,
 	brand,
 	userName,
 	userHref,
@@ -311,7 +371,7 @@ export function ScopeShellNav({
 			<aside className={styles.rail}>
 				<ScopeHead brand={brand} scopeLabel={scopeLabel} />
 				<nav className={styles.railNav} aria-label={`${scopeLabel} sections`}>
-					<NavList items={items} />
+					<NavBody items={items} groups={groups} />
 				</nav>
 				<div className={styles.foot}>
 					{footerItems && footerItems.length > 0 ? (
@@ -384,8 +444,10 @@ export function ScopeShellNav({
 								>
 									{/* Drawer drops dock-duplicated items (Seek/Swipe/Map);
 									    the rail keeps them since the mobile dock is desktop-hidden. */}
-									<NavList
-										items={items.filter((item) => !item.hideInDrawer)}
+									<NavBody
+										items={items}
+										groups={groups}
+										inDrawer
 										onNavigate={onClose}
 									/>
 								</nav>

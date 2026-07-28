@@ -128,7 +128,7 @@ export default async function SeekerPublicProfilePage({ params }: Props) {
         <div className={styles.actions}>
           <Link
             className={styles.actionPrimary}
-            href={`/host/invites?seekerProfileId=${seekerProfileId}`}
+            href={`/host/outreach?seekerProfileId=${seekerProfileId}`}
           >
             <Icon name="action.forward" size={16} aria-hidden />
             Invite this seeker

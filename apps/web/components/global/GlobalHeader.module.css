@@ -117,24 +117,11 @@
   color: color-mix(in srgb, var(--palette-white) 42%, transparent);
 }
 
-/* Silver capsule badge */
-.scopeBadge {
-  display: inline-flex;
-  align-items: center;
-  height: 1.25rem;
-  padding: 0 var(--space-8);
-  border: 1px solid color-mix(in srgb, var(--hdr-chrome) 40%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--hdr-chrome) 12%, transparent);
-  font-family: var(--font-ui);
-  font-size: 0.5625rem;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--type-label-tracking);
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--hdr-text) 80%, transparent); /* silver text */
-  white-space: nowrap;
-  flex-shrink: 0;
-}
+/* The silver capsule that used to live here became the shared RolePill
+   (components/global/RolePill.tsx) — D17 wants ONE role indicator across the
+   public header, the host top bar, and the admin top bar, and three private
+   copies of a badge is how they drift. Its own module owns the styling; the
+   header only supplies the layout slot in .brandGroup. */
 
 /* ─── Col 2 — nav: two distinct separated buttons ────────────────────────── */
 
@@ -677,9 +664,7 @@
   .pinMark  { width: 1.75rem; height: 2rem; }
 }
 
-@media (max-width: 300px) {
-  .scopeBadge { display: none; }
-}
+/* (The role pill hides itself below 380px — see RolePill.module.css.) */
 
 /* ─── Reduced motion ─────────────────────────────────────────────────────── */
 
