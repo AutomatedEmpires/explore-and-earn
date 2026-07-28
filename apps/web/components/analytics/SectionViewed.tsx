@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from "react";
 
-import { captureEvent, type HostFunnelEvent } from "../../lib/analytics";
+import { captureEvent, type AnalyticsEvent } from "../../lib/analytics";
 
 export interface SectionViewedProps {
-  readonly event: HostFunnelEvent;
+  readonly event: AnalyticsEvent;
   readonly properties?: Record<string, unknown>;
   /**
    * How much of the section must be on screen before it counts as seen. A

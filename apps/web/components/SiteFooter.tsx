@@ -10,10 +10,18 @@ const FOOTER_COLUMNS = [
 		// one door here instead of four sibling rows that made farm/maritime/
 		// remote/seasonal read as separate sites.
 		links: [
+			// The seeker door leads the column (V2 D18) — it is the page that
+			// explains the four links beneath it.
+			{ label: "For seekers", href: "/for-seekers" },
 			{ label: "Seek",  href: "/seek"  },
 			{ label: "Swipe", href: "/swipe" },
 			{ label: "Map",   href: "/map"   },
 			{ label: "Browse by category", href: "/jobs" },
+			// Community stays reachable from the footer on purpose: an
+			// authenticated seeker uses this link constantly, and a signed-out
+			// visitor who follows it now meets a seeker sign-in that returns them
+			// here rather than the 404 the auth wall used to produce.
+			{ label: "Community",   href: "/community" },
 		],
 	},
 	{
@@ -27,7 +35,6 @@ const FOOTER_COLUMNS = [
 		title: "Company",
 		links: [
 			{ label: "About",       href: "/about"     },
-			{ label: "Community",   href: "/community" },
 			{ label: "Field Guide", href: "/blog"      },
 			{ label: "FAQ",         href: "/faq"       },
 		],
