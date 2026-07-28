@@ -403,21 +403,158 @@ describe("the plan selection route", () => {
    * now /host/plans/activate, where the exact amount, the renewal, the
    * cancellation terms and what activates are stated first.
    *
-   * The plans page is checked for the ROUTE rather than for the action name. It
-   * still explains the move in its header comment, and a `toContain` on the
-   * action name would be satisfied by that prose — a source pin that a comment
+   * The surface is checked for the ROUTE rather than for the action name. The
+   * plans page still explains the move in its header comment, and a `toContain`
+   * on the action name would be satisfied by that prose — a source pin a comment
    * can satisfy is testing the comment.
+   *
+   * V2-E SPLIT THE SURFACE ACROSS TWO FILES, so this reads both. The three-card
+   * block that used to carry the links was replaced by a comparison matrix
+   * (D21), and the links went with it. Asserting only on the page would have
+   * gone quietly green while the route disappeared entirely, so the page is
+   * pinned to COMPOSE the matrix and the matrix is pinned to carry the route —
+   * the two halves of "the choice is handed forward".
    */
   it("hands the choice to the activation summary rather than straight to Stripe", () => {
     const source = readFileSync(
       new URL("(host-onboard)/host/plans/page.tsx", appDir),
       "utf8",
     );
-    expect(source).toContain("/host/plans/activate?tier=");
-    // The import is gone, not merely unused: the POST happens one page later.
-    expect(source).not.toContain(
-      'import { startHostCheckoutAction } from "../../../../actions/hostBilling"',
+    const matrix = readFileSync(
+      new URL("../../components/pricing/PlanComparisonMatrix.tsx", import.meta.url),
+      "utf8",
     );
+
+    expect(source).toContain("<PlanComparisonMatrix");
+    expect(matrix).toContain("/host/plans/activate?tier=");
+    // The import is gone from BOTH, not merely unused: the POST happens one page
+    // later, and a component the plans page renders is still the plans page.
+    expect(source).not.toContain("startHostCheckoutAction");
+    expect(matrix).not.toContain("startHostCheckoutAction");
+  });
+
+  /**
+   * THE THREE-CARD BLOCK IS GONE, and this pins that it stays gone.
+   *
+   * The founder rejected it by name: three prices and a button, presented before
+   * anything the plans do. The replacement is a matrix whose every cell is
+   * derived from PLAN_ENTITLEMENTS, so re-introducing a hand-built card grid
+   * would also re-introduce hand-typed allowances. `.planGrid` was the class the
+   * old block hung on; the entitlement list it rendered was `.entitlements`.
+   */
+  it("no longer presents the plans as three bare price cards", () => {
+    const source = readFileSync(
+      new URL("(host-onboard)/host/plans/page.tsx", appDir),
+      "utf8",
+    );
+    expect(source).not.toContain("styles.planGrid");
+    expect(source).not.toContain("styles.entitlements");
+    expect(source).not.toContain("FOUNDER_LOCKED_PRICING");
+  });
+
+  /**
+   * NO FIGURE ON THE COMMERCIAL SURFACE IS TYPED. Every allowance comes from
+   * PLAN_ENTITLEMENTS — the contract the database enforces — and every price
+   * from FOUNDER_LOCKED_PRICING through the money formatter. A marketing table
+   * that states its own allowance eventually sells one the server refuses, which
+   * is the failure ADR-039 exists to prevent and the failure a hardcoded number
+   * here would reproduce.
+   *
+   * The digit scan runs over CODE with comments stripped: prose explaining why a
+   * tier grants what it grants is not a hardcoded entitlement, and an assertion
+   * that cannot tell the difference is testing the prose.
+   */
+  it("derives every plan figure from the contract instead of typing one", () => {
+    const matrix = readFileSync(
+      new URL("../../components/pricing/PlanComparisonMatrix.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(matrix).toContain("PLAN_ENTITLEMENTS");
+    expect(matrix).toContain("FOUNDER_LOCKED_PRICING");
+    expect(matrix).toContain("formatMoney");
+    expect(matrix).toContain("ANNUAL_MONTHS_BILLED");
+
+    const code = matrix
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/\/\/[^\n]*/g, " ");
+
+    // A money-shaped literal, in any of the forms a price could be written in.
+    expect(code).not.toMatch(/\$\s?\d/);
+    // Cents, as the contract stores them. Any five-or-six digit run would be one.
+    expect(code).not.toMatch(/(?<!\d)\d{5,6}(?!\d)/);
+  });
+
+  /**
+   * NO SEAT CLAIM ANYWHERE ON THE SURFACE (D13). Accepting a team invitation
+   * grants access to nothing, so PLAN_ENTITLEMENTS.teamSeats is zero on all
+   * three tiers — and a matrix row reading "0 / 0 / 0" would present an absent
+   * capability as a limit, which is the same lie in a quieter font.
+   */
+  it("sells no team seat, not even as a zero", () => {
+    const matrix = readFileSync(
+      new URL("../../components/pricing/PlanComparisonMatrix.tsx", import.meta.url),
+      "utf8",
+    );
+    const code = matrix
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/\/\/[^\n]*/g, " ");
+
+    expect(code).not.toContain("teamSeats");
+    expect(code).not.toContain("seat");
+  });
+
+  /**
+   * THE PREVIEWS COME BEFORE THE PRICES, and they are labelled.
+   *
+   * D21's order-of-argument: what the thing looks like, then what it costs. The
+   * previews are fed from the demo fixtures rather than a host profile — which
+   * is also what keeps the topology assertion above true, since the page must
+   * render for a visitor with no profile row.
+   */
+  it("shows what a plan turns on before asking what it is worth", () => {
+    const source = readFileSync(
+      new URL("(host-onboard)/host/plans/page.tsx", appDir),
+      "utf8",
+    );
+    const previews = readFileSync(
+      new URL("../../components/pricing/CommercialPreviews.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("<CommercialPreviews");
+    expect(source.indexOf("<CommercialPreviews")).toBeLessThan(
+      source.indexOf("<PlanComparisonMatrix"),
+    );
+
+    // Real components, sample records, and the label the fixtures declare.
+    expect(previews).toContain("DemoLabel");
+    expect(previews).toContain("DEMO_DATA_LABEL");
+    expect(previews).not.toContain("getHostProfile");
+    expect(previews).not.toContain("cachedHostProfile");
+  });
+
+  /**
+   * The two questions that stop a purchase — is there a minimum term, and what
+   * happens to my work if I stop paying — were answerable only after choosing a
+   * tier. They belong on the page that asks for the choice.
+   */
+  it("states renewal and cancellation on the page that asks for the decision", () => {
+    const source = readFileSync(
+      new URL("(host-onboard)/host/plans/page.tsx", appDir),
+      "utf8",
+    );
+    const terms = readFileSync(
+      new URL("../../components/pricing/BillingTermsSummary.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("<BillingTermsSummary");
+    expect(terms).toContain("no minimum term");
+    expect(terms).toContain("Cancelling");
+    expect(terms).toContain("Nothing is deleted");
+    // The exact amount belongs one screen forward, where a tier has been chosen.
+    expect(terms).not.toMatch(/\$\s?\d/);
   });
 
   it("posts the checkout action from the activation page, still with no profile read", () => {

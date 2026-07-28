@@ -1,0 +1,439 @@
+/* ── Demo employer showcase (welcome step) ─────────────────────────────── */
+
+.showcase {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+	width: 100%;
+	min-width: 0;
+}
+
+.showcaseHead {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-8);
+}
+
+.showcaseTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
+	font-size: var(--type-heading-sm);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
+.showcaseLead {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.roleBlock {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+}
+
+/* ── Housing · Meals · Pay ─────────────────────────────────────────────── */
+
+.triad {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-8);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+@media (min-width: 40rem) {
+	.triad {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+.triadCell {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-10);
+	padding: var(--space-12);
+	border-radius: var(--radius-cell);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+}
+
+.triadCell[data-benefit="housing"] {
+	background: var(--benefit-housing-bg);
+}
+.triadCell[data-benefit="meals"] {
+	background: var(--benefit-meals-bg);
+}
+.triadCell[data-benefit="pay"] {
+	background: var(--benefit-pay-bg);
+}
+
+.triadIcon {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-primary);
+}
+
+.triadText {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.triadLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.triadValue {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+/* ── Applicants + analytics glimpses ───────────────────────────────────── */
+
+.glimpses {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-12);
+}
+
+@media (min-width: 52rem) {
+	.glimpses {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+.glimpse {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-10);
+	padding: var(--space-14);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+	min-width: 0;
+}
+
+.glimpseHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-8);
+	flex-wrap: wrap;
+}
+
+.glimpseTitle {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.glimpseNote {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-muted);
+}
+
+.applicants {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.applicant {
+	display: flex;
+	align-items: center;
+	gap: var(--space-10);
+	padding: var(--space-8);
+	border-radius: var(--radius-cell);
+	background: var(--color-paper);
+}
+
+.applicantAvatar {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	border-radius: var(--radius-pill);
+	background: var(--gradient-action);
+	color: var(--color-cta-text);
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-semibold);
+}
+
+.applicantText {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.applicantName {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.applicantMeta {
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-secondary);
+}
+
+.applicantScore {
+	margin-left: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	font-family: var(--font-ui);
+	font-variant-numeric: tabular-nums;
+	font-size: var(--type-body-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.applicantScoreUnit {
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-regular);
+	color: var(--text-muted);
+}
+
+/* ── Seeker-facing preview of the host's OWN data ──────────────────────── */
+
+.seekerPreview {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-14);
+	width: 100%;
+	min-width: 0;
+}
+
+.seekerHead {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: var(--space-12);
+}
+
+.seekerHeadText {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	min-width: 0;
+}
+
+.seekerTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
+	font-size: var(--type-heading-sm);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
+.seekerNote {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.deviceToggle {
+	display: inline-flex;
+	gap: var(--space-4);
+	padding: var(--space-4);
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--border-soft);
+	background: var(--color-paper);
+}
+
+.deviceButton {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min);
+	padding: var(--space-6) var(--space-12);
+	border: none;
+	border-radius: var(--radius-pill);
+	background: transparent;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+.deviceButton:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.deviceButton[aria-pressed="true"] {
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	font-weight: var(--font-weight-semibold);
+	box-shadow: var(--elevation-card);
+}
+
+/*
+ * The viewport frame. `narrow` clamps the rendered width so the host sees the
+ * mobile composition of the SAME markup — the components are responsive, so a
+ * width clamp is a real device preview rather than a separate mobile mock that
+ * could disagree with what ships.
+ */
+.viewport {
+	width: 100%;
+	overflow-x: auto;
+	padding: var(--space-12);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-paper);
+}
+
+.viewportInner {
+	margin: 0 auto;
+	width: 100%;
+	transition: max-width var(--motion-base) var(--ease-standard);
+}
+
+.viewportInner[data-device="mobile"] {
+	max-width: 24rem;
+}
+
+.viewportInner[data-device="desktop"] {
+	max-width: none;
+}
+
+.listingStrip {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-12);
+	margin-top: var(--space-14);
+}
+
+@media (min-width: 44rem) {
+	.viewportInner[data-device="desktop"] .listingStrip {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+/* ── "What is still missing" guidance ──────────────────────────────────── */
+
+.gaps {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-10);
+	padding: var(--space-14);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+}
+
+.gapsTitle {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.gapsLead {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.gapList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.gap {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-10);
+	padding: var(--space-10);
+	border-radius: var(--radius-cell);
+	background: var(--color-paper);
+}
+
+.gapIcon {
+	flex-shrink: 0;
+	display: inline-flex;
+	color: var(--text-secondary);
+}
+
+.gapText {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-2);
+	min-width: 0;
+}
+
+.gapLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.gapBody {
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-secondary);
+}
+
+.gapsComplete {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	margin: 0;
+	padding: var(--space-10);
+	border-radius: var(--radius-cell);
+	background: var(--status-success-bg);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-primary);
+}

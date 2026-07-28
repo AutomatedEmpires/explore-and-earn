@@ -1,0 +1,124 @@
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+}
+
+.head {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.title {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
+	color: var(--text-primary);
+}
+
+.lead {
+	margin: 0;
+	max-width: 60ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.columns {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-16);
+	align-items: start;
+}
+
+@media (min-width: 56rem) {
+	.columns {
+		grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+	}
+}
+
+.terms {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	margin: 0;
+	padding: var(--space-16);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+}
+
+.termRow {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.termRow dt {
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.termRow dd {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-primary);
+}
+
+.activation {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-10);
+	padding: var(--space-16);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-soft);
+	background: var(--color-paper);
+}
+
+.activationTitle {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.activationList {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	margin: 0;
+	padding-left: var(--space-18);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.refunds {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-muted);
+}
+
+.inlineLink {
+	color: var(--color-cta);
+	text-decoration: underline;
+}
+
+.inlineLink:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}

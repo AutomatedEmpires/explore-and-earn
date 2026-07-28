@@ -1,174 +1,134 @@
-/* Plan selection, pre-profile. Shares the visual language of
-   (host)/host/billing so a host meets the same three cards whichever door they
-   arrive through, but sits outside the host shell — this page renders before
-   there is a host to shell. */
+/*
+ * The commercial decision surface (D21). Sits outside the host shell — this page
+ * renders before there is a host to shell — and runs top to bottom as one
+ * argument: what it looks like, what changes between tiers, what sits on top,
+ * the early-host rate, then the terms.
+ *
+ * Retokenized onto the V2 surface system. The previous stylesheet referenced a
+ * palette of names that no longer resolve, so several rules had been rendering
+ * as browser defaults.
+ */
 
 .page {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-6) var(--space-4);
+	display: flex;
+	justify-content: center;
+	padding: var(--space-gutter);
+	background: var(--color-canvas);
 }
 
 .shell {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  width: 100%;
-  max-width: 72rem;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-32);
+	width: 100%;
+	max-width: var(--bp-lg);
 }
 
 .head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
 }
 
 .eyebrow {
-  margin: 0;
-  font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-muted);
 }
 
 .title {
-  margin: 0;
-  font-size: var(--type-heading-md);
-  font-weight: 700;
-  color: var(--color-text-primary);
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
+	font-size: var(--type-page-size);
+	line-height: var(--type-page-lh);
+	color: var(--text-primary);
 }
 
 .subtitle {
-  margin: 0;
-  max-width: 46rem;
-  color: var(--color-text-secondary);
-  font-size: var(--type-body-sm);
+	margin: 0;
+	max-width: 60ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-lg-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
 }
 
-/* The pre-billing promise (commercial redesign D7). Sits under the subtitle and
-   above the ask, because it is the thing that makes the ask feel optional. */
+/*
+ * The build-first door (D6/D7), as a block rather than a stray link.
+ *
+ * It is placed above the prices on purpose. A host who wants to look before
+ * paying should not have to scroll past the ask to discover they are allowed
+ * to — and the sentence about progress being kept is the half of the promise
+ * that actually makes the door usable.
+ */
+.browseFirstBlock {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-8);
+	margin-top: var(--space-6);
+	padding: var(--space-16);
+	border-radius: var(--radius-card);
+	border: 1px solid var(--border-ink-warm);
+	background: var(--color-card-warm);
+}
+
 .reassurance {
-  margin: 0;
-  max-width: 46rem;
-  color: var(--color-text-primary);
-  font-size: var(--type-body-sm);
+	margin: 0;
+	max-width: 60ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
 }
 
-/* "I just want to browse first" — SECONDARY, and deliberately still legible.
-   An outlined pill rather than a plain text link: subordinate to the three plan
-   buttons, but not something a host has to hunt for. */
 .browseFirst {
-  align-self: flex-start;
-  margin-top: var(--space-2);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  font-size: var(--type-body-sm);
-  font-weight: 600;
-  text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--tap-min);
+	padding: var(--space-12) var(--space-20);
+	border-radius: var(--radius-button);
+	border: 1px solid var(--text-primary);
+	background: var(--color-surface);
+	font-family: var(--font-ui);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	text-decoration: none;
 }
 
 .browseFirst:hover {
-  border-color: var(--color-text-primary);
+	background: var(--color-action-soft);
+}
+
+.browseFirst:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.browseFirstNote {
+	margin: 0;
+	max-width: 60ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-secondary);
 }
 
 .feedback {
-  margin: 0;
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--type-body-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
-
-.planGrid {
-  display: grid;
-  gap: var(--space-4);
-}
-
-@media (min-width: 64rem) {
-  .planGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.pricingBlock {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.pricePair {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  color: var(--color-text-primary);
-}
-
-.pricePair strong {
-  font-size: var(--type-heading-sm);
-}
-
-.pricePair span {
-  font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
-}
-
-.entitlements {
-  margin: 0 0 var(--space-4);
-  padding-left: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: var(--type-body-sm);
-}
-
-.actionGroup {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* Both are links now, not submit buttons: the choice made here is carried to
-   /host/plans/activate, which is where the exact amount is stated and where the
-   checkout action is actually posted (D12). */
-.primaryButton,
-.secondaryButton {
-  box-sizing: border-box;
-  display: block;
-  width: 100%;
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--type-body-sm);
-  font-weight: 600;
-  text-align: center;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.unavailable {
-  margin: 0;
-  font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
-}
-
-.primaryButton {
-  border: 1px solid var(--color-text-primary);
-  background: var(--color-text-primary);
-  color: var(--color-surface);
-}
-
-.secondaryButton {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-}
-
-.primaryButton:disabled,
-.secondaryButton:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+	margin: 0;
+	border-radius: var(--radius-card);
+	padding: var(--space-12) var(--space-16);
+	border: 1px solid var(--border-default);
+	background: var(--color-surface);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-primary);
 }

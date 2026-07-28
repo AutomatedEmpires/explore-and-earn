@@ -34,6 +34,40 @@ export const HOST_FUNNEL_EVENTS = {
   activationBannerClicked: "host_activation_banner_clicked",
   /** Checkout was started from a plan card. */
   checkoutStarted: "host_checkout_started",
+
+  /**
+   * REDESIGN V2-E — the onboarding funnel, step by step.
+   *
+   * The six events above answer "did they build anything at all". These answer
+   * the question that follows and that nobody could ask before: WHERE a host
+   * stops. Onboarding was three screens and one completion signal
+   * (profileCreated), so a host who abandoned on the second screen and a host
+   * who never opened the first were the same number.
+   *
+   * Each fires ONCE per step completion, not per render — the wizard holds a
+   * per-step guard, because a step that re-reports on every keystroke turns a
+   * completion rate into a typing-speed metric.
+   */
+  /** The onboarding wizard was opened. The denominator for the steps below. */
+  onboardingStarted: "host_onboarding_started",
+  /** The company identity step was completed and persisted. */
+  companyIdentityCompleted: "host_company_identity_completed",
+  /** A logo image was uploaded and bound to the host profile. */
+  logoUploaded: "host_logo_uploaded",
+  /**
+   * A cover image was uploaded.
+   *
+   * The public profile's cover IS the first listing's cover photo
+   * (app/[locale]/host/[id]/page.tsx resolves it that way), so this fires from
+   * the first-role step rather than from a profile field that does not exist.
+   */
+  coverUploaded: "host_cover_uploaded",
+  /** The employer story step was completed and persisted. */
+  storyCompleted: "host_story_completed",
+  /** The candidate-experience benefits step was completed and persisted. */
+  benefitsCompleted: "host_benefits_completed",
+  /** The host opened the seeker-facing preview of their own profile. */
+  seekerPreviewOpened: "host_seeker_preview_opened",
 } as const;
 
 export type HostFunnelEventName =

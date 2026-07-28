@@ -86,6 +86,36 @@ function ownedHousingLibraryObjectPath(
 	}
 }
 
+/**
+ * The storage object path behind a logo URL the caller genuinely owns.
+ *
+ * Same shape as ownedHousingLibraryObjectPath and same reason: a delete is only
+ * ever issued for a path that provably sits under this host's own prefix and
+ * carries a filename we would have written. Anything else returns null and is
+ * left alone — an unrecognised URL means "not ours to remove", never "remove it
+ * anyway".
+ */
+function ownedLogoObjectPath(
+	url: string | null | undefined,
+	hostProfileId: string,
+): string | null {
+	if (!url || !isAllowedStorageUrl(url)) return null
+	try {
+		const marker = "/storage/v1/object/public/listing-media/"
+		const encodedPath = new URL(url).pathname.split(marker)[1]
+		if (!encodedPath) return null
+		const path = decodeURIComponent(encodedPath)
+		const prefix = `${hostProfileId}/library/logo/`
+		const filename = path.slice(prefix.length)
+		if (!path.startsWith(prefix) || !/^[A-Za-z0-9._-]+$/.test(filename)) {
+			return null
+		}
+		return path
+	} catch {
+		return null
+	}
+}
+
 async function cleanupReplacedHousingPhotos(
 	previous: HostBenefitLibrary,
 	next: HostBenefitLibrary,
@@ -417,6 +447,188 @@ export async function uploadHousingLibraryPhotoAction(
 	} catch (error) {
 		reportError(error, {
 			action: "uploadHousingLibraryPhotoAction",
+			userId: await currentUserId(),
+		})
+		return { ok: false, error: "upload_failed" }
+	}
+}
+
+/**
+ * Normalize an untrusted logo image on the server, store it on the trusted
+ * path, and bind it to the caller's own host profile before returning.
+ *
+ * WHY THIS EXISTS (redesign V2-E). The logo affordance the product already
+ * shipped — HostCoverLogoPicker — says so in its own header: "no cover/logo
+ * persistence backend is wired here, so an upload sets a local preview URL
+ * rather than posting to a server". A host uploaded their logo, saw it appear,
+ * navigated away, and it was gone. Onboarding cannot ask for a logo through a
+ * control like that; a step whose only effect is a preview is the exact defect
+ * this program exists to remove.
+ *
+ * photo_url is the column the product already treats as the host's mark: the
+ * public profile hero renders it as the avatar, and migration 054 re-granted
+ * UPDATE on it after revoking the blanket table grant. So the logo lands there
+ * rather than in host_profiles.logo_asset_id, which exists in the schema and is
+ * referenced by no TypeScript anywhere — writing to a column nothing reads would
+ * be the same disappearance with a longer path.
+ *
+ * Every guard is the one uploadHousingLibraryPhotoAction already uses: a
+ * per-user upload budget, a per-prefix slot guard that sweeps expired orphans,
+ * server-side normalization to WebP through prepareUploadImage, and a bind that
+ * happens immediately so navigating away cannot strand the object. The displaced
+ * logo is deleted after the bind succeeds, never before.
+ */
+export async function uploadHostLogoAction(
+	formData: FormData,
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+	try {
+		const { userId, getToken } = await auth()
+		if (!userId) return { ok: false, error: "unauthenticated" }
+		const token = await getToken()
+		if (!token) return { ok: false, error: "unauthenticated" }
+		if (!(await hasTrustedUploadBudget(userId))) {
+			return { ok: false, error: "rate_limit_exceeded" }
+		}
+
+		const profile = await getHostProfile(token, userId)
+		// The logo binds to a ROW, so there has to be one. Onboarding creates the
+		// profile on the identity step for exactly this reason.
+		if (!profile) return { ok: false, error: "profile_required" }
+
+		const prefix = `${profile.id}/library/logo`
+		const referencedPaths = new Set<string>()
+		const currentPath = ownedLogoObjectPath(profile.photoUrl, profile.id)
+		if (currentPath) referencedPaths.add(currentPath)
+		try {
+			const slotGuard = await guardTrustedUploadSlot({ prefix, referencedPaths })
+			if (!slotGuard.ok) return slotGuard
+		} catch (error) {
+			reportError(error, { action: "guardHostLogoUpload", userId })
+			return { ok: false, error: "upload_temporarily_unavailable" }
+		}
+
+		const file = formData.get("file")
+		const prepared = await prepareUploadImage(file instanceof File ? file : null)
+		if (!prepared.ok) return prepared
+
+		const path = `${prefix}/${randomUUID()}.webp`
+		let uploadedUrl: string
+		try {
+			uploadedUrl = await uploadTrustedListingMedia({
+				path,
+				bytes: prepared.image.bytes,
+				contentType: prepared.image.contentType,
+			})
+		} catch (error) {
+			return {
+				ok: false,
+				error: error instanceof Error ? error.message : "upload_failed",
+			}
+		}
+
+		const result = await updateHostProfileDetails(token, userId, {
+			photoUrl: uploadedUrl,
+		})
+		if (!result.ok) {
+			// The bind failed, so the object is unreferenced. Remove it rather than
+			// leaving a paid-for byte nothing points at.
+			await deleteTrustedListingMedia(path).catch(() => undefined)
+			return { ok: false, error: result.error ?? "update_failed" }
+		}
+
+		if (currentPath && currentPath !== path) {
+			try {
+				await deleteTrustedListingMedia(currentPath)
+			} catch (error) {
+				reportError(error, { action: "cleanupReplacedHostLogo", userId })
+			}
+		}
+
+		revalidatePath("/host/profile")
+		revalidatePath("/host/profile/edit")
+		revalidateTag(HOST_PROFILES_CACHE_TAG)
+		return { ok: true, url: uploadedUrl }
+	} catch (error) {
+		reportError(error, {
+			action: "uploadHostLogoAction",
+			userId: await currentUserId(),
+		})
+		return { ok: false, error: "upload_failed" }
+	}
+}
+
+/**
+ * Normalize and store a COVER photograph, and hand back its URL for the caller
+ * to bind to a listing.
+ *
+ * WHY THIS RETURNS RATHER THAN BINDS, and why a "profile cover" is a listing
+ * field. host_profiles has a cover_asset_id column that no TypeScript in this
+ * repository reads or writes. What the public employer page actually renders as
+ * its cover band is the cover photo of the host's first listing — see the
+ * /host/[id] page, which resolves it that way. So there is exactly one cover
+ * per employer and it lives on a role.
+ *
+ * Onboarding therefore collects the cover on the role step and submits it as
+ * that listing's coverPhotoUrl, where createListingAction re-validates it
+ * against our own storage origin before it is written. Binding it to a profile
+ * column here would put the image somewhere nothing renders it from.
+ *
+ * THE UNBOUND WINDOW IS BOUNDED. Between this returning and the listing being
+ * written the object is referenced by nothing, which is the same shape the
+ * benefit-photo upload has. guardTrustedUploadSlot sweeps unreferenced versioned
+ * uploads past their TTL on the next upload to this prefix, so an abandoned
+ * onboarding cannot accumulate objects.
+ */
+export async function uploadHostCoverAction(
+	formData: FormData,
+): Promise<{ ok: boolean; url?: string; error?: string }> {
+	try {
+		const { userId, getToken } = await auth()
+		if (!userId) return { ok: false, error: "unauthenticated" }
+		const token = await getToken()
+		if (!token) return { ok: false, error: "unauthenticated" }
+		if (!(await hasTrustedUploadBudget(userId))) {
+			return { ok: false, error: "rate_limit_exceeded" }
+		}
+
+		// The storage path's first segment is the caller's OWN host profile id,
+		// which is what the listing-media RLS insert policy authorizes against.
+		const profile = await getHostProfile(token, userId)
+		if (!profile) return { ok: false, error: "profile_required" }
+
+		const prefix = `${profile.id}/library/cover`
+		try {
+			const slotGuard = await guardTrustedUploadSlot({
+				prefix,
+				referencedPaths: new Set<string>(),
+			})
+			if (!slotGuard.ok) return slotGuard
+		} catch (error) {
+			reportError(error, { action: "guardHostCoverUpload", userId })
+			return { ok: false, error: "upload_temporarily_unavailable" }
+		}
+
+		const file = formData.get("file")
+		const prepared = await prepareUploadImage(file instanceof File ? file : null)
+		if (!prepared.ok) return prepared
+
+		const path = `${prefix}/${randomUUID()}.webp`
+		try {
+			const uploadedUrl = await uploadTrustedListingMedia({
+				path,
+				bytes: prepared.image.bytes,
+				contentType: prepared.image.contentType,
+			})
+			return { ok: true, url: uploadedUrl }
+		} catch (error) {
+			return {
+				ok: false,
+				error: error instanceof Error ? error.message : "upload_failed",
+			}
+		}
+	} catch (error) {
+		reportError(error, {
+			action: "uploadHostCoverAction",
 			userId: await currentUserId(),
 		})
 		return { ok: false, error: "upload_failed" }

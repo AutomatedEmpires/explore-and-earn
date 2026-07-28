@@ -1,19 +1,13 @@
 import type { Metadata } from "next";
-import {
-  ANNUAL_MONTHS_BILLED,
-  FOUNDER_LOCKED_PRICING,
-  PLAN_ENTITLEMENTS,
-} from "@explore-and-earn/contracts";
 import { getFoundingHostProgram } from "@explore-and-earn/db";
-import { Card } from "@explore-and-earn/ui";
 
 import { FoundingHostSection } from "../../../../../components/founding/FoundingHostSection";
 import { resolveFoundingProgramView } from "../../../../../components/founding/program";
-import { formatMoney } from "../../../../../lib/format";
-import {
-  hasStripeCheckoutConfig,
-  type HostSubscriptionTier,
-} from "../../../../../services/stripe";
+import { AddOnTable } from "../../../../../components/pricing/AddOnTable";
+import { BillingTermsSummary } from "../../../../../components/pricing/BillingTermsSummary";
+import { CommercialPreviews } from "../../../../../components/pricing/CommercialPreviews";
+import { PlanComparisonMatrix } from "../../../../../components/pricing/PlanComparisonMatrix";
+import { hasStripeCheckoutConfig } from "../../../../../services/stripe";
 import {
   CaptureOnMount,
   FunnelLink,
@@ -22,7 +16,7 @@ import { HOST_FUNNEL_EVENTS } from "../../../../../lib/analytics/events";
 import styles from "./page.module.css";
 
 /**
- * Plan selection for a host who does not have a host profile yet.
+ * The commercial decision surface (spec V2 D21).
  *
  * THIS PAGE EXISTS BECAUSE THE FUNNEL WAS A CLOSED LOOP. Migration 083 gated
  * create_my_host_profile on an active paid tier, so a new host had to pay BEFORE
@@ -37,43 +31,54 @@ import styles from "./page.module.css";
  * is that second door, and it is deliberately prominent — a secondary action
  * nobody can find is a dark pattern with extra steps.
  *
- * WHERE THAT LINK GOES, and why it is a single href rather than a fork. It
- * points at /host, and the (host) layout does the rest: that layout redirects a
- * profile-less user to /host/onboarding and renders the workspace for everyone
- * else. So one link already means "onboarding if you have no profile, your
- * workspace if you do" — and this page gets that for free without reading a host
- * profile, WHICH IT MUST NOT DO. host-acquisition-funnel.test.ts pins that by
- * scanning this file for the names of the host-profile readers, so naming one
- * here — even in a comment, even to say it is forbidden — fails the build. The
- * page has to render for someone who has no profile row at all.
+ * ── WHAT V2 CHANGED, AND WHY ────────────────────────────────────────────────
+ * The founder rejected the V1 presentation: three price cards and a button. The
+ * problem was not the design, it was the ORDER OF THE ARGUMENT. A host was shown
+ * what three plans cost before being shown anything the plans do, could not diff
+ * the tiers without holding three lists in their head, and had no answer to the
+ * two questions that actually stop a purchase — is there a minimum term, and
+ * what happens to my work if I stop paying.
+ *
+ * So the page is now one sequence, and each section answers the question the
+ * previous one raises:
+ *
+ *   1. previews   — what the thing looks like, in production components
+ *   2. matrix     — what changes between tiers, derived from PLAN_ENTITLEMENTS
+ *   3. add-ons    — what sits on top, from the founder-locked contract
+ *   4. founding   — the early-host rate, in whatever state it is genuinely in
+ *   5. terms      — renewal, cancellation, and what activation turns on
+ *
+ * The bare three-card block is gone. Nothing was deleted from it: every figure
+ * it rendered now appears in the matrix, sourced from the same contract.
+ *
+ * ── WHERE THE BROWSE-FIRST LINK GOES, and why it is a single href rather than
+ * a fork. It points at /host, and the (host) layout does the rest: that layout
+ * redirects a profile-less user to /host/onboarding and renders the workspace
+ * for everyone else. So one link already means "onboarding if you have no
+ * profile, your workspace if you do" — and this page gets that for free without
+ * reading a host profile, WHICH IT MUST NOT DO. host-acquisition-funnel.test.ts
+ * pins that by scanning this file for the names of the host-profile readers, so
+ * naming one here — even in a comment, even to say it is forbidden — fails the
+ * build. The page has to render for someone who has no profile row at all. That
+ * constraint is also why every preview above is fed from demo fixtures.
  *
  * It sits in (host-onboard) for the same reason /host/onboarding does: that
  * group's layout gates on being SIGNED IN and nothing else.
  *
- * /host/billing keeps the same three plans plus the portal and refund surfaces
- * for hosts who are already through onboarding. Both post to the same action.
+ * /host/billing keeps the subscription and account-value surfaces for hosts who
+ * are already through onboarding; under D21 it is never a second plans page.
  *
- * D12 MOVED THE CHECKOUT POST ONE SCREEN LATER. This page used to submit
- * startHostCheckoutAction directly from each card, which meant the last thing a
- * host saw before Stripe was three prices and a button — no total, no renewal
- * amount, no cancellation terms, and no statement of what activating actually
- * turns on. Those facts now live on /host/plans/activate, which posts the same
- * action with the same fields. This page selects a tier and an interval; it
- * still reads no host profile, and every ?error= the action can raise still
- * lands here as a sentence.
+ * D12 MOVED THE CHECKOUT POST ONE SCREEN LATER. This page used to submit the
+ * checkout action directly from each card, which meant the last thing a host saw
+ * before Stripe was three prices and a button — no total, no renewal amount, no
+ * cancellation terms, and no statement of what activating actually turns on.
+ * Those facts now live on /host/plans/activate, which posts the same action with
+ * the same fields. This page selects a tier and an interval and LINKS there
+ * rather than restating it; every ?error= the action can raise still lands here
+ * as a sentence.
  */
 export const metadata: Metadata = { title: "Choose your plan" };
 export const dynamic = "force-dynamic";
-
-const HOST_PLAN_TIERS: HostSubscriptionTier[] = [
-  "starter",
-  "professional",
-  "enterprise",
-];
-
-function titleCaseTier(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
 type PlansSearchParams = { error?: string };
 
@@ -86,7 +91,7 @@ function resolveFeedback(searchParams: PlansSearchParams): string | null {
     case "expired_session":
       return "Please sign in again, then choose your plan.";
     case "already_subscribed":
-      return "You're already on a plan — carry on and create your host profile.";
+      return "You're already on a plan — carry on and build your employer profile.";
     // The guard found a live Stripe subscription in a recoverable lapse
     // (paused / unpaid / past due). A second checkout would stack a second
     // subscription the moment the first collects again, so the way back is
@@ -135,7 +140,7 @@ export default async function HostPlansPage({
   return (
     <main className={styles.page}>
       <CaptureOnMount event={HOST_FUNNEL_EVENTS.plansViewed} />
-      <section className={styles.shell}>
+      <div className={styles.shell}>
         <header className={styles.head}>
           <p className={styles.eyebrow}>Explore &amp; Earn · For hosts</p>
           <h1 className={styles.title}>Choose your plan</h1>
@@ -143,21 +148,28 @@ export default async function HostPlansPage({
             Start with a plan, or build your profile first and activate when
             you&apos;re ready to publish.
           </p>
-          <p className={styles.reassurance}>
-            You can build and preview your employer profile before choosing a
-            plan.
-          </p>
+
           {/* The second door. Prominent, and placed where the decision is made
-              rather than buried under three price cards — a host who wants to
-              look before paying should not have to scroll past the ask to find
-              out they are allowed to. */}
-          <FunnelLink
-            event={HOST_FUNNEL_EVENTS.browseFirstSelected}
-            href="/host"
-            className={styles.browseFirst}
-          >
-            I just want to browse first
-          </FunnelLink>
+              rather than buried under the prices — a host who wants to look
+              before paying should not have to scroll past the ask to find out
+              they are allowed to. */}
+          <div className={styles.browseFirstBlock}>
+            <p className={styles.reassurance}>
+              You can build and preview your employer profile before choosing a
+              plan.
+            </p>
+            <FunnelLink
+              event={HOST_FUNNEL_EVENTS.browseFirstSelected}
+              href="/host"
+              className={styles.browseFirst}
+            >
+              I just want to browse first
+            </FunnelLink>
+            <p className={styles.browseFirstNote}>
+              Everything you have entered so far is kept. Nothing here expires,
+              and coming back later costs you no progress.
+            </p>
+          </div>
         </header>
 
         {feedback ? (
@@ -172,83 +184,25 @@ export default async function HostPlansPage({
           </p>
         ) : null}
 
-        <div id="plans" className={styles.planGrid}>
-          {HOST_PLAN_TIERS.map((tier) => {
-            const pricing = FOUNDER_LOCKED_PRICING[tier];
-            const entitlements = PLAN_ENTITLEMENTS[tier];
+        {/* 1. What the thing looks like, before what it costs. */}
+        <CommercialPreviews />
 
-            return (
-              <Card key={tier} title={titleCaseTier(tier)}>
-                <div className={styles.pricingBlock}>
-                  <div className={styles.pricePair}>
-                    <strong>{formatMoney(pricing.monthly)}</strong>
-                    <span>monthly</span>
-                  </div>
-                  <div className={styles.pricePair}>
-                    <strong>{formatMoney(pricing.yearly)}</strong>
-                    <span>annual · {ANNUAL_MONTHS_BILLED} months billed</span>
-                  </div>
-                </div>
+        {/* 2. What changes between tiers. Replaces the three-card block. */}
+        <PlanComparisonMatrix checkoutConfigured={checkoutConfigured} />
 
-                <ul className={styles.entitlements}>
-                  <li>{entitlements.listings} active listing slots</li>
-                  <li>
-                    {entitlements.includedInviteCredits} included invite credits /
-                    month
-                  </li>
-                  <li>{entitlements.monthlyAnnouncements} monthly announcements</li>
-                  {/* Listed only when the plan actually grants seats, so a tier
-                      with none says nothing rather than advertising "0". */}
-                  {entitlements.teamSeats > 0 ? (
-                    <li>{entitlements.teamSeats} team seats</li>
-                  ) : null}
-                  <li>{entitlements.analytics} analytics access</li>
-                </ul>
+        {/* 3. What sits on top of a plan, from the founder-locked contract. */}
+        <AddOnTable />
 
-                <div className={styles.actionGroup}>
-                  {/* Both actions carry the choice to the activation summary,
-                      which states the exact amount due today, what renews and
-                      when, what activates the moment the payment lands, and how
-                      to cancel — and posts the same checkout action from there.
-                      The funnel event still fires on this click, because this is
-                      where the host chose. */}
-                  {checkoutConfigured ? (
-                    <>
-                      <FunnelLink
-                        event={HOST_FUNNEL_EVENTS.checkoutStarted}
-                        properties={{ tier, interval: "monthly" }}
-                        href={`/host/plans/activate?tier=${tier}&interval=monthly`}
-                        className={styles.primaryButton}
-                      >
-                        Continue monthly
-                      </FunnelLink>
-                      <FunnelLink
-                        event={HOST_FUNNEL_EVENTS.checkoutStarted}
-                        properties={{ tier, interval: "yearly" }}
-                        href={`/host/plans/activate?tier=${tier}&interval=yearly`}
-                        className={styles.secondaryButton}
-                      >
-                        Continue annual
-                      </FunnelLink>
-                    </>
-                  ) : (
-                    <p className={styles.unavailable}>
-                      Checkout isn&apos;t available on this environment yet.
-                    </p>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* The early-host programme, in whatever state it is genuinely in. Its
-            call to action points BACK at the cards above rather than forward:
-            the discount is not a separate product, it is the same three plans at
-            a different rate, applied on the activation summary when the row says
-            a place is claimable. */}
+        {/* 4. The early-host programme, in whatever state it is genuinely in.
+            Its call to action points BACK at the matrix rather than forward: the
+            discount is not a separate product, it is the same three plans at a
+            different rate, applied on the activation summary when the row says a
+            place is claimable. */}
         <FoundingHostSection view={foundingView} ctaHref="#plans" />
-      </section>
+
+        {/* 5. Renewal, cancellation, and what activation turns on. */}
+        <BillingTermsSummary />
+      </div>
     </main>
   );
 }
