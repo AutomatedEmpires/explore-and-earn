@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import {
   getHostInvites,
@@ -7,14 +8,13 @@ import {
   getMatchedSeekersForListing,
 } from "@explore-and-earn/db";
 import type { HostInvite, ListingRow } from "@explore-and-earn/db/client";
-import { Chip, Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
+import { Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
 import { HostSectionHeading } from "../../../../../components/host";
 import {
   MatchedSeekerSourcing,
   type SourcingBucketVM,
 } from "../../../../../components/host/MatchedSeekerSourcing";
-import { EmptyState } from "../../../../../components/discovery";
 import { InvitesList } from "./InvitesList";
 import styles from "./page.module.css";
 
@@ -27,6 +27,26 @@ const SEEKERS_PER_LISTING = 12;
  * the unit and its state (an invite is sent, opened, applied), and for the
  * metered credit that pays for one. Renaming the noun as well would have made
  * the allowance copy, the add-on, and the DB all read wrong.
+ *
+ * WHAT LEFT THIS PAGE, AND WHY (spec §8).
+ *
+ * A "Campaign builder" panel used to sit at the top: four `<select>`s and a
+ * `<textarea>` with a `defaultValue`, no form action, no state, no submit. Its
+ * own footnote admitted "nothing here sends on its own." It was a form that
+ * could not be filled in, above a product that charges for outreach.
+ *
+ * It is gone rather than wired, because there is nothing to wire it to. There
+ * is NO campaign object anywhere: no campaigns table, no campaign_id on
+ * `invites`, no campaign name — the only "campaign" in the schema is
+ * `listing_boost_campaigns`, which is paid advertising and unrelated. Building
+ * the panel for real would mean inventing a table, a write path, and a sending
+ * mechanism, none of which belongs in a workspace-layout change.
+ *
+ * So this page presents what IS real: the invite ledger, per-listing invite
+ * funnels grouped from actual `invites` rows, ranked matched seekers, and the
+ * metered single-invite send. The word "campaign" does not appear on it,
+ * because a grouping computed in this file at render time is not an object a
+ * host created and can return to.
  */
 export const metadata: Metadata = { title: "Outreach" };
 
@@ -38,8 +58,12 @@ const OPENED_STATUSES = new Set(["viewed", "applied"]);
 /** Terminal-negative statuses — count as sent but not "in flight". */
 const COLD_STATUSES = new Set(["ignored", "expired", "withdrawn"]);
 
-/** A campaign = all invites a host sent for one listing, with its funnel. */
-interface InviteCampaign {
+/**
+ * One listing's invite funnel, grouped in memory from real `invites` rows.
+ * Deliberately NOT called a campaign — nothing was created, named, or stored;
+ * this is a view over rows the host already sent one at a time.
+ */
+interface ListingOutreach {
   readonly listingId: string;
   readonly listingTitle: string;
   readonly sent: number;
@@ -49,9 +73,8 @@ interface InviteCampaign {
   readonly latestAt: string;
 }
 
-/** Group invites by listing into campaigns, freshest campaign first. */
-function toCampaigns(invites: readonly HostInvite[]): InviteCampaign[] {
-  const byListing = new Map<string, InviteCampaign>();
+function groupByListing(invites: readonly HostInvite[]): ListingOutreach[] {
+  const byListing = new Map<string, ListingOutreach>();
   for (const invite of invites) {
     const key = invite.listingId;
     const existing = byListing.get(key);
@@ -66,9 +89,7 @@ function toCampaigns(invites: readonly HostInvite[]): InviteCampaign[] {
         applied: existing.applied + applied,
         cold: existing.cold + cold,
         latestAt:
-          invite.createdAt > existing.latestAt
-            ? invite.createdAt
-            : existing.latestAt,
+          invite.createdAt > existing.latestAt ? invite.createdAt : existing.latestAt,
       });
     } else {
       byListing.set(key, {
@@ -82,23 +103,20 @@ function toCampaigns(invites: readonly HostInvite[]): InviteCampaign[] {
       });
     }
   }
-  return [...byListing.values()].sort((a, b) =>
-    b.latestAt.localeCompare(a.latestAt),
-  );
+  return [...byListing.values()].sort((a, b) => b.latestAt.localeCompare(a.latestAt));
 }
 
-/** Tone + label for a campaign's status pill, driven by its real funnel. */
-function campaignTone(c: InviteCampaign): { tone: string; label: string } {
-  if (c.applied > 0) return { tone: "hot", label: "Converting" };
-  if (c.opened > 0) return { tone: "live", label: "Active" };
-  if (c.sent > c.cold) return { tone: "live", label: "Awaiting" };
-  return { tone: "draft", label: "Cold" };
+/** Tone + label for a listing's outreach pill, driven by its real funnel. */
+function outreachTone(entry: ListingOutreach): { tone: string; label: string } {
+  if (entry.applied > 0) return { tone: "hot", label: "Converting" };
+  if (entry.opened > 0) return { tone: "live", label: "Opened" };
+  if (entry.sent > entry.cold) return { tone: "live", label: "Awaiting" };
+  return { tone: "draft", label: "No response" };
 }
 
 function pct(part: number, whole: number): number {
   return whole > 0 ? Math.round((part / whole) * 100) : 0;
 }
-
 
 export default async function HostOutreachPage() {
   const { userId, getToken } = await auth();
@@ -108,12 +126,9 @@ export default async function HostOutreachPage() {
     return (
       <section className={styles.block}>
         <HostSectionHeading
+          level={1}
           title="Outreach"
           description="Sign in as a host to send and track your invites."
-        />
-        <EmptyState
-          title="Sign in to manage invites"
-          message="You need to be signed in as a host to view your sent invites."
         />
       </section>
     );
@@ -139,233 +154,174 @@ export default async function HostOutreachPage() {
       return { listing, seekers: result?.seekers ?? [] };
     }),
   );
-  const sourcingBuckets: SourcingBucketVM[] = bucketResults.map(({ listing, seekers }) => ({
-    listingId: listing.id,
-    listingTitle: listing.title || "Untitled listing",
-    category: listing.category,
-    locationDisplay: listing.location_display,
-    seekers,
-  }));
+  const sourcingBuckets: SourcingBucketVM[] = bucketResults.map(
+    ({ listing, seekers }) => ({
+      listingId: listing.id,
+      listingTitle: listing.title || "Untitled listing",
+      category: listing.category,
+      locationDisplay: listing.location_display,
+      seekers,
+    }),
+  );
 
-  // --- Real metrics derived from the invite data --------------------------
+  // --- Real metrics derived from the invite rows -------------------------
   const sent = invites.length;
   const opened = invites.filter((i) => OPENED_STATUSES.has(i.status)).length;
   const applied = invites.filter((i) => i.status === "applied").length;
-  const openRate = pct(opened, sent);
-  const applyRate = pct(applied, sent);
-  const campaigns = toCampaigns(invites);
+  const byListing = groupByListing(invites);
 
-  const roleOptions =
-    listings.length > 0
-      ? listings.map((l) => l.title)
-      : ["Create a listing to target a role"];
+  // Compact starting state: nothing sent, nothing to send to.
+  if (sent === 0 && listings.length === 0) {
+    return (
+      <section className={styles.block}>
+        <HostSectionHeading
+          level={1}
+          eyebrow="Outbound recruiting"
+          title="Outreach"
+          description="Invite the seekers who fit your listings, and track every invite from sent to applied."
+        />
+        <div className={styles.firstRun}>
+          <h2 className={styles.firstRunTitle}>Nothing to reach out about yet</h2>
+          <p className={styles.firstRunLede}>
+            Outreach works from a listing: publish one and we rank the seekers
+            whose profile, timeline, and needs actually fit it. Each invite draws
+            one credit from your monthly allowance.
+          </p>
+          <div className={styles.firstRunActions}>
+            <Link className={styles.firstRunCta} href="/host/listings/new">
+              <Icon name="status.open" size={16} aria-hidden />
+              Create a listing
+            </Link>
+            <Link className={styles.firstRunGhost} href="/for-hosts/demo/outreach">
+              <Icon name="action.view" size={16} aria-hidden />
+              See outreach in a full season
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={styles.block}>
       <HostSectionHeading
+        level={1}
         eyebrow="Outbound recruiting"
-        title="Invites should feel targeted, not spammy."
-        description="Build campaigns from role fit, timeline, and profile strength — then track every invite from sent to applied."
+        title="Outreach"
+        description="Ranked seekers for each of your listings, the invites you have sent, and what came back."
       />
 
       <MetricGrid>
         <MetricCard
           label="Invites sent"
           value={sent.toLocaleString()}
-          trend={sent > 0 ? "All-time" : "None yet"}
+          trend={sent > 0 ? "All time" : "None yet"}
           trendTone="neutral"
         />
         <MetricCard
-          label="Open rate"
-          value={`${openRate}%`}
-          trend={sent > 0 ? `${opened} opened` : "—"}
-          trendTone={openRate >= 40 ? "up" : "neutral"}
+          label="Opened"
+          value={`${pct(opened, sent)}%`}
+          trend={sent > 0 ? `${opened} of ${sent}` : "—"}
+          trendTone={pct(opened, sent) >= 40 ? "up" : "neutral"}
         />
         <MetricCard
-          label="Invite-to-apply"
-          value={`${applyRate}%`}
-          trend={sent > 0 ? `${applied} applied` : "—"}
-          trendTone={applyRate >= 15 ? "up" : "neutral"}
+          label="Turned into applications"
+          value={`${pct(applied, sent)}%`}
+          trend={sent > 0 ? `${applied} of ${sent}` : "—"}
+          trendTone={pct(applied, sent) >= 15 ? "up" : "neutral"}
         />
       </MetricGrid>
 
-      <div className={styles.split}>
-        {/* --- Campaign builder (planning surface) ------------------------ */}
-        <div className={styles.panel}>
-          <div className={styles.panelHead}>
-            <div className={styles.panelTitles}>
-              <h2 className={styles.panelTitle}>Campaign builder</h2>
-              <p className={styles.panelSub}>
-                Shape the audience and the message, then send from your seeker
-                search.
-              </p>
-            </div>
-            <Chip icon="action.edit">Planning aid</Chip>
-          </div>
-
-          <div className={styles.form}>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="campaign-role">
-                Role
-              </label>
-              <select
-                id="campaign-role"
-                className={styles.select}
-                defaultValue={roleOptions[0]}
-              >
-                {roleOptions.map((title, i) => (
-                  <option key={`${title}-${i}`} value={title}>
-                    {title}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="campaign-audience">
-                Audience
-              </label>
-              <select id="campaign-audience" className={styles.select}>
-                <option>Seekers in your category</option>
-                <option>Ready-now seekers</option>
-                <option>Seekers needing housing</option>
-                <option>Open to all seekers</option>
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="campaign-timeline">
-                Timeline
-              </label>
-              <select id="campaign-timeline" className={styles.select}>
-                <option>Ready now to 1 month</option>
-                <option>1–3 months</option>
-                <option>3–6 months</option>
-              </select>
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="campaign-volume">
-                Volume
-              </label>
-              <select id="campaign-volume" className={styles.select}>
-                <option>20 high-quality invites</option>
-                <option>50 broad invites</option>
-              </select>
-            </div>
-            <div className={`${styles.field} ${styles.fieldFull}`}>
-              <label className={styles.label} htmlFor="campaign-message">
-                Message angle
-              </label>
-              <textarea
-                id="campaign-message"
-                className={styles.textarea}
-                defaultValue="We think you could be a strong fit for our seasonal role. Housing is available, the work is hands-on, and your timeline looks aligned."
-              />
-            </div>
-          </div>
-
-          <p className={styles.builderNote}>
-            <Icon name="system.info" size={16} aria-hidden />
-            This builder is a planning aid, not an automatic match engine —
-            nothing here sends on its own. Use it to shape your angle, then pick
-            a listing below and open seeker search to send real, personalized
-            invites. Every send is tracked as a campaign.
-          </p>
-        </div>
-
-        {/* --- Live campaigns (real, grouped by listing) ------------------ */}
-        <div className={styles.panel}>
-          <div className={styles.panelHead}>
-            <div className={styles.panelTitles}>
-              <h2 className={styles.panelTitle}>Live campaigns</h2>
-              <p className={styles.panelSub}>
-                Each listing&apos;s invite funnel, from sent to applied.
-              </p>
-            </div>
-            <Chip icon="action.forward">{`${campaigns.length}`}</Chip>
-          </div>
-
-          {campaigns.length === 0 ? (
-            <div className={styles.empty}>
-              <Icon name="action.forward" size={24} aria-hidden />
-              <p>
-                No campaigns yet. Invite seekers to a listing and they&apos;ll
-                appear here grouped into a tracked campaign.
-              </p>
-            </div>
-          ) : (
-            <div className={styles.campaigns}>
-              {campaigns.map((c) => {
-                const { tone, label } = campaignTone(c);
-                const reach = pct(c.opened + c.applied, c.sent);
-                return (
-                  <article key={c.listingId} className={styles.campaign}>
-                    <div className={styles.campaignHead}>
-                      <div className={styles.campaignTitles}>
-                        <h3 className={styles.campaignTitle}>
-                          {c.listingTitle}
-                        </h3>
-                        <p className={styles.campaignStats}>
-                          {c.sent} sent · {c.opened} opened · {c.applied} applied
-                        </p>
-                      </div>
-                      <span className={styles.pill} data-tone={tone}>
-                        {label}
-                      </span>
-                    </div>
-                    <div
-                      className={styles.funnel}
-                      role="meter"
-                      aria-valuenow={reach}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label={`${c.listingTitle} engagement`}
-                    >
-                      <span
-                        className={styles.funnelFill}
-                        style={{ width: `${Math.max(reach, 4)}%` }}
-                      />
-                    </div>
-                    <div className={styles.campaignTags}>
-                      <span className={styles.tag}>
-                        <Icon name="action.view" size={16} aria-hidden />
-                        {pct(c.opened, c.sent)}% open
-                      </span>
-                      <span className={styles.tag}>
-                        <Icon name="status.applied" size={16} aria-hidden />
-                        {pct(c.applied, c.sent)}% apply
-                      </span>
-                      {c.cold > 0 ? (
-                        <span className={styles.tag}>
-                          {c.cold} cold
-                        </span>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* --- Matched seekers: per-listing buckets + metered invite --------- */}
+      {/* --- Matched seekers: per-listing buckets + the metered invite ----- */}
       <div className={styles.section}>
         <div className={styles.sectionText}>
-          <h2 className={styles.sectionTitle}>Matched seekers</h2>
+          <h2 className={styles.sectionTitle}>Seekers who fit your listings</h2>
           <p className={styles.sectionLede}>
-            Ranked, real-fit seekers for each of your listings. Invite the strongest matches to
-            apply — every send draws from your monthly allowance.
+            Ranked by their real match score, with the components that produced
+            it. A discovery aid, never a gate — anyone can still apply. Every
+            send draws one credit from your monthly allowance.
           </p>
         </div>
       </div>
       <MatchedSeekerSourcing buckets={sourcingBuckets} entitlement={entitlement} />
 
-      {/* --- Sent invites + the real send/withdraw flow (unchanged) -------- */}
+      {/* --- Response tracking, grouped by listing ------------------------ */}
+      {byListing.length > 0 ? (
+        <div className={styles.section}>
+          <div className={styles.sectionText}>
+            <h2 className={styles.sectionTitle}>What came back, by listing</h2>
+            <p className={styles.sectionLede}>
+              Every invite you have sent for each listing and how far it got.
+              Grouped here for reading — invites are sent and tracked one at a
+              time.
+            </p>
+          </div>
+          <div className={styles.funnels}>
+            {byListing.map((entry) => {
+              const { tone, label } = outreachTone(entry);
+              const reach = pct(entry.opened + entry.applied, entry.sent);
+              return (
+                <article key={entry.listingId} className={styles.funnelCard}>
+                  <div className={styles.funnelHead}>
+                    <div className={styles.funnelTitles}>
+                      <h3 className={styles.funnelTitle}>{entry.listingTitle}</h3>
+                      <p className={styles.funnelStats}>
+                        {entry.sent} sent · {entry.opened} opened · {entry.applied}{" "}
+                        applied
+                      </p>
+                    </div>
+                    <span className={styles.pill} data-tone={tone}>
+                      {label}
+                    </span>
+                  </div>
+                  <div
+                    className={styles.track}
+                    role="meter"
+                    aria-valuenow={reach}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${entry.listingTitle} invite engagement`}
+                  >
+                    <span
+                      className={styles.trackFill}
+                      style={{ width: `${Math.max(reach, 4)}%` }}
+                    />
+                  </div>
+                  <div className={styles.funnelTags}>
+                    <span className={styles.tag}>
+                      <Icon name="action.view" size={16} aria-hidden />
+                      {pct(entry.opened, entry.sent)}% opened
+                    </span>
+                    <span className={styles.tag}>
+                      <Icon name="status.applied" size={16} aria-hidden />
+                      {pct(entry.applied, entry.sent)}% applied
+                    </span>
+                    {entry.cold > 0 ? (
+                      <span className={styles.tag}>{entry.cold} no response</span>
+                    ) : null}
+                    <Link
+                      className={styles.funnelLink}
+                      href={`/host/applicants?listingId=${entry.listingId}`}
+                    >
+                      See applicants
+                      <Icon name="action.forward" size={14} aria-hidden />
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {/* --- Sent invites + the real send/withdraw flow -------------------- */}
       <div className={styles.section}>
         <div className={styles.sectionText}>
           <h2 className={styles.sectionTitle}>Sent invites</h2>
           <p className={styles.sectionLede}>
-            Seekers you have invited to apply to your listings — withdraw any
-            that are still pending.
+            Seekers you have invited to apply — withdraw any that are still
+            pending. A withdrawn invite returns its credit only if it was never
+            delivered.
           </p>
         </div>
       </div>

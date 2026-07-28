@@ -324,3 +324,117 @@
     justify-content: space-between;
   }
 }
+
+/* ── Status stack + closing-soon (V2-F1) ─────────────────────────── */
+.statusStack {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.closingSoon {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--status-warning-bg);
+  color: var(--state-soon-fg);
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+/* ── Listing health ──────────────────────────────────────────────── */
+.health {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-10);
+  border: 1px solid var(--border-soft);
+  border-left-width: 3px;
+  border-left-color: var(--state-later-fg);
+  border-radius: var(--radius-cell);
+  background: var(--color-surface);
+}
+
+.health[data-blocking="true"] { border-left-color: var(--state-urgent-fg); }
+
+.healthToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.healthToggle span { flex: 1 1 auto; }
+.healthToggle:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+.healthList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.healthItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.healthField {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.healthField[data-blocking="true"] { color: var(--state-urgent-fg); }
+
+.healthReason {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.healthFix a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--tap-min);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta);
+  text-decoration: none;
+}
+.healthFix a:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+.healthNote,
+.healthOk {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  color: var(--text-muted);
+}
+
+.healthOk { color: var(--state-ready-fg); }

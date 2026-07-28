@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@explore-and-earn/ui";
 
 import { updateApplicationStatusAction } from "../../app/actions/applicationStatus";
+import { captureFunnelEvent } from "../../lib/analytics/capture";
+import { HOST_WORKSPACE_EVENTS } from "../../lib/analytics/events";
 import { legalCardActions, type ApplicantCardAction, type ApplicantStage } from "./models";
 import styles from "./HostApplicantCard.module.css";
 
@@ -55,6 +57,14 @@ export function HostApplicantCardActions({
 			try {
 				const result = await updateApplicationStatusAction(applicantId, action.status);
 				if (result.ok) {
+					// Captured only AFTER the server accepted the edge, so the funnel
+					// counts moves that HAPPENED, not moves attempted. Properties are
+					// stage names — never the candidate, never their score.
+					captureFunnelEvent(HOST_WORKSPACE_EVENTS.candidateStageChanged, {
+						from: status,
+						to: action.status,
+						surface: "card",
+					});
 					router.refresh();
 					return; // optimistic overlay clears when the fresh status lands
 				}

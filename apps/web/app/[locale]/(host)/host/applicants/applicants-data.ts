@@ -98,11 +98,14 @@ export function toApplicantItem(
   displayNames?: SeekerNameLookup,
   threadsByApplicationId?: ReadonlyMap<string, string>,
   matchScores?: ReadonlyMap<string, ListingMatchScore>,
+  /** Last message per CONVERSATION id, from getLastMessagesForConversations. */
+  lastMessages?: ReadonlyMap<string, LastMessageSummary>,
 ): HostApplicantItem {
   const threadId = threadsByApplicationId?.get(application.id);
   const match = matchScores?.get(
     matchScoreKey(application.listingId, application.seekerProfileId),
   );
+  const lastMessage = threadId ? lastMessages?.get(threadId) : undefined;
   return {
     id: application.id,
     applicantName: displayNames
@@ -118,8 +121,30 @@ export function toApplicantItem(
     appliedOn: formatAppliedOn(application.submittedAt),
     ...(application.coverMessage ? { note: application.coverMessage } : {}),
     ...(threadId ? { threadId } : {}),
-    ...(match ? { matchScore: match.score, matchBand: match.band } : {}),
+    // The score and the components travel together or not at all — a score
+    // without its components would render as an unexplained verdict, which is
+    // exactly what the card must never show.
+    ...(match
+      ? {
+          matchScore: match.score,
+          matchBand: match.band,
+          matchComponents: match.components,
+        }
+      : {}),
+    ...(lastMessage
+      ? {
+          lastMessageAt: lastMessage.createdAt,
+          lastMessageFrom: lastMessage.senderType,
+        }
+      : {}),
+    ...(application.previouslyApplied ? { reapplied: true } : {}),
   };
+}
+
+/** The slice of a Message the applicant surfaces read. */
+export interface LastMessageSummary {
+  readonly createdAt: string;
+  readonly senderType: "seeker" | "host";
 }
 
 /**

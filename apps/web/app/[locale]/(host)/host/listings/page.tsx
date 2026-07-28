@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -6,79 +7,22 @@ import {
   getApplicationCountsByListing,
   getNewApplicationCountsByListing,
   getHostListings,
+  getHostListingSignals,
   getHostProfile,
   rowToDiscoveryFields,
+  type HostListingSignal,
   type ListingRow,
 } from "@explore-and-earn/db";
-
-import { MetricCard, MetricGrid, Chip } from "@explore-and-earn/ui";
+import { Icon } from "@explore-and-earn/ui";
 
 import {
   HostListingsManager,
   HostSectionHeading,
-  countListingsByState,
   dbStatusToHostState,
   type HostListingItem,
 } from "../../../../../components/host";
 import { EmptyState } from "../../../../../components/discovery";
 import styles from "./page.module.css";
-
-/**
- * Boost strategy fallback ladder — Enterprise fills first, Pro backfills empty
- * premium slots, Starter backfills only what is left without competing with
- * paid inventory. Mirrors the benchmark listingsView() "Boost strategy" panel.
- * Static copy: this explains the homepage-exposure logic; it drives nothing.
- */
-const BOOST_TIERS = [
-  {
-    step: "1",
-    tier: "Enterprise priority",
-    pill: "First fill",
-    body: "Paid Enterprise boosted cards surface first — rotated by category and match relevance across the homepage and matched feed.",
-    tags: ["Homepage", "Matched feed", "Top carousel"],
-  },
-  {
-    step: "2",
-    tier: "Pro fallback",
-    pill: "Second",
-    body: "Pro listings backfill empty premium slots only when Enterprise inventory is insufficient, weighted by category and location fit.",
-    tags: ["Weighted", "Category fit", "Location fit"],
-  },
-  {
-    step: "3",
-    tier: "Starter fallback",
-    pill: "Last",
-    body: "Starter can backfill unsold slots at lower weight, and never carries a premium badge that competes with paid boost inventory.",
-    tags: ["Controlled", "Lower weight", "No premium badge"],
-  },
-] as const;
-
-/**
- * Derive the listings command-strip metrics from the host's REAL listings +
- * applicant counts (never hardcoded), so the strip can never drift from the
- * inventory rendered below. Presentation only — no matching/scoring.
- */
-function deriveListingMetrics(items: readonly HostListingItem[]) {
-  const counts = countListingsByState(items);
-  const active = counts.open + counts.partially_filled + counts.filled;
-  const boostedUsed = items.filter(
-    (item) =>
-      item.state !== "draft" &&
-      (item.listing.conditionalBadges?.includes("boosted") ?? false),
-  ).length;
-  const applications = items.reduce((sum, item) => sum + item.applicantCount, 0);
-  const newApplications = items.reduce(
-    (sum, item) => sum + item.newApplicantCount,
-    0,
-  );
-  return {
-    active,
-    drafts: counts.draft,
-    boostedUsed,
-    applications,
-    newApplications,
-  };
-}
 
 export const metadata: Metadata = { title: "Listings" };
 
@@ -95,8 +39,8 @@ function toItems(rows: readonly ListingRow[]): HostListingItem[] {
   return rows.map((row) => ({
     listing: rowToDiscoveryFields(row),
     state: dbStatusToHostState(row.status),
-    // Applicant counts are merged in HostListingsPage from
-    // getApplicationCountsByListing; default to zero until merged.
+    // Applicant counts and health signals are merged below; default to the
+    // honest "nothing loaded" values until then.
     applicantCount: 0,
     newApplicantCount: 0,
   }));
@@ -139,6 +83,7 @@ function SignInToManage() {
   return (
     <section className={styles.block}>
       <HostSectionHeading
+        level={1}
         title="Listings"
         description="Sign in as a host to post opportunities and manage your applicant pipeline."
       />
@@ -150,19 +95,81 @@ function SignInToManage() {
   );
 }
 
+/**
+ * The first-listing state (spec §6, D23).
+ *
+ * Three doors, and every one of them goes somewhere real. There is deliberately
+ * no "start from a template": no template mechanism exists in the schema or the
+ * query layer, and a fourth button that opened a form with nothing in it would
+ * be the kind of promise this redesign is repaying. What DOES exist is
+ * `duplicateListing`, which needs a first listing to copy — so it appears on a
+ * listing's own page, not here.
+ */
+function FirstListing() {
+  const doors = [
+    {
+      href: "/host/listings/new",
+      icon: "action.edit" as const,
+      title: "Write it from scratch",
+      body: "Role, place, dates, and the three answers seekers need most: housing, meals, pay.",
+      primary: true,
+    },
+    {
+      href: "/for-hosts/demo/job",
+      icon: "action.view" as const,
+      title: "Look at a finished one first",
+      body: "The demo workspace's flagship role, written out in full. Sample data, clearly labelled.",
+      primary: false,
+    },
+    {
+      href: "/host/onboarding",
+      icon: "action.forward" as const,
+      title: "Pick up where you left off",
+      body: "Return to setup if you started your workspace and stopped partway.",
+      primary: false,
+    },
+  ];
+
+  return (
+    <div className={styles.firstRun}>
+      <h2 className={styles.firstRunTitle}>Nothing posted yet</h2>
+      <p className={styles.firstRunLede}>
+        A listing is how seekers find you. Drafts are free and private — you only
+        need a plan when you publish.
+      </p>
+      <ul className={styles.doors}>
+        {doors.map((door) => (
+          <li key={door.href}>
+            <Link
+              className={styles.door}
+              href={door.href}
+              data-primary={door.primary ? "true" : undefined}
+            >
+              <span className={styles.doorIcon} aria-hidden>
+                <Icon name={door.icon} size={20} />
+              </span>
+              <span className={styles.doorText}>
+                <span className={styles.doorTitle}>{door.title}</span>
+                <span className={styles.doorBody}>{door.body}</span>
+              </span>
+              <Icon name="action.forward" size={18} aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default async function HostListingsPage() {
   const { userId, getToken } = await auth();
-  if (!userId) {
-    return <SignInToManage />;
-  }
+  if (!userId) return <SignInToManage />;
   const token = await getToken();
-  if (!token) {
-    return <SignInToManage />;
-  }
+  if (!token) return <SignInToManage />;
 
-  // Listings (with embed/fallback) and real applicant counts are independent;
-  // a counts failure must not break the listings view, so it degrades to {}.
-  const [items, counts, newCounts] = await Promise.all([
+  // Listings, applicant counts and health signals are independent; a counts or
+  // signals failure must not break the inventory view, so each degrades alone.
+  const [items, counts, newCounts, signals] = await Promise.all([
     loadHostItems(token, userId),
     getApplicationCountsByListing(token, userId).catch(
       () => ({}) as Record<string, number>,
@@ -170,106 +177,36 @@ export default async function HostListingsPage() {
     getNewApplicationCountsByListing(token, userId).catch(
       () => ({}) as Record<string, number>,
     ),
+    getHostListingSignals(token, userId).catch(
+      () => new Map<string, HostListingSignal>(),
+    ),
   ]);
 
-  const withCounts = items.map((item) => ({
-    ...item,
-    applicantCount: counts[item.listing.id] ?? 0,
-    newApplicantCount: newCounts[item.listing.id] ?? 0,
-  }));
-
-  const metrics = deriveListingMetrics(withCounts);
+  const withCounts: HostListingItem[] = items.map((item) => {
+    const signal = signals.get(item.listing.id);
+    return {
+      ...item,
+      applicantCount: counts[item.listing.id] ?? 0,
+      newApplicantCount: newCounts[item.listing.id] ?? 0,
+      ...(signal ? { readiness: signal.readiness, deadlineAt: signal.expiresAt } : {}),
+    };
+  });
 
   return (
     <section className={styles.block}>
       <HostSectionHeading
-        eyebrow="Listings command"
+        level={1}
+        eyebrow="Your inventory"
         title="Listings"
-        description="Every opportunity you have posted, with live applicant counts. Filter by status to focus your pipeline."
+        description="Every opportunity you have posted, with live applicant counts and what each one still needs."
         actionLabel="New listing"
         actionHref="/host/listings/new"
       />
 
       {withCounts.length > 0 ? (
-        <>
-          <div className={styles.command}>
-            <MetricGrid>
-              <MetricCard
-                label="Active"
-                value={metrics.active}
-                trend={metrics.active > 0 ? "Live" : "None live"}
-                trendTone={metrics.active > 0 ? "up" : "down"}
-              />
-              <MetricCard
-                label="Drafts"
-                value={metrics.drafts}
-                trend={metrics.drafts > 0 ? "Finish" : "Clear"}
-                trendTone={metrics.drafts > 0 ? "neutral" : "down"}
-              />
-              <MetricCard
-                label="Boosted"
-                value={metrics.boostedUsed}
-                trend={
-                  metrics.boostedUsed > 0
-                    ? metrics.active > 0
-                      ? `of ${metrics.active} active`
-                      : "Live"
-                    : "None boosted"
-                }
-                trendTone={metrics.boostedUsed > 0 ? "up" : "neutral"}
-              />
-              <MetricCard
-                label="Applications"
-                value={metrics.applications}
-                trend={
-                  metrics.newApplications > 0
-                    ? `+${metrics.newApplications} new`
-                    : "Steady"
-                }
-                trendTone={metrics.newApplications > 0 ? "up" : "neutral"}
-              />
-            </MetricGrid>
-          </div>
-
-          <HostListingsManager listings={withCounts} />
-
-          <section className={styles.command} aria-label="Boost strategy">
-            <HostSectionHeading
-              eyebrow="Boost strategy"
-              title="Homepage exposure logic"
-              description="Paid boosted slots surface first. Empty premium inventory falls back Enterprise → Pro → Starter, with clear visual distinction."
-            />
-            <div className={styles.boostGrid}>
-              {BOOST_TIERS.map((tier, index) => (
-                <article
-                  key={tier.tier}
-                  className={`${styles.boostCard}${
-                    index === 0 ? ` ${styles.boostCardLead}` : ""
-                  }`}
-                >
-                  <div className={styles.boostHead}>
-                    <span className={styles.boostStep} aria-hidden="true">
-                      {tier.step}
-                    </span>
-                    <Chip>{tier.pill}</Chip>
-                  </div>
-                  <h3 className={styles.boostTitle}>{tier.tier}</h3>
-                  <p className={styles.boostBody}>{tier.body}</p>
-                  <div className={styles.boostTags}>
-                    {tier.tags.map((tag) => (
-                      <Chip key={tag}>{tag}</Chip>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        </>
+        <HostListingsManager listings={withCounts} />
       ) : (
-        <EmptyState
-          title="No listings yet"
-          message="Post your first opportunity to start receiving applicants."
-        />
+        <FirstListing />
       )}
     </section>
   );

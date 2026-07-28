@@ -1,99 +1,105 @@
+/* Listings surface layout. Semantic tokens only — no literal colour value in
+   this file, comments included (the G50 ratchet reads comments). */
+
 .block {
   display: flex;
   flex-direction: column;
   gap: var(--space-24);
 }
 
-.stack {
+/* ── First-listing state (D23: teach, never a giant slab) ───────────── */
+
+.firstRun {
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
-}
-
-/* Command strip — the listing inventory + boost-capacity context that sits
-   above the inventory list, mirroring the benchmark listingsView() metric row. */
-.command {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-}
-
-/* Boost strategy — three-up fallback explainer (Enterprise -> Pro -> Starter). */
-.boostGrid {
-  display: grid;
-  gap: var(--space-12);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-}
-
-.boostCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-16);
-  border-radius: var(--radius-card);
+  padding: var(--space-20);
   border: 1px solid var(--border-soft);
-  background: var(--color-surface);
+  border-radius: var(--radius-feature);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-card);
 }
 
-/* The primary (Enterprise) fallback tier is visually dominant — one dominant
-   element per module — via a brushed accent wash, never a flat gray card. */
-.boostCardLead {
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--color-cta) 14%, var(--color-surface)),
-    var(--color-surface) 62%
-  );
-  border-color: color-mix(in srgb, var(--color-cta) 32%, var(--border-soft));
-}
-
-.boostHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-8);
-}
-
-.boostStep {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: var(--space-24);
-  height: var(--space-24);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: 0.9rem;
-  line-height: 1;
-  color: var(--color-cta-text);
-  background: var(--color-cta);
-}
-
-.boostCard:not(.boostCardLead) .boostStep {
-  color: var(--text-secondary);
-  background: color-mix(in srgb, var(--text-muted) 18%, transparent);
-}
-
-.boostTitle {
+.firstRunTitle {
   margin: 0;
   font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  line-height: var(--type-section-lh);
   font-weight: var(--font-weight-bold);
-  font-size: 1.15rem;
-  line-height: 1.05;
-  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
-.boostBody {
+.firstRunLede {
   margin: 0;
-  font-size: 0.92rem;
+  max-width: 60ch;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
   line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.boostTags {
+.doors {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-10);
+}
+
+@media (min-width: 1024px) {
+  .doors { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.door {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-6);
-  margin-top: auto;
+  align-items: flex-start;
+  gap: var(--space-12);
+  height: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-14);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard);
+}
+.door:hover { background: var(--color-action-soft); }
+.door:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+.door[data-primary="true"] { border-color: var(--color-cta); }
+
+.doorIcon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-32);
+  height: var(--space-32);
+  border-radius: var(--radius-control);
+  background: var(--status-match-bg);
+  color: var(--color-cta);
+}
+
+.doorText {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.doorTitle {
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+}
+
+.doorBody {
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: 1.45;
+  color: var(--text-secondary);
 }

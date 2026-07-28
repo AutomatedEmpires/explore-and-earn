@@ -190,31 +190,6 @@ D18. Community becomes an authenticated SEEKER space. Signed-out header: For
      return handling; no pre-auth profile creation anywhere (verify server
      truth, not just nav). Route-access matrix tested for guest/seeker/host/
      team/admin/demo.
-
-     SHIPPED (phase C). What was actually wrong: /community was already outside
-     the public matcher, but NOTHING OWNED THE SIGNED-OUT ANSWER, and Clerk's
-     auth.protect() gives two — a browser was sent to `signInUrl`, which with no
-     NEXT_PUBLIC_CLERK_SIGN_IN_URL configured is Clerk's hosted Account Portal
-     (off-domain, no role, no return target), while every non-document request
-     (crawler, unfurler, curl, fetch) got notFound() and read as a plain 404.
-     Same class as the /swipe and /for-hosts/demo misses. Fixes: a
-     `protectedFunnel` entry keyed on lib/communityRoutes.isCommunityPath, so
-     every Community path — deep links included — 307s to
-     /sign-in?role=seeker&returnTo=<exact path+query> in BOTH middleware
-     branches; a server-side gate at (seeker)/community/layout.tsx as the
-     in-render backstop; `returnTo` accepted beside Clerk's `redirect_url` and
-     validated by one function (lib/authRedirect) at the middleware, the
-     sign-in page, and the onboarding wizard's last step; a host without a
-     seeker profile gets an explicit "join as a seeker" screen and no silent
-     conversion. Nothing on the path mutates — the ROUTE flow never attempts
-     the write the database was already refusing.
-
-     PRICING LINK DEVIATION: the For Hosts menu points "Pricing" at
-     /for-hosts#plans, not /host/plans. /host/plans is a private dashboard
-     segment (lib/hostRoutes), so the literal reading auth-walls a prospect
-     before they see a number — the pay-before-you-look funnel D6/D7 removed.
-     The public page publishes the same founder-locked prices and its cards
-     lead into /host/plans for anyone ready to activate.
 D19. TOUR: anchored, one-at-a-time, persistent-progress coachmarks attached to
      real controls (the P3 ProductTour foundation evolves; the blocking modal
      dies). Resumable from Help.

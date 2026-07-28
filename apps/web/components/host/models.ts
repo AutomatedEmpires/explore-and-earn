@@ -3,7 +3,9 @@ import {
   canTransition,
   type ApplicationStatus,
   type MatchBand,
+  type MatchComponentScores,
 } from "@explore-and-earn/contracts";
+import type { ListingReadiness } from "@explore-and-earn/db";
 import type { IconKey } from "@explore-and-earn/ui";
 
 import type { DiscoveryListing } from "../discovery";
@@ -114,11 +116,91 @@ export function dbStatusToHostState(status: string): HostListingState {
   }
 }
 
+/* ── The REAL lifecycle vocabulary ─────────────────────────────────────── */
+
+/**
+ * `listings.status` exactly as the database stores it (migration 006's CHECK).
+ *
+ * WHY THIS EXISTS ALONGSIDE HostListingState. `dbStatusToHostState` above folds
+ * six stored values into five display states, and three of those folds lose
+ * something a host manages by: `paused` and `archived` both become "closed", and
+ * `under_review` becomes "draft". A listings surface whose tabs cannot tell a
+ * paused listing from an archived one is not a management surface — so the
+ * workspace filters, tabs, and status chips read THIS, and the lossy mapping is
+ * left to the older surfaces that already depend on it.
+ */
+export const LISTING_LIFECYCLE_STATUSES = [
+  "draft",
+  "under_review",
+  "live",
+  "paused",
+  "closed",
+  "archived",
+] as const;
+
+export type ListingLifecycleStatus = (typeof LISTING_LIFECYCLE_STATUSES)[number];
+
+export const LISTING_LIFECYCLE_LABEL: Record<ListingLifecycleStatus, string> = {
+  draft: "Draft",
+  under_review: "In review",
+  live: "Live",
+  paused: "Paused",
+  closed: "Closed",
+  archived: "Archived",
+};
+
+/** Canonical Icon registry key per stored status (never a non-registry key). */
+export const LISTING_LIFECYCLE_ICON: Record<ListingLifecycleStatus, IconKey> = {
+  draft: "action.edit",
+  under_review: "system.info",
+  live: "status.open",
+  paused: "action.close",
+  closed: "system.success",
+  archived: "action.sort",
+};
+
+export function isListingLifecycleStatus(
+  value: string,
+): value is ListingLifecycleStatus {
+  return (LISTING_LIFECYCLE_STATUSES as readonly string[]).includes(value);
+}
+
 export interface HostListingItem {
   readonly listing: DiscoveryListing;
   readonly state: HostListingState;
   readonly applicantCount: number;
   readonly newApplicantCount: number;
+  /**
+   * Health + deadline signals for this listing, from getHostListingSignals.
+   * Optional because the surfaces that predate the workspace rebuild do not
+   * load them, and a card without a health chip is better than a fabricated one.
+   */
+  readonly readiness?: ListingReadiness;
+  /** `listings.expires_at` — the application deadline, when one is set. */
+  readonly deadlineAt?: string | null;
+}
+
+/**
+ * Tally by the STORED status, for the workspace tabs. Mirrors
+ * countListingsByState but over the un-folded vocabulary, so a tab count can
+ * never disagree with the rows it filters to.
+ */
+export function countListingsByStatus(
+  listings: readonly HostListingItem[],
+): Record<ListingLifecycleStatus, number> {
+  const counts = Object.fromEntries(
+    LISTING_LIFECYCLE_STATUSES.map((status) => [status, 0]),
+  ) as Record<ListingLifecycleStatus, number>;
+  for (const item of listings) {
+    const status = item.listing.status;
+    if (isListingLifecycleStatus(status)) counts[status] += 1;
+  }
+  return counts;
+}
+
+/** Live listings whose application deadline is inside the closing-soon window. */
+export function countClosingSoon(listings: readonly HostListingItem[]): number {
+  return listings.filter((item) => item.readiness?.closingSoon === true).length;
 }
 
 export type ApplicantStage =
@@ -189,6 +271,23 @@ export interface HostApplicantItem {
   readonly matchScore?: number;
   /** Match band for the score above (strong/developing/needs_attention). */
   readonly matchBand?: MatchBand;
+  /**
+   * The persisted per-component sub-scores behind that number.
+   *
+   * WHY THE CARD NEEDS THESE. A bare "84/100" beside a person's name is a
+   * judgement with no argument — the host cannot tell whether it means the dates
+   * line up or the pay does, and neither can we. G34 forbids storing the
+   * sentence, so the components travel and `matchReasonPhrase` composes the
+   * explanation at render time. Absent components mean no explanation is
+   * rendered at all; none is ever guessed from the score.
+   */
+  readonly matchComponents?: MatchComponentScores;
+  /** When the last message in this application's thread was sent. */
+  readonly lastMessageAt?: string;
+  /** Who sent it — so "waiting on you" is a fact, not an assumption. */
+  readonly lastMessageFrom?: "seeker" | "host";
+  /** The applicant re-applied after withdrawing (applications.reactivated_at). */
+  readonly reapplied?: boolean;
 }
 
 /** A single message inside a host <-> applicant conversation (UI-only). */

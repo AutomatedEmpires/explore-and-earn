@@ -1,11 +1,178 @@
+/* Listings workspace controls. Semantic tokens only — no literal colour value
+   appears in this file, comments included (the G50 ratchet reads comments). */
+
 .manager {
   display: flex;
   flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* ── Search + sort ──────────────────────────────────────────────────── */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-12);
 }
 
-.stack {
+.search {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-pill);
+  background: var(--field-bg);
+  color: var(--text-muted);
+}
+.search:focus-within {
+  border-color: var(--field-border-focus);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--text-primary);
+}
+.searchInput:focus { outline: none; }
+.searchInput::placeholder { color: var(--field-placeholder); }
+
+.sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.sortLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sortSelect {
+  min-height: var(--tap-min);
+  padding: 0 var(--space-12);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+  background: var(--field-bg);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+}
+.sortSelect:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+/* ── Status tabs ────────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: var(--tap-min);
+  padding: var(--space-6) var(--space-14);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+.tab:hover { background: var(--color-action-soft); }
+.tab:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }
+
+.tab[data-active="true"] {
+  background: var(--gradient-action);
+  border-color: transparent;
+  color: var(--color-cta-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.tabCount {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* ── Grid ───────────────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-14);
+}
+
+@media (min-width: 768px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1440px) {
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ── No results (a filtered dead end, not an empty account) ─────────── */
+
+.noResults {
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
+  gap: var(--space-10);
+  padding: var(--space-20);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  text-align: center;
+  align-items: center;
 }
+
+.noResultsTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.noResultsActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-8);
+}
+
+.noResultsBtn,
+.noResultsLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: var(--space-6) var(--space-16);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+.noResultsBtn:focus-visible,
+.noResultsLink:focus-visible { outline: none; box-shadow: var(--ui-focus-ring); }

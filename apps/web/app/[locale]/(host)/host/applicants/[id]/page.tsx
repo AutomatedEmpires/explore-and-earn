@@ -3,11 +3,15 @@ import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 
 import {
+  analyticsScopeForTier,
   canStartApplicationConversation,
   getConversations,
   getHostApplications,
   getHostListings,
+  getHostSubscriptionTier,
+  getMatchScoresForHost,
   getSeekerDisplayName,
+  getSeekerProfileForHost,
   getSeekerResumeByProfileId,
   rowToDiscoveryFields,
   singleSeekerName,
@@ -18,6 +22,8 @@ import {
   HostSectionHeading,
 } from "../../../../../../components/host";
 import type { DiscoveryListing } from "../../../../../../components/discovery";
+import { CaptureOnMount } from "../../../../../../components/analytics/FunnelEvents";
+import { HOST_WORKSPACE_EVENTS } from "../../../../../../lib/analytics/events";
 import { toApplicantItem, threadsByApplicationId } from "../applicants-data";
 import { StatusActions } from "./StatusActions";
 import { ApplicantResumePopupButton } from "./ApplicantResumePopupButton";
@@ -41,11 +47,14 @@ export default async function HostApplicantDetailPage({
     notFound();
   }
 
-  const [applications, listingRows, conversations] = await Promise.all([
-    getHostApplications(token, userId),
-    getHostListings(token, userId).catch(() => []),
-    getConversations(token, userId, "host").catch(() => []),
-  ]);
+  const [applications, listingRows, conversations, matchScores, subscriptionTier] =
+    await Promise.all([
+      getHostApplications(token, userId),
+      getHostListings(token, userId).catch(() => []),
+      getConversations(token, userId, "host").catch(() => []),
+      getMatchScoresForHost(token).catch(() => new Map()),
+      getHostSubscriptionTier(token, userId).catch(() => "none" as const),
+    ]);
   const threadsMap = threadsByApplicationId(conversations);
 
   // Ownership check: application must belong to one of this host's own listings.
@@ -58,18 +67,21 @@ export default async function HostApplicantDetailPage({
     notFound();
   }
 
-  // The applicant's name + resume are entitlement-checked in the database
-  // (migration 084): host identity comes from the JWT, and rows come back only
-  // for a seeker related to this host. Loaded in parallel.
+  // The applicant's name, resume and profile are entitlement-checked in the
+  // database (migration 084): host identity comes from the JWT, and rows come
+  // back only for a seeker related to this host. Loaded in parallel.
   //
-  // The two reads fail differently on purpose. The RESUME is this page: if that
-  // read faults, getSeekerResumeByProfileId throws and the request fails loudly,
-  // because a blank resume shown as though it were the applicant's is the exact
-  // lie 084 exists to remove. The NAME is a heading, so its lookup reports a
-  // fault as data and the heading falls back to the pseudonymous handle below.
-  const [nameLookup, resume] = await Promise.all([
+  // The three reads fail differently on purpose. The RESUME is this page: if
+  // that read faults, getSeekerResumeByProfileId throws and the request fails
+  // loudly, because a blank resume shown as though it were the applicant's is
+  // the exact lie 084 exists to remove. The NAME is a heading, so its lookup
+  // reports a fault as data and the heading falls back to the pseudonymous
+  // handle. The PROFILE decorates a fact strip whose every row is conditional,
+  // so a fault there simply removes rows that were never guaranteed.
+  const [nameLookup, resume, profile] = await Promise.all([
     getSeekerDisplayName(token, application.seekerProfileId),
     getSeekerResumeByProfileId(token, application.seekerProfileId),
+    getSeekerProfileForHost(token, application.seekerProfileId).catch(() => null),
   ]);
   if (nameLookup.status === "unavailable") {
     console.error("[host/applicants/id] applicant name lookup failed:", nameLookup.reason);
@@ -82,23 +94,30 @@ export default async function HostApplicantDetailPage({
       rowToDiscoveryFields(row),
     ]),
   );
-  const applicant = toApplicantItem(application, listingsById, undefined, threadsMap);
+  const applicant = toApplicantItem(
+    application,
+    listingsById,
+    undefined,
+    threadsMap,
+    matchScores,
+  );
   // Prefer the resolved display name in the heading; fall back to the existing
   // pseudonymous handle when no name is available yet.
   const applicantWithName = displayName
     ? { ...applicant, applicantName: displayName }
     : applicant;
-  const canStartConversation = canStartApplicationConversation(
-    application.status,
-  );
+  const canStartConversation = canStartApplicationConversation(application.status);
   const canOpenConversation =
     Boolean(applicantWithName.threadId) || canStartConversation;
+  const showMatch = analyticsScopeForTier(subscriptionTier) === "full";
 
   return (
     <section className={styles.block}>
       <HostSectionHeading
-        title="Applicant detail"
-        description="Review this application and the opportunity it targets."
+        level={1}
+        eyebrow="Candidate"
+        title={applicantWithName.applicantName}
+        description="Everything this seeker has shared with you, and the decision controls."
         actionLabel="All applicants"
         actionHref="/host/applicants"
       />
@@ -109,18 +128,30 @@ export default async function HostApplicantDetailPage({
         seekerProfileId={application.seekerProfileId}
         canMessage={canOpenConversation}
       />
-      <HostApplicantDetail applicant={applicantWithName} resume={resume} />
-      <StatusActions applicationId={application.id} status={application.status} />
-      {!applicantWithName.threadId && canStartConversation ? (
-        <div className={detailStyles.messageLink}>
-          <OpenConversationButton
-            role="host"
-            seekerProfileId={application.seekerProfileId}
-            applicationId={application.id}
-            label="Send a message to this applicant"
-          />
-        </div>
-      ) : null}
+      <HostApplicantDetail
+        applicant={applicantWithName}
+        resume={resume}
+        profile={profile}
+        showMatch={showMatch}
+        actions={
+          <>
+            <StatusActions applicationId={application.id} status={application.status} />
+            {!applicantWithName.threadId && canStartConversation ? (
+              <div className={detailStyles.messageLink}>
+                <OpenConversationButton
+                  role="host"
+                  seekerProfileId={application.seekerProfileId}
+                  applicationId={application.id}
+                  label="Send a message"
+                />
+              </div>
+            ) : null}
+          </>
+        }
+      />
+      {/* A candidate was actually opened. No id, no name, no score — the event
+          says a review happened, not who it was about. */}
+      <CaptureOnMount event={HOST_WORKSPACE_EVENTS.candidateReviewed} />
     </section>
   );
 }

@@ -257,22 +257,14 @@ describe("onboarding persistence and preview truth", () => {
     expect(middleware).toContain("isPrivateHostDashboardPath(pathname)");
     expect(middleware).toContain('pathname.startsWith("/claim/")');
     expect(middleware).toContain("stripUnsafeAuthRedirect(request)");
-    // The scrub now covers BOTH accepted parameter names (V2 D18 added the
-    // spec-named `returnTo` beside Clerk's `redirect_url`); RETURN_PARAM_NAMES
-    // in lib/authRedirect is the single list, so the middleware iterates it
-    // rather than naming one of them here.
-    expect(middleware).toContain("RETURN_PARAM_NAMES.filter");
-    expect(middleware).toContain("searchParams.getAll(name)");
+    expect(middleware).toContain('searchParams.getAll("redirect_url")');
     expect(middleware).toContain(
       "`${request.nextUrl.pathname}${request.nextUrl.search}`",
     );
-    expect(middleware).toContain('url.searchParams.set("role", funnel.role)');
-    // The parameter NAME is per-funnel now (host/claim/onboarding keep
-    // redirect_url; Community emits returnTo), and the value goes through the
-    // shared validator before it is written.
-    expect(middleware).toContain("url.searchParams.set(funnel.param, safePath)");
-    expect(middleware).toContain("safeInternalRedirect(requestedPath)");
-    expect(middleware).toContain("param: REDIRECT_PARAM");
+    expect(middleware).toContain('url.searchParams.set("role", role)');
+    expect(middleware).toContain(
+      'url.searchParams.set("redirect_url", requestedPath)',
+    );
     expect(hostLayout).toContain("/sign-in?role=host&redirect_url=");
     expect(seekerLayout).toContain("/sign-in?role=seeker&redirect_url=");
   });

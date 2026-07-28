@@ -10,7 +10,6 @@ import {
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import { saveOnboardingStep } from "../../../../actions/seekerOnboarding";
-import { stepHref, useOnboardingReturnTo } from "../returnTo";
 import styles from "../onboarding.module.css";
 
 const MAX_TAGS = 10;
@@ -33,7 +32,6 @@ const CATEGORY_ICON: Record<MarketplaceCategory, IconKey> = {
 
 export default function OnboardingSkillsPage() {
   const router = useRouter();
-  const returnTo = useOnboardingReturnTo();
   const [selected, setSelected] = useState<MarketplaceCategory[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
@@ -84,7 +82,7 @@ export default function OnboardingSkillsPage() {
           setSaveError("We couldn’t finish your profile. Please try again.");
           return;
         }
-        router.push(stepHref("/onboarding/done", returnTo));
+        router.push("/onboarding/done");
       } catch {
         setSaveError("We couldn’t finish your profile. Please try again.");
       }
@@ -105,7 +103,7 @@ export default function OnboardingSkillsPage() {
           setSaveError("We couldn’t finish your profile. Please try again.");
           return;
         }
-        router.push(stepHref("/onboarding/done", returnTo));
+        router.push("/onboarding/done");
       } catch {
         setSaveError("We couldn’t finish your profile. Please try again.");
       }

@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { saveOnboardingStep } from "../../../../actions/seekerOnboarding";
-import { stepHref, useOnboardingReturnTo } from "../returnTo";
 import styles from "../onboarding.module.css";
 
 type LocationPref = "remote" | "on_site" | "either";
@@ -35,7 +34,6 @@ const HOUSING_OPTIONS: ReadonlyArray<{
 
 export default function OnboardingPrefsPage() {
   const router = useRouter();
-  const returnTo = useOnboardingReturnTo();
   const [locationPref, setLocationPref] = useState<LocationPref | null>(null);
   const [housingPref, setHousingPref] = useState<HousingPref | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -50,7 +48,7 @@ export default function OnboardingPrefsPage() {
           setSaveError("We couldn’t save your preferences. Please try again.");
           return;
         }
-        router.push(stepHref("/onboarding/skills", returnTo));
+        router.push("/onboarding/skills");
       } catch {
         setSaveError("We couldn’t save your preferences. Please try again.");
       }
@@ -136,7 +134,7 @@ export default function OnboardingPrefsPage() {
         <button
           type="button"
           className={styles.linkButton}
-          onClick={() => router.push(stepHref("/onboarding/skills", returnTo))}
+          onClick={() => router.push("/onboarding/skills")}
           disabled={pending}
         >
           Skip

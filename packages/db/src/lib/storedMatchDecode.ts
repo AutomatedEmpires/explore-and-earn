@@ -48,7 +48,7 @@ function isRenderableScore(value: unknown): value is number {
  * through the cast and into MatchTrace.components. Arrays are excluded
  * explicitly because `typeof [] === "object"`.
  */
-function toComponentScores(value: unknown): MatchComponentScores {
+export function toComponentScores(value: unknown): MatchComponentScores {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return {} as MatchComponentScores;
   }
