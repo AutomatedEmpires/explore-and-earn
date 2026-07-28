@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { ScopeShellNav, type ScopeNavItem } from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
-import { ThemeSwitcher } from "../global/ThemeSwitcher";
+import { RolePill } from "../global/RolePill";
 import { OnboardingWalkthrough, SEEKER_TOUR_STEPS } from "../onboarding";
 
 /**
@@ -137,12 +137,15 @@ export function SeekerShell({
 
       <div className="seekeros-main">
         <header className="seekeros-top">
+          {/* D17 — role pill leads the bar; the rail carries the wordmark at
+              desktop width. Theme switcher removed: Settings → Appearance is
+              the single home for it now. */}
+          <RolePill role="seeker" />
           <CommandSearch
             className="seekeros-search"
             action="/seek"
             placeholder="Search opportunities, places, hosts…"
           />
-          <ThemeSwitcher />
           <Link
             className="seekeros-tact seekeros-tact--icon ui-pressable"
             href="/notifications"

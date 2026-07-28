@@ -51,7 +51,7 @@ export default async function HostApplicantsPage({
           title="Sign in to review applicants"
           message="You need to be signed in as a host to see who has applied to your listings."
           actionLabel="Invite seekers"
-          actionHref="/host/invites"
+          actionHref="/host/outreach"
         />
       </section>
     );
@@ -195,7 +195,7 @@ export default async function HostApplicantsPage({
                 </p>
               </div>
               {matchedSeekersUnlocked && matchedSeekers.length > 0 ? (
-                <Link className={styles.bucketAction} href="/host/invites">
+                <Link className={styles.bucketAction} href="/host/outreach">
                   Invite seekers
                   <Icon name="action.forward" size={16} aria-hidden />
                 </Link>
@@ -255,7 +255,7 @@ export default async function HostApplicantsPage({
               : "When seekers apply to your listings, their applications will appear here, grouped by stage for review."
           }
           actionLabel="Invite seekers"
-          actionHref="/host/invites"
+          actionHref="/host/outreach"
         />
       )}
     </section>

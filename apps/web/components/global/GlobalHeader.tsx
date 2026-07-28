@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Icon } from "@explore-and-earn/ui";
 
 import { UnreadBadge } from "../seeker/UnreadBadge";
+import { RolePill, type ChromeRole } from "./RolePill";
 import styles from "./GlobalHeader.module.css";
 
 const IMMERSIVE_ROUTES = ["/map", "/swipe"];
@@ -121,7 +122,16 @@ export function GlobalHeader({
     pathname === "/community" ? "feed" :
     null;
   const onCommunity = communityTab !== null;
-  const scopeLabel = onCommunity ? "Community" : scope === "host" ? "Host" : scope === "seeker" ? "Seeker" : null;
+  // D17 — the badge beside the wordmark is a ROLE pill now, so it says who you
+  // are, not where you are. Two consequences:
+  //   * "Community" is gone from it. Community is a place, not a role; an
+  //     authenticated seeker reading the feed is still a Seeker, and the nav
+  //     already shows which section is active.
+  //   * It renders only when SIGNED IN. Signed-out visitors have no role, and a
+  //     pill reading "Seeker" over a marketing page was asserting a state the
+  //     visitor had not entered.
+  const chromeRole: ChromeRole | null =
+    scope === "host" ? "host" : scope === "seeker" ? "seeker" : null;
   const homeHref = scope === "host" ? "/host/listings" : "/";
   // Founder canon (2026-07-13): "Explore brings to homepage." The Explore tab is
   // the always-clear way back to the scope's home (the marketing homepage for
@@ -136,7 +146,9 @@ export function GlobalHeader({
     pathname === exploreHref ? "explore" :
     null;
   const profileHref = scope === "host" ? "/host/profile" : "/profile";
-  const userInitial = userName?.trim().charAt(0).toUpperCase() ?? (scopeLabel?.charAt(0) ?? "E");
+  const userInitial =
+    userName?.trim().charAt(0).toUpperCase() ??
+    (chromeRole ? chromeRole.charAt(0).toUpperCase() : "E");
 
   return (
     <header className={`${styles.header}${hidden ? ` ${styles.headerHidden}` : ""}`}>
@@ -149,10 +161,8 @@ export function GlobalHeader({
               Explore<span className={styles.wordmarkAmp}>&amp;</span>Earn
             </span>
           </Link>
-          {scopeLabel ? (
-            <span className={styles.scopeBadge} aria-label={`Current scope: ${scopeLabel}`}>
-              {scopeLabel}
-            </span>
+          {chromeRole ? (
+            <RolePill role={chromeRole} tone="onDark" isAuthenticated={isAuthenticated} />
           ) : null}
         </div>
 

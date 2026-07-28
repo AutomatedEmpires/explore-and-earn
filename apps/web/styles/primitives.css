@@ -346,6 +346,28 @@ html {
 }
 
 /* =================================================================== */
+/* Tabular figures -- metrics, prices, counters, tables                 */
+/* =================================================================== */
+/*
+ * D22 pairs the metric and price type steps with TABULAR numerals, and this is
+ * the utility that applies them anywhere a number is read as a number.
+ *
+ * Why it matters beyond neatness: Manrope's default figures are proportional,
+ * so a column of numbers does not line up on the decimal, and any value that
+ * changes in place (a live count, a countdown, a running total) re-flows its
+ * own container as digits swap width. `tabular-nums` fixes every digit to one
+ * advance; the redundant `font-feature-settings` is the fallback for older
+ * engines that ignore the high-level property.
+ *
+ * Use on the ELEMENT holding the figure, not on a wrapper — inheriting it into
+ * prose makes ordinary sentences look like a spreadsheet.
+ */
+.ui-tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* =================================================================== */
 /* Skeleton -- loading placeholder                                      */
 /* =================================================================== */
 .ui-skeleton {

@@ -1,8 +1,8 @@
 {
   "apps/web/app/[locale]/(host)/host/applicants/applicants-data.ts": 2,
-  "apps/web/app/[locale]/(host)/host/invites/InvitesList.tsx": 2,
   "apps/web/app/[locale]/(host)/host/listings/[id]/page.tsx": 2,
   "apps/web/app/[locale]/(host)/host/messages/page.tsx": 2,
+  "apps/web/app/[locale]/(host)/host/outreach/InvitesList.tsx": 2,
   "apps/web/app/[locale]/(seeker)/accepted/page.tsx": 4,
   "apps/web/app/[locale]/(seeker)/applied/[id]/page.tsx": 2,
   "apps/web/app/[locale]/(seeker)/applied/page.tsx": 2,

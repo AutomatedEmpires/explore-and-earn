@@ -10,7 +10,8 @@ describe("private host dashboard routes", () => {
     "/host",
     "/host/applicants",
     "/host/applicants/application-id",
-    "/host/assistant",
+    "/host/coach",
+    "/host/outreach",
     "/host/messages/thread-id",
   ])("recognizes %s as private", (pathname) => {
     expect(isPrivateHostDashboardPath(pathname)).toBe(true);
@@ -24,6 +25,20 @@ describe("private host dashboard routes", () => {
   );
 
   it("tracks every current private host route segment", () => {
-    expect(HOST_DASHBOARD_SEGMENTS).toContain("assistant");
+    expect(HOST_DASHBOARD_SEGMENTS).toContain("coach");
+    expect(HOST_DASHBOARD_SEGMENTS).toContain("outreach");
   });
+
+  /**
+   * The D17 renames are redirected, not deleted. A crawler working from a
+   * cached index still REQUESTS the old paths, and this list is what robots.txt
+   * and HideOnHost consult to decide "private" — so dropping the old segments
+   * would briefly advertise two host-dashboard URLs as public pages.
+   */
+  it.each(["/host/invites", "/host/assistant"])(
+    "still treats the pre-rename path %s as private",
+    (pathname) => {
+      expect(isPrivateHostDashboardPath(pathname)).toBe(true);
+    },
+  );
 });

@@ -97,15 +97,11 @@
 	white-space: nowrap;
 }
 
-.topScope s {
-	margin-block-start: 3px;
-	font-size: var(--type-label-size);
-	font-weight: 700;
-	letter-spacing: 0.14em;
-	text-transform: uppercase;
-	color: var(--text-muted);
-	text-decoration: none;
-}
+/* The scope word that used to sit under the wordmark here is now the shared
+   <RolePill> (D17) — one role indicator across public, host, and admin chrome
+   instead of a per-shell reimplementation. It renders as a sibling of .topLead,
+   so it stays visible at ≥1024px where .topLead hides and the rail owns the
+   brand; the top bar keeps a left anchor and still names the scope. */
 
 .spacer {
 	flex: 1 1 auto;

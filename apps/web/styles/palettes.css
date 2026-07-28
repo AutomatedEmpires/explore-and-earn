@@ -1,10 +1,11 @@
 /*
  * ACCENT PALETTES — optional, user-selectable accent reskins.
  * ─────────────────────────────────────────────────────────────────────────────
- * The Glacier design system in tokens.css is the LOCKED default. This file adds
- * opt-in accent palettes on a SECOND axis (`data-palette` on <html>), orthogonal
- * to the light/dark `data-theme` axis. Selecting one is purely cosmetic and never
- * changes the default: with no `data-palette` (or "glacier"), tokens.css wins.
+ * The "Lakeside" design system in tokens.css is the LOCKED default (V2 · D22,
+ * 2026-07-28; it replaced the cool "Glacier" system). This file adds opt-in
+ * accent palettes on a SECOND axis (`data-palette` on <html>), orthogonal to the
+ * light/dark `data-theme` axis. Selecting one is purely cosmetic and never
+ * changes the default: with no `data-palette`, tokens.css wins.
  *
  * HOW IT WORKS
  * The entire primary accent — CTA, links, focus ring, the action gradient, the
@@ -13,7 +14,12 @@
  * gradient's second stop), plus their `-hover` variants. So each palette only
  * overrides those four seeds for LIGHT, and re-brightens `--color-cta` for DARK
  * (the dark theme sets --color-cta to a lightened accent directly, mirroring the
- * Glacier base at tokens.css:456). Everything else cascades automatically.
+ * base system's own dark block). Everything else cascades automatically.
+ *
+ * NAME NOTE: the `--palette-sky` seed no longer holds a sky blue — the V2
+ * re-value made the base action colour a lake teal and demoted blue to
+ * status/info. The NAME is kept because it is this file's whole contract: these
+ * four palettes, and PaletteControl, are built on overriding exactly it.
  *
  * WHAT IS DELIBERATELY NOT TOUCHED
  * The founder-locked CATEGORY triad (farm/maritime/remote/seasonal accents) and
@@ -26,14 +32,21 @@
  * near-white surface (≥ ~4.5:1) and as a button ground under white --color-cta-
  * text; each dark --color-cta is light enough on the dark surface. The gradient's
  * teal end is decorative (the button ground is dominated by the darker start).
+ * The V2 re-value moved the base surfaces warm but kept them near-white / near-
+ * black, so these four seeds still clear AA against them unchanged.
  *
  * ADD A PALETTE: add its light seed rule + the two dark --color-cta rules here,
  * then add the id to PALETTES in components/seeker/PaletteControl.tsx.
  */
 
 /* ── Sunset — deep coral → amber ─────────────────────────────────────────── */
+/* The primary was darkened a step in the V2 re-value: at its previous value it
+   measured 4.47:1 as link text on the new warm canvas — under AA, and only on
+   the canvas (it still cleared on the card surface), which is exactly the kind
+   of miss that ships. token-contrast.test.ts now checks all four palettes
+   against both surfaces so a seed can never silently fall behind again. */
 :root[data-palette="sunset"] {
-	--palette-sky: #C4461F;
+	--palette-sky: #BF431D;
 	--palette-sky-hover: #A93C1A;
 	--palette-teal: #E8843A;
 	--palette-teal-hover: #D6742E;

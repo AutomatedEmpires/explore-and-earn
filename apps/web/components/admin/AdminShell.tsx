@@ -10,7 +10,7 @@ import {
   type ScopeNavItem,
 } from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
-import { ThemeSwitcher } from "../global/ThemeSwitcher";
+import { RolePill } from "../global/RolePill";
 
 /**
  * Admin OS shell — the moderation command center chrome.
@@ -129,13 +129,18 @@ export function AdminShell({
 
       <div className="adminos-main" style={mainStyle}>
         <header className="adminos-top">
+          {/* D17 — role pill leads the bar. Admin chrome and host chrome are
+              structurally alike, and an operator with both roles needs to know
+              at a glance which one they are acting as. */}
+          <RolePill role="admin" />
           <CommandSearch
             className="adminos-search"
             action="/applications"
             placeholder="Search listings, hosts, applications…"
           />
           <div className="adminos-topmeta">
-            <ThemeSwitcher />
+            {/* Theme switcher removed (D17): appearance is a preference, and
+                seeker Settings → Appearance is its one home now. */}
             <span
               className="adminos-health"
               role="meter"

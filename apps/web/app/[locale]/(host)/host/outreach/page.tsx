@@ -21,7 +21,14 @@ import styles from "./page.module.css";
 /** How many matched seekers to source per listing bucket. */
 const SEEKERS_PER_LISTING = 12;
 
-export const metadata: Metadata = { title: "Invites" };
+/**
+ * NAMING (D17): the SECTION is "Outreach" — the host's outbound recruiting
+ * surface, which is more than a list of invites. "Invite" stays the word for
+ * the unit and its state (an invite is sent, opened, applied), and for the
+ * metered credit that pays for one. Renaming the noun as well would have made
+ * the allowance copy, the add-on, and the DB all read wrong.
+ */
+export const metadata: Metadata = { title: "Outreach" };
 
 // Per-host, never statically cached.
 export const dynamic = "force-dynamic";
@@ -93,7 +100,7 @@ function pct(part: number, whole: number): number {
 }
 
 
-export default async function HostInvitesPage() {
+export default async function HostOutreachPage() {
   const { userId, getToken } = await auth();
   const token = userId ? await getToken() : null;
 
@@ -101,7 +108,7 @@ export default async function HostInvitesPage() {
     return (
       <section className={styles.block}>
         <HostSectionHeading
-          title="Invites"
+          title="Outreach"
           description="Sign in as a host to send and track your invites."
         />
         <EmptyState

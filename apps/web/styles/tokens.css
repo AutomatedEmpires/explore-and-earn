@@ -1,18 +1,47 @@
 /**
- * Design tokens — V3 "Glacier: Ice & Chrome" (founder-locked 2026-07-13).
+ * Design tokens — V4 "Lakeside" (redesign V2 · D22, 2026-07-28).
  *
- * Palette: a cool ice-white base + chrome/graphite neutrals, lifted by a
- * glacier-blue → teal action gradient. Strong, premium, gradient-forward — the
- * opposite of the retired warm-pastel "Adventure Paper & Sky" system. Included
- * benefits read strong emerald; not-offered reads rose. Gold is reserved ONLY
- * for the paid/premium register (boosted · featured · founding).
+ * WHAT CHANGED FROM V3 "Glacier" (and why)
+ * V3 painted every page on a pale blue-grey canvas and floated white rounded
+ * cards on it. The founder's V2 directive retires that default: the page reads
+ * as a WARM OFF-WHITE surface, and the blue/teal duality that made the action
+ * colour ambiguous is consolidated into ONE lake-teal.
+ *
+ *   canvas        warm off-white (--palette-paper) — no longer ice-blue
+ *   text          deep ink/navy, essentially unmoved from V3
+ *   action        LAKE-TEAL. One hue for CTA, links, focus, progress, header.
+ *                 The old glacier blue is DEMOTED to status/info surfaces
+ *                 (match · pay · maritime) and never signals "press me".
+ *   identity      ALPINE GREEN for place/employer accents — farm lane,
+ *                 verified host, housing/meals included, ready state.
+ *   premium       GOLD, unchanged in role: boosted · featured · founding only.
+ *
+ * Three surface levels replace "white card on tint":
+ *   1 canvas  --color-canvas / --palette-paper   (the page)
+ *   2 surface --color-surface                    (a card on the page)
+ *   3 raised  --color-surface-raised             (a thing on a card)
+ *
+ * Type scale is up at desktop (D22): page titles 32–40, sections 24–30,
+ * metrics 30–48, marketing display to 56–72. Radius follows a hierarchy
+ * instead of one pill-ish value: controls 8–12 · cards 14–18 · feature 20–24.
  *
  * Governance: TIER 1 primitives feed TIER 2 semantics. Feature code references
  * SEMANTIC tokens only. Custom-property names are STABLE — only values changed,
- * so re-valuing the primitives here re-colors every surface at once.
+ * so re-valuing the primitives here re-colors every surface at once. That is
+ * the whole point of this file and the reason D22 says "re-value, don't rename".
  *
- * Canon: founder direction 2026-07-13 (Glacier). One premium design across all
- * four lanes — category is a single glassy badge, never a per-card color tint.
+ * NOT re-valued in this pass (deliberate): the CATEGORY ATMOSPHERE gradients
+ * (--cat-*, --gradient-category-*, --gradient-cover-*). They are photo-FALLBACK
+ * surfaces, and the photography layer (V2 phase A / D16) is what decides whether
+ * they survive at all. Re-tinting them now would be churn against a moving
+ * target. Lane identity in chips/pins DID move (see the accents below).
+ *
+ * Every bg/fg pair defined here is contrast-checked in
+ * apps/web/tests/unit/token-contrast.test.ts — light AND dark. Change a value,
+ * run the test; it fails loudly rather than shipping an unreadable chip.
+ *
+ * Canon retained from 2026-07-13: one premium design across all four lanes —
+ * category is a single glassy badge, never a per-card color tint.
  */
 
 :root {
@@ -23,52 +52,59 @@
   /* TIER 1 — PRIMITIVES                                             */
   /* =============================================================== */
 
-  /* Foundation — cool ice surfaces */
-  --palette-paper:        #EDF2F6;   /* page bg — cool ice-white              */
-  --palette-surface:      #FFFFFF;   /* card surface — clean white            */
-  --palette-white:        #FFFFFF;
-  --palette-line:         #DCE6EC;   /* border hairlines — chrome             */
-  --palette-ink-stroke:   #16252F;   /* flat card border — cool ink           */
-  --palette-ink:          #0F1B24;   /* primary text — cool near-black        */
-  --palette-ink-soft:     #3E5460;   /* secondary text — cool graphite        */
-  --palette-ink-muted:    #566A77;   /* muted text — chrome graphite          */
+  /* Foundation — WARM off-white surfaces (D22: the pale-blue canvas retires) */
+  --palette-paper:        #F6F3EC;   /* page canvas — warm off-white          */
+  --palette-surface:      #FFFCF7;   /* card surface — warm white             */
+  --palette-white:        #FFFFFF;   /* literal white: on-photo borders/scrims */
+  --palette-line:         #E4DDD1;   /* border hairlines — warm               */
+  --palette-ink-stroke:   #17242E;   /* flat card border — deep ink           */
+  --palette-ink:          #101E29;   /* primary text — deep ink/navy          */
+  --palette-ink-soft:     #3F525E;   /* secondary text — ink graphite         */
+  --palette-ink-muted:    #55666F;   /* muted text — graphite                 */
 
-  /* Category accents (chip bg / ink fg) — one cool family; the card badge is a
-     single glassy chip, these are only for incidental lane chips + map pins. */
-  --palette-farm-bg:      #DDEFE7;   --palette-farm-fg:      #0A7D54;
-  --palette-maritime-bg:  #D8E9F3;   --palette-maritime-fg:  #1C6F86;
-  --palette-remote-bg:    #E2EBF0;   --palette-remote-fg:    #3B5566;
-  --palette-seasonal-bg:  #D6EEF1;   --palette-seasonal-fg:  #0E7A8C;
-  --palette-mix-bg:       #E4ECF0;   --palette-mix-fg:       #43586A;
+  /* Category accents (chip bg / ink fg) — warm grounds, lane-true inks. The
+     card badge is a single glassy chip; these are incidental lane chips + map
+     pins. Farm reads ALPINE (identity green), maritime + seasonal carry the
+     water hues, remote/mix are warm graphite. */
+  --palette-farm-bg:      #DFEDE2;   --palette-farm-fg:      #1A6647;
+  --palette-maritime-bg:  #DDEAF1;   --palette-maritime-fg:  #1A6485;
+  --palette-remote-bg:    #EBE6DD;   --palette-remote-fg:    #4A5960;
+  --palette-seasonal-bg:  #D9EBEB;   --palette-seasonal-fg:  #0D6068;
+  --palette-mix-bg:       #E9E4DA;   --palette-mix-fg:       #4D5B60;
 
-  /* Benefit triad (chip bg / ink fg) — HOUSING / MEALS included = emerald;
-     PAY = cool steel (neutral, never red). */
-  --palette-housing-bg:   #E2F5EE;   --palette-housing-fg:   #0A7D54;
-  --palette-meals-bg:     #E2F5EE;   --palette-meals-fg:     #0A7D54;
-  --palette-pay-bg:       #E7EFF4;   --palette-pay-fg:       #1C5A78;
+  /* Benefit triad (chip bg / ink fg) — HOUSING / MEALS included = ALPINE;
+     PAY = the demoted info blue (neutral, never red). */
+  --palette-housing-bg:   #DFEDE2;   --palette-housing-fg:   #1A6647;
+  --palette-meals-bg:     #DFEDE2;   --palette-meals-fg:     #1A6647;
+  --palette-pay-bg:       #E3EDF2;   --palette-pay-fg:       #195A78;
 
-  /* Status / system (chip bg / ink fg) */
-  --palette-boosted-bg:   #F8EACB;   --palette-boosted-fg:   #7A5814;   /* gold — paid */
-  --palette-match-bg:     #DBEAF3;   --palette-match-fg:     #1C6F86;   /* glacier */
-  --palette-featured-bg:  #F6E7C6;   --palette-featured-fg:  #6E5520;   /* gold — paid */
-  --palette-verified-bg:  #E2F5EE;   --palette-verified-fg:  #0A7D54;   /* green */
-  --palette-founding-bg:  #F8EACB;   --palette-founding-fg:  #7A5814;   /* gold — paid */
-  --palette-success-bg:   #E2F5EE;   --palette-success-fg:   #0A7D54;
-  --palette-warning-bg:   #FAECD0;   --palette-warning-fg:   #8A5A12;
-  --palette-error-bg:     #FCE7EA;   --palette-error-fg:     #C2334A;   /* rose */
+  /* Status / system (chip bg / ink fg). Blue survives HERE and only here —
+     "match" and "pay" are information, not action (D22: sky demoted). */
+  --palette-boosted-bg:   #F6E8C6;   --palette-boosted-fg:   #77550F;   /* gold — paid */
+  --palette-match-bg:     #DDEAF1;   --palette-match-fg:     #1A6485;   /* info blue */
+  --palette-featured-bg:  #F4E4C2;   --palette-featured-fg:  #6B521C;   /* gold — paid */
+  --palette-verified-bg:  #DFEDE2;   --palette-verified-fg:  #1A6647;   /* alpine */
+  --palette-founding-bg:  #F6E8C6;   --palette-founding-fg:  #77550F;   /* gold — paid */
+  --palette-success-bg:   #DFEDE2;   --palette-success-fg:   #1A6647;
+  --palette-warning-bg:   #F8E9CA;   --palette-warning-fg:   #84550E;
+  --palette-error-bg:     #FBE4E5;   --palette-error-fg:     #B92F42;   /* rose */
 
   /* =============================================================== */
   /* TIER 2 — SEMANTIC TOKENS (reference these in feature code)      */
   /* =============================================================== */
 
-  /* Cool panels — chrome/ice surfaces (employer cards, framed photos) */
-  --palette-parchment:   #E7EFF3;   /* cool panel background */
-  --palette-card-warm:   #FFFFFF;   /* card surface (name kept for compat) */
-  --palette-ink-warm:    #16252F;   /* cool ink for card borders */
-  --palette-gold:        #D8A84E;   /* warm gold for star/sparkle + premium marks */
+  /* Warm panels — inset/framed surfaces (employer cards, framed photos) */
+  --palette-parchment:   #F0EBE1;   /* warm panel background */
+  --palette-card-warm:   #FFFCF7;   /* card surface (name kept for compat) */
+  --palette-ink-warm:    #17242E;   /* deep ink for card borders */
+  --palette-gold:        #C6963C;   /* gold for star/sparkle + premium marks */
 
   /* surfaces / text / borders */
   --color-paper:          var(--palette-paper);
+  /* D22 alias: "paper" was ambiguous once the page stopped being paper-white.
+     --color-canvas is the name new work should reach for; --color-paper stays
+     as the compat alias so no existing rule has to change. Same value, always. */
+  --color-canvas:         var(--palette-paper);
   --color-surface:        var(--palette-surface);
   --color-surface-raised: var(--palette-white);
   --color-ink:            var(--palette-ink);    /* backward compat alias */
@@ -138,21 +174,28 @@
   --z-overlay:     100;  /* modal/popup scrims (portal to body)        */
   --z-lightbox:    300;  /* full-screen media viewers                  */
 
-  /* radius — rounder in the Glacier system so things pop */
-  --radius-pill:   999px;
-  --radius-input:  12px;
-  --radius-button: 16px;
-  --radius-cell:   16px;
-  --radius-image:  18px;
-  --radius-card:   24px;
-  --radius-modal:  28px;
+  /* radius — a HIERARCHY, not one pillish value (D22).
+       controls 8–12  · cards 14–18 · feature 20–24
+     Glacier rounded everything to 16–28px, which read as one soft blob: a
+     button and the modal behind it had nearly the same corner, so nothing
+     announced its rank. These are re-valued in place, so call sites are
+     untouched — a rule asking for --radius-card simply gets a card corner. */
+  --radius-pill:    999px;
+  --radius-control: 10px;  /* named tier-1 of the hierarchy (controls)  */
+  --radius-input:   10px;
+  --radius-button:  10px;
+  --radius-cell:    12px;
+  --radius-image:   16px;
+  --radius-card:    16px;
+  --radius-feature: 22px;  /* named tier-3 of the hierarchy (feature)   */
+  --radius-modal:   22px;
 
-  /* elevation — Glacier lifts are cooler + a touch deeper than borders-only,
-     so gradient cards visibly float. Still restrained, never heavy. */
-  --elevation-card:    0 1px 2px rgba(18, 40, 58, 0.06), 0 8px 22px rgba(18, 40, 58, 0.08);
-  --elevation-hover:   0 12px 30px rgba(18, 40, 58, 0.16);
-  --elevation-overlay: 0 16px 40px rgba(12, 26, 38, 0.20);
-  --elevation-pin:     0 3px 10px rgba(12, 26, 38, 0.28);
+  /* elevation — warm-ink lifts (D22: SELECTIVE borders/shadows). A cool-blue
+     shadow on a warm canvas reads as grey haze; these are keyed to the ink. */
+  --elevation-card:    0 1px 2px rgba(38, 30, 20, 0.05), 0 8px 22px rgba(38, 30, 20, 0.07);
+  --elevation-hover:   0 12px 30px rgba(38, 30, 20, 0.14);
+  --elevation-overlay: 0 16px 40px rgba(28, 22, 14, 0.20);
+  --elevation-pin:     0 3px 10px rgba(28, 22, 14, 0.28);
 
   /* motion */
   --motion-fast:   120ms;
@@ -191,10 +234,18 @@
      pair it with --font-weight-display; accent pairs with semibold. */
   --font-weight-display: 800;
 
-  --type-display-size: 30px;  --type-display-lh: 1.15;
-  --type-page-size:    26px;  --type-page-lh:    1.2;
-  --type-section-size: 22px;  --type-section-lh: 1.2;
-  --type-card-size:    20px;  --type-card-lh:    1.25;
+  /* D22 — the desktop scale grows. V3's flat 26px page title made a product
+     surface indistinguishable from a settings list; a title now OUTRANKS its
+     content at the sizes a 1280–1440px workspace can afford. Every step below
+     the page title is unchanged at phone width (the clamp minimums are the old
+     values), so nothing reflows on mobile — the scale only opens up with room.
+       page    32–40 desktop   section 24–30 desktop
+       card    18–22           metric  30–48  (pair with .ui-tabular)
+     Consumers pick these up automatically; no call site changes. */
+  --type-display-size: clamp(30px, 3.9vw, 44px);  --type-display-lh: 1.12;
+  --type-page-size:    clamp(26px, 3.2vw, 36px);  --type-page-lh:    1.18;
+  --type-section-size: clamp(21px, 2.4vw, 28px);  --type-section-lh: 1.2;
+  --type-card-size:    clamp(19px, 1.6vw, 21px);  --type-card-lh:    1.25;
   --type-body-size:    16px;  --type-body-lh:    1.5;
   --type-meta-size:    14px;  --type-meta-lh:    1.45;
   --type-caption-size: 12px;  --type-caption-lh: 1.4;
@@ -203,9 +254,10 @@
   --type-label-tracking: 0.06em;
 
   /* Marketing display clamps — one scale for all hero/section display type so
-     the homepage + for-hosts stop rolling their own ad-hoc clamp() values. */
-  --type-display-hero:    clamp(30px, 7vw, 56px);
-  --type-display-section: clamp(24px, 4.2vw, 38px);
+     the homepage + for-hosts stop rolling their own ad-hoc clamp() values.
+     D22 lifts the desktop ceiling into the 56–72 band. */
+  --type-display-hero:    clamp(32px, 7.4vw, 68px);
+  --type-display-section: clamp(26px, 4.6vw, 44px);
 
   --font-weight-regular:  400;
   --font-weight-medium:   500;
@@ -217,8 +269,8 @@
      brief requires that the scale above did not yet name. Metric/price are
      tabular by intent — pair them with font-variant-numeric: tabular-nums. */
   --type-body-lg-size: 18px;  --type-body-lg-lh: 1.5;
-  --type-metric-size:  28px;  --type-metric-lh:  1.1;
-  --type-price-size:   34px;  --type-price-lh:   1.05;
+  --type-metric-size:  clamp(30px, 3.2vw, 44px);  --type-metric-lh:  1.08;
+  --type-price-size:   clamp(34px, 3.6vw, 48px);  --type-price-lh:   1.04;
   --type-helper-size:  13px;  --type-helper-lh:  1.45;
   --type-error-size:   13px;  --type-error-lh:   1.45;
 
@@ -241,49 +293,69 @@
   --type-body-sm:    var(--type-meta-size);
 
   /* =============================================================== */
-  /* V3 — INTERACTIVE / CHROME TOKENS                                */
-  /* Glacier blue, teal, ice, chrome/graphite. Header, CTAs, badges. */
+  /* V4 — INTERACTIVE / CHROME TOKENS                                */
+  /* Lake-teal action · alpine identity · info blue · warm chrome.   */
   /* =============================================================== */
 
-  /* Header — glacier blue */
-  --palette-header:     var(--palette-sky); /* header IS the glacier blue — one source */
-  --palette-header-mid: #2A7EA0;
+  /* Header — lake teal */
+  --palette-header:     var(--palette-sky); /* header IS the action colour — one source */
+  --palette-header-mid: #11838B;
 
-  /* Glacier blue — primary CTA, active links, interactive */
-  --palette-sky:        #1E6A9E;
-  --palette-sky-light:  #D3E8F3;
-  --palette-sky-dark:   #124E6B;
-  --palette-sky-hover:  #2A7EB4;   /* action-gradient hover stop (blue end)  */
-  --palette-teal-hover: #12A99A;   /* action-gradient hover stop (teal end)  */
+  /* THE ACTION COLOUR — lake teal. Primary CTA, active links, focus, progress.
+     NAME NOTE (D22, "re-value over rename"): this primitive is still called
+     --palette-sky because it is the documented accent SEED — palettes.css
+     reskins the entire action system by overriding exactly these four names,
+     and PaletteControl ships four palettes built on that contract. Renaming it
+     would break an unrelated, working feature to satisfy a label. The VALUE is
+     lake teal; the old glacier blue now lives on --palette-info below and is
+     used only where blue means *information*. */
+  --palette-sky:        #0D6A70;
+  --palette-sky-light:  #D5E9E9;
+  --palette-sky-dark:   #084E56;
+  --palette-sky-hover:  #11838B;   /* action-gradient hover stop (deep end)  */
+  --palette-teal-hover: #17A394;   /* action-gradient hover stop (bright end) */
 
-  /* Teal — the warm end of the action gradient, housing/success tones */
-  --palette-teal:       #0E9488;
-  --palette-teal-light: #D7F2EC;
+  /* Teal — the bright end of the action gradient. Same lake family as the seed
+     above (V3 ran blue→teal, which read as two competing brand hues). */
+  --palette-teal:       #12897C;
+  --palette-teal-light: #D8F0E9;
 
-  /* Ice — bright cool highlight */
-  --palette-ice:        #7FD4E8;
-  --palette-ice-light:  #DBF2F8;
+  /* Info blue — the DEMOTED glacier. Status/info surfaces only (match · pay ·
+     maritime lane). Never a call to action. */
+  --palette-info:       #1A6485;
+  --palette-info-light: #DDEAF1;
 
-  /* Silver / chrome — borders, badges, metallic accents */
-  --palette-silver:     #B7C6CE;
-  --palette-chrome:     #DCE6EC;
-  --palette-steel:      #EAF1F5;
+  /* Alpine green — place / employer IDENTITY accents (farm lane, verified
+     host, housing + meals included, "ready" lifecycle). */
+  --palette-alpine:       #1A6647;
+  --palette-alpine-light: #DFEDE2;
+
+  /* Ice — bright lake highlight */
+  --palette-ice:        #5FC3BE;
+  --palette-ice-light:  #DBF0EE;
+
+  /* Silver / chrome — borders, badges, metallic accents (warm) */
+  --palette-silver:     #BDB2A3;
+  --palette-chrome:     #E4DDD1;
+  --palette-steel:      #EFE9DF;
   /* Chrome-gradient stops (the flagship card surface) — named so the gradient
      follows the theme instead of baking raw hex. */
-  --palette-chrome-hi:  #F4F8FA;
-  --palette-chrome-lo:  #E2EBF0;
+  --palette-chrome-hi:  #FBF7F0;
+  --palette-chrome-lo:  #EDE6DA;
 
-  /* Warm gold — RESERVED for premium / paid (boosted · featured · founding) */
-  --palette-amber:      #D8A84E;
-  --palette-amber-light:#F6E7C6;
+  /* Gold — RESERVED for premium / paid (boosted · featured · founding) */
+  --palette-amber:      #C6963C;
+  --palette-amber-light:#F4E4C2;
 
   /* Semantic aliases */
   --color-header-bg:  var(--palette-header);
   --color-cta:        var(--palette-sky);
   --color-cta-text:   #FFFFFF;
   --color-action-soft: color-mix(in srgb, var(--palette-sky) 12%, var(--palette-white));
-  --color-panel-dark: #10222E;   /* deep cool charcoal panel (employer/CTA blocks) */
+  --color-panel-dark: #16242A;   /* deep warm-ink panel (employer/CTA blocks) */
   --color-teal:       var(--palette-teal);
+  --color-info:       var(--palette-info);
+  --color-alpine:     var(--palette-alpine);
   --color-ice:        var(--palette-ice);
   --color-gold:       var(--palette-amber);
   --color-gold-text:  #3A2600;
@@ -372,15 +444,15 @@
   /* LIFECYCLE / READINESS STATE — ready (available/accepted · green) */
   /* · soon (pending · gold) · later (6mo · slate) · urgent (rose).   */
   /* =============================================================== */
-  --state-ready-fg:   #0A7D54;  --state-ready-bg:  var(--palette-teal-light);
-  --state-soon-fg:    #8A5A12;  --state-soon-bg:   var(--palette-amber-light);
-  --state-later-fg:   #3B5566;  --state-later-bg:  var(--palette-remote-bg);
+  --state-ready-fg:   #1A6647;  --state-ready-bg:  var(--palette-alpine-light);
+  --state-soon-fg:    #84550E;  --state-soon-bg:   var(--palette-amber-light);
+  --state-later-fg:   #4A5960;  --state-later-bg:  var(--palette-remote-bg);
   --state-urgent-fg:  var(--status-error-fg);  --state-urgent-bg: var(--status-error-bg);
-  --state-live-dot:   #22D3AA;  /* pulsing "live / now" indicator */
+  --state-live-dot:   #1FC79E;  /* pulsing "live / now" indicator */
 
-  --gradient-state-ready: linear-gradient(135deg, #0A7D54 0%, #12A98A 100%);
-  --gradient-state-soon:  linear-gradient(135deg, #9A6A08 0%, #C48A14 100%);
-  --gradient-state-later: linear-gradient(135deg, #2A4050 0%, #48627A 100%);
+  --gradient-state-ready: linear-gradient(135deg, #1A6647 0%, #229C74 100%);
+  --gradient-state-soon:  linear-gradient(135deg, #8A600A 0%, #B98413 100%);
+  --gradient-state-later: linear-gradient(135deg, #3A423E 0%, #5C6660 100%);
   --gradient-progress:    linear-gradient(135deg, var(--palette-sky) 0%, var(--palette-teal) 100%);
 
   /* =============================================================== */
@@ -389,10 +461,10 @@
   /* token-driven and themes in dark (glassy pills sit over photos,  */
   /* so these read as vivid on both light and dark surfaces).        */
   /* =============================================================== */
-  --match-strong: #34D399;   /* emerald — best fit  */
-  --match-good:   #22C3B8;   /* teal              */
-  --match-fair:   #58B6E8;   /* glacier           */
-  --match-low:    #9FB6C4;   /* steel             */
+  --match-strong: #3FD9A0;   /* alpine bright — best fit */
+  --match-good:   #29C6B4;   /* lake                     */
+  --match-fair:   #58B0DE;   /* info blue                */
+  --match-low:    #BCB2A4;   /* warm steel               */
 
   --tone-success: #7BE8C0;   /* right-slot badge label tones (on dark glass) */
   --tone-warning: #F4CE82;
@@ -417,7 +489,12 @@
 }
 
 /* =================================================================== */
-/* NIGHT / DARK GLACIER                                                 */
+/* NIGHT / WARM DARK (D22)                                              */
+/*                                                                     */
+/* V3's night was blue-dark, which made the light theme's move to a    */
+/* warm canvas read as two different products. Night is now WARM dark: */
+/* the neutrals carry the same ink/sand bias as day, and the accent    */
+/* stays in the lake family (brightened for the dark ground).          */
 /*                                                                     */
 /* Re-values TIER-1 primitives + a few TIER-2 semantics that don't     */
 /* flow from a primitive. Feature code is unchanged: every surface     */
@@ -436,67 +513,75 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  /* Neutrals — cool graphite night surfaces */
-  --palette-paper:        #0B141B;
-  --palette-surface:      #131E27;
-  --palette-line:         #2A3A46;
-  --palette-ink-stroke:   #3B4E5C;
-  --palette-ink-muted:    #8296A4;   /* lighter muted (>=4.5:1 on night paper+surface) */
+  /* Neutrals — warm graphite night surfaces */
+  --palette-paper:        #15120E;
+  --palette-surface:      #1E1A15;
+  --palette-line:         #383229;
+  --palette-ink-stroke:   #4B443A;
+  --palette-ink-muted:    #A79D8E;   /* lighter muted (>=4.5:1 on night paper+surface) */
 
-  /* Cool panels + backward-compat surfaces */
-  --palette-parchment:    #17222B;
-  --palette-card-warm:    #131E27;
-  --palette-ink-warm:     #3B4E5C;
+  /* Warm panels + backward-compat surfaces */
+  --palette-parchment:    #221E18;
+  --palette-card-warm:    #1E1A15;
+  --palette-ink-warm:     #4B443A;
 
   /* Chrome / metallic — muted for night */
-  --palette-silver:       #3A4C58;
-  --palette-chrome:       #2A3A46;
-  --palette-steel:        #1E2C36;
-  --palette-chrome-hi:    #1B2833;
-  --palette-chrome-lo:    #101A22;
+  --palette-silver:       #554E43;
+  --palette-chrome:       #383229;
+  --palette-steel:        #2A251E;
+  --palette-chrome-hi:    #262119;
+  --palette-chrome-lo:    #191510;
 
   /* Interactive tints rebased onto dark */
-  --palette-sky-light:    #1B3A52;
-  --palette-teal-light:   #123A34;
+  --palette-sky-light:    #12343A;
+  --palette-teal-light:   #123630;
   --palette-amber-light:  #3A2E14;
+  --palette-info-light:   #14303E;
+  --palette-alpine-light: #133220;
+
+  /* Accent inks brighten on the dark ground (they are ink on light chips, but
+     ambient marks on night surfaces). */
+  --palette-info:         #6CC3E0;
+  --palette-alpine:       #5FD09E;
+  --palette-gold:         #E4C374;
 
   /* Category accents (chip bg deep / fg bright) */
-  --palette-farm-bg:      #123328;   --palette-farm-fg:      #4FC8A2;
-  --palette-maritime-bg:  #12303F;   --palette-maritime-fg:  #64C2E2;
-  --palette-remote-bg:    #23303A;   --palette-remote-fg:    #9BB6C8;
-  --palette-seasonal-bg:  #123339;   --palette-seasonal-fg:  #4FC8D8;
-  --palette-mix-bg:       #202E38;   --palette-mix-fg:       #9BB6C8;
+  --palette-farm-bg:      #133220;   --palette-farm-fg:      #5FD09E;
+  --palette-maritime-bg:  #14303E;   --palette-maritime-fg:  #6CC3E0;
+  --palette-remote-bg:    #302B22;   --palette-remote-fg:    #BFB4A2;
+  --palette-seasonal-bg:  #12333A;   --palette-seasonal-fg:  #4FC8CE;
+  --palette-mix-bg:       #2C2720;   --palette-mix-fg:       #BFB4A2;
 
-  /* Benefit triad — HOUSING/MEALS emerald (dark counterparts), PAY steel */
-  --palette-housing-bg:   #123528;   --palette-housing-fg:   #4FD3A0;
-  --palette-meals-bg:     #123528;   --palette-meals-fg:     #4FD3A0;
-  --palette-pay-bg:       #16303E;   --palette-pay-fg:       #79C0E4;
+  /* Benefit triad — HOUSING/MEALS alpine (dark counterparts), PAY info blue */
+  --palette-housing-bg:   #133220;   --palette-housing-fg:   #5FD09E;
+  --palette-meals-bg:     #133220;   --palette-meals-fg:     #5FD09E;
+  --palette-pay-bg:       #16303C;   --palette-pay-fg:       #7CC1E2;
 
   /* Status / system */
-  --palette-boosted-bg:   #3A2E14;   --palette-boosted-fg:   #E6C674;
-  --palette-match-bg:     #123243;   --palette-match-fg:     #6FC6E4;
-  --palette-featured-bg:  #3A2E14;   --palette-featured-fg:  #E6C674;
-  --palette-verified-bg:  #123528;   --palette-verified-fg:  #4FD3A0;
-  --palette-founding-bg:  #3A2E14;   --palette-founding-fg:  #E6C674;
-  --palette-success-bg:   #123528;   --palette-success-fg:   #4FD3A0;
-  --palette-warning-bg:   #3A2C12;   --palette-warning-fg:   #E6B968;
-  --palette-error-bg:     #3A1820;   --palette-error-fg:     #FF8B9B;
+  --palette-boosted-bg:   #3A2E14;   --palette-boosted-fg:   #E4C374;
+  --palette-match-bg:     #14303E;   --palette-match-fg:     #6CC3E0;
+  --palette-featured-bg:  #3A2E14;   --palette-featured-fg:  #E4C374;
+  --palette-verified-bg:  #133220;   --palette-verified-fg:  #5FD09E;
+  --palette-founding-bg:  #3A2E14;   --palette-founding-fg:  #E4C374;
+  --palette-success-bg:   #133220;   --palette-success-fg:   #5FD09E;
+  --palette-warning-bg:   #3A2D12;   --palette-warning-fg:   #E4B766;
+  --palette-error-bg:     #3A1A1D;   --palette-error-fg:     #FF8D96;
 
   /* Semantic overrides that don't flow from a re-valued primitive */
-  --color-surface-raised: #1B2831;   /* raised panel (was --palette-white)   */
-  --color-ink:            #EAF2F7;   /* backward-compat text alias           */
-  --text-primary:         #EAF2F7;
-  --text-secondary:       #A9BCC8;
-  --border-ink:           #45596A;
-  --border-ink-warm:      #45596A;
-  --color-cta:            #5AB4E4;   /* brighter glacier for links/label text on dark */
+  --color-surface-raised: #262119;   /* raised panel (was --palette-white)   */
+  --color-ink:            #F4EEE4;   /* backward-compat text alias           */
+  --text-primary:         #F4EEE4;
+  --text-secondary:       #BEB4A4;
+  --border-ink:           #554E43;
+  --border-ink-warm:      #554E43;
+  --color-cta:            #4FC8C2;   /* brighter lake for links/label text on dark */
   --color-action-soft:    color-mix(in srgb, var(--palette-sky) 24%, var(--palette-surface));
   --color-gold-text:      #241700;
 
   /* Lifecycle state — brighten fg (bg flows from the dark tints above) */
-  --state-ready-fg:       #4FD3A0;
-  --state-soon-fg:        #E6B968;
-  --state-later-fg:       #9BB6C8;
+  --state-ready-fg:       #5FD09E;
+  --state-soon-fg:        #E4B766;
+  --state-later-fg:       #BFB4A2;
 
   /* Dark category atmospheres — deep tints derived from the (now dark) lane
      primitives so lane-keyed rails/covers/cells don't glare on night paper. */
@@ -529,58 +614,64 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --palette-paper:        #0B141B;
-    --palette-surface:      #131E27;
-    --palette-line:         #2A3A46;
-    --palette-ink-stroke:   #3B4E5C;
-    --palette-ink-muted:    #8296A4;
+    --palette-paper:        #15120E;
+    --palette-surface:      #1E1A15;
+    --palette-line:         #383229;
+    --palette-ink-stroke:   #4B443A;
+    --palette-ink-muted:    #A79D8E;
 
-    --palette-parchment:    #17222B;
-    --palette-card-warm:    #131E27;
-    --palette-ink-warm:     #3B4E5C;
+    --palette-parchment:    #221E18;
+    --palette-card-warm:    #1E1A15;
+    --palette-ink-warm:     #4B443A;
 
-    --palette-silver:       #3A4C58;
-    --palette-chrome:       #2A3A46;
-    --palette-steel:        #1E2C36;
-    --palette-chrome-hi:    #1B2833;
-    --palette-chrome-lo:    #101A22;
+    --palette-silver:       #554E43;
+    --palette-chrome:       #383229;
+    --palette-steel:        #2A251E;
+    --palette-chrome-hi:    #262119;
+    --palette-chrome-lo:    #191510;
 
-    --palette-sky-light:    #1B3A52;
-    --palette-teal-light:   #123A34;
+    --palette-sky-light:    #12343A;
+    --palette-teal-light:   #123630;
     --palette-amber-light:  #3A2E14;
+    --palette-info-light:   #14303E;
+    --palette-alpine-light: #133220;
 
-    --palette-farm-bg:      #123328;   --palette-farm-fg:      #4FC8A2;
-    --palette-maritime-bg:  #12303F;   --palette-maritime-fg:  #64C2E2;
-    --palette-remote-bg:    #23303A;   --palette-remote-fg:    #9BB6C8;
-    --palette-seasonal-bg:  #123339;   --palette-seasonal-fg:  #4FC8D8;
-    --palette-mix-bg:       #202E38;   --palette-mix-fg:       #9BB6C8;
+    --palette-info:         #6CC3E0;
+    --palette-alpine:       #5FD09E;
+    --palette-gold:         #E4C374;
 
-    --palette-housing-bg:   #123528;   --palette-housing-fg:   #4FD3A0;
-    --palette-meals-bg:     #123528;   --palette-meals-fg:     #4FD3A0;
-    --palette-pay-bg:       #16303E;   --palette-pay-fg:       #79C0E4;
+    --palette-farm-bg:      #133220;   --palette-farm-fg:      #5FD09E;
+    --palette-maritime-bg:  #14303E;   --palette-maritime-fg:  #6CC3E0;
+    --palette-remote-bg:    #302B22;   --palette-remote-fg:    #BFB4A2;
+    --palette-seasonal-bg:  #12333A;   --palette-seasonal-fg:  #4FC8CE;
+    --palette-mix-bg:       #2C2720;   --palette-mix-fg:       #BFB4A2;
 
-    --palette-boosted-bg:   #3A2E14;   --palette-boosted-fg:   #E6C674;
-    --palette-match-bg:     #123243;   --palette-match-fg:     #6FC6E4;
-    --palette-featured-bg:  #3A2E14;   --palette-featured-fg:  #E6C674;
-    --palette-verified-bg:  #123528;   --palette-verified-fg:  #4FD3A0;
-    --palette-founding-bg:  #3A2E14;   --palette-founding-fg:  #E6C674;
-    --palette-success-bg:   #123528;   --palette-success-fg:   #4FD3A0;
-    --palette-warning-bg:   #3A2C12;   --palette-warning-fg:   #E6B968;
-    --palette-error-bg:     #3A1820;   --palette-error-fg:     #FF8B9B;
+    --palette-housing-bg:   #133220;   --palette-housing-fg:   #5FD09E;
+    --palette-meals-bg:     #133220;   --palette-meals-fg:     #5FD09E;
+    --palette-pay-bg:       #16303C;   --palette-pay-fg:       #7CC1E2;
 
-    --color-surface-raised: #1B2831;
-    --color-ink:            #EAF2F7;
-    --text-primary:         #EAF2F7;
-    --text-secondary:       #A9BCC8;
-    --border-ink:           #45596A;
-    --border-ink-warm:      #45596A;
-    --color-cta:            #5AB4E4;
+    --palette-boosted-bg:   #3A2E14;   --palette-boosted-fg:   #E4C374;
+    --palette-match-bg:     #14303E;   --palette-match-fg:     #6CC3E0;
+    --palette-featured-bg:  #3A2E14;   --palette-featured-fg:  #E4C374;
+    --palette-verified-bg:  #133220;   --palette-verified-fg:  #5FD09E;
+    --palette-founding-bg:  #3A2E14;   --palette-founding-fg:  #E4C374;
+    --palette-success-bg:   #133220;   --palette-success-fg:   #5FD09E;
+    --palette-warning-bg:   #3A2D12;   --palette-warning-fg:   #E4B766;
+    --palette-error-bg:     #3A1A1D;   --palette-error-fg:     #FF8D96;
+
+    --color-surface-raised: #262119;
+    --color-ink:            #F4EEE4;
+    --text-primary:         #F4EEE4;
+    --text-secondary:       #BEB4A4;
+    --border-ink:           #554E43;
+    --border-ink-warm:      #554E43;
+    --color-cta:            #4FC8C2;
     --color-action-soft:    color-mix(in srgb, var(--palette-sky) 24%, var(--palette-surface));
     --color-gold-text:      #241700;
 
-    --state-ready-fg:       #4FD3A0;
-    --state-soon-fg:        #E6B968;
-    --state-later-fg:       #9BB6C8;
+    --state-ready-fg:       #5FD09E;
+    --state-soon-fg:        #E4B766;
+    --state-later-fg:       #BFB4A2;
 
     --cat-farm-body:  linear-gradient(158deg, color-mix(in srgb, var(--palette-farm-fg) 14%, var(--palette-surface)) 0%, var(--palette-surface) 100%);
     --cat-farm-cover: linear-gradient(145deg, color-mix(in srgb, var(--palette-farm-fg) 42%, var(--palette-paper)) 0%, color-mix(in srgb, var(--palette-farm-fg) 20%, var(--palette-paper)) 100%);

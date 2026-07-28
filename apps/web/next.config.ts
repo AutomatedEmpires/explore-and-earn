@@ -12,6 +12,16 @@ const require = createRequire(import.meta.url);
 // wrapped by Sentry so both integrations compose.
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
+/**
+ * Locale alternation for path-to-regexp params in `redirects()`.
+ *
+ * Mirrors `routing.locales` in i18n/routing.ts. next.config is evaluated by
+ * Node before the app's module graph exists, so it does not import the routing
+ * module; the duplication is asserted in
+ * apps/web/tests/unit/host-nav-renames.test.ts, which reads both files.
+ */
+const LOCALE_PATTERN = "en";
+
 // Baseline security headers applied to every response.
 //
 // CSP is sent in REPORT-ONLY mode: it logs violations to /api/csp-report
@@ -85,6 +95,41 @@ const nextConfig: NextConfig = {
         // when rel=icon points at the generated metadata route.
         source: "/favicon.ico",
         destination: "/icon",
+        permanent: true,
+      },
+      // ── D17 host-nav renames (redesign V2-B) ───────────────────────────────
+      // "Invites" → Outreach, "Assistant" → Recruiting Coach. Hosts have these
+      // URLs bookmarked, emailed to their team, and — for /host/invites — baked
+      // into a live Stripe checkout success_url on sessions that may already be
+      // in flight. Permanent (308) so the method and body survive the hop and
+      // search engines transfer the old path.
+      //
+      // Sources are listed twice on purpose. localePrefix is "as-needed", so
+      // English is unprefixed (/host/invites) while any future locale carries a
+      // prefix (/es/host/invites); one pattern cannot cover both, and the
+      // prefixed form would 404 silently the day a second locale ships. The
+      // :locale param is CONSTRAINED to the configured locale list rather than
+      // left as a bare wildcard — an unconstrained /:locale would swallow
+      // /anything/host/invites and redirect it to a 404. Keep LOCALE_PATTERN in
+      // sync with routing.locales in i18n/routing.ts; a unit test asserts it.
+      {
+        source: "/host/invites",
+        destination: "/host/outreach",
+        permanent: true,
+      },
+      {
+        source: `/:locale(${LOCALE_PATTERN})/host/invites`,
+        destination: "/:locale/host/outreach",
+        permanent: true,
+      },
+      {
+        source: "/host/assistant",
+        destination: "/host/coach",
+        permanent: true,
+      },
+      {
+        source: `/:locale(${LOCALE_PATTERN})/host/assistant`,
+        destination: "/:locale/host/coach",
         permanent: true,
       },
     ];

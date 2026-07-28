@@ -39,7 +39,7 @@ export function HostPipelineBoard({ applicants }: HostPipelineBoardProps) {
           As seekers apply, they flow through this pipeline — new, reviewing,
           saved, then offered. Invite standout seekers to get the first ones in.
         </p>
-        <Link className={styles.emptyCta} href="/host/invites">
+        <Link className={styles.emptyCta} href="/host/outreach">
           <Icon name="action.forward" size={16} aria-hidden />
           Invite seekers
         </Link>

@@ -79,7 +79,7 @@ export function InvitesList({ invites, listings }: InvitesListProps) {
       if (!result.ok) {
         setWithdrawError(result.error ?? "Could not withdraw the invite.");
       }
-      // On success, revalidatePath('/host/invites') refreshes this list's props.
+      // On success, revalidatePath('/host/outreach') refreshes this list's props.
     });
   }
 

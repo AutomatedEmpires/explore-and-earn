@@ -63,8 +63,14 @@
 .value {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: var(--type-display-size);
-  line-height: 1;
+  /* D22: the METRIC step (30–48 desktop), not the generic display step — this
+     is a figure on a card, and it now has a token that says so. Tabular
+     numerals keep a grid of metric cards from shivering as digits change:
+     in proportional Manrope a "1" is narrower than a "0", so a live counter
+     ticking 199 → 200 visibly re-lays-out the whole card. */
+  font-size: var(--type-metric-size);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--type-metric-lh);
   letter-spacing: -0.03em;
   color: var(--text-primary);
   /* The headline leads on mount; the sparkline (below) follows ~a beat later. */
