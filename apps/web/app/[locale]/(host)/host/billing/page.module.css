@@ -1,7 +1,7 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-24);
 }
 
 .header {
@@ -9,7 +9,7 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
-  gap: var(--space-4);
+  gap: var(--space-16);
 }
 
 .heading {
@@ -20,7 +20,7 @@
 }
 
 .subheading {
-  margin: var(--space-1) 0 0;
+  margin: var(--space-4) 0 0;
   max-width: 46rem;
   color: var(--text-secondary);
   font-size: var(--type-body-sm);
@@ -30,7 +30,7 @@
 .warning,
 .error {
   border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-12) var(--space-16);
   font-size: var(--type-body-sm);
   border: 1px solid var(--border-default);
 }
@@ -53,7 +53,7 @@
 .currentPlan {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-4);
 }
 
 .currentPlanName {
@@ -74,7 +74,7 @@
 .secondaryButton {
   width: 100%;
   border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-12) var(--space-16);
   font-size: var(--type-body-sm);
   font-weight: 600;
   cursor: pointer;
