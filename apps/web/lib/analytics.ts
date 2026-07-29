@@ -180,7 +180,7 @@ export function registerAnalyticsClient(instance: AnalyticsClient): void {
 
 /** Fire a funnel event. Safe on the server (no-op) and before the SDK loads. */
 export function captureEvent(
-  name: HostFunnelEvent,
+  name: AnalyticsEvent,
   properties?: Record<string, unknown>,
 ): void {
   if (typeof window === "undefined") return;
