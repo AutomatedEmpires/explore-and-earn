@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { CSSProperties } from "react";
 import { auth } from "@clerk/nextjs/server";
 
 import { getDiscoveryListingsWithCoords } from "../../../../components/discovery/data";
@@ -6,6 +7,24 @@ import { MapViewLazy } from "../../../../components/map";
 import { getSupabaseToken } from "../../../../lib/serverCache";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Visually-hidden heading. The map is an immersive, full-bleed surface with no
+ * visible page title, which measured as a route with ZERO h1s: a screen-reader
+ * user landing here got a document with no name, and heading navigation had
+ * nothing to jump to. /swipe already solved this the same way.
+ */
+const SR_ONLY: CSSProperties = {
+	position: "absolute",
+	width: 1,
+	height: 1,
+	padding: 0,
+	margin: -1,
+	overflow: "hidden",
+	clip: "rect(0, 0, 0, 0)",
+	whiteSpace: "nowrap",
+	border: 0,
+};
 
 export const metadata: Metadata = {
 	title: "Explore opportunities on the map",
@@ -54,10 +73,15 @@ export default async function MapPage({
 	]);
 	const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 	return (
-		<MapViewLazy
-			listings={listings}
-			initialFocusId={firstValue(params.focus)}
-			mapboxToken={mapboxToken}
-		/>
+		<section aria-labelledby="map-heading">
+			<h1 id="map-heading" style={SR_ONLY}>
+				Explore opportunities on the map
+			</h1>
+			<MapViewLazy
+				listings={listings}
+				initialFocusId={firstValue(params.focus)}
+				mapboxToken={mapboxToken}
+			/>
+		</section>
 	);
 }

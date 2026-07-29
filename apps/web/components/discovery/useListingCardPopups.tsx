@@ -3,7 +3,10 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
+import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
+
 import { BenefitTrustModal } from "./BenefitTrustModal";
+import { CardDetailPopover, type CardDetailKind } from "./CardDetailPopover";
 import { HostProfilePopup } from "./HostProfilePopup";
 import { PayDetailsDrawer } from "./PayDetailsDrawer";
 import { QuickPeekDrawer } from "./QuickPeekDrawer";
@@ -47,6 +50,14 @@ export interface ListingCardHandlers {
   readonly onPayClick: ListingCardActionHandler;
   /** Opens the Report Listing drawer (default) — the report flag tap. */
   readonly onReport: ListingCardActionHandler;
+  /** Opens the season/timing popover (default) — the BEGINS|ENDS strip tap. */
+  readonly onDatesClick: ListingCardActionHandler;
+  /** Opens the "what Verified Host means" popover (default) — badge tap. */
+  readonly onVerificationClick: ListingCardActionHandler;
+  /** Opens the match explanation popover (default) — match pill / "Why?" tap. */
+  readonly onMatchClick: ListingCardActionHandler;
+  /** Share the listing. Present only when a surface supplies it. */
+  readonly onShare?: ListingCardActionHandler;
   /** Focuses the listing on the map (default → router.push('/map?focus='+id)). */
   readonly onLocationClick: ListingCardActionHandler;
   /** Passthrough — present only when a surface supplies it. */
@@ -78,6 +89,10 @@ export interface ListingCardPopupOverrides {
   readonly onMealsClick?: ListingCardActionHandler;
   readonly onPayClick?: ListingCardActionHandler;
   readonly onReport?: ListingCardActionHandler;
+  readonly onDatesClick?: ListingCardActionHandler;
+  readonly onVerificationClick?: ListingCardActionHandler;
+  readonly onMatchClick?: ListingCardActionHandler;
+  readonly onShare?: ListingCardActionHandler;
   readonly onLocationClick?: ListingCardActionHandler;
   readonly onApply?: ListingCardActionHandler;
   readonly onSave?: ListingCardActionHandler;
@@ -96,6 +111,14 @@ export interface UseListingCardPopupsResult {
 export function useListingCardPopups(
   listings: readonly DiscoveryListing[],
   overrides?: ListingCardPopupOverrides,
+  /**
+   * Analytics surface name for the `listing_card_opened` event, e.g. "swipe" or
+   * "map". Fired from the DEFAULT open handler, which is what makes the event
+   * automatic for every surface that uses the shared popup host rather than
+   * something each one has to remember. Omit it and no event is emitted (a
+   * surface that overrides onOpen fires its own).
+   */
+  analyticsSurface?: string,
 ): UseListingCardPopupsResult {
   const router = useRouter();
 
@@ -108,6 +131,13 @@ export function useListingCardPopups(
   } | null>(null);
   const [activePayId, setActivePayId] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
+  // One state slot for the three card explainers (dates / verification / match):
+  // they share a popover host, so opening one always closes another rather than
+  // stacking two dialogs over the same card.
+  const [activeDetail, setActiveDetail] = useState<{
+    readonly id: string;
+    readonly kind: CardDetailKind;
+  } | null>(null);
 
   // ── Active-item resolvers (verbatim from DiscoveryFeed) ───────────────────
   const activeListing = useMemo(
@@ -130,6 +160,10 @@ export function useListingCardPopups(
     () => listings.find((listing) => listing.id === reportId) ?? null,
     [listings, reportId],
   );
+  const activeDetailListing = useMemo(
+    () => listings.find((listing) => listing.id === activeDetail?.id) ?? null,
+    [listings, activeDetail],
+  );
 
   // A sourced listing has NO host profile — its "host" tap must never open the
   // host-profile popup (which would present a phantom/unverified host). Route
@@ -145,7 +179,17 @@ export function useListingCardPopups(
   );
 
   // ── Default popup openers (stable identity) ───────────────────────────────
-  const openQuickPeek = useCallback((id: string) => setActiveId(id), []);
+  const openQuickPeek = useCallback(
+    (id: string) => {
+      if (analyticsSurface) {
+        captureEvent(SEEKER_DISCOVERY_EVENTS.listingCardOpened, {
+          surface: analyticsSurface,
+        });
+      }
+      setActiveId(id);
+    },
+    [analyticsSurface],
+  );
   const openHost = useCallback(
     (id: string) => (sourcedIds.has(id) ? setActiveId(id) : setActiveHostId(id)),
     [sourcedIds],
@@ -160,6 +204,18 @@ export function useListingCardPopups(
   );
   const openPay = useCallback((id: string) => setActivePayId(id), []);
   const openReport = useCallback((id: string) => setReportId(id), []);
+  const openDates = useCallback(
+    (id: string) => setActiveDetail({ id, kind: "dates" }),
+    [],
+  );
+  const openVerification = useCallback(
+    (id: string) => setActiveDetail({ id, kind: "verification" }),
+    [],
+  );
+  const openMatch = useCallback(
+    (id: string) => setActiveDetail({ id, kind: "match" }),
+    [],
+  );
   const focusOnMap = useCallback(
     (id: string) => router.push(`/map?focus=${id}`),
     [router],
@@ -175,6 +231,10 @@ export function useListingCardPopups(
       onMealsClick: overrides?.onMealsClick ?? openMeals,
       onPayClick: overrides?.onPayClick ?? openPay,
       onReport: overrides?.onReport ?? openReport,
+      onDatesClick: overrides?.onDatesClick ?? openDates,
+      onVerificationClick: overrides?.onVerificationClick ?? openVerification,
+      onMatchClick: overrides?.onMatchClick ?? openMatch,
+      onShare: overrides?.onShare,
       onLocationClick: overrides?.onLocationClick ?? focusOnMap,
       onApply: overrides?.onApply,
       onSave: overrides?.onSave,
@@ -191,6 +251,10 @@ export function useListingCardPopups(
       overrides?.onMealsClick,
       overrides?.onPayClick,
       overrides?.onReport,
+      overrides?.onDatesClick,
+      overrides?.onVerificationClick,
+      overrides?.onMatchClick,
+      overrides?.onShare,
       overrides?.onLocationClick,
       overrides?.onApply,
       overrides?.onSave,
@@ -205,6 +269,9 @@ export function useListingCardPopups(
       openMeals,
       openPay,
       openReport,
+      openDates,
+      openVerification,
+      openMatch,
       focusOnMap,
     ],
   );
@@ -233,6 +300,12 @@ export function useListingCardPopups(
       <PayDetailsDrawer listing={activePayListing} onClose={() => setActivePayId(null)} />
 
       <ReportListingDrawer listing={activeReportListing} onClose={() => setReportId(null)} />
+
+      <CardDetailPopover
+        listing={activeDetailListing}
+        kind={activeDetail?.kind ?? null}
+        onClose={() => setActiveDetail(null)}
+      />
     </>
   );
 

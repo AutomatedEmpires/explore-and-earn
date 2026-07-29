@@ -263,3 +263,111 @@
 		grid-template-columns: repeat(3, 1fr);
 	}
 }
+
+/* ─── List layout ───────────────────────────────────────────────────────── */
+
+/* One card per row at every width. The card itself is unchanged — a list view
+   that redrew the card would be a second card system, which is exactly what the
+   single-card rule exists to prevent. Rows are capped so a card does not
+   stretch to an unreadable width on a desktop. */
+.list {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-section);
+}
+
+@media (min-width: 900px) {
+	.list > * {
+		max-width: 46rem;
+	}
+}
+
+/* ─── Sort select + view toggle + map link ──────────────────────────────── */
+
+.selectField {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	min-width: 0;
+}
+
+.select {
+	min-height: var(--tap-min);
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-input);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+}
+
+.select:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.viewToggle {
+	display: inline-flex;
+	gap: var(--space-4);
+	padding: var(--space-2);
+	border-radius: var(--radius-control);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+}
+
+.viewButton {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min);
+	padding: var(--space-6) var(--space-12);
+	border: none;
+	border-radius: var(--radius-control);
+	background: none;
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+}
+
+.viewButtonActive {
+	background: var(--color-surface-raised);
+	color: var(--text-primary);
+	box-shadow: var(--elevation-card);
+}
+
+.viewButton:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.mapLink {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min);
+	padding: var(--space-8) var(--space-14);
+	border-radius: var(--radius-control);
+	border: 1px solid color-mix(in srgb, var(--color-cta) 35%, var(--border-soft));
+	background: var(--color-surface);
+	color: var(--color-cta);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-bold);
+	text-decoration: none;
+}
+
+.mapLink:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+/* The control row wraps rather than scrolling: on a phone these are five
+   independent decisions, and a horizontal scroller hides the last two. */
+.controlRow {
+	flex-wrap: wrap;
+	align-items: flex-end;
+}

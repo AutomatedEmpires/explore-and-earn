@@ -4,6 +4,8 @@ import {
 	NOT_STATED_LABEL,
 	SOURCED_DISCLOSURE_LABEL,
 	benefitCardState,
+	cardRecordCompleteness,
+	missingFactsSentence,
 	type BenefitEvidenceStatus,
 	type BenefitProvision,
 	type DiscoveryCardConditionalBadge,
@@ -78,6 +80,44 @@ export interface DiscoveryCardData {
 		readonly pay: BenefitEvidenceStatus
 	}
 	readonly fillPercent?: number
+
+	// ── Card v2 (V2-G) ────────────────────────────────────────────────────────
+	//
+	// Every field below is OPTIONAL and self-omitting, and the card renders each
+	// one ONLY when it is present. That is the whole design: a listing whose host
+	// never answered a question shows the question as unanswered (see the
+	// "what's missing" line below), never a plausible default. Display strings
+	// arrive pre-formatted from the host app so this package stays locale-free.
+
+	/** Derived from begins/ends by formatSeasonLength, e.g. "about 12 weeks". */
+	readonly seasonLength?: string
+	/**
+	 * Pre-formatted `listings.expires_at`. Rendered as "Listing closes …" and
+	 * NEVER as an application deadline: the schema stores no deadline, and
+	 * promoting an expiry into one would invent a commitment.
+	 */
+	readonly closesOn?: string
+	/** Host-stated `experience_level_required`. */
+	readonly experienceLevel?: string
+	/** Host-stated `physical_demand`, 0–3. Absent = unstated (never 0). */
+	readonly physicalDemand?: number
+	/** Host-stated listing perks (060). Up to three are shown. */
+	readonly perks?: readonly string[]
+	/** Host's free-text housing summary (`housing_description`). */
+	readonly housingSummary?: string
+	/** Host's free-text meals summary (`meals_description`). */
+	readonly mealsSummary?: string
+	/**
+	 * Render-time match reasons, computed from the stored component scores. Shown
+	 * only beside a shown match score — an explanation of a hidden number is an
+	 * explanation of nothing.
+	 */
+	readonly matchReasons?: readonly { readonly label: string }[]
+	/** ADR-040 confidence (data quality), distinct from the score. */
+	readonly matchConfidence?: number
+	/** Employer logo/mark for the info-zone chip (`host_profiles.photo_url`). */
+	readonly employerLogoUrl?: string
+
 	/** Top skills shown in place of H/M/P on host_applicant_review surface (max 3) */
 	readonly skills?: readonly string[]
 	/** Number of active reports on this listing — shown on admin_review surface */
@@ -99,6 +139,18 @@ export interface DiscoveryCardProps {
 	readonly onMealsClick?: (id: string) => void
 	readonly onPayClick?: (id: string) => void
 	readonly onReport?: (id: string) => void
+	/**
+	 * Opens the dates popover (season window, length, listing close). Supplying
+	 * it turns the BEGINS|ENDS strip into a real button; omitting it leaves the
+	 * strip as static text. There is no hover-only path either way.
+	 */
+	readonly onDatesClick?: (id: string) => void
+	/** Opens the verification popover — what the Verified Host badge does and does not assert. */
+	readonly onVerificationClick?: (id: string) => void
+	/** Opens the match-detail popover (which axes carried the score, and confidence). */
+	readonly onMatchClick?: (id: string) => void
+	/** Share this listing. Rendered in the image zone beside Report. */
+	readonly onShare?: (id: string) => void
 	readonly onSkip?: (id: string) => void
 	readonly onSchedule?: (id: string) => void
 	readonly onApprove?: (id: string) => void
@@ -134,11 +186,17 @@ export interface DiscoveryCardProps {
 		readonly loading: "eager" | "lazy"
 		readonly fetchPriority?: "high"
 	}) => ReactNode
+	/**
+	 * Lifecycle / relationship state. `interview`, `skipped` and `closed` joined
+	 * the set in V2-G: an interview is not the same promise as a scheduling
+	 * request, a skipped listing on a review surface needs its own honest badge,
+	 * and a host-closed role is not the same fact as an expired one.
+	 */
 	readonly cardState?:
-		| "saved" | "applied" | "offered" | "scheduled"
+		| "saved" | "applied" | "offered" | "scheduled" | "interview"
 		| "accepted" | "matched" | "not_selected" | "withdrawn"
-		| "draft" | "paused" | "expired" | "filled"
-		| "invited" | "reported" | "unavailable"
+		| "draft" | "paused" | "expired" | "filled" | "closed"
+		| "invited" | "reported" | "unavailable" | "skipped"
 }
 
 // ─── Category maps ────────────────────────────────────────────────────────────
@@ -318,6 +376,10 @@ export function DiscoveryCard({
 	onMealsClick,
 	onPayClick,
 	onReport,
+	onDatesClick,
+	onVerificationClick,
+	onMatchClick,
+	onShare,
 	onSkip,
 	onSchedule,
 	onApprove,
@@ -384,6 +446,9 @@ export function DiscoveryCard({
 	const isFilled      = cardState === "filled"
 	const isInvited     = cardState === "invited"
 	const isReported    = cardState === "reported"
+	const isInterview   = cardState === "interview"
+	const isSkipped     = cardState === "skipped"
+	const isClosed      = cardState === "closed"
 	// A listing the seeker kept (saved) that is no longer live — muted, honest,
 	// non-actionable (pair with variant="disabled" for the dimmed treatment).
 	const isUnavailable = cardState === "unavailable"
@@ -400,6 +465,7 @@ export function DiscoveryCard({
 
 	const centerBadge: CenterBadge | null =
 		isApplied    ? { label: "Applied",  tone: "paper",   decoration: false }
+		: isInterview ? { label: "Interview", tone: "success", decoration: true }
 		: isScheduled ? { label: "Schedule", tone: "paper",   decoration: true  }
 		: isDraft     ? { label: "Draft",    tone: "paper",   decoration: false }
 		: isFilled    ? { label: "Filled",   tone: "success", decoration: false }
@@ -429,6 +495,11 @@ export function DiscoveryCard({
 		: isUnavailable ? { label: "No longer available", tone: "muted" }
 		: isPaused    ? { label: "Paused",          tone: "warning" }
 		: isExpired   ? { label: "Expired",         tone: "muted"   }
+		// A host CLOSING a role and a listing EXPIRING are different facts about
+		// different actors; collapsing them would tell the seeker the host acted
+		// when nobody did.
+		: isClosed    ? { label: "Closed",          tone: "muted"   }
+		: isSkipped   ? { label: "Skipped",         tone: "muted"   }
 		: isReported && data.reportCategory ? { label: data.reportCategory, tone: "error" }
 		: null
 
@@ -440,12 +511,16 @@ export function DiscoveryCard({
 	const showDecisionBar =
 		(isDiscoveryFeed || surface === "map" || isMatched)
 		&& !isApplied && !isReported && !isUnavailable && !isDisabled
+		&& !isClosed && !isExpired && !isFilled
 		&& Boolean(onApply || onOpen)
 
 	// ── CTA resolution ────────────────────────────────────────────────────────
 	const ctaLabel =
 		isApplied     ? "Applied"
 		: isOffered   ? "Accept"
+		: isInterview ? "View interview"
+		: isClosed    ? "No longer accepting applications"
+		: isSkipped   ? "Take another look"
 		: isScheduled ? "Schedule"
 		: isAccepted  ? "View Details"
 		: isMatched   ? "Quick Apply"
@@ -463,9 +538,12 @@ export function DiscoveryCard({
 		: onApply     ? "Quick Apply"
 		:               "Open Role"
 
-	const ctaDisabled = isApplied || isNotSelected || isReported || isUnavailable || isDisabled
+	const ctaDisabled =
+		isApplied || isNotSelected || isReported || isUnavailable || isDisabled || isClosed
 	const ctaHandler  = ctaDisabled ? undefined
 		: isSeekerSurface ? (onOpen ? () => onOpen(data.id) : undefined)
+		: isInterview ? (onOpen  ? () => onOpen(data.id)  : undefined)
+		: isSkipped   ? (onOpen  ? () => onOpen(data.id)  : undefined)
 		: isScheduled ? (onOpen  ? () => onOpen(data.id)  : undefined)
 		: isOffered   ? (onOpen  ? () => onOpen(data.id)  : undefined)
 		: isAccepted  ? (onOpen  ? () => onOpen(data.id)  : undefined)
@@ -483,8 +561,53 @@ export function DiscoveryCard({
 	const titleHandler = onHostClick ? () => onHostClick(data.id)
 		: onOpen ? () => onOpen(data.id) : undefined
 
-	const isPassiveCta = isApplied || isNotSelected || isReported || isUnavailable || isDisabled
+	const isPassiveCta =
+		isApplied || isNotSelected || isReported || isUnavailable || isDisabled || isClosed
 	const ctaClass = `${styles.cta}${isPassiveCta ? ` ${styles.ctaPassive}` : ""}`
+
+	// ── Record completeness (V2-G honesty) ────────────────────────────────────
+	//
+	// Computed from EXACTLY the values rendered above, through the shared
+	// contract, so the note can never contradict the card it sits under. A
+	// listing that answers everything produces no note at all — the card does not
+	// congratulate a host for doing the minimum.
+	const record = cardRecordCompleteness({
+		location: data.location,
+		begins: data.begins,
+		ends: data.ends,
+		opportunityWindow: data.opportunityWindow,
+		housingProvision: hp,
+		mealsProvision: mp,
+		payValue: data.triad.pay,
+		benefitEvidence: ev,
+	})
+	const missingSentence = missingFactsSentence(record.missing)
+
+	// Stated facts, in the order a seeker asks for them. Nothing is defaulted:
+	// each entry exists only because a host actually recorded that column.
+	const DEMAND_LABEL = ["Light", "Moderate", "Demanding", "Very demanding"] as const
+	const facts: { key: string; label: string; value: string }[] = []
+	if (data.seasonLength) facts.push({ key: "season", label: "Season length", value: data.seasonLength })
+	if (data.experienceLevel) facts.push({ key: "experience", label: "Experience", value: data.experienceLevel })
+	if (
+		typeof data.physicalDemand === "number" &&
+		Number.isInteger(data.physicalDemand) &&
+		data.physicalDemand >= 0 &&
+		data.physicalDemand < DEMAND_LABEL.length
+	) {
+		facts.push({ key: "demand", label: "Physical demand", value: DEMAND_LABEL[data.physicalDemand] })
+	}
+	if (data.housingSummary) facts.push({ key: "housing", label: "Housing", value: data.housingSummary })
+	if (data.mealsSummary) facts.push({ key: "meals", label: "Meals", value: data.mealsSummary })
+
+	const topPerks = (data.perks ?? []).slice(0, 3)
+	const reasonLabels = (data.matchReasons ?? []).map((reason) => reason.label)
+	// The reasons row explains a number the card is SHOWING. When the score is
+	// below the display threshold there is no number on screen, so there is
+	// nothing to explain and the row is not rendered.
+	const showReasons = reasonLabels.length > 0 && matchCenterEligible
+	const lowConfidence =
+		typeof data.matchConfidence === "number" && data.matchConfidence < 55
 
 	const hostCircleClass = [
 		styles.hostCircle,
@@ -572,9 +695,24 @@ export function DiscoveryCard({
 					    is fabricated trust. role="img" so the label is actually
 					    announced rather than sitting on a generic span. */}
 					{!isApplicantReview && verified ? (
-						<span className={styles.verifiedDot} role="img" aria-label="Verified Host">
-							<Icon name="trust.verified_host" size={16} aria-hidden />
-						</span>
+						onVerificationClick ? (
+							/* The badge is an ASSERTION, so it has to be able to explain
+							   itself. As a button it is reachable by keyboard, by touch and
+							   by a screen reader alike — there is no hover-only path to what
+							   "Verified Host" does and does not mean. */
+							<button
+								type="button"
+								className={`${styles.verifiedDot} ${styles.verifiedDotButton}`}
+								onClick={() => onVerificationClick(data.id)}
+								aria-label="Verified Host — what this means"
+							>
+								<Icon name="trust.verified_host" size={16} aria-hidden />
+							</button>
+						) : (
+							<span className={styles.verifiedDot} role="img" aria-label="Verified Host">
+								<Icon name="trust.verified_host" size={16} aria-hidden />
+							</span>
+						)
 					) : null}
 				</div>
 
@@ -592,18 +730,42 @@ export function DiscoveryCard({
 					</div>
 				) : showMatchCenter && data.matchScore !== undefined ? (
 					/* Match score — centered pill, colour-coded by band with a mini
-					   fill bar (how well it fits), keeping the % text. */
-					<span
-						className={`${styles.matchPill} ${matchBandClass(data.matchScore)}`}
-						style={{ "--dc-bar-pct": `${clampPct(data.matchScore)}%` } as CSSProperties}
-						aria-label={`Match ${data.matchScore} percent`}
-					>
-						<span className={styles.matchPillNum}>{data.matchScore}%</span>
-						<span className={styles.matchPillLabel}>Match</span>
-						<span className={styles.matchPillTrack} aria-hidden>
-							<span className={styles.matchPillFill} />
-						</span>
-					</span>
+					   fill bar (how well it fits), keeping the % text. With a detail
+					   handler the pill becomes a BUTTON: a score a seeker cannot
+					   interrogate is exactly the black box this product refuses to ship,
+					   and the interrogation must work by keyboard and touch, not hover. */
+					(() => {
+						const pillClass = `${styles.matchPill} ${matchBandClass(data.matchScore)}`
+						const pillStyle = { "--dc-bar-pct": `${clampPct(data.matchScore)}%` } as CSSProperties
+						const pillInner = (
+							<>
+								<span className={styles.matchPillNum}>{data.matchScore}%</span>
+								<span className={styles.matchPillLabel}>Match</span>
+								<span className={styles.matchPillTrack} aria-hidden>
+									<span className={styles.matchPillFill} />
+								</span>
+							</>
+						)
+						return onMatchClick ? (
+							<button
+								type="button"
+								className={`${pillClass} ${styles.matchPillButton}`}
+								style={pillStyle}
+								onClick={() => onMatchClick(data.id)}
+								aria-label={`Match ${data.matchScore} percent — why this matched`}
+							>
+								{pillInner}
+							</button>
+						) : (
+							<span
+								className={pillClass}
+								style={pillStyle}
+								aria-label={`Match ${data.matchScore} percent`}
+							>
+								{pillInner}
+							</span>
+						)
+					})()
 				) : showHeroBar && data.fillPercent !== undefined ? (
 					/* Fill-quality bar — listing scarcity signal */
 					<div
@@ -652,16 +814,44 @@ export function DiscoveryCard({
 					</span>
 				) : null}
 
-				{/* Report flag — bottom-right */}
-				{onReport ? (
-					<button
-						type="button"
-						className={styles.reportBtn}
-						onClick={() => onReport(data.id)}
-						aria-label="Report listing"
-					>
-						<Icon name="action.report" size={20} aria-hidden />
-					</button>
+				{/* Image-zone actions — bottom-right cluster.
+				    Save appears here ONLY when the decision bar below is not rendered:
+				    two Save controls on one card is two places to wonder whether the
+				    first one worked. Share is always available when a handler exists. */}
+				{onShare || onReport || (onSave && !showDecisionBar) ? (
+					<div className={styles.heroActions}>
+						{onSave && !showDecisionBar ? (
+							<button
+								type="button"
+								className={styles.heroActionBtn}
+								onClick={() => onSave(data.id)}
+								aria-label={isSaved ? "Saved" : "Save this opportunity"}
+								aria-pressed={isSaved}
+							>
+								<Icon name="nav.saved" size={20} aria-hidden />
+							</button>
+						) : null}
+						{onShare ? (
+							<button
+								type="button"
+								className={styles.heroActionBtn}
+								onClick={() => onShare(data.id)}
+								aria-label="Share this opportunity"
+							>
+								<Icon name="action.share" size={20} aria-hidden />
+							</button>
+						) : null}
+						{onReport ? (
+							<button
+								type="button"
+								className={styles.heroActionBtn}
+								onClick={() => onReport(data.id)}
+								aria-label="Report listing"
+							>
+								<Icon name="action.report" size={20} aria-hidden />
+							</button>
+						) : null}
+					</div>
 				) : null}
 			</div>
 
@@ -692,14 +882,28 @@ export function DiscoveryCard({
 						: verified
 							? "trust.verified_host"
 							: "nav.hosts"
+					// Employer logo chip — only for a real host profile. A sourced
+					// listing never reaches here with one (the mapper withholds it), so
+					// a scraped posting can never wear an employer's mark.
+					const mark = data.employerLogoUrl && !isSourced && !isApplicantReview ? (
+						<img
+							src={data.employerLogoUrl}
+							alt=""
+							loading="lazy"
+							decoding="async"
+							className={styles.employerMark}
+						/>
+					) : (
+						<Icon name={hostIcon} size={18} aria-hidden />
+					)
 					return titleHandler ? (
 						<button type="button" className={`${styles.metaRow} ${styles.hostRow}`} onClick={titleHandler}>
-							<Icon name={hostIcon} size={18} aria-hidden />
+							{mark}
 							<span className={styles.hostName}>{data.hostName}</span>
 						</button>
 					) : (
 						<div className={`${styles.metaRow} ${styles.hostRow}`}>
-							<Icon name={hostIcon} size={18} aria-hidden />
+							{mark}
 							<span className={styles.hostName}>{data.hostName}</span>
 						</div>
 					)
@@ -733,30 +937,65 @@ export function DiscoveryCard({
 					)
 				) : null}
 
-				{/* 5. TIMING — concrete BEGINS | ENDS when known, else the opportunity window */}
-				{hasDates ? (
-					<div className={styles.datesRow}>
-						<div className={styles.dateCell}>
-							<span className={styles.dateLabel}>
-								<Icon name="status.begins" size={16} aria-hidden />
-								Begins
+				{/* 5. TIMING — concrete BEGINS | ENDS when known, else the opportunity
+				    window. A dates handler turns the whole strip into ONE button
+				    (season window, length and listing close live in the popover), so
+				    the detail is reachable by keyboard and touch, never by hover. */}
+				{(() => {
+					const datesInner = hasDates ? (
+						<>
+							<span className={styles.dateCell}>
+								<span className={styles.dateLabel}>
+									<Icon name="status.begins" size={16} aria-hidden />
+									Begins
+								</span>
+								<span className={styles.dateValue}>{data.begins ?? "Flexible"}</span>
 							</span>
-							<span className={styles.dateValue}>{data.begins ?? "Flexible"}</span>
-						</div>
-						<div className={styles.dateCell}>
-							<span className={styles.dateLabel}>
-								<Icon name="status.ends" size={16} aria-hidden />
-								Ends
+							<span className={styles.dateCell}>
+								<span className={styles.dateLabel}>
+									<Icon name="status.ends" size={16} aria-hidden />
+									Ends
+								</span>
+								<span className={styles.dateValue}>{data.ends ?? "Flexible"}</span>
 							</span>
-							<span className={styles.dateValue}>{data.ends ?? "Flexible"}</span>
+						</>
+					) : null
+					const datesLabel = hasDates
+						? `Dates: ${data.begins ?? "flexible"} to ${data.ends ?? "flexible"}`
+						: `Timing: ${data.opportunityWindow || "open"}`
+
+					if (hasDates) {
+						return onDatesClick ? (
+							<button
+								type="button"
+								className={`${styles.datesRow} ${styles.datesRowButton}`}
+								onClick={() => onDatesClick(data.id)}
+								aria-label={`${datesLabel} — season details`}
+							>
+								{datesInner}
+							</button>
+						) : (
+							<div className={styles.datesRow}>{datesInner}</div>
+						)
+					}
+
+					return onDatesClick ? (
+						<button
+							type="button"
+							className={`${styles.windowRow} ${styles.datesRowButton}`}
+							onClick={() => onDatesClick(data.id)}
+							aria-label={`${datesLabel} — season details`}
+						>
+							<Icon name="status.begins" size={16} aria-hidden />
+							<span className={styles.dateValue}>{data.opportunityWindow || "Open timing"}</span>
+						</button>
+					) : (
+						<div className={styles.windowRow}>
+							<Icon name="status.begins" size={16} aria-hidden />
+							<span className={styles.dateValue}>{data.opportunityWindow || "Open timing"}</span>
 						</div>
-					</div>
-				) : (
-					<div className={styles.windowRow}>
-						<Icon name="status.begins" size={16} aria-hidden />
-						<span className={styles.dateValue}>{data.opportunityWindow || "Open timing"}</span>
-					</div>
-				)}
+					)
+				})()}
 
 				{/* 6. SKILLS (applicant review) or HOUSING | MEALS | PAY */}
 				{isApplicantReview && data.skills && data.skills.length > 0 ? (
@@ -799,6 +1038,84 @@ export function DiscoveryCard({
 				{surface === "matched" && typeof data.matchScore === "number" ? (
 					<div>
 						<Meter value={data.matchScore} label="Match" />
+					</div>
+				) : null}
+
+				{/* ── 8. STATED FACTS (V2-G info zone) ──────────────────────────────
+				    Season length, experience, physical demand, and the host's own
+				    housing/meals summaries. Rendered ONLY where a host actually filled
+				    the column in — an empty list produces no section, because a row of
+				    em-dashes is a worse answer than no row. */}
+				{!isApplicantReview && (facts.length > 0 || topPerks.length > 0) ? (
+					<div className={styles.facts}>
+						{facts.length > 0 ? (
+							<dl className={styles.factList}>
+								{facts.map((fact) => (
+									<div key={fact.key} className={styles.factItem}>
+										<dt className={styles.factLabel}>{fact.label}</dt>
+										<dd className={styles.factValue}>{fact.value}</dd>
+									</div>
+								))}
+							</dl>
+						) : null}
+						{topPerks.length > 0 ? (
+							<ul className={styles.perks} aria-label="Listed benefits">
+								{topPerks.map((perk) => (
+									<li key={perk} className={styles.perk}>
+										{perk}
+									</li>
+								))}
+							</ul>
+						) : null}
+					</div>
+				) : null}
+
+				{/* ── 9. DECISION META ──────────────────────────────────────────────
+				    Why this matched, when the listing closes, and what the host has
+				    left unanswered. All three are decision inputs, so they sit
+				    immediately above the decision itself. */}
+				{!isApplicantReview && !isAdminReview &&
+				(showReasons || data.closesOn || missingSentence) ? (
+					<div className={styles.decisionMeta}>
+						{showReasons ? (
+							<p className={styles.reasons}>
+								<Icon name="status.match" size={14} aria-hidden />
+								<span>
+									Strong on {reasonLabels.join(" · ")}
+									{lowConfidence ? " — based on a partly-filled profile" : ""}
+								</span>
+								{onMatchClick ? (
+									<button
+										type="button"
+										className={styles.reasonsMore}
+										onClick={() => onMatchClick(data.id)}
+									>
+										Why?
+									</button>
+								) : null}
+							</p>
+						) : null}
+
+						{data.closesOn ? (
+							/* "Listing closes", never "apply by": the schema stores an
+							   expiry, not a deadline, and the two make different promises. */
+							<p className={styles.closes}>
+								<Icon name="status.ends" size={14} aria-hidden />
+								Listing closes {data.closesOn}
+							</p>
+						) : null}
+
+						{missingSentence ? (
+							<p
+								className={styles.missing}
+								data-reduced={record.reducedConfidence ? "true" : undefined}
+							>
+								<Icon name="system.info" size={14} aria-hidden />
+								<span>
+									{missingSentence}. {record.completeness}% of this listing is answered.
+								</span>
+							</p>
+						) : null}
 					</div>
 				) : null}
 

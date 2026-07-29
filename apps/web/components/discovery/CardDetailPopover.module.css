@@ -1,0 +1,125 @@
+.panel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+}
+
+.row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: var(--space-16);
+	padding-bottom: var(--space-8);
+	border-bottom: 1px solid var(--border-soft);
+}
+
+.rowLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-muted);
+	flex-shrink: 0;
+}
+
+.rowValue {
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	text-align: right;
+}
+
+/* A missing value reads as missing — same slot, plainly different voice, and a
+   full sentence rather than a dash a reader has to interpret. */
+.rowMissing {
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-style: italic;
+	color: var(--text-muted);
+	text-align: right;
+}
+
+.lead {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.list {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.listYes,
+.listNo {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-8);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+}
+
+.listYes :global(svg),
+.listNo :global(svg) {
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.listYes {
+	color: var(--text-primary);
+}
+
+.listYes :global(svg) {
+	color: var(--status-success-fg);
+}
+
+.listNo {
+	color: var(--text-secondary);
+}
+
+.listNo :global(svg) {
+	color: var(--text-muted);
+}
+
+.note,
+.warn {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-8);
+	margin: 0;
+	padding: var(--space-10) var(--space-12);
+	border-radius: var(--radius-input);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+}
+
+.note :global(svg),
+.warn :global(svg) {
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.note {
+	background: var(--color-surface);
+	border: 1px solid var(--border-soft);
+	color: var(--text-secondary);
+}
+
+.warn {
+	background: var(--color-surface);
+	border: 1px solid color-mix(in srgb, var(--status-warning-fg) 40%, var(--border-soft));
+	color: var(--status-warning-fg);
+}

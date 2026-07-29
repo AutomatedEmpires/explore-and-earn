@@ -1,0 +1,202 @@
+/* The launcher. Quiet by design — it sits above the mobile dock and out of the
+   way of the content, and it never nags. */
+.launcher {
+	position: fixed;
+	left: var(--space-16);
+	bottom: calc(var(--size-bottom-nav) + var(--space-16));
+	z-index: 60;
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min);
+	padding: var(--space-8) var(--space-14);
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface-raised);
+	box-shadow: var(--elevation-card);
+	color: var(--text-secondary);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+}
+
+.launcher:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+@media (min-width: 1024px) {
+	.launcher {
+		bottom: var(--space-16);
+	}
+}
+
+/* The bubble. NO scrim and NO scroll lock — the page underneath stays live,
+   which is the whole difference between a coachmark and the modal this
+   replaced. */
+.bubble {
+	position: fixed;
+	z-index: 70;
+	width: min(22rem, calc(100vw - var(--space-32)));
+	padding: var(--space-16);
+	border-radius: var(--radius-feature);
+	background: var(--color-surface-raised);
+	border: 1px solid var(--border-soft);
+	box-shadow: var(--elevation-overlay);
+	color: var(--text-primary);
+}
+
+/* Anchored: sit under the highlighted control, centred on it, and clamped so
+   the bubble can never leave the viewport on a narrow screen. */
+.bubble[data-placement="anchored"] {
+	top: calc(var(--cm-top) + var(--space-10));
+	left: clamp(
+		var(--space-16),
+		calc(var(--cm-left) - 11rem),
+		calc(100vw - min(22rem, calc(100vw - var(--space-32))) - var(--space-16))
+	);
+}
+
+/* Docked: the control is on another route, so the bubble parks in the corner
+   and the body tells the seeker where the control actually lives. */
+.bubble[data-placement="docked"] {
+	left: var(--space-16);
+	bottom: calc(var(--size-bottom-nav) + var(--space-16) + var(--tap-min));
+}
+
+.bubble:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-8);
+	margin-bottom: var(--space-8);
+}
+
+.step {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.close {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--tap-min);
+	height: var(--tap-min);
+	margin: calc(-1 * var(--space-8)) calc(-1 * var(--space-8)) 0 0;
+	border: none;
+	border-radius: var(--radius-pill);
+	background: none;
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+.close:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.title {
+	margin: 0 0 var(--space-6);
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	font-weight: var(--font-weight-bold);
+	color: var(--text-primary);
+}
+
+.body {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.where {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-6);
+	margin: var(--space-10) 0 0;
+	padding: var(--space-8) var(--space-10);
+	border-radius: var(--radius-input);
+	background: var(--color-surface);
+	border: 1px solid var(--border-soft);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-muted);
+}
+
+.where svg {
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.actions {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-8);
+	margin-top: var(--space-14);
+}
+
+.back,
+.next {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	min-height: var(--tap-min);
+	padding: var(--space-8) var(--space-16);
+	border-radius: var(--radius-button);
+	font-family: var(--font-ui);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-bold);
+	cursor: pointer;
+}
+
+.back {
+	background: none;
+	border: 1px solid var(--border-soft);
+	color: var(--text-secondary);
+}
+
+.back:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.next {
+	background: var(--gradient-action);
+	border: none;
+	color: var(--color-cta-text);
+}
+
+.back:focus-visible,
+.next:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+/* The target highlight ([data-coachmark="active"]) cannot live here: a CSS
+   module rejects a selector with no local class ("not pure"), and the attribute
+   lands on an arbitrary element the tour is pointing at. It is in
+   styles/seeker-os.css, the scope's own stylesheet. */
+
+@media (prefers-reduced-motion: reduce) {
+	.bubble {
+		transition: none;
+	}
+}

@@ -220,6 +220,35 @@ export function formatDate(
   return new Date(iso).toLocaleDateString(locale, opts);
 }
 
+/**
+ * Season length, derived from the two stored dates and NOTHING else.
+ *
+ * This is arithmetic on `begins_at`/`ends_at`, not an invented field: a card
+ * that shows "Jun 2 – Sep 14" is asking the reader to do the subtraction, and
+ * the subtraction is the fact they actually care about ("how long am I gone
+ * for"). Returns null when either date is missing or unparseable — a missing
+ * season length must read as missing, never as zero.
+ *
+ * Weeks below one month, months above; both rounded, both hedged with "about",
+ * because a listing's real end date moves and a precise-looking number would
+ * over-claim.
+ */
+export function formatSeasonLength(
+  begins?: string | null,
+  ends?: string | null,
+): string | null {
+  if (!begins || !ends) return null;
+  const from = Date.parse(begins);
+  const to = Date.parse(ends);
+  if (Number.isNaN(from) || Number.isNaN(to) || to <= from) return null;
+  const days = Math.round((to - from) / 86_400_000);
+  if (days < 7) return `${days} ${days === 1 ? "day" : "days"}`;
+  const weeks = Math.round(days / 7);
+  if (weeks < 9) return `about ${weeks} weeks`;
+  const months = Math.round(days / 30.44);
+  return `about ${months} months`;
+}
+
 export interface OpportunityWindowInput {
   /** Host-authored timeline text; wins over the begins/ends range. */
   readonly timelineSummary?: string | null;

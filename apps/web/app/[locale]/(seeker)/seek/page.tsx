@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 
 import {
 	type DiscoveryEnrichment,
@@ -9,6 +9,7 @@ import {
 	behavioralAdjustment,
 	computeBehaviorProfile,
 	enrichmentFromScope,
+	getMatchDetailsForSeeker,
 	getMatchScoresForSeeker,
 	getSavedSearches,
 	getSeekerBehaviorInteractions,
@@ -33,9 +34,7 @@ import {
 	warnIfDiscoveryDataMissingInProduction,
 } from "../../../../components/discovery/data";
 import { SeekBrowser } from "../../../../components/seeker";
-import { SeekerDashboard } from "../../../../components/seeker/SeekerDashboard";
-import { getSeekerStatus, getMatchedListings } from "../../../../components/seeker/data";
-import { cachedSeekerProfile, getSupabaseToken } from "../../../../lib/serverCache";
+import { getSupabaseToken } from "../../../../lib/serverCache";
 import { buildFeaturedEmployers } from "../../../../lib/employer-utils";
 import styles from "./page.module.css";
 
@@ -222,14 +221,18 @@ export default async function SeekPage({
 	let behaviorProfile = EMPTY_BEHAVIOR_PROFILE;
 	if (userId && token && hasPublicDataConfig) {
 		try {
-			const [scope, scores, behaviorInteractions] = await Promise.all([
+			const [scope, scores, details, behaviorInteractions] = await Promise.all([
 				resolveSeekerDiscoveryScope(token, userId),
 				getMatchScoresForSeeker(token, userId),
+				// Component sub-scores, so every match pill on this page can explain
+				// itself. Best-effort like the rest of the scope: no details means no
+				// reasons, never invented ones.
+				getMatchDetailsForSeeker(token, userId).catch(() => undefined),
 				getSeekerBehaviorInteractions(token, userId).catch(() => []),
 			]);
 			seekerScope = { clerkToken: token, clerkUserId: userId };
 			storedScores = scores;
-			enrichment = enrichmentFromScope(scope, scores);
+			enrichment = enrichmentFromScope(scope, scores, details);
 			behaviorProfile = computeBehaviorProfile(
 				behaviorInteractions ?? [],
 				Date.now(),
@@ -305,30 +308,21 @@ export default async function SeekPage({
 
 	const showPagination = page > 1 || hasNextPage;
 
-	// Dashboard data — only fetched when signed in. If the seeker-status fetch
-	// fails (transient DB fault, or the dev bench's sentinel token locally),
-	// degrade to the public discovery view instead of 500ing the whole page —
-	// discovery must never dead-end on a personalization fault.
-	let dashboardProps = null;
+	// Saved searches — the only personalization /seek still carries.
+	//
+	// THE DASHBOARD USED TO LIVE HERE, AND THAT WAS THE BUG. A signed-in seeker
+	// opening the marketplace's search surface was shown a welcome banner, a
+	// readiness slider, a pipeline, a résumé nudge and two rails BEFORE the first
+	// result — the dashboard swallowed discovery on the one route whose entire
+	// job is discovery. The dashboard is now its own destination (/home) and
+	// /seek is search, start to finish. See (seeker)/home/page.tsx.
 	let savedSearchViews: { id: string; label: string; href: string }[] = [];
-	seekerDashboard: if (userId && token) {
-		const clerkUser = await currentUser();
-		const fallbackName =
-			clerkUser?.firstName
-				? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
-				: "Seeker";
-
-		let status, matchedListings, profile, savedSearches;
+	seekerSavedSearches: if (userId && token) {
+		let savedSearches;
 		try {
-			[status, matchedListings, profile, savedSearches] =
-				await Promise.all([
-					getSeekerStatus(token, userId, fallbackName),
-					getMatchedListings(token, userId),
-					cachedSeekerProfile(token, userId),
-					getSavedSearches(token, userId).catch(() => []),
-				]);
+			savedSearches = await getSavedSearches(token, userId).catch(() => []);
 		} catch {
-			break seekerDashboard;
+			break seekerSavedSearches;
 		}
 
 		// Per saved search, count live listings published AFTER it was saved that
@@ -367,14 +361,6 @@ export default async function SeekPage({
 			}),
 		);
 
-		dashboardProps = {
-			profile,
-			status,
-			matchedListings: matchedListings.slice(0, 12),
-			seekerName: status.seekerName,
-			featuredEmployers,
-		};
-
 		// The grid's match %, applied HARD-exclusion, previously-skipped marker,
 		// and MATCH-PRIMARY order were already stamped up front from the stored
 		// scope + enrichment (see the `seekerScope` block above) — no per-render
@@ -383,29 +369,24 @@ export default async function SeekPage({
 
 	return (
 		<>
-			{dashboardProps && (
-				<SeekerDashboard {...dashboardProps} />
-			)}
-
-			<div className={dashboardProps ? styles.discoverSection : undefined}>
-				{dashboardProps && (
-					<h2 className={styles.discoverHeading}>Discover Opportunities</h2>
-				)}
-				<SeekBrowser
-					listings={listings}
-					featuredEmployers={featuredEmployers}
-					query={query}
-					category={category}
-					housing={housing}
-					meals={meals}
-					visaSupport={visaSupport}
-					startRangeMonths={startRangeMonths}
-					location={location}
-					payMin={payMin}
-					payUnit={payUnit}
-					savedSearches={savedSearchViews}
-				/>
-			</div>
+			<SeekBrowser
+				listings={listings}
+				featuredEmployers={featuredEmployers}
+				query={query}
+				category={category}
+				housing={housing}
+				meals={meals}
+				visaSupport={visaSupport}
+				startRangeMonths={startRangeMonths}
+				location={location}
+				payMin={payMin}
+				payUnit={payUnit}
+				startAfter={startAfter}
+				startBefore={startBefore}
+				savedSearches={savedSearchViews}
+				hasMorePages={hasNextPage}
+				isAuthenticated={Boolean(userId)}
+			/>
 
 			{showPagination ? (
 				<nav className={styles.pagination} aria-label="Search results pages">

@@ -18,6 +18,7 @@ import type { BenefitTriad } from "./benefits";
 import type { DiscoveryCardConditionalBadge } from "./card";
 import type { OpportunityCategory } from "./categories";
 import type { CompensationUnit, ListingStatus } from "./enums";
+import type { MatchReason } from "./match";
 import type { ImageSelection } from "./media";
 import type { ListingProvenanceInfo } from "./provenance";
 
@@ -33,6 +34,13 @@ export interface ListingHost {
   readonly verified: boolean;
   /** Short employer tagline for the featured-employer rail (1–2 punchy sentences). */
   readonly tagline?: string;
+  /**
+   * `host_profiles.photo_url` — the employer's own mark, rendered as the card's
+   * logo chip. Absent for sourced inventory by construction: an unconfirmed
+   * posting has no host profile, so putting a logo on it would dress a scraped
+   * listing as a claimed one.
+   */
+  readonly logoUrl?: string;
   /**
    * Host subscription tier — powers monetization ranking ("pay more, show more":
    * Enterprise > Professional > Starter, below Boosted and strong Match). Derived
@@ -119,4 +127,44 @@ export interface OpportunityListing {
    * "not provided".
    */
   readonly provenanceInfo?: ListingProvenanceInfo;
+
+  // ── V2-G card fields ──────────────────────────────────────────────────────
+  //
+  // EVERY field below maps to a REAL stored column. Nothing here is inferred,
+  // averaged, or filled in from a sibling listing: an absent field means the
+  // host never stated it, and the card is required to say so rather than guess.
+  // The card's "what's missing" line is built from exactly these absences.
+
+  /**
+   * `listings.expires_at` (034/067) — when this listing stops being live.
+   *
+   * This is a LISTING expiry, not an application deadline: the product stores
+   * no `application_deadline` column, so surfaces must phrase it as "listing
+   * closes", never as "apply by". Presenting an expiry as a deadline would
+   * invent a commitment the host never made.
+   */
+  readonly expiresAt?: string;
+  /** `listings.experience_level_required` (051). Freeform host text. */
+  readonly experienceLevel?: string;
+  /**
+   * `listings.physical_demand` (051) — 0 (light) … 3 (very demanding).
+   * Absent means unstated; never defaulted to 0.
+   */
+  readonly physicalDemand?: number;
+  /** `listings.perks` (060) — listing-level perks, plain strings. */
+  readonly perks?: readonly string[];
+  /** `listings.required_certifications` (051). */
+  readonly requiredCertifications?: readonly string[];
+  /**
+   * Render-time match reasons, derived from the stored `match_scores.components`
+   * by {@link topMatchReasons}. G34 law: reason TEXT is never persisted, so this
+   * is computed per render from numbers the engine wrote. Absent when the
+   * pairing has no stored components (i.e. "not scored yet", never "no fit").
+   */
+  readonly matchReasons?: readonly MatchReason[];
+  /**
+   * `match_scores.confidence` (052) — the ADR-040 data-quality axis, distinct
+   * from the score. Drives the card's reduced-confidence treatment.
+   */
+  readonly matchConfidence?: number;
 }

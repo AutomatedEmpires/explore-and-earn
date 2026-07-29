@@ -228,9 +228,10 @@
     right: 0;
     bottom: 0;
     width: 100%;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    /* D17: five destinations — Explore · Swipe · Saved · Applications · Profile. */
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
     background: var(--color-surface);
     border-top: 1px solid var(--seekeros-line);
     box-shadow: 0 -2px 12px color-mix(in srgb, var(--palette-ink) 7%, transparent);
@@ -241,7 +242,7 @@
     background: transparent;
     color: var(--text-muted);
     border-radius: var(--radius-cell);
-    padding: var(--space-6) var(--space-4);
+    padding: var(--space-6) var(--space-2);
     min-height: var(--tap-min);
     display: grid;
     place-items: center;
@@ -250,6 +251,25 @@
     line-height: var(--type-label-lh);
     font-weight: 700;
     text-decoration: none;
+    /* Five labels across a 390px viewport: "Applications" is the long one, so
+       the label ellipsises rather than wrapping the dock to two rows or
+       overflowing the tab. The icon + aria-current still identify the tab, and
+       the accessible name is the full word. */
+    min-width: 0;
+    text-align: center;
+  }
+
+  .seekeros-mtab > :last-child,
+  .seekeros-mtab {
+    overflow-wrap: anywhere;
+  }
+
+  /* Below ~360px even "anywhere" wrapping runs out of room; shrink the label
+     rather than let the dock grow a second row under the content. */
+  @media (max-width: 380px) {
+    .seekeros-mtab {
+      font-size: var(--type-label-size);
+    }
   }
 
   /* Active tab — quiet soft-sky fill + deep-sky glyph (no heavy gradient pill). */
@@ -343,4 +363,18 @@
     transform: none;
     opacity: 1;
   }
+}
+
+/* ── Coachmark target highlight (D19) ──────────────────────────────────────
+   The attribute is stamped by SeekerCoachmarks onto whatever real control the
+   current mark points at, so the rule cannot live in a CSS module (a module
+   selector must contain a local class; this one, by design, cannot).
+
+   An OUTLINE rather than a background: forced-colours and high-contrast modes
+   discard background colours, and a highlight that disappears in exactly the
+   mode a low-vision reader is using is not a highlight. */
+[data-coachmark="active"] {
+  outline: 3px solid var(--color-cta);
+  outline-offset: 3px;
+  border-radius: var(--radius-control);
 }

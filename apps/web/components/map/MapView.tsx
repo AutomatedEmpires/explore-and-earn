@@ -27,6 +27,7 @@ import { MAPPIN_ICON } from "../seeker/mappin";
 import { SeekFilterPopup, type SeekFilterPopupValue } from "../seeker/SeekFilterPopup";
 import { SeekSortPopup } from "../seeker/SeekSortPopup";
 import { byMonetization, type MonetizationInputs } from "../../lib/ranking";
+import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
 import styles from "./MapView.module.css";
 
 export interface MapViewProps {
@@ -264,6 +265,22 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
     });
   }, []);
 
+  /**
+   * The region-search event.
+   *
+   * NO COORDINATES LEAVE THE PAGE. The properties are a zoom level and a result
+   * count — never the bounds, because a signed-in seeker panning around where
+   * they live would be emitting their home location to an analytics vendor one
+   * viewport at a time. Zoom answers "were they scanning a state or a street",
+   * which is the product question, without answering "which street".
+   */
+  const reportRegion = useCallback(() => {
+    const map = mapRef.current;
+    captureEvent(SEEKER_DISCOVERY_EVENTS.mapRegionSearched, {
+      zoom: map ? Math.round(map.getZoom()) : undefined,
+    });
+  }, []);
+
   const focusListing = (listing: MappedListing) => {
     setSelectedId(listing.id);
     mapRef.current?.flyTo({
@@ -334,6 +351,7 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
     <ListingCardProvider
       listings={mapped}
       overrides={{ onApply: (id) => router.push(`/listing/${id}`) }}
+      analyticsSurface="map"
     >
     <div className={styles.shell}>
       <div className={styles.canvas}>
@@ -347,7 +365,10 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
             setLoaded(true);
             syncBounds();
           }}
-          onMoveEnd={syncBounds}
+          onMoveEnd={() => {
+            syncBounds();
+            reportRegion();
+          }}
           onError={() => setErrored(true)}
           onClick={() => setSelectedId(null)}
           reuseMaps
@@ -464,6 +485,18 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
           </span>
         </button>
         <div className={styles.trayBody}>
+          {/* LOCATION PRECISION (074). A listing's latitude/longitude is a point
+              the HOST placed and can clear at any time; the constraint set only
+              guarantees the pair is complete, in-bounds, and accompanied by a
+              display label. It is not a surveyed address and must never be
+              presented as one, so the tray says what a pin is before the seeker
+              plans a journey around it. */}
+          <p className={styles.precisionNote}>
+            <Icon name="system.info" size={14} aria-hidden />
+            Pins show the place each host chose to publish — an area, not a
+            street address. Confirm the exact address with the host before you
+            travel.
+          </p>
           {trayListings.length === 0 ? (
             <p className={styles.trayEmpty}>
               No opportunities in this view. Pan or zoom out, or loosen your

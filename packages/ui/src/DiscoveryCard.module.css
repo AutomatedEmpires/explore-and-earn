@@ -161,6 +161,38 @@
   flex-shrink: 0;
 }
 
+/* The badge as an explainer. Same geometry as the static dot — a button that
+   moved would make the trust mark jump when the card gained a handler.
+
+   The MARK is 20px because that is what reads correctly against the host
+   circle; the TAP TARGET is not. The pseudo-element below expands the hit area
+   to the full --tap-min square, centred on the mark and invisible, so a thumb
+   or a shaky hand lands on it without the badge growing into the photo.
+   Measured live: the button itself was 20x20, under every touch-target
+   guideline there is. */
+.verifiedDotButton {
+  padding: 0;
+  cursor: pointer;
+  appearance: none;
+  position: absolute;
+}
+
+.verifiedDotButton::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-pill);
+}
+
+.verifiedDotButton:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
 /* ── STAMPS (photo overlay badges) ────────────────────────────────────────── */
 
 .centerSlot {
@@ -272,6 +304,29 @@
 
 /* Bands — strong (emerald) · good (teal) · fair (glacier) · low (steel).
    Values are named tokens (light-identical) so the card is fully token-driven. */
+/* The pill as an explainer button — same geometry, real focus ring, and the
+   same invisible hit expansion as the verified badge. The pill measures ~20px
+   tall by design (it sits over the photo); the target it presents must not. */
+.matchPillButton {
+  appearance: none;
+  cursor: pointer;
+}
+
+.matchPillButton::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: var(--tap-min);
+  transform: translateY(-50%);
+}
+
+.matchPillButton:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
 .matchStrong { --dc-match-fg: var(--match-strong); }
 .matchGood   { --dc-match-fg: var(--match-good); }
 .matchFair   { --dc-match-fg: var(--match-fair); }
@@ -480,6 +535,49 @@
   box-shadow: var(--ui-focus-ring);
 }
 
+/* ── IMAGE-ZONE ACTION CLUSTER (save / share / report) ────────────────────── */
+
+.heroActions {
+  position: absolute;
+  right: var(--space-12);
+  bottom: var(--space-12);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+/* Every control is a full tap target in its own right — the cluster shrinks the
+   gap between them, never the buttons. */
+.heroActionBtn {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--palette-ink) 42%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in srgb, var(--palette-white) 34%, transparent);
+  box-shadow: var(--elevation-pin);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  color: var(--palette-white);
+}
+
+.heroActionBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.heroActionBtn[aria-pressed="true"] {
+  background: var(--gradient-state-ready);
+  border-color: var(--palette-white);
+}
+
 /* ── BODY (boxed near-equal info rows) ────────────────────────────────────── */
 
 .body {
@@ -627,6 +725,31 @@ button.metaRow:focus-visible {
   color: var(--text-primary);
 }
 
+/* The dates strip as a control. Kept visually identical to the static strip so
+   a card does not restyle itself when a popover handler is supplied; the affordance
+   is the cursor, the focus ring and the aria-label, not a different look. */
+.datesRowButton {
+  width: 100%;
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.datesRowButton:focus-visible {
+  outline: none;
+  border-radius: var(--radius-input);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.datesRowButton:hover .dateCell {
+  border-color: color-mix(in srgb, var(--color-cta) 45%, var(--border-soft));
+}
+
 /* Fallback single opportunity-window row */
 .windowRow {
   display: flex;
@@ -638,6 +761,168 @@ button.metaRow:focus-visible {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-input);
   color: var(--text-secondary);
+}
+
+/* ── STATED FACTS + PERKS (V2-G info zone) ────────────────────────────────── */
+
+.facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.factList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.factItem {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.factLabel {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.factValue {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-align: right;
+  /* Host summaries are free text of any length; two lines then ellipsis, with
+     the full text in the Housing/Meals popover. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.perks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.perk {
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  padding: var(--space-4) var(--space-10);
+}
+
+/* ── DECISION META (why it matched · when it closes · what's missing) ─────── */
+
+.decisionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.reasons,
+.closes,
+.missing {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+}
+
+.reasons {
+  color: var(--text-secondary);
+}
+
+.reasons :global(svg),
+.closes :global(svg),
+.missing :global(svg) {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.reasonsMore {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: auto;
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-cta);
+  text-decoration: underline;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.reasonsMore:focus-visible {
+  outline: none;
+  border-radius: var(--radius-control);
+  box-shadow: var(--ui-focus-ring);
+}
+
+.closes {
+  color: var(--status-warning-fg);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The gap disclosure. Muted by default; when enough is unanswered that the card
+   must stop presenting as ordinary, it gains a border and a warning tone —
+   never a colour alone, because the sentence itself already names the gaps. */
+.missing {
+  color: var(--text-muted);
+}
+
+.missing[data-reduced="true"] {
+  color: var(--text-secondary);
+  padding: var(--space-8) var(--space-10);
+  background: var(--color-surface);
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-input);
+}
+
+/* ── EMPLOYER MARK (info-zone logo chip) ──────────────────────────────────── */
+
+.employerMark {
+  width: var(--space-20);
+  height: var(--space-20);
+  flex-shrink: 0;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+}
+
+/* ── FEATURED VARIANT ─────────────────────────────────────────────────────── */
+
+/* A featured card is lifted, not recoloured: the category stamp still says what
+   lane it is, and a gold wash would read as an ad. */
+.card[data-variant="featured"] {
+  border-color: color-mix(in srgb, var(--palette-gold) 55%, var(--border-soft));
+  box-shadow: var(--elevation-hover);
 }
 
 /* ── SKILLS (host_applicant_review) ───────────────────────────────────────── */
