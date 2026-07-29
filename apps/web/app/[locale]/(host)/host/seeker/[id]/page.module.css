@@ -123,16 +123,22 @@
   flex-wrap: wrap;
 }
 
+/* min-height, not height: --ui-btn-height was never defined, so the whole
+   declaration dropped and these buttons collapsed to the 12px line-box of their
+   own uppercase label — a touch target roughly a third of the WCAG 2.2 floor.
+   44px matches the control height the rest of the app sets literally (there is
+   no control-height token), and min- lets a wrapped label grow instead of
+   spilling out of a fixed box. */
 .actionPrimary {
   display: inline-flex;
   align-items: center;
   gap: var(--space-8);
-  height: var(--ui-btn-height);
+  min-height: 44px;
   padding: 0 var(--space-20);
   border-radius: var(--radius-pill);
   border: none;
   background: var(--color-cta);
-  color: var(--color-on-cta);
+  color: var(--color-cta-text);
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   font-weight: var(--font-weight-semibold);
@@ -157,7 +163,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-8);
-  height: var(--ui-btn-height);
+  min-height: 44px;
   padding: 0 var(--space-20);
   border-radius: var(--radius-pill);
   border: 1.5px solid var(--border-ink);

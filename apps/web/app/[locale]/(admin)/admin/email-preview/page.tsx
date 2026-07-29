@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -16,11 +16,20 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * Allow-list only, exactly like every other admin surface.
+ *
+ * This used to accept `publicMetadata.role === "admin"` as an ALTERNATIVE to
+ * the allow-list, which directly contradicts the property lib/admin.ts is
+ * written to hold — "NOT a Clerk role/claim, so a leaked or misconfigured role
+ * can never escalate into the admin surface". The parent (admin)/layout.tsx
+ * gate is allow-list-only and runs first, so nothing was actually reachable
+ * through the role branch; it was a second, weaker gate sitting in the codebase
+ * waiting for someone to copy it somewhere the layout does not cover.
+ */
 async function requireAdmin(): Promise<void> {
   const { userId } = await auth();
-  const user = await currentUser();
-  const role = (user?.publicMetadata as { role?: unknown } | undefined)?.role;
-  if (role !== "admin" && !isAdminUserId(userId)) {
+  if (!isAdminUserId(userId)) {
     redirect("/");
   }
 }

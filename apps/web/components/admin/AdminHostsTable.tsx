@@ -6,6 +6,7 @@ import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 import { Badge, Button, Icon, MetricCard, MetricGrid, VerifiedHostBadge } from "@explore-and-earn/ui";
 
 import { clearHostFlagAction, unverifyHostAction, verifyHostAction } from "../../app/actions/admin";
+import { ConfirmAction } from "./ConfirmAction";
 import styles from "./AdminHostsTable.module.css";
 
 export interface AdminHostRowView {
@@ -372,6 +373,10 @@ export function AdminHostsTable({
                 </div>
 
                 <div className={styles.actions}>
+                  {/* Attest stays one click. It is the grant, not the taking
+                      away, and Un-attest sits right beside it to undo — the
+                      half worth a second look is the one that removes trust,
+                      not the one that extends it. */}
                   <Button
                     variant="primary"
                     icon="trust.verified_host"
@@ -383,29 +388,30 @@ export function AdminHostsTable({
                   >
                     Attest
                   </Button>
-                  <Button
-                    variant="ghost"
+                  <ConfirmAction
+                    label="Un-attest"
+                    confirmLabel="Confirm un-attest"
+                    question="Remove this host's trust attestation? They return to the unreviewed queue, but their listings stay public — this clears the moderator sign-off only, not the paid Verified Host badge."
+                    subject={company}
                     icon="action.close"
-                    disabled={busy || !attested}
-                    aria-label={`Remove trust attestation from ${company}`}
-                    onClick={() =>
+                    disabled={!attested}
+                    busy={busy}
+                    onConfirm={() =>
                       runAction(host.id, () => unverifyHostAction(host.id))
                     }
-                  >
-                    Un-attest
-                  </Button>
+                  />
                   {host.flaggedForReview ? (
-                    <Button
-                      variant="ghost"
+                    <ConfirmAction
+                      label="Clear flag"
+                      confirmLabel="Confirm clear flag"
+                      question="Clear this spam-report flag? The reason it was raised is erased with it, and this screen never showed you what that reason was."
+                      subject={company}
                       icon="action.close"
-                      disabled={busy}
-                      aria-label={`Clear the spam-report flag on ${company}`}
-                      onClick={() =>
+                      busy={busy}
+                      onConfirm={() =>
                         runAction(host.id, () => clearHostFlagAction(host.id))
                       }
-                    >
-                      Clear flag
-                    </Button>
+                    />
                   ) : null}
                 </div>
               </article>

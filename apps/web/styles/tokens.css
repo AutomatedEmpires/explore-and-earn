@@ -139,10 +139,20 @@
   --status-warning-bg:        var(--palette-warning-bg);  --status-warning-fg:       var(--palette-warning-fg);
   --status-error-bg:          var(--palette-error-bg);    --status-error-fg:         var(--palette-error-fg);
 
-  /* spacing scale (2px base) */
+  /* spacing scale (2px base)
+     THE NUMBER IN THE NAME IS THE PIXEL VALUE. --space-4 is 4px, not a "step 4"
+     of some other scale. This matters: a stylesheet authored against a
+     step-indexed scale (Tailwind's, where 4 means 16px) still COMPILES here and
+     silently lays out at a quarter size. If a rule wants 16px of card padding,
+     it asks for --space-16.
+     Rungs 1 and 5 exist so that the low end is continuous — a bare var() for a
+     rung that does not exist drops the ENTIRE declaration (guardrail G54), which
+     is a harder failure than an off-by-one gap. */
+  --space-1:  1px;
   --space-2:  2px;
   --space-3:  3px;
   --space-4:  4px;
+  --space-5:  5px;
   --space-6:  6px;
   --space-8:  8px;
   --space-10: 10px;
@@ -152,9 +162,11 @@
   --space-18: 18px;
   --space-20: 20px;
   --space-24: 24px;
+  --space-28: 28px;
   --space-32: 32px;
   --space-40: 40px;
   --space-48: 48px;
+  --space-56: 56px;
   --space-64: 64px;
   --space-80: 80px;
   --space-card:     16px;

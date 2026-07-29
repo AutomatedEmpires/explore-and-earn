@@ -17,21 +17,21 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--status-success-fg) 8%, var(--color-surface));
 }
 
 .introIcon {
   display: grid;
   place-items: center;
   flex: none;
-  color: var(--color-success);
+  color: var(--status-success-fg);
 }
 
 .introText {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .form {
@@ -49,12 +49,12 @@
 .label {
   font-size: var(--type-body-sm);
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .hint {
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .select,
@@ -62,12 +62,12 @@
 .textarea {
   width: 100%;
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   background: var(--color-surface);
   padding: var(--space-3) var(--space-4);
   font: inherit;
   font-size: var(--type-body-sm);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .textarea {
@@ -78,7 +78,7 @@
 .select:focus-visible,
 .input:focus-visible,
 .textarea:focus-visible {
-  outline: 2px solid var(--color-text-primary);
+  outline: 2px solid var(--text-primary);
   outline-offset: 1px;
 }
 
@@ -92,11 +92,11 @@
 .selectedAmount {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .selectedAmount strong {
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .error,
@@ -107,17 +107,17 @@
   margin: 0;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   font-size: var(--type-body-sm);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .error {
-  background: color-mix(in srgb, var(--color-danger) 10%, white);
+  background: color-mix(in srgb, var(--status-error-fg) 10%, white);
 }
 
 .success {
-  background: color-mix(in srgb, var(--color-success) 12%, white);
+  background: color-mix(in srgb, var(--status-success-fg) 12%, white);
 }
 
 .submitRow {
@@ -130,20 +130,20 @@
   flex-direction: column;
   gap: var(--space-3);
   padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--border-default);
 }
 
 .historyTitle {
   margin: 0;
   font-size: var(--type-heading-sm);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .historyEmpty {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .historyList {
@@ -161,7 +161,7 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   background: var(--color-surface);
 }
 
@@ -175,7 +175,7 @@
 .historyAmount {
   font-size: var(--type-heading-sm);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .historyMeta {
@@ -184,7 +184,7 @@
   gap: var(--space-2);
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .metaDot {
@@ -192,17 +192,17 @@
   width: 3px;
   height: 3px;
   border-radius: var(--radius-pill);
-  background: var(--color-text-secondary);
+  background: var(--text-secondary);
 }
 
 .historyReason {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .historyNote {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }

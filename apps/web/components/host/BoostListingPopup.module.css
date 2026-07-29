@@ -73,7 +73,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-tertiary, var(--text-secondary));
+  color: var(--text-muted, var(--text-secondary));
 }
 
 .tier {
@@ -226,7 +226,7 @@
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
   line-height: var(--type-label-lh);
-  color: var(--text-tertiary, var(--text-secondary));
+  color: var(--text-muted, var(--text-secondary));
 }
 
 /* ── Not-live guidance ───────────────────────────────────────────────────── */

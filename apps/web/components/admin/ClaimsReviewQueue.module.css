@@ -59,7 +59,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-weight: var(--font-weight-bold);
-  font-size: var(--type-title-size);
+  font-size: var(--type-section-size);
   color: var(--text-primary);
 }
 
@@ -108,7 +108,7 @@
 .listingLink {
   font-family: var(--font-display);
   font-weight: var(--font-weight-bold);
-  font-size: var(--type-title-size);
+  font-size: var(--type-section-size);
   color: var(--text-primary);
   text-decoration: none;
 }
@@ -245,7 +245,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-weight: var(--font-weight-bold);
-  font-size: var(--type-title-size);
+  font-size: var(--type-section-size);
   color: var(--text-primary);
 }
 

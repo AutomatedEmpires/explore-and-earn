@@ -28,8 +28,8 @@
 	margin: 0;
 	font-family: var(--font-display);
 	font-weight: var(--font-weight-bold);
-	font-size: var(--type-title-size);
-	line-height: var(--type-title-line);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
 	color: var(--text-primary);
 }
 
@@ -65,7 +65,7 @@
 	gap: var(--space-12);
 	min-height: 11rem;
 	padding: var(--space-16);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	overflow: hidden;
 	text-decoration: none;
 	color: var(--palette-white);
@@ -115,7 +115,7 @@
 .hero {
 	position: relative;
 	min-height: 16rem;
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	overflow: hidden;
 	display: flex;
 	align-items: flex-end;
@@ -161,8 +161,8 @@
 	margin: 0;
 	font-family: var(--font-display);
 	font-weight: var(--font-weight-bold);
-	font-size: var(--type-title-size);
-	line-height: var(--type-title-line);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
 }
 
 .heroCount {

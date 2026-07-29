@@ -13,6 +13,7 @@ import {
 } from "@explore-and-earn/ui";
 
 import { reviewClaimAction, revokeClaimAction } from "../../app/actions/listingClaims";
+import { ConfirmAction } from "./ConfirmAction";
 import { formatAdminDate, humanizeToken } from "./status";
 import styles from "./ClaimsReviewQueue.module.css";
 
@@ -285,15 +286,20 @@ export function ClaimsReviewQueue({
                   </div>
                 ) : (
                   <div className={styles.actions}>
-                    <Button
-                      variant="ghost"
+                    {/* Reject confirms for the same reason Approve does. It was
+                        the unguarded half: approving merely invites the claimant
+                        to prove themselves, while rejecting ends the claim and
+                        tells them so. The irreversible verb was the one click
+                        away. */}
+                    <ConfirmAction
+                      label="Reject"
+                      confirmLabel="Confirm rejection"
+                      question="Reject this claim? The claimant is told their authority over this listing was not accepted, and the listing stays sourced and unattached."
+                      subject={`claim on ${claim.listingTitle}`}
                       icon="status.declined"
-                      disabled={busy}
-                      aria-label={`Reject the claim on ${claim.listingTitle}`}
-                      onClick={() => runDecision(claim.id, "rejected")}
-                    >
-                      {busy ? "Working…" : "Reject"}
-                    </Button>
+                      busy={busy}
+                      onConfirm={() => runDecision(claim.id, "rejected")}
+                    />
                     <Button
                       variant="primary"
                       icon="status.accepted"

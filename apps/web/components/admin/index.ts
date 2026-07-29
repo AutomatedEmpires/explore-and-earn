@@ -28,3 +28,5 @@ export { AdminShell } from "./AdminShell";
 export type { AdminShellProps } from "./AdminShell";
 export { AdminPager } from "./AdminPager";
 export type { AdminPagerProps } from "./AdminPager";
+export { ConfirmAction } from "./ConfirmAction";
+export type { ConfirmActionProps } from "./ConfirmAction";

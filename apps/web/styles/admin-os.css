@@ -37,6 +37,33 @@
   --adminos-danger-bg: var(--status-error-bg);
   --adminos-control:  46px;
 
+  /* ---- ADMIN DENSITY (founder Part VIII) ----------------------------
+     A moderator reads queues, not marketing. The same card padding and
+     heading scale that gives a seeker room to breathe costs an operator
+     rows per screen, which is the only unit that matters when the job is
+     "get through the queue".
+
+     This is a SCOPED RE-VALUATION of semantic tokens that already exist,
+     not a parallel set of --adminos-space-* names. Every admin surface
+     already reads --space-card / --type-section-size, so they all tighten
+     from here with no per-component edit, and nothing outside .admin-os
+     moves. Adding new tokens would have meant touching every stylesheet
+     and would have left two vocabularies for one idea.
+
+     FLOORS ARE DELIBERATE. Body text stops at 15px and meta at 13px;
+     --adminos-control (46px) and the 40px/44px hit areas are NOT reduced.
+     Density is a spacing decision, never a legibility or touch-target one. */
+  --space-section:  16px;   /* 24 → 16: gap between board sections   */
+  --space-card:     12px;   /* 16 → 12: padding inside panels        */
+  --space-gutter:   12px;   /* 16 → 12: page gutters                 */
+  --space-row-gap:   8px;   /* 12 →  8: list/table row rhythm        */
+
+  --type-page-size:    clamp(22px, 2.4vw, 28px);  --type-page-lh:    1.2;
+  --type-section-size: clamp(18px, 1.8vw, 22px);  --type-section-lh: 1.25;
+  --type-card-size:    clamp(16px, 1.3vw, 18px);  --type-card-lh:    1.3;
+  --type-body-size:    15px;  --type-body-lh: 1.45;
+  --type-meta-size:    13px;  --type-meta-lh: 1.4;
+
   color: var(--text-primary);
   background:
     radial-gradient(circle at 16% 0%, color-mix(in srgb, var(--palette-sky) 8%, transparent), transparent 35%),

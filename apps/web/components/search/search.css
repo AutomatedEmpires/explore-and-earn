@@ -27,8 +27,8 @@
 	margin: 0;
 	font-family: var(--font-display);
 	font-weight: var(--font-weight-semibold);
-	font-size: var(--type-title-size, 1.5rem);
-	line-height: var(--type-title-lh, 1.25);
+	font-size: var(--type-section-size, 1.5rem);
+	line-height: var(--type-section-lh, 1.25);
 	color: var(--text-primary);
 }
 

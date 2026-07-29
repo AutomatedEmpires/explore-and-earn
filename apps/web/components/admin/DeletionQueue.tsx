@@ -8,6 +8,7 @@ import {
   resolveDeletionRequestAction,
   type DeletionResolution,
 } from "../../app/actions/accountDeletionAdmin";
+import { ConfirmAction } from "./ConfirmAction";
 import { formatAdminDate } from "./status";
 import styles from "./DeletionQueue.module.css";
 
@@ -113,6 +114,11 @@ export function DeletionQueue({
                 ) : null}
               </div>
 
+              {/* "Start" is a status move and reverses freely, so it stays a
+                  single click. The other two do not: one records an erasure as
+                  carried out, the other refuses a statutory request. Both are
+                  answers to a data subject that cannot be taken back from this
+                  queue, so both confirm. */}
               <div className={styles.actions}>
                 {r.status !== "in_progress" ? (
                   <Button
@@ -123,20 +129,27 @@ export function DeletionQueue({
                     Start
                   </Button>
                 ) : null}
-                <Button
-                  variant="primary"
-                  onClick={() => act(r.id, "completed")}
-                  disabled={isPending && busyId === r.id}
-                >
-                  {isPending && busyId === r.id ? "Working…" : "Mark done"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => act(r.id, "rejected")}
-                  disabled={isPending && busyId === r.id}
-                >
-                  Reject
-                </Button>
+                <ConfirmAction
+                  label="Mark done"
+                  subject={r.displayLabel ?? r.clerkUserId}
+                  question="Record this erasure as carried out? Do this only once the data is actually deleted — the request leaves the queue and the deadline stops being tracked."
+                  confirmLabel="Confirm erasure done"
+                  busyLabel="Working…"
+                  triggerVariant="primary"
+                  tone="danger"
+                  busy={isPending && busyId === r.id}
+                  onConfirm={() => act(r.id, "completed")}
+                />
+                <ConfirmAction
+                  label="Reject"
+                  subject={r.displayLabel ?? r.clerkUserId}
+                  question="Refuse this erasure request? A refusal has to be justifiable under the exemption you are relying on, and the requester can escalate it."
+                  confirmLabel="Confirm rejection"
+                  busyLabel="Working…"
+                  tone="danger"
+                  busy={isPending && busyId === r.id}
+                  onConfirm={() => act(r.id, "rejected")}
+                />
               </div>
             </li>
           );

@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, MetricCard, MetricGrid } from "@explore-and-earn/ui";
+import { Badge, MetricCard, MetricGrid } from "@explore-and-earn/ui";
 
 import {
   cancelDeliveryAction,
   requeueDeliveryAction,
 } from "../../app/actions/adminNotifications";
+import { ConfirmAction } from "./ConfirmAction";
 import { formatAdminDate, humanizeToken } from "./status";
 import styles from "./NotificationOps.module.css";
 
@@ -62,6 +63,16 @@ function isCancellable(status: string): boolean {
   return status === "pending" || status === "deferred" || status === "failed_retryable";
 }
 
+/**
+ * How a row reads out loud in a confirmation. A delivery id identifies nothing
+ * to the person deciding, so the confirmation names what the delivery IS and
+ * who it is aimed at — the two facts that make "twice" or "never" mean
+ * something.
+ */
+function deliverySubject(row: NotificationDeliveryRowView): string {
+  return `${humanizeToken(row.notificationType)} to ${row.recipientClerkUserId}`;
+}
+
 function DeliveryTable({
   rows,
   emptyText,
@@ -113,24 +124,28 @@ function DeliveryTable({
               <td>
                 <span className={styles.actionsCell}>
                   {isRequeueable(row.status) ? (
-                    <Button
-                      variant="ghost"
-                      type="button"
+                    <ConfirmAction
+                      label="Requeue"
+                      question="Requeue this delivery? If the original send actually succeeded and was only recorded as failed, the recipient gets it twice."
+                      confirmLabel="Confirm requeue"
+                      subject={deliverySubject(row)}
+                      tone="neutral"
                       disabled={pendingId !== null}
-                      onClick={() => onRequeue(row.id)}
-                    >
-                      {pendingId === row.id ? "Working…" : "Requeue"}
-                    </Button>
+                      busy={pendingId === row.id}
+                      onConfirm={() => onRequeue(row.id)}
+                    />
                   ) : null}
                   {isCancellable(row.status) ? (
-                    <Button
-                      variant="ghost"
-                      type="button"
+                    <ConfirmAction
+                      label="Cancel"
+                      question="Cancel this delivery? It will never be sent, and the notification it carried is not regenerated."
+                      confirmLabel="Confirm cancel"
+                      subject={deliverySubject(row)}
+                      tone="danger"
                       disabled={pendingId !== null}
-                      onClick={() => onCancel(row.id)}
-                    >
-                      {pendingId === row.id ? "Working…" : "Cancel"}
-                    </Button>
+                      busy={pendingId === row.id}
+                      onConfirm={() => onCancel(row.id)}
+                    />
                   ) : null}
                 </span>
               </td>

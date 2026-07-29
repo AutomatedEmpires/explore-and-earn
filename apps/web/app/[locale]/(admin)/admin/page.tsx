@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   countOpenAccountDeletionRequests,
+  getClaimsAwaitingReview,
   getMarketplaceStats,
   getModerationStats,
+  getOpenFoundingClaimDiscrepancies,
   getRefundStats,
 } from "@explore-and-earn/db";
 import { Chip, Icon, MetricCard, MetricGrid } from "@explore-and-earn/ui";
@@ -39,19 +41,28 @@ export default async function AdminDashboardPage() {
   // reports and refund/payment requests. Read resiliently — a transient failure
   // yields zeros so the overview always renders. Counts are honest when present,
   // never fabricated.
-  const [moderation, refunds, openDeletions] = await Promise.all([
-    getModerationStats(serviceRoleToken).catch(() => null),
-    getRefundStats(serviceRoleToken).catch(() => null),
-    // Erasure requests run against a statutory deadline, so they belong on the
-    // overview beside the other queues rather than only behind their own URL.
-    countOpenAccountDeletionRequests(serviceRoleToken).catch(() => 0),
-  ]);
+  const [moderation, refunds, openDeletions, pendingClaims, discrepancies] =
+    await Promise.all([
+      getModerationStats(serviceRoleToken).catch(() => null),
+      getRefundStats(serviceRoleToken).catch(() => null),
+      // Erasure requests run against a statutory deadline, so they belong on the
+      // overview beside the other queues rather than only behind their own URL.
+      countOpenAccountDeletionRequests(serviceRoleToken).catch(() => 0),
+      // Two queues that had their own routes and their own real backing tables
+      // but were missing from the board: a moderator only learned there was a
+      // claim to review, or a founding over-subscription to settle, by opening
+      // the page on a hunch. A queue nobody is told about is not a queue.
+      getClaimsAwaitingReview().catch(() => []),
+      getOpenFoundingClaimDiscrepancies().catch(() => []),
+    ]);
   const openReports = (moderation?.open ?? 0) + (moderation?.reviewing ?? 0);
   // Both UNRESOLVED refund states count here. 'approved' is a claimed row whose
   // Stripe outcome was never recorded — money may already have left — so
   // counting only 'requested' made exactly the row that needs a human the one
   // the overview never mentioned.
   const openRefunds = (refunds?.requested ?? 0) + (refunds?.approved ?? 0);
+  const openClaims = pendingClaims.length;
+  const openDiscrepancies = discrepancies.length;
 
   // Presentation-only derivations from the already-fetched stats. No new reads.
   const livePct = pct(stats.liveListings, stats.totalListings);
@@ -268,6 +279,46 @@ export default async function AdminDashboardPage() {
                 <span className={styles.queueMeta}>Payment / subscription</span>
               </span>
               <span className={styles.queueCount}>{openRefunds}</span>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/claims"
+              className={styles.queueRow}
+              data-tone={openClaims > 0 ? "hot" : undefined}
+            >
+              <span className={styles.queueIcon}>
+                <Icon name="profile.verification" size={20} aria-hidden />
+              </span>
+              <span className={styles.queueBody}>
+                <span className={styles.queueLabel}>Listing claims to review</span>
+                <span className={styles.queueMeta}>Employer authority evidence</span>
+              </span>
+              <span className={styles.queueCount}>{openClaims}</span>
+              <span className={styles.queueGo} aria-hidden="true">
+                <Icon name="action.view" size={20} aria-hidden />
+              </span>
+            </Link>
+
+            <Link
+              href="/admin/founding"
+              className={styles.queueRow}
+              data-tone={openDiscrepancies > 0 ? "hot" : undefined}
+            >
+              <span className={styles.queueIcon}>
+                <Icon name="system.warning" size={20} aria-hidden />
+              </span>
+              <span className={styles.queueBody}>
+                <span className={styles.queueLabel}>
+                  Early-host over-subscriptions
+                </span>
+                <span className={styles.queueMeta}>
+                  Paid past capacity — needs a settlement
+                </span>
+              </span>
+              <span className={styles.queueCount}>{openDiscrepancies}</span>
               <span className={styles.queueGo} aria-hidden="true">
                 <Icon name="action.view" size={20} aria-hidden />
               </span>

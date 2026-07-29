@@ -36,7 +36,7 @@
 	justify-content: center;
 	gap: var(--space-8);
 	padding: var(--space-12) var(--space-16);
-	border-radius: var(--radius-medium);
+	border-radius: var(--radius-cell);
 	border: 1.5px dashed var(--border-soft);
 	background: transparent;
 	color: var(--text-secondary);
@@ -112,7 +112,7 @@
 	position: relative;
 	aspect-ratio: 16 / 9;
 	overflow: hidden;
-	border-radius: var(--radius-medium);
+	border-radius: var(--radius-cell);
 	border: 2.5px solid transparent;
 	background: var(--color-paper);
 	cursor: pointer;

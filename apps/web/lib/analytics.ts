@@ -21,44 +21,26 @@ export interface AnalyticsClient {
   capture(event: string, properties?: Record<string, unknown>): unknown;
 }
 
-/** Host acquisition funnel events. Snake_case, no PII beyond ids PostHog holds. */
-export const HOST_FUNNEL_EVENTS = {
-  /** The /for-hosts acquisition page was viewed. */
-  hostLandingViewed: "host_landing_viewed",
-  /** A demo workspace surface was opened. */
-  hostDemoOpened: "host_demo_opened",
-  /**
-   * A specific demo surface was viewed, carrying `{ surface }`.
-   *
-   * Deliberately separate from host_demo_opened: that event answers "did the
-   * demo get opened at all", which is the funnel question, while this one
-   * answers "which surfaces did they actually walk", which is the product
-   * question. Collapsing them would make the second unanswerable.
-   */
-  demoSurfaceViewed: "demo_surface_viewed",
-  /** A candidate detail view was opened from the demo pipeline. */
-  demoCandidateOpened: "demo_candidate_opened",
-  /** A candidate was moved between stages in the demo (session-local only). */
-  demoStageMoved: "demo_stage_moved",
-  /** The seeker-side preview of the demo workspace was opened. */
-  demoViewAsSeeker: "demo_view_as_seeker",
-  /** The demo was reset to its canonical state. */
-  demoReset: "demo_reset",
-  /** The anchored product tour was walked to its last stop. */
-  demoTourCompleted: "demo_tour_completed",
-  /**
-   * The pricing area was actually SEEN — scrolled into the viewport, not merely
-   * present in a page the visitor left at the hero. That distinction is the
-   * whole reason this is a separate event from host_landing_viewed: on a page
-   * built to show the product before the price, "did they reach the price" is
-   * the question, and a page-view event cannot answer it.
-   */
-  hostPricingViewed: "host_pricing_viewed",
-  /** The activation summary was opened, one step before Stripe. */
-  hostActivationPageViewed: "host_activation_page_viewed",
-  /** The early-host programme section was scrolled into view. */
-  foundingSectionViewed: "founding_section_viewed",
-} as const;
+/**
+ * Host funnel events — ONE catalogue, defined in ./analytics/events.
+ *
+ * This module used to declare its own `HOST_FUNNEL_EVENTS` with an entirely
+ * different set of keys from the one in ./analytics/events. Both were exported
+ * under that name, so `import { HOST_FUNNEL_EVENTS } from "../../lib/analytics"`
+ * and `… from "../../lib/analytics/events"` handed back different objects, and
+ * a call site that guessed wrong got `undefined` — captured without complaint
+ * and reported as a funnel with no traffic.
+ *
+ * Re-exported rather than moved so that every existing importer of this path
+ * keeps working; the definition now has exactly one home.
+ */
+import type { HostFunnelEventName as HostFunnelEventNameInternal } from "./analytics/events";
+
+export { HOST_FUNNEL_EVENTS, HOST_WORKSPACE_EVENTS } from "./analytics/events";
+export type {
+  HostFunnelEventName,
+  HostWorkspaceEventName,
+} from "./analytics/events";
 
 /**
  * Public information-architecture events (V2 D18 — the two-door header).
@@ -135,8 +117,12 @@ export type SeekerDiscoveryEvent =
 export type PublicIaEvent =
   (typeof PUBLIC_IA_EVENTS)[keyof typeof PUBLIC_IA_EVENTS];
 
-export type HostFunnelEvent =
-  (typeof HOST_FUNNEL_EVENTS)[keyof typeof HOST_FUNNEL_EVENTS];
+/**
+ * Kept as an alias of the catalogue's own name so existing importers of
+ * `HostFunnelEvent` compile unchanged. It now covers the workspace events too,
+ * which is correct: they travel this transport.
+ */
+export type HostFunnelEvent = HostFunnelEventNameInternal;
 
 /**
  * Every event name this seam will carry.

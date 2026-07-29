@@ -18,7 +18,7 @@
 
 .modal {
   background: var(--color-paper);
-  border-radius: var(--radius-large) var(--radius-large) 0 0;
+  border-radius: var(--radius-modal) var(--radius-modal) 0 0;
   width: 100%;
   max-width: 520px;
   max-height: 80dvh;
@@ -30,7 +30,7 @@
 
 @media (min-width: 480px) {
   .modal {
-    border-radius: var(--radius-large);
+    border-radius: var(--radius-modal);
     max-height: 70dvh;
   }
 }
@@ -46,7 +46,7 @@
 
 .title {
   font-family: var(--font-display);
-  font-size: var(--type-subheading-size);
+  font-size: var(--type-heading-sm);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -58,7 +58,7 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-control);
   border: 1px solid var(--border-soft);
   background: transparent;
   color: var(--text-secondary);
@@ -106,7 +106,7 @@
   justify-content: center;
   gap: var(--space-8);
   padding: var(--space-12) var(--space-16);
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-cell);
   border: 1.5px dashed var(--border-soft);
   background: transparent;
   color: var(--text-secondary);
@@ -141,7 +141,7 @@
   font-size: var(--type-label-size);
   color: var(--color-error, #C04040);
   padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-control);
   background: rgba(192, 64, 64, 0.08);
   margin: 0;
 }
@@ -165,7 +165,7 @@
 
 .gradientSwatch {
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-medium);
+  border-radius: var(--radius-cell);
   border: 2.5px solid transparent;
   cursor: pointer;
   position: relative;

@@ -68,7 +68,7 @@
 	font-family: var(--font-mono, monospace);
 	font-size: 0.9em;
 	padding: 0.1em 0.35em;
-	border-radius: var(--radius-small);
+	border-radius: var(--radius-control);
 	background: color-mix(in srgb, var(--palette-ink) 12%, transparent);
 	color: var(--text-primary);
 }
@@ -79,7 +79,7 @@
 	gap: var(--space-6);
 	margin-top: var(--space-8);
 	padding: var(--space-12) var(--space-16);
-	border-radius: var(--radius-medium);
+	border-radius: var(--radius-cell);
 	border: 1px solid var(--border-soft);
 	background: color-mix(in srgb, var(--color-surface) 70%, transparent);
 }
@@ -217,7 +217,7 @@
 	align-items: center;
 	gap: var(--space-12);
 	padding: var(--space-8);
-	border-radius: var(--radius-medium);
+	border-radius: var(--radius-cell);
 	border: 1px solid color-mix(in srgb, var(--border-soft) 70%, transparent);
 	background: color-mix(in srgb, var(--color-surface) 60%, transparent);
 }
@@ -228,7 +228,7 @@
 	width: 64px;
 	height: 48px;
 	overflow: hidden;
-	border-radius: var(--radius-small);
+	border-radius: var(--radius-control);
 	background: var(--color-paper);
 	border: 1px solid var(--border-soft);
 }

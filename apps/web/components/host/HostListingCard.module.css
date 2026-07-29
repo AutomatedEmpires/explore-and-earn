@@ -62,7 +62,7 @@
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .card:hover .coverImg {
     transform: scale(1.03);
-    transition: transform var(--motion-slow) var(--ease-standard);
+    transition: transform var(--motion-base) var(--ease-standard);
   }
 }
 
