@@ -16,6 +16,7 @@ import {
   resolveRefundAction,
   type RefundDecision,
 } from "../../app/actions/refunds";
+import { ConfirmAction } from "./ConfirmAction";
 import { formatAdminDate, humanizeToken } from "./status";
 import {
   REFUND_LANES,
@@ -418,16 +419,20 @@ export function RefundQueue({
                       </div>
                     ) : (
                       <div className={styles.actions}>
-                        <Button
-                          variant="ghost"
+                        {/* Deny confirms too. Approving already did, on the
+                            grounds that moving money "cannot be undone" — but a
+                            denial is equally final from this queue: it closes
+                            the request and tells a paying host no. Only the
+                            branch that spends money was ever guarded. */}
+                        <ConfirmAction
+                          label="Deny"
+                          confirmLabel="Confirm denial"
+                          question={`Deny this ${formatCents(request.amountCents)} refund request? The host is told their request was refused and the request closes.`}
+                          subject={`refund request from ${request.hostCompanyName ?? "host"}`}
                           icon="status.declined"
-                          disabled={busy}
-                          data-tone="deny"
-                          aria-label={`Deny refund request from ${request.hostCompanyName ?? "host"}`}
-                          onClick={() => runDecision(request, "deny")}
-                        >
-                          Deny
-                        </Button>
+                          busy={busy}
+                          onConfirm={() => runDecision(request, "deny")}
+                        />
                         <Button
                           variant="primary"
                           icon="status.accepted"

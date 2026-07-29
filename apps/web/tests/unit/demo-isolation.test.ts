@@ -343,7 +343,13 @@ describe("the anchored tour", () => {
 // ── 5. The analytics seam ──────────────────────────────────────────────────
 
 describe("the demo analytics events", () => {
-  const analytics = readSource("lib/analytics.ts");
+  // The event names live in ONE catalogue module. They used to be declared in
+  // lib/analytics.ts as well, under a HOST_FUNNEL_EVENTS constant that shared
+  // its name with — but held different keys from — the one here, so which
+  // events a call site could see depended on which of the two paths it
+  // imported. The catalogue is now lib/analytics/events.ts alone; lib/analytics
+  // re-exports it (pinned below).
+  const analytics = readSource("lib/analytics/events.ts");
 
   it.each([
     "demo_surface_viewed",
@@ -355,6 +361,19 @@ describe("the demo analytics events", () => {
     "host_demo_opened",
   ])("defines %s", (event) => {
     expect(analytics).toContain(`"${event}"`);
+  });
+
+  /**
+   * There must be exactly one definition. Two modules exporting the same name
+   * with different contents is the drift this consolidation removed, and
+   * nothing but a test stops it being reintroduced by a well-meaning import fix.
+   */
+  it("lib/analytics re-exports the catalogue rather than redeclaring it", () => {
+    const seam = readSource("lib/analytics.ts");
+    expect(seam).not.toMatch(/export const HOST_FUNNEL_EVENTS\s*=/);
+    expect(seam).toMatch(
+      /export\s*\{[^}]*HOST_FUNNEL_EVENTS[^}]*\}\s*from\s*["']\.\/analytics\/events["']/,
+    );
   });
 
   it.each([

@@ -16,6 +16,7 @@ import {
   holdListingAction,
   rejectListingAction,
 } from "../../app/actions/admin";
+import { ConfirmAction } from "./ConfirmAction";
 import { formatAdminDate, humanizeToken, listingStatusVariant } from "./status";
 import styles from "./AdminListingsTable.module.css";
 
@@ -422,6 +423,11 @@ export function AdminListingsTable({
                     </span>
                   </div>
                   <div className={styles.actions}>
+                    {/* Approve stays one click on purpose. It is the throughput
+                        verb of this queue, and it is the reversible one: a
+                        listing approved by mistake can be pulled straight back
+                        with Hold or Reject below. Confirming it would tax the
+                        common path to guard the cheapest mistake. */}
                     {isAwaitingReview ? (
                       <Button
                         variant="primary"
@@ -437,28 +443,31 @@ export function AdminListingsTable({
                     ) : null}
                     {isAwaitingReview ? (
                       <div className={styles.actionsSecondary}>
-                        <Button
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() =>
+                        <ConfirmAction
+                          label="Hold"
+                          confirmLabel="Confirm hold"
+                          question="Hold this listing? It leaves the seeker feed immediately and goes back to the host as a draft for them to fix and republish. Nothing notifies them that it moved."
+                          subject={listing.title || "Untitled listing"}
+                          triggerVariant="secondary"
+                          busy={busy}
+                          onConfirm={() =>
                             runAction(listing.id, () =>
                               holdListingAction(listing.id),
                             )
                           }
-                        >
-                          Hold
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() =>
+                        />
+                        <ConfirmAction
+                          label="Reject"
+                          confirmLabel="Confirm rejection"
+                          question="Reject this listing? It closes and leaves the marketplace immediately. No reason is recorded anywhere and the host is not notified."
+                          subject={listing.title || "Untitled listing"}
+                          busy={busy}
+                          onConfirm={() =>
                             runAction(listing.id, () =>
                               rejectListingAction(listing.id),
                             )
                           }
-                        >
-                          Reject
-                        </Button>
+                        />
                       </div>
                     ) : null}
                     <Button

@@ -18,18 +18,18 @@
 .eyebrow {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .title {
   margin: 0;
   font-size: var(--type-heading-md);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .subtitle {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: var(--type-body-sm);
 }

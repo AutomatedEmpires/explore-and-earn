@@ -161,7 +161,7 @@
 }
 
 .payDash {
-	color: var(--text-tertiary);
+	color: var(--text-muted);
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	flex-shrink: 0;

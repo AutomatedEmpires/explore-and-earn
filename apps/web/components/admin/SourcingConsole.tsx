@@ -12,6 +12,7 @@ import {
 	listListingSourcesAction,
 	runSourceImportAction,
 } from "../../app/actions/sourceImport";
+import { ConfirmAction } from "./ConfirmAction";
 import styles from "./SourcingConsole.module.css";
 
 /**
@@ -78,6 +79,12 @@ export function SourcingConsole({
 			}
 		});
 	};
+
+	// What the live-run confirmation names. The id is the value the select
+	// carries, but it is the source NAME the operator chose, so the confirmation
+	// says that and falls back to the id only when nothing matches.
+	const selectedSourceName =
+		sources.find((source) => source.id === sourceId)?.name ?? sourceId;
 
 	return (
 		<div className={styles.page}>
@@ -188,14 +195,32 @@ export function SourcingConsole({
 						/>
 						Dry run (plan + stats only, no writes)
 					</label>
-					<button
-						type="button"
-						className={styles.runBtn}
-						onClick={runImport}
-						disabled={pending || !sourceId || payloadText.length === 0}
-					>
-						{pending ? "Running…" : dryRun ? "Preview import" : "Run import"}
-					</button>
+					{/* A dry run writes nothing, so it stays one click — putting a
+					confirmation in front of the safe rehearsal is how operators learn
+					to click through the one that matters. Only the live run is
+					guarded. */}
+					{dryRun ? (
+						<button
+							type="button"
+							className={styles.runBtn}
+							onClick={runImport}
+							disabled={pending || !sourceId || payloadText.length === 0}
+						>
+							{pending ? "Running…" : "Preview import"}
+						</button>
+					) : (
+						<ConfirmAction
+							label="Run import"
+							question="Run this import for real? It writes listing rows to the database. There is no undo from this console."
+							confirmLabel="Confirm live import"
+							busyLabel="Running…"
+							subject={selectedSourceName}
+							tone="danger"
+							disabled={pending || !sourceId || payloadText.length === 0}
+							busy={pending}
+							onConfirm={runImport}
+						/>
+					)}
 					<button
 						type="button"
 						className={styles.refreshBtn}

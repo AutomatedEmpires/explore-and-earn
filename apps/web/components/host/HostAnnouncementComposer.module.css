@@ -2,8 +2,8 @@
  * The announcement composer (V2 §10).
  *
  * NOTE FOR THE NEXT EDITOR: the pre-V2 version of this stylesheet referenced
- * --font-size-sm, --color-border, --color-ink-secondary, --font-body,
- * --radius-full and --radius-lg, none of which are declared in tokens.css or
+ * --font-size-sm, --border-default, --text-secondary, --font-body,
+ * --radius-pill and --radius-card, none of which are declared in tokens.css or
  * primitives.css. CSS custom properties fail silently, so those rules did
  * nothing and the composer inherited whatever the page happened to set. Every
  * declaration below names a token that exists.

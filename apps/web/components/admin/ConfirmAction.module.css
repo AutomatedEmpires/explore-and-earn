@@ -1,0 +1,37 @@
+/* Two-step confirmation bar. Sits INSIDE the row it guards — a moderator
+   should never have to look away from the thing they are about to change. */
+.confirm {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-10);
+	padding: var(--space-12);
+	border-radius: var(--radius-input);
+	border: 1px solid var(--border-soft);
+	background: color-mix(in srgb, var(--palette-sky) 8%, transparent);
+}
+
+/* The warm-red danger register the admin scope already defines, so a
+   destructive confirm does not look like an informational one. */
+.confirm[data-tone="danger"] {
+	border-color: color-mix(in srgb, var(--status-error-fg) 40%, transparent);
+	background: color-mix(in srgb, var(--status-error-fg) 8%, transparent);
+}
+
+.question {
+	margin: 0;
+	font-size: var(--type-meta-size);
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+/* Admin density (D-VIII) still respects the touch floor: a confirm the
+   moderator has to aim for is a confirm they will learn to pre-click. */
+.buttons > * {
+	min-height: 40px;
+}

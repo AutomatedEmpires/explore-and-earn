@@ -42,7 +42,7 @@
   flex: 1;
   min-height: 0;
   border: 1px solid var(--palette-line, #e4ddd0);
-  border-radius: var(--radius-lg, 16px);
+  border-radius: var(--radius-card, 16px);
   background: var(--palette-surface, #faf6ee);
   overflow: hidden;
 }
@@ -206,7 +206,7 @@
   justify-content: center;
   text-align: center;
   border: 1px dashed var(--palette-line, #e4ddd0);
-  border-radius: var(--radius-lg, 16px);
+  border-radius: var(--radius-card, 16px);
   padding: 2.5rem 1rem;
   color: var(--palette-ink, #17130d);
   font-family: var(--font-ui, sans-serif);

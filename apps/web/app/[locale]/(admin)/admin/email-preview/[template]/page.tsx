@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -43,10 +43,10 @@ export default async function EmailTemplatePreviewPage({
 }: {
   readonly params: Promise<{ template: string }>;
 }) {
+  // Allow-list only — see the sibling index page. A Clerk role/claim is NOT an
+  // alternative route into an admin surface.
   const { userId } = await auth();
-  const user = await currentUser();
-  const role = (user?.publicMetadata as { role?: unknown } | undefined)?.role;
-  if (role !== "admin" && !isAdminUserId(userId)) {
+  if (!isAdminUserId(userId)) {
     redirect("/");
   }
 

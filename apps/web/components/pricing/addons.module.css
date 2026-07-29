@@ -25,13 +25,13 @@
   margin: 0;
   font-size: var(--type-heading-md);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .lead {
   margin: 0;
   max-width: 48rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: var(--type-body-sm);
 }
 
@@ -59,7 +59,7 @@
   gap: var(--space-2);
   padding: var(--space-4);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   background: var(--color-surface);
 }
 
@@ -67,13 +67,13 @@
   margin: 0;
   font-size: var(--type-body-md);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .groupMeta {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .rows {
@@ -91,7 +91,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   padding: var(--space-1) 0;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .row:last-child {
@@ -100,23 +100,23 @@
 
 .rowLabel {
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .rowPrice {
   font-size: var(--type-body-md);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .rowUnit {
   font-size: var(--type-body-sm);
   font-weight: 400;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .groupNote {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }

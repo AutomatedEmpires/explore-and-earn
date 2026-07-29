@@ -40,12 +40,12 @@
   align-items: center;
   min-height: 24px;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   text-decoration: none;
 }
 
 .back:hover {
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   text-decoration: underline;
 }
 
@@ -53,13 +53,13 @@
   margin: 0;
   font-size: var(--type-heading-md);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .subtitle {
   margin: 0;
   max-width: 46rem;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: var(--type-body-sm);
 }
 
@@ -91,7 +91,7 @@
   gap: var(--space-3);
   padding: var(--space-4);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   background: var(--color-surface);
 }
 
@@ -99,7 +99,7 @@
   margin: 0;
   font-size: var(--type-body-md);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .capabilities,
@@ -109,7 +109,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
   font-size: var(--type-body-sm);
 }
 
@@ -136,17 +136,17 @@
   margin: 0;
   font-size: var(--type-body-sm);
   font-weight: 600;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .termRow dd {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .inlineLink {
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   text-decoration: underline;
 }
 
@@ -170,7 +170,7 @@
   gap: var(--space-2);
   padding: var(--space-4);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   background: var(--color-surface);
 }
 
@@ -193,26 +193,26 @@
   margin: 0;
   font-size: var(--type-body-sm);
   font-weight: 600;
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .totalWas {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .total {
   margin: 0;
   font-size: var(--type-heading-md);
   font-weight: 700;
-  color: var(--color-text-primary);
+  color: var(--text-primary);
 }
 
 .totalNote {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }
 
 .form {
@@ -223,9 +223,9 @@
   box-sizing: border-box;
   width: 100%;
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-text-primary);
+  border: 1px solid var(--text-primary);
   padding: var(--space-3) var(--space-4);
-  background: var(--color-text-primary);
+  background: var(--text-primary);
   color: var(--color-surface);
   font-size: var(--type-body-sm);
   font-weight: 600;
@@ -241,10 +241,10 @@
   display: block;
   width: 100%;
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--border-default);
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   font-size: var(--type-body-sm);
   font-weight: 600;
   text-align: center;
@@ -252,12 +252,12 @@
 }
 
 .secondaryLink:hover {
-  border-color: var(--color-text-primary);
+  border-color: var(--text-primary);
 }
 
 .unavailable,
 .reassurance {
   margin: 0;
   font-size: var(--type-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--text-secondary);
 }

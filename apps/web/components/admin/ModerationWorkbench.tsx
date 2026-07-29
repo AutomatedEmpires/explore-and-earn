@@ -9,6 +9,7 @@ import {
   takeModerationActionAction,
   type ModerationActionInput,
 } from "../../app/actions/moderation";
+import { ConfirmAction } from "./ConfirmAction";
 import { formatAdminDate, humanizeToken } from "./status";
 import styles from "./ModerationWorkbench.module.css";
 
@@ -125,17 +126,64 @@ function reportAge(iso: string): string {
 }
 
 /** The four moderator decisions, each wired to one server-action `action` token. */
+/**
+ * The four decisions, each with the consequence a moderator is agreeing to.
+ *
+ * All four confirm. The previous guard covered only content_removed/suspended
+ * on the reasoning that those two "actually archive the listing" — but every
+ * decision here writes an immutable moderation_actions audit row and closes the
+ * report, and Dismiss is the one that tells a reporter their report went
+ * nowhere. There is no undo on this surface for any of them.
+ */
 const DECISIONS: ReadonlyArray<{
   readonly action: ModerationActionInput["action"];
   readonly label: string;
+  readonly confirmLabel: string;
+  readonly question: (listingTitle: string) => string;
   readonly icon: IconKey;
   readonly variant: "primary" | "secondary" | "ghost";
   readonly tone: "danger" | "warn" | "neutral";
 }> = [
-  { action: "dismissed", label: "Dismiss", icon: "action.close", variant: "ghost", tone: "neutral" },
-  { action: "warned", label: "Warn host", icon: "system.warning", variant: "secondary", tone: "warn" },
-  { action: "content_removed", label: "Remove content", icon: "action.delete", variant: "secondary", tone: "warn" },
-  { action: "suspended", label: "Suspend", icon: "system.lock", variant: "primary", tone: "danger" },
+  {
+    action: "dismissed",
+    label: "Dismiss",
+    confirmLabel: "Confirm dismissal",
+    question: () =>
+      "Close this report with no action against the listing? The decision is logged and the report leaves the queue.",
+    icon: "action.close",
+    variant: "ghost",
+    tone: "neutral",
+  },
+  {
+    action: "warned",
+    label: "Warn host",
+    confirmLabel: "Confirm warning",
+    question: () =>
+      "Log a formal warning against this host? The listing stays public, but the warning is on their record permanently.",
+    icon: "system.warning",
+    variant: "secondary",
+    tone: "warn",
+  },
+  {
+    action: "content_removed",
+    label: "Remove content",
+    confirmLabel: "Confirm removal",
+    question: (title) =>
+      `Remove “${title}”? It comes down from public search, seek and map immediately.`,
+    icon: "action.delete",
+    variant: "secondary",
+    tone: "warn",
+  },
+  {
+    action: "suspended",
+    label: "Suspend",
+    confirmLabel: "Confirm suspension",
+    question: (title) =>
+      `Suspend “${title}”? It comes down from public search, seek and map immediately and the host is held.`,
+    icon: "system.lock",
+    variant: "primary",
+    tone: "danger",
+  },
 ];
 
 /**
@@ -169,17 +217,11 @@ export function ModerationWorkbench({
     report: ModerationReportRowView,
     action: ModerationActionInput["action"],
   ) {
-    // content_removed/suspended now actually archive the listing (it drops
-    // out of public search/seek/map immediately) — confirm before firing,
-    // same as any other can't-be-undone-from-here action in this app.
-    if (
-      (action === "content_removed" || action === "suspended") &&
-      !window.confirm(
-        `${action === "suspended" ? "Suspend" : "Remove"} "${report.listingTitle}"? It will come down from public search immediately.`,
-      )
-    ) {
-      return;
-    }
+    // Confirmation lives in the ConfirmAction control that renders each
+    // decision, not behind a window.confirm here: the dialog could only guard
+    // the two verbs it named, was unstyleable, and browsers suppress repeated
+    // confirms — a moderator working a long queue could lose the guard entirely
+    // and never know.
     setError(null);
     setPendingId(report.id);
     startTransition(async () => {
@@ -411,17 +453,18 @@ export function ModerationWorkbench({
                   {live ? (
                     <div className={styles.actions}>
                       {DECISIONS.map((d) => (
-                        <Button
+                        <ConfirmAction
                           key={d.action}
-                          variant={d.variant}
+                          label={d.label}
+                          confirmLabel={d.confirmLabel}
+                          question={d.question(report.listingTitle)}
+                          subject={`report on ${report.listingTitle}`}
                           icon={d.icon}
-                          disabled={busy}
-                          data-tone={d.tone}
-                          aria-label={`${d.label} — report on ${report.listingTitle}`}
-                          onClick={() => runDecision(report, d.action)}
-                        >
-                          {d.label}
-                        </Button>
+                          triggerVariant={d.variant}
+                          tone={d.tone === "neutral" ? "neutral" : "danger"}
+                          busy={busy}
+                          onConfirm={() => runDecision(report, d.action)}
+                        />
                       ))}
                     </div>
                   ) : (

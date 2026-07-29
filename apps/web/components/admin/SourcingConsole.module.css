@@ -17,7 +17,7 @@
 	margin: 0;
 	font-family: var(--font-display);
 	font-weight: var(--font-weight-bold);
-	font-size: var(--type-title-size);
+	font-size: var(--type-section-size);
 	color: var(--text-primary);
 }
 
@@ -34,7 +34,7 @@
 	gap: var(--space-12);
 	padding: var(--space-16);
 	border: 1px solid color-mix(in srgb, var(--color-chrome) 35%, transparent);
-	border-radius: var(--radius-lg);
+	border-radius: var(--radius-card);
 	background: var(--color-surface);
 }
 

@@ -68,6 +68,60 @@ export const HOST_FUNNEL_EVENTS = {
   benefitsCompleted: "host_benefits_completed",
   /** The host opened the seeker-facing preview of their own profile. */
   seekerPreviewOpened: "host_seeker_preview_opened",
+
+  /**
+   * ACQUISITION + DEMO — everything BEFORE the plans page.
+   *
+   * These eleven lived in a SECOND constant, also called HOST_FUNNEL_EVENTS, in
+   * lib/analytics.ts. Two modules exported the same name with disjoint keys, so
+   * which events a call site could see depended on whether it imported
+   * "../lib/analytics" or "../lib/analytics/events" — and every one of those
+   * paths is a `../../..` chain nobody reads closely. Reaching for
+   * `HOST_FUNNEL_EVENTS.listingDraftStarted` from the wrong one yields
+   * `undefined`, and `posthog.capture(undefined)` does not throw: the funnel
+   * simply reports zero, which is indistinguishable from nobody doing it.
+   *
+   * Merged here, into the module with no imports, so there is one catalogue and
+   * one autocomplete list. NO EVENT NAME CHANGED — every string is byte-identical
+   * to what it was, because the runbook, the PostHog dashboards and the
+   * historical data are all keyed on these strings, and a rename would silently
+   * split every existing funnel in two.
+   */
+  /** The /for-hosts acquisition page was viewed. */
+  hostLandingViewed: "host_landing_viewed",
+  /** A demo workspace surface was opened. */
+  hostDemoOpened: "host_demo_opened",
+  /**
+   * A specific demo surface was viewed, carrying `{ surface }`.
+   *
+   * Deliberately separate from host_demo_opened: that event answers "did the
+   * demo get opened at all", which is the funnel question, while this one
+   * answers "which surfaces did they actually walk", which is the product
+   * question. Collapsing them would make the second unanswerable.
+   */
+  demoSurfaceViewed: "demo_surface_viewed",
+  /** A candidate detail view was opened from the demo pipeline. */
+  demoCandidateOpened: "demo_candidate_opened",
+  /** A candidate was moved between stages in the demo (session-local only). */
+  demoStageMoved: "demo_stage_moved",
+  /** The seeker-side preview of the demo workspace was opened. */
+  demoViewAsSeeker: "demo_view_as_seeker",
+  /** The demo was reset to its canonical state. */
+  demoReset: "demo_reset",
+  /** The anchored product tour was walked to its last stop. */
+  demoTourCompleted: "demo_tour_completed",
+  /**
+   * The pricing area was actually SEEN — scrolled into the viewport, not merely
+   * present in a page the visitor left at the hero. That distinction is the
+   * whole reason this is a separate event from host_landing_viewed: on a page
+   * built to show the product before the price, "did they reach the price" is
+   * the question, and a page-view event cannot answer it.
+   */
+  hostPricingViewed: "host_pricing_viewed",
+  /** The activation summary was opened, one step before Stripe. */
+  hostActivationPageViewed: "host_activation_page_viewed",
+  /** The early-host programme section was scrolled into view. */
+  foundingSectionViewed: "founding_section_viewed",
 } as const;
 
 /**

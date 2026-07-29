@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@explore-and-earn/ui";
 
 import { saveFoundingProgramAction } from "../../app/actions/foundingProgram";
 import type { FoundingProgramRow } from "../founding/program";
+import { ConfirmAction } from "./ConfirmAction";
 import styles from "./FoundingProgramConsole.module.css";
 
 /**
@@ -174,10 +174,21 @@ export function FoundingProgramConsole({
         </label>
       </div>
 
+      {/* Saving here is not "saving a form" — it is publishing scarcity. The
+          same click sets what the public page claims about remaining places and
+          what checkout charges the next host, so it gets the second step. */}
       <div className={styles.actions}>
-        <Button variant="primary" onClick={save} disabled={isPending}>
-          {isPending ? "Saving…" : "Save programme"}
-        </Button>
+        <ConfirmAction
+          label="Save programme"
+          question="Publish these programme settings? Capacity and status drive the public scarcity messaging and what a host is charged at checkout."
+          confirmLabel="Confirm and publish"
+          busyLabel="Saving…"
+          subject="early-host programme settings"
+          tone="danger"
+          triggerVariant="primary"
+          busy={isPending}
+          onConfirm={save}
+        />
       </div>
 
       {message ? (

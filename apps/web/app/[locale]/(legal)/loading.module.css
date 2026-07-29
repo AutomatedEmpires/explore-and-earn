@@ -1,0 +1,77 @@
+/* Legal/editorial loading skeleton — document-shaped, token-driven.
+   Widths are set on the wrapper span so the skeleton primitive stays a plain
+   block and the ragged right edge reads as prose rather than as a table. */
+
+.wrap {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+	padding: var(--space-16) var(--space-gutter) var(--space-56);
+	max-width: 72ch;
+	margin-inline: auto;
+}
+
+.title {
+	width: min(24ch, 80%);
+}
+
+.title :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: calc(var(--type-page-size) * 1.2);
+	border-radius: var(--radius-input);
+}
+
+.standfirst {
+	width: min(48ch, 100%);
+}
+
+.standfirst :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: calc(var(--type-body-lg-size) * 1.4);
+	border-radius: var(--radius-input);
+}
+
+.block {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	margin-block-start: var(--space-16);
+}
+
+.subhead {
+	width: min(18ch, 60%);
+	margin-block-end: var(--space-4);
+}
+
+.subhead :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: calc(var(--type-section-size) * 1.15);
+	border-radius: var(--radius-input);
+}
+
+.line :global(.ui-skeleton) {
+	display: block;
+	width: 100%;
+	height: calc(var(--type-body-size) * 1.35);
+	border-radius: var(--radius-input);
+}
+
+/* Ragged last line so a paragraph does not read as a justified block. */
+.line:last-child {
+	width: 62%;
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
