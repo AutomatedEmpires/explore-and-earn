@@ -46,6 +46,9 @@ const coachmarkCss = read("components/seeker/SeekerCoachmarks.module.css");
 const dashboard = read("components/seeker/SeekerDashboard.tsx");
 const seekPage = read("app/[locale]/(seeker)/seek/page.tsx");
 const homePage = read("app/[locale]/(seeker)/home/page.tsx");
+// The dashboard's reads live behind one seam since redesign W1 (getSeasonBoard);
+// the honesty invariants below follow the code to where it moved.
+const seasonData = read("components/seeker/data.ts");
 
 // ── 1. The blocking modal is dead ─────────────────────────────────────────
 
@@ -171,8 +174,9 @@ describe("the seeker dashboard", () => {
   });
 
   it("shows counts from the seeker's own rows, not from fixtures", () => {
-    expect(homePage).toContain("getSeekerStatus");
-    expect(homePage).toContain("getConversations");
+    expect(homePage).toContain("getSeasonBoard");
+    expect(seasonData).toContain("getSeekerStatus");
+    expect(seasonData).toContain("getConversations");
     expect(homePage).not.toMatch(/FIXTURE|SEEKER_STATUS\b/);
   });
 
@@ -188,7 +192,9 @@ describe("the seeker dashboard", () => {
   });
 
   it("degrades one failing read without blanking the others", () => {
-    expect(homePage).toContain("Promise.allSettled");
+    // The seam the page calls settles every axis independently.
+    expect(homePage).toContain("getSeasonBoard");
+    expect(seasonData).toContain("Promise.allSettled");
   });
 });
 

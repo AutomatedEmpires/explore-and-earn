@@ -1,368 +1,510 @@
-"use client";
-
+import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useMemo, useOptimistic, useTransition } from "react";
 
 import { Icon } from "@explore-and-earn/ui";
+import type { ApplicationWithListing } from "@explore-and-earn/db";
 import type { SeekerProfileRecord } from "@explore-and-earn/db";
-import { saveReadinessAction } from "../../app/actions/seekerProfile";
-import { byMonetization } from "../../lib/ranking";
-import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
-import type { DiscoveryListing } from "../discovery";
-import { FeaturedEmployerStrip } from "./FeaturedEmployerStrip";
-import { JourneyPipeline } from "./JourneyPipeline";
+
+import { formatDate } from "../../lib/format";
 import { MatchCardRail } from "./MatchCardRail";
-import { ReadinessSlider } from "./ReadinessSlider";
+import { ReadinessIsland } from "./ReadinessIsland";
 import styles from "./SeekerDashboard.module.css";
-import { RESUME_APPLY_THRESHOLD, type SeekerStatusSummary } from "./models";
+import { APPLICATION_STATUS_LABEL, type ApplicationStatus } from "./models";
+import {
+  buildSeasonLine,
+  buildWeekQueue,
+  composeLede,
+  daysUntil,
+  formatDayDate,
+  movementLine,
+  nextStepLine,
+  relativeRecency,
+  type SeasonBoard,
+} from "./seasonBoard";
 
 export interface SeekerDashboardProps {
   readonly profile: SeekerProfileRecord | null;
-  readonly status: SeekerStatusSummary;
-  readonly matchedListings: readonly DiscoveryListing[];
-  readonly featuredEmployers: readonly FeaturedEmployer[];
+  readonly board: SeasonBoard;
   readonly seekerName: string;
-  /**
-   * Number of message THREADS the seeker has. Deliberately not "unread": there
-   * is no seeker-side unread reader, and a zero from a host-scoped one would
-   * read as "nothing waiting for you" — a claim nobody can currently make.
-   */
-  readonly conversationCount?: number;
 }
 
 /**
- * The three discovery modes, as LINKS.
+ * /home — the seeker's season headquarters ("Basecamp", redesign W1).
  *
- * The dashboard used to be rendered on top of /seek, which meant the seeker's
- * status pushed the marketplace below the fold on the surface whose only job is
- * the marketplace. The dashboard is now its own destination, and its
- * relationship to discovery is a doorway rather than an embed: nothing here
- * renders a feed, a deck or a map, so nothing here can swallow one.
+ * STRUCTURE IS THE PROMISE. The page reads top to bottom as the season does:
+ * the decision on the table (offer as a full object, never a sentence), the
+ * week's deadlines, the season drawn on one line, readiness, the applications
+ * in motion, the shortlist being watched, and only then fresh matches. Every
+ * date on this page came from a row; every "Host viewed" is applications
+ * .viewed_at; a missing date removes its line rather than approximating it
+ * (see seasonBoard.ts — the honesty contract lives there, with tests).
  *
- * The ids are coachmark anchors (see SeekerCoachmarks) — the tour points at the
- * real controls rather than describing them in a modal.
+ * DISTINCT FROM DISCOVERY, BY CONSTRUCTION (V2-G invariant, kept): Seek,
+ * Swipe and Map render as LINKS in a slim row — never embeds — so the
+ * dashboard cannot swallow the marketplace again. The ids on those links and
+ * on the Saved pipeline cell are coachmark anchors (SeekerCoachmarks).
+ *
+ * SERVER COMPONENT: time-derived strings are computed once per request with a
+ * single clock; the availability control is the page's one client island.
  */
+
 const DISCOVERY_MODES = [
-  {
-    href: "/seek",
-    id: "seeker-mode-seek",
-    label: "Seek",
-    blurb: "Search and filter every open role",
-    icon: "nav.seek",
-  },
-  {
-    href: "/swipe",
-    id: "seeker-mode-swipe",
-    label: "Swipe",
-    blurb: "One role at a time, decide fast",
-    icon: "nav.swipe",
-  },
-  {
-    href: "/map",
-    id: "seeker-mode-map",
-    label: "Map",
-    blurb: "Choose by place",
-    icon: "nav.map",
-  },
+  { href: "/seek", id: "seeker-mode-seek", label: "Seek", icon: "nav.seek" },
+  { href: "/swipe", id: "seeker-mode-swipe", label: "Swipe", icon: "nav.swipe" },
+  { href: "/map", id: "seeker-mode-map", label: "Map", icon: "nav.map" },
 ] as const;
 
-/* ─── Monetization helpers (shared "pay more, show more" util) ─── */
+/** Category → cover-gradient token, for offers whose listing has no photo. */
+const CATEGORY_GRADIENT: Record<string, string> = {
+  farm: "var(--gradient-category-farm)",
+  maritime: "var(--gradient-category-maritime)",
+  remote: "var(--gradient-category-remote)",
+  seasonal: "var(--gradient-category-seasonal)",
+  mix: "var(--gradient-category-mix)",
+};
 
-/** Map a listing onto the shared MonetizationInputs the ranking util consumes. */
-function monetizationInputs(listing: DiscoveryListing) {
-  return {
-    boosted: listing.conditionalBadges?.includes("boosted") ?? false,
-    hostTier: listing.host.tier,
-    matchScore: listing.matchScore,
-  };
+function benefitWord(provision: string, yes: string, no: string): string {
+  return provision === "provided" ? yes : no;
 }
 
-/** A listing is "promoted" when it is boosted or from a paid-tier host. */
-function isPromoted(listing: DiscoveryListing): boolean {
-  return (
-    (listing.conditionalBadges?.includes("boosted") ?? false) ||
-    (listing.host.tier != null && listing.host.tier !== "none")
-  );
+function seasonWindow(application: ApplicationWithListing): string {
+  const listing = application.listing;
+  if (!listing) return "";
+  if (listing.begins && listing.ends) {
+    const format = (iso: string) =>
+      formatDate(iso, { month: "short", day: "numeric" });
+    return `${format(listing.begins)} – ${format(listing.ends)}`;
+  }
+  return listing.opportunityWindow;
 }
 
-/* ─── Next action ─── */
+/* ─── The consequential object: a pending offer, rendered in full ─── */
 
-type ActionTone = "offer" | "invite" | "accepted" | "resume" | "match" | "explore";
-
-interface NextAction {
-  readonly tone: ActionTone;
-  readonly headline: string;
-  readonly ctaLabel: string;
-  readonly href: string;
-}
-
-/**
- * The ONE thing this seeker should do next — presentation prioritization only,
- * derived entirely from their real status counts (never a fabricated score).
- * Priority mirrors the Seeker Home spec: offer → invite → accepted → résumé →
- * fresh matches → explore.
- */
-function resolveNextAction(
-  status: SeekerStatusSummary,
-  hasMatches: boolean,
-): NextAction {
-  const plural = (n: number) => (n > 1 ? "s" : "");
-
-  if (status.offersCount > 0) {
-    return {
-      tone: "offer",
-      headline: `You have ${status.offersCount} offer${plural(status.offersCount)} to review`,
-      ctaLabel: "Review offers",
-      href: "/offered",
-    };
-  }
-  if (status.invitesCount > 0) {
-    return {
-      tone: "invite",
-      headline: `${status.invitesCount} host${plural(status.invitesCount)} invited you to apply`,
-      ctaLabel: "See invites",
-      href: "/invites",
-    };
-  }
-  if (status.acceptedUpcoming) {
-    return {
-      tone: "accepted",
-      headline: `You're headed to ${status.acceptedUpcoming}`,
-      ctaLabel: "View details",
-      href: "/accepted",
-    };
-  }
-  if (status.resumeCompletion < RESUME_APPLY_THRESHOLD) {
-    return {
-      tone: "resume",
-      headline: "Finish your résumé to start applying",
-      ctaLabel: "Complete résumé",
-      href: "/resume",
-    };
-  }
-  if (hasMatches) {
-    return {
-      tone: "match",
-      headline: "Fresh opportunities match your profile",
-      ctaLabel: "See your matches",
-      href: "/seek",
-    };
-  }
-  return {
-    tone: "explore",
-    headline: "Ready to find your next adventure?",
-    ctaLabel: "Start swiping",
-    href: "/swipe",
-  };
-}
-
-const TONE_ICON = {
-  offer: "status.offered",
-  invite: "status.match",
-  accepted: "status.accepted",
-  resume: "action.edit",
-  match: "nav.seek",
-  explore: "nav.swipe",
-} as const;
-
-function NextActionBanner({
-  seekerName,
-  action,
+function OfferObject({
+  offer,
+  now,
 }: {
-  readonly seekerName: string;
-  readonly action: NextAction;
+  readonly offer: ApplicationWithListing;
+  readonly now: Date;
 }) {
-  const firstName = seekerName.trim().split(/\s+/)[0] || "there";
+  const listing = offer.listing;
+  if (!listing) return null;
+  const days = daysUntil(offer.expiresAt, now);
+
   return (
-    <section
-      className={styles.hero}
-      data-tone={action.tone}
-      aria-labelledby="seeker-next-action"
-    >
-      <p className={styles.greeting}>Welcome back, {firstName}</p>
-      <h1 id="seeker-next-action" className={styles.headline}>
-        {action.headline}
-      </h1>
-      <Link href={action.href} className={styles.heroCta}>
-        <Icon name={TONE_ICON[action.tone]} size={18} aria-hidden />
-        {action.ctaLabel}
-        <span aria-hidden="true">→</span>
-      </Link>
+    <section className={styles.offer} aria-labelledby="offer-heading">
+      <div className={styles.offerPhoto}>
+        {listing.coverPhotoUrl ? (
+          <Image
+            src={listing.coverPhotoUrl}
+            alt=""
+            fill
+            sizes="(max-width: 1024px) 100vw, 380px"
+            style={{ objectFit: "cover" }}
+          />
+        ) : (
+          <div
+            className={styles.offerPhotoFallback}
+            style={{ background: CATEGORY_GRADIENT[listing.category] ?? CATEGORY_GRADIENT.mix }}
+            aria-hidden="true"
+          />
+        )}
+        <span className={styles.offerChip}>
+          {days != null && days >= 0
+            ? `Offer · ${days === 0 ? "decide today" : `${days} day${days === 1 ? "" : "s"} left`}`
+            : "Offer"}
+        </span>
+        <span className={styles.offerPlace}>{listing.location}</span>
+      </div>
+      <div className={styles.offerBody}>
+        {offer.expiresAt ? (
+          <p className={styles.offerReceived}>
+            Decide by <strong>{formatDayDate(offer.expiresAt)}</strong>
+          </p>
+        ) : (
+          <p className={styles.offerReceived}>Offer received</p>
+        )}
+        <h2 id="offer-heading" className={styles.offerTitle}>
+          {listing.title}
+        </h2>
+        <p className={styles.offerHost}>
+          {listing.host.name !== "Unknown Host" ? `${listing.host.name} · ` : ""}
+          {listing.location}
+        </p>
+        <dl className={styles.offerFacts}>
+          <div>
+            <dt>Pay</dt>
+            <dd>{listing.benefits.pay.summary}</dd>
+          </div>
+          <div>
+            <dt>Season</dt>
+            <dd>{seasonWindow(offer)}</dd>
+          </div>
+          <div>
+            <dt>Housing</dt>
+            <dd>{benefitWord(listing.benefits.housing.provision, "Included", "Not included")}</dd>
+          </div>
+          <div>
+            <dt>Meals</dt>
+            <dd>{benefitWord(listing.benefits.meals.provision, "Included", "Not included")}</dd>
+          </div>
+        </dl>
+        <div className={styles.offerActions}>
+          <Link href="/offered" className={styles.offerPrimary}>
+            Review the offer
+            <span aria-hidden="true"> →</span>
+          </Link>
+          <Link href="/messages" className={styles.offerSecondary}>
+            Ask a question
+          </Link>
+        </div>
+      </div>
     </section>
   );
 }
 
-/* ─── Resume completion callout (soft nudge, 70–79%) ─── */
-function ResumeCallout({ pct }: { pct: number }) {
-  const r = 14;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
-  const ringColor = pct >= 40 ? "var(--state-soon-fg)" : "var(--accent-seasonal-fg)";
+/* ─── Root ─── */
 
-  return (
-    <Link
-      href="/resume"
-      className={styles.resumeCallout}
-      aria-label={`Complete your résumé — ${pct}% done`}
-    >
-      <div className={styles.calloutRing}>
-        <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
-          <circle cx="18" cy="18" r={r} stroke="var(--border-soft)" strokeWidth="3" fill="none" />
-          <circle
-            cx="18" cy="18" r={r}
-            stroke={ringColor} strokeWidth="3" fill="none"
-            strokeDasharray={`${dash} ${circ - dash}`}
-            strokeLinecap="round"
-            transform="rotate(-90 18 18)"
-          />
-          <text x="18" y="22" textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--benefit-pay-fg)">
-            {pct}%
-          </text>
-        </svg>
-      </div>
-      <div className={styles.calloutText}>
-        <p className={styles.calloutTitle}>Finish your résumé</p>
-        <p className={styles.calloutSub}>A complete profile gets 3× more invites</p>
-      </div>
-      <span className={styles.calloutCta} aria-hidden="true">Go →</span>
-    </Link>
-  );
-}
+export function SeekerDashboard({ profile, board, seekerName }: SeekerDashboardProps) {
+  const now = new Date();
+  const firstName = seekerName.trim().split(/\s+/)[0] || "there";
 
-/* ─── Root dashboard ─── */
-export function SeekerDashboard({
-  profile,
-  status,
-  matchedListings,
-  featuredEmployers,
-  seekerName,
-  conversationCount = 0,
-}: SeekerDashboardProps) {
-  const [isPending, startTransition] = useTransition();
-  const [optimisticTimeline, setOptimisticTimeline] = useOptimistic<string | null>(
-    profile?.seekingTimeline ?? null,
-  );
+  const lede = composeLede(board, now);
+  const week = buildWeekQueue(board, now);
+  const line = buildSeasonLine(board, now);
+  const leadOffer = board.offers.find((offer) => offer.listing) ?? null;
 
-  const handleReadinessChange = useCallback(
-    (value: string) => {
-      startTransition(async () => {
-        setOptimisticTimeline(value);
-        await saveReadinessAction(value);
-      });
-    },
-    [setOptimisticTimeline],
-  );
+  const decideDays =
+    leadOffer?.expiresAt != null ? daysUntil(leadOffer.expiresAt, now) : null;
+  const seasonStarts = [...board.accepted, ...board.offers]
+    .map((application) => application.listing?.begins)
+    .filter((iso): iso is string => Boolean(iso))
+    .map((iso) => daysUntil(iso, now))
+    .filter((days): days is number => days != null && days >= 0)
+    .sort((a, b) => a - b);
 
-  // Order both rails by the shared "pay more, show more" util (boosted >
-  // enterprise > strong match > professional > starter); ties keep the incoming
-  // best-match-first order (stable sort). The rails are then partitioned so a
-  // listing never appears in both.
-  const { matchedOnly, promoted } = useMemo(() => {
-    const ranked = [...matchedListings].sort(byMonetization(monetizationInputs));
-    const promotedList = ranked.filter(isPromoted).slice(0, 8);
-    const promotedIds = new Set(promotedList.map((l) => l.id));
-    return {
-      promoted: promotedList,
-      matchedOnly: ranked.filter((l) => !promotedIds.has(l.id)).slice(0, 12),
-    };
-  }, [matchedListings]);
-
-  const hasMatches = matchedListings.length > 0;
-  const action = resolveNextAction(status, hasMatches);
-
-  // The next-action banner already surfaces an incomplete résumé (<70%) and any
-  // pending offer, so only show the softer résumé nudge for the 70–79% band.
-  const showResumeCallout =
-    action.tone !== "resume" && status.resumeCompletion < 80;
+  const pipeline = [
+    { href: "/seek", label: "Matched", count: board.matches.length, id: undefined },
+    { href: "/saved", label: "Saved", count: board.status.savedCount, id: "seeker-glance-saved" },
+    { href: "/applied", label: "Applied", count: board.status.appliedCount, id: undefined },
+    { href: "/offered", label: "Offers", count: board.status.offersCount, id: undefined },
+    { href: "/accepted", label: "Accepted", count: board.status.acceptedCount, id: undefined },
+  ] as const;
 
   return (
     <div className={styles.main}>
-      {/* Lead: welcome + the ONE next action. */}
-      <NextActionBanner seekerName={seekerName} action={action} />
+      {/* Season header: identity, the written lede, the numbers that matter. */}
+      <header className={styles.header}>
+        <div className={styles.headerText}>
+          <p className={styles.eyebrow}>
+            {`Welcome back, ${firstName} — ${formatDate(now.toISOString(), {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}`}
+          </p>
+          <h1 className={styles.title}>
+            Your season<span className={styles.titleMark}>.</span>
+          </h1>
+          <p className={styles.lede}>{lede.sentence}</p>
+          {lede.aside ? <p className={styles.aside}>{lede.aside}</p> : null}
+        </div>
+        <div className={styles.numerals} role="group" aria-label="Season at a glance">
+          {decideDays != null && decideDays >= 0 ? (
+            <div className={`${styles.numeral} ${styles.numeralUrgent}`}>
+              <b className="ui-tabular">{decideDays}</b>
+              <span>{decideDays === 1 ? "day" : "days"} to decide on your offer</span>
+            </div>
+          ) : null}
+          {seasonStarts.length > 0 ? (
+            <div className={styles.numeral}>
+              <b className="ui-tabular">{seasonStarts[0]}</b>
+              <span>days until the season opens</span>
+            </div>
+          ) : null}
+          <div className={styles.numeral}>
+            <b className="ui-tabular">{board.status.appliedCount}</b>
+            <span>{board.status.appliedCount === 1 ? "application" : "applications"} in play</span>
+          </div>
+        </div>
+      </header>
 
-      {/* Doorways to discovery. Links, never embeds — see DISCOVERY_MODES. */}
-      <nav className={styles.modes} aria-label="Ways to find work">
-        {DISCOVERY_MODES.map((mode) => (
-          <Link key={mode.href} id={mode.id} href={mode.href} className={styles.mode}>
-            <Icon name={mode.icon} size={20} aria-hidden />
-            <span className={styles.modeLabel}>{mode.label}</span>
-            <span className={styles.modeBlurb}>{mode.blurb}</span>
+      {/* The decision on the table — rendered as the full object it is. When
+          the offer's listing cannot be read (paused, removed), the offer still
+          surfaces: a claim with a destination, never a silent drop. */}
+      {leadOffer ? (
+        <OfferObject offer={leadOffer} now={now} />
+      ) : board.offers.length > 0 ? (
+        <Link href="/offered" className={styles.offerFallback}>
+          <span>
+            {board.offers.length === 1
+              ? "An offer is waiting for your review"
+              : `${board.offers.length} offers are waiting for your review`}
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      ) : null}
+
+      {/* This week: everything with a real deadline, in deadline order. */}
+      {week.length > 0 ? (
+        <section className={styles.week} aria-labelledby="week-heading">
+          <div className={styles.sectionHead}>
+            <h2 id="week-heading" className={styles.sectionKicker}>
+              This week
+            </h2>
+            <span className={styles.sectionNote}>
+              {week.length} item{week.length === 1 ? "" : "s"} · ordered by deadline
+            </span>
+          </div>
+          <ol className={styles.weekList}>
+            {week.map((row) => (
+              <li key={row.key} className={styles.weekRow}>
+                <div
+                  className={`${styles.weekDay} ${row.urgent ? styles.weekDayUrgent : ""}`}
+                >
+                  <b>{row.dayLabel}</b>
+                  <span>{row.dateLabel}</span>
+                </div>
+                <div className={styles.weekBody}>
+                  <h3>{row.title}</h3>
+                  <p>{row.sub}</p>
+                </div>
+                <Link
+                  href={row.ctaHref}
+                  className={`${styles.weekAction} ${row.primary ? styles.weekActionPrimary : ""}`}
+                >
+                  {row.ctaLabel}
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
+      {/* The season on one line — only when real dates exist to draw. */}
+      {line ? (
+        <section className={styles.line} aria-labelledby="line-heading">
+          <div className={styles.sectionHead}>
+            <h2 id="line-heading" className={styles.sectionKicker}>
+              Season timeline
+            </h2>
+            <span className={styles.sectionNote}>every date is real</span>
+          </div>
+          <div className={styles.lineBand}>
+            {line.monthTicks.map((tick) => (
+              <span
+                key={tick.label + tick.pct}
+                className={styles.lineTick}
+                style={{ left: `${tick.pct}%` }}
+              >
+                {tick.label}
+              </span>
+            ))}
+            {line.marks.map((mark) => (
+              <span
+                key={mark.key}
+                className={`${styles.lineMark} ${styles[`lineMark_${mark.kind}`] ?? ""}`}
+                style={{ left: `${mark.pct}%` }}
+              >
+                <i aria-hidden="true" />
+                {mark.label}
+              </span>
+            ))}
+            <div className={styles.lineLanes}>
+              {line.spans.slice(0, 4).map((span) => (
+                <div key={span.key} className={styles.lineLane}>
+                  <span
+                    className={`${styles.lineSpan} ${styles[`lineSpan_${span.kind}`] ?? ""}`}
+                    style={{ left: `${span.startPct}%`, width: `${Math.max(4, span.endPct - span.startPct)}%` }}
+                  >
+                    {span.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* Readiness + correspondence, side by side where width allows. */}
+      <div
+        className={`${styles.duo} ${board.threads.length === 0 ? styles.duoSingle : ""}`}
+      >
+        <section className={styles.module} aria-labelledby="ready-heading">
+          <div className={styles.sectionHead}>
+            <h2 id="ready-heading" className={styles.sectionKicker}>
+              Ready to go?
+            </h2>
+            <Link href="/resume" className={styles.sectionLink}>
+              Résumé · {board.status.resumeCompletion}%
+            </Link>
+          </div>
+          <div
+            className={styles.resumeBar}
+            role="img"
+            aria-label={`Résumé ${board.status.resumeCompletion} percent complete`}
+          >
+            <i style={{ width: `${Math.min(100, Math.max(0, board.status.resumeCompletion))}%` }} />
+          </div>
+          <ReadinessIsland initialValue={profile?.seekingTimeline ?? null} />
+          {board.accepted.length > 0 || leadOffer ? (
+            <Link href="/travel" className={styles.travelRow}>
+              Plan your travel
+              {seasonStarts.length > 0 ? ` — the season opens in ${seasonStarts[0]} days` : ""}
+              <span aria-hidden="true"> →</span>
+            </Link>
+          ) : null}
+        </section>
+
+        {board.threads.length > 0 ? (
+          <section className={styles.module} aria-labelledby="mail-heading">
+            <div className={styles.sectionHead}>
+              <h2 id="mail-heading" className={styles.sectionKicker}>
+                Conversations
+              </h2>
+              <span className={styles.sectionNote}>{board.threads.length} thread{board.threads.length === 1 ? "" : "s"}</span>
+            </div>
+            <ul className={styles.mailList}>
+              {board.threads.slice(0, 3).map((thread) => (
+                <li key={thread.id}>
+                  <Link href="/messages" className={styles.mailRow}>
+                    <span className={styles.mailWith}>{thread.withName}</span>
+                    <span className={styles.mailWhen}>
+                      {relativeRecency(thread.lastMessageAt, now) ?? "—"}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <Link href="/messages" className={styles.moduleFoot}>
+              Open inbox <span aria-hidden="true">→</span>
+            </Link>
+          </section>
+        ) : null}
+      </div>
+
+      {/* In motion: each application as an object with its last movement. */}
+      {board.inMotion.length > 0 || board.closedRecent.length > 0 ? (
+        <section className={styles.motion} aria-labelledby="motion-heading">
+          <div className={styles.sectionHead}>
+            <h2 id="motion-heading" className={styles.sectionKicker}>
+              In motion
+            </h2>
+            <Link href="/applied" className={styles.sectionLink}>
+              All applications <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+          <ul className={styles.motionList}>
+            {board.inMotion.map((application) => (
+              <li key={application.id} className={styles.motionRow}>
+                <div className={styles.motionMain}>
+                  <h3>{application.listing?.title ?? "A listing that is no longer visible"}</h3>
+                  <p>
+                    {application.listing
+                      ? `${application.listing.location} · ${seasonWindow(application)}`
+                      : "The host has paused or removed this listing"}
+                  </p>
+                </div>
+                <span
+                  className={styles.stageChip}
+                  data-stage={application.status}
+                >
+                  {APPLICATION_STATUS_LABEL[application.status as ApplicationStatus] ??
+                    application.status}
+                </span>
+                <div className={styles.motionMeta}>
+                  <span>{movementLine(application, now)}</span>
+                  <span className={styles.motionNext}>{nextStepLine(application)}</span>
+                </div>
+              </li>
+            ))}
+            {board.closedRecent.map((application) => (
+              <li
+                key={application.id}
+                className={`${styles.motionRow} ${styles.motionRowClosed}`}
+              >
+                <div className={styles.motionMain}>
+                  <h3>{application.listing?.title ?? "A closed application"}</h3>
+                  <p>{application.listing?.location ?? ""}</p>
+                </div>
+                <span className={`${styles.stageChip} ${styles.stageChipClosed}`}>
+                  {APPLICATION_STATUS_LABEL[application.status as ApplicationStatus] ??
+                    application.status}
+                </span>
+                <div className={styles.motionMeta}>
+                  <span>No action — archived</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* Watching: the shortlist, nearest deadline first. */}
+      {board.watching.length > 0 ? (
+        <section className={styles.watching} aria-labelledby="watching-heading">
+          <div className={styles.sectionHead}>
+            <h2 id="watching-heading" className={styles.sectionKicker}>
+              Watching
+            </h2>
+            <Link href="/saved" className={styles.sectionLink}>
+              All {board.status.savedCount} saved <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+          <ul className={styles.watchList}>
+            {board.watching.slice(0, 3).map(({ listing, closesAt }) => {
+              const days = daysUntil(closesAt, now);
+              const closing = closesAt != null && days != null && days >= 0;
+              return (
+                <li key={listing.id}>
+                  <Link href={`/listing/${listing.id}`} className={styles.watchRow}>
+                    <div className={styles.watchMain}>
+                      <h3>{listing.title}</h3>
+                      <p>
+                        {listing.host.name} · {listing.location}
+                      </p>
+                    </div>
+                    {closing ? (
+                      <span
+                        className={`${styles.watchCloses} ${days <= 3 ? styles.watchClosesUrgent : ""}`}
+                      >
+                        Closes {formatDayDate(closesAt)}
+                        {days <= 7 ? ` · ${days} day${days === 1 ? "" : "s"}` : ""}
+                      </span>
+                    ) : (
+                      <span className={styles.watchCloses}>Open</span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* Clickable pipeline: five real counts, five destinations. */}
+      <nav className={styles.pipeline} aria-label="Your pipeline">
+        {pipeline.map((cell) => (
+          <Link key={cell.href} id={cell.id} href={cell.href} className={styles.pipelineCell}>
+            <b className="ui-tabular">{cell.count}</b>
+            <span>{cell.label}</span>
           </Link>
         ))}
       </nav>
 
-      {/* At a glance — every number below is a real count from the seeker's own
-          rows. A bucket with nothing in it says zero and links anyway; hiding an
-          empty bucket would make the pipeline look shorter than it is. */}
-      <section className={styles.glance} aria-labelledby="seeker-glance-heading">
-        <h2 id="seeker-glance-heading" className={styles.glanceHeading}>
-          At a glance
-        </h2>
-        <div className={styles.glanceRow}>
-          <Link id="seeker-glance-saved" href="/saved" className={styles.glanceCell}>
-            <span className={`${styles.glanceNum} ui-tabular`}>{status.savedCount}</span>
-            <span className={styles.glanceLabel}>Saved</span>
+      {/* Fresh matches — a doorway, not a feed. */}
+      <MatchCardRail listings={board.matches.slice(0, 8)} title="Add to your season" />
+
+      {/* Discovery, as links — never embeds (see file docblock). */}
+      <nav className={styles.modes} aria-label="Ways to find work">
+        <span className={styles.modesLabel}>Find more:</span>
+        {DISCOVERY_MODES.map((mode) => (
+          <Link key={mode.href} id={mode.id} href={mode.href} className={styles.mode}>
+            <Icon name={mode.icon} size={16} aria-hidden />
+            {mode.label}
           </Link>
-          <Link href="/applied" className={styles.glanceCell}>
-            <span className={`${styles.glanceNum} ui-tabular`}>{status.appliedCount}</span>
-            <span className={styles.glanceLabel}>Applications</span>
-          </Link>
-          <Link href="/messages" className={styles.glanceCell}>
-            <span className={`${styles.glanceNum} ui-tabular`}>{conversationCount}</span>
-            <span className={styles.glanceLabel}>Conversations</span>
-          </Link>
-          <Link href="/offered" className={styles.glanceCell}>
-            <span className={`${styles.glanceNum} ui-tabular`}>{status.offersCount}</span>
-            <span className={styles.glanceLabel}>Offers</span>
-          </Link>
-        </div>
-      </section>
-
-      {/* Availability — a small personalization control ("it knows my season"). */}
-      <ReadinessSlider
-        value={optimisticTimeline}
-        onChange={handleReadinessChange}
-        saving={isPending}
-      />
-
-      {/* Clickable pipeline — each stage routes to its own view. */}
-      <section className={styles.pipelineSection} aria-labelledby="pipeline-heading">
-        <div className={styles.pipelineHeader}>
-          <h2 id="pipeline-heading" className={styles.pipelineHeading}>Your pipeline</h2>
-          <Link href="/applied" className={styles.pipelineLink}>
-            All applications <span aria-hidden="true">→</span>
-          </Link>
-        </div>
-        <JourneyPipeline
-          matchedCount={matchedListings.length}
-          savedCount={status.savedCount}
-          appliedCount={status.appliedCount}
-          offersCount={status.offersCount}
-          acceptedCount={status.acceptedCount}
-          acceptedUpcoming={status.acceptedUpcoming}
-        />
-      </section>
-
-      {/* Résumé readiness (soft nudge). */}
-      {showResumeCallout && <ResumeCallout pct={status.resumeCompletion} />}
-
-      {/* Their matched opportunities. When there are no matches at all, the rail
-          renders its own honest empty state prompting résumé completion. */}
-      {hasMatches ? (
-        matchedOnly.length > 0 && (
-          <MatchCardRail listings={matchedOnly} title="Matched for you" />
-        )
-      ) : (
-        <MatchCardRail listings={[]} title="Matched for you" />
-      )}
-
-      {/* Boosted picks — promoted inventory only, ordered by monetization. */}
-      {promoted.length > 0 && (
-        <MatchCardRail listings={promoted} title="Boosted picks" />
-      )}
-
-      {/* Featured employers. */}
-      <FeaturedEmployerStrip employers={featuredEmployers} />
+        ))}
+      </nav>
     </div>
   );
 }

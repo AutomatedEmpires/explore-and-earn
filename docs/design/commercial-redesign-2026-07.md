@@ -271,3 +271,26 @@ D26. Coach: context-embedded assistance + a workspace summarizing real state;
 
 Sequencing: A ∥ B first; C after B; D after A+B; E/F after B (D fixtures
 feed F empty-state examples); G after C; H last.
+
+## Redesign W — the world-class program (founder directive 2026-07-29)
+
+Standing mandate: page-by-page redesign of every surface to an investor-ready
+standard ("you determine" — direction selection delegated). Locked application
+truths: the mobile dock (Explore | Swipe | Saved | Applications | Profile),
+role-scoped headers, the dashboard as its own surface, Community, exactly four
+categories (maritime/remote/seasonal/farm), and the DiscoveryCard as canon.
+
+### W1 — Seeker dashboard ("Basecamp"), delivered
+Chosen from three built directions (Basecamp / Atlas / Field Desk; comps and
+comparison in the program workspace). Structure = the season's own shape: a
+written lede composed from real state; the pending offer as a full object
+(photo, facts, expiry, actions — never a sentence); "This week" as a
+deadline-ordered queue; the season timeline drawn only from real dates;
+readiness; applications with "last movement / next step" (from
+applications.reviewed_at) and retired-ink closed rows; deadline-sorted
+watching; the clickable five-stage pipeline; matches last. Honesty contract
+pinned in tests (season-board.test.ts): no date → no claim; an unreadable
+offer still surfaces as a claim with a destination, never facts. Typeface
+stays Manrope alone (a display-serif proposal is parked as its own decision).
+D27: the number-is-the-pixel spacing scale, token-only color, and the V2
+guardrails carry unchanged into every W surface.
