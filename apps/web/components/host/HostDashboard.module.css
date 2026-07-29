@@ -10,6 +10,238 @@
   gap: var(--space-20);
 }
 
+/* ── Page header — the morning briefing (redesign W2) ─────────────────── */
+
+.pageHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-24);
+  padding: var(--space-8) 0 var(--space-4);
+}
+
+.pageHeaderText {
+  max-width: 640px;
+  min-width: 0;
+}
+
+.pageEyebrow {
+  margin: 0;
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-extrabold);
+  color: var(--text-secondary);
+}
+
+.pageTitle {
+  margin: var(--space-6) 0 0;
+  font-size: var(--type-display-section);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  font-weight: var(--font-weight-display);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.titleMark {
+  color: var(--color-gold);
+}
+
+.headerMarks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-10);
+}
+
+.headerLocation {
+  font-size: var(--type-body-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.pageLede {
+  margin: var(--space-12) 0 0;
+  font-size: var(--type-body-lg-size);
+  line-height: 1.5;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  max-width: 56ch;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-10);
+  margin-top: var(--space-16);
+}
+
+.pageNumerals {
+  display: flex;
+  gap: var(--space-24);
+  flex: none;
+  text-align: right;
+}
+
+.pageNumeral b {
+  display: block;
+  font-size: var(--type-metric-size);
+  font-weight: var(--font-weight-display);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.pageNumeral span {
+  display: block;
+  margin-top: var(--space-6);
+  max-width: 120px;
+  font-size: var(--type-caption-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.pageNumeralUrgent b {
+  color: var(--state-urgent-fg);
+}
+
+.coverBand {
+  position: relative;
+  height: 180px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+}
+
+.coverBandImg {
+  object-fit: cover;
+}
+
+/* ── Attention row anatomy (W2) ───────────────────────────────────────── */
+
+.toneChip {
+  flex: none;
+  align-self: center;
+  padding: var(--space-4) var(--space-10);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-extrabold);
+  color: var(--text-secondary);
+}
+
+.toneChip[data-tone="urgent"] {
+  color: var(--state-urgent-fg);
+  border-color: var(--state-urgent-fg);
+}
+
+.toneChip[data-tone="soon"] {
+  color: var(--state-soon-fg);
+  border-color: var(--state-soon-fg);
+}
+
+.attentionAction {
+  flex: none;
+  align-self: center;
+  font-size: var(--type-body-sm);
+  font-weight: var(--font-weight-extrabold);
+  color: var(--color-cta);
+  white-space: nowrap;
+}
+
+/* ── First-run start band (W2) ────────────────────────────────────────── */
+
+.startBand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-24);
+  padding: var(--space-20) var(--space-24);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+}
+
+.startText {
+  min-width: 0;
+}
+
+.startKicker {
+  display: block;
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-extrabold);
+  color: var(--text-secondary);
+}
+
+.startTitle {
+  margin: var(--space-6) 0 0;
+  font-size: var(--type-heading-sm);
+  font-weight: var(--font-weight-display);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.startBody {
+  margin: var(--space-6) 0 0;
+  font-size: var(--type-body-sm);
+  line-height: 1.55;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+  max-width: 60ch;
+}
+
+@media (max-width: 1024px) {
+  .pageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-16);
+  }
+
+  .pageNumerals {
+    text-align: left;
+  }
+
+  .pageNumeral span {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .pageTitle {
+    font-size: var(--type-page-size);
+  }
+
+  .pageNumerals {
+    gap: var(--space-16);
+    flex-wrap: wrap;
+  }
+
+  .pageNumeral b {
+    font-size: var(--type-heading-md);
+  }
+
+  .coverBand {
+    height: 120px;
+  }
+
+  .startBand {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-14);
+  }
+
+  .toneChip {
+    display: none;
+  }
+}
+
 /* ── Identity & season band ─────────────────────────────────────────── */
 
 .identity {

@@ -322,6 +322,72 @@ export function opportunityPerformance(
     .sort((a, b) => b.applications - a.applications);
 }
 
+/* ── The written lede (redesign W2) ──────────────────────────────────────── */
+
+const COUNT_WORD = ["Nothing", "One thing", "Two things", "Three things"] as const;
+
+/**
+ * The host's morning sentence, composed from the SAME queue the page renders —
+ * the lede and the list cannot disagree because the lede is written from the
+ * list. Attention titles already carry their own counts and deadlines
+ * ("3 applicants nobody has opened", "Trail Crew closes in 3 days"), so the
+ * sentence simply names the top items in priority order, capped at three.
+ * With an empty queue it states the season's real shape from real counts.
+ */
+export function hostLede(
+  attention: readonly AttentionItem[],
+  liveCount: number,
+  pipelineTotal: number,
+): string {
+  if (attention.length > 0) {
+    // Titles join verbatim — lower-casing would mangle listing names
+    // ("Trail Crew" is not "trail Crew"), and the enumeration idiom reads
+    // fine with each item keeping its own capitals.
+    const kept = attention.slice(0, 3).map((item) => item.title);
+    const opener = COUNT_WORD[kept.length] ?? `${attention.length} things`;
+    const verb = kept.length === 1 ? "needs" : "need";
+    const body =
+      kept.length === 1
+        ? kept[0]
+        : kept.length === 2
+          ? `${kept[0]}, and ${kept[1]}`
+          : `${kept[0]}, ${kept[1]}, and ${kept[2]}`;
+    const overflowCount = attention.length - kept.length;
+    const overflow =
+      overflowCount > 0
+        ? ` ${overflowCount} more ${overflowCount === 1 ? "item" : "items"} can wait.`
+        : "";
+    return `${opener} ${verb} you today: ${body}.${overflow}`;
+  }
+
+  if (liveCount === 0 && pipelineTotal === 0) {
+    return "Your workspace is ready to open — post your first opportunity and the season starts.";
+  }
+  const listings =
+    liveCount === 1 ? "one listing live" : `${liveCount} listings live`;
+  const pipeline =
+    pipelineTotal === 1
+      ? "one person in your pipeline"
+      : `${pipelineTotal} people in your pipeline`;
+  return `All clear today — ${listings}, ${pipeline}.`;
+}
+
+/**
+ * The action word a queue row earns from its destination. One verb, not a
+ * bare arrow — the row should say what clicking it does.
+ */
+export function attentionActionLabel(item: AttentionItem): string {
+  if (item.id === "billing") return "Fix billing";
+  if (item.href.startsWith("/host/applicants")) return "Review";
+  if (item.href.startsWith("/host/messages")) return "Reply";
+  // Profile before the generic /edit branch — /host/profile/edit is "Finish",
+  // a listing's /edit is "Complete".
+  if (item.href.startsWith("/host/profile")) return "Finish";
+  if (item.href.endsWith("/edit")) return "Complete";
+  if (item.href === "/host/listings/new") return "Post it";
+  return "Open";
+}
+
 /* ── Upcoming ────────────────────────────────────────────────────────────── */
 
 /**

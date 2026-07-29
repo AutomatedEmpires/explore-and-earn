@@ -445,9 +445,13 @@ describe("no fabricated data sources", () => {
 
   it("never renders a stock photograph where a host's own cover belongs", () => {
     // The photo catalog's honesty rule forbids presenting a scene as this
-    // host's place. Absent cover -> guidance, not a stand-in image.
+    // host's place. Since redesign W2 the rule is stronger than guidance:
+    // with no cover, NOTHING renders where the cover would go (the missing
+    // cover is the profile attention item's job), and the cover band is
+    // gated on the host's own photo.
     expect(OVERVIEW).not.toContain("SitePhoto");
-    expect(OVERVIEW).toContain("No cover photo yet");
+    expect(OVERVIEW).toMatch(/\{coverPhotoUrl \? \(/);
+    expect(OVERVIEW).not.toContain("/photos/");
   });
 
   it("claims no announcement scheduling, because none exists", () => {
