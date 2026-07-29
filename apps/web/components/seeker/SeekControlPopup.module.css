@@ -217,3 +217,58 @@
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: var(--space-8);
 }
+/* ─── Text / date fields (place + exact start window) ───────────────────── */
+
+.fieldRow {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-12);
+}
+
+@media (min-width: 560px) {
+	.fieldRow {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	min-width: 0;
+}
+
+.fieldLabel {
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	font-weight: var(--font-weight-bold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-muted);
+}
+
+.fieldInput {
+	min-height: var(--tap-min);
+	width: 100%;
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-input);
+	border: 1px solid var(--border-soft);
+	background: var(--field-bg);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+}
+
+.fieldInput:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.fieldNote {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-muted);
+}

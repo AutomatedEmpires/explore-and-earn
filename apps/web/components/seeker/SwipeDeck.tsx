@@ -36,6 +36,7 @@ import {
 	unpassListingAction,
 } from "../../app/actions/swipe";
 import { byMonetization } from "../../lib/ranking";
+import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
 import styles from "./SwipeDeck.module.css";
 
 type SwipeAction = "pass" | "save" | "apply";
@@ -301,6 +302,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				return;
 			}
 			if (action === "save") {
+				captureEvent(SEEKER_DISCOVERY_EVENTS.listingSaved, { surface: "swipe" });
 				// Persist the save without blocking the swipe animation. Best-effort:
 				// a failure (e.g. the seeker has no profile row yet) is intentionally
 				// swallowed so the gesture/animation is never interrupted.
@@ -311,6 +313,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				});
 			}
 			if (action === "pass") {
+				captureEvent(SEEKER_DISCOVERY_EVENTS.listingSkipped, { surface: "swipe" });
 				// Persist the pass (057) so this card never resurfaces in a later
 				// session — a pass is a real preference signal. Same best-effort
 				// contract as Save.
@@ -375,6 +378,7 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 			clearTimeout(feedbackTimer.current);
 		}
 		setFeedback(null);
+		captureEvent(SEEKER_DISCOVERY_EVENTS.swipeUndo, { surface: "swipe" });
 		setDecisions((prev) => {
 			const last = prev[prev.length - 1];
 			// Undoing a pass removes the persisted pass so the card can
@@ -520,6 +524,14 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 			case "Backspace":
 				event.preventDefault();
 				undo();
+				break;
+			// Enter OPENS rather than acting. Every other binding here commits an
+			// irreversible-feeling decision, and Enter is the key a keyboard user
+			// presses to "look at this" — wiring it to Apply would turn a reflex
+			// into an application.
+			case "Enter":
+				event.preventDefault();
+				router.push(`/listing/${current.id}`);
 				break;
 			default:
 				break;
@@ -761,7 +773,11 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 					<Icon name="action.close" size={24} aria-hidden />
 				</button>
 
-				<ListingCardProvider listings={deck} overrides={cardOverrides}>
+				<ListingCardProvider
+					listings={deck}
+					overrides={cardOverrides}
+					analyticsSurface="swipe"
+				>
 				<div className={styles.stack}>
 					{visible.map((listing, depth) => {
 						const isTop = depth === 0;
@@ -915,15 +931,45 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 				</div>
 			) : null}
 
-			{/* De-duplicated controls: Skip / Save now live ONLY on the flanking
-			    arrows (≥768) + the swipe gesture, and Quick Apply is the on-card
-			    stamp — so the dock keeps just Undo (the one action with no gesture
-			    or arrow equivalent). */}
+			{/* ── The dock: Skip · Undo · Save ────────────────────────────────────
+			    NEVER GESTURE-ONLY. The flanking arrows are hidden under coarse
+			    pointers, so on a phone Skip and Save had NO visible control at all —
+			    the only way to act was to know the swipe. That is a hidden interface
+			    for anyone who does not already know the pattern, and unusable for
+			    anyone using a switch or voice control, where "swipe left" is not an
+			    available verb. Skip and Save are therefore real buttons here on
+			    touch, and the arrows keep their place on pointer widths (the CSS
+			    hides one set or the other, never both). */}
 			<div className={styles.controls}>
+				<span className={styles.touchOnly}>
+					<Button
+						variant="secondary"
+						icon="action.close"
+						onClick={() => triggerLeave("pass")}
+						disabled={arrowsDisabled}
+					>
+						Skip
+					</Button>
+				</span>
 				<Button variant="ghost" icon="action.back" onClick={undo} disabled={decisions.length === 0}>
 					Undo
 				</Button>
+				<span className={styles.touchOnly}>
+					<Button
+						variant="secondary"
+						icon="action.save"
+						onClick={() => triggerLeave("save")}
+						disabled={arrowsDisabled}
+					>
+						Save
+					</Button>
+				</span>
 			</div>
+
+			<p className={styles.keyHint}>
+				Arrow keys work too: ← skip · → save · ↑ apply · Enter opens ·
+				Backspace undoes.
+			</p>
 
 			<span className={styles.srOnly} role="status" aria-live="polite">
 				{`Opportunity ${index + 1} of ${total}: ${current.title}`}

@@ -22,7 +22,49 @@ export interface SeekerDashboardProps {
   readonly matchedListings: readonly DiscoveryListing[];
   readonly featuredEmployers: readonly FeaturedEmployer[];
   readonly seekerName: string;
+  /**
+   * Number of message THREADS the seeker has. Deliberately not "unread": there
+   * is no seeker-side unread reader, and a zero from a host-scoped one would
+   * read as "nothing waiting for you" — a claim nobody can currently make.
+   */
+  readonly conversationCount?: number;
 }
+
+/**
+ * The three discovery modes, as LINKS.
+ *
+ * The dashboard used to be rendered on top of /seek, which meant the seeker's
+ * status pushed the marketplace below the fold on the surface whose only job is
+ * the marketplace. The dashboard is now its own destination, and its
+ * relationship to discovery is a doorway rather than an embed: nothing here
+ * renders a feed, a deck or a map, so nothing here can swallow one.
+ *
+ * The ids are coachmark anchors (see SeekerCoachmarks) — the tour points at the
+ * real controls rather than describing them in a modal.
+ */
+const DISCOVERY_MODES = [
+  {
+    href: "/seek",
+    id: "seeker-mode-seek",
+    label: "Seek",
+    blurb: "Search and filter every open role",
+    icon: "nav.seek",
+  },
+  {
+    href: "/swipe",
+    id: "seeker-mode-swipe",
+    label: "Swipe",
+    blurb: "One role at a time, decide fast",
+    icon: "nav.swipe",
+  },
+  {
+    href: "/map",
+    id: "seeker-mode-map",
+    label: "Map",
+    blurb: "Choose by place",
+    icon: "nav.map",
+  },
+] as const;
 
 /* ─── Monetization helpers (shared "pay more, show more" util) ─── */
 
@@ -194,6 +236,7 @@ export function SeekerDashboard({
   matchedListings,
   featuredEmployers,
   seekerName,
+  conversationCount = 0,
 }: SeekerDashboardProps) {
   const [isPending, startTransition] = useTransition();
   const [optimisticTimeline, setOptimisticTimeline] = useOptimistic<string | null>(
@@ -236,6 +279,44 @@ export function SeekerDashboard({
     <div className={styles.main}>
       {/* Lead: welcome + the ONE next action. */}
       <NextActionBanner seekerName={seekerName} action={action} />
+
+      {/* Doorways to discovery. Links, never embeds — see DISCOVERY_MODES. */}
+      <nav className={styles.modes} aria-label="Ways to find work">
+        {DISCOVERY_MODES.map((mode) => (
+          <Link key={mode.href} id={mode.id} href={mode.href} className={styles.mode}>
+            <Icon name={mode.icon} size={20} aria-hidden />
+            <span className={styles.modeLabel}>{mode.label}</span>
+            <span className={styles.modeBlurb}>{mode.blurb}</span>
+          </Link>
+        ))}
+      </nav>
+
+      {/* At a glance — every number below is a real count from the seeker's own
+          rows. A bucket with nothing in it says zero and links anyway; hiding an
+          empty bucket would make the pipeline look shorter than it is. */}
+      <section className={styles.glance} aria-labelledby="seeker-glance-heading">
+        <h2 id="seeker-glance-heading" className={styles.glanceHeading}>
+          At a glance
+        </h2>
+        <div className={styles.glanceRow}>
+          <Link id="seeker-glance-saved" href="/saved" className={styles.glanceCell}>
+            <span className={`${styles.glanceNum} ui-tabular`}>{status.savedCount}</span>
+            <span className={styles.glanceLabel}>Saved</span>
+          </Link>
+          <Link href="/applied" className={styles.glanceCell}>
+            <span className={`${styles.glanceNum} ui-tabular`}>{status.appliedCount}</span>
+            <span className={styles.glanceLabel}>Applications</span>
+          </Link>
+          <Link href="/messages" className={styles.glanceCell}>
+            <span className={`${styles.glanceNum} ui-tabular`}>{conversationCount}</span>
+            <span className={styles.glanceLabel}>Conversations</span>
+          </Link>
+          <Link href="/offered" className={styles.glanceCell}>
+            <span className={`${styles.glanceNum} ui-tabular`}>{status.offersCount}</span>
+            <span className={styles.glanceLabel}>Offers</span>
+          </Link>
+        </div>
+      </section>
 
       {/* Availability — a small personalization control ("it knows my season"). */}
       <ReadinessSlider

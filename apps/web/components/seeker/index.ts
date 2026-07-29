@@ -86,3 +86,5 @@ export * from "./travel";
 export * from "./journey";
 export { SeekerShell } from "./SeekerShell";
 export type { SeekerShellProps } from "./SeekerShell";
+export { SeekerCoachmarks, SEEKER_COACHMARKS } from "./SeekerCoachmarks";
+export type { Coachmark } from "./SeekerCoachmarks";

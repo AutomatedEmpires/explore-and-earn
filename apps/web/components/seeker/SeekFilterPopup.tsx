@@ -9,6 +9,26 @@ import styles from "./SeekControlPopup.module.css";
 type StartRangeMonths = 1 | 3 | 6;
 type PayUnit = "hour" | "day";
 
+/**
+ * THE FILTER SET IS THE QUERY'S FILTER SET, EXACTLY.
+ *
+ * Every field below maps to one predicate in `searchListings` (packages/db):
+ *
+ *   housing        → listings.housing_included = true
+ *   meals          → listings.meals_included   = true
+ *   visaSupport    → listings.visa_support     = true
+ *   payMin/payUnit → compensation_min_cents >= n AND compensation_unit = unit
+ *   startRangeMonths → begins_at BETWEEN today AND today + n months
+ *   startAfter/Before→ begins_at >= / <= an explicit date
+ *   location       → location_display ILIKE %term% (trigram-indexed, 051)
+ *
+ * Nothing else is offered, because nothing else is filterable. Weekly hours,
+ * openings, and application deadlines have NO columns; experience level and
+ * certifications have columns (051) but no predicate in searchListings, so a
+ * control for them would either silently do nothing or force a client-side
+ * filter that lies across page boundaries. The gaps are listed in the PR rather
+ * than papered over with dead controls.
+ */
 export interface SeekFilterPopupValue {
 	readonly housing: boolean;
 	readonly meals: boolean;
@@ -16,6 +36,11 @@ export interface SeekFilterPopupValue {
 	readonly startRangeMonths?: StartRangeMonths;
 	readonly payMin?: number;
 	readonly payUnit?: PayUnit;
+	/** Free-text place match against `location_display`. */
+	readonly location?: string;
+	/** ISO yyyy-mm-dd bounds on `begins_at`. */
+	readonly startAfter?: string;
+	readonly startBefore?: string;
 }
 
 export interface SeekFilterPopupProps {
@@ -85,6 +110,8 @@ export function SeekFilterPopup({
 		if (draft.meals) count += 1;
 		if (draft.visaSupport) count += 1;
 		if (draft.startRangeMonths) count += 1;
+		if (draft.location?.trim()) count += 1;
+		if (draft.startAfter || draft.startBefore) count += 1;
 		return count;
 	}, [draft]);
 
@@ -104,6 +131,12 @@ export function SeekFilterPopup({
 		}
 		if (draft.startRangeMonths) {
 			items.push(`${draft.startRangeMonths} month`);
+		}
+		if (draft.location?.trim()) {
+			items.push(draft.location.trim());
+		}
+		if (draft.startAfter || draft.startBefore) {
+			items.push(`${draft.startAfter ?? "any"} → ${draft.startBefore ?? "any"}`);
 		}
 		return items;
 	}, [draft]);
@@ -280,6 +313,68 @@ export function SeekFilterPopup({
 							</button>
 						);
 					})}
+				</div>
+			</section>
+
+			{/* Both sections below map to real, indexed predicates and neither had a
+			    control until now — the server page has always parsed ?location,
+			    ?start_after and ?start_before, so two working filters were
+			    unreachable from the UI. */}
+			<section className={styles.group} aria-label="Place">
+				<h3 className={styles.groupLabel}>Place</h3>
+				<label className={styles.field}>
+					<span className={styles.fieldLabel}>Location contains</span>
+					<input
+						type="text"
+						className={styles.fieldInput}
+						value={draft.location ?? ""}
+						placeholder="Idaho, Coeur d&rsquo;Alene, coast…"
+						onChange={(event) =>
+							setDraft((current) => ({
+								...current,
+								location: event.target.value || undefined,
+							}))
+						}
+					/>
+				</label>
+				<p className={styles.fieldNote}>
+					Matches the place the host wrote on the listing. It is a text match,
+					not a distance search — there is no radius filter, because listings
+					store a single host-placed point and no travel distance.
+				</p>
+			</section>
+
+			<section className={styles.group} aria-label="Start-date window">
+				<h3 className={styles.groupLabel}>Exact start window</h3>
+				<div className={styles.fieldRow}>
+					<label className={styles.field}>
+						<span className={styles.fieldLabel}>Starts on or after</span>
+						<input
+							type="date"
+							className={styles.fieldInput}
+							value={draft.startAfter ?? ""}
+							onChange={(event) =>
+								setDraft((current) => ({
+									...current,
+									startAfter: event.target.value || undefined,
+								}))
+							}
+						/>
+					</label>
+					<label className={styles.field}>
+						<span className={styles.fieldLabel}>Starts on or before</span>
+						<input
+							type="date"
+							className={styles.fieldInput}
+							value={draft.startBefore ?? ""}
+							onChange={(event) =>
+								setDraft((current) => ({
+									...current,
+									startBefore: event.target.value || undefined,
+								}))
+							}
+						/>
+					</label>
 				</div>
 			</section>
 		</PopupShell>

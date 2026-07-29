@@ -10,6 +10,7 @@ import {
 } from "../lib/storedMatchDecode";
 
 import { authedClient } from "../client";
+import type { SeekerMatchDetail } from "./listings";
 
 /**
  * Read access to the ADR-040 match_scores cache (migration 052).
@@ -113,6 +114,57 @@ export async function getMatchScoresForSeeker(
     // match_scores may not exist yet (pre-052) — degrade to no scores.
   }
   return scores;
+}
+
+/**
+ * The stored component sub-scores + confidence for EVERY listing the authed
+ * seeker has been scored against, keyed by listing id.
+ *
+ * This is the batch sibling of {@link getSeekerListingMatch}: the feed already
+ * reads the score so the card can show a percentage, but a percentage with no
+ * explanation is exactly the "trust the algorithm" pattern the product refuses.
+ * Reading the components lets the card say WHICH axes carried the match, and
+ * the sentence is composed at render time from these numbers (G34 — reason text
+ * is never persisted, so copy can change without a migration).
+ *
+ * Same double-scoping as {@link getMatchScoresForSeeker} (RLS + an explicit
+ * seeker_profile_id filter) and the same degrade-to-empty contract: a pre-052
+ * schema, a missing profile, or an RLS fault yields an empty map, and the card
+ * then shows a score with no reasons rather than inventing any.
+ */
+export async function getMatchDetailsForSeeker(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<Map<string, SeekerMatchDetail>> {
+  const details = new Map<string, SeekerMatchDetail>();
+  try {
+    const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
+    if (!seekerProfileId) return details;
+
+    const db = authedClient(clerkToken) as unknown as SupabaseClient;
+    const { data, error } = await db
+      .from("match_scores")
+      .select("listing_id, score, confidence, components")
+      .eq("seeker_profile_id", seekerProfileId);
+    if (error || !data) return details;
+
+    for (const raw of data as Array<Record<string, unknown>>) {
+      const listingId = raw.listing_id != null ? String(raw.listing_id) : "";
+      if (!listingId) continue;
+      // Decoded through the shared row decoder, never cast: these numbers reach
+      // the seeker as an explanation of a decision, and a malformed row must
+      // produce NO explanation rather than a wrong one.
+      const decoded = decodeStoredMatchRow(raw);
+      if (!decoded) continue;
+      details.set(listingId, {
+        components: decoded.components,
+        confidence: decoded.confidence,
+      });
+    }
+  } catch {
+    // match_scores may not exist yet (pre-052) — degrade to no details.
+  }
+  return details;
 }
 
 /**

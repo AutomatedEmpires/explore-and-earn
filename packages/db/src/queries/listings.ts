@@ -13,6 +13,7 @@ import type {
   ListingLogistics,
   ListingProvenanceInfo,
   ListingStatus,
+  MatchComponentScores,
   OpportunityCategory,
   OpportunityListing,
 } from "@explore-and-earn/contracts";
@@ -22,6 +23,7 @@ import {
   formatCompensation,
   hostBenefitDecision,
   formatOpportunityWindow,
+  topMatchReasons,
   hasVerifiedHostSubscription,
   isValidGeoPoint,
   sanitizeCategoryDepth,
@@ -59,9 +61,26 @@ export interface ListingRow {
   published_at: string | null;
   cover_photo_url: string | null;
   gallery_photo_urls: string[] | null;
+  /**
+   * Listing expiry (034 backfill, 067 trigger). The ONLY stored closing date on
+   * a listing — there is no application_deadline column, so every surface must
+   * phrase this as "listing closes", never "apply by".
+   */
+  expires_at: string | null;
+  /** 051 match inputs. Freeform / 0–3 / string arrays; null = host never stated. */
+  experience_level_required: string | null;
+  physical_demand: number | null;
+  required_certifications: string[] | null;
+  /** 060 immersive fields — jsonb arrays of plain strings. */
+  perks: string[] | null;
   host_profiles: {
     company_name: string;
     subscription_tier: string | null;
+    /**
+     * Employer logo/photo. Anon-readable by 080's allow-list (it is one of the
+     * 15 public-safe columns), so selecting it here cannot 403 the feed.
+     */
+    photo_url: string | null;
   } | null;
   /* ── Provenance (migration 064) ──
      'verified' = host-authored/claimed; 'sourced' = real attributable public
@@ -123,7 +142,16 @@ type RawListingRow = {
   published_at: string | null;
   cover_photo_url: string | null;
   gallery_photo_urls: string[] | null;
-  host_profiles: { company_name: string; subscription_tier: string | null } | null;
+  expires_at: string | null;
+  experience_level_required: string | null;
+  physical_demand: number | null;
+  required_certifications: unknown;
+  perks: unknown;
+  host_profiles: {
+    company_name: string;
+    subscription_tier: string | null;
+    photo_url: string | null;
+  } | null;
   provenance: string;
   source_name: string | null;
   source_url: string | null;
@@ -186,9 +214,27 @@ function buildCompensationSummary(
 const asEvidence = (value: string | null | undefined): BenefitEvidenceStatus =>
   value === "stated" || value === "confirmed" ? value : "not_stated";
 
+/**
+ * Coerce a jsonb/text[] column to a clean string list.
+ *
+ * Sanitize-on-read, same rule the logistics/category-depth jsonb follows: the
+ * column is `jsonb not null default '[]'` (060) or `text[]` (051), but jsonb
+ * can hold anything, and a card must never render a number or an object as if
+ * a host had typed it. Anything that is not a non-empty string is dropped.
+ */
+function toStringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((entry): entry is string => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
 function toListingRow(raw: RawListingRow): ListingRow {
   return {
     ...raw,
+    required_certifications: toStringList(raw.required_certifications),
+    perks: toStringList(raw.perks),
     category: raw.category as OpportunityCategory,
     provenance: raw.provenance === "sourced" ? "sourced" : "verified",
     housing_evidence: asEvidence(raw.housing_evidence),
@@ -314,6 +360,21 @@ export interface DiscoveryEnrichment {
    * {@link MEANINGFUL_MATCH_SCORE_THRESHOLD}; lower/absent scores show no pill.
    */
   readonly matchScores?: ReadonlyMap<string, number>;
+  /**
+   * Stored ADR-040 component sub-scores by listing id (see
+   * {@link getMatchDetailsForSeeker}). The mapper turns these into `matchReasons`
+   * through {@link topMatchReasons} at MAP time — G34 law: the engine persists
+   * numbers, the reason SENTENCE is computed, never stored. A listing with no
+   * entry gets no reasons, which the card must present as "not scored yet"
+   * rather than as a weak match.
+   */
+  readonly matchDetails?: ReadonlyMap<string, SeekerMatchDetail>;
+}
+
+/** The per-listing slice of a stored match_scores row a card can render. */
+export interface SeekerMatchDetail {
+  readonly components: MatchComponentScores;
+  readonly confidence: number;
 }
 
 /**
@@ -363,6 +424,19 @@ export function rowToDiscoveryFields(
 
   const previouslySkipped = enrich?.previouslySkippedIds?.has(row.id) ? true : undefined;
 
+  // Match reasons: derived HERE from the stored component numbers, so the card
+  // and the listing page make the same assertion, and so no reason sentence is
+  // ever persisted (G34). Reasons only travel with a shown score — explaining a
+  // number the card is not displaying would be an explanation of nothing.
+  const detail = enrich?.matchDetails?.get(row.id);
+  const matchReasons =
+    matchScore !== undefined && detail
+      ? (() => {
+          const reasons = topMatchReasons(detail.components, 3);
+          return reasons.length > 0 ? reasons : undefined;
+        })()
+      : undefined;
+
   return {
     id: row.id,
     title: row.title,
@@ -374,13 +448,29 @@ export function rowToDiscoveryFields(
     status: row.status as ListingStatus,
     conditionalBadges,
     matchScore,
+    matchReasons,
+    matchConfidence: matchScore !== undefined ? detail?.confidence : undefined,
     previouslySkipped,
+    // Card-detail facts. Each is self-omitting: `undefined` means the host never
+    // stated it, and the card renders that absence rather than a default.
+    expiresAt: row.expires_at ?? undefined,
+    experienceLevel: row.experience_level_required?.trim() || undefined,
+    physicalDemand:
+      typeof row.physical_demand === "number" ? row.physical_demand : undefined,
+    perks: row.perks && row.perks.length > 0 ? row.perks : undefined,
+    requiredCertifications:
+      row.required_certifications && row.required_certifications.length > 0
+        ? row.required_certifications
+        : undefined,
     host: {
       // Sourced listings expose NO host id — there is no host profile to
       // open, review, or navigate to (structural, not cosmetic).
       id: isSourced ? undefined : row.host_profile_id ?? undefined,
       name: hostName,
       verified,
+      // Sourced inventory carries no employer mark — there is no host profile,
+      // and a logo would read as a claimed listing.
+      logoUrl: isSourced ? undefined : row.host_profiles?.photo_url ?? undefined,
       // Monetization ranking ("pay more, show more"): expose the host's real
       // active subscription tier so Enterprise > Professional > Starter is
       // honored. Never fabricated — anything other than a known paid tier
@@ -472,11 +562,13 @@ export async function resolveSeekerDiscoveryScope(
 export function enrichmentFromScope(
   scope: SeekerDiscoveryScope,
   matchScores?: ReadonlyMap<string, number>,
+  matchDetails?: ReadonlyMap<string, SeekerMatchDetail>,
 ): DiscoveryEnrichment {
   return {
     boostedListingIds: scope.boostedIds,
     previouslySkippedIds: scope.skippedIds,
     matchScores,
+    matchDetails,
   };
 }
 
@@ -486,10 +578,22 @@ const PROVENANCE_COLUMNS =
   "source_published_at,source_last_seen_at,source_status,claim_summary," +
   "housing_evidence,meals_evidence,pay_evidence";
 
+/**
+ * V2-G card columns. Every one is SELECT-granted to anon and authenticated by
+ * 072 (which re-granted every listings column except benefit_details), so
+ * widening the projection here cannot 403 the public feed. They exist so the
+ * card can state facts the host actually recorded — season close, experience,
+ * demand, certifications, perks — instead of leaving the reader to guess.
+ */
+const CARD_DETAIL_COLUMNS =
+  "expires_at,experience_level_required,physical_demand,required_certifications,perks";
+
 const LISTING_COLUMNS =
   "id,host_profile_id,title,category,description,location_display,latitude,longitude,status,housing_included,meals_included,housing_description,meals_description,visa_support,compensation_summary,compensation_min_cents,compensation_max_cents,compensation_unit,compensation_currency,timeline_summary,begins_at,ends_at,published_at,cover_photo_url,gallery_photo_urls,logistics,category_depth," +
+  CARD_DETAIL_COLUMNS +
+  "," +
   PROVENANCE_COLUMNS +
-  ",host_profiles(company_name,subscription_tier)";
+  ",host_profiles(company_name,subscription_tier,photo_url)";
 
 /** Max cards returned per swipe-deck page (Task 1/Task 3 batch size). */
 export const SWIPE_BATCH_SIZE = 20;

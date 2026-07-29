@@ -84,6 +84,11 @@ export interface ListingCardProviderProps {
   readonly listings: readonly DiscoveryListing[];
   /** Surface-wide handler overrides (e.g. onApply / onSave / onSkip). */
   readonly overrides?: ListingCardPopupOverrides;
+  /**
+   * Analytics surface name — makes the default card-open handler emit
+   * `listing_card_opened` for this surface. See useListingCardPopups.
+   */
+  readonly analyticsSurface?: string;
   readonly children: ReactNode;
 }
 
@@ -95,9 +100,14 @@ export interface ListingCardProviderProps {
 export function ListingCardProvider({
   listings,
   overrides,
+  analyticsSurface,
   children,
 }: ListingCardProviderProps) {
-  const { handlers, popups } = useListingCardPopups(listings, overrides);
+  const { handlers, popups } = useListingCardPopups(
+    listings,
+    overrides,
+    analyticsSurface,
+  );
   const value = useMemo<ListingCardContextValue>(() => ({ handlers }), [handlers]);
 
   return (
@@ -186,6 +196,11 @@ export function ListingCard({
           onMealsClick: overrides.onMealsClick ?? handlers.onMealsClick,
           onPayClick: overrides.onPayClick ?? handlers.onPayClick,
           onReport: overrides.onReport ?? handlers.onReport,
+          onDatesClick: overrides.onDatesClick ?? handlers.onDatesClick,
+          onVerificationClick:
+            overrides.onVerificationClick ?? handlers.onVerificationClick,
+          onMatchClick: overrides.onMatchClick ?? handlers.onMatchClick,
+          onShare: overrides.onShare ?? handlers.onShare,
           onLocationClick: overrides.onLocationClick ?? handlers.onLocationClick,
           onApply: overrides.onApply ?? handlers.onApply,
           onSave: overrides.onSave ?? handlers.onSave,
@@ -204,6 +219,10 @@ export function ListingCard({
       onMealsClick: guardTap(merged.onMealsClick, suppressTap)!,
       onPayClick: guardTap(merged.onPayClick, suppressTap)!,
       onReport: guardTap(merged.onReport, suppressTap)!,
+      onDatesClick: guardTap(merged.onDatesClick, suppressTap)!,
+      onVerificationClick: guardTap(merged.onVerificationClick, suppressTap)!,
+      onMatchClick: guardTap(merged.onMatchClick, suppressTap)!,
+      onShare: guardTap(merged.onShare, suppressTap),
       onLocationClick: guardTap(merged.onLocationClick, suppressTap)!,
       onApply: guardTap(merged.onApply, suppressTap),
       onSave: guardTap(merged.onSave, suppressTap),
@@ -234,6 +253,10 @@ export function ListingCard({
       onMealsClick={resolved.onMealsClick}
       onPayClick={resolved.onPayClick}
       onReport={resolved.onReport}
+      onDatesClick={resolved.onDatesClick}
+      onVerificationClick={resolved.onVerificationClick}
+      onMatchClick={resolved.onMatchClick}
+      onShare={resolved.onShare}
       onLocationClick={resolved.onLocationClick}
       onApply={resolved.onApply}
       onSave={resolved.onSave}
@@ -253,6 +276,8 @@ export interface ListingCardGridProps {
   readonly surface: DiscoveryCardSurface;
   /** Surface-wide handler overrides (onApply / onSave / onSkip, …). */
   readonly overrides?: ListingCardPopupOverrides;
+  /** Analytics surface name for the default card-open event. */
+  readonly analyticsSurface?: string;
   /** Per-listing cardState (saved / applied / offered / …); default none. */
   readonly getCardState?: (
     listing: DiscoveryListing,
@@ -289,6 +314,7 @@ export function ListingCardGrid({
   listings,
   surface,
   overrides,
+  analyticsSurface,
   getCardState,
   getVariant,
   getActions,
@@ -315,7 +341,11 @@ export function ListingCardGrid({
   }
 
   return (
-    <ListingCardProvider listings={listings} overrides={overrides}>
+    <ListingCardProvider
+      listings={listings}
+      overrides={overrides}
+      analyticsSurface={analyticsSurface}
+    >
       <div className={gridClass}>
         {listings.map((listing, index) => (
           <ListingCard

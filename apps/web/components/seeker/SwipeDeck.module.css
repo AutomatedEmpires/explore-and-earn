@@ -449,3 +449,36 @@
 		gap: var(--space-6);
 	}
 }
+
+/* ─── Touch-visible Skip / Save + the keyboard hint ─────────────────────── */
+
+/* The flanking arrows only exist at (min-width: 768px) and (pointer: fine).
+   Everywhere else — every phone, every tablet, every touch laptop — Skip and
+   Save had no visible control at all and the gesture was the only way to act.
+   These buttons ARE that control; they hide exactly where the arrows appear, so
+   the two never both show. */
+.touchOnly {
+	display: contents;
+}
+
+@media (min-width: 768px) and (pointer: fine) {
+	.touchOnly {
+		display: none;
+	}
+}
+
+.keyHint {
+	margin: 0;
+	text-align: center;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-muted);
+}
+
+/* On coarse pointers the arrow keys are not reachable, so the hint is noise. */
+@media (pointer: coarse) {
+	.keyHint {
+		display: none;
+	}
+}

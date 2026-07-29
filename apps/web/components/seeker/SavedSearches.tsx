@@ -9,6 +9,7 @@ import {
   deleteSavedSearchAction,
   saveSearchAction,
 } from "../../app/actions/savedSearch";
+import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
 import styles from "./SavedSearches.module.css";
 
 /** Pre-built view (href computed server-side from the stored filters). */
@@ -65,7 +66,19 @@ export function SavedSearches({
   const onSave = () => {
     startTransition(async () => {
       const res = await saveSearchAction(currentFilters, currentLabel);
-      if (res.ok) setJustSaved(true);
+      if (res.ok) {
+        setJustSaved(true);
+        // Fired on the WRITE SUCCEEDING, not on the click: a save that the
+        // server refused is not a saved search, and counting it would make the
+        // retention flywheel look like it is turning when it is not. Carries
+        // which filter AXES were used, never their values (a location or a
+        // free-text query is the seeker's own information).
+        captureEvent(SEEKER_DISCOVERY_EVENTS.savedSearchCreated, {
+          axes: Object.entries(currentFilters)
+            .filter(([, value]) => value !== undefined && value !== false)
+            .map(([key]) => key),
+        });
+      }
     });
   };
 

@@ -383,3 +383,25 @@
 		transition: none;
 	}
 }
+
+/* Location-precision disclosure (074). Sits at the top of the tray, above the
+   result list, because it changes how every card below it should be read. */
+.precisionNote {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-6);
+	margin: 0 0 var(--space-12);
+	padding: var(--space-8) var(--space-10);
+	border-radius: var(--radius-input);
+	background: var(--color-surface);
+	border: 1px solid var(--border-soft);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.precisionNote svg {
+	flex-shrink: 0;
+	margin-top: 2px;
+}

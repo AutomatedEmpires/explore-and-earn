@@ -15,6 +15,8 @@ export type {
   BenefitTrustModalEditProps,
   BenefitTrustModalViewProps,
 } from "./BenefitTrustModal";
+export { CardDetailPopover } from "./CardDetailPopover";
+export type { CardDetailKind, CardDetailPopoverProps } from "./CardDetailPopover";
 export { PayDetailsDrawer } from "./PayDetailsDrawer";
 export type { PayDetailsDrawerProps } from "./PayDetailsDrawer";
 export { HostProfilePopup } from "./HostProfilePopup";

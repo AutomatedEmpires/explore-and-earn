@@ -7,24 +7,41 @@ import { Icon, type IconKey } from "@explore-and-earn/ui";
 import { ScopeShellNav, type ScopeNavItem } from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
 import { RolePill } from "../global/RolePill";
-import { OnboardingWalkthrough, SEEKER_TOUR_STEPS } from "../onboarding";
+import { SeekerCoachmarks } from "./SeekerCoachmarks";
 
 /**
  * Seeker OS shell.
  *
- * Navigation model (founder canon 2026-07-13 — "secondary nav is TUCKED; NEVER
- * a row of selectors at the bottom of the page"):
- *   - PRIMARY modes stay on the founder-locked MOBILE bottom dock:
- *     Swipe · Map · Seek · Profile (that order, mobile only).
+ * Navigation model:
+ *   - PRIMARY destinations sit on the MOBILE bottom dock (mobile only).
  *   - ALL secondary / scope nav lives in the shared <ScopeShellNav>: a persistent
  *     LEFT RAIL at ≥1024px (content offset by the rail width) and a HAMBURGER
  *     drawer at <1024px. The rail also carries the primary destinations because
- *     the mobile dock is hidden on desktop — the rail is the only way to reach
- *     Swipe / Map / Seek there.
+ *     the mobile dock is hidden on desktop.
  *
- * The shell no longer owns a bespoke sidebar cluster: the personalized,
- * content-first surface is the page itself (SeekerDashboard). The top bar stays
- * minimal — command search + a notifications bell + the profile avatar.
+ * ── THE DOCK CHANGED IN V2-G, AND IT IS A DELIBERATE OVERRIDE ───────────────
+ *
+ * The dock was Swipe · Map · Seek · Profile, marked in this file as
+ * founder-locked (2026-07-13). D17 supersedes it with Explore · Swipe · Saved ·
+ * Applications · Profile, because the old set answered only "how do I look for
+ * work" and had no answer at all for "what happened to the things I already
+ * did" — Saved and Applications, the two surfaces a returning seeker opens
+ * first, were both three taps deep behind a hamburger.
+ *
+ * MAP DID NOT LOSE ITS PLACE. It moves from a tab to (a) the rail and the mobile
+ * drawer — the `hideInDrawer` flag is off for it now, where before the dock's
+ * ownership kept it hidden — and (b) an explicit "Map view" control on /seek
+ * that carries the current filters across. So the map is one tap from Explore
+ * rather than zero, and reachable from the menu on every seeker route.
+ *
+ * ── THE BLOCKING TOUR IS GONE (D19) ────────────────────────────────────────
+ *
+ * This shell used to render <OnboardingWalkthrough>: an `aria-modal="true"`
+ * card with a scrim, a focus trap, a scroll lock, and every sibling of the panel
+ * set aria-hidden. It described the product while making the product unusable.
+ * It is replaced by <SeekerCoachmarks> — three non-modal marks anchored to real
+ * controls, with persisted progress. OnboardingWalkthrough itself stays in the
+ * tree; the host shell still uses it and that surface is not this phase's.
  */
 
 interface SectionDef {
@@ -38,18 +55,22 @@ interface SectionDef {
   readonly hideInDrawer?: boolean;
 }
 
-// Scope sections — rail body + hamburger drawer. Order = discovery modes first,
-// then the pipeline, then the community/journey. Every href resolves to a real
-// (seeker) route. Seek/Swipe/Map are hidden from the mobile drawer because the
-// bottom dock already carries them; the rail keeps them (no dock on desktop).
+// Scope sections — rail body + hamburger drawer. Order = home, then discovery
+// modes, then the pipeline, then the community/journey. Every href resolves to a
+// real (seeker) route.
+//
+// `hideInDrawer` marks a destination the mobile DOCK already carries, so the
+// drawer does not repeat it. Map is deliberately NOT flagged: it left the dock
+// in V2-G, so the drawer is now its mobile home.
 const SECTIONS: readonly SectionDef[] = [
+  { href: "/home", label: "Home", icon: "nav.dashboard", exact: true },
   { href: "/seek", label: "Seek", icon: "nav.seek", hideInDrawer: true },
   { href: "/swipe", label: "Swipe", icon: "nav.swipe", hideInDrawer: true },
-  { href: "/map", label: "Map", icon: "nav.map", hideInDrawer: true },
+  { href: "/map", label: "Map", icon: "nav.map" },
   { href: "/assistant", label: "Assistant", icon: "action.message" },
   { href: "/resume", label: "Résumé", icon: "profile.resume" },
-  { href: "/saved", label: "Saved", icon: "nav.saved" },
-  { href: "/applied", label: "Applications", icon: "action.apply" },
+  { href: "/saved", label: "Saved", icon: "nav.saved", hideInDrawer: true },
+  { href: "/applied", label: "Applications", icon: "action.apply", hideInDrawer: true },
   { href: "/invites", label: "Invites", icon: "status.match" },
   { href: "/offered", label: "Offers", icon: "status.offered" },
   { href: "/messages", label: "Messages", icon: "nav.messages", badgeKey: "unread" },
@@ -65,12 +86,25 @@ const FOOTER: readonly SectionDef[] = [
   { href: "/help", label: "Help", icon: "nav.help" },
 ];
 
-// Founder-locked seeker MOBILE dock: Swipe · Map · Seek · Profile (order fixed).
-const MOBILE_PRIMARY: readonly { readonly href: string; readonly label: string; readonly icon: IconKey }[] = [
+/**
+ * Seeker MOBILE dock (D17): Explore · Swipe · Saved · Applications · Profile.
+ *
+ * Two discovery modes and the two lifecycle buckets a returning seeker actually
+ * opens. Map moved to the rail/drawer and to the "Map view" control on /seek —
+ * see the file header for why, and what it cost.
+ */
+const MOBILE_PRIMARY: readonly {
+  readonly href: string;
+  readonly label: string;
+  readonly icon: IconKey;
+  /** DOM id, so a coachmark can anchor to the real control. */
+  readonly id?: string;
+}[] = [
+  { href: "/seek", label: "Explore", icon: "nav.seek" },
   { href: "/swipe", label: "Swipe", icon: "nav.swipe" },
-  { href: "/map", label: "Map", icon: "nav.map" },
-  { href: "/seek", label: "Seek", icon: "nav.seek" },
-  { href: "/profile", label: "Profile", icon: "nav.profile" },
+  { href: "/saved", label: "Saved", icon: "nav.saved" },
+  { href: "/applied", label: "Applications", icon: "action.apply" },
+  { href: "/profile", label: "Profile", icon: "nav.profile", id: "seeker-nav-profile" },
 ];
 
 export interface SeekerShellProps {
@@ -172,6 +206,7 @@ export function SeekerShell({
           return (
             <Link
               key={item.href}
+              id={item.id}
               href={item.href}
               className="seekeros-mtab ui-pressable"
               aria-current={active ? "page" : undefined}
@@ -183,14 +218,8 @@ export function SeekerShell({
         })}
       </nav>
 
-      {/* Seeker onboarding tour — subtle (launcher only, no auto-start). */}
-      <OnboardingWalkthrough
-        storageKey="ee.onboarding.seeker.v1"
-        eyebrow="Quick tour"
-        title="Find your way around"
-        steps={SEEKER_TOUR_STEPS}
-        launcherLabel="Take a quick tour"
-      />
+      {/* D19 — anchored, non-blocking, persisted. Replaces the modal tour. */}
+      <SeekerCoachmarks />
     </div>
   );
 }

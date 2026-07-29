@@ -1,30 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type {
 	CompensationUnit,
 	OpportunityCategory,
 } from "@explore-and-earn/contracts";
-import { DiscoveryCard, Icon, type IconKey } from "@explore-and-earn/ui";
+import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import {
-	BenefitTrustModal,
 	CATEGORY_ICON,
 	CATEGORY_LABEL,
 	EmptyState,
-	HostProfilePopup,
-	PayDetailsDrawer,
-	QuickPeekDrawer,
-	ReportListingDrawer,
-	toDiscoveryCardData,
-	type BenefitKind,
+	ListingCardGrid,
 	type DiscoveryListing,
+	type ListingCardPopupOverrides,
 } from "../discovery";
 import {
 	FeaturedEmployersRail,
 	type FeaturedEmployer,
 } from "../public/FeaturedEmployersRail";
+import { passListingAction, saveListingAction } from "../../app/actions/swipe";
+import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
 import styles from "./SeekBrowser.module.css";
 import { SeekFilterPopup, type SeekFilterPopupValue } from "./SeekFilterPopup";
 import { SavedSearches, type SavedSearchView } from "./SavedSearches";
@@ -34,62 +32,67 @@ import { SeekSortPopup } from "./SeekSortPopup";
 type StartRangeMonths = 1 | 3 | 6;
 type PayUnit = Extract<CompensationUnit, "hour" | "day">;
 
-type ActiveBenefit = { readonly id: string; readonly bucket: BenefitKind };
+const SEARCH_DEBOUNCE_MS = 400;
 
-/** Extracted to avoid duplicating the 30-line DiscoveryCard map block. */
-function ListingSection({
-	id,
-	title,
-	listings,
-	styles: s,
-	onOpen,
-	onHostClick,
-	onBenefit,
-	onPay,
-	onLocation,
-	onReport,
-}: {
-	id: string;
-	title: string;
-	listings: readonly DiscoveryListing[];
-	styles: Record<string, string>;
-	onOpen: (id: string) => void;
-	onHostClick: (id: string) => void;
-	onBenefit: (v: ActiveBenefit) => void;
-	onPay: (id: string) => void;
-	onLocation: (id: string) => void;
-	onReport: (id: string) => void;
-}) {
-	return (
-		<section className={s.listingSection} aria-labelledby={id}>
-			<header className={s.listingSectionHead}>
-				<h2 id={id} className={s.listingSectionTitle}>{title}</h2>
-				<p className={s.listingSectionCount}>
-					{listings.length}&nbsp;{listings.length === 1 ? "opportunity" : "opportunities"}
-				</p>
-			</header>
-			<div className={s.grid}>
-				{listings.map((listing, index) => (
-					<DiscoveryCard
-						key={listing.id}
-						data={toDiscoveryCardData(listing)}
-						surface="discovery_feed"
-						imageLoading={index < 2 ? "eager" : "lazy"}
-						onOpen={onOpen}
-						onHostClick={onHostClick}
-						onHousingClick={(lid) => onBenefit({ id: lid, bucket: "housing" })}
-						onMealsClick={(lid) => onBenefit({ id: lid, bucket: "meals" })}
-						onPayClick={onPay}
-						onLocationClick={onLocation}
-						onReport={onReport}
-					/>
-				))}
-			</div>
-		</section>
-	);
+/**
+ * SORT is client-side over the CURRENT PAGE, and says so.
+ *
+ * The server orders by (published_at DESC, id DESC) and pages with .range(), so
+ * a "sort by pay" that only reordered the 48 rows already fetched while
+ * presenting itself as a global sort would be a lie at every page boundary
+ * except the first. The control is therefore labelled "Sort this page", and
+ * "Newest" is the identity option that hands the server order straight back.
+ */
+const SORT_OPTIONS = [
+	{ id: "newest", label: "Newest first" },
+	{ id: "match", label: "Best match" },
+	{ id: "pay", label: "Highest pay" },
+	{ id: "soonest", label: "Starting soonest" },
+] as const;
+type SortId = (typeof SORT_OPTIONS)[number]["id"];
+
+/** Comparable pay floor in cents, or null when the listing states no range. */
+function payFloor(listing: DiscoveryListing): number | null {
+	const cents = listing.payInsight?.minCents;
+	return typeof cents === "number" ? cents : null;
 }
 
-const SEARCH_DEBOUNCE_MS = 400;
+function startTime(listing: DiscoveryListing): number | null {
+	if (!listing.begins) return null;
+	const parsed = Date.parse(listing.begins);
+	return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Sort the page. Listings that cannot be judged on the chosen axis are never
+ * hidden and never promoted — they sink to the end in their original order, so
+ * a missing pay range costs a listing its position but not its existence.
+ */
+function sortListings(
+	listings: readonly DiscoveryListing[],
+	sort: SortId,
+): readonly DiscoveryListing[] {
+	if (sort === "newest") return listings;
+	const keyed = listings.map((listing, index) => ({ listing, index }));
+	const value = (listing: DiscoveryListing): number | null =>
+		sort === "match"
+			? listing.matchScore ?? null
+			: sort === "pay"
+				? payFloor(listing)
+				: startTime(listing);
+	// Ascending for "starting soonest", descending for match and pay.
+	const ascending = sort === "soonest";
+	keyed.sort((a, b) => {
+		const av = value(a.listing);
+		const bv = value(b.listing);
+		if (av === null && bv === null) return a.index - b.index;
+		if (av === null) return 1;
+		if (bv === null) return -1;
+		if (av === bv) return a.index - b.index;
+		return ascending ? av - bv : bv - av;
+	});
+	return keyed.map((entry) => entry.listing);
+}
 
 export interface SeekBrowserProps {
 	readonly listings: readonly DiscoveryListing[];
@@ -103,18 +106,42 @@ export interface SeekBrowserProps {
 	readonly location?: string;
 	readonly payMin?: number;
 	readonly payUnit?: CompensationUnit;
+	readonly startAfter?: string;
+	readonly startBefore?: string;
 	readonly savedSearches?: readonly SavedSearchView[];
+	/** Total across all pages is unknown; this page's count is what we can claim. */
+	readonly hasMorePages?: boolean;
+	/** Signed-out visitors get the same browse, but save/skip route to sign-in. */
+	readonly isAuthenticated?: boolean;
 }
 
 /**
- * SeekBrowser — the browsable Seek tab. All filter state (text query, category,
- * housing/meals, location, pay floor) lives in the URL query string: the server
- * page parses it, runs searchListings, and hands the already-filtered listings
- * here. The controls below only navigate — toggling a chip or typing in the
- * search box pushes a new URL, which re-renders the server page, so a filtered
- * view is shareable and bookmarkable. Sort is a client-only reordering of the
- * returned rows. The drawers (QuickPeek / HostProfile / BenefitBucket / Report)
- * are unchanged.
+ * SeekBrowser — the serious-search surface (V2-G Part VII).
+ *
+ * WHAT CHANGED AND WHY.
+ *
+ * 1. IT RENDERS THE CANONICAL CARD WRAPPER. This component used to build its
+ *    own popup host — five useState slots, five resolvers, five drawers — a
+ *    verbatim fork of the wiring that already lives in useListingCardPopups.
+ *    The fork is why the card's newer popovers never reached /seek. It now
+ *    renders <ListingCardGrid>, so every popup the card grows, /seek gets.
+ *
+ * 2. SAVE AND SKIP ACTUALLY DO SOMETHING. The card's decision bar renders
+ *    whenever an open handler exists, so /seek was drawing a Save button and a
+ *    Skip button with NO handlers behind them: both were silent no-ops on the
+ *    marketplace's main browse surface. They are now wired to the same
+ *    persisted actions the swipe deck uses.
+ *
+ * 3. EVERY FILTER MAPS TO A REAL COLUMN. Location and the explicit start-date
+ *    window were parsed by the server page and applied by searchListings, but
+ *    no control ever set them, so two working filters were unreachable. They
+ *    are in the filter popover now. Nothing has been added that the query
+ *    cannot serve — see the filter popover for the enumerated set.
+ *
+ * All filter state stays in the URL: the server page parses it, runs
+ * searchListings, and hands the filtered rows here, so a filtered view is
+ * shareable and bookmarkable. Sort and the grid/list view are client-side view
+ * state and are labelled as such.
  */
 export function SeekBrowser({
 	listings,
@@ -128,7 +155,11 @@ export function SeekBrowser({
 	location,
 	payMin,
 	payUnit,
+	startAfter,
+	startBefore,
 	savedSearches = [],
+	hasMorePages = false,
+	isAuthenticated = true,
 }: SeekBrowserProps) {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -136,12 +167,12 @@ export function SeekBrowser({
 
 	const [searchText, setSearchText] = useState<string>(query ?? "");
 	const [filterOpen, setFilterOpen] = useState(false);
-	const [sortOpen, setSortOpen] = useState(false);
-	const [activeId, setActiveId] = useState<string | null>(null);
-	const [activeHostId, setActiveHostId] = useState<string | null>(null);
-	const [activeBenefit, setActiveBenefit] = useState<ActiveBenefit | null>(null);
-	const [activePayId, setActivePayId] = useState<string | null>(null);
-	const [reportId, setReportId] = useState<string | null>(null);
+	const [laneOpen, setLaneOpen] = useState(false);
+	const [sort, setSort] = useState<SortId>("newest");
+	const [view, setView] = useState<"grid" | "list">("grid");
+	const [savedIds, setSavedIds] = useState<ReadonlySet<string>>(new Set());
+	const [skippedIds, setSkippedIds] = useState<ReadonlySet<string>>(new Set());
+	const [, startAction] = useTransition();
 
 	const currentQuery = query ?? "";
 
@@ -178,52 +209,7 @@ export function SeekBrowser({
 		router.push(queryString ? `${pathname}?${queryString}` : pathname);
 	};
 
-	const results = listings;
-
-	// Split results into featured (boosted / verified hosts) and the rest.
-	// Only shown when no active filters; when filtering, a single flat grid
-	// is more useful than an artificial featured/all split.
-	const featuredResults = useMemo(
-		() =>
-			results.filter(
-				(l) =>
-					l.conditionalBadges?.includes("boosted") || l.host.verified,
-			),
-		[results],
-	);
-	const restResults = useMemo(
-		() =>
-			results.filter(
-				(l) =>
-					!l.conditionalBadges?.includes("boosted") && !l.host.verified,
-			),
-		[results],
-	);
-
-	const activeListing = useMemo(
-		() => listings.find((listing) => listing.id === activeId) ?? null,
-		[listings, activeId],
-	);
-
-	const activeHost = useMemo(
-		() => listings.find((listing) => listing.id === activeHostId)?.host ?? null,
-		[listings, activeHostId],
-	);
-
-	const activeBenefitListing = useMemo(
-		() => listings.find((listing) => listing.id === activeBenefit?.id) ?? null,
-		[listings, activeBenefit],
-	);
-
-	const activePayListing = useMemo(
-		() => listings.find((listing) => listing.id === activePayId) ?? null,
-		[listings, activePayId],
-	);
-
-	const activeReportListing = useMemo(
-		() => listings.find((listing) => listing.id === reportId) ?? null,
-		[listings, reportId],
-	);
+	const results = useMemo(() => sortListings(listings, sort), [listings, sort]);
 
 	const hasActiveFilters =
 		Boolean(query) ||
@@ -234,12 +220,20 @@ export function SeekBrowser({
 		Boolean(startRangeMonths) ||
 		Boolean(location) ||
 		payMin != null ||
-		Boolean(payUnit);
+		Boolean(payUnit) ||
+		Boolean(startAfter) ||
+		Boolean(startBefore);
 
 	const activeFilterChips = useMemo(() => {
 		const chips: { label: string; icon: IconKey }[] = [];
 		if (startRangeMonths) {
-			chips.push({ label: `${startRangeMonths} mo`, icon: "system.info" });
+			chips.push({ label: `${startRangeMonths} mo`, icon: "status.begins" });
+		}
+		if (startAfter || startBefore) {
+			chips.push({
+				label: `${startAfter ?? "any"} → ${startBefore ?? "any"}`,
+				icon: "status.begins",
+			});
 		}
 		if (visaSupport) {
 			chips.push({ label: "Visa", icon: "system.info" });
@@ -260,7 +254,17 @@ export function SeekBrowser({
 			chips.push({ label: location, icon: "nav.map" });
 		}
 		return chips;
-	}, [housing, location, meals, payMin, payUnit, startRangeMonths, visaSupport]);
+	}, [
+		housing,
+		location,
+		meals,
+		payMin,
+		payUnit,
+		startAfter,
+		startBefore,
+		startRangeMonths,
+		visaSupport,
+	]);
 
 	const filterCount = activeFilterChips.length;
 
@@ -291,14 +295,17 @@ export function SeekBrowser({
 
 	const applyFilters = (value: SeekFilterPopupValue) => {
 		const next = new URLSearchParams(searchParams.toString());
-		if (value.housing) next.set("housing", "1");
-		else next.delete("housing");
-		if (value.meals) next.set("meals", "1");
-		else next.delete("meals");
-		if (value.visaSupport) next.set("visa", "1");
-		else next.delete("visa");
-		if (value.startRangeMonths) next.set("start_range", String(value.startRangeMonths));
-		else next.delete("start_range");
+		const set = (key: string, on: unknown, raw?: string) => {
+			if (on) next.set(key, raw ?? "1");
+			else next.delete(key);
+		};
+		set("housing", value.housing);
+		set("meals", value.meals);
+		set("visa", value.visaSupport);
+		set("start_range", value.startRangeMonths, String(value.startRangeMonths));
+		set("location", value.location?.trim(), value.location?.trim());
+		set("start_after", value.startAfter, value.startAfter);
+		set("start_before", value.startBefore, value.startBefore);
 		// pay_unit only rides along with an active pay floor — a unit on its own
 		// would filter listings by rate unit with no minimum, which seek/page reads
 		// (parsePayUnit) and applies. Keep the two params coupled.
@@ -310,14 +317,17 @@ export function SeekBrowser({
 			next.delete("pay_min");
 			next.delete("pay_unit");
 		}
+		// Any filter change invalidates the page cursor: page 3 of the old result
+		// set is not page 3 of the new one.
+		next.delete("page");
 		const queryString = next.toString();
 		router.push(queryString ? `${pathname}?${queryString}` : pathname);
 		setFilterOpen(false);
 	};
 
-	const applySort = (nextCategory: OpportunityCategory | null) => {
+	const applyLane = (nextCategory: OpportunityCategory | null) => {
 		pushParam("category", nextCategory);
-		setSortOpen(false);
+		setLaneOpen(false);
 	};
 
 	// Triad-first quick filters — each flips a single URL param via pushParam.
@@ -326,9 +336,179 @@ export function SeekBrowser({
 	const selectLane = (lane: OpportunityCategory) =>
 		pushParam("category", category === lane ? null : lane);
 
+	// ── Card actions ────────────────────────────────────────────────────────
+	//
+	// Optimistic and best-effort, exactly like the deck: the write must never
+	// block the interaction, and a failure leaves the card in its previous state
+	// rather than claiming a save that did not happen.
+	const requireAuth = useCallback((): boolean => {
+		if (isAuthenticated) return false;
+		router.push(`/sign-in?role=seeker&returnTo=${encodeURIComponent("/seek")}`);
+		return true;
+	}, [isAuthenticated, router]);
+
+	const cardOverrides = useMemo<ListingCardPopupOverrides>(
+		() => ({
+			// onOpen is deliberately NOT overridden: the shared default opens Quick
+			// Peek, which is the right affordance on a comparison surface (read four
+			// listings without losing your filters), and it is also what fires
+			// `listing_card_opened` via analyticsSurface below.
+			onApply: (id) => {
+				if (requireAuth()) return;
+				router.push(`/listing/${id}?apply=1`);
+			},
+			onSave: (id) => {
+				if (requireAuth()) return;
+				setSavedIds((prev) => new Set(prev).add(id));
+				captureEvent(SEEKER_DISCOVERY_EVENTS.listingSaved, { surface: "seek" });
+				startAction(() => {
+					void saveListingAction(id).catch(() => {
+						setSavedIds((prev) => {
+							const next = new Set(prev);
+							next.delete(id);
+							return next;
+						});
+					});
+				});
+			},
+			onSkip: (id) => {
+				if (requireAuth()) return;
+				setSkippedIds((prev) => new Set(prev).add(id));
+				captureEvent(SEEKER_DISCOVERY_EVENTS.listingSkipped, { surface: "seek" });
+				startAction(() => {
+					void passListingAction(id).catch(() => {
+						setSkippedIds((prev) => {
+							const next = new Set(prev);
+							next.delete(id);
+							return next;
+						});
+					});
+				});
+			},
+		}),
+		[requireAuth, router],
+	);
+
+	const getCardState = useCallback(
+		(listing: DiscoveryListing) =>
+			savedIds.has(listing.id)
+				? ("saved" as const)
+				: skippedIds.has(listing.id)
+					? ("skipped" as const)
+					: undefined,
+		[savedIds, skippedIds],
+	);
+
+	// The honest count. We know this page exactly; we do NOT know the global
+	// total (the query pages with .range and never asks for a count), so a
+	// further page is announced as "more", never as a fabricated number.
 	const countLabel = `${results.length} ${
 		results.length === 1 ? "opportunity" : "opportunities"
-	}`;
+	}${hasMorePages ? " on this page, more on the next" : ""}`;
+
+	const removeHref = useCallback(
+		(...keys: readonly string[]) => {
+			const next = new URLSearchParams(searchParams.toString());
+			for (const key of keys) next.delete(key);
+			const queryString = next.toString();
+			return queryString ? `${pathname}?${queryString}` : pathname;
+		},
+		[pathname, searchParams],
+	);
+
+	/** The current filter set, carried onto the map so the toggle keeps context. */
+	const mapHref = useMemo(() => {
+		const next = new URLSearchParams(searchParams.toString());
+		next.delete("page");
+		const queryString = next.toString();
+		return queryString ? `/map?${queryString}` : "/map";
+	}, [searchParams]);
+
+	const emptyState = (() => {
+		if (!hasActiveFilters) {
+			return (
+				<div className={styles.emptyWrap}>
+					<EmptyState
+						title="No opportunities yet"
+						message="Check back soon — new roles are added regularly. In the meantime, the map shows every place hosts are hiring."
+						actionLabel="Open the map"
+						actionHref="/map"
+					/>
+				</div>
+			);
+		}
+		// Recovery surface: every chip is a plain link that drops ONE filter param
+		// (no client state), so the dead end names what screened everything out and
+		// offers the way back.
+		const removeChips: { label: string; href: string; icon?: IconKey }[] = [];
+		if (query) {
+			removeChips.push({ label: `“${query}”`, href: removeHref("q"), icon: "action.search" });
+		}
+		if (category) {
+			removeChips.push({
+				label: CATEGORY_LABEL[category as OpportunityCategory],
+				href: removeHref("category"),
+				icon: CATEGORY_ICON[category as OpportunityCategory],
+			});
+		}
+		if (housing) {
+			removeChips.push({ label: "Housing", href: removeHref("housing"), icon: "benefit.housing" });
+		}
+		if (meals) {
+			removeChips.push({ label: "Meals", href: removeHref("meals"), icon: "benefit.meals" });
+		}
+		if (visaSupport) {
+			removeChips.push({ label: "Visa support", href: removeHref("visa"), icon: "system.info" });
+		}
+		if (startRangeMonths) {
+			removeChips.push({
+				label: `Starts within ${startRangeMonths} mo`,
+				href: removeHref("start_range"),
+				icon: "status.begins",
+			});
+		}
+		if (startAfter || startBefore) {
+			removeChips.push({
+				label: "Start-date window",
+				href: removeHref("start_after", "start_before"),
+				icon: "status.begins",
+			});
+		}
+		if (payMin != null && payMin > 0) {
+			removeChips.push({
+				label: `$${payMin}${payUnit ? `/${payUnit}` : ""}+`,
+				href: removeHref("pay_min", "pay_unit"),
+				icon: "benefit.pay",
+			});
+		}
+		if (location) {
+			removeChips.push({ label: location, href: removeHref("location"), icon: "nav.map" });
+		}
+		const lanes = (["farm", "maritime", "remote", "seasonal"] as const).map((lane) => ({
+			label: CATEGORY_LABEL[lane],
+			href: `/seek?category=${lane}`,
+			icon: CATEGORY_ICON[lane],
+		}));
+		const filterNoun = removeChips.length === 1 ? "filter" : "filters";
+		return (
+			<div className={styles.emptyWrap}>
+				<EmptyState
+					title={query ? `No matches for “${query}”` : "These filters came up empty"}
+					message={
+						removeChips.length > 0
+							? `Every open opportunity is being screened out by your ${removeChips.length} active ${filterNoun}. Drop one below and the trail usually reopens.`
+							: "Every open opportunity is being screened out by the current view. Loosen it below and the trail usually reopens."
+					}
+					filterChipsLabel="Remove a filter"
+					filterChips={removeChips}
+					suggestionsLabel="Or scout a lane"
+					suggestions={lanes}
+					actionLabel="Clear all filters"
+					actionHref="/seek"
+				/>
+			</div>
+		);
+	})();
 
 	return (
 		<section className={styles.wrap}>
@@ -365,6 +545,7 @@ export function SeekBrowser({
 						type="button"
 						className={styles.controlButton}
 						onClick={() => setFilterOpen(true)}
+						aria-haspopup="dialog"
 					>
 						<Icon name="action.filter" size={16} aria-hidden />
 						<span className={styles.controlLabel}>Filter</span>
@@ -372,22 +553,72 @@ export function SeekBrowser({
 							<span className={styles.controlCount}>{filterCount}</span>
 						) : null}
 					</button>
+
 					<button
 						type="button"
 						className={styles.controlButton}
-						onClick={() => setSortOpen(true)}
+						onClick={() => setLaneOpen(true)}
+						aria-haspopup="dialog"
 					>
 						<Icon
-							name={
-								category ? CATEGORY_ICON[category as OpportunityCategory] : "action.sort"
-							}
+							name={category ? CATEGORY_ICON[category as OpportunityCategory] : "nav.seek"}
 							size={16}
 							aria-hidden
 						/>
 						<span className={styles.controlLabel}>
-							{category ? CATEGORY_LABEL[category as OpportunityCategory] : "Sort"}
+							{category ? CATEGORY_LABEL[category as OpportunityCategory] : "Lane"}
 						</span>
 					</button>
+
+					{/* Sort is page-scoped and labelled so — see SORT_OPTIONS. */}
+					<label className={styles.selectField}>
+						<span className={styles.sortLabel}>Sort this page</span>
+						<select
+							className={styles.select}
+							value={sort}
+							onChange={(event) => setSort(event.target.value as SortId)}
+						>
+							{SORT_OPTIONS.map((option) => (
+								<option key={option.id} value={option.id}>
+									{option.label}
+								</option>
+							))}
+						</select>
+					</label>
+
+					<div className={styles.viewToggle} role="group" aria-label="Result layout">
+						<button
+							type="button"
+							className={
+								view === "grid"
+									? `${styles.viewButton} ${styles.viewButtonActive}`
+									: styles.viewButton
+							}
+							aria-pressed={view === "grid"}
+							onClick={() => setView("grid")}
+						>
+							<Icon name="nav.seek" size={16} aria-hidden />
+							Grid
+						</button>
+						<button
+							type="button"
+							className={
+								view === "list"
+									? `${styles.viewButton} ${styles.viewButtonActive}`
+									: styles.viewButton
+							}
+							aria-pressed={view === "list"}
+							onClick={() => setView("list")}
+						>
+							<Icon name="action.sort" size={16} aria-hidden />
+							List
+						</button>
+					</div>
+
+					<Link className={styles.mapLink} href={mapHref}>
+						<Icon name="nav.map" size={16} aria-hidden />
+						Map view
+					</Link>
 				</div>
 
 				<SeekQuickFilters
@@ -415,214 +646,46 @@ export function SeekBrowser({
 								{chip.label}
 							</span>
 						))}
-						<button
-							type="button"
-							className={styles.clearButton}
-							onClick={() => {
-								const next = new URLSearchParams(searchParams.toString());
-								next.delete("category");
-								next.delete("housing");
-								next.delete("meals");
-								next.delete("visa");
-								next.delete("start_range");
-								next.delete("pay_min");
-								next.delete("pay_unit");
-								next.delete("location");
-								const queryString = next.toString();
-								router.push(queryString ? `${pathname}?${queryString}` : pathname);
-							}}
-						>
+						<Link className={styles.clearButton} href={removeHref(
+							"category",
+							"housing",
+							"meals",
+							"visa",
+							"start_range",
+							"pay_min",
+							"pay_unit",
+							"location",
+							"start_after",
+							"start_before",
+							"page",
+						)}>
 							Clear
-						</button>
+						</Link>
 					</div>
 				) : null}
 			</div>
 
-			{/* \u2500\u2500 Featured Employers Rail — always above the listings \u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
+			{/* Featured Employers Rail — always above the listings */}
 			{featuredEmployers.length > 0 ? (
 				<FeaturedEmployersRail employers={featuredEmployers} />
 			) : null}
 
-			{/* \u2500\u2500 Listing sections \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */}
-			{hasActiveFilters ? (
-				/* \u2500\u2500 Filtered view: single flat grid \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
-				<>
-					<p className={styles.count} role="status" aria-live="polite">
-						{countLabel}
-					</p>
-					{results.length === 0 ? (() => {
-						// Recovery surface: every chip is a plain link that drops ONE
-						// filter param (no client state), so the dead end names what
-						// screened everything out and offers the way back.
-						const removeHref = (...keys: readonly string[]) => {
-							const next = new URLSearchParams(searchParams.toString());
-							for (const key of keys) next.delete(key);
-							const queryString = next.toString();
-							return queryString ? `${pathname}?${queryString}` : pathname;
-						};
-						const removeChips: { label: string; href: string; icon?: IconKey }[] = [];
-						if (query) {
-							removeChips.push({ label: `\u201c${query}\u201d`, href: removeHref("q"), icon: "action.search" });
-						}
-						if (category) {
-							removeChips.push({
-								label: CATEGORY_LABEL[category as OpportunityCategory],
-								href: removeHref("category"),
-								icon: CATEGORY_ICON[category as OpportunityCategory],
-							});
-						}
-						if (housing) {
-							removeChips.push({ label: "Housing", href: removeHref("housing"), icon: "benefit.housing" });
-						}
-						if (meals) {
-							removeChips.push({ label: "Meals", href: removeHref("meals"), icon: "benefit.meals" });
-						}
-						if (visaSupport) {
-							removeChips.push({ label: "Visa support", href: removeHref("visa"), icon: "system.info" });
-						}
-						if (startRangeMonths) {
-							removeChips.push({
-								label: `Starts within ${startRangeMonths} mo`,
-								href: removeHref("start_range"),
-								icon: "status.begins",
-							});
-						}
-						if (payMin != null && payMin > 0) {
-							removeChips.push({
-								label: `$${payMin}${payUnit ? `/${payUnit}` : ""}+`,
-								href: removeHref("pay_min", "pay_unit"),
-								icon: "benefit.pay",
-							});
-						}
-						if (location) {
-							removeChips.push({ label: location, href: removeHref("location"), icon: "nav.map" });
-						}
-						const lanes = (["farm", "maritime", "remote", "seasonal"] as const).map((lane) => ({
-							label: CATEGORY_LABEL[lane],
-							href: `/seek?category=${lane}`,
-							icon: CATEGORY_ICON[lane],
-						}));
-						const filterNoun = removeChips.length === 1 ? "filter" : "filters";
-						return (
-							<div className={styles.emptyWrap}>
-								<EmptyState
-									title={
-										query
-											? `No matches for \u201c${query}\u201d`
-											: "These filters came up empty"
-									}
-									message={
-										removeChips.length > 0
-											? `Every open opportunity is being screened out by your ${removeChips.length} active ${filterNoun}. Drop one below and the trail usually reopens.`
-											: "Every open opportunity is being screened out by the current view. Loosen it below and the trail usually reopens."
-									}
-									filterChipsLabel="Remove a filter"
-									filterChips={removeChips}
-									suggestionsLabel="Or scout a lane"
-									suggestions={lanes}
-									actionLabel="Clear all filters"
-									actionHref="/seek"
-								/>
-							</div>
-						);
-					})() : (
-						<div className={styles.grid}>
-							{results.map((listing, index) => (
-								<DiscoveryCard
-									key={listing.id}
-									data={toDiscoveryCardData(listing)}
-									surface="discovery_feed"
-									imageLoading={index < 2 ? "eager" : "lazy"}
-									onOpen={(id) => setActiveId(id)}
-									onHostClick={(id) => setActiveHostId(id)}
-									onHousingClick={(id) => setActiveBenefit({ id, bucket: "housing" })}
-									onMealsClick={(id) => setActiveBenefit({ id, bucket: "meals" })}
-									onPayClick={(id) => setActivePayId(id)}
-									onLocationClick={(id) => router.push(`/map?focus=${id}`)}
-									onReport={(id) => setReportId(id)}
-								/>
-							))}
-						</div>
-					)}
-				</>
-			) : results.length === 0 ? (
-				<div className={styles.emptyWrap}>
-					<EmptyState
-						title="No opportunities yet"
-						message="Check back soon — new roles are added regularly."
-					/>
-				</div>
-			) : featuredResults.length > 0 && restResults.length > 0 ? (
-				<>
-					<ListingSection
-						id="featured-listings-heading"
-						title="Featured listings"
-						listings={featuredResults}
-						styles={styles}
-						onOpen={setActiveId}
-						onHostClick={setActiveHostId}
-						onBenefit={setActiveBenefit}
-						onPay={setActivePayId}
-						onLocation={(id) => router.push(`/map?focus=${id}`)}
-						onReport={setReportId}
-					/>
-					<ListingSection
-						id="all-listings-heading"
-						title="All listings"
-						listings={restResults}
-						styles={styles}
-						onOpen={setActiveId}
-						onHostClick={setActiveHostId}
-						onBenefit={setActiveBenefit}
-						onPay={setActivePayId}
-						onLocation={(id) => router.push(`/map?focus=${id}`)}
-						onReport={setReportId}
-					/>
-				</>
-			) : (
-				<ListingSection
-					id="all-listings-heading"
-					title={featuredResults.length === results.length ? "Featured listings" : "All listings"}
-					listings={results}
-					styles={styles}
-					onOpen={setActiveId}
-					onHostClick={setActiveHostId}
-					onBenefit={setActiveBenefit}
-					onPay={setActivePayId}
-					onLocation={(id) => router.push(`/map?focus=${id}`)}
-					onReport={setReportId}
-				/>
-			)}
+			{/* The result count is unconditional now: a search surface that only
+			    counts when a filter is active leaves the seeker guessing on the
+			    first, most common view. */}
+			<p className={styles.count} role="status" aria-live="polite">
+				{countLabel}
+			</p>
 
-			<QuickPeekDrawer
-				listing={activeListing}
-				onClose={() => setActiveId(null)}
-			/>
-
-			<HostProfilePopup
-				host={activeHost}
-				listings={listings}
-				onClose={() => setActiveHostId(null)}
-				onSelectListing={(id) => {
-					setActiveHostId(null);
-					setActiveId(id);
-				}}
-			/>
-
-			<BenefitTrustModal
-				listing={activeBenefitListing}
-				bucket={activeBenefit?.bucket ?? null}
-				onClose={() => setActiveBenefit(null)}
-			/>
-
-			<PayDetailsDrawer
-				listing={activePayListing}
-				onClose={() => setActivePayId(null)}
-			/>
-
-			<ReportListingDrawer
-				listing={activeReportListing}
-				onClose={() => setReportId(null)}
+			<ListingCardGrid
+				listings={results}
+				surface="discovery_feed"
+				overrides={cardOverrides}
+				analyticsSurface="seek"
+				getCardState={getCardState}
+				eagerCount={2}
+				className={view === "list" ? styles.list : styles.grid}
+				emptyState={emptyState}
 			/>
 
 			<SeekFilterPopup
@@ -638,15 +701,18 @@ export function SeekBrowser({
 						payUnit === "hour" || payUnit === "day"
 							? (payUnit as PayUnit)
 							: undefined,
+					location,
+					startAfter,
+					startBefore,
 				}}
 				onApply={applyFilters}
 			/>
 
 			<SeekSortPopup
-				open={sortOpen}
-				onClose={() => setSortOpen(false)}
+				open={laneOpen}
+				onClose={() => setLaneOpen(false)}
 				category={category}
-				onApply={applySort}
+				onApply={applyLane}
 			/>
 		</section>
 	);
