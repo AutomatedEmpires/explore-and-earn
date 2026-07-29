@@ -1,6 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
+import { ConfirmAction } from "../../components/admin/ConfirmAction";
 
 /**
  * Destructive admin actions confirm before they fire (founder Part VIII).
@@ -134,6 +138,55 @@ describe("admin destructive-action confirmations", () => {
     const beforeMarker = control.slice(0, marker);
     const lastDisabled = beforeMarker.lastIndexOf("disabled=");
     expect(beforeMarker.slice(lastDisabled)).toContain("disabled={disabled || busy}");
+  });
+
+  /**
+   * Rendered behaviour, not just source shape. The control's whole a11y story
+   * is that the trigger is a real button carrying the verb AND its subject —
+   * a screen-reader user hearing "Reject" from a queue of nine listings learns
+   * nothing about which one.
+   */
+  describe("the rendered trigger", () => {
+    const html = renderToStaticMarkup(
+      createElement(ConfirmAction, {
+        label: "Reject",
+        confirmLabel: "Confirm rejection",
+        question: "Reject this claim? The claimant is told it was not accepted.",
+        subject: "claim on Glacier Orchard",
+        onConfirm: () => {},
+      }),
+    );
+
+    it("is a real button, not a div with a click handler", () => {
+      expect(html).toMatch(/<button[^>]*type="button"/);
+    });
+
+    it("names both the verb and the subject", () => {
+      expect(html).toContain('aria-label="Reject: claim on Glacier Orchard"');
+    });
+
+    it("shows the verb, and does NOT leak the confirm step before it is opened", () => {
+      expect(html).toContain("Reject");
+      expect(html).not.toContain("Confirm rejection");
+      expect(html).not.toContain("The claimant is told");
+    });
+
+    it("carries the danger tone by default", () => {
+      expect(html).toContain('data-tone="deny"');
+    });
+  });
+
+  /**
+   * Density must not shrink the hit area. The admin scope tightens spacing and
+   * type; the confirm buttons keep a 40px floor so the guard does not become a
+   * thing operators mis-click past.
+   */
+  it("confirm-step controls keep a 40px minimum height", () => {
+    const css = readFileSync(
+      join(ADMIN_COMPONENTS, "ConfirmAction.module.css"),
+      "utf8",
+    );
+    expect(css).toMatch(/\.buttons\s*>\s*\*\s*\{[^}]*min-height:\s*40px/);
   });
 
   /**

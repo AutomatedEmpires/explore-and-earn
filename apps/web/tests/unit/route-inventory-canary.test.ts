@@ -40,8 +40,12 @@ const WEB = join(__dirname, "../..");
  */
 const PHASE_C: readonly string[] = [
   "app/[locale]/for-seekers/page.tsx",
+  "app/[locale]/for-seekers/layout.tsx",
   "lib/communityRoutes.ts",
-  "components/community/CommunityJoinGate.tsx",
+  // The gate is co-located with the route it guards, not in components/.
+  "app/[locale]/(seeker)/community/layout.tsx",
+  "app/[locale]/(seeker)/community/CommunityJoinGate.tsx",
+  "app/[locale]/(seeker)/community/access.ts",
   "components/global/NavMenu.tsx",
   "tests/unit/community-auth-gate.test.ts",
   "tests/unit/public-ia.test.ts",
