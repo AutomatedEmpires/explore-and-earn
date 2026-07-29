@@ -1,0 +1,617 @@
+/*
+ * /for-seekers — the seeker door (V2 D18).
+ *
+ * Photography-led, matching /for-hosts' section craftsmanship: one full-bleed
+ * hero photograph with a warm ink scrim, then sectioned bands on the warm
+ * canvas. NO large decorative gradients — every image on this page is a real
+ * catalogue photograph (components/media/SitePhoto), so there is no gradient
+ * slab standing in for one.
+ *
+ * WEIGHT-BRIDGE DISCIPLINE: --font-display is Manrope like everything else, so
+ * a display block that does not state a weight renders at the inherited 400 and
+ * silently loses its rank. Every rule below that reaches for --font-display
+ * also sets --font-weight-display or an explicit weight.
+ *
+ * Fully tokenized — zero raw colour literals (G50/G51).
+ */
+
+.page {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-64);
+	width: 100%;
+	padding-bottom: var(--space-64);
+}
+
+/* ─── Shared section container ───────────────────────────────────────────── */
+
+.section {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 1200px;
+	margin-inline: auto;
+	padding-inline: var(--space-gutter);
+}
+
+.sectionHead {
+	max-width: 62ch;
+	margin-bottom: var(--space-24);
+}
+
+.eyebrow {
+	margin: 0 0 var(--space-6);
+	font-family: var(--font-accent);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--color-cta);
+}
+
+.sectionTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
+	font-weight: var(--font-weight-display);
+	letter-spacing: -0.01em;
+	color: var(--text-primary);
+	text-wrap: balance;
+}
+
+.sectionSub {
+	margin: var(--space-10) 0 0;
+	max-width: 62ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-lg-size);
+	line-height: var(--type-body-lg-lh);
+	color: var(--text-secondary);
+}
+
+.inlineLink {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	margin-top: var(--space-16);
+	min-height: var(--tap-min);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta);
+	text-decoration: none;
+	border-radius: var(--radius-button);
+}
+
+.inlineLink:hover { text-decoration: underline; }
+
+.inlineLink:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 3px;
+}
+
+/* ─── Hero — a photograph, not a gradient ────────────────────────────────── */
+
+.hero {
+	position: relative;
+	isolation: isolate;
+	display: flex;
+	align-items: flex-end;
+	width: 100%;
+	min-height: clamp(28rem, 72vh, 44rem);
+	overflow: hidden;
+	background: var(--color-panel-dark);
+}
+
+.heroMedia {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+}
+
+.heroPhoto {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	object-position: center;
+}
+
+/* Legibility only, and warm rather than grey: a cool black scrim over a warm
+   photograph reads as haze. Bottom-weighted so the image survives above the
+   copy. Every stop is mixed from the ink primitive — no literal colour values.
+   (The G50 ratchet scans COMMENTS too, so naming the function this rule avoids
+   would itself count as a raw colour. It is deliberately not spelled here.) */
+.heroScrim {
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in srgb, var(--palette-ink) 6%, transparent) 0%,
+			color-mix(in srgb, var(--palette-ink) 26%, transparent) 44%,
+			color-mix(in srgb, var(--palette-ink) 82%, transparent) 100%
+		),
+		linear-gradient(
+			76deg,
+			color-mix(in srgb, var(--palette-ink) 58%, transparent) 0%,
+			transparent 62%
+		);
+}
+
+.heroInner {
+	position: relative;
+	z-index: 1;
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 1200px;
+	margin-inline: auto;
+	padding: var(--space-48) var(--space-gutter);
+}
+
+.heroEyebrow {
+	margin: 0 0 var(--space-12);
+	font-family: var(--font-accent);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--palette-white) 88%, transparent);
+}
+
+.heroTitle {
+	margin: 0 0 var(--space-16);
+	max-width: 18ch;
+	font-family: var(--font-display);
+	font-size: var(--type-display-hero);
+	line-height: 1.02;
+	font-weight: var(--font-weight-display);
+	letter-spacing: -0.02em;
+	color: var(--palette-white);
+	text-wrap: balance;
+}
+
+.heroSub {
+	margin: 0 0 var(--space-24);
+	max-width: 46ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-lg-size);
+	line-height: var(--type-body-lg-lh);
+	color: color-mix(in srgb, var(--palette-white) 88%, transparent);
+}
+
+.heroActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-12);
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+
+.primaryLg,
+.ghostLg,
+.ghostLgDark {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-8);
+	min-height: 3rem;
+	padding: 0 var(--space-24);
+	border-radius: var(--radius-button);
+	font-family: var(--font-ui);
+	font-size: var(--type-button-size);
+	line-height: var(--type-button-lh);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+	transition:
+		background var(--motion-fast) var(--ease-standard),
+		border-color var(--motion-fast) var(--ease-standard);
+}
+
+.primaryLg {
+	border: none;
+	background: var(--color-cta);
+	color: var(--palette-white);
+}
+
+.primaryLg:hover { background: var(--palette-sky-hover); }
+
+.ghostLg {
+	border: 1.5px solid color-mix(in srgb, var(--palette-white) 60%, transparent);
+	background: color-mix(in srgb, var(--palette-white) 12%, transparent);
+	color: var(--palette-white);
+}
+
+.ghostLg:hover {
+	background: color-mix(in srgb, var(--palette-white) 22%, transparent);
+}
+
+.ghostLgDark {
+	border: 1.5px solid var(--border-soft);
+	background: transparent;
+	color: var(--text-primary);
+}
+
+.ghostLgDark:hover { border-color: var(--text-secondary); }
+
+.primaryLg:focus-visible,
+.ghostLgDark:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 3px;
+}
+
+.ghostLg:focus-visible {
+	outline: 2px solid var(--palette-white);
+	outline-offset: 3px;
+}
+
+/* ─── Triad ──────────────────────────────────────────────────────────────── */
+
+.triadGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-16);
+}
+
+@media (min-width: 760px) {
+	.triadGrid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.triadCard {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding: var(--space-24);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+}
+
+.triadIcon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--icon-chip);
+	height: var(--icon-chip);
+	border-radius: var(--radius-input);
+	background: color-mix(in srgb, var(--color-alpine) 12%, transparent);
+	color: var(--color-alpine);
+}
+
+.triadLabel {
+	margin: var(--space-4) 0 0;
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	font-weight: var(--font-weight-bold);
+	color: var(--text-primary);
+}
+
+.triadQuestion {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta);
+}
+
+.triadBody {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+/* ─── Real card row ──────────────────────────────────────────────────────── */
+
+.cardGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-20);
+	align-items: start;
+}
+
+@media (min-width: 720px) {
+	.cardGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1040px) {
+	.cardGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* The label is not decoration — it is the difference between a preview and a
+   fabricated listing, so it renders above the cards and in the reading order. */
+.exampleLabel {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	margin: 0 0 var(--space-16);
+	padding: var(--space-10) var(--space-14);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-input);
+	background: var(--color-parchment);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-secondary);
+}
+
+.exampleLabel > svg { flex-shrink: 0; color: var(--text-muted); }
+
+.emptyPanel {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: var(--space-8);
+	padding: var(--space-48) var(--space-24);
+	border: 1px dashed var(--border-soft);
+	border-radius: var(--radius-feature);
+	background: var(--color-surface);
+	color: var(--text-muted);
+}
+
+.emptyTitle {
+	margin: var(--space-4) 0 0;
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	font-weight: var(--font-weight-bold);
+	color: var(--text-primary);
+}
+
+.emptySub {
+	margin: 0;
+	max-width: 46ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+/* ─── Discovery modes ────────────────────────────────────────────────────── */
+
+.modeGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-20);
+}
+
+@media (min-width: 900px) {
+	.modeGrid { grid-template-columns: repeat(3, 1fr); }
+}
+
+.modeCard {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-feature);
+	background: var(--color-surface);
+	text-decoration: none;
+	transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.modeCard:hover { border-color: var(--color-cta); }
+
+.modeCard:focus-visible {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 3px;
+}
+
+.modeMedia {
+	display: block;
+	aspect-ratio: 16 / 10;
+	overflow: hidden;
+	background: var(--color-parchment);
+}
+
+.modePhoto {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.modeBody {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	padding: var(--space-20);
+}
+
+.modeName {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	font-weight: var(--font-weight-bold);
+	color: var(--text-primary);
+}
+
+.modeName > svg { color: var(--color-cta); }
+
+.modeText {
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.modeCta {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-6);
+	margin-top: var(--space-4);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta);
+}
+
+/* ─── How it works ───────────────────────────────────────────────────────── */
+
+.steps {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-16);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: step;
+}
+
+@media (min-width: 900px) {
+	.steps { grid-template-columns: repeat(2, 1fr); }
+}
+
+.step {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-14);
+	padding: var(--space-20);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+}
+
+.stepNumber {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--color-cta) 12%, transparent);
+	color: var(--color-cta);
+	font-family: var(--font-display);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-bold);
+	font-variant-numeric: tabular-nums;
+}
+
+.stepText {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+	min-width: 0;
+}
+
+.stepTitle {
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	font-weight: var(--font-weight-bold);
+	color: var(--text-primary);
+}
+
+.stepBody {
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+/* ─── Community split ────────────────────────────────────────────────────── */
+
+.split {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0;
+	overflow: hidden;
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-feature);
+	background: var(--color-surface);
+}
+
+@media (min-width: 900px) {
+	.split {
+		grid-template-columns: 30rem 1fr;
+		align-items: stretch;
+	}
+}
+
+.splitMedia {
+	min-height: 14rem;
+	overflow: hidden;
+	background: var(--color-parchment);
+}
+
+.splitPhoto {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.splitBody {
+	display: flex;
+	flex-direction: column;
+	padding: var(--space-32) var(--space-24);
+}
+
+.freeLine {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-8);
+	margin: var(--space-16) 0 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.freeLine > svg { flex-shrink: 0; margin-top: 2px; color: var(--color-alpine); }
+
+/* ─── Final CTA ──────────────────────────────────────────────────────────── */
+
+.finalCta {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 1200px;
+	margin-inline: auto;
+	padding: var(--space-48) var(--space-24);
+	border-radius: var(--radius-feature);
+	background: var(--color-parchment);
+	text-align: center;
+}
+
+@media (max-width: 767px) {
+	.finalCta {
+		border-radius: 0;
+	}
+}
+
+.finalTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-display-section);
+	line-height: 1.1;
+	font-weight: var(--font-weight-display);
+	letter-spacing: -0.01em;
+	color: var(--text-primary);
+}
+
+.finalSub {
+	margin: var(--space-12) auto var(--space-24);
+	max-width: 52ch;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-lg-size);
+	line-height: var(--type-body-lg-lh);
+	color: var(--text-secondary);
+}
+
+.finalCta .heroActions { justify-content: center; }
+
+@media (prefers-reduced-motion: reduce) {
+	.primaryLg,
+	.ghostLg,
+	.ghostLgDark,
+	.modeCard {
+		transition: none;
+	}
+}
