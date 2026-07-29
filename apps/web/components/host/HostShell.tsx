@@ -12,7 +12,7 @@ import {
   type ScopeNavGroup,
 } from "../shell";
 import { RolePill } from "../global/RolePill";
-import { OnboardingWalkthrough, HOST_TOUR_STEPS } from "../onboarding";
+import { HostCoachmarks, HOST_COACHMARK_TARGETS } from "./HostCoachmarks";
 import { HostActivationBanner } from "./HostActivationBanner";
 import { HOST_NAV_GROUPS, type HostNavItem } from "./hostNav";
 import styles from "./HostShell.module.css";
@@ -45,6 +45,15 @@ import styles from "./HostShell.module.css";
  * NOT SHIPPED HERE, deliberately: a workspace search box. There is no host-side
  * query surface to submit to yet, and a search field that goes nowhere is worse
  * than no search field. It belongs with the workspace rebuild.
+ *
+ * D19 (redesign V2) removes the third thing this shell used to mount: an
+ * `OnboardingWalkthrough` with `autoStart`. A host's first view of their own
+ * workspace was a `role="dialog"` with `aria-modal="true"`, a scrim, a focus
+ * trap, a scroll lock, and `aria-hidden` on every sibling of <body> — three
+ * abstract steps describing a product the dialog was covering. It is replaced
+ * by <HostCoachmarks>: two or three non-modal marks anchored to real controls,
+ * dismissible, persisted, and replayable from Help. The seeker shell keeps its
+ * own copy for now; that one is Phase G's to remove.
  */
 
 type NavDef = HostNavItem;
@@ -129,6 +138,7 @@ export function HostShell({
         userHref="/host/profile"
         avatar={avatar}
         menuLabel="Open host menu"
+        railId={HOST_COACHMARK_TARGETS.rail}
       />
 
       <div className={styles.main}>
@@ -142,7 +152,11 @@ export function HostShell({
           <RolePill role="host" />
           <span className={styles.spacer} />
           <div className={styles.topActions}>
-            <Link className={styles.newBtn} href="/host/listings/new">
+            <Link
+              className={styles.newBtn}
+              href="/host/listings/new"
+              id={HOST_COACHMARK_TARGETS.create}
+            >
               <span aria-hidden>+</span>
               <span className={styles.newLabel}>Create listing</span>
             </Link>
@@ -161,19 +175,21 @@ export function HostShell({
         </header>
         {/* Between the bar and the content on purpose: in the reading order a
             host meets it once, above their work, and it scrolls away. */}
-        <HostActivationBanner accountState={accountState} />
+        <HostActivationBanner
+          accountState={accountState}
+          id={HOST_COACHMARK_TARGETS.activation}
+        />
         <div className={styles.content}>{children}</div>
       </div>
 
-      {/* Host onboarding tour — prominent (auto-starts on first visit). */}
-      <OnboardingWalkthrough
-        storageKey="ee.onboarding.host.v1"
-        eyebrow="Host tour"
-        title="Welcome — here’s the lay of the land"
-        steps={HOST_TOUR_STEPS}
-        autoStart
-        launcherLabel="Host tour"
-      />
+      {/*
+        D19: anchored, dismissible, persisted — never a blocking modal.
+        The activation stop is offered only to a PROSPECT, the only state the
+        banner renders for. Even then the banner may be dismissed for the
+        session, so the coachmark also skips a stop whose target never appears —
+        a mark pointing at nothing is a tour of a page the host cannot see.
+      */}
+      <HostCoachmarks showActivationStop={accountState === "prospect"} />
     </div>
   );
 }

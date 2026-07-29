@@ -41,9 +41,19 @@ export interface HostActivationBannerProps {
    * decided once, on the server, from the subscription authority.
    */
   readonly accountState: string | null | undefined;
+  /**
+   * Element id for the anchored coachmark (D19).
+   *
+   * On the BANNER, not on a wrapper in the shell. This component returns null
+   * for every state but `prospect` — and for a prospect who dismissed it — so a
+   * wrapper carrying the id would leave a zero-height element for the coachmark
+   * to find and point at. An id that only exists when the thing exists is the
+   * only version that cannot mislead.
+   */
+  readonly id?: string;
 }
 
-export function HostActivationBanner({ accountState }: HostActivationBannerProps) {
+export function HostActivationBanner({ accountState, id }: HostActivationBannerProps) {
   // Starts hidden and is revealed by the effect below. Rendering it during SSR
   // and removing it on hydration would flash the banner at a host who dismissed
   // it a minute ago, which is exactly the nagging this is meant to avoid.
@@ -72,7 +82,7 @@ export function HostActivationBanner({ accountState }: HostActivationBannerProps
   if (accountState !== "prospect" || !visible) return null;
 
   return (
-    <aside className={styles.banner} aria-label="Plan activation">
+    <aside className={styles.banner} aria-label="Plan activation" id={id}>
       <span className={styles.icon} aria-hidden>
         <Icon name="system.info" size={20} />
       </span>

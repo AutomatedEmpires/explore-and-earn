@@ -38,7 +38,7 @@
   max-width: 56ch;
 }
 
-/* ── Chart + radial split ────────────────────────────────────────── */
+/* ── Chart + funnel split ────────────────────────────────────────── */
 
 .split {
   display: grid;
@@ -203,91 +203,6 @@
     transform: scaleX(1);
     opacity: 1;
   }
-}
-
-/* ── Conversion radial ───────────────────────────────────────────── */
-
-.radialWrap {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-8) 0;
-}
-
-.radial {
-  --score: 0%;
-  width: 168px;
-  height: 168px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background:
-    conic-gradient(
-      var(--color-cta) 0 var(--score),
-      color-mix(in srgb, var(--text-muted) 22%, transparent) var(--score) 100%
-    );
-  box-shadow: 0 0 0 1px var(--border-soft) inset;
-  animation: analytics-radial 0.8s var(--ease-standard, ease) both;
-}
-
-.radialInner {
-  width: 72%;
-  height: 72%;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  gap: var(--space-2);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--border-soft);
-}
-
-.radialValue {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: 2.1rem;
-  line-height: 1;
-  letter-spacing: -0.03em;
-  color: var(--text-primary);
-}
-
-.radialCaption {
-  font-family: var(--font-ui);
-  font-size: 0.68rem;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-@keyframes analytics-radial {
-  from {
-    opacity: 0;
-    transform: scale(0.94) rotate(-12deg);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.radialLegend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-8) var(--space-14);
-  margin-top: auto;
-}
-
-.legendItem {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-6);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  color: var(--text-secondary);
-}
-
-.legendItem :global(svg) {
-  color: var(--color-cta);
 }
 
 /* ── Per-listing diagnosis cards ─────────────────────────────────── */
@@ -678,8 +593,141 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bar,
-  .radial {
+  .bar {
     animation: none;
   }
+}
+
+/* ── Funnel (D25) ─────────────────────────────────────────────────
+   The bar list that replaced the conic-gradient conversion ring. A bar
+   omitted is a stage with nothing in it; a ring at zero was a picture of
+   failure drawn before anything could happen. */
+
+.funnelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.funnelRow {
+  display: grid;
+  grid-template-columns: minmax(84px, 22%) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-10);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+.funnelLabel {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.track {
+  display: block;
+  height: var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.trackFill {
+  --fill: 0%;
+  display: block;
+  height: 100%;
+  width: var(--fill);
+  background: var(--color-cta);
+}
+
+.funnelValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+/* ── Listing comparison table ─────────────────────────────────────── */
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-meta-size);
+}
+
+.tableCaption {
+  padding: var(--space-12) var(--space-14);
+  text-align: left;
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+}
+
+.table th,
+.table td {
+  padding: var(--space-10) var(--space-14);
+  text-align: left;
+  border-top: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+
+.table thead th {
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.table tbody th {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  white-space: normal;
+  min-width: 18ch;
+}
+
+.tableLink {
+  color: var(--color-cta);
+  text-decoration: none;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* ── Diagnosis read-out ───────────────────────────────────────────── */
+
+.diagRead {
+  margin: var(--space-6) 0 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Empty-state actions (D23) ────────────────────────────────────── */
+
+.emptyActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-12);
+  margin-top: var(--space-12);
+}
+
+.emptyLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--type-meta-size);
+  color: var(--color-cta);
+  text-decoration: none;
 }

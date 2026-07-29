@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getHostAnalytics } from "@explore-and-earn/db";
 
 import { HostSectionHeading } from "../../../../../components/host";
-import { HostAnalyticsDashboard } from "../../../../../components/host/HostAnalyticsDashboard";
+import { HostAnalyticsWorkspace } from "../../../../../components/host/HostAnalyticsWorkspace";
 import { EmptyState } from "../../../../../components/discovery";
 import styles from "./page.module.css";
 
@@ -61,7 +61,7 @@ export default async function HostAnalyticsPage() {
             : "Application pipeline and invite acceptance rates across all your opportunities."
         }
       />
-      <HostAnalyticsDashboard analytics={analytics} />
+      <HostAnalyticsWorkspace analytics={analytics} />
     </section>
   );
 }

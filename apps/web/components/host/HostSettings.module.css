@@ -944,3 +944,43 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── D21: links out, no plan grid ─────────────────────────────────── */
+
+.billingLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-10);
+  margin-bottom: var(--space-16);
+}
+
+.billingLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.billingLink:hover {
+  border-color: var(--color-cta);
+  color: var(--color-cta);
+}
+
+.sectionSubtitle {
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-card-size);
+  color: var(--text-primary);
+}
+
+.sectionSubnote {
+  margin: 0 0 var(--space-12);
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+}

@@ -201,6 +201,65 @@ export async function getFeedAnnouncements(
   });
 }
 
+/**
+ * One host's own announcements — every status, newest first.
+ *
+ * DISTINCT FROM getFeedAnnouncements, which answers the SEEKER's question
+ * ("what is running right now across the marketplace") and therefore filters to
+ * `status = 'active'` and an unexpired run. A host's own history is the
+ * opposite question: the drafts they have paid for and not filled in, and the
+ * runs that have already finished, are exactly the rows they need to see. Read
+ * through the `host_announcements_owner_read_all` policy (031, re-cut by 081),
+ * which is why this takes the caller's token rather than the admin client.
+ *
+ * `expiresAt` comes back raw. Whether a row reads as "live" or "finished" is a
+ * comparison against now, and doing it here would bake the server's clock into
+ * a value the caller may render hours later.
+ */
+export interface HostOwnAnnouncement {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+  readonly kind: AnnouncementKind;
+  /** The stored lifecycle value: 'draft' | 'active' | 'removed'. */
+  readonly status: string;
+  readonly expiresAt: string;
+  readonly createdAt: string;
+  /** True when a $149 single run paid for this row rather than the allowance. */
+  readonly isPurchased: boolean;
+}
+
+export async function getHostOwnAnnouncements(
+  token: string,
+  hostProfileId: string,
+  limit = 50,
+): Promise<HostOwnAnnouncement[]> {
+  const db = authedClient(token) as unknown as SupabaseClient;
+  const { data, error } = await db
+    .from("host_announcements")
+    .select(
+      "id, title, body, kind, status, expires_at, created_at, stripe_payment_intent_id, stripe_checkout_session_id",
+    )
+    .eq("host_profile_id", hostProfileId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(`getHostOwnAnnouncements: ${error.message}`);
+  if (!data) return [];
+
+  return data.map((row: Record<string, unknown>) => ({
+    id: row.id as string,
+    title: (row.title as string) ?? "",
+    body: (row.body as string) ?? "",
+    kind: (row.kind as AnnouncementKind) ?? "general",
+    status: (row.status as string) ?? "active",
+    expiresAt: row.expires_at as string,
+    createdAt: row.created_at as string,
+    isPurchased: Boolean(
+      row.stripe_payment_intent_id ?? row.stripe_checkout_session_id,
+    ),
+  }));
+}
+
 export async function getLatestDraftAnnouncement(
   token: string,
   hostProfileId: string,

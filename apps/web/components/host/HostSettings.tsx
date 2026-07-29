@@ -3,12 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
+// Only the ADD-ON prices are read here now. FOUNDER_LOCKED_PRICING,
+// PLAN_ENTITLEMENTS and ANNUAL_MONTHS_BILLED left with the plan cards (D21):
+// this module no longer states a plan price or a plan entitlement anywhere.
 import {
   ADDITIONAL_LISTING_PRICING,
   ADDON_PRICING,
-  ANNUAL_MONTHS_BILLED,
-  FOUNDER_LOCKED_PRICING,
-  PLAN_ENTITLEMENTS,
 } from "@explore-and-earn/contracts";
 // TYPE-ONLY. @explore-and-earn/db's entry point pulls in modules that import
 // "server-only", which cannot be bundled into a client component — so the
@@ -18,15 +18,14 @@ import {
 import type { TeamMember, TeamSeatUsage } from "@explore-and-earn/db";
 
 import { requestAccountDeletionAction } from "../../app/actions/accountDeletion";
-import {
-  startHostCheckoutAction,
-  startHostBillingPortalAction,
-} from "../../app/actions/hostBilling";
+// startHostBillingPortalAction left with the plan cards too — "Manage in
+// Stripe" now lives once, on /host/billing, beside the invoices it opens.
 import {
   inviteTeamMemberAction,
   revokeTeamMemberAction,
 } from "../../app/actions/hostTeam";
 import { createAdditionalListingCheckoutAction } from "../../app/actions/listingSlots";
+import { AppearanceControl } from "../seeker/AppearanceControl";
 import styles from "./HostSettings.module.css";
 
 const SUPPORT_EMAIL = "jackson@automatedempires.com";
@@ -53,72 +52,20 @@ export interface HostSettingsProps {
 
 type SettingsTab = "billing" | "team" | "support" | "account";
 
-/* ── Paid tiers (rendered from the founder-locked pricing contract) ──────
- * There is NO free tier. Names + taglines are presentation; every number — price
- * AND entitlement — is read from @explore-and-earn/contracts so this surface can
- * never drift from canonical pricing (the prior hardcoded plan list did, inventing
- * a free tier, "3 starter listings", "unlimited pro listings", etc.). */
-
-type PaidTier = "starter" | "professional" | "enterprise";
-type BillingInterval = "monthly" | "yearly";
-const PAID_TIERS: readonly PaidTier[] = ["starter", "professional", "enterprise"];
-
-const TIER_META: Record<
-  PaidTier,
-  { name: string; tagline: string; highlighted: boolean; cta: string }
-> = {
-  starter: {
-    name: "Starter",
-    tagline: "Get your first crew in the door",
-    highlighted: false,
-    cta: "Choose Starter",
-  },
-  professional: {
-    name: "Professional",
-    tagline: "For established, growing operations",
-    highlighted: true,
-    cta: "Choose Professional",
-  },
-  enterprise: {
-    name: "Enterprise",
-    tagline: "Large, multi-site teams",
-    highlighted: false,
-    cta: "Choose Enterprise",
-  },
-};
+/* ── Plans are NOT rendered here (D21) ───────────────────────
+ * This module used to carry TIER_META, planFeatures(), a tier list and a
+ * plan card with its own checkout forms — a THIRD plan grid, after
+ * /host/billing and /host/plans. All three collapsed onto /host/plans, and
+ * Settings now links to it. The add-on cards below stay, because an add-on
+ * changes THIS account’s limits and is therefore a setting; choosing a tier
+ * is a commercial decision and is not. */
 
 /** Whole-dollar USD from integer cents (the contract stores cents everywhere). */
 function usd(cents: number): string {
   return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
 }
 
-/** Human feature list derived entirely from the locked plan entitlements. */
-function planFeatures(tier: PaidTier): string[] {
-  const e = PLAN_ENTITLEMENTS[tier];
-  // Widened from the `as const` literal so the singular/plural test stays a
-  // runtime branch. Every tier is 0 today (see TEAM_SEATS_BY_TIER), which would
-  // otherwise make `=== 1` a compile error instead of a false condition.
-  const teamSeats: number = e.teamSeats;
-  const features: (string | null)[] = [
-    `${e.listings} active listing${e.listings === 1 ? "" : "s"}`,
-    e.analytics === "full"
-      ? "Full analytics + per-listing breakdown"
-      : "Basic analytics overview",
-    e.monthlyAnnouncements > 0
-      ? `${e.monthlyAnnouncements} community announcement${e.monthlyAnnouncements === 1 ? "" : "s"} / month`
-      : null,
-    e.includedInviteCredits > 0
-      ? `${e.includedInviteCredits} invite credits / month`
-      : null,
-    // Seats are listed only where the plan actually grants one — a zero must not
-    // render as a sold feature. Every tier is 0 today because accepting a team
-    // invitation grants no access; see TEAM_SEATS_BY_TIER.
-    teamSeats > 0 ? `${teamSeats} team seat${teamSeats === 1 ? "" : "s"}` : null,
-    "Public host profile",
-    "Direct applicant messaging",
-  ];
-  return features.filter((f): f is string => Boolean(f));
-}
+
 
 /* ── FAQ data ───────────────────────────────────────────────────── */
 
@@ -187,72 +134,6 @@ function TabBar({
           <span>{tab.label}</span>
         </button>
       ))}
-    </div>
-  );
-}
-
-function PlanCard({
-  tier,
-  current,
-  interval,
-}: {
-  tier: PaidTier;
-  current: boolean;
-  interval: BillingInterval;
-}) {
-  const meta = TIER_META[tier];
-  const annual = interval === "yearly";
-  const price = usd(
-    annual ? FOUNDER_LOCKED_PRICING[tier].yearly : FOUNDER_LOCKED_PRICING[tier].monthly,
-  );
-  const features = planFeatures(tier);
-
-  return (
-    <div
-      className={`${styles.planCard}${meta.highlighted ? ` ${styles.planHighlighted}` : ""}${current ? ` ${styles.planCurrent}` : ""}`}
-    >
-      {meta.highlighted && !current ? (
-        <div className={styles.planBadge}>Most popular</div>
-      ) : null}
-      {current ? <div className={styles.planBadge}>Your plan</div> : null}
-      <div className={styles.planHead}>
-        <p className={styles.planName}>{meta.name}</p>
-        <div className={styles.planPriceRow}>
-          <span className={styles.planPrice}>{price}</span>
-          <span className={styles.planPeriod}>{annual ? "per year" : "per month"}</span>
-        </div>
-        {annual ? (
-          <span className={styles.planSaveNote}>
-            {12 - ANNUAL_MONTHS_BILLED} months free vs monthly
-          </span>
-        ) : null}
-        <p className={styles.planTagline}>{meta.tagline}</p>
-      </div>
-      <ul className={styles.planFeatures} role="list">
-        {features.map((f) => (
-          <li key={f} className={styles.planFeature}>
-            <span className={styles.planCheck} aria-hidden>
-              <Icon name="system.success" size={16} aria-hidden />
-            </span>
-            {f}
-          </li>
-        ))}
-      </ul>
-      {current ? (
-        <form action={startHostBillingPortalAction} className={styles.ctaForm}>
-          <button type="submit" className={`${styles.planCta} ${styles.planCtaManage}`}>
-            Manage billing
-          </button>
-        </form>
-      ) : (
-        <form action={startHostCheckoutAction} className={styles.ctaForm}>
-          <input type="hidden" name="tier" value={tier} />
-          <input type="hidden" name="interval" value={interval} />
-          <button type="submit" className={styles.planCta} aria-label={meta.cta}>
-            {meta.cta}
-          </button>
-        </form>
-      )}
     </div>
   );
 }
@@ -416,47 +297,42 @@ function BillingPanel({
   includedListingCap: number;
   effectiveListingCap: number;
 }) {
-  const [interval, setInterval] = useState<BillingInterval>("monthly");
-
+  /*
+   * D21: SETTINGS LINKS TO BILLING AND TO PLANS. IT RENDERS NEITHER.
+   *
+   * This panel used to hold a monthly/annual toggle and three PlanCards with
+   * their own checkout forms — the product's THIRD plan grid, after
+   * /host/billing and /host/plans. Three grids meant three presentations of the
+   * same contract figures, and the add-on and discount rules only ever landed
+   * on some of them. What stays here is what is genuinely a SETTING: the
+   * add-ons that change this account's limits. Choosing a plan is a commercial
+   * decision and lives on the one surface built for it.
+   */
   return (
     <div className={styles.panel} id="panel-billing" role="tabpanel" aria-label="Plan & billing">
       <div className={styles.panelHead}>
-        <h2 className={styles.panelTitle}>Plans</h2>
+        <h2 className={styles.panelTitle}>Plan &amp; billing</h2>
         <p className={styles.panelDesc}>
-          Choose the plan that fits your operation. Every plan includes a public host profile and
-          direct applicant messaging.
+          You are on{" "}
+          <strong>
+            {subscriptionTier === "none"
+              ? "no plan yet"
+              : `${subscriptionTier.charAt(0).toUpperCase()}${subscriptionTier.slice(1)}`}
+          </strong>
+          . Your invoices, usage against your allowance, and refund requests all
+          live on Billing; the plans themselves are compared in one place.
         </p>
       </div>
 
-      <div className={styles.intervalToggle} role="group" aria-label="Billing interval">
-        <button
-          type="button"
-          className={interval === "monthly" ? `${styles.intervalOption} ${styles.intervalActive}` : styles.intervalOption}
-          aria-pressed={interval === "monthly"}
-          onClick={() => setInterval("monthly")}
-        >
-          Monthly
-        </button>
-        <button
-          type="button"
-          className={interval === "yearly" ? `${styles.intervalOption} ${styles.intervalActive}` : styles.intervalOption}
-          aria-pressed={interval === "yearly"}
-          onClick={() => setInterval("yearly")}
-        >
-          Annual
-          <span className={styles.intervalBadge}>{12 - ANNUAL_MONTHS_BILLED} mo free</span>
-        </button>
-      </div>
-
-      <div className={styles.planGrid}>
-        {PAID_TIERS.map((tier) => (
-          <PlanCard
-            key={tier}
-            tier={tier}
-            current={subscriptionTier === tier}
-            interval={interval}
-          />
-        ))}
+      <div className={styles.billingLinks}>
+        <Link className={styles.billingLink} href="/host/billing">
+          <Icon name="benefit.pay" size={16} aria-hidden />
+          Billing — invoices, usage and refunds
+        </Link>
+        <Link className={styles.billingLink} href="/host/plans">
+          <Icon name="analytics.meter" size={16} aria-hidden />
+          Compare plans
+        </Link>
       </div>
 
       <AddOnsSection
@@ -469,9 +345,9 @@ function BillingPanel({
       <div className={styles.billingNote}>
         <Icon name="system.info" size={16} aria-hidden />
         <span>
-          Plans are billed securely through Stripe — choose a plan above, or use
-          Manage billing to update payment details, switch plans, or cancel. To
-          cancel an add-on, use Manage billing. Anything else, email{" "}
+          Plans are billed securely through Stripe. Use Manage billing on the
+          Billing page to update payment details, switch plans, or cancel — and
+          to cancel an add-on. Anything else, email{" "}
           <a href={`mailto:${SUPPORT_EMAIL}`} className={styles.inlineLink}>
             {SUPPORT_EMAIL}
           </a>
@@ -828,10 +704,58 @@ function AccountPanel({
         </div>
         <div className={styles.accountRow}>
           <div className={styles.accountRowInfo}>
-            <span className={styles.accountRowLabel}>Password & security</span>
-            <span className={styles.accountRowValue}>Managed via your sign-in provider</span>
+            <span className={styles.accountRowLabel}>Password &amp; security</span>
+            <span className={styles.accountRowValue}>
+              Your password, email and two-factor settings live with Clerk, the
+              sign-in provider — this product never stores them. There is no
+              in-app page for them yet, so change them where you sign in.
+            </span>
           </div>
+          {/*
+            NO LINK, deliberately. The app mounts Clerk's sign-in and sign-up
+            only; it has no account-portal route, and NEXT_PUBLIC_CLERK_SIGN_IN_URL
+            is unset in this environment, so any href written here would be a
+            guess that 404s or leaves the domain. Naming the provider is the
+            honest version of this row until that route exists.
+          */}
         </div>
+        {/*
+          §14 asks for a data/export stub that is HONEST about being a stub.
+          There is no export feature anywhere in the product — no route, no
+          action, no query — so this row says so and gives the address that
+          actually reaches a human, rather than a "Download my data" button
+          that would do nothing.
+        */}
+        <div className={styles.accountRow}>
+          <div className={styles.accountRowInfo}>
+            <span className={styles.accountRowLabel}>Export your data</span>
+            <span className={styles.accountRowValue}>
+              Not built yet. There is no self-serve export — email us and we
+              will assemble your listings, applications and messages by hand.
+            </span>
+          </div>
+          <a
+            className={styles.accountRowAction}
+            href={`mailto:${SUPPORT_EMAIL}?subject=Data%20export%20request`}
+          >
+            Request an export
+          </a>
+        </div>
+      </div>
+
+      {/*
+        Appearance. D17 moved the theme control out of the workspace top bar
+        and into Settings; until now the host side had no Settings home for it,
+        which meant a host had no way to choose Light/Dark/System at all. The
+        control is the same one seeker Settings renders, so the Light-default
+        contract has exactly one implementation.
+      */}
+      <div className={styles.accountSection}>
+        <h3 className={styles.sectionSubtitle}>Appearance</h3>
+        <p className={styles.sectionSubnote}>
+          Light is the default. System follows your device.
+        </p>
+        <AppearanceControl />
       </div>
 
       <div className={styles.dangerZone}>

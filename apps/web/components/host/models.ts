@@ -310,6 +310,32 @@ export interface HostMessageThread {
 }
 
 /**
+ * A conversation as the message workspace needs it (V2 §9).
+ *
+ * Wider than HostMessageThread on purpose. The old list needed a name, a
+ * subject line and a read flag; the workspace needs the JOINS, because the
+ * product claim is that an answer stays attached to the person who asked. So
+ * the summary carries the listing and application ids the `conversations` row
+ * actually stores — nullable, because both foreign keys are `on delete set
+ * null` and a conversation really can outlive the listing it started on.
+ *
+ * `updatedIso` is kept BESIDE the formatted label rather than instead of it:
+ * sorting and "is this from today" are date questions, and re-parsing a
+ * localised string to answer them is how a list ends up ordered by alphabet.
+ */
+export interface HostConversationSummary {
+  readonly id: string;
+  readonly applicantName: string;
+  readonly listingTitle: string | null;
+  readonly listingId: string | null;
+  readonly applicationId: string | null;
+  readonly preview: string;
+  readonly unread: boolean;
+  readonly updatedIso: string | null;
+  readonly updatedLabel: string;
+}
+
+/**
  * Pure, deterministic pipeline tally for the host dashboard. Presentation only
  * — NOT a matching/scoring algorithm (match isolation is enforced by
  * guardrails). Unit-testable without a backend.

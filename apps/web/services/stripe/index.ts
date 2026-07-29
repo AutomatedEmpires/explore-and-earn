@@ -38,6 +38,7 @@ import {
   resolveFoundingPriceId,
   resolveTierFromFoundingPriceId,
 } from "./foundingPrices";
+import type { HostInvoiceListResult } from "./invoiceTypes";
 import { reportError } from "../../lib/sentry";
 
 const APP_INFO = {
@@ -1689,6 +1690,80 @@ export async function findLatestHostSubscriptionCharge(
     return { ok: true, charge };
   } catch (error) {
     return { ok: false, error: stripeErrorMessage(error, "Stripe invoice lookup failed.") };
+  }
+}
+
+export type {
+  HostInvoiceSummary,
+  HostInvoiceListResult,
+} from "./invoiceTypes";
+
+/**
+ * The host's own billing history — a READ, and only a read.
+ *
+ * §13 asks for billing history "IF an API path exists server-side". None did:
+ * the single `invoices.list` call in this module is scoped to the PLAN
+ * subscription and reduced to one charge for refund verification, which is a
+ * deliberately narrow question and the wrong one here. This is the general
+ * read, and it is intentionally unscoped by subscription — a host's history
+ * includes the $149 announcement run and the boost they bought, and hiding
+ * those behind "billing history" would be the more misleading choice.
+ *
+ * NO WRITE PATH IS ADDED. Everything that changes a subscription still goes
+ * through the Stripe billing portal, which is the surface Stripe itself keeps
+ * correct across dunning, proration and tax.
+ *
+ * A missing customer is `ok: true` with no rows, not an error: a host who has
+ * never paid has an empty history, and that is a fact rather than a fault.
+ */
+export async function listHostInvoices(
+  clerkUserId: string,
+  limit = 12,
+): Promise<HostInvoiceListResult> {
+  if (!hasStripeServerConfig()) {
+    return {
+      ok: false,
+      invoices: [],
+      error: "Stripe is not configured on this environment.",
+    };
+  }
+  if (!clerkUserId) {
+    return { ok: false, invoices: [], error: "Missing Clerk user id." };
+  }
+
+  try {
+    const stripe = getStripeClient();
+    const customers = await stripe.customers.search({
+      query: `metadata['clerkUserId']:'${searchQueryValue(clerkUserId)}'`,
+      limit: 1,
+    });
+    const customer = customers.data[0];
+    if (!customer) return { ok: true, invoices: [] };
+
+    const invoices = await stripe.invoices.list({
+      customer: customer.id,
+      limit: Math.min(Math.max(1, limit), 100),
+    });
+
+    return {
+      ok: true,
+      invoices: invoices.data.map((invoice) => ({
+        id: invoice.id ?? "",
+        number: invoice.number ?? null,
+        createdAt: invoice.created,
+        amountPaidCents: invoice.amount_paid ?? 0,
+        currency: (invoice.currency ?? "usd").toUpperCase(),
+        status: invoice.status ?? "unknown",
+        hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+        invoicePdfUrl: invoice.invoice_pdf ?? null,
+      })),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      invoices: [],
+      error: stripeErrorMessage(error, "Stripe invoice lookup failed."),
+    };
   }
 }
 

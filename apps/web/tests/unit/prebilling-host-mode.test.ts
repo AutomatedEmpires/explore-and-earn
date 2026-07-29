@@ -147,7 +147,13 @@ describe("the prospect activation banner", () => {
 
   it("is mounted by the host shell, so every host page carries it", () => {
     const shell = componentSource("HostShell.tsx");
-    expect(shell).toContain("<HostActivationBanner accountState={accountState} />");
+    // Matched on the element and the prop rather than on one formatted line:
+    // V2-F2 added an `id` for the anchored coachmark, which reflowed the JSX
+    // across four lines and broke a substring match that was really asserting
+    // Prettier's output. The two facts that matter are that the shell mounts
+    // the banner and that it passes the state through.
+    expect(shell).toContain("<HostActivationBanner");
+    expect(shell).toContain("accountState={accountState}");
     // The prop was declared and silently dropped before this change.
     expect(shell).toContain("accountState,");
   });

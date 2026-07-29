@@ -4,6 +4,10 @@ import { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
+import {
+  HOST_COACHMARK_EVENT,
+  resetHostCoachmarks,
+} from "./HostCoachmarks";
 import styles from "./HostHelpCenter.module.css";
 
 /* ── Content model ─────────────────────────────────────────────────────
@@ -162,13 +166,31 @@ interface QuickLink {
   readonly icon: IconKey;
 }
 
+/**
+ * "Show me" deep links.
+ *
+ * Every one lands on a route that exists in this build — the previous "Plan &
+ * billing" entry pointed at /host/settings, which after D21 no longer renders a
+ * plan anywhere, so it went to Billing where the invoices and usage actually
+ * are.
+ */
 const QUICK_LINKS: readonly QuickLink[] = [
   { href: "/host/listings/new", label: "Post a listing", sub: "Start a new opportunity", icon: "category.mix" },
   { href: "/host/applicants", label: "Review applicants", sub: "Move your pipeline", icon: "status.match" },
+  { href: "/host/messages", label: "Answer a message", sub: "Threads waiting on you", icon: "nav.messages" },
   { href: "/host/analytics", label: "See performance", sub: "Counts & conversion", icon: "analytics.trend" },
-  { href: "/host/settings", label: "Plan & billing", sub: "Manage your plan", icon: "system.info" },
+  { href: "/host/billing", label: "Billing & usage", sub: "Invoices and allowances", icon: "benefit.pay" },
+  { href: "/host/coach", label: "Ask the Coach", sub: "Grounded in your own rows", icon: "status.match" },
 ];
 
+/**
+ * ONBOARDING PROGRESS IS NOT SHOWN HERE, and that is a finding rather than an
+ * omission. §15 asks for it "if resumable": the host onboarding wizard records
+ * no per-step completion a later page could read — its progress lives in the
+ * profile and listing rows themselves — so a progress bar on this page would
+ * have to be derived from a source that does not exist. What IS resumable is
+ * the workspace tour, and that is offered below.
+ */
 function highlight(text: string, query: string): boolean {
   if (!query) return true;
   return text.toLowerCase().includes(query.toLowerCase());
@@ -291,6 +313,42 @@ export function HostHelpCenter() {
         </section>
       ) : null}
 
+      {/* ── Tours (V2 §15) ─────────────────────────────────────────
+          Two different things, deliberately labelled as two different things.
+          The workspace tour walks the host's OWN screen; the demo tour walks a
+          worked example with sample data. Merging them under one "Take a tour"
+          button would mean a host clicking it could not tell which they were
+          about to get. */}
+      {!hasQuery ? (
+        <section className={styles.tours} aria-labelledby="tours-heading">
+          <h2 id="tours-heading" className={styles.toursTitle}>
+            Show me around
+          </h2>
+          <div className={styles.tourRow}>
+            <button
+              type="button"
+              className={styles.tourBtn}
+              onClick={() => {
+                resetHostCoachmarks();
+                window.dispatchEvent(new Event(HOST_COACHMARK_EVENT));
+              }}
+            >
+              <Icon name="system.info" size={16} aria-hidden />
+              Replay the workspace tour
+            </button>
+            <Link className={styles.tourLink} href="/for-hosts/demo">
+              <Icon name="action.view" size={16} aria-hidden />
+              Walk the full product tour — sample data
+            </Link>
+          </div>
+          <p className={styles.tourNote}>
+            The workspace tour is two or three pointers on your own screen and
+            never blocks it. The product tour opens a demo workspace filled with
+            example records, clearly labelled, that writes nothing.
+          </p>
+        </section>
+      ) : null}
+
       {/* ── Topic filter ──────────────────────────────────────────── */}
       <div className={styles.topicBar} role="tablist" aria-label="Help topics">
         <button
@@ -371,9 +429,17 @@ export function HostHelpCenter() {
           <h2 id="contact-heading" className={styles.contactTitle}>
             Still stuck?
           </h2>
+          {/*
+            HONEST ABOUT THE PATH. Email is the only support channel that
+            exists — there is no ticket queue, no chat widget, and no in-app
+            contact form behind this button. The response-time sentence stayed
+            because a human really does read this address; the "one business
+            day" is the founder's commitment, not a rendered SLA.
+          */}
           <p className={styles.contactNote}>
-            We answer hosts directly. Send us the listing or applicant in question
-            and we&apos;ll get back within one business day.
+            Email is the whole support desk — there is no ticket system or chat
+            queue behind it. Send the listing or applicant in question and a
+            person answers, usually within one business day.
           </p>
         </div>
         <a className={styles.contactBtn} href="mailto:hosts@exploreandearn.com">

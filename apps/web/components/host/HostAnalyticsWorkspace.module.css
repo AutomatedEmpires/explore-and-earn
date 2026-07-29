@@ -1,0 +1,83 @@
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding: var(--space-16);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+}
+
+.window {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.controlRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.selectLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-width: 0;
+}
+
+.selectText {
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.select {
+  max-width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+  background: var(--color-surface-raised);
+  padding: var(--space-8) var(--space-10);
+  font: inherit;
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+}
+
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  padding: var(--space-8) var(--space-16);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.exportBtn:hover {
+  border-color: var(--color-cta);
+}
+
+.scopeNote {
+  margin: 0;
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-secondary);
+}
