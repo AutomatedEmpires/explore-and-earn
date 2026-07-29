@@ -12,6 +12,8 @@ import type {
 import { CATEGORY_ICON, CATEGORY_LABEL } from "../discovery";
 import { formatDate } from "../../lib/format";
 import {
+  attentionActionLabel,
+  hostLede,
   needsAttention,
   opportunityPerformance,
   pipelineFunnel,
@@ -165,76 +167,53 @@ export function HostDashboard({
   // because they are the same list.
   const primary: AttentionItem | undefined = attention[0];
 
+  // The morning sentence, written from that same queue (redesign W2).
+  const lede = hostLede(attention, liveCount, funnel.total);
+
+  // A first-run host gets a quiet page: header, queue, one doorway to the
+  // demo. Seven empty panels explaining absence is not an overview — the
+  // panels return the moment there is anything real to put in them.
+  const firstRun = signals.length === 0 && funnel.total === 0;
+
   return (
     <StaggerReveal className={`host-page ${styles.overview}`}>
-      {/* ── Identity & season band ───────────────────────────────────── */}
-      <section
-        className={styles.identity}
-        data-lane={primaryLane ?? undefined}
-        aria-labelledby="host-identity-heading"
-      >
-        <div className={styles.identityCover}>
-          {coverPhotoUrl ? (
-            <Image
-              src={coverPhotoUrl}
-              alt=""
-              fill
-              sizes="(max-width: 1023px) 100vw, 320px"
-              className={styles.identityCoverImg}
-              unoptimized
-            />
-          ) : (
-            // No stand-in scene. A stock photograph here would read as this
-            // host's own place, which is the one thing the photo catalog's
-            // honesty rule forbids.
-            <div className={styles.coverEmpty}>
-              <Icon name="action.edit" size={20} aria-hidden />
-              <p className={styles.coverEmptyText}>
-                No cover photo yet — seekers see your operation here.
-              </p>
-              <Link className={styles.coverEmptyCta} href="/host/profile/edit">
-                Add one
-              </Link>
-            </div>
-          )}
-        </div>
-
-        <div className={styles.identityBody}>
-          <div className={styles.identityMarks}>
+      {/* ── Page header — the morning briefing (redesign W2) ─────────── */}
+      <header className={styles.pageHeader} aria-labelledby="host-identity-heading">
+        <div className={styles.pageHeaderText}>
+          <p className={styles.pageEyebrow}>
+            {[
+              hostName,
+              formatDate(new Date().toISOString(), {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              }),
+            ]
+              .filter(Boolean)
+              .join(" — ")}
+          </p>
+          <h1 id="host-identity-heading" className={styles.pageTitle}>
+            {companyName ?? "Your workspace"}
+            <span className={styles.titleMark}>.</span>
+          </h1>
+          <div className={styles.headerMarks}>
             {verified ? <VerifiedHostBadge /> : null}
             <span className={styles.planPill}>{planLabel}</span>
             {accountState === "lapsed" ? (
               <span className={styles.lapsedPill}>Payment overdue</span>
             ) : null}
+            {location ? (
+              <span className={styles.headerLocation}>{location}</span>
+            ) : null}
           </div>
-
-          <h1 id="host-identity-heading" className={styles.identityTitle}>
-            {companyName ?? "Your workspace"}
-          </h1>
-
-          <p className={styles.identityMeta}>
-            {[hostName, location].filter(Boolean).join(" · ") ||
-              "Add your name and home base so seekers know who is hiring."}
-          </p>
-
-          <dl className={styles.identityFacts}>
-            <div className={styles.identityFact}>
-              <dt>Live listings</dt>
-              <dd className="ui-tabular">{liveCount}</dd>
-            </div>
-            <div className={styles.identityFact}>
-              <dt>Profile</dt>
-              <dd className="ui-tabular">
-                {profile.filled}/{profile.total}
-              </dd>
-            </div>
-            <div className={styles.identityFact}>
-              <dt>In pipeline</dt>
-              <dd className="ui-tabular">{funnel.total}</dd>
-            </div>
-          </dl>
-
-          <div className={styles.identityActions}>
+          <p className={styles.pageLede}>{lede}</p>
+          {!profile.complete ? (
+            <p className={styles.identityHint}>
+              Still blank: {profile.missing.join(", ")}.{" "}
+              <Link href="/host/profile/edit">Finish your profile</Link>
+            </p>
+          ) : null}
+          <div className={styles.headerActions}>
             {primary ? (
               <Link className={styles.primaryCta} href={primary.href}>
                 <Icon name="action.forward" size={18} aria-hidden />
@@ -253,17 +232,52 @@ export function HostDashboard({
               </Link>
             ) : null}
           </div>
-
-          {!profile.complete ? (
-            <p className={styles.identityHint}>
-              Still blank: {profile.missing.join(", ")}.{" "}
-              <Link href="/host/profile/edit">Finish your profile</Link>
-            </p>
-          ) : null}
         </div>
-      </section>
+        <div
+          className={styles.pageNumerals}
+          role="group"
+          aria-label="Season at a glance"
+        >
+          <div className={styles.pageNumeral}>
+            <b className="ui-tabular">{liveCount}</b>
+            <span>{liveCount === 1 ? "listing live" : "listings live"}</span>
+          </div>
+          <div className={styles.pageNumeral}>
+            <b className="ui-tabular">{funnel.total}</b>
+            <span>in your pipeline</span>
+          </div>
+          <div
+            className={
+              attention.length > 0
+                ? `${styles.pageNumeral} ${styles.pageNumeralUrgent}`
+                : styles.pageNumeral
+            }
+          >
+            <b className="ui-tabular">{attention.length}</b>
+            <span>{attention.length === 1 ? "item needs you" : "items need you"}</span>
+          </div>
+        </div>
+      </header>
+
+      {/* The host's OWN cover, as a slim band — when there is one. No
+          stand-in scene: a stock photograph here would read as this host's
+          own place, which the photo catalog's honesty rule forbids. A missing
+          cover is the profile attention item's job, not an empty hero's. */}
+      {coverPhotoUrl ? (
+        <div className={styles.coverBand} data-lane={primaryLane ?? undefined}>
+          <Image
+            src={coverPhotoUrl}
+            alt=""
+            fill
+            sizes="100vw"
+            className={styles.coverBandImg}
+            unoptimized
+          />
+        </div>
+      ) : null}
 
       {/* ── Hiring pulse ─────────────────────────────────────────────── */}
+      {!firstRun ? (
       <section className="host-panel host-panel--raised" aria-labelledby="pulse-heading">
         <div className="host-panel__head">
           <div className="host-panel__titles">
@@ -317,6 +331,7 @@ export function HostDashboard({
           </div>
         )}
       </section>
+      ) : null}
 
       {/* ── Needs attention — THE single prioritised queue ───────────── */}
       <section className="host-panel host-panel--raised" aria-labelledby="attention-heading">
@@ -348,7 +363,12 @@ export function HostDashboard({
                     {/* The record this was counted from — never advice. */}
                     <span className={styles.attentionEvidence}>{item.evidence}</span>
                   </span>
-                  <Icon name="action.forward" size={18} aria-hidden />
+                  <span className={styles.toneChip} data-tone={item.tone}>
+                    {item.tone === "urgent" ? "Urgent" : item.tone === "soon" ? "Soon" : "Later"}
+                  </span>
+                  <span className={styles.attentionAction}>
+                    {attentionActionLabel(item)}
+                  </span>
                 </Link>
               </li>
             ))}
@@ -362,6 +382,28 @@ export function HostDashboard({
         )}
       </section>
 
+      {/* First-run: one doorway to a populated season, not four empty panels. */}
+      {firstRun ? (
+        <section className={styles.startBand} aria-labelledby="start-heading">
+          <div className={styles.startText}>
+            <span className={styles.startKicker}>While you set up</span>
+            <h2 id="start-heading" className={styles.startTitle}>
+              See a season in progress
+            </h2>
+            <p className={styles.startBody}>
+              The demo workspace shows a full winter mid-flight — live listings,
+              96 applicants, message threads, analytics — so you can see what
+              this overview becomes once your first listing is up.
+            </p>
+          </div>
+          <Link className={styles.ghostCta} href="/for-hosts/demo">
+            Open the demo
+            <Icon name="action.forward" size={16} aria-hidden />
+          </Link>
+        </section>
+      ) : null}
+
+      {!firstRun ? (
       <div className={styles.twoCol}>
         {/* ── Pipeline funnel ────────────────────────────────────────── */}
         <section className="host-panel host-panel--raised" aria-labelledby="funnel-heading">
@@ -474,6 +516,7 @@ export function HostDashboard({
           )}
         </section>
       </div>
+      ) : null}
 
       {/* ── Opportunity performance ──────────────────────────────────── */}
       {opportunities.length > 0 ? (
@@ -574,6 +617,7 @@ export function HostDashboard({
         </section>
       ) : null}
 
+      {!firstRun ? (
       <div className={styles.twoCol}>
         {/* ── Communications ─────────────────────────────────────────── */}
         <section className="host-panel host-panel--raised" aria-labelledby="comms-heading">
@@ -665,6 +709,7 @@ export function HostDashboard({
           </ul>
         </section>
       </div>
+      ) : null}
     </StaggerReveal>
   );
 }
