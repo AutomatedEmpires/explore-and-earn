@@ -78,6 +78,42 @@ const SET_PROPERTY_RE = /setProperty\(\s*["'](--[A-Za-z0-9_-]+)["']/g;
  * reference carries a fallback (`var(--x, …)`), which cannot silently drop.
  */
 const VAR_RE = /var\(\s*(--[A-Za-z0-9_-]+)\s*(,)?/g;
+/** A numeric spacing rung reference: `var(--space-12)`. */
+const SPACE_RUNG_RE = /var\(\s*--space-(\d+)\s*[,)]/g;
+
+/* ===================================================================== */
+/* FOREIGN-SCALE HEURISTIC                                                */
+/*                                                                        */
+/* The second failure mode of this token family, and the one that does    */
+/* NOT produce an undefined reference: a stylesheet authored against      */
+/* Tailwind's step-indexed scale, where `4` means 16px. Here the number   */
+/* IS the pixel value, so `padding: var(--space-4)` compiles perfectly    */
+/* and renders a 4px card. Five files shipped that way — including the    */
+/* $199 activation page, whose checkout button had 3px of vertical        */
+/* padding — and no existing gate could see it, because every token they  */
+/* referenced was defined.                                                */
+/*                                                                        */
+/* THE SIGNAL: a file whose ENTIRE numeric spacing vocabulary sits at or  */
+/* below 6px, across enough declarations to be a layout rather than a     */
+/* detail. Nobody designs a whole component in ≤6px increments; a file    */
+/* that appears to is a file whose author meant 16px and 24px.            */
+/*                                                                        */
+/* WHAT IT CANNOT CATCH: a MIXED file, where a correct px-literal pass    */
+/* and a Tailwind-scale pass are interleaved (host/billing is exactly     */
+/* this — rungs 1-4 alongside 10/12/14). Raising the max rung to catch    */
+/* those would fire on every legitimately fine-grained stylesheet, so the */
+/* heuristic deliberately stays narrow: it catches the wholesale case     */
+/* cleanly and says nothing about the mixed one. A narrow check that      */
+/* nobody silences beats a broad one everyone allowlists.                 */
+/*                                                                        */
+/* This is a HARD gate with an EMPTY allowlist, which it can be only      */
+/* because the population is currently zero. Adding an entry here means   */
+/* claiming a file really is all-hairlines — say why.                     */
+/* ===================================================================== */
+const SCALE_MAX_RUNG = 6;
+const SCALE_MIN_REFS = 4;
+/** @type {Map<string, string>} file → justification */
+const SCALE_ALLOWLIST = new Map();
 
 /** Strip comments so a commented-out reference is not counted as live code. */
 function stripComments(text, isCss) {
@@ -129,6 +165,8 @@ const defined = new Set();
 const bareRefs = [];
 /** @type {{file: string, line: number, name: string}[]} */
 const fallbackRefs = [];
+/** CSS file → every numeric --space-N rung it references. @type {Map<string, number[]>} */
+const spaceRungs = new Map();
 
 const files = SCAN_ROOTS.flatMap((r) => walk(join(ROOT, r)));
 
@@ -156,6 +194,11 @@ for (const file of files) {
     const entry = { file: rel, line: lineOf(text, m.index ?? 0), name: m[1] };
     if (m[2]) fallbackRefs.push(entry);
     else bareRefs.push(entry);
+  }
+
+  if (isCss) {
+    const rungs = [...text.matchAll(SPACE_RUNG_RE)].map((m) => Number(m[1]));
+    if (rungs.length > 0) spaceRungs.set(rel, rungs);
   }
 }
 
@@ -210,4 +253,35 @@ const suffix =
     : "";
 console.log(
   `G54 token references OK: ${bareRefs.length + fallbackRefs.length} var() references across ${files.length} files resolve against ${defined.size} defined properties${suffix}.`,
+);
+
+/* ---- G54b: foreign-scale stylesheets -------------------------------- */
+
+const scaleSuspects = [];
+for (const [file, rungs] of spaceRungs) {
+  if (SCALE_ALLOWLIST.has(file)) continue;
+  if (rungs.length < SCALE_MIN_REFS) continue;
+  const max = Math.max(...rungs);
+  if (max <= SCALE_MAX_RUNG) {
+    scaleSuspects.push({ file, max, count: rungs.length });
+  }
+}
+
+if (scaleSuspects.length > 0) {
+  console.error(
+    "G54b foreign spacing scale — these stylesheets lay out entirely in <=6px increments, which is the signature of a file written against a STEP-indexed scale (Tailwind's, where 4 means 16px). Here the number IS the pixel value:",
+  );
+  for (const s of scaleSuspects.sort((a, b) => a.file.localeCompare(b.file))) {
+    console.error(
+      `  - ${s.file}: ${s.count} spacing references, largest is --space-${s.max} (${s.max}px)`,
+    );
+  }
+  console.error(
+    "Re-map each reference onto the rung the author MEANT: 1→--space-4, 2→--space-8, 3→--space-12, 4→--space-16, 5→--space-20, 6→--space-24. Fix whole files — a half-fix inverts the file's own ordering, making --space-1 (4px) larger than the --space-2 (2px) beside it. If a file really is all hairlines, add it to SCALE_ALLOWLIST with a reason.",
+  );
+  process.exit(1);
+}
+
+console.log(
+  `G54b spacing scale OK: no stylesheet lays out entirely in <=${SCALE_MAX_RUNG}px increments (${spaceRungs.size} stylesheets reference the spacing scale).`,
 );
