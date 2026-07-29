@@ -1,18 +1,12 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
-import {
-  getConversations,
-  getSeekerDisplayNames,
-  resolveSeekerName,
-} from "@explore-and-earn/db";
 
 import { EmptyState } from "../../../../../components/discovery";
-import { loadMessageListData } from "../../../../../lib/messageListData";
 import {
+  HostMessageWorkspace,
   HostSectionHeading,
-  HostThreadGroups,
-  type HostMessageThread,
 } from "../../../../../components/host";
+import { loadHostConversations } from "./messages-data";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -20,18 +14,13 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Messages" };
 
 const PAGE_DESCRIPTION =
-  "Conversations with applicants and confirmed crew, unread first.";
-
-function formatUpdatedOn(iso: string | null): string {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
+  "Every conversation stays attached to the application it started from.";
 
 export default async function HostMessagesPage() {
   const { userId, getToken } = await auth();
-  if (!userId) {
+  const token = userId ? await getToken() : null;
+
+  if (!userId || !token) {
     return (
       <section className={styles.block}>
         <HostSectionHeading title="Messages" description={PAGE_DESCRIPTION} />
@@ -43,81 +32,41 @@ export default async function HostMessagesPage() {
     );
   }
 
-  const token = await getToken();
-  if (!token) {
+  const threads = await loadHostConversations(token, userId);
+
+  if (threads.length === 0) {
     return (
       <section className={styles.block}>
         <HostSectionHeading title="Messages" description={PAGE_DESCRIPTION} />
+        {/*
+          D23: an empty state that TEACHES. It says when threads appear, offers
+          the two surfaces that cause them to appear, and points at a worked
+          example — rather than asserting that conversations are on their way,
+          which for a host with no live listing would simply be false.
+        */}
         <EmptyState
-          title="Sign in to see your messages"
-          message="Conversations with applicants will show up here."
+          icon="nav.messages"
+          title="No conversations yet"
+          message="A thread opens when an applicant messages you, or when you open one from an application. Publish a role or send an invitation and the first replies land here."
+          suggestionsLabel="Start a conversation"
+          suggestions={[
+            { label: "Review applicants", href: "/host/applicants", icon: "nav.seekers" },
+            { label: "Invite seekers", href: "/host/outreach", icon: "action.share" },
+            {
+              label: "See a worked example",
+              href: "/for-hosts/demo/messages",
+              icon: "system.info",
+            },
+          ]}
         />
       </section>
     );
   }
-
-  const conversations = await getConversations(token, userId, "host");
-
-  if (conversations.length === 0) {
-    return (
-      <section className={styles.block}>
-        <HostSectionHeading title="Messages" description={PAGE_DESCRIPTION} />
-        <EmptyState
-          title="No messages yet"
-          message="Conversations with applicants will show up here."
-        />
-      </section>
-    );
-  }
-
-  // Batch-fetch stable participant-only context, seeker names, and last
-  // messages. Context remains available after a listing closes.
-  const seekerProfileIds = conversations.map(
-    (conversation) => conversation.seekerProfileId,
-  );
-  const conversationIds = conversations.map((c) => c.id);
-
-  const [{ contexts, lastMessages }, seekerDisplayNames] = await Promise.all([
-    loadMessageListData({
-      token,
-      userId,
-      route: "/host/messages",
-      conversationIds,
-    }),
-    getSeekerDisplayNames(token, seekerProfileIds),
-  ]);
-
-  // The transcript list is the page; names decorate it. A lookup fault is logged
-  // and labelled, never allowed to take the list down and never laundered into
-  // the "Seeker" placeholder, which would be indistinguishable from the bug
-  // migration 084 fixed.
-  if (seekerDisplayNames.status === "unavailable") {
-    console.error("[host/messages] applicant name lookup failed:", seekerDisplayNames.reason);
-  }
-
-  const threads: HostMessageThread[] = conversations.map((conversation) => {
-    const context = contexts.get(conversation.id) ?? null;
-    const lastMessage = lastMessages.get(conversation.id) ?? null;
-    return {
-      id: conversation.id,
-      applicantName: resolveSeekerName(
-        seekerDisplayNames,
-        conversation.seekerProfileId,
-        "Seeker",
-      ),
-      listingTitle: context?.listingTitle || "Conversation",
-      preview: lastMessage?.body ?? "No messages yet",
-      unread: lastMessage
-        ? lastMessage.senderType !== "host" && !lastMessage.readAt
-        : false,
-      updatedOn: formatUpdatedOn(conversation.lastMessageAt),
-    };
-  });
 
   return (
     <section className={styles.block}>
       <HostSectionHeading title="Messages" description={PAGE_DESCRIPTION} />
-      <HostThreadGroups threads={threads} />
+      <HostMessageWorkspace threads={threads} activeId={null} initialMessages={[]} />
     </section>
   );
 }

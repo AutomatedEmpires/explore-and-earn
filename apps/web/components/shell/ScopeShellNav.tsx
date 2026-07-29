@@ -88,6 +88,12 @@ export interface ScopeShellNavProps {
 	readonly footerItems?: ReadonlyArray<ScopeNavItem>;
 	/** Accessible label for the hamburger. Defaults to `Open {scopeLabel} menu`. */
 	readonly menuLabel?: string;
+	/**
+	 * Element id placed on the DESKTOP rail, so an anchored coachmark can point
+	 * at it (V2 D19). Optional and inert when unset — no scope is required to
+	 * carry one, and it never affects layout or behaviour.
+	 */
+	readonly railId?: string;
 }
 
 /**
@@ -257,6 +263,7 @@ export function ScopeShellNav({
 	avatar,
 	footerItems,
 	menuLabel,
+	railId,
 }: ScopeShellNavProps) {
 	const { open, onOpen, onClose } = useScopeNavDisclosure(false);
 
@@ -368,7 +375,7 @@ export function ScopeShellNav({
 	return (
 		<>
 			{/* Desktop: persistent left rail (hidden <1024px via CSS). */}
-			<aside className={styles.rail}>
+			<aside className={styles.rail} id={railId}>
 				<ScopeHead brand={brand} scopeLabel={scopeLabel} />
 				<nav className={styles.railNav} aria-label={`${scopeLabel} sections`}>
 					<NavBody items={items} groups={groups} />

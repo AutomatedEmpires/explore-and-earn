@@ -420,3 +420,59 @@
   .quickCard:hover,
   .contactBtn:hover { transform: none; }
 }
+
+/* ── Tours (V2 §15) ─────────────────────────────────────────────── */
+
+.tours {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding: var(--space-16);
+  background: var(--color-surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+}
+
+.toursTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-size);
+  color: var(--text-primary);
+}
+
+.tourRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-10);
+}
+
+.tourBtn,
+.tourLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-16);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  color: var(--text-primary);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tourBtn:hover,
+.tourLink:hover {
+  border-color: var(--color-cta);
+  color: var(--color-cta);
+}
+
+.tourNote {
+  margin: 0;
+  max-width: 72ch;
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-secondary);
+}

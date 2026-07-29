@@ -1,22 +1,31 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import {
-  emptySeekerNameLookup,
-  getConversations,
-  getMessages,
-  getSeekerDisplayName,
-  markMessagesRead,
-  singleSeekerName,
-} from "@explore-and-earn/db";
+import { getMessages, markMessagesRead } from "@explore-and-earn/db";
+
 import { EmptyState } from "../../../../../../components/discovery";
-import { HostSectionHeading } from "../../../../../../components/host";
-import { MessageTranscript } from "../../../../../../components/messaging/MessageTranscript";
+import {
+  HostMessageWorkspace,
+  HostSectionHeading,
+} from "../../../../../../components/host";
+import { loadHostConversations } from "../messages-data";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = { title: "Conversation" };
 export const dynamic = "force-dynamic";
 
+const PAGE_DESCRIPTION =
+  "Every conversation stays attached to the application it started from.";
+
+/**
+ * One conversation — rendered by the SAME workspace as the index.
+ *
+ * The route is what selects the thread (V2 §9), so this page is the index page
+ * with an id: it loads the whole thread list because the desktop layout shows
+ * it beside the transcript, and it loads the transcript because this is the
+ * route that marks the thread read. A separate detail component would have had
+ * to reimplement both, and the two lists would have drifted.
+ */
 export default async function HostMessageThreadPage({
   params,
 }: {
@@ -24,7 +33,9 @@ export default async function HostMessageThreadPage({
 }) {
   const { id } = await params;
   const { userId, getToken } = await auth();
-  if (!userId) {
+  const token = userId ? await getToken() : null;
+
+  if (!userId || !token) {
     return (
       <section className={styles.block}>
         <HostSectionHeading
@@ -41,59 +52,32 @@ export default async function HostMessageThreadPage({
     );
   }
 
-  const token = await getToken();
-  if (!token) {
-    return (
-      <section className={styles.block}>
-        <HostSectionHeading
-          title="Conversation"
-          description="Message history with this applicant."
-          actionLabel="All messages"
-          actionHref="/host/messages"
-        />
-        <EmptyState
-          title="Sign in to see this conversation"
-          message="The message history appears here once you sign in."
-        />
-      </section>
-    );
-  }
-
-  // Fetch transcript + conversations in parallel; mark-read failure never blocks render.
-  const [messages, conversations] = await Promise.all([
+  // Transcript + list in parallel; a mark-read failure never blocks the render.
+  const [messages, threads] = await Promise.all([
     getMessages(token, userId, id),
-    getConversations(token, userId, "host"),
+    loadHostConversations(token, userId),
     markMessagesRead(token, userId, id).catch(() => null),
   ]);
   revalidatePath("/host/messages");
-  const conversation = conversations.find((entry) => entry.id === id) ?? null;
-  // The transcript is this page. The counterpart's name is a heading detail, so
-  // a failed lookup is logged and falls through to the generic phrasing below
-  // instead of failing the render.
-  const nameLookup = conversation
-    ? await getSeekerDisplayName(token, conversation.seekerProfileId)
-    : emptySeekerNameLookup();
-  if (nameLookup.status === "unavailable") {
-    console.error("[host/messages/id] applicant name lookup failed:", nameLookup.reason);
-  }
-  const seekerName = conversation
-    ? singleSeekerName(nameLookup, conversation.seekerProfileId)
-    : null;
+
+  const active = threads.find((thread) => thread.id === id) ?? null;
 
   return (
     <section className={styles.block}>
       <HostSectionHeading
-        title="Conversation"
-        description={`Message history with ${seekerName ?? "this applicant"}.`}
+        title="Messages"
+        description={
+          active
+            ? `Message history with ${active.applicantName}.`
+            : PAGE_DESCRIPTION
+        }
         actionLabel="All messages"
         actionHref="/host/messages"
       />
-      <MessageTranscript
+      <HostMessageWorkspace
+        threads={threads}
+        activeId={active ? id : null}
         initialMessages={messages}
-        conversationId={id}
-        viewerType="host"
-        counterpartName={seekerName}
-        replyPlaceholder="Message this applicant…"
       />
     </section>
   );

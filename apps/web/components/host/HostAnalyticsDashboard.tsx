@@ -103,22 +103,102 @@ function StageChart({ byStatus }: { byStatus: Record<string, number> }) {
   );
 }
 
-function ConversionRadial({ score }: { score: number }) {
-  return (
-    <div className={styles.radialWrap}>
-      <div
-        className={styles.radial}
-        style={{ "--score": `${score}%` } as React.CSSProperties}
-        role="img"
-        aria-label={`Conversion score: ${score} percent of applicants advance past first review`}
-      >
-        <div className={styles.radialInner}>
-          <span className={styles.radialValue}>{score}%</span>
-          <span className={styles.radialCaption}>advance</span>
-        </div>
-      </div>
-    </div>
+/**
+ * The funnel, as a bar list.
+ *
+ * THIS REPLACED A CONIC-GRADIENT RING, and the reason is D23 rather than taste.
+ * The ring was rendered unconditionally with `--score: 0%`: a host on their
+ * first day got a 168-pixel dial reading "0% advance", captioned "Quiet". A
+ * dial at zero is not a neutral report of no data — it is a picture of failure,
+ * drawn before anything has had a chance to happen. Bars are omitted when there
+ * is nothing in them, and the panel itself is omitted when there is nothing at
+ * all, so the page can be honestly silent.
+ */
+function ApplicationFunnel({
+  byStatus,
+  total,
+}: {
+  byStatus: Record<string, number>;
+  total: number;
+}) {
+  const stages = APPLICATION_STATUS_ORDER.filter(
+    (status) => (byStatus[status] ?? 0) > 0,
   );
+
+  return (
+    <>
+      <ul className={styles.funnelList}>
+        {stages.map((status) => {
+          const count = byStatus[status] ?? 0;
+          const pct = Math.round((count / Math.max(1, total)) * 100);
+          return (
+            <li key={status} className={styles.funnelRow}>
+              <span className={styles.funnelLabel}>
+                {APPLICATION_STATUS_LABEL[status] ?? status}
+              </span>
+              <span
+                className={styles.track}
+                role="img"
+                aria-label={`${APPLICATION_STATUS_LABEL[status] ?? status}: ${count} of ${total} applications`}
+              >
+                <span
+                  className={styles.trackFill}
+                  style={{ "--fill": `${pct}%` } as React.CSSProperties}
+                />
+              </span>
+              <span className={styles.funnelValue}>{count}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className={styles.panelNote}>
+        Every application this account has received, in the pipeline&rsquo;s own
+        stages. The figures are all-time — the data layer stores no dated
+        counters, so there is no week-on-week comparison to show.
+      </p>
+    </>
+  );
+}
+
+/**
+ * A plain-language diagnosis for one listing — or nothing.
+ *
+ * D25 asks for diagnoses "ONLY where derivable with evidence". So this returns
+ * null rather than reaching for a sentence: a listing with no applications and
+ * no invitations has produced no evidence of anything, and "engagement is low"
+ * would be a mood, not a finding. Every branch below names the numbers it is
+ * reading, and those numbers are on the same row.
+ */
+export function diagnoseListing(stat: HostPerListingStats): string | null {
+  const applications = stat.totalApplications;
+  const sent = stat.invitesSent;
+  const accepted = stat.applicationsByStatus.accepted ?? 0;
+  const advanced = countFor(stat.applicationsByStatus, [
+    "reviewing",
+    "saved_by_host",
+    "offered",
+    "accepted",
+  ]);
+
+  if (applications === 0 && sent === 0) return null;
+
+  if (applications === 0 && sent > 0) {
+    return `${sent} invitation${sent === 1 ? "" : "s"} sent and no applications back — the audience you invited is not converting, so the role or the pay band is the thing to change before spending more credits.`;
+  }
+
+  if (applications > 0 && advanced === 0) {
+    return `${applications} application${applications === 1 ? "" : "s"} and none moved past Applied — the pool exists, the review does not. This is a queue to work, not a listing to fix.`;
+  }
+
+  if (accepted > 0) {
+    return `${accepted} accepted from ${applications} application${applications === 1 ? "" : "s"} — this role is closing candidates. Whatever it says about pay, housing and hours is worth copying into the ones that are not.`;
+  }
+
+  if (sent > 0 && stat.invitesAccepted === 0) {
+    return `${applications} application${applications === 1 ? "" : "s"} arrived on their own, but none of the ${sent} invitation${sent === 1 ? "" : "s"} was accepted — organic reach is working and outreach is not.`;
+  }
+
+  return `${advanced} of ${applications} application${applications === 1 ? "" : "s"} advanced past first review — the pipeline is moving.`;
 }
 
 function ListingDiagnosis({ stat }: { stat: HostPerListingStats }) {
@@ -126,6 +206,7 @@ function ListingDiagnosis({ stat }: { stat: HostPerListingStats }) {
     stat.invitesSent > 0 ? stat.invitesAccepted / stat.invitesSent : null;
   const status = stat.listingStatus;
   const statusLabel = LISTING_STATUS_LABEL[status] ?? status;
+  const diagnosis = diagnoseListing(stat);
 
   // Honest, data-derived diagnosis tags (no fixtures).
   const tags: { icon: IconKey; text: string }[] = [];
@@ -167,6 +248,14 @@ function ListingDiagnosis({ stat }: { stat: HostPerListingStats }) {
             </span>
           ))}
         </div>
+        {diagnosis ? (
+          <p className={styles.diagRead}>{diagnosis}</p>
+        ) : (
+          <p className={styles.diagRead}>
+            Nothing has happened on this role yet, so there is nothing to
+            diagnose.
+          </p>
+        )}
       </div>
       <div className={styles.diagAction}>
         <a
@@ -233,54 +322,128 @@ export function HostAnalyticsDashboard({ analytics }: HostAnalyticsDashboardProp
         </MetricGrid>
       </section>
 
-      {/* ── Chart + radial split ───────────────────────────────────────── */}
-      <section className={styles.section} aria-labelledby="pipeline-heading">
-        <h2 id="pipeline-heading" className={styles.sectionTitle}>
-          <Icon name="analytics.funnel" size={16} aria-hidden />
-          Where applicants stand
-        </h2>
-        <div className={styles.split}>
-          <div className={styles.panel}>
-            <div className={styles.panelHead}>
-              <div>
-                <h3 className={styles.panelTitle}>Applications by stage</h3>
-                <p className={styles.panelNote}>
-                  How your current pool is distributed across the pipeline.
-                </p>
+      {/* ── Pipeline: the stage chart and the funnel ────────────────────
+          Both panels are behind `totalApps > 0`. A chart of nothing and a
+          funnel of nothing are the zero-donut in a different shape. */}
+      {totalApps > 0 ? (
+        <section className={styles.section} aria-labelledby="pipeline-heading">
+          <h2 id="pipeline-heading" className={styles.sectionTitle}>
+            <Icon name="analytics.funnel" size={16} aria-hidden />
+            Where applicants stand
+          </h2>
+          <div className={styles.split}>
+            <div className={styles.panel}>
+              <div className={styles.panelHead}>
+                <div>
+                  <h3 className={styles.panelTitle}>Applications by stage</h3>
+                  <p className={styles.panelNote}>
+                    How your current pool is distributed across the pipeline.
+                  </p>
+                </div>
+                <span className={styles.kicker}>{totalApps} total</span>
               </div>
-              <span className={styles.kicker}>{totalApps} total</span>
+              <StageChart byStatus={totalApplicationsByStatus} />
             </div>
-            <StageChart byStatus={totalApplicationsByStatus} />
-          </div>
 
-          <div className={styles.panel}>
-            <div className={styles.panelHead}>
-              <div>
-                <h3 className={styles.panelTitle}>Conversion score</h3>
-                <p className={styles.panelNote}>
-                  Share of applicants who advance past first review.
-                </p>
+            <div className={styles.panel}>
+              <div className={styles.panelHead}>
+                <div>
+                  <h3 className={styles.panelTitle}>The funnel</h3>
+                  <p className={styles.panelNote}>
+                    {score}% of applicants advance past first review —{" "}
+                    {acceptedApps} accepted, {reviewingApps} in review.
+                  </p>
+                </div>
               </div>
-              <span
-                className={`${styles.kicker} ${score >= 50 ? styles.kickerGood : ""}`.trim()}
-              >
-                {score >= 50 ? "Healthy" : score > 0 ? "Warming" : "Quiet"}
-              </span>
-            </div>
-            <ConversionRadial score={score} />
-            <div className={styles.radialLegend}>
-              <span className={styles.legendItem}>
-                <Icon name="status.accepted" size={16} aria-hidden />
-                {acceptedApps} accepted
-              </span>
-              <span className={styles.legendItem}>
-                <Icon name="analytics.funnel" size={16} aria-hidden />
-                {reviewingApps} in review
-              </span>
+              <ApplicationFunnel
+                byStatus={totalApplicationsByStatus}
+                total={totalApps}
+              />
             </div>
           </div>
-        </div>
+        </section>
+      ) : null}
+
+      {/* ── Discovery sources ──────────────────────────────────────────────
+          §12 asks where seekers found each role. `events.source_surface` is a
+          free-text, unindexed column with one writer in the whole app, and
+          nothing rolls it up per host — so there is no split to render, and a
+          three-lane chart split evenly would be a fabrication with a legend. */}
+      <section className={styles.section} aria-labelledby="sources-heading">
+        <h2 id="sources-heading" className={styles.sectionTitle}>
+          <Icon name="analytics.source" size={16} aria-hidden />
+          Where seekers found you
+        </h2>
+        <p className={styles.sectionLede}>
+          Not measured yet. Discovery is not attributed to Seek, Swipe or Map
+          per listing anywhere in the product, so this section stays empty
+          rather than showing a split nothing recorded.
+        </p>
       </section>
+
+      {/* ── Listing comparison table ────────────────────────────────────
+          The accessible equivalent of the diagnosis cards below, and the thing
+          the CSV export serialises. Rendered as a real table because a
+          role-by-role comparison IS tabular, and reading it column-wise is the
+          whole point. */}
+      {hasPerListingAccess && perListingStats.length > 0 ? (
+        <section className={styles.section} aria-labelledby="compare-heading">
+          <h2 id="compare-heading" className={styles.sectionTitle}>
+            <Icon name="analytics.trend" size={16} aria-hidden />
+            Role by role
+          </h2>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <caption className={styles.tableCaption}>
+                Every listing on this account, with its own all-time counts.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Listing</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Applications</th>
+                  <th scope="col">Advanced</th>
+                  <th scope="col">Accepted</th>
+                  <th scope="col">Invites sent</th>
+                  <th scope="col">Invites accepted</th>
+                </tr>
+              </thead>
+              <tbody>
+                {perListingStats.map((stat) => (
+                  <tr key={stat.listingId}>
+                    <th scope="row">
+                      <a
+                        className={styles.tableLink}
+                        href={`/host/listings/${stat.listingId}`}
+                      >
+                        {stat.listingTitle}
+                      </a>
+                    </th>
+                    <td>
+                      {LISTING_STATUS_LABEL[stat.listingStatus] ??
+                        stat.listingStatus}
+                    </td>
+                    <td className={styles.num}>{stat.totalApplications}</td>
+                    <td className={styles.num}>
+                      {countFor(stat.applicationsByStatus, [
+                        "reviewing",
+                        "saved_by_host",
+                        "offered",
+                        "accepted",
+                      ])}
+                    </td>
+                    <td className={styles.num}>
+                      {stat.applicationsByStatus.accepted ?? 0}
+                    </td>
+                    <td className={styles.num}>{stat.invitesSent}</td>
+                    <td className={styles.num}>{stat.invitesAccepted}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       {/* ── Per-listing diagnosis (the FULL-analytics entitlement) ─────── */}
       {hasPerListingAccess && perListingStats.length > 0 ? (
@@ -322,23 +485,40 @@ export function HostAnalyticsDashboard({ analytics }: HostAnalyticsDashboardProp
               sent, and invites accepted for each of your {listingCount}{" "}
               {listingCount === 1 ? "listing" : "listings"}.
             </p>
-            <a className={styles.gateBtn} href="/host/settings#billing">
-              View plans
+            {/* D21: plans live at /host/plans and nowhere else. This used to
+                point at /host/settings#billing, which rendered a second grid. */}
+            <a className={styles.gateBtn} href="/host/plans">
+              Compare plans
             </a>
           </div>
         </section>
       ) : null}
 
-      {/* ── Empty state ────────────────────────────────────────────────── */}
+      {/* ── Empty state (D23) ──────────────────────────────────────────────
+          Four things, in this order: what this page will contain, WHY it is
+          empty, the one action that changes that, and a labelled sample so the
+          value is legible before the data exists. The pre-V2 version had only
+          the first sentence and a zero-value dial above it. */}
       {listingCount === 0 && totalApps === 0 ? (
         <div className={styles.emptyState}>
           <span className={styles.emptyIcon}>
             <Icon name="analytics.meter" size={24} aria-hidden />
           </span>
-          <p className={styles.emptyTitle}>No data yet</p>
+          <p className={styles.emptyTitle}>Nothing to measure yet</p>
           <p className={styles.emptyNote}>
-            Analytics appear once your listings are live and receiving applications.
+            This page counts applications, pipeline stages and invitation
+            outcomes per role. You have no listings, so none of those numbers
+            exist — publishing one starts them.
           </p>
+          <div className={styles.emptyActions}>
+            <a className={styles.gateBtn} href="/host/listings/new">
+              Create a listing
+            </a>
+            <a className={styles.emptyLink} href="/for-hosts/demo/dashboard">
+              <Icon name="system.info" size={16} aria-hidden />
+              See a populated example — sample data
+            </a>
+          </div>
         </div>
       ) : null}
     </div>

@@ -35,13 +35,21 @@ function source(relative: string): string {
   return readFileSync(new URL(relative, HOST_ROOT), "utf8");
 }
 
-/** Every file that touches a resolved name on its way to a host's screen. */
+/**
+ * Every file that touches a resolved name on its way to a host's screen.
+ *
+ * V2-F2 MOVED THE MESSAGE SURFACES. Both `/host/messages` and
+ * `/host/messages/[id]` now render one workspace and load their thread list
+ * from `messages/messages-data.ts`, so that module — not the two pages — is
+ * where a name is resolved. Listing both pages here after the move would have
+ * been a test that passes because the pages no longer mention names at all,
+ * which is the failure mode this file exists to catch.
+ */
 const NAME_SURFACES = [
   "applicants/applicants-data.ts",
   "applicants/page.tsx",
   "applicants/[id]/page.tsx",
-  "messages/page.tsx",
-  "messages/[id]/page.tsx",
+  "messages/messages-data.ts",
   "listings/[id]/page.tsx",
 ] as const;
 
@@ -53,17 +61,15 @@ const NAME_SURFACES = [
 const LABEL_PRODUCERS = [
   "applicants/applicants-data.ts",
   "applicants/[id]/page.tsx",
-  "messages/page.tsx",
-  "messages/[id]/page.tsx",
+  "messages/messages-data.ts",
   "listings/[id]/page.tsx",
 ] as const;
 
-/** The pages that perform a lookup, as opposed to consuming one. */
+/** The modules that perform a lookup, as opposed to consuming one. */
 const LOOKUP_CALLERS = [
   "applicants/page.tsx",
   "applicants/[id]/page.tsx",
-  "messages/page.tsx",
-  "messages/[id]/page.tsx",
+  "messages/messages-data.ts",
   "listings/[id]/page.tsx",
 ] as const;
 

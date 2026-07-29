@@ -314,3 +314,16 @@
 		transform: none;
 	}
 }
+
+/* ── Coachmark target highlight (D19) ────────────────────────────────────
+   Scoped under .shell for two reasons: CSS Modules rejects a top-level
+   :global([attr]) rule as impure, and a workspace-only outline should not
+   be able to leak onto a page outside the workspace. An OUTLINE rather than
+   only a colour, so it survives forced-colours and high-contrast modes — a
+   highlight that disappears in the mode most likely to need it is not a
+   highlight. */
+.shell :global([data-coachmark-target="active"]) {
+	outline: 2px solid var(--color-cta);
+	outline-offset: 3px;
+	border-radius: var(--radius-control);
+}

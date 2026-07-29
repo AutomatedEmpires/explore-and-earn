@@ -1,0 +1,442 @@
+/*
+ * The host message workspace (V2 §9).
+ *
+ * ONE GRID, THREE BREAKPOINTS. Below 1024px the panes stack and `data-pane`
+ * decides which one is on screen; at 1024px the list and the conversation sit
+ * side by side; at 1360px the context rail joins them. The rail is the pane
+ * that leaves first because it is the one whose content is repeated elsewhere.
+ */
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-16);
+  min-height: 0;
+}
+
+/* ── Panes ──────────────────────────────────────────────────────────────── */
+
+.listPane,
+.conversationPane,
+.contextPane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  padding: var(--space-16);
+  gap: var(--space-12);
+}
+
+/*
+ * On a phone exactly one pane is on screen. Hiding with `display: none` rather
+ * than a transform is deliberate: the hidden pane must leave the tab order and
+ * the accessibility tree, not merely the viewport.
+ */
+.workspace[data-pane="list"] .conversationPane,
+.workspace[data-pane="list"] .contextPane,
+.workspace[data-pane="conversation"] .listPane {
+  display: none;
+}
+
+.workspace[data-pane="conversation"] .contextPane[data-open="false"] {
+  display: none;
+}
+
+.paneTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.paneNote {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Thread list ────────────────────────────────────────────────────────── */
+
+.listHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.listTitleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.count {
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.searchLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: 0 var(--space-10);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  color: var(--text-secondary);
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: var(--space-8) 0;
+  font: inherit;
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+}
+
+.search:focus {
+  outline: none;
+}
+
+.searchLabel:focus-within {
+  border-color: var(--color-cta);
+}
+
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.segmented {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+}
+
+.segment {
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  padding: var(--space-4) var(--space-12);
+  font: inherit;
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--color-action-soft);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.selectLabel {
+  display: inline-flex;
+  min-width: 0;
+}
+
+.select {
+  max-width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+  background: var(--color-surface);
+  padding: var(--space-6) var(--space-10);
+  font: inherit;
+  font-size: var(--type-caption-size);
+  color: var(--text-primary);
+}
+
+.threadScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.threadList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--radius-cell);
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: inherit;
+}
+
+.thread:hover {
+  background: var(--color-surface);
+}
+
+.thread[aria-current="page"] {
+  background: var(--color-action-soft);
+  border-color: var(--color-cta);
+}
+
+.threadTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.threadName {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+}
+
+.unreadDot {
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-pill);
+  background: var(--color-cta);
+  flex: none;
+}
+
+.threadTime {
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.threadListing {
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+}
+
+.threadPreview {
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.listEmpty {
+  margin: 0;
+  padding: var(--space-16) 0;
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
+}
+
+/* ── Conversation ───────────────────────────────────────────────────────── */
+
+.conversationHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  padding-bottom: var(--space-10);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.conversationHeading {
+  flex: 1;
+  min-width: 0;
+}
+
+.backButton,
+.contextToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  padding: var(--space-4) var(--space-10);
+  font: inherit;
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.placeholder {
+  margin: auto;
+  max-width: 34ch;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-40) 0;
+}
+
+.placeholderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-48);
+  height: var(--space-48);
+  border-radius: var(--radius-pill);
+  background: var(--color-action-soft);
+  color: var(--color-cta);
+}
+
+.placeholderTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-size);
+  color: var(--text-primary);
+}
+
+.placeholderBody {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Context rail ───────────────────────────────────────────────────────── */
+
+.contextList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.contextRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.contextTerm {
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.contextValue {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+}
+
+.contextLinks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.contextLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  font-size: var(--type-meta-size);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.contextLink:hover {
+  background: var(--color-surface);
+}
+
+.contextNote {
+  margin: 0;
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-secondary);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Breakpoints ────────────────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  .workspace {
+    grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  /* Both panes are on screen, so the URL no longer chooses between them. */
+  .workspace[data-pane="list"] .conversationPane,
+  .workspace[data-pane="conversation"] .listPane {
+    display: flex;
+  }
+
+  .backButton {
+    display: none;
+  }
+
+  .listPane,
+  .conversationPane,
+  .contextPane {
+    max-height: calc(100vh - var(--space-64) - var(--space-64));
+  }
+
+  .conversationPane {
+    overflow-y: auto;
+  }
+
+  /* Below the rail breakpoint the drawer toggle is still the way in. */
+  .workspace[data-pane="conversation"] .contextPane[data-open="true"] {
+    display: flex;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1360px) {
+  .workspace {
+    grid-template-columns: minmax(260px, 300px) minmax(0, 1fr) minmax(240px, 300px);
+  }
+
+  .workspace[data-pane="conversation"] .contextPane,
+  .workspace[data-pane="conversation"] .contextPane[data-open="false"],
+  .workspace[data-pane="conversation"] .contextPane[data-open="true"] {
+    display: flex;
+    grid-column: auto;
+  }
+
+  .contextToggle {
+    display: none;
+  }
+
+  .contextPane {
+    overflow-y: auto;
+  }
+}

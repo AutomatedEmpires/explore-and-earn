@@ -1,0 +1,145 @@
+/*
+ * Host workspace coachmarks (V2 D19).
+ *
+ * NO SCRIM RULE EXISTS IN THIS FILE, and that absence is the design. The modal
+ * this replaced dimmed and locked the page; a coachmark that points at a
+ * control must leave the control visible and clickable. The panel is FIXED and
+ * positioned from four custom properties the component writes after measuring,
+ * so the layout math lives in the component and the stylesheet stays
+ * declarative — the same split the demo tour uses.
+ */
+
+.panel {
+  position: fixed;
+  z-index: var(--z-lightbox);
+  box-sizing: border-box;
+  width: min(23rem, calc(100vw - var(--space-32)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-16);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border-ink-warm);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  box-shadow: var(--elevation-overlay);
+}
+
+.panel:focus-visible {
+  outline: none;
+  box-shadow: var(--elevation-overlay), 0 0 0 3px var(--color-cta);
+}
+
+/* No target measured yet — dock out of the way rather than jump to 0,0. */
+.panel[data-placement="docked"] {
+  left: 50%;
+  bottom: var(--space-24);
+  transform: translateX(-50%);
+}
+
+/* Anchored below the target, clamped into the viewport on both axes. */
+.panel[data-placement="anchored"] {
+  top: min(
+    calc(var(--anchor-top) + var(--anchor-height) + var(--space-12)),
+    calc(100vh - 18rem)
+  );
+  left: max(
+    var(--space-16),
+    min(var(--anchor-left), calc(100vw - min(23rem, 100vw) - var(--space-16)))
+  );
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.step {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-chip-compact);
+  height: var(--icon-chip-compact);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.close:hover {
+  border-color: var(--border-soft);
+  color: var(--text-primary);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+}
+
+.body {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  margin-top: var(--space-4);
+}
+
+.skip {
+  border: 0;
+  background: transparent;
+  padding: var(--space-6) var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.next {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-8) var(--space-16);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+/*
+ * THE TARGET HIGHLIGHT LIVES IN HostShell.module.css, not here.
+ *
+ * CSS Modules rejects a top-level `:global([attr])` rule as impure — a
+ * selector must carry at least one local class or id — and the elements this
+ * highlights (the rail, the create button, the activation banner) are rendered
+ * by the shell, not by this component. Scoping the rule under the shell's own
+ * `.shell` class is both what the compiler requires and what keeps a
+ * workspace-only outline from leaking onto every page in the app.
+ */

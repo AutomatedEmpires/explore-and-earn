@@ -52,6 +52,7 @@ export * from "./queries/behaviorInteractions";
 export * from "./queries/matchScores";
 export * from "./queries/savedSearchAlerts";
 export * from "./lib/hostAnalyticsScope";
+export * from "./lib/listingReadiness";
 export * from "./hostAnalytics";
 export * from "./lib/hostPulse";
 export * from "./lib/listingReadiness";

@@ -27,6 +27,15 @@ export interface MessageTranscriptProps {
 	readonly counterpartName?: string | null;
 	/** Placeholder for the inline reply box. */
 	readonly replyPlaceholder?: string;
+	/**
+	 * Fired ONLY after the server action reports the message persisted.
+	 *
+	 * Deliberately post-accept rather than on submit: sends are rate-limited (30
+	 * a minute) and can be refused, and a caller that counted attempts would
+	 * report a messaging volume the database never saw. The transcript owns the
+	 * one place that knows the difference, so it is the one place that can say.
+	 */
+	readonly onSent?: () => void;
 }
 
 function formatSentAt(iso: string): string {
@@ -114,6 +123,7 @@ export function MessageTranscript({
 	viewerType,
 	counterpartName,
 	replyPlaceholder,
+	onSent,
 }: MessageTranscriptProps) {
 	const [messages, setMessages] = useState<readonly MessageView[]>(() => [
 		...initialMessages,
@@ -196,6 +206,7 @@ export function MessageTranscript({
 						m.id === tempId ? { ...m, pending: false } : m,
 					),
 				);
+				onSent?.();
 				return { ok: true };
 			}
 			// Failure: drop the optimistic bubble and surface an inline error.
@@ -203,7 +214,7 @@ export function MessageTranscript({
 			setError("Your message couldn't be sent. Please try again.");
 			return { ok: false };
 		},
-		[conversationId, viewerType],
+		[conversationId, viewerType, onSent],
 	);
 
 	return (

@@ -46,8 +46,12 @@ describe("conversation open entry points", () => {
     const seekerMessages = source(
       "app/[locale]/(seeker)/messages/page.tsx",
     );
+    // V2-F2: the host side loads its thread list from one module shared by the
+    // index and the conversation route, so that module is what has to go
+    // through the RPC. Asserting the page after the move would have asserted
+    // nothing — it no longer loads threads at all.
     const hostMessages = source(
-      "app/[locale]/(host)/host/messages/page.tsx",
+      "app/[locale]/(host)/host/messages/messages-data.ts",
     );
     const messageListData = source("lib/messageListData.ts");
 

@@ -91,6 +91,41 @@ export const HOST_WORKSPACE_EVENTS = {
   inviteSent: "host_invite_sent",
   /** A listing's health/gap detail was expanded. Tells us whether the diagnosis lands. */
   listingHealthViewed: "listing_health_viewed",
+
+  /**
+   * REDESIGN V2-F2 — communication and intelligence.
+   *
+   * F1's four measure whether a host works their PIPELINE. These six measure
+   * whether they use the things the pipeline feeds: the inbox, the marketplace
+   * announcement, the numbers, the coach, and the plan they are paying for.
+   *
+   * WHEN THEY FIRE IS PART OF THE DEFINITION. `messageSent` fires only after
+   * the server action reports the row persisted — sends are rate-limited (30 a
+   * minute) and can be refused, and counting attempts would report a messaging
+   * volume the database never saw. `announcementPublished` is separate from
+   * `announcementCreated` for the same class of reason: a PURCHASED run is
+   * created by the Stripe webhook and published by the host later, sometimes
+   * days later, and one name for both would hide the gap between paying and
+   * publishing — the number worth knowing.
+   *
+   * NAMING: `announcement_*`, `analytics_*`, `coach_*` and `plan_*` do not
+   * carry the `host_` actor prefix the six above use. That is the founder
+   * brief's own list, kept verbatim so the runbook, the dashboards and this
+   * file agree; renaming them here to satisfy the convention would silently
+   * break every funnel query written against the brief.
+   */
+  /** A host message was persisted. Post-accept only, never on submit. */
+  messageSent: "host_message_sent",
+  /** A community announcement row was created. */
+  announcementCreated: "announcement_created",
+  /** An announcement became publicly visible. */
+  announcementPublished: "announcement_published",
+  /** An analytics control was changed. Carries `{ filter }`. */
+  analyticsFilterUsed: "analytics_filter_used",
+  /** A Recruiting Coach recommendation was followed. Carries `{ kind }`. */
+  coachRecommendationOpened: "coach_recommendation_opened",
+  /** A plan-usage surface was viewed. Carries `{ surface }`. */
+  planUsageViewed: "plan_usage_viewed",
 } as const;
 
 export type HostWorkspaceEventName =

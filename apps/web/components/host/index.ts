@@ -1,4 +1,15 @@
 export { HostHeader } from "./HostHeader";
+export {
+  HostCoachmarks,
+  HOST_COACHMARK_EVENT,
+  HOST_COACHMARK_STOPS,
+  HOST_COACHMARK_TARGETS,
+  resetHostCoachmarks,
+} from "./HostCoachmarks";
+export type {
+  HostCoachmarksProps,
+  HostCoachmarkStop,
+} from "./HostCoachmarks";
 export { HostActivationBanner } from "./HostActivationBanner";
 export type { HostActivationBannerProps } from "./HostActivationBanner";
 export { HostSectionHeading } from "./HostSectionHeading";
@@ -35,6 +46,14 @@ export { HostThreadList } from "./HostThreadList";
 export type { HostThreadListProps } from "./HostThreadList";
 export { HostThreadGroups } from "./HostThreadGroups";
 export type { HostThreadGroupsProps } from "./HostThreadGroups";
+export { HostMessageWorkspace } from "./HostMessageWorkspace";
+export type { HostMessageWorkspaceProps } from "./HostMessageWorkspace";
+export {
+  HostAnnouncementHistory,
+  HostAnnouncementPerformance,
+  deriveAnnouncementStatus,
+} from "./HostAnnouncementHistory";
+export type { HostAnnouncementHistoryProps } from "./HostAnnouncementHistory";
 export { HostProfilePanel } from "./HostProfilePanel";
 export type { HostProfilePanelProps } from "./HostProfilePanel";
 export { HostProfileForm } from "./HostProfileForm";
@@ -42,15 +61,24 @@ export type { HostProfileFormProps } from "./HostProfileForm";
 export { HostDetailSkeleton } from "./HostDetailSkeleton";
 export { BoostListingPopup } from "./BoostListingPopup";
 export type { BoostListingPopupProps } from "./BoostListingPopup";
-export { HostAnalyticsDashboard } from "./HostAnalyticsDashboard";
+export { HostAnalyticsDashboard, diagnoseListing } from "./HostAnalyticsDashboard";
 export type { HostAnalyticsDashboardProps } from "./HostAnalyticsDashboard";
+export { HostAnalyticsWorkspace } from "./HostAnalyticsWorkspace";
+export type { HostAnalyticsWorkspaceProps } from "./HostAnalyticsWorkspace";
 export { HostSettings } from "./HostSettings";
 export type { HostSettingsProps } from "./HostSettings";
+export { HostUsageMeters } from "./HostUsageMeters";
+export type { HostUsageMetersProps, HostUsageRow } from "./HostUsageMeters";
 export { HostProfileHero } from "./HostProfileHero";
 export type { HostProfileHeroProps } from "./HostProfileHero";
 export { HostTrustBand } from "./HostTrustBand";
 export type { HostTrustBandProps } from "./HostTrustBand";
 export { HostHelpCenter } from "./HostHelpCenter";
+export { HostCoachSummary } from "./HostCoachSummary";
+export type {
+  HostCoachSummaryProps,
+  CoachRecommendation,
+} from "./HostCoachSummary";
 export { SeekerSearchDrawer } from "./SeekerSearchDrawer";
 export type { SeekerSearchDrawerProps } from "./SeekerSearchDrawer";
 export { HousingFormDrawer } from "./HousingFormDrawer";

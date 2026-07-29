@@ -1,7 +1,42 @@
+/*
+ * The announcement composer (V2 §10).
+ *
+ * NOTE FOR THE NEXT EDITOR: the pre-V2 version of this stylesheet referenced
+ * --font-size-sm, --color-border, --color-ink-secondary, --font-body,
+ * --radius-full and --radius-lg, none of which are declared in tokens.css or
+ * primitives.css. CSS custom properties fail silently, so those rules did
+ * nothing and the composer inherited whatever the page happened to set. Every
+ * declaration below names a token that exists.
+ */
+
 .composer {
   display: flex;
   flex-direction: column;
   gap: var(--space-16);
+}
+
+/* ── Allowance line ─────────────────────────────────────────────────────── */
+
+.allowance {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  background: var(--color-action-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-primary);
+}
+
+/* ── Form + preview ─────────────────────────────────────────────────────── */
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-20);
+  align-items: start;
 }
 
 .form {
@@ -18,26 +53,26 @@
 }
 
 .fieldLabel {
-  font-size: var(--font-size-sm);
+  font-size: var(--type-meta-size);
   font-weight: var(--font-weight-medium);
-  color: var(--color-ink-secondary);
+  color: var(--text-primary);
 }
 
 .fieldLabel span {
-  font-weight: var(--font-weight-normal);
-  color: var(--color-ink-tertiary);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-secondary);
 }
 
 .input,
 .textarea {
   width: 100%;
   padding: var(--space-10) var(--space-12);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
   background: var(--color-surface);
-  font-family: var(--font-body);
-  font-size: var(--font-size-base);
-  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  color: var(--text-primary);
   transition: border-color 150ms;
   resize: vertical;
 }
@@ -50,12 +85,14 @@
 
 .charCount {
   align-self: flex-end;
-  font-size: var(--font-size-xs);
-  color: var(--color-ink-tertiary);
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
 .kindGroup {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-12);
   border: none;
   padding: 0;
@@ -66,16 +103,25 @@
   display: flex;
   align-items: center;
   gap: var(--space-6);
-  font-size: var(--font-size-sm);
-  color: var(--color-ink-secondary);
+  font-size: var(--type-meta-size);
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
 .kindOption input[type="radio"] {
   accent-color: var(--color-cta);
-  width: 16px;
-  height: 16px;
+  width: var(--space-16);
+  height: var(--space-16);
 }
+
+.scheduleNote {
+  margin: 0;
+  font-size: var(--type-caption-size);
+  line-height: var(--type-caption-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
 
 .submitBtn {
   align-self: flex-start;
@@ -83,8 +129,9 @@
   background: var(--color-cta);
   color: var(--color-cta-text);
   border: none;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition: opacity 150ms;
@@ -95,93 +142,187 @@
   cursor: not-allowed;
 }
 
-/* ─── Quota badge ─────────────────────────────────────────────────────────── */
-
-.quotaBadge {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-8) var(--space-12);
-  background: color-mix(in srgb, var(--color-cta) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-cta) 20%, transparent);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  color: var(--color-cta);
+.ghostBtn {
+  padding: var(--space-10) var(--space-20);
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  cursor: pointer;
 }
 
-/* ─── Draft badge ─────────────────────────────────────────────────────────── */
+/* ── Live preview ───────────────────────────────────────────────────────── */
 
-.draftBadge {
-  display: flex;
-  align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-8) var(--space-12);
-  background: color-mix(in srgb, var(--status-success-fg) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--status-success-fg) 20%, transparent);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  color: color-mix(in srgb, var(--status-success-fg) 80%, var(--color-ink));
-  margin: 0;
-}
-
-/* ─── Pricing cards ───────────────────────────────────────────────────────── */
-
-.purchaseHeading {
-  font-size: var(--font-size-sm);
-  color: var(--color-ink-secondary);
-  margin: 0;
-}
-
-.pricingCards {
-  display: flex;
-  gap: var(--space-12);
-}
-
-.pricingCard {
+.previewColumn {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-6);
-  width: 100%;
-  max-width: 260px;
-  padding: var(--space-16) var(--space-16);
-  background: var(--color-surface);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 150ms, box-shadow 150ms;
+  gap: var(--space-10);
 }
 
-.pricingCard:hover:not(:disabled) {
-  border-color: var(--color-cta);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-cta) 12%, transparent);
+.previewHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
 }
 
-.pricingCard:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.pricingDuration {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-ink);
-}
-
-.pricingPrice {
+.previewTitle {
+  margin: 0;
   font-family: var(--font-display);
-  font-size: var(--font-size-2xl, 1.5rem);
   font-weight: var(--font-weight-bold);
-  color: var(--color-cta);
+  font-size: var(--type-card-size);
+  color: var(--text-primary);
 }
 
-.pricingTagline {
-  font-size: var(--font-size-xs);
-  color: var(--color-ink-tertiary);
+.segmented {
+  display: inline-flex;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
 }
 
-/* ─── Success / error ─────────────────────────────────────────────────────── */
+.segment {
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-pill);
+  padding: var(--space-4) var(--space-12);
+  font: inherit;
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--color-action-soft);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/*
+ * The frame is the DEVICE, the card is the CONTENT. Constraining the frame
+ * rather than restyling the card is what makes the mobile preview honest: the
+ * same markup at 360px, so a headline that wraps to three lines on a phone
+ * wraps to three lines here.
+ */
+.previewFrame {
+  padding: var(--space-16);
+  background: var(--color-canvas);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+}
+
+.previewFrame[data-width="mobile"] {
+  max-width: 360px;
+}
+
+.previewCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-16);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+}
+
+.previewKind {
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-10);
+  border-radius: var(--radius-pill);
+  background: var(--color-action-soft);
+  color: var(--text-primary);
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.previewCardTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.previewCardBody {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.previewNote {
+  margin: 0;
+  font-size: var(--type-caption-size);
+  color: var(--text-secondary);
+}
+
+/* ── Confirmation ───────────────────────────────────────────────────────── */
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  background: var(--color-surface);
+  border: 1px solid var(--color-cta);
+  border-radius: var(--radius-card);
+}
+
+.confirmTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-size);
+  color: var(--text-primary);
+}
+
+.confirmList {
+  margin: 0;
+  padding-left: var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.confirmItem {
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-primary);
+}
+
+.confirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-10);
+}
+
+/* ── Purchase-only state ────────────────────────────────────────────────── */
+
+.purchaseHeading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--type-card-size);
+  color: var(--text-primary);
+}
+
+.purchaseBody {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-secondary);
+}
+
+/* ── Success / error ────────────────────────────────────────────────────── */
 
 .successCard {
   display: flex;
@@ -189,25 +330,38 @@
   align-items: center;
   gap: var(--space-12);
   padding: var(--space-24);
-  background: color-mix(in srgb, var(--status-success-fg) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--status-success-fg) 20%, transparent);
-  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--status-success-fg);
+  border-radius: var(--radius-card);
   text-align: center;
-  color: color-mix(in srgb, var(--status-success-fg) 80%, var(--color-ink));
+  color: var(--text-primary);
+}
+
+.successText {
+  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
 }
 
 .resetBtn {
   padding: var(--space-8) var(--space-16);
   background: transparent;
-  border: 1.5px solid currentColor;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
   color: inherit;
   cursor: pointer;
 }
 
 .error {
-  font-size: var(--font-size-sm);
-  color: var(--status-error-fg);
   margin: 0;
+  font-size: var(--type-meta-size);
+  color: var(--status-error-fg);
+}
+
+@media (min-width: 1024px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
 }
