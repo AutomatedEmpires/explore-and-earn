@@ -151,10 +151,10 @@
      stylesheets referenced rungs that did not exist, and every one of those
      references turned out to be a Tailwind-scale mistake rather than a request
      for 5px. Defining it made those mistakes RENDER (at a quarter size);
-     removing it makes the next one fail the build instead. --space-1 survives
-     only because host/billing still references it — that file interleaves both
-     scales and needs a per-site decision, after which this rung should go too. */
-  --space-1:  1px;
+     removing it makes the next one fail the build instead. --space-1 is gone
+     for the same reason: host/billing's per-site decision landed (its 1/3/4/6
+     references were Tailwind-scale; its 2px and 4px micro-gaps were real and
+     stayed), and no rule anywhere asks for 1px. */
   --space-2:  2px;
   --space-3:  3px;
   --space-4:  4px;
