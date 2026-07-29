@@ -8,14 +8,14 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-16);
 }
 
 .intro {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   background: color-mix(in srgb, var(--status-success-fg) 8%, var(--color-surface));
@@ -37,13 +37,13 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-16);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-8);
 }
 
 .label {
@@ -64,7 +64,7 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   background: var(--color-surface);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-12) var(--space-16);
   font: inherit;
   font-size: var(--type-body-sm);
   color: var(--text-primary);
@@ -103,9 +103,9 @@
 .success {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-8);
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   font-size: var(--type-body-sm);
@@ -128,8 +128,8 @@
 .history {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-4);
+  gap: var(--space-12);
+  padding-top: var(--space-16);
   border-top: 1px solid var(--border-default);
 }
 
@@ -152,14 +152,14 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-12);
 }
 
 .historyItem {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   background: var(--color-surface);
@@ -169,7 +169,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-12);
 }
 
 .historyAmount {
@@ -181,7 +181,7 @@
 .historyMeta {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-8);
   margin: 0;
   font-size: var(--type-body-sm);
   color: var(--text-secondary);

@@ -4,8 +4,8 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4);
+  gap: var(--space-16);
+  padding: var(--space-16);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   background: var(--color-surface);
@@ -23,7 +23,7 @@
 .notice,
 .error {
   box-sizing: border-box;
-  padding: var(--space-3);
+  padding: var(--space-12);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
   color: var(--text-primary);
@@ -32,7 +32,7 @@
 .evidence {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-5);
+  gap: var(--space-20);
   margin: 0;
 }
 
@@ -51,7 +51,7 @@
 
 .fields {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-12);
 }
 
 @media (min-width: 48rem) {
@@ -63,7 +63,7 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -78,7 +78,7 @@
   width: 100%;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-8) var(--space-12);
   background: var(--color-surface);
   color: var(--text-primary);
   font-size: var(--type-body-sm);
@@ -86,5 +86,5 @@
 
 .actions {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-8);
 }

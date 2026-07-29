@@ -144,15 +144,20 @@
      of some other scale. This matters: a stylesheet authored against a
      step-indexed scale (Tailwind's, where 4 means 16px) still COMPILES here and
      silently lays out at a quarter size. If a rule wants 16px of card padding,
-     it asks for --space-16.
-     Rungs 1 and 5 exist so that the low end is continuous — a bare var() for a
-     rung that does not exist drops the ENTIRE declaration (guardrail G54), which
-     is a harder failure than an off-by-one gap. */
+     it asks for --space-16. Guardrail G54b catches a whole file written that
+     way; nothing catches a single stray declaration, so read the name literally.
+
+     --space-5 is GONE, deliberately. It was added as a bridge when five
+     stylesheets referenced rungs that did not exist, and every one of those
+     references turned out to be a Tailwind-scale mistake rather than a request
+     for 5px. Defining it made those mistakes RENDER (at a quarter size);
+     removing it makes the next one fail the build instead. --space-1 survives
+     only because host/billing still references it — that file interleaves both
+     scales and needs a per-site decision, after which this rung should go too. */
   --space-1:  1px;
   --space-2:  2px;
   --space-3:  3px;
   --space-4:  4px;
-  --space-5:  5px;
   --space-6:  6px;
   --space-8:  8px;
   --space-10: 10px;
