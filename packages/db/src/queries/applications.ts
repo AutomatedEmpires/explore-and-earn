@@ -248,6 +248,14 @@ export interface SeekerApplication {
   readonly status: string;
   readonly submittedAt: string;
   readonly expiresAt: string | null;
+  /**
+   * When the HOST moved this application into review (007's reviewed_at), or
+   * null if they have not. The seeker dashboard's "last movement" line reads
+   * this — "Host began review · yesterday" is a real timestamp, never an
+   * inference. (`viewed_at` does NOT exist on applications — it lives on
+   * invites/offers; selecting it here 42501s the whole read.)
+   */
+  readonly reviewedAt: string | null;
 }
 
 export async function getSeekerApplications(
@@ -262,7 +270,7 @@ export async function getSeekerApplications(
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data, error } = await untyped
     .from("applications")
-    .select("id, listing_id, status, submitted_at, expires_at")
+    .select("id, listing_id, status, submitted_at, expires_at, reviewed_at")
     .eq("seeker_profile_id", seekerProfileId)
     .order("submitted_at", { ascending: false });
 
@@ -276,6 +284,7 @@ export async function getSeekerApplications(
     status: row.status as string,
     submittedAt: typeof row.submitted_at === "string" ? row.submitted_at : "",
     expiresAt: typeof row.expires_at === "string" ? row.expires_at : null,
+    reviewedAt: typeof row.reviewed_at === "string" ? row.reviewed_at : null,
   }));
 }
 
@@ -605,6 +614,14 @@ export interface ApplicationListing {
   readonly status: ListingStatus;
   readonly host: { readonly name: string; readonly verified: boolean };
   readonly benefits: BenefitTriad;
+  /** Season start (listings.begins_at), when the host set concrete dates. */
+  readonly begins?: string;
+  /** Season end (listings.ends_at). Only present alongside a real value. */
+  readonly ends?: string;
+  /** When the LISTING stops taking applications (listings.expires_at). */
+  readonly closesAt?: string;
+  /** Listing cover photograph, when the host uploaded one. */
+  readonly coverPhotoUrl?: string;
 }
 
 export type ApplicationWithListing = SeekerApplication & {
@@ -673,6 +690,13 @@ function rowToDiscoveryListing(value: unknown): ApplicationListing | null {
       : "live") as ListingStatus,
     host: { name: "Unknown Host", verified: false },
     benefits,
+    begins: typeof row.begins_at === "string" ? row.begins_at : undefined,
+    ends: typeof row.ends_at === "string" ? row.ends_at : undefined,
+    closesAt: typeof row.expires_at === "string" ? row.expires_at : undefined,
+    coverPhotoUrl:
+      typeof row.cover_photo_url === "string" && row.cover_photo_url.length > 0
+        ? row.cover_photo_url
+        : undefined,
   };
 }
 
@@ -694,7 +718,7 @@ export async function getSeekerApplicationsWithListings(
   const { data, error } = await untyped
     .from("applications")
     .select(
-      "id, listing_id, status, submitted_at, expires_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary)",
+      "id, listing_id, status, submitted_at, expires_at, reviewed_at, listings!listing_id(id, title, category, location_display, housing_included, meals_included, compensation_summary, compensation_min_cents, compensation_max_cents, compensation_unit, timeline_summary, begins_at, ends_at, expires_at, cover_photo_url)",
     )
     .eq("seeker_profile_id", seekerProfileId)
     .in("status", statuses)
@@ -712,6 +736,7 @@ export async function getSeekerApplicationsWithListings(
       status: typeof r.status === "string" ? r.status : "applied",
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
       expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
+      reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
       listing: rowToDiscoveryListing(r.listings),
     } satisfies ApplicationWithListing;
   });
@@ -774,7 +799,7 @@ export type SeekerApplicationWithListing = SeekerApplication & {
 };
 
 const SEEKER_APPLICATION_SELECT =
-  "id, listing_id, status, cover_message, submitted_at, expires_at, " +
+  "id, listing_id, status, cover_message, submitted_at, expires_at, reviewed_at, " +
   "listings!listing_id(id, title, category, location_display, status, " +
   "housing_included, meals_included, compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
@@ -880,6 +905,7 @@ export async function getApplicationsForSeekerWithListings(
       status: typeof r.status === "string" ? r.status : "applied",
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
       expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
+      reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
       coverMessage:
         typeof r.cover_message === "string" ? r.cover_message : null,
       listing: rowToSeekerApplicationListing(
@@ -926,6 +952,7 @@ export async function getApplicationById(
     status: typeof r.status === "string" ? r.status : "applied",
     submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
     expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
+    reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
     coverMessage:
       typeof r.cover_message === "string" ? r.cover_message : null,
     listing: rowToSeekerApplicationListing(

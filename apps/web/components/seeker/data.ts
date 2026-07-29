@@ -16,10 +16,13 @@ import type {
   SeekerStatusSummary,
 } from "./models";
 import {
+  type ApplicationWithListing,
   type DiscoveryEnrichment,
   getActiveBoostedListingIds,
+  getConversations,
   getMatchScoresForSeeker,
   getPassedListingIds,
+  getPublicListingsByIds,
   getSavedListingIds,
   getSeekerApplicationIds,
   getSeekerApplications,
@@ -29,6 +32,7 @@ import {
   getUnreadNotificationCount,
   rowToDiscoveryFields,
 } from "@explore-and-earn/db";
+import type { SeasonBoard, SeasonInvite, SeasonThread, WatchedListing } from "./seasonBoard";
 import { matchBandFor } from "@explore-and-earn/contracts";
 
 import { cachedSeekerProfile, getPublicListingsCached } from "../../lib/serverCache";
@@ -240,6 +244,133 @@ export async function getMatchedListings(
   } catch {
 		return allowFixtureFallback ? [...MATCHED_LISTINGS] : [];
   }
+}
+
+/** Lifecycle partitions the season board draws from, in one applications read. */
+const BOARD_STATUSES = [
+  "offered",
+  "applied",
+  "reviewing",
+  "accepted",
+  "not_selected",
+  "withdrawn",
+] as const;
+
+const EMPTY_BOARD_LISTS = {
+  offers: [] as ApplicationWithListing[],
+  inMotion: [] as ApplicationWithListing[],
+  closedRecent: [] as ApplicationWithListing[],
+  accepted: [] as ApplicationWithListing[],
+  invites: [] as SeasonInvite[],
+  watching: [] as WatchedListing[],
+  threads: [] as SeasonThread[],
+};
+
+/**
+ * The composed, honest state of the seeker's season — ONE seam the dashboard
+ * reads. Every axis loads independently (allSettled): a failing read empties
+ * that one list while the rest of the board renders. Nothing here invents a
+ * value; every date came from a row.
+ */
+export async function getSeasonBoard(
+  token?: string | null,
+  clerkUserId?: string | null,
+  fallbackName?: string | null,
+): Promise<SeasonBoard> {
+  const status = await getSeekerStatus(token, clerkUserId, fallbackName);
+  if (!token || !clerkUserId) {
+    return { status, matches: await getMatchedListings(token, clerkUserId), ...EMPTY_BOARD_LISTS };
+  }
+
+  const [applicationsResult, invitesResult, watchingResult, threadsResult, matchesResult] =
+    await Promise.allSettled([
+      getSeekerApplicationsWithListings(token, clerkUserId, [...BOARD_STATUSES]),
+      getSeekerInvites(token, clerkUserId),
+      (async (): Promise<WatchedListing[]> => {
+        const savedIds = await getSavedListingIds(token, clerkUserId);
+        if (savedIds.length === 0) return [];
+        const [rows, boostedListingIds, matchScores] = await Promise.all([
+          getPublicListingsByIds(savedIds),
+          getActiveBoostedListingIds(token).catch(() => new Set<string>()),
+          getMatchScoresForSeeker(token, clerkUserId).catch(
+            () => new Map<string, number>(),
+          ),
+        ]);
+        const enrichment: DiscoveryEnrichment = {
+          boostedListingIds,
+          previouslySkippedIds: new Set<string>(),
+          matchScores,
+        };
+        return rows
+          .map((row) => rowToDiscoveryFields(row, enrichment) as DiscoveryListing)
+          .map((listing) => ({ listing, closesAt: listing.expiresAt ?? null }))
+          .sort((a, b) => {
+            if (a.closesAt && b.closesAt) return a.closesAt.localeCompare(b.closesAt);
+            if (a.closesAt) return -1;
+            if (b.closesAt) return 1;
+            return 0;
+          });
+      })(),
+      getConversations(token, clerkUserId, "seeker"),
+      getMatchedListings(token, clerkUserId),
+    ]);
+
+  const applications =
+    applicationsResult.status === "fulfilled" ? applicationsResult.value : [];
+  const offers = applications.filter((a) => a.status === "offered");
+  const inMotion = applications.filter(
+    (a) => a.status === "applied" || a.status === "reviewing",
+  );
+  const accepted = applications.filter((a) => a.status === "accepted");
+  const closedRecent = applications
+    .filter((a) => a.status === "not_selected" || a.status === "withdrawn")
+    .slice(0, 2);
+
+  const invites: SeasonInvite[] =
+    invitesResult.status === "fulfilled"
+      ? invitesResult.value
+          .filter((entry) => entry.listing)
+          .map((entry) => ({
+            id: entry.invite.id,
+            listingId: entry.invite.listingId ?? null,
+            listingTitle: entry.listing?.title ?? null,
+            location: entry.listing?.location ?? null,
+            expiresAt: entry.invite.expiresAt ?? null,
+          }))
+      : [];
+
+  // Thread partners resolve from the board's own listings (a conversation row
+  // carries ids, not names). Unresolvable partners stay "A host" — named only
+  // when a real row names them.
+  const titleByListingId = new Map<string, string>();
+  for (const application of applications) {
+    if (application.listing) {
+      titleByListingId.set(application.listingId, application.listing.title);
+    }
+  }
+  const threads: SeasonThread[] =
+    threadsResult.status === "fulfilled"
+      ? threadsResult.value.slice(0, 4).map((conversation) => ({
+          id: conversation.id,
+          withName:
+            (conversation.listingId
+              ? titleByListingId.get(conversation.listingId)
+              : undefined) ?? "A host",
+          lastMessageAt: conversation.lastMessageAt,
+        }))
+      : [];
+
+  return {
+    status,
+    offers,
+    inMotion,
+    closedRecent,
+    accepted,
+    invites,
+    watching: watchingResult.status === "fulfilled" ? watchingResult.value : [],
+    threads,
+    matches: matchesResult.status === "fulfilled" ? matchesResult.value : [],
+  };
 }
 
 /**
