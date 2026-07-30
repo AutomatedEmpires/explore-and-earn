@@ -9,7 +9,7 @@
 
 ## Overview
 
-Explore & Earn connects **seekers** — people who want to travel and work — with **hosts** offering work-stay opportunities: farms, boats, lodges, seasonal operations, and remote-friendly businesses. It is live in production at **[exploreandearn.com](https://exploreandearn.com)**, with paid host subscriptions operating on Stripe.
+Explore & Earn connects **seekers** — people who want to travel and work — with **hosts** offering work-stay opportunities: farms, boats, lodges, seasonal operations, and remote-friendly businesses. The marketplace is live in production at **[exploreandearn.com](https://exploreandearn.com)**; host subscription billing is fully built but remains founder-gated and is not charging yet (see Status).
 
 The product's core contract is the **Opportunity Triad**. Every listing must state, as first-class structured data, **Housing** (where you sleep), **Meals** (what you eat), and **Pay** (what you earn). The triad is enforced in the type system (`BenefitTriad` in `packages/contracts`), in publication gates, and in CI guardrails — it can never be collapsed into a vague "perks" label.
 
@@ -36,7 +36,7 @@ Opportunity categories are fixed: **farm, maritime, remote, seasonal** (plus a m
 
 - **Listings workspace** — create, edit, and publish listings with coordinate constraints, logistics, and category-depth fields; self-publish with entitlement enforcement.
 - **Applicant pipeline** — applicant review, seeker profiles, messaging, and an outreach/coach surface.
-- **Billing** — Stripe-hosted checkout and customer portal for Starter / Professional / Enterprise plans (monthly and yearly), listing boosts (7/14/28 days), a flat 7-day community announcement placement, and a per-tier additional-active-listing add-on.
+- **Billing** (built, founder-gated) — Stripe-hosted checkout and customer portal for Starter / Professional / Enterprise plans (monthly and yearly), listing boosts (7/14/28 days), a flat 7-day community announcement placement, and a per-tier additional-active-listing add-on.
 - **Trust mechanics** — Verified-Host badge is subscription-gated; invite quotas are tier-locked (Enterprise 20 / Pro 10 / Starter 3) via an invite credit ledger.
 
 ### Founder operations (`(admin)` route group)
@@ -45,7 +45,7 @@ An admin panel gated by an explicit Clerk user-id allow-list (not a role), with 
 
 ### Platform
 
-- **Public read API** (`/api/public/v1/listings`, `/api/public/v1/organizations`) and an **MCP endpoint** (`/api/public/mcp`) for agent access to public inventory.
+- **Public read API** (`GET /api/public/v1/listings`, `GET /api/public/v1/listings/{id}`, `GET /api/public/v1/organizations/{id}`) and an **MCP endpoint** (`POST /api/public/mcp/mcp`) for agent access to public inventory.
 - **PWA** (app manifest + web push channel), locale-aware routing via `next-intl` (English shipped), token-driven theming.
 - **Email** via Resend with a bounce/complaint suppression webhook (`/api/webhooks/resend`).
 
@@ -54,7 +54,7 @@ An admin panel gated by an explicit Clerk user-id allow-list (not a role), with 
 | Area | State |
 | --- | --- |
 | Marketplace (seeker + host + admin surfaces) | **Live** at exploreandearn.com |
-| Stripe payments (subscriptions, boosts, add-ons) | **Live** |
+| Stripe billing (subscriptions, boosts, add-ons) | **Built, founder-gated** — the production webhook returns 503 with prices unset until activation; no real charge has been taken |
 | V2 redesign program (PRs #294–#305) | **Merged and deployed** (2026-07-29); follow-on redesign waves continue |
 | Notification engine (dispatch, digests, backoff, unsubscribe) | **Built, staged activation** — a founder-controlled env ladder (`disabled` → … → `enabled`); production sends await founder provisioning |
 | Listing-source ingestion (sourced listings, provenance) | **Built, dark** — each source requires explicit compliance approval before activation (`078_sourced_ingestion_activation`) |
