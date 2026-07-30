@@ -79,7 +79,7 @@ Deploys are automatic: merging `main` ships to production via Vercel.
 | Monitoring | Sentry |
 | Tooling | pnpm workspaces + Turborepo, TypeScript strict, Vitest, Playwright |
 
-```
+```text
 apps/
   web/              # Next.js app: [locale] route groups (seeker/host/admin/legal), api/ (cron, webhooks, public v1 + MCP)
   jobs/             # background job workers
