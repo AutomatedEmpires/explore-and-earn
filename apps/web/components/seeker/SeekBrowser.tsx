@@ -429,8 +429,8 @@ export function SeekBrowser({
 			return (
 				<div className={styles.emptyWrap}>
 					<EmptyState
-						title="No opportunities yet"
-						message="Check back soon — new roles are added regularly. In the meantime, the map shows every place hosts are hiring."
+						title="No opportunities are live right now"
+						message="Hosts are building their seasons — the moment the first listing opens, it lands here with housing, meals, and pay stated up front. The map knows every place the moment it happens, and Swipe deals you one role at a time."
 						actionLabel="Open the map"
 						actionHref="/map"
 					/>
@@ -510,14 +510,31 @@ export function SeekBrowser({
 		);
 	})();
 
+	// The header's written line claims only what this PAGE proves: the row
+	// count is the fetched page, match counts are the stamped scores, and the
+	// triad promise (housing/meals/pay stated up front) is the card contract
+	// itself. No totals are invented — the server never fetched one.
+	const matchesOnPage = listings.filter(
+		(listing) => typeof listing.matchScore === "number",
+	).length;
+	const roleNoun = listings.length === 1 ? "open role" : "open roles";
+	const seekLede =
+		listings.length === 0
+			? hasActiveFilters
+				? "Nothing matches this search yet — loosen a filter and the roles come back."
+				: "The marketplace opens with its first listing — hosts are building their seasons now."
+			: matchesOnPage > 0
+				? `Showing ${listings.length} ${roleNoun}${hasMorePages ? ", with more pages after this one" : ""} — ${matchesOnPage} match your profile, and every card states housing, meals, and pay up front.`
+				: `Showing ${listings.length} ${roleNoun}${hasMorePages ? ", with more pages after this one" : ""} — every card states housing, meals, and pay up front.`;
+
 	return (
 		<section className={styles.wrap}>
 			<header className={styles.header}>
-				<h1 className={styles.heading}>Seek opportunities</h1>
-				<p className={styles.subheading}>
-					Browse every open work-travel opportunity — housing, meals, and pay
-					from hosts worldwide.
-				</p>
+				<p className={styles.eyebrow}>The marketplace</p>
+				<h1 className={styles.heading}>
+					Seek<span className={styles.titleMark}>.</span>
+				</h1>
+				<p className={styles.subheading}>{seekLede}</p>
 			</header>
 
 			<SavedSearches
