@@ -95,4 +95,24 @@ describe("category landing contract", () => {
     // No invented numbers anywhere in static copy.
     expect(meta.description).not.toMatch(/\d/);
   });
+
+  it.each([...MARKETPLACE_LANES])(
+    "openGraph for %s survives the shallow-merge trap",
+    (lane) => {
+      const meta = buildCategoryLandingMetadata(lane);
+      // A page-level openGraph key REPLACES the root-resolved object wholesale
+      // (Next merges metadata shallowly), so siteName and type must be
+      // restated here or the lane pages lose them — which is exactly what
+      // shipped before W4.
+      expect(meta.openGraph.siteName).toBe("Explore & Earn");
+      expect(meta.openGraph.type).toBe("website");
+      // The share image comes from the segment's opengraph-image.tsx file
+      // convention; Next only re-injects it when the config declares NO
+      // images property. Adding `images` here would silently drop the
+      // per-lane card again.
+      expect(Object.prototype.hasOwnProperty.call(meta.openGraph, "images")).toBe(
+        false,
+      );
+    },
+  );
 });

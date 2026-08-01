@@ -112,6 +112,7 @@ means the listing is no longer available.
 - Listing: ${baseUrl}/listing/{id}
 - Host organization: ${baseUrl}/host/{id}
 - Browse: ${baseUrl}/seek · Search: ${baseUrl}/search · Map: ${baseUrl}/map
+- Category hub: ${baseUrl}/jobs · Lanes: ${baseUrl}/jobs/farm · ${baseUrl}/jobs/maritime · ${baseUrl}/jobs/remote · ${baseUrl}/jobs/seasonal
 - About: ${baseUrl}/about · FAQ: ${baseUrl}/faq · For hosts: ${baseUrl}/for-hosts
 - Field Guide (editorial): ${baseUrl}/blog
 - Legal: ${baseUrl}/terms · ${baseUrl}/privacy · ${baseUrl}/cookies

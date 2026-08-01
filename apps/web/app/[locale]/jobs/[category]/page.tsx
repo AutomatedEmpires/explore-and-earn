@@ -70,6 +70,35 @@ function toRankInputs(listing: DiscoveryListing): MonetizationInputs {
 }
 
 /**
+ * The hero's written state line — composed from the rows this page actually
+ * renders (48-capped with a "+"), never a fabricated marketplace total. Zero
+ * inventory states the publish-gate truth instead of apologizing.
+ */
+function laneLede(count: number, capped: boolean, readFailed: boolean): {
+	countText: string | null;
+	rest: string;
+} {
+	if (readFailed) {
+		// A faulted read is never dressed up as an empty lane.
+		return {
+			countText: null,
+			rest: "This lane couldn't be read just now — refresh in a moment to try again.",
+		};
+	}
+	if (count === 0) {
+		return {
+			countText: null,
+			rest: "No roles are live in this lane yet — we only publish opportunities that answer housing, meals, and pay up front.",
+		};
+	}
+	const noun = count === 1 ? "role is" : "roles are";
+	return {
+		countText: `${count}${capped ? "+" : ""}`,
+		rest: ` ${noun} live right now — every card states housing, meals, and pay before you apply.`,
+	};
+}
+
+/**
  * /jobs/{farm|maritime|remote|seasonal} — the indexable category landing page.
  *
  * Data honesty (same three-branch gate as /search):
@@ -86,11 +115,20 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
 	const copy = CATEGORY_LANDING[category];
 
 	let listings: readonly DiscoveryListing[];
+	let readFailed = false;
 	if (hasDiscoveryPublicDataConfig()) {
-		const rows = await getCategoryListingsCached(category, CATEGORY_PAGE_LIMIT);
-		listings = rows
-			.map((row) => rowToDiscoveryFields(row, undefined))
-			.sort(byMonetization(toRankInputs));
+		try {
+			const rows = await getCategoryListingsCached(category, CATEGORY_PAGE_LIMIT);
+			listings = rows
+				.map((row) => rowToDiscoveryFields(row, undefined))
+				.sort(byMonetization(toRankInputs));
+		} catch {
+			// A faulted read degrades this page's listing section only — it is
+			// never rendered as "no roles listed yet" (a lie during an outage)
+			// and never crashes the indexable page into the error boundary.
+			readFailed = true;
+			listings = [];
+		}
 	} else if (canUseDiscoveryFixtureFallback()) {
 		listings = DISCOVERY_FIXTURES.filter((l) => l.category === category);
 	} else {
@@ -103,21 +141,26 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
 		{ name: "Jobs", url: `${SITE_URL}/jobs` },
 		{ name: copy.label, url: `${SITE_URL}${path}` },
 	]);
-	const collectionJsonLd = generateCollectionPageJsonLd({
-		name: copy.title,
-		description: copy.description,
-		url: `${SITE_URL}${path}`,
-		items: listings.map((listing) => ({
-			name: listing.title,
-			url: `${SITE_URL}/listing/${listing.id}`,
-		})),
-	});
+	// On a faulted read we assert nothing about the collection — an empty
+	// ItemList would claim "zero items" with no read to back it.
+	const collectionJsonLd = readFailed
+		? null
+		: generateCollectionPageJsonLd({
+				name: copy.title,
+				description: copy.description,
+				url: `${SITE_URL}${path}`,
+				items: listings.map((listing) => ({
+					name: listing.title,
+					url: `${SITE_URL}/listing/${listing.id}`,
+				})),
+			});
 
 	const otherLanes = LANDING_CATEGORIES.filter((lane) => lane !== category);
-	const liveCount =
-		listings.length >= CATEGORY_PAGE_LIMIT
-			? `${CATEGORY_PAGE_LIMIT}+`
-			: `${listings.length}`;
+	const lede = laneLede(
+		listings.length,
+		listings.length >= CATEGORY_PAGE_LIMIT,
+		readFailed,
+	);
 
 	return (
 		<>
@@ -125,10 +168,12 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
 				type="application/ld+json"
 				dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }}
 			/>
-			<script
-				type="application/ld+json"
-				dangerouslySetInnerHTML={{ __html: collectionJsonLd }}
-			/>
+			{collectionJsonLd ? (
+				<script
+					type="application/ld+json"
+					dangerouslySetInnerHTML={{ __html: collectionJsonLd }}
+				/>
+			) : null}
 			<div className={styles.page}>
 				{/* The hero band paints the lane's OWN cover gradient (keyed by
 				    data-category in jobs.module.css). There is no lane photograph -- see
@@ -140,10 +185,14 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
 							<Icon name={`category.${category}`} size={16} aria-hidden />
 							{copy.blurb}
 						</p>
-						<h1 className={styles.heroTitle}>{copy.heading}</h1>
-						{listings.length > 0 ? (
-							<p className={styles.heroCount}>{liveCount} live now</p>
-						) : null}
+						<h1 className={styles.heroTitle}>
+							{copy.heading}
+							<span className={styles.titleMark}>.</span>
+						</h1>
+						<p className={styles.heroLede}>
+							{lede.countText ? <b>{lede.countText}</b> : null}
+							{lede.rest}
+						</p>
 						<div className={styles.heroActions}>
 							<Link
 								className={styles.heroCta}
@@ -152,11 +201,21 @@ export default async function CategoryLandingPage({ params }: CategoryPageProps)
 								Filter &amp; sort in Seek
 								<Icon name="action.forward" size={16} aria-hidden />
 							</Link>
+							<Link
+								className={styles.heroCtaQuiet}
+								href={`/search?category=${category}`}
+							>
+								Search this lane
+							</Link>
 						</div>
 					</div>
 				</header>
 
-				<CategoryListingsIsland category={category} listings={listings} />
+				<CategoryListingsIsland
+					category={category}
+					listings={listings}
+					readFailed={readFailed}
+				/>
 
 				<nav className={styles.laneNav} aria-label="Other categories">
 					<p className={styles.laneNavLabel}>Scout a different lane</p>

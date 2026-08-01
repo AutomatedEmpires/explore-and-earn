@@ -90,12 +90,27 @@ export function categoryLandingPath(category: LandingCategory): string {
  * Metadata for a landing lane — pure and testable. Bare title (root template
  * brands it), canonical guards UTM/query variants, robots explicit like
  * /search.
+ *
+ * SHALLOW-MERGE TRAP (fixed 2026-07-31): Next.js replaces the root-resolved
+ * openGraph object WHOLESALE when a page declares its own `openGraph` key, so
+ * this builder's image-less openGraph was silently stripping og:image,
+ * twitter:image, og:site_name, and og:type from all four lane pages — the
+ * product's highest-value SEO landings unfurled as bare text links. siteName
+ * and type are restored here; the image comes from the segment's own
+ * opengraph-image.tsx file convention (a per-lane card), which Next re-injects
+ * because this openGraph carries no `images` property.
  */
 export function buildCategoryLandingMetadata(category: LandingCategory): {
 	title: string;
 	description: string;
 	alternates: { canonical: string };
-	openGraph: { title: string; description: string; url: string };
+	openGraph: {
+		title: string;
+		description: string;
+		url: string;
+		siteName: string;
+		type: string;
+	};
 	robots: { index: true; follow: true };
 } {
 	const copy = CATEGORY_LANDING[category];
@@ -104,7 +119,13 @@ export function buildCategoryLandingMetadata(category: LandingCategory): {
 		title: copy.title,
 		description: copy.description,
 		alternates: { canonical: path },
-		openGraph: { title: copy.title, description: copy.description, url: path },
+		openGraph: {
+			title: copy.title,
+			description: copy.description,
+			url: path,
+			siteName: "Explore & Earn",
+			type: "website",
+		},
 		robots: { index: true, follow: true },
 	};
 }
