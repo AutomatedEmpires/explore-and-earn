@@ -6,6 +6,7 @@
   "apps/web/app/[locale]/(legal)/LegalPageNav.module.css": 14,
   "apps/web/app/[locale]/(legal)/LegalPageNav.tsx": 6,
   "apps/web/app/[locale]/host/[id]/page.module.css": 7,
+  "apps/web/app/[locale]/jobs/[category]/opengraph-image.tsx": 16,
   "apps/web/app/api/notifications/unsubscribe/route.ts": 5,
   "apps/web/app/global-error.tsx": 4,
   "apps/web/app/icon.tsx": 2,

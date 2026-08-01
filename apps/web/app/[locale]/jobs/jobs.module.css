@@ -3,7 +3,9 @@
  *
  * Fully tokenized (G50): every color is a var()/color-mix over the founder
  * tokens. Per-lane atmosphere rides the --cat-* token sets from tokens.css
- * (both themes already defined there), keyed by data-category.
+ * (both themes already defined there), keyed by data-category. The header
+ * follows the W1-W3 Basecamp idiom: tracked-caps eyebrow → display title with
+ * the gold full-stop → written lede.
  */
 
 .page {
@@ -15,28 +17,129 @@
 	gap: var(--space-24);
 }
 
-/* ─── Hub ────────────────────────────────────────────────────────────────── */
+/* ─── Hub header (Basecamp idiom) ────────────────────────────────────────── */
 
 .hubHeader {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-8);
+	max-width: 640px;
 	padding-top: var(--space-8);
 }
 
-.hubTitle {
+.hubEyebrow {
 	margin: 0;
+	font-size: var(--type-label-size);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	font-weight: var(--font-weight-extrabold);
+	color: var(--text-secondary);
+}
+
+.hubTitle {
+	margin: var(--space-6) 0 0;
 	font-family: var(--font-display);
-	font-weight: var(--font-weight-bold);
-	font-size: var(--type-section-size);
-	line-height: var(--type-section-lh);
+	font-size: var(--type-display-section);
+	line-height: 1.04;
+	letter-spacing: -0.02em;
+	font-weight: var(--font-weight-display);
 	color: var(--text-primary);
 }
 
-.hubSub {
+.titleMark {
+	color: var(--color-gold);
+}
+
+.hubLede {
+	margin: var(--space-12) 0 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-lg-size);
+	line-height: 1.5;
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	max-width: 62ch;
+}
+
+/* ─── Hub search band (plain GET form → /search; works without JS) ───────── */
+
+.searchBand {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-12);
+	align-items: center;
+	padding: var(--space-16);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+}
+
+.searchInput {
+	min-height: var(--tap-min);
+	padding: 0 var(--space-12);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-input);
+	background: var(--color-paper);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	width: 100%;
+}
+
+.searchInput:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.searchSubmit {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-8);
+	min-height: var(--tap-min);
+	padding: 0 var(--space-20);
+	border: none;
+	border-radius: var(--radius-button);
+	background: var(--gradient-sky);
+	color: var(--color-cta-text);
+	font-family: var(--font-ui);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+}
+
+.searchSubmit:hover {
+	filter: brightness(1.04);
+}
+
+.searchSubmit:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.searchAside {
 	margin: 0;
+	font-size: var(--type-meta-size);
 	color: var(--text-secondary);
 }
+
+.searchAside a {
+	color: var(--color-cta);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+}
+
+.searchAside a:hover {
+	text-decoration: underline;
+}
+
+@media (min-width: 768px) {
+	.searchBand {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	.searchAside {
+		grid-column: 1 / -1;
+	}
+}
+
+/* ─── Lane grid ──────────────────────────────────────────────────────────── */
 
 .laneGrid {
 	list-style: none;
@@ -110,6 +213,73 @@
 	color: color-mix(in srgb, var(--palette-white) 85%, transparent);
 }
 
+/* ─── Hub closing bands (browse modes · hosts) ───────────────────────────── */
+
+.bandGrid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-16);
+}
+
+@media (min-width: 768px) {
+	.bandGrid {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+.band {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: var(--space-16);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+}
+
+.bandTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-weight: var(--font-weight-bold);
+	font-size: var(--type-body-lg-size);
+	color: var(--text-primary);
+}
+
+.bandText {
+	margin: 0;
+	font-size: var(--type-body-size);
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.bandLinks {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+.bandLink {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--color-chrome) 40%, transparent);
+	background: var(--color-paper);
+	color: var(--text-primary);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+}
+
+.bandLink:hover {
+	border-color: color-mix(in srgb, var(--color-cta) 55%, transparent);
+	color: var(--color-cta);
+}
+
 /* ─── Category hero ──────────────────────────────────────────────────────── */
 
 .hero {
@@ -153,27 +323,41 @@
 	display: inline-flex;
 	align-items: center;
 	gap: var(--space-8);
-	font-size: var(--type-meta-size);
+	font-size: var(--type-label-size);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	font-weight: var(--font-weight-extrabold);
 	color: color-mix(in srgb, var(--palette-white) 85%, transparent);
 }
 
 .heroTitle {
 	margin: 0;
 	font-family: var(--font-display);
-	font-weight: var(--font-weight-bold);
+	font-weight: var(--font-weight-display);
 	font-size: var(--type-section-size);
 	line-height: var(--type-section-lh);
+	letter-spacing: -0.01em;
 }
 
-.heroCount {
+/* The state lede: a written sentence from the page's own rendered rows —
+   real numerals in tabular figures, the publish-gate truth when empty. */
+.heroLede {
 	margin: 0;
-	font-size: var(--type-meta-size);
+	font-size: var(--type-body-size);
+	line-height: 1.5;
 	font-weight: var(--font-weight-semibold);
-	color: var(--palette-white);
+	color: color-mix(in srgb, var(--palette-white) 92%, transparent);
+	max-width: 56ch;
+}
+
+.heroLede b {
+	font-weight: var(--font-weight-extrabold);
+	font-variant-numeric: tabular-nums;
 }
 
 .heroActions {
 	display: flex;
+	flex-wrap: wrap;
 	gap: var(--space-8);
 	margin-top: var(--space-4);
 }
@@ -186,6 +370,20 @@
 	border-radius: var(--radius-pill);
 	background: var(--palette-sky-light);
 	color: var(--palette-sky-dark);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+}
+
+.heroCtaQuiet {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-8);
+	padding: var(--space-8) var(--space-16);
+	border-radius: var(--radius-pill);
+	border: 1px solid color-mix(in srgb, var(--palette-white) 55%, transparent);
+	background: color-mix(in srgb, var(--palette-white) 12%, transparent);
+	color: var(--palette-white);
 	font-size: var(--type-meta-size);
 	font-weight: var(--font-weight-semibold);
 	text-decoration: none;

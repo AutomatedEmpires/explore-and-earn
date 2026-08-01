@@ -294,3 +294,42 @@ offer still surfaces as a claim with a destination, never facts. Typeface
 stays Manrope alone (a display-serif proposal is parked as its own decision).
 D27: the number-is-the-pixel spacing scale, token-only color, and the V2
 guardrails carry unchanged into every W surface.
+
+### W2 — Host dashboard ("the host's morning briefing"), delivered
+PR #307. hostLede() composes the written briefing from the SAME attention
+queue the page renders (workspaceModel.ts) — lede and list cannot disagree;
+attentionActionLabel gives every queue row one verb; first-run quieting
+renders header + queue + demo band only until real signals exist; cover
+honesty strengthened (no cover → nothing renders).
+
+### W3 — Seeker discovery (/seek, "the marketplace speaks for its page"),
+delivered
+PR #308. W-voice header over the untouched browse machinery: eyebrow "The
+marketplace" → "Seek." → a lede claiming only page-proved facts (fetched-page
+counts, stamped match counts, the more-pages flag — the server never fetches
+a total). Elevated zero-inventory empty state (production's live face) and
+the filter dead-end recovery pattern: one removal chip per active filter,
+each a plain link dropping exactly that param. Card/filters/sort/saved
+searches untouched.
+
+### W4 — Search & results (/search · /jobs · /jobs/{lane}), delivered
+The public acquisition tier gets one coherent funnel: /jobs is the storefront
+(the homepage's primary CTA target — Basecamp header, a no-JS GET search band
+handing q to /search, the four founder lanes, browse + host bands, lane
+ItemList JSON-LD); /jobs/{lane} are the keyword landings (W-voice hero over
+the lane gradient, a state lede written from the rendered rows, per-lane
+opengraph-image cards); /search is the public query door (full Basecamp
+rebuild, /seek-parity filters incl. visa + begins-within, pagination,
+breadcrumb JSON-LD, the two-worlds empty state pinned by
+tests/unit/search-lede.test.ts).
+Defects closed in the same pass: /search shipped with an ORPHANED stylesheet
+(components/search/search.css was imported by nothing — the live page was
+unstyled) and zero inbound links; the four lane pages lost og:image /
+twitter:image / og:site_name / og:type to the Next shallow-metadata-merge
+(builder now restates siteName/type, the segment's own opengraph-image.tsx
+supplies the card, and category-landing.test.ts pins the fix); the bare
+/search empty state blamed filters the visitor never applied; empty lanes
+rendered the four lane links twice. The canonical search story is deliberate:
+/seek stays the flagship (WebSite SearchAction target, sitemap 0.9), /search
+is the deep-linkable public door (0.7) — now reachable from /jobs and every
+lane page.

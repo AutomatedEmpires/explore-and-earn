@@ -1,0 +1,328 @@
+/* /search — the public query door. Basecamp idiom (W1-W3): tracked-caps
+   eyebrow → display title with the gold full-stop → written lede composed from
+   page-proved state. Semantic tokens only (G50/G54). */
+
+.wrap {
+	max-width: 74rem;
+	margin-inline: auto;
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-24);
+	padding: var(--space-24) var(--space-16) var(--space-48);
+}
+
+/* ── Header (the W1-W3 idiom, verbatim rules) ─────────────────────────────── */
+
+.header {
+	max-width: 640px;
+}
+
+.eyebrow {
+	margin: 0;
+	font-size: var(--type-label-size);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	font-weight: var(--font-weight-extrabold);
+	color: var(--text-secondary);
+}
+
+.heading {
+	margin: var(--space-6) 0 0;
+	font-family: var(--font-display);
+	font-size: var(--type-display-section);
+	line-height: 1.04;
+	letter-spacing: -0.02em;
+	font-weight: var(--font-weight-display);
+	color: var(--text-primary);
+}
+
+.titleMark {
+	color: var(--color-gold);
+}
+
+.lede {
+	margin: var(--space-12) 0 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-body-lg-size);
+	line-height: 1.5;
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+	max-width: 62ch;
+}
+
+.lede b {
+	font-weight: var(--font-weight-extrabold);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ── Query toolbar ────────────────────────────────────────────────────────── */
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+}
+
+.queryRow {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: var(--space-12);
+	align-items: end;
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-6);
+}
+
+.label {
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	font-weight: var(--font-weight-extrabold);
+	color: var(--text-secondary);
+}
+
+.input {
+	min-height: var(--tap-min);
+	padding: 0 var(--space-12);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-input);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+}
+
+.input:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.select {
+	appearance: auto;
+}
+
+.submit {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-8);
+	min-height: var(--tap-min);
+	padding: 0 var(--space-20);
+	border: none;
+	border-radius: var(--radius-button);
+	background: var(--gradient-sky);
+	color: var(--color-cta-text);
+	font-family: var(--font-ui);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+}
+
+.submit:hover {
+	filter: brightness(1.04);
+}
+
+.submit:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.filters {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+}
+
+.filtersLabel {
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	font-weight: var(--font-weight-extrabold);
+	color: var(--text-secondary);
+}
+
+.chipRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+.chipButton {
+	border: none;
+	background: none;
+	padding: 0;
+	cursor: pointer;
+	border-radius: var(--radius-pill);
+}
+
+.chipButton:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+/* ── Advanced disclosure (pay + exact dates) ──────────────────────────────── */
+
+.advanced {
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface);
+}
+
+.advancedSummary {
+	display: flex;
+	align-items: center;
+	gap: var(--space-8);
+	min-height: var(--tap-min);
+	padding: 0 var(--space-16);
+	cursor: pointer;
+	list-style: none;
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	font-weight: var(--font-weight-extrabold);
+	color: var(--text-secondary);
+}
+
+.advancedSummary::-webkit-details-marker {
+	display: none;
+}
+
+.advancedSummary svg {
+	transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.advanced[open] .advancedSummary svg {
+	transform: rotate(90deg);
+}
+
+.advancedSummary:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+	border-radius: var(--radius-card);
+}
+
+.advancedGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-12);
+	padding: var(--space-4) var(--space-16) var(--space-16);
+}
+
+/* ── Results ──────────────────────────────────────────────────────────────── */
+
+.results {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+}
+
+.count {
+	margin: 0;
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	font-weight: var(--font-weight-extrabold);
+	color: var(--text-secondary);
+	font-variant-numeric: tabular-nums;
+}
+
+.emptyWrap {
+	padding: var(--space-16) 0;
+}
+
+/* ── Pagination (the /seek pattern) ───────────────────────────────────────── */
+
+.pagination {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-12);
+	padding: var(--space-16) 0 0;
+}
+
+.pageLink {
+	display: inline-flex;
+	align-items: center;
+	padding: var(--space-8) var(--space-12);
+	border-radius: var(--radius-pill);
+	border: 1px solid var(--border-soft);
+	background: var(--color-surface);
+	color: var(--text-primary);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+	transition: border-color var(--motion-fast) var(--ease-standard);
+}
+
+.pageLink:hover {
+	border-color: var(--border-ink);
+}
+
+.pageLink:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.pageLinkDisabled {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.pageStatus {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-secondary);
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+	.wrap {
+		padding: var(--space-32) var(--space-24) var(--space-64);
+	}
+
+	.queryRow {
+		grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+	}
+
+	.advancedGrid {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 640px) {
+	.heading {
+		font-size: var(--type-page-size);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.advancedSummary svg,
+	.pageLink,
+	.submit {
+		transition: none;
+	}
+}
