@@ -80,7 +80,7 @@ const GROUPS: ReadonlyArray<{
     tone: styles.tonePositive,
   },
   {
-    title: "Worth a look",
+    title: "Worth checking first",
     pick: (g) => g.watch,
     icon: "system.warning",
     tone: styles.toneNegative,

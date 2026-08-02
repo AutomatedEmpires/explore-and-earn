@@ -26,22 +26,26 @@ function weekday(isoDate: string): string {
  * non-clear days show their label without a misleading icon.
  */
 export function WeatherWidget({ locationLabel, outlook }: WeatherWidgetProps) {
+  // The lib can deliver fewer than the requested 10 days, so the count is
+  // derived from what actually arrived — and the unit is stated once here
+  // rather than repeated on every temperature. No forecast → no count, no unit.
+  const where = locationLabel ? `near ${locationLabel}` : "where you'd be";
   return (
     <ListingSection
       title="Weather"
       icon="category.seasonal"
       headingId="listing-weather"
       subtitle={
-        locationLabel
-          ? `A 10-day look at conditions near ${locationLabel}.`
-          : "A 10-day look at conditions where you'd be."
+        outlook
+          ? `A ${outlook.days.length}-day look at conditions ${where}, in °${outlook.temperatureUnit}.`
+          : `A look at conditions ${where}.`
       }
     >
       {outlook ? (
         <div
           className={styles.strip}
           role="list"
-          aria-label="10-day outlook"
+          aria-label={`${outlook.days.length}-day outlook`}
           tabIndex={0}
         >
           {outlook.days.map((day) => (
@@ -76,8 +80,8 @@ export function WeatherWidget({ locationLabel, outlook }: WeatherWidgetProps) {
         <div className={styles.shell}>
           <Icon name="system.info" size={20} aria-hidden />
           <p className={styles.shellText}>
-            The forecast isn&rsquo;t available right now. Check back closer to your
-            start date for the latest outlook.
+            The forecast isn&rsquo;t available right now. Check back closer to when
+            you&rsquo;d be there for the latest outlook.
           </p>
         </div>
       )}

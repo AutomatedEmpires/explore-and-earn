@@ -56,7 +56,7 @@ export function ConnectivityFacts({ connectivity, nowMs }: ConnectivityFactsProp
 				))}
 			</div>
 			{model.showsSpeedCaveat ? (
-				<p className={styles.label}>
+				<p className={styles.note}>
 					Speeds are the host&rsquo;s approximate figures — not a guaranteed or measured
 					rate.
 				</p>
@@ -75,7 +75,7 @@ function FreshnessNote({ note }: { readonly note: ConnectivityNote }) {
 				? "This was last confirmed a while ago — worth asking the host to check."
 				: "This report is over a year old. Ask the host to confirm before you rely on it.";
 	return (
-		<p className={styles.label}>
+		<p className={styles.note}>
 			<Icon name="system.info" size={14} aria-hidden /> {text}
 		</p>
 	);

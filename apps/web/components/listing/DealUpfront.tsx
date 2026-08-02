@@ -61,6 +61,14 @@ export function DealUpfront({
   children,
 }: DealUpfrontProps) {
   const payNotStated = evidence?.pay === "not_stated";
+  // "Not stated" is a non-assertion and must not wear asserted-fact styling —
+  // the value element carries data-state so the stylesheet can de-emphasise it.
+  // Compared against the imported constant, never a re-typed string.
+  const housingValue = benefitCellValue(housingIncluded, evidence?.housing);
+  const mealsValue = benefitCellValue(mealsIncluded, evidence?.meals);
+  const payValue = payNotStated ? NOT_STATED_LABEL : paySummary;
+  const stateOf = (value: string) =>
+    value === NOT_STATED_LABEL ? "not_stated" : undefined;
   return (
     <ListingSection
       title="The deal, upfront"
@@ -74,8 +82,8 @@ export function DealUpfront({
             <Icon name="benefit.housing" size={16} aria-hidden />
             <span className={styles.cellLabel}>Housing</span>
           </div>
-          <div className={styles.cellValue}>
-            {benefitCellValue(housingIncluded, evidence?.housing)}
+          <div className={styles.cellValue} data-state={stateOf(housingValue)}>
+            {housingValue}
           </div>
           {housingIncluded && housingDescription ? (
             <p className={styles.cellDesc}>{housingDescription}</p>
@@ -87,8 +95,8 @@ export function DealUpfront({
             <Icon name="benefit.meals" size={16} aria-hidden />
             <span className={styles.cellLabel}>Meals</span>
           </div>
-          <div className={styles.cellValue}>
-            {benefitCellValue(mealsIncluded, evidence?.meals)}
+          <div className={styles.cellValue} data-state={stateOf(mealsValue)}>
+            {mealsValue}
           </div>
           {mealsIncluded && mealsDescription ? (
             <p className={styles.cellDesc}>{mealsDescription}</p>
@@ -100,7 +108,9 @@ export function DealUpfront({
             <Icon name="benefit.pay" size={16} aria-hidden />
             <span className={styles.cellLabel}>Pay</span>
           </div>
-          <div className={styles.cellValue}>{payNotStated ? NOT_STATED_LABEL : paySummary}</div>
+          <div className={styles.cellValue} data-state={stateOf(payValue)}>
+            {payValue}
+          </div>
         </div>
       </div>
 

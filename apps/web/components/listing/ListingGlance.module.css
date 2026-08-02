@@ -46,3 +46,29 @@
   color: var(--text-primary);
   overflow-wrap: break-word;
 }
+
+/* "Not stated" and friends must not wear asserted-fact styling — the page opts
+   a cell in via GlanceItem.muted. */
+.value[data-muted="true"] {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+/* Caveat / freshness sentences. These are prose, not micro-caps: the .label
+   treatment (12px uppercase, line-height 1) collides when a sentence wraps,
+   and its CTA-tinted icon overstates an informational aside. */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+  margin: 0 0 var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-muted);
+}
+
+.note svg {
+  color: currentColor;
+  flex-shrink: 0;
+}

@@ -333,3 +333,39 @@ rendered the four lane links twice. The canonical search story is deliberate:
 /seek stays the flagship (WebSite SearchAction target, sitemap 0.9), /search
 is the deep-linkable public door (0.7) — now reachable from /jobs and every
 lane page.
+
+### W5 — Opportunity detail (/listing/[id]), delivered
+An ELEVATE pass (the page's honesty machinery — stored-fit resolution, benefit
+evidence, sourced gating — was already strong and is untouched). Shipped: pay
+now renders through the founder formatCompensation contract (the inline roll
+ignored compensationMaxCents and printed "See listing" — a named invention);
+the hero gains the Basecamp signature (display rank + gold full-stop kept out
+of the accessible name, a written lede composed clause-per-fact by
+listingLede.ts, unit-pinned) and a COMPACT posture when no cover photo exists
+(the old 62vh reservation rendered a viewport of empty gradient); desktop
+>=1024px becomes a true two-column read with a sticky deal rail (pay / season
+/ housing / meals + the posture-aware actions — one ApplyButton, fixed bar on
+mobile, in-rail on desktop); apply-flow hardening (already_applied resolves to
+the applied state instead of printing a machine string, unknown errors always
+fall to the generic sentence, Submitting… pending state, focus survives the
+applied swap, sourced CTA announces it leaves the platform, guests on sourced
+listings get a sign-in door); a detail-shaped loading.tsx (the ancestor
+boundary showed a discovery grid that lied about the page shape) and a
+listing-true not-found.tsx in the Basecamp voice (generateMetadata now RETURNS
+not-found metadata instead of throwing, so the route-local boundary — not the
+site-wide cosmic-joke 404 — renders for gone listings; "Page not found" title
++ noindex kept for the crawl/e2e contract); "Not stated" no longer wears
+asserted-fact styling (muted, regular weight, derived from the same
+benefitStateLabel result) in the triad, glance, and rail; honesty caveats on
+connectivity/vessel facts move from shouty tracked micro-caps to a legible
+note style; SourcedNotice links become dark-aware (--color-cta — they were
+~1.6:1 on the dark banner); the host block gains its missing h2 (via
+ListingSection); the dead pre-honesty component branch (ListingDetail,
+BenefitTriadDetail, ApplyForm, ImageGallery, SeekerFitSignal, toDetailData) is
+deleted. Verification note: production inventory is zero, so the live-probeable
+W5 surface is the 404 face; populated-state evidence is the bench fixture at
+390/768/1440 plus the keyless e2e smoke pins (fixture h1 + visible triad +
+not-found title all green). Known environmental e2e failures on /seek and
+/host (Supabase unreachable from the WSL harness; those pages predate the
+read-fault degradation pattern) are pre-existing and chipped as their own
+scoped fix.

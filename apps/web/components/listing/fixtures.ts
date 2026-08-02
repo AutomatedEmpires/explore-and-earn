@@ -3,17 +3,9 @@ import type {
 	ListingMedia,
 	ListingStatus,
 	MarketplaceCategory,
-	ResponsiveImage,
 } from "@explore-and-earn/contracts"
 
-export interface ListingHostSummary {
-	readonly id: string
-	readonly name: string
-	readonly location?: string
-	readonly verified: boolean
-	readonly tagline?: string
-	readonly avatar?: ResponsiveImage
-}
+import type { ListingHostSummary } from "./HostSummaryBlock"
 
 export interface ListingDetailData {
 	readonly id: string

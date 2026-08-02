@@ -4,13 +4,45 @@
   background-color: var(--color-paper);
   min-height: 100vh;
   /* Reserve room so the last content clears the floating action bar, which sits
-     above the fixed public bottom-nav dock (see .actionBar below). */
+     above the fixed public bottom-nav dock (see .actionBar below). The bar is
+     VARIABLE height on mobile (guide link + button row ≈ 105-110px), so the
+     reserve is sized for the tall posture — a short reserve slid the host card
+     under the bar. */
   padding-bottom: calc(
-    var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px) + var(--space-80)
+    var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px) +
+      var(--space-80) + var(--space-48)
   );
 }
 
-/* ─── Content column ─────────────────────────────────────────────────────── */
+/* Desktop: the action bar lives in the sticky rail (in flow), so the page only
+   needs ordinary breathing room at the end. */
+@media (min-width: 1024px) {
+  .page {
+    padding-bottom: var(--space-48);
+  }
+}
+
+/* ─── Content + rail layout ──────────────────────────────────────────────── */
+
+/* Mobile: a plain column (the rail contributes only the fixed bar).
+   Desktop ≥1024: a true two-column read — the content column keeps its
+   reading measure and the deal/actions sit in a sticky right rail, so the
+   page stops being a stretched phone layout at 1440. */
+.layout {
+  display: block;
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 21rem;
+    gap: var(--space-32);
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 0 var(--space-24);
+    align-items: start;
+  }
+}
 
 .content {
   max-width: 52rem;
@@ -18,11 +50,90 @@
   padding: var(--space-24) var(--space-gutter) 0;
 }
 
-.hostSummaryWrapper {
-  margin-bottom: var(--space-section);
+@media (min-width: 1024px) {
+  .content {
+    padding-inline: 0;
+    margin: 0;
+  }
 }
 
-/* ─── Sticky action bar ──────────────────────────────────────────────────── */
+/* ─── The rail (desktop) / the fixed bar (mobile) ────────────────────────── */
+
+.rail {
+  display: contents;
+}
+
+@media (min-width: 1024px) {
+  .rail {
+    display: block;
+    position: sticky;
+    top: var(--space-24);
+    padding-top: var(--space-24);
+  }
+}
+
+/* Compact restatement of the deal beside the actions — pay, season, housing,
+   meals — every value from the same reads the page renders below (pay via the
+   founder formatCompensation contract; benefit states via benefitStateLabel).
+   Hidden on mobile: there the deal section itself is one scroll away and the
+   bar must stay lean. */
+.railDeal {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .railDeal {
+    display: block;
+    padding: var(--space-16);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-card);
+    background-color: var(--color-surface);
+    margin-bottom: var(--space-16);
+  }
+}
+
+.railDealList {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.railDealRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.railDealLabel {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-extrabold);
+  color: var(--text-secondary);
+}
+
+.railDealValue {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Absence must not wear the styling of a fact (same rule as the triad). */
+.railDealValue[data-state="not_stated"] {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-regular);
+}
+
+/* ─── Action bar: fixed on mobile, in-rail on desktop ────────────────────── */
 
 .actionBar {
   position: fixed;
@@ -41,12 +152,14 @@
   z-index: var(--z-content-bar);
 }
 
-/* The dock is mobile-only (both PublicBottomNav and the seeker dock hide at
-   1024px), so reserving its height on desktop left the bar floating well above
-   the viewport edge for no reason. */
 @media (min-width: 1024px) {
   .actionBar {
-    bottom: calc(var(--space-16) + env(safe-area-inset-bottom, 0px));
+    position: static;
+    background-color: transparent;
+    border-top: none;
+    padding: 0;
+    display: block;
+    z-index: auto;
   }
 }
 
