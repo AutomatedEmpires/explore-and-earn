@@ -29,14 +29,20 @@ export interface ListingHeroProps {
    * carries that). Never pass an invented value here.
    */
   readonly dateLabel: string | null;
+  /**
+   * The written lede (composeListingLede) — a sentence built from the same
+   * real state the page renders, so headline and page can never disagree.
+   */
+  readonly lede: string;
 }
 
 /**
  * Immersive photo hero — the emotional "look, I'm headed here" opener. A
- * full-bleed cover photo (or, when none exists, the listing's category
- * atmosphere gradient — decoration, never fabricated content) carries a legibility
- * scrim with the title, category, location, and verified host overlaid. The back
- * control floats top-left.
+ * full-bleed cover photo carries a legibility scrim with the title, category,
+ * location, and verified host overlaid; the back control floats top-left.
+ * Without a cover photo the hero drops to a COMPACT band on the category
+ * atmosphere gradient (data-cover="none") — an absent photo must never cost
+ * the reader a viewport of empty gradient.
  */
 export function ListingHero({
   title,
@@ -45,9 +51,14 @@ export function ListingHero({
   coverPhotoUrl,
   host,
   dateLabel,
+  lede,
 }: ListingHeroProps) {
   return (
-    <header className={styles.hero} data-category={category}>
+    <header
+      className={styles.hero}
+      data-category={category}
+      data-cover={coverPhotoUrl ? "photo" : "none"}
+    >
       {coverPhotoUrl ? (
         <Image
           src={coverPhotoUrl}
@@ -76,7 +87,16 @@ export function ListingHero({
           ) : null}
         </div>
 
-        <h1 className={styles.title}>{title}</h1>
+        <h1 className={styles.title}>
+          {title}
+          {/* Decorative gold full-stop (Basecamp idiom) — aria-hidden so the
+              accessible name stays the bare title (e2e pins match on it). */}
+          <span className={styles.titleMark} aria-hidden>
+            .
+          </span>
+        </h1>
+
+        <p className={styles.lede}>{lede}</p>
 
         <div className={styles.metaRow}>
           {locationDisplay ? (

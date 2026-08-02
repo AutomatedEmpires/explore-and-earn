@@ -29,6 +29,19 @@
   }
 }
 
+/* Compact posture — no cover photo. The gradient is decoration, not content:
+   reserving 62vh for it renders a viewport of silence, so the band collapses
+   to its text (title, lede, facts) with just enough top room to clear the
+   floating back control. */
+.hero[data-cover="none"] {
+  min-height: 0;
+  max-height: none;
+}
+
+.hero[data-cover="none"] .overlay {
+  padding-top: var(--space-80);
+}
+
 .image {
   object-fit: cover;
   z-index: -2;
@@ -89,11 +102,27 @@
 .title {
   margin: 0 0 var(--space-12);
   font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
+  /* The Basecamp display rank: extrabold + tight tracking (W1-W3 canon). */
+  font-weight: var(--font-weight-display);
+  letter-spacing: -0.02em;
   font-size: var(--type-display-size);
   line-height: var(--type-display-lh);
   color: var(--color-cta-text);
   text-wrap: balance;
+}
+
+.titleMark {
+  color: var(--color-gold);
+}
+
+.lede {
+  margin: 0 0 var(--space-12);
+  font-family: var(--font-ui);
+  font-size: var(--type-body-lg-size);
+  line-height: 1.5;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-cta-text);
+  max-width: 56ch;
 }
 
 .metaRow {

@@ -6,6 +6,11 @@ export interface GlanceItem {
   readonly icon: IconKey;
   readonly label: string;
   readonly value: string;
+  /**
+   * De-emphasises the value ("Not stated" must not wear asserted-fact
+   * styling). The page decides which values are non-assertions.
+   */
+  readonly muted?: boolean;
 }
 
 export interface ListingGlanceProps {
@@ -29,7 +34,12 @@ export function ListingGlance({ items }: ListingGlanceProps) {
             <Icon name={item.icon} size={16} aria-hidden />
             <span>{item.label}</span>
           </dt>
-          <dd className={styles.value}>{item.value}</dd>
+          <dd
+            className={styles.value}
+            data-muted={item.muted ? "true" : undefined}
+          >
+            {item.value}
+          </dd>
         </div>
       ))}
     </dl>

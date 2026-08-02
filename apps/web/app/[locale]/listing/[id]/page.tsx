@@ -46,7 +46,8 @@ import { WhyWorkForUs } from "../../../../components/listing/WhyWorkForUs";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../../lib/seo";
 import { fetchWeather } from "../../../../lib/weather";
-import { formatMoney } from "../../../../lib/format";
+import { formatCompensation } from "../../../../lib/format";
+import { composeListingLede } from "../../../../components/listing/listingLede";
 import {
   formatListingWindow,
   listingDurationMonths,
@@ -89,10 +90,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const listing = await resolveListingDetail(id);
 
   if (!listing) {
-    // Thrown HERE (pre-stream) so the response carries a real 404 status —
-    // the route has a loading.tsx, so by the time the page body calls
-    // notFound() the 200 status has already been flushed with the skeleton.
-    notFound();
+    // RETURN not-found metadata rather than throwing here. A notFound() from
+    // generateMetadata renders the ROOT not-found boundary (the site-wide
+    // face), not this route's listing-true not-found.tsx — the page body's
+    // own notFound() below is what reaches the route-local boundary. The
+    // response status is 200 either way (the loading boundary has already
+    // flushed by resolution time — measured, not assumed), so the crawl
+    // protection is the explicit noindex here plus the one Next stamps on
+    // not-found renders.
+    return {
+      title: "Page not found",
+      robots: { index: false, follow: false },
+    };
   }
 
   // The root template appends "| Explore & Earn" — don't bake the brand in twice.
@@ -163,7 +172,13 @@ export default async function ListingDetailPage({ params }: Props) {
     }
   }
 
-  // Visibility rule: non-live listings are only shown to the owning host
+  // Visibility guard, defense-in-depth. In practice the read above uses the
+  // ANON client and RLS (listings_select_public) only exposes status='live'
+  // rows — so a non-live listing is null for EVERYONE, owner included, and
+  // 404s before reaching this line. Owner preview of drafts is served by the
+  // host dashboard (/host/listings), not this public route. The guard stays so
+  // a future read-path change (e.g. fetching with the viewer's token) cannot
+  // silently expose drafts to non-owners.
   if (listing.status !== "live" && !isOwner) notFound();
 
   // Fetch seeker-specific state (applied/saved/résumé) when authed. The apply
@@ -259,14 +274,38 @@ export default async function ListingDetailPage({ params }: Props) {
     ? await fetchWeather(listing.latitude as number, listing.longitude as number)
     : null;
 
-  // Benefit / pay summaries
-  const paySummary =
-    listing.compensationSummary ??
-    (listing.compensationMinCents != null
-      ? `${formatMoney(listing.compensationMinCents, { currency: listing.compensationCurrency })}${listing.compensationUnit && listing.compensationUnit !== "other" ? `/${listing.compensationUnit}` : ""}`
-      : "See listing");
+  // Pay renders through the founder pay-display contract — never an inline
+  // derivation. The old inline roll here ignored compensationMaxCents (a
+  // ceiling-only listing printed "See listing", an invention the contract
+  // names), printed a bare floor as if exact, and suffixed "/stipend". The
+  // contract's exchangeAware suffix + "From " prefix + NOT_STATED_LABEL
+  // fallback make this the same string every other pay surface shows.
+  const paySummary = formatCompensation({
+    summary: listing.compensationSummary,
+    minCents: listing.compensationMinCents,
+    maxCents: listing.compensationMaxCents,
+    unit: listing.compensationUnit,
+    currency: listing.compensationCurrency,
+  });
 
   const dateLabel = formatListingWindow(listing);
+
+  // Rail + triad state labels — one source (benefitStateLabel) for the words,
+  // and the same comparison drives the muted "absence" styling, so copy and
+  // treatment can never disagree.
+  const evidence = listing.provenanceInfo?.benefitEvidence;
+  const railHousingLabel = benefitStateLabel(listing.housingIncluded, evidence?.housing);
+  const railMealsLabel = benefitStateLabel(listing.mealsIncluded, evidence?.meals);
+  const railSeasonValue = listing.timelineSummary ?? dateLabel ?? NOT_STATED_LABEL;
+
+  // The hero's written lede — composed from the same real state the page
+  // renders (clause-per-fact; no date → no date text). See listingLede.ts.
+  const heroLede = composeListingLede({
+    categoryLabel: CATEGORY_LABEL[listing.category] ?? listing.category,
+    hostName: listing.host?.companyName ?? null,
+    locationDisplay: listing.locationDisplay,
+    dateLabel,
+  });
 
   // At-a-glance facts — each cell added ONLY when its underlying field is real.
   const glanceItems: GlanceItem[] = [];
@@ -274,11 +313,13 @@ export default async function ListingDetailPage({ params }: Props) {
     glanceItems.push({ icon: "nav.map", label: "Location", value: listing.locationDisplay });
   }
   // The glance grid is a facts table, so an unstated window reads "Not stated"
-  // here — the same word the Housing/Meals/Pay triad already uses for silence.
+  // here — the same word the Housing/Meals/Pay triad already uses for silence,
+  // muted so absence never wears the styling of a fact.
   glanceItems.push({
     icon: "status.begins",
     label: "When",
-    value: listing.timelineSummary ?? dateLabel ?? NOT_STATED_LABEL,
+    value: railSeasonValue,
+    muted: railSeasonValue === NOT_STATED_LABEL,
   });
   glanceItems.push({
     icon: `category.${listing.category}`,
@@ -390,9 +431,11 @@ export default async function ListingDetailPage({ params }: Props) {
               : null
           }
           dateLabel={dateLabel}
+          lede={heroLede}
         />
         <ListingGallery title={listing.title} photoUrls={listing.galleryPhotoUrls} />
 
+        <div className={styles.layout}>
         <div className={styles.content}>
           {/* Sourced disclosure — first, before any listing content. Renders
               only for sourced listings; verified listings are unaffected. */}
@@ -512,52 +555,95 @@ export default async function ListingDetailPage({ params }: Props) {
 
           {/* 15. About the host */}
           {listing.host && (
-            <div className={styles.hostSummaryWrapper}>
-              <HostSummaryBlock
-                host={{
-                  id: listing.host.id,
-                  name: listing.host.companyName,
-                  location: listing.host.primaryLocationName ?? undefined,
-                  verified: listing.host.verified,
-                  tagline: listing.host.about ?? undefined,
-                  avatar: listing.host.photoUrl
-                    ? {
-                        masterPath: listing.host.photoUrl,
-                        width: 120,
-                        height: 120,
-                        alt: listing.host.companyName,
-                      }
-                    : undefined,
-                }}
-              />
-            </div>
+            <HostSummaryBlock
+              host={{
+                id: listing.host.id,
+                name: listing.host.companyName,
+                location: listing.host.primaryLocationName ?? undefined,
+                verified: listing.host.verified,
+                tagline: listing.host.about ?? undefined,
+                avatar: listing.host.photoUrl
+                  ? {
+                      masterPath: listing.host.photoUrl,
+                      width: 120,
+                      height: 120,
+                      alt: listing.host.companyName,
+                    }
+                  : undefined,
+              }}
+            />
           )}
         </div>
 
-        {/* 16. Sticky action bar — ApplyButton + contextual guide link */}
-        <div className={styles.actionBar}>
-          <div className={styles.actionBarInner}>
-            {viewerRole === "seeker" && !isFixtureListing && (
-              <Link
-                href={`/assistant?listingId=${listing.id}&listingTitle=${encodeURIComponent(listing.title)}`}
-                className={styles.guideLink}
-              >
-                <Icon name="action.message" size={18} aria-hidden />
-                <span>Ask your guide about this role</span>
-              </Link>
-            )}
-            <ApplyButton
-              listingId={listing.id}
-              title={listing.title}
-              viewerRole={viewerRole}
-              alreadyApplied={alreadyApplied}
-              alreadySaved={alreadySaved}
-              resumeComplete={resumeComplete}
-              resumeMissing={resumeMissing}
-              isSourced={isSourced}
-              sourceUrl={listing.provenanceInfo?.source?.sourceUrl ?? null}
-            />
+        {/* 16. The rail: a compact deal restatement (desktop only) + the
+            actions — fixed bottom bar on mobile, sticky beside the content at
+            >=1024px (page.module.css owns both postures; one ApplyButton). */}
+        <aside className={styles.rail} aria-label="The deal and your next step">
+          <div className={styles.railDeal}>
+            <dl className={styles.railDealList}>
+              <div className={styles.railDealRow}>
+                <dt className={styles.railDealLabel}>Pay</dt>
+                <dd
+                  className={styles.railDealValue}
+                  data-state={paySummary === NOT_STATED_LABEL ? "not_stated" : undefined}
+                >
+                  {paySummary}
+                </dd>
+              </div>
+              <div className={styles.railDealRow}>
+                <dt className={styles.railDealLabel}>Season</dt>
+                <dd
+                  className={styles.railDealValue}
+                  data-state={railSeasonValue === NOT_STATED_LABEL ? "not_stated" : undefined}
+                >
+                  {railSeasonValue}
+                </dd>
+              </div>
+              <div className={styles.railDealRow}>
+                <dt className={styles.railDealLabel}>Housing</dt>
+                <dd
+                  className={styles.railDealValue}
+                  data-state={railHousingLabel === NOT_STATED_LABEL ? "not_stated" : undefined}
+                >
+                  {railHousingLabel}
+                </dd>
+              </div>
+              <div className={styles.railDealRow}>
+                <dt className={styles.railDealLabel}>Meals</dt>
+                <dd
+                  className={styles.railDealValue}
+                  data-state={railMealsLabel === NOT_STATED_LABEL ? "not_stated" : undefined}
+                >
+                  {railMealsLabel}
+                </dd>
+              </div>
+            </dl>
           </div>
+          <div className={styles.actionBar}>
+            <div className={styles.actionBarInner}>
+              {viewerRole === "seeker" && !isFixtureListing && (
+                <Link
+                  href={`/assistant?listingId=${listing.id}&listingTitle=${encodeURIComponent(listing.title)}`}
+                  className={styles.guideLink}
+                >
+                  <Icon name="action.message" size={18} aria-hidden />
+                  <span>Ask your guide about this role</span>
+                </Link>
+              )}
+              <ApplyButton
+                listingId={listing.id}
+                title={listing.title}
+                viewerRole={viewerRole}
+                alreadyApplied={alreadyApplied}
+                alreadySaved={alreadySaved}
+                resumeComplete={resumeComplete}
+                resumeMissing={resumeMissing}
+                isSourced={isSourced}
+                sourceUrl={listing.provenanceInfo?.source?.sourceUrl ?? null}
+              />
+            </div>
+          </div>
+        </aside>
         </div>
       </div>
     </>

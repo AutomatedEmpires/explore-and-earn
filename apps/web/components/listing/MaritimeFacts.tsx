@@ -50,7 +50,7 @@ export function MaritimeFacts({ maritime, nowMs }: MaritimeFactsProps) {
 				))}
 			</div>
 			{model.showsLengthCaveat ? (
-				<p className={styles.label}>
+				<p className={styles.note}>
 					Length is the host&rsquo;s approximate figure — not a measured or registered
 					dimension.
 				</p>
@@ -69,7 +69,7 @@ function FreshnessNote({ note }: { readonly note: MaritimeNote }) {
 				? "This was last confirmed a while ago — worth asking the host to check."
 				: "This report is over a year old. Ask the host to confirm before you rely on it.";
 	return (
-		<p className={styles.label}>
+		<p className={styles.note}>
 			<Icon name="system.info" size={14} aria-hidden /> {text}
 		</p>
 	);

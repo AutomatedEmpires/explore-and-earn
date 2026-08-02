@@ -12,6 +12,27 @@
 .buttonRow {
   display: flex;
   gap: var(--space-12);
+  outline: none;
+}
+
+/* On phones the actions fill the bar — a content-width Apply half-fills the
+   thumb zone. Desktop (the sticky rail) keeps natural widths. */
+@media (max-width: 1023px) {
+  .buttonRow > * {
+    flex: 1;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* The sourced-listing primary action is an outbound <a>, not a <button>: it

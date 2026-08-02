@@ -14,7 +14,10 @@
 	gap: var(--space-10);
 }
 .headline > svg {
-	color: var(--palette-sky);
+	/* --color-cta resolves to the same accent in light and re-brightens in dark;
+	   the raw --palette-sky primitive has no dark override and vanished on the
+	   dark banner. */
+	color: var(--color-cta);
 	flex-shrink: 0;
 	margin-top: 2px;
 }
@@ -80,7 +83,9 @@
 	font-size: var(--type-meta-size);
 	font-weight: var(--font-weight-semibold);
 	text-decoration: none;
-	color: var(--palette-sky-dark, var(--palette-sky));
+	/* Dark-aware link accent — --palette-sky-dark has no dark override and read
+	   at roughly 1.6:1 on the dark banner. */
+	color: var(--color-cta);
 }
 .claimLink { color: var(--text-primary); }
 .sourceLink:hover,

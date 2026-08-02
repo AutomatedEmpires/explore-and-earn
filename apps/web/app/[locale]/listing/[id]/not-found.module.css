@@ -1,0 +1,100 @@
+/* Gone-listing 404 — Basecamp header idiom over the plain paper canvas. */
+
+.wrap {
+  min-height: 60vh;
+  background-color: var(--color-paper);
+  display: flex;
+  align-items: center;
+}
+
+.inner {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: var(--space-48) var(--space-gutter);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: var(--type-label-size);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-extrabold);
+  color: var(--text-secondary);
+}
+
+.title {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--type-display-section);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  font-weight: var(--font-weight-display);
+  color: var(--text-primary);
+}
+
+.titleMark {
+  color: var(--color-gold);
+}
+
+.lede {
+  margin: var(--space-12) 0 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-body-lg-size);
+  line-height: 1.5;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  max-width: 56ch;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  margin-top: var(--space-24);
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-20);
+  border-radius: var(--radius-button);
+  background: var(--gradient-sky);
+  color: var(--color-cta-text);
+  font-family: var(--font-ui);
+  font-size: var(--type-button-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.primary:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.quiet:hover {
+  border-color: var(--border-ink);
+}
+
+.quiet:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}

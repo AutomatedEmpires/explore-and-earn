@@ -282,6 +282,8 @@
 	},
 	"Apply": {
 		"signInToApply": "Sign in to apply",
+		"signInToSave": "Sign in to save",
+		"submitting": "Submitting…",
 		"editListing": "Edit listing",
 		"applicationSent": "Application sent",
 		"confirmHeading": "Apply to this listing?",

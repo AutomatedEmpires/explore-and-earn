@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
-import { Button, Modal } from "@explore-and-earn/ui";
+import { useRef, useState, useTransition } from "react";
+import { Button, Icon, Modal } from "@explore-and-earn/ui";
 import { applyToListingAction } from "../../../actions/applications";
 import { saveListingAction, unsaveListingAction } from "../../../actions/savedListings";
 import { resolveSaveOutcome } from "../../../../lib/saveOutcome";
@@ -63,6 +63,11 @@ export function ApplyButton({
     message: string;
   } | null>(null);
   const [saved, setSaved] = useState(alreadySaved);
+  // Focus lands here after the confirm dialog closes: the Modal's own restore
+  // targets the opener button, which is disabled (and then replaced) during
+  // the commit — focus() on it silently fails and keyboard focus dropped to
+  // <body> at the most anxious moment of the flow.
+  const rowRef = useRef<HTMLDivElement>(null);
 
   if (viewerRole === "guest" && !isSourced) {
     return (
@@ -116,6 +121,9 @@ export function ApplyButton({
 
   const handleConfirm = () => {
     setShowConfirmModal(false);
+    // The Modal restores focus to the (now disabled) opener on unmount; land
+    // focus on the action row instead so it survives the applied-state swap.
+    requestAnimationFrame(() => rowRef.current?.focus());
     startTransition(async () => {
       try {
         const result = await applyToListingAction(listingId);
@@ -125,12 +133,23 @@ export function ApplyButton({
           // Server-side gate rejected a stale client — surface the same
           // "finish your résumé" path rather than a generic error.
           setShowResumeModal(true);
+        } else if (result.error === "already_applied") {
+          // A double-submit race (second tab, stale page) is not an error —
+          // the application exists. Refresh into the applied state instead of
+          // showing the seeker a machine string.
+          router.refresh();
+        } else if (result.error === "profile_not_found") {
+          // No seeker profile yet — same recovery as the résumé gate.
+          setShowResumeModal(true);
         } else {
+          // Known transient codes get their sentence; EVERYTHING else falls to
+          // the generic sentence. result.error can carry raw server/database
+          // strings — never print those to a seeker mid-application.
           const msg = result.error === "rate_limit_exceeded"
             ? t("errorRateLimit")
             : result.error === "unauthenticated"
               ? t("errorSessionExpired")
-              : (result.error ?? t("errorGeneric"));
+              : t("errorGeneric");
           setErrorDialog({ heading: t("errorHeading"), message: msg });
         }
       } catch {
@@ -199,6 +218,12 @@ export function ApplyButton({
               rel="noopener noreferrer nofollow"
             >
               {t("applyOnOriginal")}
+              {/* The one primary control on the page that leaves the platform —
+                  say so, visibly and audibly. */}
+              <Icon name="action.forward" size={16} aria-hidden />
+              <span className={styles.srOnly}>
+                {" — opens the original posting in a new tab"}
+              </span>
             </a>
           ) : (
             <p className={styles.sourcedUnavailable}>{t("sourcedNoApplyPath")}</p>
@@ -211,6 +236,18 @@ export function ApplyButton({
               aria-pressed={saved}
             >
               {saved ? tc("saved") : tc("save")}
+            </Button>
+          )}
+          {viewerRole === "guest" && (
+            // Guests could apply off-platform and lose the listing forever —
+            // give the one sourced posture with no platform onramp its door.
+            <Button
+              variant="secondary"
+              onClick={() => {
+                router.push(`/sign-in?redirect_url=/listing/${listingId}`);
+              }}
+            >
+              {t("signInToSave")}
             </Button>
           )}
         </div>
@@ -228,9 +265,14 @@ export function ApplyButton({
 
   return (
     <>
-      <div className={styles.buttonRow}>
+      <div
+        className={styles.buttonRow}
+        ref={rowRef}
+        tabIndex={-1}
+        aria-busy={isPending}
+      >
         <Button variant="primary" onClick={handleApply} disabled={isPending}>
-          {tc("apply")}
+          {isPending ? t("submitting") : tc("apply")}
         </Button>
         <Button
           variant="secondary"

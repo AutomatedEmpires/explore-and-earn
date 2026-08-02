@@ -38,6 +38,9 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
 const GUARDED_SITES = [
   "apps/web/components/listing/DealUpfront.tsx",
   "apps/web/components/listing/SourcedNotice.tsx",
+  // The detail page itself renders benefit-state labels in the W5 deal rail —
+  // same rule: reference the contracts constants, never re-type the copy.
+  "apps/web/app/[locale]/listing/[id]/page.tsx",
   "apps/web/components/discovery/QuickPeekDrawer.tsx",
   "packages/ui/src/DiscoveryCard.tsx",
   // Host authoring surfaces: these promise the host that an unanswered field

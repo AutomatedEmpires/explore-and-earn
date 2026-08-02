@@ -1,6 +1,8 @@
 /* ─── HostSummaryBlock ────────────────────────────────────────────────────── */
 
-.section {
+/* The card body — the section shell (heading, spacing) comes from
+   ListingSection. */
+.card {
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
@@ -66,11 +68,14 @@
 .viewLink {
   display: inline-flex;
   align-items: center;
+  /* A real navigation target: action accent (not the match-status green) and a
+     full-height touch target. */
+  min-height: var(--tap-min);
   gap: var(--space-4);
   font-family: var(--font-ui);
   font-size: var(--type-button-size);
   line-height: var(--type-body-lh);
-  color: var(--status-match-fg);
+  color: var(--color-cta);
   text-decoration: none;
 }
 

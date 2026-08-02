@@ -1,13 +1,13 @@
 .triad {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--space-12);
   margin-bottom: var(--space-16);
 }
 
-@media (max-width: 33.4375rem) {
+@media (min-width: 640px) {
   .triad {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -63,6 +63,13 @@
   font-size: var(--type-body-size);
   font-weight: var(--font-weight-semibold);
   color: var(--cell-fg);
+}
+
+/* "Not stated" is a non-assertion — it must not wear the same lane-ink
+   semibold as "Included". */
+.cellValue[data-state="not_stated"] {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-regular);
 }
 
 .cellDesc {

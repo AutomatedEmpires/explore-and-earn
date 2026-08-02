@@ -40,7 +40,7 @@ export function SourcedNotice({
         <div>
           <h2 className={styles.title}>{SOURCED_DISCLOSURE_LABEL}</h2>
           <p className={styles.body}>
-            We found this opportunity from a public posting. Explore &amp; Earn has not
+            We found this opportunity in a public posting. Explore &amp; Earn has not
             confirmed the employer or these details. Anything the posting didn&apos;t
             state is shown as <strong>not stated</strong> — never assumed.
           </p>

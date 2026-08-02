@@ -10,6 +10,20 @@
   display: none;
 }
 
+/* The scrollbar is hidden, so this sticky right-edge fade is the only visual
+   cue that more days are clipped off-screen. It rides the scrollport edge
+   (position: sticky on a flex item) and fades to the page backdrop behind
+   the strip, not the card surface. */
+.strip::after {
+  content: "";
+  position: sticky;
+  right: 0;
+  flex: 0 0 var(--space-32);
+  margin-left: calc(-1 * var(--space-32));
+  background: linear-gradient(to right, transparent, var(--color-paper));
+  pointer-events: none;
+}
+
 /* The strip is keyboard-scrollable (tabIndex=0) because its children are not
    focusable, so it needs a visible focus ring of its own. */
 .strip:focus-visible {
