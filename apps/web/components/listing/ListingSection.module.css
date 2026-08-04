@@ -18,6 +18,7 @@
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
   color: var(--text-primary);
+  scroll-margin-top: var(--space-24);
 }
 
 .title svg {

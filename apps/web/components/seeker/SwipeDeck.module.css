@@ -69,6 +69,11 @@
 	border-color: var(--border-ink);
 }
 
+.tool:disabled {
+	opacity: 0.5;
+	cursor: wait;
+}
+
 .toolActive {
 	color: var(--text-primary);
 	border-color: var(--color-cta);
@@ -331,6 +336,17 @@
 	gap: var(--space-8);
 }
 
+.decisionError {
+	align-self: center;
+	margin: 0;
+	color: var(--status-error-fg);
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	line-height: var(--type-label-lh);
+	font-weight: var(--font-weight-semibold);
+	text-align: center;
+}
+
 .feedbackToast {
 	display: inline-flex;
 	align-self: center;
@@ -382,6 +398,11 @@
 
 .feedbackUndo:hover {
 	background: color-mix(in srgb, var(--color-ink) 6%, var(--color-surface-raised));
+}
+
+.feedbackUndo:disabled {
+	opacity: 0.5;
+	cursor: wait;
 }
 
 .srOnly {
@@ -450,21 +471,11 @@
 	}
 }
 
-/* ─── Touch-visible Skip / Save + the keyboard hint ─────────────────────── */
+/* ─── Undo + keyboard hint ──────────────────────────────────────────────── */
 
-/* The flanking arrows only exist at (min-width: 768px) and (pointer: fine).
-   Everywhere else — every phone, every tablet, every touch laptop — Skip and
-   Save had no visible control at all and the gesture was the only way to act.
-   These buttons ARE that control; they hide exactly where the arrows appear, so
-   the two never both show. */
-.touchOnly {
-	display: contents;
-}
-
-@media (min-width: 768px) and (pointer: fine) {
-	.touchOnly {
-		display: none;
-	}
+.undoDock {
+	display: flex;
+	justify-content: center;
 }
 
 .keyHint {

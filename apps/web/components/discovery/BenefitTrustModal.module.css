@@ -67,6 +67,30 @@
 	border-radius: inherit;
 }
 
+.photoEmpty {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-6);
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-secondary);
+}
+
+.photoStatus {
+	margin: var(--space-10) 0 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	line-height: var(--type-caption-lh);
+	color: var(--text-muted);
+	text-align: center;
+}
+
 /* ── Housing slot atmospheres — tokenized cool tints (auto-theme; a real
       uploaded photo covers these placeholders once present). ──────────── */
 
@@ -219,8 +243,8 @@
 	color: var(--text-secondary);
 }
 
-/* Descriptor — the card no longer shows the Housing/Meals text, so this is
-   the prominent home for the host's summary (e.g. "Shared bunkhouse"). */
+/* Descriptor — repeats the concise card summary with room for the full text
+   and the evidence categories beneath it. */
 .descriptor {
 	margin: 0;
 	font-family: var(--font-display);

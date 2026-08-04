@@ -216,16 +216,25 @@ function sanitizeBenefitDetail(
 /**
  * Public (no-auth) read of a live listing's benefit detail — backs the
  * seeker-facing Housing/Meals viewer (photos + structured detail the host
- * published). Returns {} for non-live/missing listings.
+ * published). A successful empty map means the live listing has no saved
+ * detail. Read failures stay distinguishable so seeker UI cannot present a
+ * failed request as confirmed empty evidence.
  */
 export async function getPublicBenefitDetailsAction(
   listingId: string,
-): Promise<BenefitDetailsMap> {
-  if (!listingId) return {};
+): Promise<
+  | { readonly ok: true; readonly details: BenefitDetailsMap }
+  | { readonly ok: false; readonly error: string }
+> {
+  if (!listingId) return { ok: false, error: "Missing listing id." };
   try {
-    return await getPublicBenefitDetails(listingId);
-  } catch {
-    return {};
+    return { ok: true, details: await getPublicBenefitDetails(listingId) };
+  } catch (cause) {
+    reportError(cause, { action: "getPublicBenefitDetailsAction" });
+    return {
+      ok: false,
+      error: "Benefit details are temporarily unavailable.",
+    };
   }
 }
 

@@ -228,8 +228,8 @@
     right: 0;
     bottom: 0;
     width: 100%;
-    /* D17: five destinations — Explore · Swipe · Saved · Applications · Profile. */
-    grid-template-columns: repeat(5, 1fr);
+    /* Founder-locked: Seek · Swipe · Map · Profile. */
+    grid-template-columns: repeat(4, 1fr);
     gap: 2px;
     padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
     background: var(--color-surface);
@@ -251,10 +251,7 @@
     line-height: var(--type-label-lh);
     font-weight: 700;
     text-decoration: none;
-    /* Five labels across a 390px viewport: "Applications" is the long one, so
-       the label ellipsises rather than wrapping the dock to two rows or
-       overflowing the tab. The icon + aria-current still identify the tab, and
-       the accessible name is the full word. */
+    /* Keep every destination within its equal-width touch target. */
     min-width: 0;
     text-align: center;
   }

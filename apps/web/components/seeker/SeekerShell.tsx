@@ -19,20 +19,12 @@ import { SeekerCoachmarks } from "./SeekerCoachmarks";
  *     drawer at <1024px. The rail also carries the primary destinations because
  *     the mobile dock is hidden on desktop.
  *
- * ── THE DOCK CHANGED IN V2-G, AND IT IS A DELIBERATE OVERRIDE ───────────────
+ * ── FOUNDER-LOCKED MOBILE DOCK (2026-08-04) ─────────────────────────────────
  *
- * The dock was Swipe · Map · Seek · Profile, marked in this file as
- * founder-locked (2026-07-13). D17 supersedes it with Explore · Swipe · Saved ·
- * Applications · Profile, because the old set answered only "how do I look for
- * work" and had no answer at all for "what happened to the things I already
- * did" — Saved and Applications, the two surfaces a returning seeker opens
- * first, were both three taps deep behind a hamburger.
- *
- * MAP DID NOT LOSE ITS PLACE. It moves from a tab to (a) the rail and the mobile
- * drawer — the `hideInDrawer` flag is off for it now, where before the dock's
- * ownership kept it hidden — and (b) an explicit "Map view" control on /seek
- * that carries the current filters across. So the map is one tap from Explore
- * rather than zero, and reachable from the menu on every seeker route.
+ * The dock is Seek · Swipe · Map · Profile, in that exact order. These are the
+ * four primary discovery/account modes a seeker needs on every mobile route.
+ * Saved and Applications remain available in the rail/drawer as lifecycle
+ * destinations; do not add them to, or reorder, the pinned dock.
  *
  * ── THE BLOCKING TOUR IS GONE (D19) ────────────────────────────────────────
  *
@@ -60,17 +52,16 @@ interface SectionDef {
 // real (seeker) route.
 //
 // `hideInDrawer` marks a destination the mobile DOCK already carries, so the
-// drawer does not repeat it. Map is deliberately NOT flagged: it left the dock
-// in V2-G, so the drawer is now its mobile home.
+// drawer does not repeat it.
 const SECTIONS: readonly SectionDef[] = [
   { href: "/home", label: "Home", icon: "nav.dashboard", exact: true },
   { href: "/seek", label: "Seek", icon: "nav.seek", hideInDrawer: true },
   { href: "/swipe", label: "Swipe", icon: "nav.swipe", hideInDrawer: true },
-  { href: "/map", label: "Map", icon: "nav.map" },
+  { href: "/map", label: "Map", icon: "nav.map", hideInDrawer: true },
   { href: "/assistant", label: "Assistant", icon: "action.message" },
   { href: "/resume", label: "Résumé", icon: "profile.resume" },
-  { href: "/saved", label: "Saved", icon: "nav.saved", hideInDrawer: true },
-  { href: "/applied", label: "Applications", icon: "action.apply", hideInDrawer: true },
+  { href: "/saved", label: "Saved", icon: "nav.saved" },
+  { href: "/applied", label: "Applications", icon: "action.apply" },
   { href: "/invites", label: "Invites", icon: "status.match" },
   { href: "/offered", label: "Offers", icon: "status.offered" },
   { href: "/messages", label: "Messages", icon: "nav.messages", badgeKey: "unread" },
@@ -87,11 +78,7 @@ const FOOTER: readonly SectionDef[] = [
 ];
 
 /**
- * Seeker MOBILE dock (D17): Explore · Swipe · Saved · Applications · Profile.
- *
- * Two discovery modes and the two lifecycle buckets a returning seeker actually
- * opens. Map moved to the rail/drawer and to the "Map view" control on /seek —
- * see the file header for why, and what it cost.
+ * Founder-locked seeker MOBILE dock: Seek · Swipe · Map · Profile.
  */
 const MOBILE_PRIMARY: readonly {
   readonly href: string;
@@ -100,10 +87,9 @@ const MOBILE_PRIMARY: readonly {
   /** DOM id, so a coachmark can anchor to the real control. */
   readonly id?: string;
 }[] = [
-  { href: "/seek", label: "Explore", icon: "nav.seek" },
+  { href: "/seek", label: "Seek", icon: "nav.seek" },
   { href: "/swipe", label: "Swipe", icon: "nav.swipe" },
-  { href: "/saved", label: "Saved", icon: "nav.saved" },
-  { href: "/applied", label: "Applications", icon: "action.apply" },
+  { href: "/map", label: "Map", icon: "nav.map" },
   { href: "/profile", label: "Profile", icon: "nav.profile", id: "seeker-nav-profile" },
 ];
 

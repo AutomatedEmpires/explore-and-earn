@@ -2,10 +2,12 @@
 
 import { auth } from "@clerk/nextjs/server";
 
-import { passListing, saveListingWithStatus, unpassListing } from "@explore-and-earn/db";
-
+import {
+	restoreListingDecisionAction,
+	setListingDecisionAction,
+	type ListingDecisionActionResult,
+} from "./mapDecisions";
 import { getSwipeListings, type SwipeBatch } from "../../components/discovery/data";
-import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 
 /**
@@ -51,25 +53,28 @@ function sanitizeIds(ids: unknown): string[] {
  * saveListingAction (same `save:${userId}` bucket) since both write the same
  * per-seeker saved set.
  */
+function relationshipIsAlreadyAbsent(
+	result: ListingDecisionActionResult,
+	expected: "saved" | "skipped",
+): boolean {
+	return (
+		result.conflict === true &&
+		result.consistent &&
+		result.decision !== expected
+	);
+}
+
 async function saveListingActionImpl(
 	listingId: string,
 ): Promise<{ ok: boolean; alreadySaved: boolean }> {
-	if (typeof listingId !== "string" || !UUID_RE.test(listingId)) {
-		return { ok: false, alreadySaved: false };
-	}
-	const { userId, getToken } = await auth();
-	if (!userId) {
-		return { ok: false, alreadySaved: false };
-	}
-	const { allowed } = await checkRateLimitDistributed(`save:${userId}`, 60, 5 * 60 * 1000);
-	if (!allowed) {
-		return { ok: false, alreadySaved: false };
-	}
-	const token = await getToken();
-	if (!token) {
-		return { ok: false, alreadySaved: false };
-	}
-	return saveListingWithStatus(token, userId, listingId);
+	const result = await setListingDecisionAction(listingId, "saved");
+	return {
+		ok: result.ok && result.consistent && result.decision === "saved",
+		alreadySaved:
+			result.ok &&
+			result.consistent &&
+			result.previousDecision === "saved",
+	};
 }
 
 export async function saveListingAction(
@@ -93,16 +98,10 @@ export async function saveListingAction(
  * so the budget is generous.
  */
 async function passListingActionImpl(listingId: string): Promise<{ ok: boolean }> {
-	if (typeof listingId !== "string" || !UUID_RE.test(listingId)) {
-		return { ok: false };
-	}
-	const { userId, getToken } = await auth();
-	if (!userId) return { ok: false };
-	const { allowed } = await checkRateLimitDistributed(`pass:${userId}`, 200, 5 * 60 * 1000);
-	if (!allowed) return { ok: false };
-	const token = await getToken();
-	if (!token) return { ok: false };
-	return passListing(token, userId, listingId);
+	const result = await setListingDecisionAction(listingId, "skipped");
+	return {
+		ok: result.ok && result.consistent && result.decision === "skipped",
+	};
 }
 
 export async function passListingAction(listingId: string): Promise<{ ok: boolean }> {
@@ -117,14 +116,14 @@ export async function passListingAction(listingId: string): Promise<{ ok: boolea
 /** Remove a persisted pass — the deck's Undo. */
 export async function unpassListingAction(listingId: string): Promise<{ ok: boolean }> {
 	try {
-		if (typeof listingId !== "string" || !UUID_RE.test(listingId)) {
-			return { ok: false };
-		}
-		const { userId, getToken } = await auth();
-		if (!userId) return { ok: false };
-		const token = await getToken();
-		if (!token) return { ok: false };
-		return unpassListing(token, userId, listingId);
+		const result = await restoreListingDecisionAction(
+			listingId,
+			"skipped",
+			null,
+		);
+		return {
+			ok: result.ok || relationshipIsAlreadyAbsent(result, "skipped"),
+		};
 	} catch (error) {
 		reportError(error, { action: "unpassListingAction", userId: await currentUserId() });
 		throw error;

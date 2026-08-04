@@ -50,12 +50,11 @@ rows through `@explore-and-earn/db`; the fixture fallbacks are dev-only.
   `@explore-and-earn/contracts` is the shared derivation, and the card's
   "what's missing" line comes from it.
 
-## Navigation (D17)
+## Navigation
 
-- MOBILE dock: **Explore · Swipe · Saved · Applications · Profile**. This
-  replaced the earlier Swipe · Map · Seek · Profile set; Map moved to the rail /
-  drawer and to the "Map view" control on /seek. See the header comment in
-  `components/seeker/SeekerShell.tsx` for the reasoning and what it cost.
+- MOBILE dock: **Seek · Swipe · Map · Profile**, in that founder-locked order.
+  Saved and Applications remain available in the rail / drawer as lifecycle
+  destinations.
 - Secondary / scope nav is the shared `<ScopeShellNav>` — a left rail at
   ≥1024px, a hamburger drawer below it.
 - The onboarding tour is **non-blocking** (D19): three anchored coachmarks in

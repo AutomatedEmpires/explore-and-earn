@@ -39,7 +39,7 @@ describe("listing application state", () => {
     );
     const modalClose = component.indexOf(
       "setShowConfirmModal(false)",
-      handleConfirm,
+      actionCall,
     );
     const confirmButton = component.slice(
       component.indexOf('variant="primary"', component.indexOf("{showConfirmModal")),

@@ -185,9 +185,8 @@ describe("the decision bar on /seek", () => {
    * supplied one and no action handlers, so both buttons were live, focusable,
    * and silently did nothing on the marketplace's main browse surface.
    */
-  it("wires Save and Skip to the persisted actions", () => {
-    expect(browserCode).toContain("saveListingAction");
-    expect(browserCode).toContain("passListingAction");
+  it("wires Save and Skip to the exclusive persisted transition", () => {
+    expect(browserCode).toContain("setMapListingDecisionAction");
   });
 
   it("routes a signed-out seeker to sign-in rather than dropping the tap", () => {
@@ -195,8 +194,20 @@ describe("the decision bar on /seek", () => {
     expect(browserCode).toContain("role=seeker");
   });
 
-  it("rolls the optimistic state back when the write fails", () => {
-    expect(browserCode).toMatch(/catch\(\(\) => \{\s*setSavedIds/);
+  it("reconciles optimistic state to the server-authoritative decision", () => {
+    const decisionStart = browserCode.indexOf("const commitDecision");
+    const decisionEnd = browserCode.indexOf("const cardOverrides", decisionStart);
+    const decisionFlow = browserCode.slice(decisionStart, decisionEnd);
+
+    expect(decisionStart).toBeGreaterThan(-1);
+    expect(decisionEnd).toBeGreaterThan(decisionStart);
+    // A resolved action reports the exact persisted outcome after compensation;
+    // a rejected action restores the local snapshot without inventing a badge.
+    expect(decisionFlow).toContain("setMapListingDecisionAction(id, decision)");
+    expect(decisionFlow).toContain(
+      "result.decision === undefined ? previous : result.decision",
+    );
+    expect(decisionFlow).toContain(".catch(() => setCardDecision(id, previous))");
   });
 });
 

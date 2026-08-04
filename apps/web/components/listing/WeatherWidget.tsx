@@ -11,6 +11,15 @@ export interface WeatherWidgetProps {
   readonly outlook: WeatherOutlook | null;
 }
 
+export interface WeatherWidgetLoadingProps {
+  readonly locationLabel: string | null;
+}
+
+function weatherLocation(locationLabel: string | null): string {
+  const normalized = locationLabel?.trim();
+  return normalized ? `near ${normalized}` : "where you'd be";
+}
+
 /** Short weekday label from an ISO date, anchored at midday to dodge tz edges. */
 function weekday(isoDate: string): string {
   const parsed = new Date(`${isoDate}T12:00:00`);
@@ -29,7 +38,7 @@ export function WeatherWidget({ locationLabel, outlook }: WeatherWidgetProps) {
   // The lib can deliver fewer than the requested 10 days, so the count is
   // derived from what actually arrived — and the unit is stated once here
   // rather than repeated on every temperature. No forecast → no count, no unit.
-  const where = locationLabel ? `near ${locationLabel}` : "where you'd be";
+  const where = weatherLocation(locationLabel);
   return (
     <ListingSection
       title="Weather"
@@ -85,6 +94,27 @@ export function WeatherWidget({ locationLabel, outlook }: WeatherWidgetProps) {
           </p>
         </div>
       )}
+    </ListingSection>
+  );
+}
+
+/** Streaming fallback. It owns the same anchor as the resolved widget. */
+export function WeatherWidgetLoading({
+  locationLabel,
+}: WeatherWidgetLoadingProps) {
+  const where = weatherLocation(locationLabel);
+
+  return (
+    <ListingSection
+      title="Weather"
+      icon="category.seasonal"
+      headingId="listing-weather"
+      subtitle={`Loading the 10-day outlook ${where}.`}
+    >
+      <div className={styles.shell} role="status" aria-busy="true">
+        <Icon name="system.info" size={20} aria-hidden />
+        <p className={styles.shellText}>Loading the latest forecast&hellip;</p>
+      </div>
     </ListingSection>
   );
 }

@@ -22,17 +22,27 @@ import {
   ListingCard,
   ListingCardProvider,
   type DiscoveryListing,
+  type ListingCardPopupOverrides,
 } from "../discovery";
 import { MAPPIN_ICON } from "../seeker/mappin";
 import { SeekFilterPopup, type SeekFilterPopupValue } from "../seeker/SeekFilterPopup";
 import { SeekSortPopup } from "../seeker/SeekSortPopup";
 import { byMonetization, type MonetizationInputs } from "../../lib/ranking";
 import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
+import { setMapListingDecisionAction } from "../../app/actions/mapDecisions";
+import type { ExclusiveListingDecision } from "../../lib/exclusiveListingDecision";
 import styles from "./MapView.module.css";
 
 export interface MapViewProps {
   readonly listings: readonly DiscoveryListing[];
   readonly initialFocusId?: string;
+  /** Whether card decisions may write for the current viewer. */
+  readonly isAuthenticated?: boolean;
+  /** Persisted relationship state read by the authenticated server page. */
+  readonly initialSavedListingIds?: readonly string[];
+  readonly initialSkippedListingIds?: readonly string[];
+  /** Server-attested preview fixture ids with known-empty benefit detail. */
+  readonly knownEmptyBenefitDetailsListingIds?: readonly string[];
   /**
    * Mapbox access token, read in the server component (map/page.tsx) and passed
    * down. Falls back to the client-inlined env var, but the prop is the reliable
@@ -63,6 +73,7 @@ interface ViewBounds {
 
 const USA_VIEW = { longitude: -98.5795, latitude: 39.8283, zoom: 4 } as const;
 const MAP_STYLE = { width: "100%", height: "100%" };
+const EMPTY_LISTING_IDS: readonly string[] = [];
 
 const EMPTY_FILTERS: SeekFilterPopupValue = {
   housing: false,
@@ -168,7 +179,15 @@ function groupMarkers(listings: readonly MappedListing[]): MarkerGroup[] {
   });
 }
 
-export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps) {
+export function MapView({
+  listings,
+  initialFocusId,
+  mapboxToken,
+  isAuthenticated = false,
+  initialSavedListingIds = EMPTY_LISTING_IDS,
+  initialSkippedListingIds = EMPTY_LISTING_IDS,
+  knownEmptyBenefitDetailsListingIds,
+}: MapViewProps) {
   const router = useRouter();
   const token = mapboxToken ?? process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const mapRef = useRef<MapRef | null>(null);
@@ -219,6 +238,31 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
   const [trayOpen, setTrayOpen] = useState(Boolean(initialFocusId));
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
+  const initialDecisions = useMemo(() => {
+    const next = new Map<string, ExclusiveListingDecision>();
+    for (const listing of mapped) {
+      if (listing.previouslySkipped) next.set(listing.id, "skipped");
+    }
+    for (const id of initialSkippedListingIds) next.set(id, "skipped");
+    // Saved wins if stale/legacy data ever contains both relationships.
+    for (const id of initialSavedListingIds) next.set(id, "saved");
+    return next;
+  }, [initialSavedListingIds, initialSkippedListingIds, mapped]);
+  const [decisions, setDecisions] = useState<
+    ReadonlyMap<string, ExclusiveListingDecision>
+  >(() => initialDecisions);
+  const decisionsRef = useRef(new Map(initialDecisions));
+  const decisionVersions = useRef(new Map<string, number>());
+  const decisionQueues = useRef(new Map<string, Promise<void>>());
+
+  // A server navigation may update these props without remounting the dynamic
+  // map. Keep both the rendered map and the imperative optimistic-write ref on
+  // the same authenticated snapshot.
+  useEffect(() => {
+    const next = new Map(initialDecisions);
+    decisionsRef.current = next;
+    setDecisions(next);
+  }, [initialDecisions]);
 
   // A ?focus=<id> deep link can point at a listing the map can't show — one with
   // no coordinates, or one filtered out of the map query entirely (e.g. an
@@ -289,6 +333,92 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
     });
   };
 
+  // Map cards use the same authenticated persistence actions and optimistic
+  // relationship states as Seek. Signed-out taps retain intent through the
+  // sign-in return path; no visible control is backed by a no-op handler.
+  const requireAuth = useCallback((): boolean => {
+    if (isAuthenticated) return false;
+    router.push(`/sign-in?role=seeker&returnTo=${encodeURIComponent("/map")}`);
+    return true;
+  }, [isAuthenticated, router]);
+
+  const setLocalDecision = useCallback(
+    (id: string, decision: ExclusiveListingDecision | null) => {
+      const next = new Map(decisionsRef.current);
+      if (decision) next.set(id, decision);
+      else next.delete(id);
+      decisionsRef.current = next;
+      setDecisions(next);
+    },
+    [],
+  );
+
+  /**
+   * Serialize writes per listing so rapid Save -> Skip taps cannot interleave
+   * into contradictory rows. The latest tap stays optimistic; only its result
+   * may reconcile local state, while each queued server transition observes
+   * the persistence left by the transition before it.
+   */
+  const queueDecision = useCallback(
+    (id: string, next: ExclusiveListingDecision) => {
+      const previous = decisionsRef.current.get(id) ?? null;
+      setLocalDecision(id, next);
+
+      const version = (decisionVersions.current.get(id) ?? 0) + 1;
+      decisionVersions.current.set(id, version);
+      const prior = decisionQueues.current.get(id) ?? Promise.resolve();
+      const task = prior
+        .catch(() => undefined)
+        .then(async () => {
+          try {
+            const result = await setMapListingDecisionAction(id, next);
+            if (decisionVersions.current.get(id) !== version) return;
+            setLocalDecision(
+              id,
+              result.decision === undefined ? previous : result.decision,
+            );
+          } catch {
+            if (decisionVersions.current.get(id) === version) {
+              setLocalDecision(id, previous);
+            }
+          }
+        });
+      decisionQueues.current.set(id, task);
+      void task.finally(() => {
+        if (decisionQueues.current.get(id) === task) {
+          decisionQueues.current.delete(id);
+        }
+      });
+    },
+    [setLocalDecision],
+  );
+
+  const cardOverrides = useMemo<ListingCardPopupOverrides>(
+    () => ({
+      onApply: (id) => {
+        // The listing page owns the resumable auth/apply intent. Routing there
+        // first preserves this exact listing for signed-out seekers.
+        router.push(`/listing/${id}?apply=1`);
+      },
+      onSave: (id) => {
+        if (requireAuth()) return;
+        queueDecision(id, "saved");
+        captureEvent(SEEKER_DISCOVERY_EVENTS.listingSaved, { surface: "map" });
+      },
+      onSkip: (id) => {
+        if (requireAuth()) return;
+        queueDecision(id, "skipped");
+        captureEvent(SEEKER_DISCOVERY_EVENTS.listingSkipped, { surface: "map" });
+      },
+    }),
+    [queueDecision, requireAuth, router],
+  );
+
+  const cardState = useCallback(
+    (id: string) => decisions.get(id),
+    [decisions],
+  );
+
   const onTrayPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
     trayStartY.current = event.clientY;
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -350,8 +480,9 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
     // pin, don't navigate/quick-peek) are per-card overrides below.
     <ListingCardProvider
       listings={mapped}
-      overrides={{ onApply: (id) => router.push(`/listing/${id}`) }}
+      overrides={cardOverrides}
       analyticsSurface="map"
+      knownEmptyBenefitDetailsListingIds={knownEmptyBenefitDetailsListingIds}
     >
     <div className={styles.shell}>
       <div className={styles.canvas}>
@@ -422,6 +553,7 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
                   <ListingCard
                     listing={selected}
                     surface="map"
+                    cardState={cardState(selected.id)}
                     overrides={{
                       onOpen: (id) => setSelectedId(id),
                       onLocationClick: (id) => setSelectedId(id),
@@ -516,6 +648,7 @@ export function MapView({ listings, initialFocusId, mapboxToken }: MapViewProps)
                   <ListingCard
                     listing={listing}
                     surface="map"
+                    cardState={cardState(listing.id)}
                     overrides={{
                       onOpen: (id) => {
                         const next = mapped.find((item) => item.id === id);

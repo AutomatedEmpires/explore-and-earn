@@ -89,6 +89,8 @@ export interface ListingCardProviderProps {
    * `listing_card_opened` for this surface. See useListingCardPopups.
    */
   readonly analyticsSurface?: string;
+  /** Server-attested fixture ids whose public benefit-photo detail is known empty. */
+  readonly knownEmptyBenefitDetailsListingIds?: readonly string[];
   readonly children: ReactNode;
 }
 
@@ -101,12 +103,14 @@ export function ListingCardProvider({
   listings,
   overrides,
   analyticsSurface,
+  knownEmptyBenefitDetailsListingIds,
   children,
 }: ListingCardProviderProps) {
   const { handlers, popups } = useListingCardPopups(
     listings,
     overrides,
     analyticsSurface,
+    knownEmptyBenefitDetailsListingIds,
   );
   const value = useMemo<ListingCardContextValue>(() => ({ handlers }), [handlers]);
 

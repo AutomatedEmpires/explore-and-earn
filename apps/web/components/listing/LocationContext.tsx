@@ -14,8 +14,8 @@ const MAPPIN_BY_CATEGORY: Record<OpportunityCategory, IconKey> = {
 
 export interface LocationContextProps {
   readonly locationDisplay: string | null;
-  readonly latitude: number;
-  readonly longitude: number;
+  readonly latitude: number | null;
+  readonly longitude: number | null;
   readonly category: OpportunityCategory;
 }
 
@@ -27,10 +27,10 @@ function formatCoords(lat: number, lon: number): string {
 }
 
 /**
- * "Where you'll be" — grounds the opportunity in a real place using the listing's
- * coordinates. A category-tinted region panel with the place name and exact
- * coordinates; no fabricated distances, travel times, or landmarks. The page only
- * renders this when real coordinates exist.
+ * "About the location" — grounds the opportunity in the place the host stated.
+ * Exact coordinates appear only when both values exist; a real place name still
+ * deserves a section when coordinates have not been supplied. No fabricated
+ * distances, travel times, or landmarks.
  */
 export function LocationContext({
   locationDisplay,
@@ -38,9 +38,15 @@ export function LocationContext({
   longitude,
   category,
 }: LocationContextProps) {
+  const locationName = locationDisplay?.trim() || null;
+  const coordinates =
+    latitude != null && longitude != null
+      ? formatCoords(latitude, longitude)
+      : null;
+
   return (
     <ListingSection
-      title="Where you'll be"
+      title="About the location"
       icon="nav.map"
       headingId="listing-location"
     >
@@ -49,14 +55,16 @@ export function LocationContext({
           <Icon name={MAPPIN_BY_CATEGORY[category]} size={40} aria-hidden />
         </div>
         <div className={styles.body}>
-          {locationDisplay ? (
-            <span className={styles.place}>{locationDisplay}</span>
+          {locationName ? (
+            <span className={styles.place}>{locationName}</span>
           ) : null}
-          <span className={styles.coords}>{formatCoords(latitude, longitude)}</span>
-          <p className={styles.note}>
-            Show your family exactly where you&rsquo;re headed &mdash; drop these
-            coordinates into any map app to see the area.
-          </p>
+          {coordinates ? <span className={styles.coords}>{coordinates}</span> : null}
+          {coordinates ? (
+            <p className={styles.note}>
+              Show your family exactly where you&rsquo;re headed &mdash; drop these
+              coordinates into any map app to see the area.
+            </p>
+          ) : null}
         </div>
       </div>
     </ListingSection>

@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type {
@@ -21,7 +27,7 @@ import {
 	FeaturedEmployersRail,
 	type FeaturedEmployer,
 } from "../public/FeaturedEmployersRail";
-import { passListingAction, saveListingAction } from "../../app/actions/swipe";
+import { setMapListingDecisionAction } from "../../app/actions/mapDecisions";
 import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
 import styles from "./SeekBrowser.module.css";
 import { SeekFilterPopup, type SeekFilterPopupValue } from "./SeekFilterPopup";
@@ -33,6 +39,7 @@ type StartRangeMonths = 1 | 3 | 6;
 type PayUnit = Extract<CompensationUnit, "hour" | "day">;
 
 const SEARCH_DEBOUNCE_MS = 400;
+const EMPTY_LISTING_IDS: readonly string[] = [];
 
 /**
  * SORT is client-side over the CURRENT PAGE, and says so.
@@ -50,6 +57,7 @@ const SORT_OPTIONS = [
 	{ id: "soonest", label: "Starting soonest" },
 ] as const;
 type SortId = (typeof SORT_OPTIONS)[number]["id"];
+type SeekCardDecision = "saved" | "skipped";
 
 /** Comparable pay floor in cents, or null when the listing states no range. */
 function payFloor(listing: DiscoveryListing): number | null {
@@ -113,6 +121,9 @@ export interface SeekBrowserProps {
 	readonly hasMorePages?: boolean;
 	/** Signed-out visitors get the same browse, but save/skip route to sign-in. */
 	readonly isAuthenticated?: boolean;
+	/** Persisted relationship state read by the authenticated server page. */
+	readonly initialSavedListingIds?: readonly string[];
+	readonly initialSkippedListingIds?: readonly string[];
 }
 
 /**
@@ -160,6 +171,8 @@ export function SeekBrowser({
 	savedSearches = [],
 	hasMorePages = false,
 	isAuthenticated = true,
+	initialSavedListingIds = EMPTY_LISTING_IDS,
+	initialSkippedListingIds = EMPTY_LISTING_IDS,
 }: SeekBrowserProps) {
 	const pathname = usePathname();
 	const router = useRouter();
@@ -170,9 +183,30 @@ export function SeekBrowser({
 	const [laneOpen, setLaneOpen] = useState(false);
 	const [sort, setSort] = useState<SortId>("newest");
 	const [view, setView] = useState<"grid" | "list">("grid");
-	const [savedIds, setSavedIds] = useState<ReadonlySet<string>>(new Set());
-	const [skippedIds, setSkippedIds] = useState<ReadonlySet<string>>(new Set());
-	const [, startAction] = useTransition();
+	const hydratedSavedIds = useMemo(
+		() => new Set(initialSavedListingIds),
+		[initialSavedListingIds],
+	);
+	const hydratedSkippedIds = useMemo(
+		() =>
+			new Set(
+				initialSkippedListingIds.filter((id) => !hydratedSavedIds.has(id)),
+			),
+		[hydratedSavedIds, initialSkippedListingIds],
+	);
+	const [savedIds, setSavedIds] =
+		useState<ReadonlySet<string>>(hydratedSavedIds);
+	const [skippedIds, setSkippedIds] =
+		useState<ReadonlySet<string>>(hydratedSkippedIds);
+	const decisionInFlight = useRef(new Set<string>());
+
+	// Server navigation can replace the result page without remounting this
+	// client boundary. Reconcile to the newly authenticated snapshot so a saved
+	// or skipped card never looks undecided after filters, paging, or reload.
+	useEffect(() => {
+		setSavedIds(hydratedSavedIds);
+		setSkippedIds(hydratedSkippedIds);
+	}, [hydratedSavedIds, hydratedSkippedIds]);
 
 	const currentQuery = query ?? "";
 
@@ -347,6 +381,62 @@ export function SeekBrowser({
 		return true;
 	}, [isAuthenticated, router]);
 
+	/**
+	 * Keep the two local relationship sets mutually exclusive. A card can be
+	 * saved or skipped, never both; React batches these paired updates.
+	 */
+	const setCardDecision = useCallback(
+		(id: string, decision: SeekCardDecision | null) => {
+			setSavedIds((current) => {
+				const next = new Set(current);
+				if (decision === "saved") next.add(id);
+				else next.delete(id);
+				return next;
+			});
+			setSkippedIds((current) => {
+				const next = new Set(current);
+				if (decision === "skipped") next.add(id);
+				else next.delete(id);
+				return next;
+			});
+		},
+		[],
+	);
+
+	const commitDecision = useCallback(
+		(id: string, decision: SeekCardDecision) => {
+			if (requireAuth() || decisionInFlight.current.has(id)) return;
+
+			const previous: SeekCardDecision | null = savedIds.has(id)
+				? "saved"
+				: skippedIds.has(id)
+					? "skipped"
+					: null;
+
+			decisionInFlight.current.add(id);
+			setCardDecision(id, decision);
+			captureEvent(
+				decision === "saved"
+					? SEEKER_DISCOVERY_EVENTS.listingSaved
+					: SEEKER_DISCOVERY_EVENTS.listingSkipped,
+				{ surface: "seek" },
+			);
+
+			// The server reads the persisted relationship, performs one exclusive
+			// transition, and reports the exact outcome after any compensation.
+			void setMapListingDecisionAction(id, decision)
+				.then((result) => {
+					setCardDecision(
+						id,
+						result.decision === undefined ? previous : result.decision,
+					);
+				})
+				.catch(() => setCardDecision(id, previous))
+				.finally(() => decisionInFlight.current.delete(id));
+		},
+		[requireAuth, savedIds, setCardDecision, skippedIds],
+	);
+
 	const cardOverrides = useMemo<ListingCardPopupOverrides>(
 		() => ({
 			// onOpen is deliberately NOT overridden: the shared default opens Quick
@@ -354,39 +444,14 @@ export function SeekBrowser({
 			// listings without losing your filters), and it is also what fires
 			// `listing_card_opened` via analyticsSurface below.
 			onApply: (id) => {
-				if (requireAuth()) return;
+				// The listing page validates the listing, then performs the safe auth
+				// redirect while retaining this exact one-shot application intent.
 				router.push(`/listing/${id}?apply=1`);
 			},
-			onSave: (id) => {
-				if (requireAuth()) return;
-				setSavedIds((prev) => new Set(prev).add(id));
-				captureEvent(SEEKER_DISCOVERY_EVENTS.listingSaved, { surface: "seek" });
-				startAction(() => {
-					void saveListingAction(id).catch(() => {
-						setSavedIds((prev) => {
-							const next = new Set(prev);
-							next.delete(id);
-							return next;
-						});
-					});
-				});
-			},
-			onSkip: (id) => {
-				if (requireAuth()) return;
-				setSkippedIds((prev) => new Set(prev).add(id));
-				captureEvent(SEEKER_DISCOVERY_EVENTS.listingSkipped, { surface: "seek" });
-				startAction(() => {
-					void passListingAction(id).catch(() => {
-						setSkippedIds((prev) => {
-							const next = new Set(prev);
-							next.delete(id);
-							return next;
-						});
-					});
-				});
-			},
+			onSave: (id) => commitDecision(id, "saved"),
+			onSkip: (id) => commitDecision(id, "skipped"),
 		}),
-		[requireAuth, router],
+		[commitDecision, router],
 	);
 
 	const getCardState = useCallback(

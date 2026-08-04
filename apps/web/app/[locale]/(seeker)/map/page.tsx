@@ -67,7 +67,7 @@ export default async function MapPage({
 	// unscoped public map (no crash).
 	const { userId } = await auth();
 	const token = userId ? await getSupabaseToken() : null;
-	const [params, listings] = await Promise.all([
+	const [params, mapData] = await Promise.all([
 		searchParams,
 		getDiscoveryListingsWithCoords(token, userId),
 	]);
@@ -78,9 +78,15 @@ export default async function MapPage({
 				Explore opportunities on the map
 			</h1>
 			<MapViewLazy
-				listings={listings}
+				listings={mapData.listings}
+				initialSavedListingIds={mapData.initialSavedListingIds}
+				initialSkippedListingIds={mapData.initialSkippedListingIds}
+				knownEmptyBenefitDetailsListingIds={
+					mapData.knownEmptyBenefitDetailsListingIds
+				}
 				initialFocusId={firstValue(params.focus)}
 				mapboxToken={mapboxToken}
+				isAuthenticated={Boolean(userId)}
 			/>
 		</section>
 	);

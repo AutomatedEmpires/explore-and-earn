@@ -15,7 +15,6 @@ import {
 	type OpportunityTriad,
 } from "@explore-and-earn/contracts"
 
-import { Meter } from "./Meter"
 import { Icon, type IconKey } from "./icons"
 import styles from "./DiscoveryCard.module.css"
 
@@ -282,6 +281,39 @@ const benefitNotStated = (
 const benefitProvided = (provision: BenefitProvision | undefined): boolean =>
 	benefitCardState(provision) === "provided"
 
+/**
+ * Resolve one seeker-facing benefit value without turning silence into a
+ * promise. Evidence/provision wins over stale summary text; once the benefit is
+ * known to be answered, prefer the host's concise summary and then the triad
+ * fallback already carried by the canonical card contract.
+ */
+function benefitTruthValue(
+	provision: BenefitProvision | undefined,
+	evidence: BenefitEvidenceStatus | undefined,
+	summary: string | undefined,
+	fallback: string,
+): string {
+	const state = benefitCardState(provision, evidence)
+	if (state === "not_stated") {
+		return NOT_STATED_LABEL
+	}
+	// An explicit NO is authoritative. Old summary copy can survive a host
+	// changing the provision, so it must never override the current decision.
+	if (state === "not_provided") {
+		return "Not provided"
+	}
+	const statedSummary = summary?.trim()
+	if (statedSummary) {
+		return statedSummary
+	}
+	// `benefitCardState` intentionally folds partial into its positive state for
+	// card color semantics. Preserve the finer provision truth in visible copy.
+	if (provision === "partial") {
+		return "Partial"
+	}
+	return fallback.trim() || "Provided"
+}
+
 // ─── Benefit triad cell (housing / meals / pay) ────────────────────────────
 //
 // The card's dominant module. Housing & Meals read OFFERED (green ✓) / NOT
@@ -307,11 +339,11 @@ function BenefitTriadCell({
 	readonly onClick?: () => void
 }) {
 	const isPay = kind === "pay"
-	const stateClass = isPay
-		? styles.benefitPay
-		: notStated
+	const stateClass = notStated
 			? styles.benefitNotStated
-			: provided
+			: isPay
+				? styles.benefitPay
+				: provided
 				? styles.benefitProvided
 				: styles.benefitNot
 	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
@@ -330,8 +362,9 @@ function BenefitTriadCell({
 	// The fix keeps the v2.2 lock intact (no icon, no checkmark, one compact
 	// tier) and instead lets the LABEL carry the state, exactly as the
 	// "Not stated" cell already does in this same component.
-	const stateText = isPay ? "" : notStated ? "not stated" : provided ? "included" : "not included"
+	const stateText = notStated ? "not stated" : isPay ? "" : provided ? "included" : "not included"
 	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
+	const displayValue = notStated ? NOT_STATED_LABEL : value.trim() || NOT_STATED_LABEL
 	const benefitText = notStated
 		? NOT_STATED_LABEL
 		: provided
@@ -343,7 +376,7 @@ function BenefitTriadCell({
 	const inner = isPay ? (
 		<>
 			<span className={styles.benefitHead}>{label}</span>
-			<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{value}</span>
+			<span className={`${styles.benefitValue} ${styles.benefitPayValue}`}>{displayValue}</span>
 		</>
 	) : (
 		<span className={styles.benefitLabel}>{benefitText}</span>
@@ -413,9 +446,13 @@ export function DiscoveryCard({
 
 	const hp = data.benefitProvision?.housing
 	const mp = data.benefitProvision?.meals
+	const pp = data.benefitProvision?.pay
 
-	const canOpenHousing = Boolean(onHousingClick && hp !== "not_provided")
-	const canOpenMeals   = Boolean(onMealsClick   && mp !== "not_provided")
+	// Every triad cell remains explainable, including an explicit "not provided"
+	// or an unanswered value. The overlay owns the fuller truth and evidence
+	// categories; disabling the tap on negative/empty states hid that context.
+	const canOpenHousing = Boolean(onHousingClick)
+	const canOpenMeals   = Boolean(onMealsClick)
 
 	// "seasonal" is a category; "featured" is not a platform concept — only "boosted" is valid
 	const isBoosted = (data.conditionalBadges ?? []).includes("boosted")
@@ -509,10 +546,12 @@ export function DiscoveryCard({
 	// surfaces; resolved lifecycle states keep their single state CTA. Skip only
 	// appears when a handler exists (e.g. a deck); the grid shows Apply · Save.
 	const showDecisionBar =
-		(isDiscoveryFeed || surface === "map" || isMatched)
+		(isDiscoveryFeed || surface === "swipe" || surface === "map" || isMatched)
 		&& !isApplied && !isReported && !isUnavailable && !isDisabled
 		&& !isClosed && !isExpired && !isFilled
-		&& Boolean(onApply || onOpen)
+		// The three-label bar is atomic: rendering any dead control—or allowing
+		// Apply to fall back to Quick Peek—would make its visible promise false.
+		&& Boolean(onSkip && onApply && onSave)
 
 	// ── CTA resolution ────────────────────────────────────────────────────────
 	const ctaLabel =
@@ -583,11 +622,36 @@ export function DiscoveryCard({
 	})
 	const missingSentence = missingFactsSentence(record.missing)
 
-	// Stated facts, in the order a seeker asks for them. Nothing is defaulted:
-	// each entry exists only because a host actually recorded that column.
+	// The primary decision snapshot is always present on seeker listing cards.
+	// Unanswered fields say so directly instead of disappearing and making the
+	// card look complete. The stored match is never recomputed here.
+	const matchValue =
+		typeof data.matchScore === "number" && Number.isFinite(data.matchScore)
+			? `${clampPct(data.matchScore)}%`
+			: "Not scored"
+	const glanceFacts = [
+		{ key: "match", label: "Match", value: matchValue },
+		{
+			key: "season",
+			label: "Season length",
+			value: data.seasonLength?.trim() || NOT_STATED_LABEL,
+		},
+		{
+			key: "housing",
+			label: "Housing",
+			value: benefitTruthValue(hp, ev?.housing, data.housingSummary, data.triad.housing),
+		},
+		{
+			key: "meals",
+			label: "Meals",
+			value: benefitTruthValue(mp, ev?.meals, data.mealsSummary, data.triad.meals),
+		},
+	] as const
+
+	// Additional stored facts stay self-omitting: unlike the core snapshot above,
+	// these are not required to decide whether a seeker can take the role.
 	const DEMAND_LABEL = ["Light", "Moderate", "Demanding", "Very demanding"] as const
 	const facts: { key: string; label: string; value: string }[] = []
-	if (data.seasonLength) facts.push({ key: "season", label: "Season length", value: data.seasonLength })
 	if (data.experienceLevel) facts.push({ key: "experience", label: "Experience", value: data.experienceLevel })
 	if (
 		typeof data.physicalDemand === "number" &&
@@ -597,9 +661,6 @@ export function DiscoveryCard({
 	) {
 		facts.push({ key: "demand", label: "Physical demand", value: DEMAND_LABEL[data.physicalDemand] })
 	}
-	if (data.housingSummary) facts.push({ key: "housing", label: "Housing", value: data.housingSummary })
-	if (data.mealsSummary) facts.push({ key: "meals", label: "Meals", value: data.mealsSummary })
-
 	const topPerks = (data.perks ?? []).slice(0, 3)
 	const reasonLabels = (data.matchReasons ?? []).map((reason) => reason.label)
 	// The reasons row explains a number the card is SHOWING. When the score is
@@ -1029,16 +1090,37 @@ export function DiscoveryCard({
 						<BenefitTriadCell
 							kind="pay"
 							value={data.triad.pay}
+							notStated={
+								benefitNotStated(pp, ev?.pay) || data.triad.pay.trim().length === 0
+							}
 							onClick={onPayClick ? () => onPayClick(data.id) : undefined}
 						/>
 					</div>
 				)}
 
-				{/* Match meter (matched surface only) */}
-				{surface === "matched" && typeof data.matchScore === "number" ? (
-					<div>
-						<Meter value={data.matchScore} label="Match" />
-					</div>
+				{/* Core decision snapshot — Match, season length and the host's own
+				    Housing/Meals wording remain visible on every seeker listing card.
+				    Missing values are explicit, never silently omitted. */}
+				{!isApplicantReview && !isAdminReview ? (
+					<dl className={`${styles.factList} ${styles.glanceFacts}`} aria-label="Opportunity at a glance">
+						{glanceFacts.map((fact) => (
+							<div key={fact.key} className={styles.factItem}>
+								<dt className={styles.factLabel}>{fact.label}</dt>
+								<dd
+									className={styles.factValue}
+									data-state={
+										fact.key === "match" && fact.value === "Not scored"
+											? "not_scored"
+											: fact.value === NOT_STATED_LABEL
+												? "not_stated"
+												: undefined
+									}
+								>
+									{fact.value}
+								</dd>
+							</div>
+						))}
+					</dl>
 				) : null}
 
 				{/* ── 8. STATED FACTS (V2-G info zone) ──────────────────────────────
@@ -1197,12 +1279,12 @@ export function DiscoveryCard({
 								onClick={onSkip ? () => onSkip(data.id) : undefined}
 								aria-label="Skip this opportunity"
 							>
-								<Icon name="action.close" size={18} aria-hidden />
+								Skip
 							</button>
 							<button
 								type="button"
 								className={`${styles.ctaBtn} ${styles.ctaApply} ui-pressable`}
-								onClick={onApply ? () => onApply(data.id) : onOpen ? () => onOpen(data.id) : undefined}
+								onClick={onApply ? () => onApply(data.id) : undefined}
 							>
 								Apply
 								<Icon name="action.forward" size={16} aria-hidden />
@@ -1213,7 +1295,7 @@ export function DiscoveryCard({
 								onClick={onSave ? () => onSave(data.id) : undefined}
 								aria-label="Save this opportunity"
 							>
-								<Icon name="nav.saved" size={18} aria-hidden />
+								Save
 							</button>
 						</div>
 					) : (
