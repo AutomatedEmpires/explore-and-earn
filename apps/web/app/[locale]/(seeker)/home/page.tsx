@@ -43,7 +43,7 @@ export default async function SeekerHomePage() {
   // The review bench must stay usable when .env.local points at a stopped
   // local Supabase stack. Its synthetic role is explicit, so render the
   // existing non-production season fixture without starting any data reads.
-  if (isDevBenchEnabled() && (await readDevRole())) {
+  if (isDevBenchEnabled() && (await readDevRole()) === "seeker") {
     const board = await getSeasonBoard(undefined, undefined, devSeekerName());
     return (
       <SeekerDashboard

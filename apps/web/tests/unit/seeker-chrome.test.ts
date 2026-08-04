@@ -66,13 +66,28 @@ describe("the seeker shell landmark", () => {
 describe("the local seeker review state", () => {
   it("does not wait on configured local data services", () => {
     expect(homePage).toContain(
-      "isDevBenchEnabled() && (await readDevRole())",
+      'isDevBenchEnabled() && (await readDevRole()) === "seeker"',
+    );
+    expect(seekerLayout).toContain(
+      'isDevBenchEnabled() && (await readDevRole()) === "seeker"',
     );
     expect(homePage).toContain(
       "getSeasonBoard(undefined, undefined, devSeekerName())",
     );
     expect(seekerLayout).toContain("unreadCommunity: 0");
   });
+
+  it.each(["host", "admin"])(
+    "does not enable seeker fixtures for the %s review role",
+    (role) => {
+      expect(homePage).not.toContain(
+        `isDevBenchEnabled() && (await readDevRole()) === "${role}"`,
+      );
+      expect(seekerLayout).not.toContain(
+        `isDevBenchEnabled() && (await readDevRole()) === "${role}"`,
+      );
+    },
+  );
 });
 
 // ── 1. The blocking modal is dead ─────────────────────────────────────────

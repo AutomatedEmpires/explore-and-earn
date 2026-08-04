@@ -66,7 +66,7 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
   // DEV MOCK BENCH (review tooling only): present a clean impersonated identity
   // and skip the DB reads that would fail on the bench's sentinel token. No-op
   // in production/preview (isDevBenchEnabled() is false).
-  if (isDevBenchEnabled() && (await readDevRole())) {
+  if (isDevBenchEnabled() && (await readDevRole()) === "seeker") {
     return {
       unreadCount: 0,
       clerkUserId: DEV_USER_ID,

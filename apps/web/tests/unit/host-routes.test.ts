@@ -35,13 +35,13 @@ describe("private host dashboard routes", () => {
     const devGate = hostOverview.indexOf(
       'isDevBenchEnabled() && (await readDevRole()) === "host"',
     );
+    const devHostRead = hostOverview.indexOf("devHostProfile()", devGate);
     const authRead = hostOverview.indexOf("await auth()", devGate);
 
     expect(devGate).toBeGreaterThan(-1);
-    expect(hostOverview.indexOf("devHostProfile()", devGate)).toBeGreaterThan(
-      devGate,
-    );
+    expect(devHostRead).toBeGreaterThan(devGate);
     expect(authRead).toBeGreaterThan(devGate);
+    expect(devHostRead).toBeLessThan(authRead);
   });
 
   it.each([

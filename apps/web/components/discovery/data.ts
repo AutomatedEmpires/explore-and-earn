@@ -172,7 +172,7 @@ export async function getDiscoveryListingsWithCoords(
 
 export function canUseDiscoveryFixtureFallback(): boolean {
   // A configured-but-offline local Supabase must not defeat the review bench.
-  // NEXT_PUBLIC_DEV_BENCH=0 opts developers back into the real data path.
+  // Only explicit NEXT_PUBLIC_DEV_BENCH=1 selects deterministic local fixtures.
   if (isDevBenchEnabled()) return true;
   return !hasPublicDataConfig && allowFixtureFallback;
 }

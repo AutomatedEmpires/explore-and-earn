@@ -29,4 +29,35 @@ describe("listing application state", () => {
     expect(component).not.toContain("requestAnimationFrame");
     expect(styles).toMatch(/\.appliedState:focus\s*\{[^}]*var\(--ui-focus-ring\)/s);
   });
+
+  it("keeps focus inside the confirmation dialog while apply is pending", () => {
+    const component = source("app/[locale]/listing/[id]/ApplyButton.tsx");
+    const handleConfirm = component.indexOf("const handleConfirm");
+    const actionCall = component.indexOf(
+      "await applyToListingAction(listingId)",
+      handleConfirm,
+    );
+    const modalClose = component.indexOf(
+      "setShowConfirmModal(false)",
+      handleConfirm,
+    );
+    const confirmButton = component.slice(
+      component.indexOf('variant="primary"', component.indexOf("{showConfirmModal")),
+      component.indexOf('variant="ghost"', component.indexOf("{showConfirmModal")),
+    );
+
+    expect(handleConfirm).toBeGreaterThan(-1);
+    expect(actionCall).toBeGreaterThan(handleConfirm);
+    expect(modalClose).toBeGreaterThan(actionCall);
+    expect(component).toContain("if (applyRequestInFlight.current) return");
+    expect(component).toContain(
+      "if (!applyRequestInFlight.current) setShowConfirmModal(false)",
+    );
+    expect(confirmButton).toContain("aria-busy={isApplying}");
+    expect(confirmButton).toContain("aria-disabled={isApplying}");
+    expect(confirmButton).toContain(
+      '{isApplying ? t("submitting") : tc("confirm")}',
+    );
+    expect(confirmButton).not.toContain("disabled={isPending}");
+  });
 });

@@ -34,8 +34,8 @@ export function isDevRole(value: unknown): value is DevRole {
 
 /**
  * The single switch everything keys off. False in production no matter what,
- * so the bench can never ship. A `NEXT_PUBLIC_DEV_BENCH=0` kill-switch lets a
- * developer force it off locally; otherwise it is on under `next dev`.
+ * so the bench can never ship. Local review also requires an explicit
+ * `NEXT_PUBLIC_DEV_BENCH=1` opt-in; an unset flag fails closed.
  *
  * NODE_ENV and NEXT_PUBLIC_DEV_BENCH are inlined by Next at build time, so this
  * evaluates correctly on both the server and the client.
@@ -43,7 +43,7 @@ export function isDevRole(value: unknown): value is DevRole {
 export function isDevBenchEnabled(): boolean {
   return (
     process.env.NODE_ENV !== "production" &&
-    process.env.NEXT_PUBLIC_DEV_BENCH !== "0"
+    process.env.NEXT_PUBLIC_DEV_BENCH === "1"
   );
 }
 
@@ -84,9 +84,8 @@ function isNonProdSupabaseUrl(): boolean {
  * handed to the impersonated session.
  *
  * Requires ALL of:
- *   1. isDevBenchEnabled()            — the existing NODE_ENV gate (not weakened).
- *   2. NEXT_PUBLIC_DEV_BENCH === "1"  — EXPLICIT opt-in (note: stricter than the
- *      base gate's `!== "0"`; a developer must deliberately turn it on).
+ *   1. isDevBenchEnabled()            — NODE_ENV gate plus explicit local opt-in.
+ *   2. NEXT_PUBLIC_DEV_BENCH === "1"  — repeated here as defense in depth.
  *   3. isNonProdSupabaseUrl()         — the data target is a local, non-prod DB.
  *
  * So a stray `next dev` against production env — which has a hosted Supabase URL

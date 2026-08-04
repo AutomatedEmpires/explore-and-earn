@@ -68,6 +68,7 @@ export function ApplyButton({
   const [applicationCommitted, setApplicationCommitted] = useState(false);
   const appliedStateRef = useRef<HTMLDivElement>(null);
   const focusAppliedAfterCommit = useRef(false);
+  const applyRequestInFlight = useRef(false);
 
   useEffect(() => {
     if (!applicationCommitted || !focusAppliedAfterCommit.current) return;
@@ -131,10 +132,15 @@ export function ApplyButton({
   };
 
   const handleConfirm = () => {
-    setShowConfirmModal(false);
+    if (applyRequestInFlight.current) return;
+    applyRequestInFlight.current = true;
     startApplying(async () => {
       try {
         const result = await applyToListingAction(listingId);
+        // Keep the dialog and its focused confirm control mounted until the
+        // request resolves. Closing sooner would make Modal restore focus to
+        // the now-disabled page action while a slow submission is pending.
+        setShowConfirmModal(false);
         if (result.ok) {
           focusAppliedAfterCommit.current = true;
           setApplicationCommitted(true);
@@ -165,7 +171,10 @@ export function ApplyButton({
           setErrorDialog({ heading: t("errorHeading"), message: msg });
         }
       } catch {
+        setShowConfirmModal(false);
         setErrorDialog({ heading: t("errorHeading"), message: t("errorGeneric") });
+      } finally {
+        applyRequestInFlight.current = false;
       }
     });
   };
@@ -297,7 +306,9 @@ export function ApplyButton({
       {showConfirmModal && (
         <Modal
           heading={t("confirmHeading")}
-          onClose={() => setShowConfirmModal(false)}
+          onClose={() => {
+            if (!applyRequestInFlight.current) setShowConfirmModal(false);
+          }}
         >
           <p className={styles.modalText}>
             {t.rich("confirmBody", {
@@ -309,9 +320,10 @@ export function ApplyButton({
             <Button
               variant="primary"
               onClick={handleConfirm}
-              disabled={isPending}
+              aria-busy={isApplying}
+              aria-disabled={isApplying}
             >
-              {tc("confirm")}
+              {isApplying ? t("submitting") : tc("confirm")}
             </Button>
             <Button
               variant="ghost"
