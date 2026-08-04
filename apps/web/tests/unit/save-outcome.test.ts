@@ -19,6 +19,7 @@ import type { SaveFailureReason, SaveResult } from "../../app/actions/savedListi
 const ALL_REASONS: readonly SaveFailureReason[] = [
   "unauthenticated",
   "rate_limit_exceeded",
+  "temporarily_unavailable",
   "failed",
 ];
 

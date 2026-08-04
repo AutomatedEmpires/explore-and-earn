@@ -222,10 +222,10 @@ describe("stated facts come from stored columns only", () => {
     expect(html).not.toContain("Stale private cabin copy");
   });
 
-  it("preserves partial and not-stated benefit truth", () => {
+  it("preserves partial benefit truth alongside a host summary", () => {
     const partial = render({
       data: base({
-        housingSummary: undefined,
+        housingSummary: "Weekday breakfast only",
         benefitProvision: {
           housing: "partial",
           meals: "provided",
@@ -233,8 +233,10 @@ describe("stated facts come from stored columns only", () => {
         },
       }),
     });
-    expect(partial).toContain("Partial");
+    expect(partial).toContain("Partial — Weekday breakfast only");
+  });
 
+  it("lets not-stated evidence override stale benefit summary copy", () => {
     const unstated = render({
       data: base({
         mealsSummary: "Stale crew dinner copy",
@@ -247,6 +249,32 @@ describe("stated facts come from stored columns only", () => {
     });
     expect(unstated).toContain(NOT_STATED_LABEL);
     expect(unstated).not.toContain("Stale crew dinner copy");
+  });
+
+  it("lets explicit not-provided pay override a stale rate everywhere", () => {
+    const html = render({
+      data: base({
+        triad: { housing: "Included", meals: "Included", pay: "$99/hr stale" },
+        benefitProvision: {
+          housing: "provided",
+          meals: "provided",
+          pay: "not_provided",
+        },
+      }),
+    });
+    expect(html).toContain(">Not provided<");
+    expect(html).toContain('aria-label="Pay: not provided"');
+    expect(html).not.toContain("$99/hr stale");
+  });
+
+  it("keeps an unscored Match value muted despite first-row emphasis", () => {
+    const css = readFileSync(
+      new URL("../../../../packages/ui/src/DiscoveryCard.module.css", import.meta.url),
+      "utf8",
+    );
+    expect(css).toMatch(
+      /\.glanceFacts \.factItem:first-child \.factValue:is\([\s\S]*?\[data-state="not_scored"\][\s\S]*?\)\s*\{[\s\S]*?font-weight: var\(--font-weight-medium\);/,
+    );
   });
 
   it("renders stored match, season, housing and meals together at a glance", () => {
@@ -646,7 +674,11 @@ describe("the image zone", () => {
     expect(actions).toContain(
       "result.decision === undefined ? previous : result.decision",
     );
-    expect(actions).toContain(".catch(() => setCardDecision(id, previous))");
+    expect(actions).toContain(".catch(() => {");
+    expect(actions).toContain("setCardDecision(id, previous);");
+    expect(actions).toContain(
+      'setDecisionError("We couldn’t reach the server. Try again.")',
+    );
     expect(actions).not.toContain("unsaveListingAction(id)");
     expect(actions).not.toContain("unpassListingAction(id)");
   });
@@ -705,6 +737,9 @@ describe("Housing and Meals evidence popups", () => {
     expect(source).toContain("checking photo availability");
     expect(source).toContain("photo availability unknown");
     expect(source).toContain("Availability unknown");
+    expect(source).toMatch(
+      /className=\{styles\.photoEmpty\}[\s\S]*?role="img"[\s\S]*?aria-label=/,
+    );
     expect(source).toContain('!isEdit && publicReadStatus === "ready"');
 
     const fixtureBranchStart = source.indexOf("if (knownEmptyFixtureEvidence)");

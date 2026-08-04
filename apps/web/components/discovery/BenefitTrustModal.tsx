@@ -771,6 +771,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 										) : !isEdit ? (
 											<span
 												className={styles.photoEmpty}
+												role="img"
 												aria-label={`${slot.label}: ${
 													publicReadStatus === "ready"
 														? "no photo added"

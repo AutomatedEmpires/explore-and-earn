@@ -431,12 +431,14 @@ describe("the swipe deck", () => {
   });
 
   it("restores the authoritative prior decision and rewinds only after success", () => {
-    const start = deck.indexOf("const undo");
+    const start = deck.indexOf("const undo = useCallback");
     const end = deck.indexOf("const restart", start);
     const undo = deck.slice(start, end);
     const failureGuard = undo.indexOf("!result.ok");
     const rewind = undo.indexOf("setIndex((value) => Math.max(0, value - 1))");
 
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
     expect(undo).toContain("restoreListingDecisionAction(");
     expect(undo).toContain("expectedCurrentDecision");
     expect(undo).toContain("last.previousDecision");

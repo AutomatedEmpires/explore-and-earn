@@ -257,7 +257,9 @@ export function ApplyButton({
             ? t("saveErrorRateLimit")
             : outcome.reason === "unauthenticated"
               ? t("errorSessionExpired")
-              : t("errorGeneric"),
+              : outcome.reason === "temporarily_unavailable"
+                ? t("saveErrorTemporary")
+                : t("errorGeneric"),
       });
     });
   };

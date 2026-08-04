@@ -18,6 +18,7 @@ import {
 export type SaveFailureReason =
 	| "unauthenticated"
 	| "rate_limit_exceeded"
+	| "temporarily_unavailable"
 	| "failed";
 
 export interface SaveResult {
@@ -32,6 +33,9 @@ function toSaveResult(result: ListingDecisionActionResult): SaveResult {
 	}
 	if (result.failureReason === "rate_limit_exceeded") {
 		return { ok: false, error: "rate_limit_exceeded" };
+	}
+	if (result.failureReason === "temporarily_unavailable") {
+		return { ok: false, error: "temporarily_unavailable" };
 	}
 	return { ok: false, error: "failed" };
 }

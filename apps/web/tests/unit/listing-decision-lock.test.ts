@@ -65,6 +65,55 @@ describe("listing decision lock", () => {
     expect(work).not.toHaveBeenCalled();
   });
 
+  it("uses Upstash fallbacks when primary KV variables are blank", async () => {
+    const previousKvUrl = process.env.KV_REST_API_URL;
+    const previousKvToken = process.env.KV_REST_API_TOKEN;
+    const previousUpstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const previousUpstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    process.env.KV_REST_API_URL = "";
+    process.env.KV_REST_API_TOKEN = "";
+    process.env.UPSTASH_REDIS_REST_URL = "https://fallback-kv.invalid/";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "fallback-token";
+
+    const fetchMock = vi
+      .fn(async () => kvResponse("OK"))
+      .mockImplementationOnce(async () => kvResponse("OK"))
+      .mockImplementationOnce(async () => kvResponse(1));
+    const fetchImpl = fetchMock as unknown as typeof fetch;
+
+    try {
+      const result = await withListingDecisionLock(
+        "user-1",
+        "listing-1",
+        async () => "done",
+        {
+          environment: "production",
+          fetchImpl,
+          tokenFactory: () => "owner-token",
+          maxAttempts: 1,
+        },
+      );
+
+      expect(result).toEqual({ acquired: true, value: "done" });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0]?.[0]).toBe("https://fallback-kv.invalid");
+      expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
+        headers: {
+          Authorization: "Bearer fallback-token",
+        },
+      });
+    } finally {
+      const restore = (name: string, value: string | undefined) => {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      };
+      restore("KV_REST_API_URL", previousKvUrl);
+      restore("KV_REST_API_TOKEN", previousKvToken);
+      restore("UPSTASH_REDIS_REST_URL", previousUpstashUrl);
+      restore("UPSTASH_REDIS_REST_TOKEN", previousUpstashToken);
+    }
+  });
+
   it("uses SET NX PX and releases only its own token", async () => {
     const commands: unknown[][] = [];
     const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {

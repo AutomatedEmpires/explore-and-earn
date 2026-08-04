@@ -27,7 +27,10 @@ import {
 	FeaturedEmployersRail,
 	type FeaturedEmployer,
 } from "../public/FeaturedEmployersRail";
-import { setMapListingDecisionAction } from "../../app/actions/mapDecisions";
+import {
+	setMapListingDecisionAction,
+	type ListingDecisionFailureReason,
+} from "../../app/actions/mapDecisions";
 import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
 import styles from "./SeekBrowser.module.css";
 import { SeekFilterPopup, type SeekFilterPopupValue } from "./SeekFilterPopup";
@@ -58,6 +61,26 @@ const SORT_OPTIONS = [
 ] as const;
 type SortId = (typeof SORT_OPTIONS)[number]["id"];
 type SeekCardDecision = "saved" | "skipped";
+
+function decisionFailureMessage(
+	decision: SeekCardDecision,
+	reason: ListingDecisionFailureReason | undefined,
+): string {
+	switch (reason) {
+		case "unauthenticated":
+			return "Your session ended. Sign in again to keep this decision.";
+		case "rate_limit_exceeded":
+			return "You’re moving quickly. Wait a moment, then try again.";
+		case "temporarily_unavailable":
+			return "Decisions are temporarily unavailable. Try again shortly.";
+		case "conflict":
+			return "This opportunity changed elsewhere. Review its current state and try again.";
+		default:
+			return decision === "saved"
+				? "We couldn’t confirm that save. Try again."
+				: "We couldn’t confirm that skip. Try again.";
+	}
+}
 
 /** Comparable pay floor in cents, or null when the listing states no range. */
 function payFloor(listing: DiscoveryListing): number | null {
@@ -198,6 +221,7 @@ export function SeekBrowser({
 		useState<ReadonlySet<string>>(hydratedSavedIds);
 	const [skippedIds, setSkippedIds] =
 		useState<ReadonlySet<string>>(hydratedSkippedIds);
+	const [decisionError, setDecisionError] = useState<string | null>(null);
 	const decisionInFlight = useRef(new Set<string>());
 
 	// Server navigation can replace the result page without remounting this
@@ -414,6 +438,7 @@ export function SeekBrowser({
 					: null;
 
 			decisionInFlight.current.add(id);
+			setDecisionError(null);
 			setCardDecision(id, decision);
 			captureEvent(
 				decision === "saved"
@@ -426,12 +451,21 @@ export function SeekBrowser({
 			// transition, and reports the exact outcome after any compensation.
 			void setMapListingDecisionAction(id, decision)
 				.then((result) => {
+					const failed = !result.ok || result.decision === undefined;
 					setCardDecision(
 						id,
 						result.decision === undefined ? previous : result.decision,
 					);
+					if (failed) {
+						setDecisionError(
+							decisionFailureMessage(decision, result.failureReason),
+						);
+					}
 				})
-				.catch(() => setCardDecision(id, previous))
+				.catch(() => {
+					setCardDecision(id, previous);
+					setDecisionError("We couldn’t reach the server. Try again.");
+				})
 				.finally(() => decisionInFlight.current.delete(id));
 		},
 		[requireAuth, savedIds, setCardDecision, skippedIds],
@@ -758,6 +792,11 @@ export function SeekBrowser({
 			<p className={styles.count} role="status" aria-live="polite">
 				{countLabel}
 			</p>
+			{decisionError ? (
+				<p className={styles.count} role="alert">
+					{decisionError}
+				</p>
+			) : null}
 
 			<ListingCardGrid
 				listings={results}

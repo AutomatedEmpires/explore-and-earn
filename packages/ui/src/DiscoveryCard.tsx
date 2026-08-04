@@ -6,6 +6,7 @@ import {
 	benefitCardState,
 	cardRecordCompleteness,
 	missingFactsSentence,
+	type BenefitCardState,
 	type BenefitEvidenceStatus,
 	type BenefitProvision,
 	type DiscoveryCardConditionalBadge,
@@ -273,14 +274,6 @@ const SECONDARY_TONE_CLASS: Record<SecondaryTone, string> = {
 // pure, tested, and shared, because the private version of this inference is
 // what let the card announce "Housing: included" for a listing nobody had
 // answered.
-const benefitNotStated = (
-	provision: BenefitProvision | undefined,
-	evidence: BenefitEvidenceStatus | undefined,
-): boolean => benefitCardState(provision, evidence) === "not_stated"
-
-const benefitProvided = (provision: BenefitProvision | undefined): boolean =>
-	benefitCardState(provision) === "provided"
-
 /**
  * Resolve one seeker-facing benefit value without turning silence into a
  * promise. Evidence/provision wins over stale summary text; once the benefit is
@@ -303,13 +296,14 @@ function benefitTruthValue(
 		return "Not provided"
 	}
 	const statedSummary = summary?.trim()
+	// `benefitCardState` intentionally folds partial into its positive state for
+	// card color semantics. Preserve the finer provision truth in visible copy,
+	// including when the host also supplied a useful summary.
+	if (provision === "partial") {
+		return statedSummary ? `Partial — ${statedSummary}` : "Partial"
+	}
 	if (statedSummary) {
 		return statedSummary
-	}
-	// `benefitCardState` intentionally folds partial into its positive state for
-	// card color semantics. Preserve the finer provision truth in visible copy.
-	if (provision === "partial") {
-		return "Partial"
 	}
 	return fallback.trim() || "Provided"
 }
@@ -322,30 +316,27 @@ function benefitTruthValue(
 // A clickable cell (photo bucket / pay scale) renders as a <button>.
 function BenefitTriadCell({
 	kind,
-	provided,
-	notStated,
+	state,
 	value,
 	onClick,
 }: {
 	readonly kind: "housing" | "meals" | "pay"
-	readonly provided?: boolean
 	/**
-	 * The source did not state this benefit (sourced listings only). Renders a
-	 * NEUTRAL "Not stated" cell — never the red "not included" tone. Absence of
-	 * information is not evidence the benefit is unavailable (product law).
+	 * Canonical benefit truth. Keeping the complete state together prevents
+	 * stale display copy from overriding an explicit no or unanswered value.
 	 */
-	readonly notStated?: boolean
+	readonly state: BenefitCardState
 	readonly value: string
 	readonly onClick?: () => void
 }) {
 	const isPay = kind === "pay"
-	const stateClass = notStated
+	const stateClass = state === "not_stated"
 			? styles.benefitNotStated
-			: isPay
-				? styles.benefitPay
-				: provided
-				? styles.benefitProvided
-				: styles.benefitNot
+			: state === "not_provided"
+				? styles.benefitNot
+				: isPay
+					? styles.benefitPay
+					: styles.benefitProvided
 	const label = kind === "housing" ? "Housing" : kind === "meals" ? "Meals" : "Pay"
 	// Housing/Meals carry NO icon and NO checkmark on the card (founder card-v2.2
 	// lock) — just the label on a COLOR-CODED cell; the detail lives in the popup.
@@ -362,12 +353,20 @@ function BenefitTriadCell({
 	// The fix keeps the v2.2 lock intact (no icon, no checkmark, one compact
 	// tier) and instead lets the LABEL carry the state, exactly as the
 	// "Not stated" cell already does in this same component.
-	const stateText = notStated ? "not stated" : isPay ? "" : provided ? "included" : "not included"
+	const stateText = state === "not_stated"
+		? "not stated"
+		: state === "not_provided"
+			? isPay ? "not provided" : "not included"
+			: isPay ? "" : "included"
 	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
-	const displayValue = notStated ? NOT_STATED_LABEL : value.trim() || NOT_STATED_LABEL
-	const benefitText = notStated
+	const displayValue = state === "not_stated"
 		? NOT_STATED_LABEL
-		: provided
+		: state === "not_provided"
+			? "Not provided"
+			: value.trim() || "Provided"
+	const benefitText = state === "not_stated"
+		? NOT_STATED_LABEL
+		: state === "provided"
 			? label
 			: kind === "housing"
 				? "No housing"
@@ -447,6 +446,9 @@ export function DiscoveryCard({
 	const hp = data.benefitProvision?.housing
 	const mp = data.benefitProvision?.meals
 	const pp = data.benefitProvision?.pay
+	const housingState = benefitCardState(hp, ev?.housing)
+	const mealsState = benefitCardState(mp, ev?.meals)
+	const payState = benefitCardState(pp, ev?.pay)
 
 	// Every triad cell remains explainable, including an explicit "not provided"
 	// or an unanswered value. The overlay owns the fuller truth and evidence
@@ -1075,24 +1077,20 @@ export function DiscoveryCard({
 					<div className={styles.triad}>
 						<BenefitTriadCell
 							kind="housing"
-							provided={benefitProvided(hp)}
-							notStated={benefitNotStated(hp, ev?.housing)}
+							state={housingState}
 							value={data.triad.housing}
 							onClick={canOpenHousing ? () => onHousingClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="meals"
-							provided={benefitProvided(mp)}
-							notStated={benefitNotStated(mp, ev?.meals)}
+							state={mealsState}
 							value={data.triad.meals}
 							onClick={canOpenMeals ? () => onMealsClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="pay"
+							state={payState}
 							value={data.triad.pay}
-							notStated={
-								benefitNotStated(pp, ev?.pay) || data.triad.pay.trim().length === 0
-							}
 							onClick={onPayClick ? () => onPayClick(data.id) : undefined}
 						/>
 					</div>

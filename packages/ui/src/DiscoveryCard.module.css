@@ -835,6 +835,16 @@ button.metaRow:focus-visible {
   font-weight: var(--font-weight-medium);
 }
 
+/* The Match row is intentionally emphasized only when it carries a score.
+   Match the first-row selector's specificity so its bold weight cannot win for
+   an honest "Not scored" value. */
+.glanceFacts .factItem:first-child .factValue:is(
+  [data-state="not_stated"],
+  [data-state="not_scored"]
+) {
+  font-weight: var(--font-weight-medium);
+}
+
 .perks {
   display: flex;
   flex-wrap: wrap;
@@ -1105,6 +1115,7 @@ button.benefit:focus-visible {
   font-size: clamp(13px, 3.4vw, 16px);
   color: var(--palette-pay-fg);
 }
+.benefitNot .benefitPayValue { color: var(--status-error-fg); }
 
 /* ── 7. CTA — gradient action bar; Skip · Apply · Save split ───────────────── */
 

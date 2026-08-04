@@ -42,9 +42,9 @@ function lockKey(userId: string, listingId: string): string {
 
 function resolveKvConfig(): KvRestConfig | null {
 	const url =
-		process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL ?? "";
+		process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "";
 	const token =
-		process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN ?? "";
+		process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
 	if (!url || !token) return null;
 	return { url: url.replace(/\/+$/, ""), token };
 }

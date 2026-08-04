@@ -29,7 +29,10 @@ import { SeekFilterPopup, type SeekFilterPopupValue } from "../seeker/SeekFilter
 import { SeekSortPopup } from "../seeker/SeekSortPopup";
 import { byMonetization, type MonetizationInputs } from "../../lib/ranking";
 import { SEEKER_DISCOVERY_EVENTS, captureEvent } from "../../lib/analytics";
-import { setMapListingDecisionAction } from "../../app/actions/mapDecisions";
+import {
+  setMapListingDecisionAction,
+  type ListingDecisionFailureReason,
+} from "../../app/actions/mapDecisions";
 import type { ExclusiveListingDecision } from "../../lib/exclusiveListingDecision";
 import styles from "./MapView.module.css";
 
@@ -74,6 +77,26 @@ interface ViewBounds {
 const USA_VIEW = { longitude: -98.5795, latitude: 39.8283, zoom: 4 } as const;
 const MAP_STYLE = { width: "100%", height: "100%" };
 const EMPTY_LISTING_IDS: readonly string[] = [];
+
+function decisionFailureMessage(
+  decision: ExclusiveListingDecision,
+  reason: ListingDecisionFailureReason | undefined,
+): string {
+  switch (reason) {
+    case "unauthenticated":
+      return "Your session ended. Sign in again to keep this decision.";
+    case "rate_limit_exceeded":
+      return "You’re moving quickly. Wait a moment, then try again.";
+    case "temporarily_unavailable":
+      return "Decisions are temporarily unavailable. Try again shortly.";
+    case "conflict":
+      return "This opportunity changed elsewhere. Review its current state and try again.";
+    default:
+      return decision === "saved"
+        ? "We couldn’t confirm that save. Try again."
+        : "We couldn’t confirm that skip. Try again.";
+  }
+}
 
 const EMPTY_FILTERS: SeekFilterPopupValue = {
   housing: false,
@@ -251,6 +274,7 @@ export function MapView({
   const [decisions, setDecisions] = useState<
     ReadonlyMap<string, ExclusiveListingDecision>
   >(() => initialDecisions);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
   const decisionsRef = useRef(new Map(initialDecisions));
   const decisionVersions = useRef(new Map<string, number>());
   const decisionQueues = useRef(new Map<string, Promise<void>>());
@@ -362,6 +386,7 @@ export function MapView({
   const queueDecision = useCallback(
     (id: string, next: ExclusiveListingDecision) => {
       const previous = decisionsRef.current.get(id) ?? null;
+      setDecisionError(null);
       setLocalDecision(id, next);
 
       const version = (decisionVersions.current.get(id) ?? 0) + 1;
@@ -377,9 +402,15 @@ export function MapView({
               id,
               result.decision === undefined ? previous : result.decision,
             );
+            if (!result.ok || result.decision === undefined) {
+              setDecisionError(
+                decisionFailureMessage(next, result.failureReason),
+              );
+            }
           } catch {
             if (decisionVersions.current.get(id) === version) {
               setLocalDecision(id, previous);
+              setDecisionError("We couldn’t reach the server. Try again.");
             }
           }
         });
@@ -609,7 +640,13 @@ export function MapView({
         >
           <span className={styles.trayGrip} aria-hidden />
           <span className={styles.trayTitle}>
-            {trayOpen ? "Hide listings" : "Swipe up for listings in view"}
+            {decisionError ? (
+              <span role="alert">{decisionError}</span>
+            ) : trayOpen ? (
+              "Hide listings"
+            ) : (
+              "Swipe up for listings in view"
+            )}
           </span>
           <span className={styles.trayMeta}>
             {trayListings.length}{" "}

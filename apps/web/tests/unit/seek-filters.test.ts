@@ -207,7 +207,11 @@ describe("the decision bar on /seek", () => {
     expect(decisionFlow).toContain(
       "result.decision === undefined ? previous : result.decision",
     );
-    expect(decisionFlow).toContain(".catch(() => setCardDecision(id, previous))");
+    expect(decisionFlow).toContain(".catch(() => {");
+    expect(decisionFlow).toContain("setCardDecision(id, previous);");
+    expect(decisionFlow).toContain(
+      'setDecisionError("We couldn’t reach the server. Try again.")',
+    );
   });
 });
 

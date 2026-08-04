@@ -53,7 +53,7 @@ describe("legacy listing decision action adapters", () => {
   it.each([
     ["unauthenticated", "unauthenticated"],
     ["rate_limit_exceeded", "rate_limit_exceeded"],
-    ["temporarily_unavailable", "failed"],
+    ["temporarily_unavailable", "temporarily_unavailable"],
   ] as const)(
     "maps %s to the saved-listing public failure contract",
     async (failureReason, error) => {

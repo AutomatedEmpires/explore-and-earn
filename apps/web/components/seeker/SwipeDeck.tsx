@@ -697,12 +697,12 @@ export function SwipeDeck({ listings, initialCursor = null, isAuthenticated = tr
 		pointerTypeRef.current = "";
 		gestureAxisRef.current = "pending";
 		startRef.current = null;
+		setDragging(false);
+		setOffset({ x: 0, y: 0 });
 		if (action) {
 			void triggerLeave(action);
 			return;
 		}
-		setDragging(false);
-		setOffset({ x: 0, y: 0 });
 	};
 
 	const onPointerCancel = (event: ReactPointerEvent<HTMLDivElement>) => {
