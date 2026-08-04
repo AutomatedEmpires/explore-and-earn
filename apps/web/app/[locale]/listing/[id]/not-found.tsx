@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { Icon } from "@explore-and-earn/ui";
 
+import { Link } from "../../../../i18n/navigation";
 import styles from "./not-found.module.css";
 
 // Keeps the crawl/e2e contract of the shared 404 ("Page not found") while the
@@ -19,30 +20,28 @@ export const metadata: Metadata = {
  * do NOT guess WHICH of those happened: the id resolves to nothing, and
  * claiming "this role was filled" would invent a fact we don't have.
  */
-export default function ListingNotFound() {
+export default async function ListingNotFound() {
+  const t = await getTranslations("ListingNotFound");
+
   return (
     <div className={styles.wrap}>
       <div className={styles.inner}>
-        <p className={styles.eyebrow}>The marketplace</p>
+        <p className={styles.eyebrow}>{t("eyebrow")}</p>
         <h1 className={styles.title}>
-          This opportunity isn&rsquo;t listed
+          {t("title")}
           <span className={styles.titleMark} aria-hidden>
             .
           </span>
         </h1>
-        <p className={styles.lede}>
-          Listings leave the marketplace when they close, fill, or expire — and
-          links outlive all three. Everything else is still here: the search,
-          the four lanes, and the map are live.
-        </p>
+        <p className={styles.lede}>{t("lede")}</p>
         <div className={styles.actions}>
           <Link className={styles.primary} href="/seek">
-            Browse open opportunities
+            {t("browse")}
             <Icon name="action.forward" size={16} aria-hidden />
           </Link>
           <Link className={styles.quiet} href="/jobs">
             <Icon name="nav.seek" size={16} aria-hidden />
-            See the four lanes
+            {t("lanes")}
           </Link>
         </div>
       </div>

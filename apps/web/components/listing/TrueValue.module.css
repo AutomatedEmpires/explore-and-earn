@@ -44,7 +44,7 @@
   font-weight: var(--font-weight-semibold);
   font-size: var(--type-section-size);
   line-height: var(--type-section-lh);
-  letter-spacing: -0.02em;
+  letter-spacing: var(--type-display-tracking);
   color: var(--text-primary);
 }
 
@@ -132,14 +132,14 @@
 .resultValue {
   font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
-  font-size: var(--type-display-size);
-  line-height: 1;
-  letter-spacing: -0.03em;
+  font-size: var(--type-metric-size);
+  line-height: var(--type-metric-lh);
+  letter-spacing: var(--type-metric-tracking);
   color: var(--text-primary);
 }
 
 .resultValue small {
-  font-size: 0.42em;
+  font-size: var(--type-body-size);
   font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
   letter-spacing: 0;
@@ -162,7 +162,7 @@
   gap: var(--space-8);
   margin: 0;
   font-size: var(--type-label-size);
-  line-height: 1.4;
+  line-height: var(--type-caption-lh);
   color: var(--text-muted);
 }
 

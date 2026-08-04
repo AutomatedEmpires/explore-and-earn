@@ -131,6 +131,14 @@ const MATRIX: readonly MatrixRow[] = [
     note: "Legal. Must be readable before anyone agrees to anything.",
   },
   {
+    path: "/api/notifications/unsubscribe",
+    guest: "public",
+    seeker: "render",
+    host: "render",
+    admin: "render",
+    note: "Signed-token unsubscribe. The token is the credential for human GET and RFC 8058 POST requests, so Clerk must not intercept it.",
+  },
+  {
     path: "/blog/some-post",
     guest: "public",
     seeker: "render",
@@ -398,6 +406,10 @@ describe("route access matrix", () => {
     for (const path of ["/seek", "/map", "/swipe"]) {
       expect(derivedGuestAccess(path), path).toBe("public");
     }
+  });
+
+  it("the signed-token unsubscribe endpoint is public", () => {
+    expect(derivedGuestAccess("/api/notifications/unsubscribe")).toBe("public");
   });
 
   /**

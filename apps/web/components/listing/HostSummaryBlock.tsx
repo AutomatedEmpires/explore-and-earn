@@ -1,18 +1,9 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui"
-import type { ResponsiveImage } from "@explore-and-earn/contracts"
+import type { ListingHostSummary } from "@explore-and-earn/contracts"
 import { ListingSection } from "./ListingSection"
 import styles from "./HostSummaryBlock.module.css"
-
-export interface ListingHostSummary {
-	readonly id: string
-	readonly name: string
-	readonly location?: string
-	readonly verified: boolean
-	readonly tagline?: string
-	readonly avatar?: ResponsiveImage
-}
 
 export function HostSummaryBlock({ host }: { readonly host: ListingHostSummary }) {
 	const profileHref = host.id ? `/host/${host.id}` : null

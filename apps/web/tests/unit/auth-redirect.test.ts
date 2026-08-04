@@ -5,6 +5,7 @@ import {
   RETURN_PARAM,
   resolveReturnPath,
   safeInternalRedirect,
+  safeInternalRedirectFromOrigin,
   signInHref,
 } from "../../lib/authRedirect";
 
@@ -77,6 +78,38 @@ describe("safeInternalRedirect", () => {
    */
   it("is not simply refusing everything", () => {
     expect(safeInternalRedirect("/seek?category=farm")).toBe("/seek?category=farm");
+  });
+});
+
+describe("safeInternalRedirectFromOrigin", () => {
+  const origin = "https://exploreandearn.com";
+
+  it("normalizes Clerk's same-origin absolute redirect to an internal path", () => {
+    expect(
+      safeInternalRedirectFromOrigin(
+        "https://exploreandearn.com/team/accept?token=invite-test#join",
+        origin,
+      ),
+    ).toBe("/team/accept?token=invite-test#join");
+  });
+
+  it("keeps an already-internal path unchanged", () => {
+    expect(safeInternalRedirectFromOrigin("/saved?view=recent", origin)).toBe(
+      "/saved?view=recent",
+    );
+  });
+
+  it.each([
+    ["off-origin", "https://attacker.example/saved"],
+    ["lookalike subdomain", "https://exploreandearn.com.attacker.example/saved"],
+    ["different subdomain", "https://www.exploreandearn.com/saved"],
+    ["different port", "https://exploreandearn.com:444/saved"],
+    ["credentialed", "https://user@exploreandearn.com/saved"],
+    ["protocol-relative", "//exploreandearn.com/saved"],
+    ["backslash", "https:\\exploreandearn.com\\saved"],
+    ["control character", "https://exploreandearn.com/sa\nved"],
+  ])("rejects a %s absolute target", (_label, candidate) => {
+    expect(safeInternalRedirectFromOrigin(candidate, origin)).toBeUndefined();
   });
 });
 

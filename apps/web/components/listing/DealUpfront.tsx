@@ -6,6 +6,7 @@ import {
   benefitStateLabel,
   housingPhotoLabel,
   NOT_STATED_LABEL,
+  payStateLabel,
   type BenefitEvidenceStatus,
   type EffectiveHousingPhoto,
 } from "@explore-and-earn/contracts";
@@ -60,13 +61,12 @@ export function DealUpfront({
   evidence,
   children,
 }: DealUpfrontProps) {
-  const payNotStated = evidence?.pay === "not_stated";
   // "Not stated" is a non-assertion and must not wear asserted-fact styling —
   // the value element carries data-state so the stylesheet can de-emphasise it.
   // Compared against the imported constant, never a re-typed string.
   const housingValue = benefitCellValue(housingIncluded, evidence?.housing);
   const mealsValue = benefitCellValue(mealsIncluded, evidence?.meals);
-  const payValue = payNotStated ? NOT_STATED_LABEL : paySummary;
+  const payValue = payStateLabel(paySummary, evidence?.pay);
   const stateOf = (value: string) =>
     value === NOT_STATED_LABEL ? "not_stated" : undefined;
   return (

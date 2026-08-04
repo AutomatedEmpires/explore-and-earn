@@ -8,6 +8,7 @@ import {
   RETURN_PARAM,
   RETURN_PARAM_NAMES,
   safeInternalRedirect,
+  safeInternalRedirectFromOrigin,
   type ReturnParamName,
 } from "./lib/authRedirect";
 import { isCommunityPath } from "./lib/communityRoutes";
@@ -65,6 +66,10 @@ function redirectDefaultLocalePrefix(request: NextRequest): NextResponse | null 
 
 const isPublicRoute = createRouteMatcher([
   "/",
+  // Local review tooling must reach its own role picker before a dev-role
+  // cookie exists. The page still returns notFound() whenever NODE_ENV is
+  // production, so this opens no deployed surface.
+  "/dev",
   "/search",
   // Public discovery surfaces. These live in the (seeker) route group but its
   // layout renders safe defaults for signed-out visitors (no userId → no
@@ -100,6 +105,10 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up",
   "/sign-up/(.*)",
   "/api/webhooks/(.*)",
+  // The signed, scoped, expiring token is the credential. Both the human GET
+  // and RFC 8058 one-click POST must reach their handler without a Clerk
+  // session or every signed-out unsubscribe link presents as a fake 404.
+  "/api/notifications/unsubscribe",
   "/api/health",
   // Browser CSP violation reports are fired by the UA with no Clerk session —
   // most of them from signed-out visitors on public pages. Without this entry,
@@ -227,25 +236,36 @@ function redirectToRoleSignIn(
 /**
  * Scrub an unsafe (or duplicated) return path off the auth entry URLs.
  *
- * Runs for BOTH accepted names. A single valid value passes through untouched;
- * anything else — an absolute URL, a protocol-relative host, a backslash trick,
- * or two copies of the parameter so a later reader picks the other one — is
- * deleted and the visitor is redirected to the cleaned URL.
+ * Runs for BOTH accepted names. A single internal value passes through. Clerk
+ * may also produce an absolute URL for a generic protected route; an exact
+ * same-origin value is normalized to its internal path before rendering the
+ * auth page. Anything else — an off-origin URL, a protocol-relative host, a
+ * backslash trick, or two copies of the parameter so a later reader picks the
+ * other one — is deleted and the visitor is redirected to the cleaned URL.
  */
 function stripUnsafeAuthRedirect(request: NextRequest): NextResponse | null {
   const { pathname, searchParams } = request.nextUrl;
   if (pathname !== "/sign-in" && pathname !== "/sign-up") return null;
 
+  const normalized = new Map<ReturnParamName, string>();
   const unsafe = RETURN_PARAM_NAMES.filter((name) => {
     const candidates = searchParams.getAll(name);
     if (candidates.length === 0) return false;
     if (candidates.length > 1) return true;
-    return !safeInternalRedirect(candidates[0] ?? undefined);
+    const candidate = candidates[0] ?? undefined;
+    const safe = safeInternalRedirectFromOrigin(
+      candidate,
+      request.nextUrl.origin,
+    );
+    if (!safe) return true;
+    if (safe !== candidate) normalized.set(name, safe);
+    return false;
   });
-  if (unsafe.length === 0) return null;
+  if (unsafe.length === 0 && normalized.size === 0) return null;
 
   const url = request.nextUrl.clone();
   for (const name of unsafe) url.searchParams.delete(name);
+  for (const [name, safe] of normalized) url.searchParams.set(name, safe);
   return NextResponse.redirect(url);
 }
 

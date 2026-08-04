@@ -19,6 +19,7 @@ import {
   matchBandFor,
   matchBandLabel,
   NOT_STATED_LABEL,
+  payStateLabel,
 } from "@explore-and-earn/contracts";
 import {
   cachedHostProfile,
@@ -296,6 +297,7 @@ export default async function ListingDetailPage({ params }: Props) {
   const evidence = listing.provenanceInfo?.benefitEvidence;
   const railHousingLabel = benefitStateLabel(listing.housingIncluded, evidence?.housing);
   const railMealsLabel = benefitStateLabel(listing.mealsIncluded, evidence?.meals);
+  const railPayLabel = payStateLabel(paySummary, evidence?.pay);
   const railSeasonValue = listing.timelineSummary ?? dateLabel ?? NOT_STATED_LABEL;
 
   // The hero's written lede — composed from the same real state the page
@@ -304,7 +306,7 @@ export default async function ListingDetailPage({ params }: Props) {
     categoryLabel: CATEGORY_LABEL[listing.category] ?? listing.category,
     hostName: listing.host?.companyName ?? null,
     locationDisplay: listing.locationDisplay,
-    dateLabel,
+    dateLabel: listing.timelineSummary ?? dateLabel,
   });
 
   // At-a-glance facts — each cell added ONLY when its underlying field is real.
@@ -585,9 +587,9 @@ export default async function ListingDetailPage({ params }: Props) {
                 <dt className={styles.railDealLabel}>Pay</dt>
                 <dd
                   className={styles.railDealValue}
-                  data-state={paySummary === NOT_STATED_LABEL ? "not_stated" : undefined}
+                  data-state={railPayLabel === NOT_STATED_LABEL ? "not_stated" : undefined}
                 >
-                  {paySummary}
+                  {railPayLabel}
                 </dd>
               </div>
               <div className={styles.railDealRow}>

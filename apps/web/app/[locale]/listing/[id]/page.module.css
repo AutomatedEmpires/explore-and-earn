@@ -9,8 +9,8 @@
      reserve is sized for the tall posture — a short reserve slid the host card
      under the bar. */
   padding-bottom: calc(
-    var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px) +
-      var(--space-80) + var(--space-48)
+    var(--size-bottom-nav) + var(--space-16) + env(safe-area-inset-bottom, 0px)
+      + var(--space-80) + var(--space-48)
   );
 }
 
@@ -60,7 +60,7 @@
 /* ─── The rail (desktop) / the fixed bar (mobile) ────────────────────────── */
 
 .rail {
-  display: contents;
+  display: block;
 }
 
 @media (min-width: 1024px) {

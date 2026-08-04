@@ -69,6 +69,6 @@
 }
 
 .note svg {
-  color: currentColor;
+  color: currentcolor;
   flex-shrink: 0;
 }

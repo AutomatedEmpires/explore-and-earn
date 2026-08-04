@@ -21,8 +21,20 @@ import { join, sep, basename } from "node:path";
  */
 
 const GATE_FILE = "apps/web/lib/devBench/index.ts";
+const MIDDLEWARE_FILE = "apps/web/middleware.ts";
+const SURFACES_FILE = "apps/web/components/dev/surfaces.ts";
 const GATE_GUARD = `process.env.NODE_ENV !== "production"`;
+const PUBLIC_ENTRY = `"/dev"`;
 const FLAG = "NEXT_PUBLIC_DEV_BENCH";
+const REQUIRED_REVIEW_SURFACES = [
+  '"/dev/catalog"',
+  '"/for-seekers"',
+  '"/host/plans"',
+  '"/listing/lst_sourced_kelp_farm"',
+  '"/refunds"',
+  '"/sourced-listings"',
+  '"/team/accept"',
+];
 
 const ROOTS = ["apps", "packages", "tools", "docs", "."];
 const SKIP_DIRS = new Set(["node_modules", "dist", ".turbo", ".next", "build", ".git"]);
@@ -43,7 +55,51 @@ if (!existsSync(GATE_FILE)) {
   }
 }
 
-// --- Invariant 2: committed env files never enable the bench -----------------
+// --- Invariant 2: the local launcher is reachable before impersonation -------
+// The launcher sets the role cookie, so middleware must not require that cookie
+// before allowing /dev through. The page's NODE_ENV gate above still makes this
+// route a 404 in every production/preview build.
+if (!existsSync(MIDDLEWARE_FILE)) {
+  violations.push(`${MIDDLEWARE_FILE}  G040: middleware is missing`);
+} else {
+  const middleware = readFileSync(MIDDLEWARE_FILE, "utf8");
+  const matcherStart = middleware.indexOf("const isPublicRoute");
+  const matcherEnd = middleware.indexOf("]);", matcherStart);
+  const publicMatcher =
+    matcherStart >= 0 && matcherEnd > matcherStart
+      ? middleware.slice(matcherStart, matcherEnd)
+      : "";
+
+  if (!publicMatcher.includes(PUBLIC_ENTRY)) {
+    violations.push(
+      `${MIDDLEWARE_FILE}  G040: /dev must be public so the local role picker is reachable`,
+    );
+  }
+}
+
+// --- Invariant 3: the launcher covers deterministic review anchors ----------
+if (!existsSync(SURFACES_FILE)) {
+  violations.push(`${SURFACES_FILE}  G040: surface index is missing`);
+} else {
+  const surfaces = readFileSync(SURFACES_FILE, "utf8");
+  for (const required of REQUIRED_REVIEW_SURFACES) {
+    if (!surfaces.includes(required)) {
+      violations.push(
+        `${SURFACES_FILE}  G040: missing deterministic review surface ${required}`,
+      );
+    }
+  }
+  if (
+    !surfaces.includes('import { DEMO_SURFACES }') ||
+    !surfaces.includes("DEMO_SURFACES.map")
+  ) {
+    violations.push(
+      `${SURFACES_FILE}  G040: Enterprise demo routes must derive from canonical DEMO_SURFACES`,
+    );
+  }
+}
+
+// --- Invariant 4: committed env files never enable the bench -----------------
 // A committed env file may set the flag only to "0" (force-off). Local
 // `*.local` env files are git-ignored, so they are not scanned.
 function isScannableEnvFile(name) {
@@ -99,4 +155,6 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
-console.log("dev-bench: production kill intact, no committed env enables the bench OK");
+console.log(
+  "dev-bench: production kill intact, launcher reachable and indexed, no committed env enables the bench OK",
+);

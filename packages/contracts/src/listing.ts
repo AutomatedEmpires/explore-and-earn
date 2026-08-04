@@ -19,7 +19,7 @@ import type { DiscoveryCardConditionalBadge } from "./card";
 import type { OpportunityCategory } from "./categories";
 import type { CompensationUnit, ListingStatus } from "./enums";
 import type { MatchReason } from "./match";
-import type { ImageSelection } from "./media";
+import type { ImageSelection, ResponsiveImage } from "./media";
 import type { ListingProvenanceInfo } from "./provenance";
 
 /** Host summary embedded in an OpportunityListing. */
@@ -48,6 +48,16 @@ export interface ListingHost {
    * free or unknown hosts (ranks last, never hidden). See apps/web/lib/ranking.ts.
    */
   readonly tier?: "enterprise" | "professional" | "starter" | "none";
+}
+
+/** Canonical host summary rendered inside an opportunity detail page. */
+export interface ListingHostSummary {
+  readonly id: string;
+  readonly name: string;
+  readonly location?: string;
+  readonly verified: boolean;
+  readonly tagline?: string;
+  readonly avatar?: ResponsiveImage;
 }
 
 /**

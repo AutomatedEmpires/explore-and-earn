@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Button, Icon, Modal } from "@explore-and-earn/ui";
 import { applyToListingAction } from "../../../actions/applications";
 import { saveListingAction, unsaveListingAction } from "../../../actions/savedListings";
@@ -53,7 +53,9 @@ export function ApplyButton({
   const router = useRouter();
   const t = useTranslations("Apply");
   const tc = useTranslations("Common");
-  const [isPending, startTransition] = useTransition();
+  const [isApplying, startApplying] = useTransition();
+  const [isSaving, startSaving] = useTransition();
+  const isPending = isApplying || isSaving;
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResumeModal, setShowResumeModal] = useState(false);
   // One dialog for every failed action. It carries its own heading because
@@ -63,11 +65,15 @@ export function ApplyButton({
     message: string;
   } | null>(null);
   const [saved, setSaved] = useState(alreadySaved);
-  // Focus lands here after the confirm dialog closes: the Modal's own restore
-  // targets the opener button, which is disabled (and then replaced) during
-  // the commit — focus() on it silently fails and keyboard focus dropped to
-  // <body> at the most anxious moment of the flow.
-  const rowRef = useRef<HTMLDivElement>(null);
+  const [applicationCommitted, setApplicationCommitted] = useState(false);
+  const appliedStateRef = useRef<HTMLDivElement>(null);
+  const focusAppliedAfterCommit = useRef(false);
+
+  useEffect(() => {
+    if (!applicationCommitted || !focusAppliedAfterCommit.current) return;
+    focusAppliedAfterCommit.current = false;
+    appliedStateRef.current?.focus();
+  }, [applicationCommitted]);
 
   if (viewerRole === "guest" && !isSourced) {
     return (
@@ -97,12 +103,17 @@ export function ApplyButton({
   }
 
   // Seeker role
-  if (alreadyApplied && !isSourced) {
+  if ((alreadyApplied || applicationCommitted) && !isSourced) {
     return (
       // role="status" so the swap is announced: the modal unmounts and
       // router.refresh() replaces this row, which otherwise happens in silence
       // for a screen-reader user who has just committed to an application.
-      <div className={styles.appliedState} role="status">
+      <div
+        className={styles.appliedState}
+        role="status"
+        ref={appliedStateRef}
+        tabIndex={-1}
+      >
         {/* Decorative: the adjacent text already says it. Left announced, a
             screen reader reads "check mark Application sent". */}
         <span aria-hidden>✓</span>
@@ -121,13 +132,12 @@ export function ApplyButton({
 
   const handleConfirm = () => {
     setShowConfirmModal(false);
-    // The Modal restores focus to the (now disabled) opener on unmount; land
-    // focus on the action row instead so it survives the applied-state swap.
-    requestAnimationFrame(() => rowRef.current?.focus());
-    startTransition(async () => {
+    startApplying(async () => {
       try {
         const result = await applyToListingAction(listingId);
         if (result.ok) {
+          focusAppliedAfterCommit.current = true;
+          setApplicationCommitted(true);
           router.refresh();
         } else if (result.error === "resume_incomplete") {
           // Server-side gate rejected a stale client — surface the same
@@ -137,6 +147,8 @@ export function ApplyButton({
           // A double-submit race (second tab, stale page) is not an error —
           // the application exists. Refresh into the applied state instead of
           // showing the seeker a machine string.
+          focusAppliedAfterCommit.current = true;
+          setApplicationCommitted(true);
           router.refresh();
         } else if (result.error === "profile_not_found") {
           // No seeker profile yet — same recovery as the résumé gate.
@@ -167,7 +179,7 @@ export function ApplyButton({
    */
   const handleToggleSave = () => {
     const nextSaved = !saved;
-    startTransition(async () => {
+    startSaving(async () => {
       // null encodes "the action threw" — resolveSaveOutcome treats that the
       // same as an unexplained failure, because both mean we do not know the
       // write happened.
@@ -267,12 +279,10 @@ export function ApplyButton({
     <>
       <div
         className={styles.buttonRow}
-        ref={rowRef}
-        tabIndex={-1}
         aria-busy={isPending}
       >
         <Button variant="primary" onClick={handleApply} disabled={isPending}>
-          {isPending ? t("submitting") : tc("apply")}
+          {isApplying ? t("submitting") : tc("apply")}
         </Button>
         <Button
           variant="secondary"

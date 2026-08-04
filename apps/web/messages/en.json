@@ -301,5 +301,12 @@
 		"saveErrorRateLimit": "You're saving too quickly. Please wait a moment and try again.",
 		"applyOnOriginal": "Apply on the original posting",
 		"sourcedNoApplyPath": "This employer hasn't joined Explore & Earn yet, so applications can't be sent from here."
+	},
+	"ListingNotFound": {
+		"eyebrow": "The marketplace",
+		"title": "This opportunity isn't listed",
+		"lede": "Listings leave the marketplace when they close, fill, or expire — and links outlive all three. Everything else is still here: the search, the four lanes, and the map are live.",
+		"browse": "Browse open opportunities",
+		"lanes": "See the four lanes"
 	}
 }

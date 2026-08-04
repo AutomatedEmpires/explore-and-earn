@@ -11,6 +11,8 @@
  * host dashboard is /host itself (there is no /host/dashboard).
  */
 
+import { DEMO_SURFACES } from "../demo/enterpriseDemo";
+
 export interface DevSurface {
   readonly label: string;
   readonly href: string;
@@ -22,6 +24,10 @@ export interface DevSurfaceGroup {
 }
 
 export const DEV_SURFACES: readonly DevSurfaceGroup[] = [
+  {
+    lane: "Review tools",
+    surfaces: [{ label: "Component catalog", href: "/dev/catalog" }],
+  },
   {
     lane: "Seeker",
     surfaces: [
@@ -67,6 +73,7 @@ export const DEV_SURFACES: readonly DevSurfaceGroup[] = [
       { label: "Profile", href: "/host/profile" },
       { label: "Edit profile", href: "/host/profile/edit" },
       { label: "Billing", href: "/host/billing" },
+      { label: "Plans", href: "/host/plans" },
       { label: "Outreach", href: "/host/outreach" },
       { label: "Settings", href: "/host/settings" },
       { label: "Help", href: "/host/help" },
@@ -99,13 +106,43 @@ export const DEV_SURFACES: readonly DevSurfaceGroup[] = [
       { label: "Jobs · Remote", href: "/jobs/remote" },
       { label: "Jobs · Seasonal", href: "/jobs/seasonal" },
       { label: "Listing detail", href: "/listing/lst_orchard_wenatchee" },
+      {
+        label: "Sourced listing · unknown fields",
+        href: "/listing/lst_sourced_kelp_farm",
+      },
+      { label: "For seekers", href: "/for-seekers" },
       { label: "For hosts", href: "/for-hosts" },
       { label: "Blog", href: "/blog" },
+      {
+        label: "Blog · Housing included",
+        href: "/blog/what-housing-included-actually-means",
+      },
       { label: "About", href: "/about" },
       { label: "FAQ", href: "/faq" },
       { label: "Terms", href: "/terms" },
       { label: "Privacy", href: "/privacy" },
       { label: "Cookies", href: "/cookies" },
+      { label: "Refunds", href: "/refunds" },
+      { label: "Photo credits", href: "/credits" },
+      { label: "Sourced listings", href: "/sourced-listings" },
+    ],
+  },
+  {
+    lane: "Enterprise demo · sample data",
+    surfaces: DEMO_SURFACES.map(({ label, href }) => ({ label, href })),
+  },
+  {
+    lane: "Auth & handoffs",
+    surfaces: [
+      { label: "Sign in · Seeker", href: "/sign-in?role=seeker" },
+      { label: "Sign in · Host", href: "/sign-in?role=host" },
+      { label: "Sign in · Admin", href: "/sign-in?role=admin" },
+      { label: "Sign up · Seeker", href: "/sign-up?role=seeker" },
+      { label: "Sign up · Host", href: "/sign-up?role=host" },
+      {
+        label: "Team invite · Missing code",
+        href: "/team/accept",
+      },
     ],
   },
   {
