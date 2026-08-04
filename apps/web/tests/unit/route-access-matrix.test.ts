@@ -398,6 +398,22 @@ describe("route access matrix", () => {
     expect(middlewareGatesCommunity()).toBe(true);
   });
 
+  it("enters the local dev-role bypass before Clerk middleware", () => {
+    const wrapper = MIDDLEWARE.indexOf("function devBenchAwareClerkMiddleware(");
+    const devRoleGate = MIDDLEWARE.indexOf(
+      "request.cookies.get(DEV_ROLE_COOKIE)",
+      wrapper,
+    );
+    const clerkDelegate = MIDDLEWARE.indexOf(
+      "return configuredClerkMiddleware(request, event);",
+      wrapper,
+    );
+
+    expect(wrapper).toBeGreaterThan(-1);
+    expect(devRoleGate).toBeGreaterThan(wrapper);
+    expect(clerkDelegate).toBeGreaterThan(devRoleGate);
+  });
+
   /**
    * The three public discovery modes are one decision, and it has been got
    * wrong once. Pinned as a group so a future edit cannot quietly drop one.

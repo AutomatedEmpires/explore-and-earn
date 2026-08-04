@@ -1,6 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import createIntlMiddleware from "next-intl/middleware";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 
 import { routing } from "./i18n/routing";
 import {
@@ -283,38 +283,66 @@ if (process.env.NODE_ENV === "production" && !hasClerkMiddlewareConfig) {
   );
 }
 
+const configuredClerkMiddleware = clerkMiddleware(async (auth, request) => {
+  const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
+  if (defaultLocaleRedirect) return defaultLocaleRedirect;
+  const safeAuthRedirect = stripUnsafeAuthRedirect(request);
+  if (safeAuthRedirect) return safeAuthRedirect;
+  const localize = shouldLocalize(request.nextUrl.pathname);
+  // DEV MOCK BENCH (review tooling only): when impersonating a role locally,
+  // skip Clerk protection so every surface is reachable without a login.
+  // The bypass ONLY renders role shells — the session's getToken() hands back
+  // the inert sentinel token (not the real service-role key) and the admin
+  // grant stays off unless isDevBenchPrivileged() (explicit NEXT_PUBLIC_DEV_BENCH=1
+  // + non-prod Supabase URL). So a stray `next dev` against prod env renders
+  // empty shells with NO real data or admin — never bundled in a prod build
+  // (NODE_ENV gate). See lib/devBench.
+  if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
+    // Still run the locale middleware so the bench resolves the right
+    // /[locale]/ route (just without the Clerk gate).
+    return localize ? intlMiddleware(request) : undefined;
+  }
+  const funnel = protectedFunnel(request.nextUrl.pathname);
+  if (funnel) {
+    const { userId } = await auth();
+    if (!userId) return redirectToRoleSignIn(request, funnel);
+  }
+  if (!isPublicRoute(request)) {
+    await auth.protect();
+  }
+  // After auth, hand localizable page routes to next-intl. API + metadata
+  // routes fall through untouched (Clerk has already run on them).
+  return localize ? intlMiddleware(request) : undefined;
+});
+
+/**
+ * Keep the local review bench independent of the browser's Clerk state.
+ *
+ * clerkMiddleware performs session refresh work before its callback runs. A
+ * stale localhost Clerk cookie can therefore loop before the callback's
+ * dev-role bypass is reached, leaving protected review surfaces stuck on their
+ * loading boundary. Intercept the explicitly-dev-only role cookie before
+ * entering Clerk at all. isDevBenchEnabled() is false in production/preview,
+ * so deployed requests always delegate to configuredClerkMiddleware.
+ */
+function devBenchAwareClerkMiddleware(
+  request: NextRequest,
+  event: NextFetchEvent,
+) {
+  if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
+    const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
+    if (defaultLocaleRedirect) return defaultLocaleRedirect;
+    const safeAuthRedirect = stripUnsafeAuthRedirect(request);
+    if (safeAuthRedirect) return safeAuthRedirect;
+    return shouldLocalize(request.nextUrl.pathname)
+      ? intlMiddleware(request)
+      : NextResponse.next();
+  }
+  return configuredClerkMiddleware(request, event);
+}
+
 export default hasClerkMiddlewareConfig
-  ? clerkMiddleware(async (auth, request) => {
-      const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
-      if (defaultLocaleRedirect) return defaultLocaleRedirect;
-      const safeAuthRedirect = stripUnsafeAuthRedirect(request);
-      if (safeAuthRedirect) return safeAuthRedirect;
-      const localize = shouldLocalize(request.nextUrl.pathname);
-      // DEV MOCK BENCH (review tooling only): when impersonating a role locally,
-      // skip Clerk protection so every surface is reachable without a login.
-      // The bypass ONLY renders role shells — the session's getToken() hands back
-      // the inert sentinel token (not the real service-role key) and the admin
-      // grant stays off unless isDevBenchPrivileged() (explicit NEXT_PUBLIC_DEV_BENCH=1
-      // + non-prod Supabase URL). So a stray `next dev` against prod env renders
-      // empty shells with NO real data or admin — never bundled in a prod build
-      // (NODE_ENV gate). See lib/devBench.
-      if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
-        // Still run the locale middleware so the bench resolves the right
-        // /[locale]/ route (just without the Clerk gate).
-        return localize ? intlMiddleware(request) : undefined;
-      }
-      const funnel = protectedFunnel(request.nextUrl.pathname);
-      if (funnel) {
-        const { userId } = await auth();
-        if (!userId) return redirectToRoleSignIn(request, funnel);
-      }
-      if (!isPublicRoute(request)) {
-        await auth.protect();
-      }
-      // After auth, hand localizable page routes to next-intl. API + metadata
-      // routes fall through untouched (Clerk has already run on them).
-      return localize ? intlMiddleware(request) : undefined;
-    })
+  ? devBenchAwareClerkMiddleware
   : function authFallbackMiddleware(request: NextRequest) {
       // DEV MOCK BENCH: same impersonation bypass the Clerk branch has, so
       // keyless local QA (and the keyless Playwright harness) can traverse

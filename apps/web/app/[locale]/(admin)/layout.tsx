@@ -6,6 +6,8 @@ import { getMarketplaceStats } from "@explore-and-earn/db";
 
 import { AdminShell } from "../../../components/admin";
 import { isAdminUserId } from "../../../lib/admin";
+import { isDevBenchEnabled } from "../../../lib/devBench";
+import { readDevRole } from "../../../lib/devBench/server";
 import "../../../styles/admin-os.css";
 
 /**
@@ -61,7 +63,10 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  const { queueCount, healthScore } = await resolveShellStats();
+  const { queueCount, healthScore } =
+    isDevBenchEnabled() && (await readDevRole()) === "admin"
+      ? { queueCount: 0, healthScore: 0 }
+      : await resolveShellStats();
 
   // Admin OS — warm "Adventure Paper & Sky" moderation command center, sky
   // accent + warm-red danger register. The .admin-os token cascade flips the

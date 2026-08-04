@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { EmptyState } from "../../../../components/discovery";
 import { SeekerDashboard } from "../../../../components/seeker/SeekerDashboard";
 import { getSeasonBoard } from "../../../../components/seeker/data";
+import { devSeekerName, isDevBenchEnabled } from "../../../../lib/devBench";
+import { readDevRole } from "../../../../lib/devBench/server";
 import { cachedSeekerProfile, getSupabaseToken } from "../../../../lib/serverCache";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +38,20 @@ export default async function SeekerHomePage() {
     // The whole page is per-seeker state; there is nothing to show a visitor
     // who has not signed in, and the seeker gateway is the honest destination.
     redirect("/for-seekers");
+  }
+
+  // The review bench must stay usable when .env.local points at a stopped
+  // local Supabase stack. Its synthetic role is explicit, so render the
+  // existing non-production season fixture without starting any data reads.
+  if (isDevBenchEnabled() && (await readDevRole())) {
+    const board = await getSeasonBoard(undefined, undefined, devSeekerName());
+    return (
+      <SeekerDashboard
+        profile={null}
+        board={board}
+        seekerName={board.status.seekerName}
+      />
+    );
   }
 
   const token = await getSupabaseToken();

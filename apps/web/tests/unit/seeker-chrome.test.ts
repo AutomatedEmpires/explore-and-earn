@@ -46,9 +46,34 @@ const coachmarkCss = read("components/seeker/SeekerCoachmarks.module.css");
 const dashboard = read("components/seeker/SeekerDashboard.tsx");
 const seekPage = read("app/[locale]/(seeker)/seek/page.tsx");
 const homePage = read("app/[locale]/(seeker)/home/page.tsx");
+const seekerLayout = read("app/[locale]/(seeker)/layout.tsx");
+const assistantPage = read("app/[locale]/(seeker)/assistant/page.tsx");
+const communityJoinGate = read(
+  "app/[locale]/(seeker)/community/CommunityJoinGate.tsx",
+);
 // The dashboard's reads live behind one seam since redesign W1 (getSeasonBoard);
 // the honesty invariants below follow the code to where it moved.
 const seasonData = read("components/seeker/data.ts");
+
+describe("the seeker shell landmark", () => {
+  it("owns exactly one main landmark for every seeker route", () => {
+    expect(shell).toContain('<main className="seekeros-contentwrap">');
+    expect(assistantPage).not.toContain("<main");
+    expect(communityJoinGate).not.toContain("<main");
+  });
+});
+
+describe("the local seeker review state", () => {
+  it("does not wait on configured local data services", () => {
+    expect(homePage).toContain(
+      "isDevBenchEnabled() && (await readDevRole())",
+    );
+    expect(homePage).toContain(
+      "getSeasonBoard(undefined, undefined, devSeekerName())",
+    );
+    expect(seekerLayout).toContain("unreadCommunity: 0");
+  });
+});
 
 // ── 1. The blocking modal is dead ─────────────────────────────────────────
 

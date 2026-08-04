@@ -72,8 +72,9 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
       clerkUserId: DEV_USER_ID,
       needsOnboarding: false,
       seekerName: devSeekerName(),
-      // Service-role query — works on the bench (bypasses the sentinel token).
-      unreadCommunity: await getCommunityUnreadCount(DEV_USER_ID),
+      // Deterministic review state: never wait on a local database that may be
+      // configured in .env.local but intentionally stopped.
+      unreadCommunity: 0,
       profileScore: 78,
     };
   }

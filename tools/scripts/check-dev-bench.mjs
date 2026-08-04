@@ -23,6 +23,7 @@ import { join, sep, basename } from "node:path";
 const GATE_FILE = "apps/web/lib/devBench/index.ts";
 const MIDDLEWARE_FILE = "apps/web/middleware.ts";
 const SURFACES_FILE = "apps/web/components/dev/surfaces.ts";
+const DISCOVERY_DATA_FILE = "apps/web/components/discovery/data.ts";
 const GATE_GUARD = `process.env.NODE_ENV !== "production"`;
 const PUBLIC_ENTRY = `"/dev"`;
 const FLAG = "NEXT_PUBLIC_DEV_BENCH";
@@ -75,6 +76,25 @@ if (!existsSync(MIDDLEWARE_FILE)) {
       `${MIDDLEWARE_FILE}  G040: /dev must be public so the local role picker is reachable`,
     );
   }
+
+  const wrapperStart = middleware.indexOf("function devBenchAwareClerkMiddleware(");
+  const roleGate = middleware.indexOf(
+    "request.cookies.get(DEV_ROLE_COOKIE)",
+    wrapperStart,
+  );
+  const clerkDelegate = middleware.indexOf(
+    "return configuredClerkMiddleware(request, event);",
+    wrapperStart,
+  );
+  if (
+    wrapperStart < 0 ||
+    roleGate < wrapperStart ||
+    clerkDelegate < roleGate
+  ) {
+    violations.push(
+      `${MIDDLEWARE_FILE}  G040: local role impersonation must bypass Clerk before session refresh`,
+    );
+  }
 }
 
 // --- Invariant 3: the launcher covers deterministic review anchors ----------
@@ -99,7 +119,41 @@ if (!existsSync(SURFACES_FILE)) {
   }
 }
 
-// --- Invariant 4: committed env files never enable the bench -----------------
+// --- Invariant 4: review inventory stays deterministic ----------------------
+// A developer may have local Supabase credentials present while the local
+// stack is stopped. The bench must still render fixtures instead of hanging or
+// throwing; NEXT_PUBLIC_DEV_BENCH=0 remains the explicit live-data opt-out.
+if (!existsSync(DISCOVERY_DATA_FILE)) {
+  violations.push(`${DISCOVERY_DATA_FILE}  G040: discovery data seam is missing`);
+} else {
+  const discoveryData = readFileSync(DISCOVERY_DATA_FILE, "utf8");
+  const fixtureGate = discoveryData.indexOf(
+    "export function canUseDiscoveryFixtureFallback()",
+  );
+  const configGate = discoveryData.indexOf(
+    "export function hasDiscoveryPublicDataConfig()",
+  );
+  if (
+    fixtureGate < 0 ||
+    discoveryData.indexOf("if (isDevBenchEnabled()) return true;", fixtureGate) <
+      fixtureGate
+  ) {
+    violations.push(
+      `${DISCOVERY_DATA_FILE}  G040: dev bench must force deterministic discovery fixtures`,
+    );
+  }
+  if (
+    configGate < 0 ||
+    discoveryData.indexOf("if (isDevBenchEnabled()) return false;", configGate) <
+      configGate
+  ) {
+    violations.push(
+      `${DISCOVERY_DATA_FILE}  G040: dev bench must suppress configured live discovery data`,
+    );
+  }
+}
+
+// --- Invariant 5: committed env files never enable the bench -----------------
 // A committed env file may set the flag only to "0" (force-off). Local
 // `*.local` env files are git-ignored, so they are not scanned.
 function isScannableEnvFile(name) {

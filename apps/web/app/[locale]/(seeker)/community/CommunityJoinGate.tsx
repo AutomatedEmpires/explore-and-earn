@@ -32,7 +32,7 @@ export function CommunityJoinGate({ isHost, returnTo }: CommunityJoinGateProps) 
   const onboardingHref = `/onboarding?returnTo=${encodeURIComponent(returnTo)}`;
 
   return (
-    <main className={styles.page} aria-labelledby="community-join-title">
+    <section className={styles.page} aria-labelledby="community-join-title">
       <div className={styles.frame}>
         <div className={styles.media}>
           {/* A LANDSCAPE, not a photograph of a person. This panel asks the
@@ -94,6 +94,6 @@ export function CommunityJoinGate({ isHost, returnTo }: CommunityJoinGateProps) 
           </p>
         </div>
       </div>
-    </main>
+    </section>
   );
 }

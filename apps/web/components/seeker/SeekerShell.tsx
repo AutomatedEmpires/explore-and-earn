@@ -196,7 +196,7 @@ export function SeekerShell({
             <span className="seekeros-avatarmini">{initial}</span>
           </Link>
         </header>
-        <div className="seekeros-contentwrap">{children}</div>
+        <main className="seekeros-contentwrap">{children}</main>
       </div>
 
       {/* Founder-locked mobile bottom dock (hidden ≥1024px). */}

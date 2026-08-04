@@ -179,7 +179,7 @@ export function HostShell({
           accountState={accountState}
           id={HOST_COACHMARK_TARGETS.activation}
         />
-        <div className={styles.content}>{children}</div>
+        <main className={styles.content}>{children}</main>
       </div>
 
       {/*
