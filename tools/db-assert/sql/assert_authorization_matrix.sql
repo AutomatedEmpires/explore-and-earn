@@ -1506,8 +1506,8 @@ reset role;
 
 do $do$
 begin
-  -- 17 sections, 137 assertions: 30 positive controls and 107 refusals.
-  perform pg_temp.assert_suite_complete('authorization matrix', 17, 30, 107);
+  -- 17 sections, 138 assertions: 31 positive controls and 107 refusals.
+  perform pg_temp.assert_suite_complete('authorization matrix', 17, 31, 107);
 end;
 $do$;
 
