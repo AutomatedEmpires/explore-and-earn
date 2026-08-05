@@ -55,6 +55,26 @@ function isMarketplaceLane(category: string): category is MarketplaceLane {
   return (MARKETPLACE_LANES as readonly string[]).includes(category);
 }
 
+function lines(value: FormDataEntryValue | null): string[] {
+  return String(value ?? "")
+    .split(/\r?\n/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function teamLines(value: FormDataEntryValue | null) {
+  return lines(value).map((entry) => {
+    const [name = "", ...roleParts] = entry.split(/\s+(?:—|-|\|)\s+/);
+    return { name: name.trim(), role: roleParts.join(" — ").trim() };
+  });
+}
+
+interface EditableFaq {
+  readonly key: string;
+  readonly question: string;
+  readonly answer: string;
+}
+
 export function HostProfileForm({
   profile,
   hostProfileId,
@@ -82,6 +102,13 @@ export function HostProfileForm({
   const [categoryScopes, setCategoryScopes] = useState<MarketplaceLane[]>(() =>
     Array.from(new Set((profile.categoryScopes ?? []).filter(isMarketplaceLane))),
   );
+  const [faqs, setFaqs] = useState<EditableFaq[]>(() =>
+    (profile.faqs ?? []).map((faq, index) => ({
+      key: `saved-${index}`,
+      question: faq.question,
+      answer: faq.answer,
+    })),
+  );
   const [message, setMessage] = useState<{
     readonly ok: boolean;
     readonly text: string;
@@ -90,6 +117,31 @@ export function HostProfileForm({
   function toggleCategory(cat: MarketplaceLane) {
     setCategoryScopes((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat],
+    );
+  }
+
+  function addFaq() {
+    setFaqs((current) =>
+      current.length >= 12
+        ? current
+        : [
+            ...current,
+            {
+              key: `new-${Date.now()}-${current.length}`,
+              question: "",
+              answer: "",
+            },
+          ],
+    );
+  }
+
+  function updateFaq(
+    key: string,
+    field: "question" | "answer",
+    value: string,
+  ) {
+    setFaqs((current) =>
+      current.map((faq) => (faq.key === key ? { ...faq, [field]: value } : faq)),
     );
   }
 
@@ -140,6 +192,17 @@ export function HostProfileForm({
 
     const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
     const twitter = String(formData.get("twitter") ?? "").trim().replace(/^@/, "");
+    const cleanFaqs = faqs.map(({ question, answer }) => ({
+      question: question.trim(),
+      answer: answer.trim(),
+    }));
+    if (cleanFaqs.some((faq) => Boolean(faq.question) !== Boolean(faq.answer))) {
+      setMessage({
+        ok: false,
+        text: "Complete both the question and answer, or remove that FAQ.",
+      });
+      return;
+    }
 
     const fields = {
       companyName: String(formData.get("orgName") ?? ""),
@@ -156,6 +219,28 @@ export function HostProfileForm({
       housingOfferedGenerally: housingOffered,
       mealsOfferedGenerally: mealsOffered,
       categoryScopes,
+      narrative: {
+        whyWorkForUs: String(formData.get("whyWorkForUs") ?? "").trim() || undefined,
+        team: teamLines(formData.get("team")),
+        activities: lines(formData.get("activities")),
+        perks: lines(formData.get("perks")),
+        culture: lines(formData.get("culture")),
+        managementApproach:
+          String(formData.get("managementApproach") ?? "").trim() || undefined,
+        typicalDay: String(formData.get("typicalDay") ?? "").trim() || undefined,
+        workEnvironment:
+          String(formData.get("workEnvironment") ?? "").trim() || undefined,
+        seasonRhythm: lines(formData.get("seasonRhythm")),
+        training: lines(formData.get("training")),
+        transportation: lines(formData.get("transportation")),
+        remoteness: String(formData.get("remoteness") ?? "").trim() || undefined,
+        nearbyServices: lines(formData.get("nearbyServices")),
+        housingDescription:
+          String(formData.get("housingDescription") ?? "").trim() || undefined,
+        mealsDescription:
+          String(formData.get("mealsDescription") ?? "").trim() || undefined,
+        faqs: cleanFaqs.filter((faq) => faq.question && faq.answer),
+      },
       ...buildHostBenefitLibraryPatch(benefitLibraryAvailable, housingPhotos),
     };
 
@@ -260,6 +345,234 @@ export function HostProfileForm({
       </div>
 
       <div className={styles.fieldGroup}>
+        <div>
+          <p className={styles.fieldGroupHeading}>Public employer story</p>
+          <p className={styles.note}>
+            These fields map directly to the public employer profile. Leave a
+            section empty to hide it rather than publishing placeholder copy.
+          </p>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="profile-why-work">
+            Why work for us
+          </label>
+          <textarea
+            className={styles.textarea}
+            id="profile-why-work"
+            name="whyWorkForUs"
+            rows={5}
+            maxLength={3000}
+            defaultValue={profile.whyWorkForUs ?? ""}
+            placeholder="Give seekers the clearest reason to choose a season with your team."
+          />
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-culture">
+              Culture
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-culture"
+              name="culture"
+              rows={5}
+              maxLength={3400}
+              defaultValue={(profile.culture ?? []).join("\n")}
+              placeholder={"Direct, respectful communication\nSafety before speed"}
+            />
+            <p className={styles.note}>One principle per line.</p>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-management">
+              Management approach
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-management"
+              name="managementApproach"
+              rows={5}
+              maxLength={3000}
+              defaultValue={profile.managementApproach ?? ""}
+              placeholder="Explain scheduling, feedback, communication, and how managers support the crew."
+            />
+          </div>
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-typical-day">
+              A typical day
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-typical-day"
+              name="typicalDay"
+              rows={5}
+              maxLength={3000}
+              defaultValue={profile.typicalDay ?? ""}
+              placeholder="Walk through the rhythm from arrival to handoff and end of shift."
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-work-environment">
+              Work environment
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-work-environment"
+              name="workEnvironment"
+              rows={5}
+              maxLength={3000}
+              defaultValue={profile.workEnvironment ?? ""}
+              placeholder="Set honest expectations about pace, setting, physical demands, weather, and teamwork."
+            />
+          </div>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="profile-team">
+            Team members
+          </label>
+          <textarea
+            className={styles.textarea}
+            id="profile-team"
+            name="team"
+            rows={4}
+            maxLength={3000}
+            defaultValue={(profile.team ?? [])
+              .map((member) => `${member.name} — ${member.role}`)
+              .join("\n")}
+            placeholder={"Maya Chen — General Manager\nLuis Ortiz — Crew Lead"}
+          />
+          <p className={styles.note}>One person per line: name — role.</p>
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-season-rhythm">
+              Season rhythm
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-season-rhythm"
+              name="seasonRhythm"
+              rows={5}
+              maxLength={4000}
+              defaultValue={(profile.seasonRhythm ?? []).join("\n")}
+              placeholder={"August — onboarding\nSeptember — peak weekends\nOctober — close-down"}
+            />
+            <p className={styles.note}>One milestone per line.</p>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-training">
+              Training &amp; growth
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-training"
+              name="training"
+              rows={5}
+              maxLength={4000}
+              defaultValue={(profile.training ?? []).join("\n")}
+              placeholder={"Paid orientation\nRole shadowing\nEnd-of-season reference"}
+            />
+            <p className={styles.note}>One commitment per line.</p>
+          </div>
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-activities">
+              Life &amp; activities
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-activities"
+              name="activities"
+              rows={5}
+              maxLength={4000}
+              defaultValue={(profile.activities ?? []).join("\n")}
+              placeholder={"Trail access\nCrew dinners\nLake days"}
+            />
+            <p className={styles.note}>One activity per line.</p>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-perks">
+              Perks &amp; benefits
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-perks"
+              name="perks"
+              rows={5}
+              maxLength={4000}
+              defaultValue={(profile.perks ?? []).join("\n")}
+              placeholder={"Staff housing\nShift meals\nEnd-of-season bonus"}
+            />
+            <p className={styles.note}>One perk per line.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <div>
+          <p className={styles.fieldGroupHeading}>Location &amp; day-to-day</p>
+          <p className={styles.note}>
+            Help seekers understand how remote the location feels and how they
+            can reach work, groceries, healthcare, and town.
+          </p>
+        </div>
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="profile-remoteness">
+            Remoteness &amp; access
+          </label>
+          <textarea
+            className={styles.textarea}
+            id="profile-remoteness"
+            name="remoteness"
+            rows={4}
+            maxLength={2000}
+            defaultValue={profile.remoteness ?? ""}
+            placeholder="Describe the distance to town, whether staff live on-site, and what having a car changes."
+          />
+        </div>
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-transportation">
+              Transportation
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-transportation"
+              name="transportation"
+              rows={5}
+              maxLength={4000}
+              defaultValue={(profile.transportation ?? []).join("\n")}
+              placeholder={"Staff shuttle to town\nNearest airport and pickup options"}
+            />
+            <p className={styles.note}>One option per line.</p>
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-nearby-services">
+              Nearby services
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-nearby-services"
+              name="nearbyServices"
+              rows={5}
+              maxLength={4000}
+              defaultValue={(profile.nearbyServices ?? []).join("\n")}
+              placeholder={"Grocery store\nUrgent care\nPharmacy\nPublic library"}
+            />
+            <p className={styles.note}>One service per line.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.fieldGroup}>
         <p className={styles.fieldGroupHeading}>What you offer</p>
 
         <div className={styles.field}>
@@ -311,6 +624,104 @@ export function HostProfileForm({
             </span>
           </span>
         </label>
+
+        <div className={styles.row}>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-housing-description">
+              Housing overview
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-housing-description"
+              name="housingDescription"
+              rows={5}
+              maxLength={2000}
+              defaultValue={profile.housingDescription ?? ""}
+              placeholder="Describe the usual housing setup, cost, occupancy, commute, and what is included. Listing-specific terms still belong on each role."
+            />
+          </div>
+          <div className={styles.field}>
+            <label className={styles.label} htmlFor="profile-meals-description">
+              Meals overview
+            </label>
+            <textarea
+              className={styles.textarea}
+              id="profile-meals-description"
+              name="mealsDescription"
+              rows={5}
+              maxLength={2000}
+              defaultValue={profile.mealsDescription ?? ""}
+              placeholder="Describe the usual meal plan, shift coverage, cost, and dietary accommodations. Listing-specific terms still belong on each role."
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <div className={styles.libraryHead}>
+          <div>
+            <p className={styles.fieldGroupHeading}>Frequently asked questions</p>
+            <p className={styles.note}>
+              Answer the practical questions seekers ask before applying. Only
+              complete question-and-answer pairs are published.
+            </p>
+          </div>
+          <span className={styles.libraryCount}>{faqs.length}/12</span>
+        </div>
+        {faqs.length > 0 ? (
+          <div className={styles.libraryGrid}>
+            {faqs.map((faq, index) => (
+              <div key={faq.key} className={styles.librarySlot}>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor={`profile-faq-question-${index}`}>
+                    Question {index + 1}
+                  </label>
+                  <input
+                    className={styles.input}
+                    id={`profile-faq-question-${index}`}
+                    type="text"
+                    maxLength={240}
+                    value={faq.question}
+                    onChange={(event) => updateFaq(faq.key, "question", event.target.value)}
+                    placeholder="How are days off scheduled?"
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.label} htmlFor={`profile-faq-answer-${index}`}>
+                    Answer
+                  </label>
+                  <textarea
+                    className={styles.textarea}
+                    id={`profile-faq-answer-${index}`}
+                    rows={5}
+                    maxLength={1600}
+                    value={faq.answer}
+                    onChange={(event) => updateFaq(faq.key, "answer", event.target.value)}
+                    placeholder="Schedules are posted ten days ahead…"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className={styles.removeLibraryPhoto}
+                  onClick={() =>
+                    setFaqs((current) => current.filter((item) => item.key !== faq.key))
+                  }
+                >
+                  Remove question
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.note}>No FAQs added yet.</p>
+        )}
+        {faqs.length < 12 ? (
+          <div className={styles.chips}>
+            <button type="button" className={styles.chip} onClick={addFaq}>
+              Add question
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {showBenefitLibrary ? (

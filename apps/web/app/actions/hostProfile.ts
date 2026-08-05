@@ -6,9 +6,11 @@ import {
 	createHostProfile,
 	deleteTrustedListingMedia,
 	getHostProfile,
+	sanitizeHostProfileNarrative,
 	setMyHousingLibraryPhoto,
 	updateHostProfileDetails,
 	uploadTrustedListingMedia,
+	type HostProfileNarrative,
 	type SocialLinks,
 } from "@explore-and-earn/db"
 import {
@@ -266,6 +268,29 @@ export interface UpdateHostProfileInput {
 	mealsOfferedGenerally?: boolean
 	categoryScopes?: MarketplaceLane[]
 	benefitLibrary?: HostBenefitLibrary
+	narrative?: HostProfileNarrative
+}
+
+/**
+ * Treat server-action payloads as untrusted even when their TypeScript caller
+ * is our form. The shared normalizer enforces every public-content bound; this
+ * owner-specific wrapper also strips team photo URLs because that upload path
+ * is not implemented here.
+ */
+function sanitizeOwnerHostProfileNarrative(value: unknown): HostProfileNarrative {
+	const source =
+		value && typeof value === "object" && !Array.isArray(value)
+			? (value as Record<string, unknown>)
+			: {}
+	const team = Array.isArray(source.team)
+		? source.team.map((entry) => {
+				if (!entry || typeof entry !== "object") return entry
+				const member = entry as Record<string, unknown>
+				return { name: member.name, role: member.role }
+			})
+		: undefined
+
+	return sanitizeHostProfileNarrative({ ...source, team })
 }
 
 /**
@@ -296,6 +321,10 @@ async function updateHostProfileActionImpl(
 	let cleanBenefitLibrary: HostBenefitLibrary | undefined;
 	let previousBenefitLibrary: HostBenefitLibrary | undefined;
 	let hostProfileId: string | undefined;
+	const cleanNarrative =
+		fields.narrative === undefined
+			? undefined
+			: sanitizeOwnerHostProfileNarrative(fields.narrative)
 	if (fields.benefitLibrary !== undefined) {
 		const profile = await getHostProfile(token, userId);
 		if (!profile) return { ok: false, error: "update_failed" };
@@ -312,6 +341,7 @@ async function updateHostProfileActionImpl(
 
 	const result = await updateHostProfileDetails(token, userId, {
 		...fields,
+		...(cleanNarrative !== undefined ? { narrative: cleanNarrative } : {}),
 		...(cleanBenefitLibrary !== undefined
 			? { benefitLibrary: cleanBenefitLibrary }
 			: {}),

@@ -114,6 +114,21 @@
 	flex: none;
 }
 
+/* The drawer already carries brand + Messages. On narrow phones the top bar
+   keeps the scope, primary action, notifications, and account without
+   squeezing or creating horizontal overflow. */
+@media (max-width: 430px) {
+	.topLead,
+	.messageAction {
+		display: none;
+	}
+
+	.topbar,
+	.topActions {
+		gap: var(--space-4);
+	}
+}
+
 /* Primary "New listing" — host gold identity (inherited from .host-os), with a
    Glacier action fallback if the scope tokens are ever absent. */
 .newBtn {

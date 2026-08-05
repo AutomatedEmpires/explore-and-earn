@@ -265,7 +265,7 @@ describe("the account-people surface", () => {
 
 // ── 7. Claim guards on the acquisition page ────────────────────────────────
 
-const FOR_HOSTS = readSource("app/[locale]/for-hosts/page.tsx");
+const FOR_HOSTS = readSource("app/[locale]/for-hosts/HostMarketingPage.tsx");
 
 /**
  * Named in one place so a future edit that reintroduces one fails loudly. The
@@ -328,8 +328,12 @@ describe("the /for-hosts page", () => {
     expect(FOR_HOSTS).toContain("hostLandingViewed");
   });
 
-  it("links the three real discovery routes", () => {
-    for (const route of ['"/seek"', '"/swipe"', '"/map"']) {
+  it("links the three isolated full-fidelity discovery routes", () => {
+    for (const route of [
+      '"/for-seekers/demo/seek"',
+      '"/for-seekers/demo/swipe"',
+      '"/for-seekers/demo/map"',
+    ]) {
       expect(FOR_HOSTS).toContain(route);
     }
   });
@@ -340,8 +344,8 @@ describe("the /for-hosts page", () => {
 describe("the demo job card", () => {
   it("renders the real discovery card rather than a lookalike", () => {
     const card = readSource("components/demo/DemoJobCard.tsx");
-    expect(card).toContain("ListingCardGrid");
-    expect(card).toContain("DEMO_LISTING");
+    expect(card).toContain("DiscoveryCard");
+    expect(card).toContain("DEMO_ROLES");
   });
 
   it("overrides every handler that would touch a real row or route", () => {

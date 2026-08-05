@@ -5,15 +5,21 @@ import styles from "./NotificationList.module.css";
 
 export interface NotificationListProps {
 	readonly items: readonly NotificationItem[];
+	readonly emptyTitle?: string;
+	readonly emptyMessage?: string;
 }
 
-export function NotificationList({ items }: NotificationListProps) {
+export function NotificationList({
+	items,
+	emptyTitle = "You're all caught up",
+	emptyMessage = "New invites, offers, and updates will show up here.",
+}: NotificationListProps) {
 	if (items.length === 0) {
 		return (
 			<EmptyState
 				illustration="empty.notifications"
-				title="You're all caught up"
-				message="New invites, offers, and updates will show up here."
+				title={emptyTitle}
+				message={emptyMessage}
 			/>
 		);
 	}

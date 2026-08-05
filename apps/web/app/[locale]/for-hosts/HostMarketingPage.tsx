@@ -13,12 +13,14 @@ import { Icon, type IconKey } from "@explore-and-earn/ui";
 
 import { CaptureOnMount } from "../../../components/analytics/CaptureOnMount";
 import { SectionViewed } from "../../../components/analytics/SectionViewed";
+import { DemoJobCard } from "../../../components/demo";
 import {
+  DEMO_BILLING,
   DEMO_DATA_LABEL,
-  DEMO_ORG,
-  DemoJobCard,
-  DemoMetricTiles,
-} from "../../../components/demo";
+  DEMO_LOCATIONS,
+  DEMO_ORGANIZATION,
+  DEMO_ROLES,
+} from "../../../components/demo/full-fidelity";
 import { FoundingHostSection } from "../../../components/founding/FoundingHostSection";
 import { resolveFoundingProgramView } from "../../../components/founding/program";
 import { AddOnTable } from "../../../components/pricing/AddOnTable";
@@ -29,7 +31,7 @@ import styles from "./page.module.css";
 export const metadata: Metadata = {
   title: "Host on Explore & Earn — see the product before the price",
   description:
-    "Walk a live Enterprise demo workspace: the employer profile, the opportunity card seekers actually see, Seek/Swipe/Map discovery, match scores, the applicant pipeline, announcements, and analytics. Build your profile and draft roles for free; a plan is what makes them publishable.",
+    "Walk a populated sample workspace using the same host navigation and product surfaces: employer profile, listings, applicants, messages, announcements, and honest all-time analytics. Build your profile and draft roles for free; a plan is what makes them publishable.",
   // Canonical guards the revenue-side acquisition page against UTM/query
   // variants indexing as duplicates (review 2026-07-22).
   alternates: { canonical: "/for-hosts" },
@@ -61,6 +63,26 @@ export const revalidate = 300;
 
 const PAID_TIERS = ["starter", "professional", "enterprise"] as const;
 type PaidTier = (typeof PAID_TIERS)[number];
+
+const DEMO_PRIMARY_LOCATION = DEMO_LOCATIONS[0];
+const DEMO_HOST_FACTS = [
+  {
+    label: "Open roles",
+    value: String(DEMO_ROLES.filter((role) => role.status === "live").length),
+  },
+  {
+    label: "Season",
+    value: "May through October",
+  },
+  {
+    label: "Housing",
+    value: DEMO_ROLES[0]?.housing.summary ?? "Stated per role",
+  },
+  {
+    label: "Meals",
+    value: DEMO_ROLES[0]?.meals.summary ?? "Stated per role",
+  },
+] as const;
 
 function tierName(tier: PaidTier): string {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
@@ -105,20 +127,20 @@ const DISCOVERY_MODES: readonly {
   {
     icon: "nav.seek",
     title: "Seek",
-    href: "/seek",
+    href: "/for-seekers/demo/seek",
     body: "Filtered browsing. Seekers narrow by housing, meals, pay, lane and dates — so a role that states all three shows up in searches a vague one never reaches.",
   },
   {
     icon: "nav.swipe",
     title: "Swipe",
-    href: "/swipe",
+    href: "/for-seekers/demo/swipe",
     body: "One card at a time, on a phone, usually in the evening. A save here is a strong signal: they read the whole card and kept it.",
   },
   {
     icon: "nav.map",
     title: "Map",
-    href: "/map",
-    body: "A real map, not a picture of one. Seekers who pick a region before they pick a job find you by where you are.",
+    href: "/for-seekers/demo/map",
+    body: "A location-first view. Seekers who pick a region before they pick a job can compare each role with its stated destination context.",
   },
 ];
 
@@ -140,7 +162,7 @@ const WORKFLOW: readonly {
     icon: "action.message",
     title: "Messaging where the decision is",
     body: "The thread sits beside the application. “Is the cabin a private room?” stays attached to the person who asked it instead of disappearing into a personal inbox.",
-    href: "/for-hosts/demo/applicants",
+    href: "/for-hosts/demo/messages",
     linkLabel: "See a thread",
   },
   {
@@ -185,7 +207,7 @@ const COMPARISON: readonly {
   {
     row: "Discovery modes",
     traditional: "A keyword search box.",
-    ours: "Seek for filtered browsing, Swipe for one-at-a-time on a phone, and a real map for place-first seekers.",
+    ours: "Seek for filtered browsing, Swipe for one-at-a-time on a phone, and a place-first map view.",
   },
   {
     row: "Matching",
@@ -294,7 +316,7 @@ export default async function ForHostsPage() {
               </Link>
               <Link className={styles.ghostBtnLg} href="/for-hosts/demo">
                 <Icon name="action.view" size={20} aria-hidden />
-                Explore the live demo
+                Explore the product demo
               </Link>
             </div>
           </div>
@@ -315,8 +337,8 @@ export default async function ForHostsPage() {
         </div>
         <DemoJobCard />
         <p className={styles.previewNote}>
-          {DEMO_DATA_LABEL} · every control on this card leads into the demo
-          workspace.
+          {DEMO_DATA_LABEL} · every control works in the walkthrough or explains
+          its safe demo boundary.
         </p>
       </section>
 
@@ -340,19 +362,21 @@ export default async function ForHostsPage() {
         <div className={styles.profileCard}>
           <div className={styles.profileCover} aria-hidden="true" />
           <div className={styles.profileBody}>
-            <p className={styles.profileName}>{DEMO_ORG.name}</p>
+            <p className={styles.profileName}>{DEMO_ORGANIZATION.name}</p>
             <p className={styles.profileMeta}>
-              {DEMO_ORG.location} · Verified host · {DEMO_ORG.planName} plan
+              {DEMO_PRIMARY_LOCATION
+                ? `${DEMO_PRIMARY_LOCATION.locality}, ${DEMO_PRIMARY_LOCATION.region}`
+                : "Sample location"} · Sample verified state · {DEMO_BILLING.planName} plan
             </p>
             <ul className={styles.profileFacts}>
-              {DEMO_ORG.facts.map((fact) => (
+              {DEMO_HOST_FACTS.map((fact) => (
                 <li key={fact.label}>
                   <span className={styles.profileFactLabel}>{fact.label}</span>
                   <span className={styles.profileFactValue}>{fact.value}</span>
                 </li>
               ))}
             </ul>
-            <span className={styles.demoTag}>{DEMO_ORG.demoLabel}</span>
+            <span className={styles.demoTag}>{DEMO_DATA_LABEL}</span>
           </div>
         </div>
       </section>
@@ -442,7 +466,17 @@ export default async function ForHostsPage() {
             a pay or housing problem. The dashboard separates the two.
           </p>
         </div>
-        <DemoMetricTiles limit={4} />
+        <div className={styles.profileCard}>
+          <div className={styles.profileBody}>
+            <p className={styles.profileName}>Account totals and listing breakdowns</p>
+            <p className={styles.profileMeta}>
+              The product reports the totals it actually stores. The walkthrough
+              does not invent trend lines, attribution sources, or projected
+              conversion.
+            </p>
+            <span className={styles.demoTag}>Clearly labelled sample data</span>
+          </div>
+        </div>
         <Link className={styles.inlineLink} href="/for-hosts/demo/dashboard">
           Open the demo dashboard
           <Icon name="action.forward" size={16} aria-hidden />
@@ -561,7 +595,7 @@ export default async function ForHostsPage() {
       <section className={styles.finalCta}>
         <h2 className={styles.finalTitle}>Look before you pay</h2>
         <p className={styles.finalSub}>
-          Walk the Enterprise workspace with sample data, then build your own
+          Walk the populated workspace with sample data, then build your own
           profile and draft your first role. Nothing is charged until you
           publish.
         </p>
@@ -571,7 +605,7 @@ export default async function ForHostsPage() {
             Build your host profile
           </Link>
           <Link className={styles.ghostBtnDark} href="/for-hosts/demo">
-            Explore the live demo
+            Explore the product demo
           </Link>
         </div>
       </section>

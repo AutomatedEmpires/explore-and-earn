@@ -1,0 +1,30 @@
+.block {
+  display: grid;
+  gap: var(--space-20);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.button {
+  min-height: var(--tap-min);
+  padding: var(--space-10) var(--space-16);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-cell);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--color-cta);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}

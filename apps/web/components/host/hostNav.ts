@@ -29,8 +29,8 @@ export interface HostNavItem {
   readonly icon: IconKey;
   /** Matches its href EXACTLY, so child routes don't light the parent up. */
   readonly exact?: boolean;
-  /** When set, the item shows the live unread-messages count as a badge. */
-  readonly badgeKey?: "unread";
+  /** When set, the item shows the matching live unread count as a badge. */
+  readonly badgeKey?: "messages" | "notifications";
 }
 
 export interface HostNavGroup {
@@ -53,7 +53,13 @@ export const HOST_NAV_GROUPS: readonly HostNavGroup[] = [
         href: "/host/messages",
         label: "Messages",
         icon: "nav.messages",
-        badgeKey: "unread",
+        badgeKey: "messages",
+      },
+      {
+        href: "/host/notifications",
+        label: "Notifications",
+        icon: "nav.notifications",
+        badgeKey: "notifications",
       },
       {
         href: "/host/announcements",

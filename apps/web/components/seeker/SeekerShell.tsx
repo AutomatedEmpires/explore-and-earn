@@ -99,6 +99,10 @@ export interface SeekerShellProps {
   readonly profileScore?: number;
   readonly unread?: number;
   readonly unreadCommunity?: number;
+  /** Canonical destination -> isolated demo destination. */
+  readonly routeMap?: Readonly<Record<string, string>>;
+  /** Demo chrome never mounts persisted account coachmarks. */
+  readonly demoMode?: boolean;
   readonly children: ReactNode;
 }
 
@@ -112,11 +116,14 @@ export function SeekerShell({
   seekerName,
   unread = 0,
   unreadCommunity = 0,
+  routeMap = {},
+  demoMode = false,
   children,
 }: SeekerShellProps) {
   const pathname = usePathname();
   const name = seekerName?.trim() || "Explorer";
   const initial = name.charAt(0).toUpperCase();
+  const hrefFor = (href: string): string => routeMap[href] ?? href;
 
   const badgeFor = (badgeKey?: "unread" | "community"): number | undefined => {
     if (badgeKey === "unread") return unread > 0 ? unread : undefined;
@@ -124,14 +131,17 @@ export function SeekerShell({
     return undefined;
   };
 
-  const toNavItem = (def: SectionDef): ScopeNavItem => ({
-    href: def.href,
-    label: def.label,
-    icon: def.icon,
-    badge: badgeFor(def.badgeKey),
-    active: isActive(pathname, def.href, def.exact),
-    hideInDrawer: def.hideInDrawer,
-  });
+  const toNavItem = (def: SectionDef): ScopeNavItem => {
+    const href = hrefFor(def.href);
+    return {
+      href,
+      label: def.label,
+      icon: def.icon,
+      badge: badgeFor(def.badgeKey),
+      active: isActive(pathname, href, def.exact),
+      hideInDrawer: def.hideInDrawer,
+    };
+  };
 
   const items = SECTIONS.map(toNavItem);
   const footerItems = FOOTER.map(toNavItem);
@@ -145,10 +155,10 @@ export function SeekerShell({
         items={items}
         footerItems={footerItems}
         userName={name}
-        userHref="/profile"
+        userHref={hrefFor("/profile")}
         avatar={<span className="seekeros-railava">{initial}</span>}
         brand={
-          <Link className="seekeros-railbrand" href="/" aria-label="Explore & Earn — home">
+          <Link className="seekeros-railbrand" href={hrefFor("/home")} aria-label="Explore & Earn — Seeker home">
             <span className="seekeros-railmark" aria-hidden>E</span>
             Explore&amp;Earn
           </Link>
@@ -163,12 +173,12 @@ export function SeekerShell({
           <RolePill role="seeker" />
           <CommandSearch
             className="seekeros-search"
-            action="/seek"
+            action={hrefFor("/seek")}
             placeholder="Search opportunities, places, hosts…"
           />
           <Link
             className="seekeros-tact seekeros-tact--icon ui-pressable"
-            href="/notifications"
+            href={hrefFor("/notifications")}
             aria-label="Notifications"
           >
             <Icon name="nav.notifications" size={20} aria-hidden />
@@ -176,7 +186,7 @@ export function SeekerShell({
           </Link>
           <Link
             className="seekeros-account ui-pressable"
-            href="/profile"
+            href={hrefFor("/profile")}
             aria-label="Your profile"
           >
             <span className="seekeros-avatarmini">{initial}</span>
@@ -188,12 +198,13 @@ export function SeekerShell({
       {/* Founder-locked mobile bottom dock (hidden ≥1024px). */}
       <nav className="seekeros-mnav" aria-label="Seeker">
         {MOBILE_PRIMARY.map((item) => {
-          const active = isActive(pathname, item.href);
+          const href = hrefFor(item.href);
+          const active = isActive(pathname, href);
           return (
             <Link
               key={item.href}
               id={item.id}
-              href={item.href}
+              href={href}
               className="seekeros-mtab ui-pressable"
               aria-current={active ? "page" : undefined}
             >
@@ -205,7 +216,7 @@ export function SeekerShell({
       </nav>
 
       {/* D19 — anchored, non-blocking, persisted. Replaces the modal tour. */}
-      <SeekerCoachmarks />
+      {demoMode ? null : <SeekerCoachmarks />}
     </div>
   );
 }

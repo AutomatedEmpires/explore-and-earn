@@ -5,7 +5,11 @@ import {
   type MatchBand,
   type MatchComponentScores,
 } from "@explore-and-earn/contracts";
-import type { ListingReadiness } from "@explore-and-earn/db";
+import type {
+  HostProfileFaq,
+  HostTeamMember,
+  ListingReadiness,
+} from "@explore-and-earn/db";
 import type { IconKey } from "@explore-and-earn/ui";
 
 import type { DiscoveryListing } from "../discovery";
@@ -46,6 +50,23 @@ export interface HostProfileSummary {
   readonly mealsOfferedGenerally?: boolean;
   /** Marketplace categories this host operates in. */
   readonly categoryScopes?: readonly string[];
+  /** Showcase content rendered verbatim by the canonical public profile. */
+  readonly whyWorkForUs?: string;
+  readonly team?: readonly HostTeamMember[];
+  readonly activities?: readonly string[];
+  readonly perks?: readonly string[];
+  readonly culture?: readonly string[];
+  readonly managementApproach?: string;
+  readonly typicalDay?: string;
+  readonly workEnvironment?: string;
+  readonly seasonRhythm?: readonly string[];
+  readonly training?: readonly string[];
+  readonly transportation?: readonly string[];
+  readonly remoteness?: string;
+  readonly nearbyServices?: readonly string[];
+  readonly housingDescription?: string;
+  readonly mealsDescription?: string;
+  readonly faqs?: readonly HostProfileFaq[];
 }
 
 export type HostListingState =

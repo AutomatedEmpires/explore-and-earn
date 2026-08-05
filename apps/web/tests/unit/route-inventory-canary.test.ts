@@ -39,8 +39,8 @@ const WEB = join(__dirname, "../..");
  * case, not a hypothetical one.
  */
 const PHASE_C: readonly string[] = [
-  "app/[locale]/for-seekers/page.tsx",
-  "app/[locale]/for-seekers/layout.tsx",
+  "app/[locale]/for-seekers/(marketing)/page.tsx",
+  "app/[locale]/for-seekers/(marketing)/layout.tsx",
   "lib/communityRoutes.ts",
   // The gate is co-located with the route it guards, not in components/.
   "app/[locale]/(seeker)/community/layout.tsx",
@@ -57,7 +57,7 @@ const PUBLIC_SURFACES: readonly string[] = [
   "app/[locale]/(seeker)/seek/page.tsx",
   "app/[locale]/(seeker)/map/page.tsx",
   "app/[locale]/(seeker)/swipe/page.tsx",
-  "app/[locale]/for-hosts/page.tsx",
+  "app/[locale]/for-hosts/(marketing)/page.tsx",
   "app/[locale]/for-hosts/demo/page.tsx",
   "app/[locale]/jobs/page.tsx",
   "app/[locale]/(legal)/terms/page.tsx",
@@ -81,6 +81,7 @@ const HOST_WORKSPACE: readonly string[] = [
   "app/[locale]/(host)/host/listings/page.tsx",
   "app/[locale]/(host)/host/applicants/page.tsx",
   "app/[locale]/(host)/host/messages/page.tsx",
+  "app/[locale]/(host)/host/notifications/page.tsx",
   "app/[locale]/(host)/host/outreach/page.tsx",
   "app/[locale]/(host)/host/coach/page.tsx",
   "app/[locale]/(host)/host/analytics/page.tsx",

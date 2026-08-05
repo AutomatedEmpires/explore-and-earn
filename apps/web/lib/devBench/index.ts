@@ -144,6 +144,57 @@ export function devHostProfile(): HostProfile {
     subscriptionTier: "professional",
     benefitLibraryAvailable: true,
     benefitLibrary: {},
+    narrative: {
+      whyWorkForUs:
+        "A small crew with clear training, shared meals, and evenings free to explore the valley.",
+      team: [{ name: "Maya", role: "Orchard manager" }],
+      activities: ["River days", "Trail access", "Community markets"],
+      perks: ["Shared staff housing", "Shift meals", "End-of-season bonus"],
+      culture: [
+        "Clear expectations",
+        "Safety before speed",
+        "Respectful feedback",
+      ],
+      managementApproach:
+        "The crew starts with a short daily plan, receives schedules a week ahead, and handles feedback in private one-on-ones.",
+      typicalDay:
+        "Morning crews gather for assignments, rotate through orchard rows with a lead nearby, and finish with a shared equipment handoff.",
+      workEnvironment:
+        "Most work is outdoors on uneven ground in changing temperatures. Training, water breaks, and the pace are adjusted for conditions.",
+      seasonRhythm: [
+        "August — arrival and paid orientation",
+        "September — peak harvest",
+        "October — final pick and close-down",
+      ],
+      training: [
+        "Paid safety orientation",
+        "Role shadowing before independent work",
+        "End-of-season skills recap",
+      ],
+      transportation: [
+        "Daily shuttle between staff housing and the orchard",
+        "Weekly grocery run into Wenatchee",
+      ],
+      remoteness:
+        "Staff housing is on the orchard. Groceries and healthcare are available in Wenatchee, about fifteen minutes away.",
+      nearbyServices: ["Grocery store", "Urgent care", "Pharmacy", "Bus station"],
+      housingDescription:
+        "Shared on-site staff housing includes utilities, a kitchen, laundry access, and a short walk to the morning meeting point.",
+      mealsDescription:
+        "A hot crew meal is provided on working days, with a shared kitchen available for breakfast and days off.",
+      faqs: [
+        {
+          question: "How are days off scheduled?",
+          answer:
+            "Schedules are posted a week ahead, and the team aims to keep days off together whenever harvest conditions allow.",
+        },
+        {
+          question: "Do I need a car?",
+          answer:
+            "No. The daily work shuttle and weekly grocery run cover essentials, though a car gives you more flexibility on days off.",
+        },
+      ],
+    },
   };
 }
 

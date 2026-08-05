@@ -1,5 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
-import { getUnreadMessageCount } from "@explore-and-earn/db";
+import {
+  getUnreadMessageCount,
+  getUnreadNotificationCount,
+} from "@explore-and-earn/db";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -61,7 +64,8 @@ export default async function HostLayout({
           companyName={hostProfile.companyName}
           photoUrl={hostProfile.photoUrl}
           tier={hostProfile.subscriptionTier}
-          unread={0}
+          unreadMessages={0}
+          unreadNotifications={0}
         >
           {children}
         </HostShell>
@@ -84,9 +88,10 @@ export default async function HostLayout({
   // The account state rides along in the same fan-out rather than after it: it
   // is one indexed primary-key read, and serializing it behind the profile would
   // add a round trip to every host page for a banner.
-  const [hostProfile, unreadMessages, accountState] = await Promise.all([
+  const [hostProfile, unreadMessages, unreadNotifications, accountState] = await Promise.all([
     cachedHostProfile(token, userId),
     getUnreadMessageCount(token, userId),
+    getUnreadNotificationCount(token, userId),
     cachedHostAccountState(userId),
   ]);
   if (!hostProfile) {
@@ -100,7 +105,8 @@ export default async function HostLayout({
         photoUrl={hostProfile.photoUrl ?? null}
         tier={hostProfile.subscriptionTier ?? null}
         accountState={accountState}
-        unread={unreadMessages}
+        unreadMessages={unreadMessages}
+        unreadNotifications={unreadNotifications}
       >
         {children}
       </HostShell>

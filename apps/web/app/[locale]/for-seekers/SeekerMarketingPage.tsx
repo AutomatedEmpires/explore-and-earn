@@ -14,7 +14,7 @@ import styles from "./page.module.css";
 export const metadata: Metadata = {
   title: "For seekers — work somewhere worth waking up in",
   description:
-    "Every Explore & Earn listing states housing, meals and pay before you apply. Browse the whole grid, swipe one role at a time, or find work by place on a real map. Free forever for seekers.",
+    "Every Explore & Earn listing states housing, meals and pay before you apply. Browse the whole grid, swipe one role at a time, or find work by place in the map view. Free forever for seekers.",
   alternates: { canonical: "/for-seekers" },
   openGraph: {
     title: "For seekers · Explore & Earn",
@@ -76,7 +76,7 @@ const MODES: readonly {
   {
     key: "seek",
     name: "Seek",
-    href: "/seek",
+    href: "/for-seekers/demo/seek",
     icon: "nav.seek",
     photo: "lodge-02",
     body: "The whole grid, with filters that match how the decision is actually made: housing, meals, pay band, lane and dates. Every card carries the triad, so filtering never hides the thing you were filtering for.",
@@ -84,7 +84,7 @@ const MODES: readonly {
   {
     key: "swipe",
     name: "Swipe",
-    href: "/swipe",
+    href: "/for-seekers/demo/swipe",
     icon: "nav.swipe",
     photo: "dock-01",
     body: "One role at a time, built for a phone. Keep it or let it go — a save is yours to come back to, and nothing you skip is shown to you again as if it were new.",
@@ -92,10 +92,10 @@ const MODES: readonly {
   {
     key: "map",
     name: "Map",
-    href: "/map",
+    href: "/for-seekers/demo/map",
     icon: "nav.map",
     photo: "idaho-03",
-    body: "A real map, not a picture of one. If the place decides the season for you, start there and let the roles come to the region instead of the other way round.",
+    body: "A location-first view with the same opportunity details. If the place decides the season for you, start there and compare roles by region.",
   },
 ];
 
@@ -154,12 +154,12 @@ export default async function ForSeekersPage() {
           <div className={styles.heroActions}>
             <CaptureOnClick
               className={styles.primaryLg}
-              href="/sign-up?role=seeker"
+              href="/for-seekers/demo"
               event={PUBLIC_IA_EVENTS.forSeekersCtaSelected}
-              properties={{ cta: "create_account" }}
+              properties={{ cta: "open_full_demo" }}
             >
-              <Icon name="nav.seek" size={20} aria-hidden />
-              Create a free account
+              <Icon name="action.view" size={20} aria-hidden />
+              Explore a populated account
             </CaptureOnClick>
             <CaptureOnClick
               className={styles.ghostLg}
@@ -167,7 +167,7 @@ export default async function ForSeekersPage() {
               event={PUBLIC_IA_EVENTS.forSeekersCtaSelected}
               properties={{ cta: "browse_anonymous" }}
             >
-              <Icon name="action.view" size={20} aria-hidden />
+              <Icon name="nav.seek" size={20} aria-hidden />
               Browse without an account
             </CaptureOnClick>
           </div>
