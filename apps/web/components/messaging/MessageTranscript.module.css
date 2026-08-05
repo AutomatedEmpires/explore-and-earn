@@ -88,13 +88,3 @@
 	margin: 0;
 	padding: 0;
 }
-
-/* ── Send error ───────────────────────────────────────── */
-
-.sendError {
-	margin: 0;
-	font-family: var(--font-ui);
-	font-size: var(--type-caption-size);
-	line-height: var(--type-caption-lh);
-	color: var(--status-error-fg);
-}

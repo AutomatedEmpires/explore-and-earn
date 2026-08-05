@@ -24,6 +24,9 @@ import {
 } from "../../seeker/SeekFilterPopup";
 import { SeekSortPopup } from "../../seeker/SeekSortPopup";
 import { HeroPhotoPickerModal } from "../../seeker/HeroPhotoPickerModal";
+import { HostInterviewScheduler } from "../../scheduling/HostInterviewScheduler";
+import { InterviewScheduleCard } from "../../scheduling/InterviewScheduleCard";
+import type { SchedulingRequest } from "@explore-and-earn/db/client";
 
 import {
   DEMO_HOST,
@@ -119,6 +122,47 @@ const CARD_HANDLERS = {
   onReject: noop,
 } as const;
 
+const INTERVIEW_OPTIONS = [
+  {
+    id: "11111111-1111-4111-8111-111111111111",
+    proposalRound: 1,
+    startsAt: "2027-06-10T17:00:00.000Z",
+    endsAt: "2027-06-10T17:30:00.000Z",
+  },
+  {
+    id: "22222222-2222-4222-8222-222222222222",
+    proposalRound: 1,
+    startsAt: "2027-06-11T19:00:00.000Z",
+    endsAt: "2027-06-11T19:30:00.000Z",
+  },
+] as const;
+
+function interviewFixture(
+  status: SchedulingRequest["status"],
+  selected = false,
+): SchedulingRequest {
+  return {
+    id: `fixture-${status}`,
+    applicationId: "fixture-application",
+    status,
+    meetingType: "video",
+    durationMinutes: 30,
+    proposalTimezone: "America/Los_Angeles",
+    meetingDetails: "Private video link shared after confirmation",
+    currentRound: 1,
+    selectedOptionId: selected ? INTERVIEW_OPTIONS[0].id : null,
+    expiresAt: "2027-06-09T17:00:00.000Z",
+    respondedAt: selected ? "2027-06-01T18:00:00.000Z" : null,
+    cancelledAt: status === "cancelled" ? "2027-06-02T18:00:00.000Z" : null,
+    cancelledBy: status === "cancelled" ? "host" : null,
+    completedAt: null,
+    noShowAt: null,
+    createdAt: "2027-06-01T17:00:00.000Z",
+    options: INTERVIEW_OPTIONS,
+    listingTitle: "Alpine Lodge Guest Services",
+  };
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CatalogClient() {
@@ -210,6 +254,45 @@ export function CatalogClient() {
               hint="How a host's own listing card reads while managing it."
               specimens={HOST_STATE_SPECIMENS}
             />
+
+            <section className={styles.section}>
+              <div className={styles.sectionHead}>
+                <h2 className={styles.sectionTitle}>Interview scheduling</h2>
+                <p className={styles.sectionHint}>
+                  Dev-only persisted-state fixtures. Controls are intentionally non-mutating.
+                </p>
+              </div>
+              <div className={styles.deck}>
+                <figure className={styles.specimen}>
+                  <HostInterviewScheduler
+                    applicationId="fixture-application"
+                    applicationStatus="reviewing"
+                    available
+                    request={null}
+                    fixtureMode
+                  />
+                  <figcaption className={styles.caption}>Host proposal form</figcaption>
+                </figure>
+                {(
+                  [
+                    ["proposed", false, "Seeker · proposed"],
+                    ["selected", true, "Seeker · confirmed"],
+                    ["alternate_requested", false, "Host · alternatives requested"],
+                    ["cancelled", true, "Seeker · cancelled after confirmation"],
+                  ] as const
+                ).map(([status, selected, caption]) => (
+                  <figure key={status} className={styles.specimen}>
+                    <InterviewScheduleCard
+                      request={interviewFixture(status, selected)}
+                      viewerRole={status === "alternate_requested" ? "host" : "seeker"}
+                      showListingTitle
+                      readOnly
+                    />
+                    <figcaption className={styles.caption}>{caption}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            </section>
 
             {/* ── Popups ── */}
             <section className={styles.section}>

@@ -104,6 +104,7 @@ export function toSeekerMatchInput(profile: SeekerProfileRecord): MatchSeekerInp
     housingPreference: profile.housingPreference,
     mealsPreference: profile.mealsPreference,
     locationPref: profile.locationPref,
+    remotePreference: profile.remotePreference,
     payExpectationMinCents: profile.payExpectationMinCents,
     payFlexible: profile.payFlexible,
   };
@@ -158,6 +159,7 @@ export function seekerHasMatchInputs(profile: SeekerProfileRecord): boolean {
   return (
     (profile.desiredCategories?.length ?? 0) > 0 ||
     profile.locationPref != null ||
+    profile.remotePreference != null ||
     profile.housingPreference != null ||
     profile.mealsPreference != null ||
     profile.payExpectationMinCents != null

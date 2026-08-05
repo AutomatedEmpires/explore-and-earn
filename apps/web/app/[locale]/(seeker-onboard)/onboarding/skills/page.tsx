@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -9,11 +9,26 @@ import {
 } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
+import { useSeekerOnboarding } from "../../../../../components/onboarding/SeekerOnboardingProvider";
 import { saveOnboardingStep } from "../../../../actions/seekerOnboarding";
 import { stepHref, useOnboardingReturnTo } from "../returnTo";
 import styles from "../onboarding.module.css";
 
 const MAX_TAGS = 10;
+const MAX_TAG_LENGTH = 40;
+
+function appendTag(tags: string[], input: string): string[] {
+  const tag = input.trim();
+  if (
+    !tag ||
+    tag.length > MAX_TAG_LENGTH ||
+    tags.length >= MAX_TAGS ||
+    tags.some((value) => value.toLowerCase() === tag.toLowerCase())
+  ) {
+    return tags;
+  }
+  return [...tags, tag];
+}
 
 const CATEGORY_LABEL: Record<MarketplaceCategory, string> = {
   farm: "Farm",
@@ -31,12 +46,104 @@ const CATEGORY_ICON: Record<MarketplaceCategory, IconKey> = {
   mix: "category.mix",
 };
 
+interface TagEditorProps {
+  readonly label: string;
+  readonly hint: string;
+  readonly placeholder: string;
+  readonly tags: string[];
+  readonly input: string;
+  readonly pending: boolean;
+  readonly onInput: (value: string) => void;
+  readonly onTags: (values: string[]) => void;
+}
+
+function TagEditor({
+  label,
+  hint,
+  placeholder,
+  tags,
+  input,
+  pending,
+  onInput,
+  onTags,
+}: TagEditorProps) {
+  const hintId = useId();
+
+  function addTag() {
+    const next = appendTag(tags, input);
+    if (next === tags) return;
+    onTags(next);
+    onInput("");
+  }
+
+  return (
+    <fieldset className={styles.field}>
+      <legend className={styles.label}>
+        {label} ({tags.length}/{MAX_TAGS})
+      </legend>
+      <span id={hintId} className={styles.fieldHint}>{hint}</span>
+      <div className={styles.tagRow}>
+        <input
+          className={styles.input}
+          type="text"
+          value={input}
+          maxLength={MAX_TAG_LENGTH}
+          placeholder={placeholder}
+          aria-label={`New ${label.toLowerCase()}`}
+          aria-describedby={hintId}
+          onChange={(event) => onInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              addTag();
+            }
+          }}
+          disabled={pending || tags.length >= MAX_TAGS}
+        />
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          onClick={addTag}
+          aria-label={`Add ${label.toLowerCase()}`}
+          disabled={pending || tags.length >= MAX_TAGS || input.trim().length === 0}
+        >
+          Add
+        </button>
+      </div>
+      {tags.length > 0 ? (
+        <div className={styles.tagGrid}>
+          {tags.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              className={styles.tagSelected}
+              onClick={() => onTags(tags.filter((value) => value !== tag))}
+              aria-label={`Remove ${tag}`}
+              disabled={pending}
+            >
+              {tag}
+              <Icon name="action.close" size={14} aria-hidden />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </fieldset>
+  );
+}
+
 export default function OnboardingSkillsPage() {
   const router = useRouter();
   const returnTo = useOnboardingReturnTo();
-  const [selected, setSelected] = useState<MarketplaceCategory[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
-  const [draft, setDraft] = useState("");
+  const { draft, updateDraft } = useSeekerOnboarding();
+  const [selected, setSelected] = useState<MarketplaceCategory[]>(
+    draft.categories,
+  );
+  const [desiredRoles, setDesiredRoles] = useState<string[]>(draft.desiredRoles);
+  const [generalSkills, setGeneralSkills] = useState<string[]>(
+    draft.generalSkills,
+  );
+  const [roleInput, setRoleInput] = useState("");
+  const [skillInput, setSkillInput] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -48,89 +155,67 @@ export default function OnboardingSkillsPage() {
     );
   }
 
-  function addTag() {
-    const tag = draft.trim();
-    if (!tag) {
-      return;
-    }
-    setTags((current) => {
-      if (
-        current.length >= MAX_TAGS ||
-        current.some((value) => value.toLowerCase() === tag.toLowerCase())
-      ) {
-        return current;
-      }
-      return [...current, tag];
-    });
-    setDraft("");
-  }
-
-  function removeTag(tag: string) {
-    setTags((current) => current.filter((value) => value !== tag));
-  }
-
   function goNext() {
     startTransition(async () => {
-      // Pass complete: true here so onboarding_complete is set server-side
-      // on the server action, not in a useEffect on the done page.
       setSaveError(null);
+      // Treat a filled tag input as part of the form even if the seeker did not
+      // tap the adjacent Add button before continuing.
+      const rolesToSave = appendTag(desiredRoles, roleInput);
+      const skillsToSave = appendTag(generalSkills, skillInput);
       try {
         const result = await saveOnboardingStep({
           categories: selected,
-          freeformSkills: tags,
-          complete: true,
+          desiredRoles: rolesToSave,
+          generalSkills: skillsToSave,
         });
         if (!result.ok) {
-          setSaveError("We couldn’t finish your profile. Please try again.");
+          setSaveError("We couldn’t save your skills. Please try again.");
           return;
         }
+        updateDraft({
+          categories: selected,
+          desiredRoles: rolesToSave,
+          generalSkills: skillsToSave,
+        });
         router.push(stepHref("/onboarding/done", returnTo));
       } catch {
-        setSaveError("We couldn’t finish your profile. Please try again.");
-      }
-    });
-  }
-
-  function skip() {
-    startTransition(async () => {
-      // This is the final onboarding step, so Skip must still mark
-      // onboarding_complete — otherwise a seeker who skips here lands on the
-      // "You're all set!" page while onboarding_complete stays false, and the
-      // (seeker) layout's gate bounces them straight back to /onboarding on
-      // their next visit.
-      setSaveError(null);
-      try {
-        const result = await saveOnboardingStep({ complete: true });
-        if (!result.ok) {
-          setSaveError("We couldn’t finish your profile. Please try again.");
-          return;
-        }
-        router.push(stepHref("/onboarding/done", returnTo));
-      } catch {
-        setSaveError("We couldn’t finish your profile. Please try again.");
+        setSaveError("We couldn’t save your skills. Please try again.");
       }
     });
   }
 
   return (
     <div className={styles.shell}>
-      <div className={styles.progress} aria-hidden>
-        {[1, 2, 3].map((step) => (
+      <p className={styles.progressLabel}>Step 3 of 4 · Work fit</p>
+      <div
+        className={styles.progress}
+        role="progressbar"
+        aria-label="Onboarding progress"
+        aria-valuemin={1}
+        aria-valuemax={4}
+        aria-valuenow={3}
+      >
+        {[1, 2, 3, 4].map((step) => (
           <span
             key={step}
             className={step <= 3 ? styles.progressDotActive : styles.progressDot}
+            aria-hidden="true"
           />
         ))}
       </div>
       <header className={styles.header}>
-        <h1 className={styles.heading}>Skills &amp; interests</h1>
+        <h1 className={styles.heading}>What kind of work fits you?</h1>
         <p className={styles.sub}>
-          Pick the kinds of work you&apos;re drawn to, and add your own tags.
+          Interests shape discovery. Skills are the experience hosts rely on
+          when they review an application.
         </p>
       </header>
       <div className={styles.form}>
-        <div className={styles.field}>
-          <span className={styles.label}>Categories</span>
+        <fieldset className={styles.field}>
+          <legend className={styles.label}>Explore categories</legend>
+          <span className={styles.fieldHint}>
+            Choose any lanes you want to see. You can change these later.
+          </span>
           <div className={styles.tagGrid}>
             {MARKETPLACE_CATEGORIES.map((category) => (
               <button
@@ -148,53 +233,27 @@ export default function OnboardingSkillsPage() {
               </button>
             ))}
           </div>
-        </div>
-        <div className={styles.field}>
-          <span className={styles.label}>
-            Your tags ({tags.length}/{MAX_TAGS})
-          </span>
-          <div className={styles.tagRow}>
-            <input
-              className={styles.input}
-              type="text"
-              value={draft}
-              maxLength={40}
-              placeholder="e.g. animal care, carpentry, cooking"
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  addTag();
-                }
-              }}
-              disabled={pending || tags.length >= MAX_TAGS}
-            />
-            <button
-              type="button"
-              className={styles.primaryButton}
-              onClick={addTag}
-              disabled={pending || tags.length >= MAX_TAGS || draft.trim().length === 0}
-            >
-              Add
-            </button>
-          </div>
-          {tags.length > 0 ? (
-            <div className={styles.tagGrid}>
-              {tags.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  className={styles.tagSelected}
-                  onClick={() => removeTag(tag)}
-                  aria-label={`Remove ${tag}`}
-                  disabled={pending}
-                >
-                  {tag} ✕
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        </fieldset>
+        <TagEditor
+          label="Roles you want"
+          hint="Examples: ranch hand, line cook, guest services. These tune your matches."
+          placeholder="Add a role"
+          tags={desiredRoles}
+          input={roleInput}
+          pending={pending}
+          onInput={setRoleInput}
+          onTags={setDesiredRoles}
+        />
+        <TagEditor
+          label="Skills you bring"
+          hint="Add at least one skill to become eligible to apply."
+          placeholder="e.g. animal care, carpentry, cooking"
+          tags={generalSkills}
+          input={skillInput}
+          pending={pending}
+          onInput={setSkillInput}
+          onTags={setGeneralSkills}
+        />
       </div>
       {saveError ? (
         <p className={styles.error} role="alert">
@@ -205,10 +264,10 @@ export default function OnboardingSkillsPage() {
         <button
           type="button"
           className={styles.linkButton}
-          onClick={skip}
+          onClick={goNext}
           disabled={pending}
         >
-          Skip
+          Save and review later
         </button>
         <button
           type="button"
@@ -216,7 +275,7 @@ export default function OnboardingSkillsPage() {
           onClick={goNext}
           disabled={pending}
         >
-          {pending ? "Saving…" : "Continue"}
+          {pending ? "Saving…" : "Review profile"}
         </button>
       </footer>
     </div>

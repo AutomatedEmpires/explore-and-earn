@@ -27,7 +27,8 @@ function seeker(overrides: Partial<SeekerProfileRecord> = {}): SeekerProfileReco
     displayName: "Ada",
     shortBio: null,
     openToStatement: null,
-    locationPref: "on_site",
+    locationPref: "Pacific Northwest",
+    remotePreference: "on_site",
     housingPreference: "preferred",
     mealsPreference: "preferred",
     payExpectationMinCents: 250_000,
@@ -36,6 +37,7 @@ function seeker(overrides: Partial<SeekerProfileRecord> = {}): SeekerProfileReco
     payFlexible: true,
     desiredCategories: ["farm"],
     desiredRoles: [],
+    generalSkills: [],
     onboardingComplete: true,
     profilePhotoUrl: null,
     heroCoverUrl: null,
@@ -79,6 +81,7 @@ describe("seekerHasMatchInputs — honest gate", () => {
     const empty = seeker({
       desiredCategories: [],
       locationPref: null,
+      remotePreference: null,
       housingPreference: null,
       mealsPreference: null,
       payExpectationMinCents: null,
@@ -90,6 +93,7 @@ describe("seekerHasMatchInputs — honest gate", () => {
     const withCategory = seeker({
       desiredCategories: ["farm"],
       locationPref: null,
+      remotePreference: null,
       housingPreference: null,
       mealsPreference: null,
       payExpectationMinCents: null,

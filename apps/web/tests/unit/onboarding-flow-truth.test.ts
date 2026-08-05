@@ -305,8 +305,95 @@ describe("onboarding persistence and preview truth", () => {
     }
 
     const finalStep = source(paths[2]);
-    expect(finalStep.match(/if \(!result\.ok\)/g)).toHaveLength(2);
-    expect(finalStep).toContain("saveOnboardingStep({ complete: true })");
+    expect(finalStep.match(/if \(!result\.ok\)/g)).toHaveLength(1);
+  });
+
+  it("separates profile-step persistence from explicit onboarding completion", () => {
+    const action = source("app/actions/seekerOnboarding.ts");
+    const finalStep = source(
+      "app/[locale]/(seeker-onboard)/onboarding/skills/page.tsx",
+    );
+    const donePage = source(
+      "app/[locale]/(seeker-onboard)/onboarding/done/page.tsx",
+    );
+    const finishControl = source(
+      "components/onboarding/SeekerOnboardingFinish.tsx",
+    );
+
+    expect(finalStep).not.toContain("complete: true");
+    expect(finalStep).toContain('stepHref("/onboarding/done", returnTo)');
+    expect(finalStep.match(/onClick={goNext}/g)).toHaveLength(2);
+    expect(action).toContain("export async function finishSeekerOnboarding");
+    expect(action.match(/onboardingComplete: true/g)).toHaveLength(1);
+    expect(donePage).toContain("seekerResumeCompletion");
+    expect(donePage).toContain("Still needed to apply");
+    expect(finishControl).toContain("finishSeekerOnboarding()");
+  });
+
+  it("never replaces a persisted seeker profile with a blank draft after a read fault", () => {
+    const layout = source("app/[locale]/(seeker-onboard)/layout.tsx");
+    const profileQuery = source("../../packages/db/src/queries/seekerProfiles.ts");
+
+    expect(layout).toContain("getSeekerProfileResult");
+    expect(layout).toContain("if (!result.ok) return <ProfileLoadError />");
+    expect(layout).toContain("seekerProfileToOnboardingDraft(result.profile)");
+    expect(profileQuery).toContain("export type SeekerProfileLoadResult");
+    expect(profileQuery).toContain("ok: true, profile: null");
+    expect(profileQuery).toContain("ok: false, error:");
+  });
+
+  it("keeps the seeded seeker wizard behind the non-production dev-bench gate", () => {
+    const layout = source("app/[locale]/(seeker-onboard)/layout.tsx");
+    const action = source("app/actions/seekerOnboarding.ts");
+    const done = source(
+      "app/[locale]/(seeker-onboard)/onboarding/done/page.tsx",
+    );
+
+    expect(layout).toContain("isDevBenchEnabled()");
+    expect(layout).toContain('(await readDevRole()) === "seeker"');
+    expect(layout).toContain("DEV_BENCH_DRAFT");
+    expect(action).toContain("isSeekerDevBenchSession");
+    expect(action).toContain("isDevBenchEnabled()");
+    expect(action).toContain('(await readDevRole()) === "seeker"');
+    expect(done).toContain("DEV_BENCH_RESUME_STATUS");
+    expect(done).toContain("isDevBenchEnabled()");
+    expect(done).toContain('(await readDevRole()) === "seeker"');
+  });
+
+  it("keeps work setting separate from the free-text travel region", () => {
+    const action = source("app/actions/seekerOnboarding.ts");
+    const prefs = source(
+      "app/[locale]/(seeker-onboard)/onboarding/prefs/page.tsx",
+    );
+    const profileQuery = source("../../packages/db/src/queries/seekerProfiles.ts");
+
+    expect(action).toContain("remotePreference");
+    expect(action).not.toContain("locationPref");
+    expect(prefs).toContain("remotePreference");
+    expect(profileQuery).toContain("patch.remote_preference");
+    expect(profileQuery).toContain("patch.location_pref");
+  });
+
+  it("gives repeated skill controls distinct accessible names and hides decorative progress bars", () => {
+    const steps = [
+      source("app/[locale]/(seeker-onboard)/onboarding/page.tsx"),
+      source("app/[locale]/(seeker-onboard)/onboarding/prefs/page.tsx"),
+      source("app/[locale]/(seeker-onboard)/onboarding/skills/page.tsx"),
+      source("app/[locale]/(seeker-onboard)/onboarding/done/page.tsx"),
+    ];
+    const skills = steps[2];
+    const profile = source(
+      "app/[locale]/(seeker)/profile/edit/ProfileEditForm.tsx",
+    );
+
+    expect(skills).toContain("aria-describedby={hintId}");
+    expect(skills).toContain("aria-label={`New ${label.toLowerCase()}`}");
+    expect(skills).toContain("aria-label={`Add ${label.toLowerCase()}`}");
+    for (const step of steps) expect(step).toContain('aria-hidden="true"');
+    expect(profile).toContain('aria-label="Role to add"');
+    expect(profile).toContain('aria-label="Add role"');
+    expect(profile).toContain('aria-label="Skill to add"');
+    expect(profile).toContain('aria-label="Add skill"');
   });
 
   it("shows profile-edit success only after persistence succeeds", () => {
@@ -318,5 +405,21 @@ describe("onboarding persistence and preview truth", () => {
       form.indexOf("setSaved(true)"),
     );
     expect(form).toContain('role="alert"');
+  });
+
+  it("fails profile editing closed on read faults and preserves every pay unit", () => {
+    const page = source("app/[locale]/(seeker)/profile/edit/page.tsx");
+    const form = source(
+      "app/[locale]/(seeker)/profile/edit/ProfileEditForm.tsx",
+    );
+
+    expect(page).toContain("getSeekerProfileResult");
+    expect(page).toContain("if (!loaded.ok) return { ok: false }");
+    expect(page).toContain("result.ok ?");
+    expect(form).toContain('{ value: "year", label: "/ year" }');
+    expect(form).toContain('{ value: "other", label: "other" }');
+    expect(form).toContain("desiredRoles: rolesToSave");
+    expect(form).toContain("generalSkills: skillsToSave");
+    expect(form).toContain("disabled={pending} aria-busy={pending}");
   });
 });

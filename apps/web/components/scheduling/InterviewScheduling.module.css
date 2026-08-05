@@ -1,0 +1,243 @@
+.hostStack {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+}
+
+.card {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: var(--space-16);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface-raised);
+}
+
+.cardHead {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--space-12);
+}
+
+.cardTitleGroup {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.eyebrow,
+.meta,
+.help,
+.confirmedTime,
+.error {
+	margin: 0;
+	font-family: var(--font-ui);
+}
+
+.eyebrow {
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.cardTitle {
+	margin: 0;
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	color: var(--text-primary);
+}
+
+.status {
+	flex-shrink: 0;
+	padding: var(--space-4) var(--space-8);
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-pill);
+	font-family: var(--font-ui);
+	font-size: var(--type-caption-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.meta,
+.help {
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.confirmed {
+	padding: var(--space-12);
+	border-radius: var(--radius-cell);
+	background: var(--color-surface);
+}
+
+.confirmedTime {
+	font-size: var(--type-body-size);
+	font-weight: var(--font-weight-semibold);
+	line-height: var(--type-body-lh);
+	color: var(--text-primary);
+}
+
+.options {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.option {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--space-12);
+	min-height: 44px;
+	padding: var(--space-8) var(--space-12);
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-cell);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	color: var(--text-primary);
+}
+
+.optionTimes {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.details {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--space-12);
+	margin: 0;
+}
+
+.details div {
+	display: flex;
+	min-width: 0;
+	flex-direction: column;
+	gap: var(--space-2);
+}
+
+.details dt,
+.slotFieldset legend,
+.field span {
+	font-family: var(--font-ui);
+	font-size: var(--type-label-size);
+	font-weight: var(--font-weight-semibold);
+	letter-spacing: var(--type-label-tracking);
+	text-transform: uppercase;
+	color: var(--text-secondary);
+}
+
+.details dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-primary);
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space-8);
+}
+
+.error {
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--status-warning-fg);
+}
+
+.composer {
+	border: 1px solid var(--border-soft);
+	border-radius: var(--radius-card);
+	background: var(--color-surface-raised);
+}
+
+.composerSummary {
+	padding: var(--space-12) var(--space-16);
+	cursor: pointer;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--text-primary);
+}
+
+.form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-12);
+	padding: 0 var(--space-16) var(--space-16);
+}
+
+.field {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-4);
+}
+
+.field input,
+.field select,
+.field textarea {
+	width: 100%;
+	min-height: 44px;
+	padding: var(--space-8) var(--space-12);
+	border: 1px solid var(--border-ink);
+	border-radius: var(--radius-input);
+	background: var(--color-surface);
+	font: inherit;
+	color: var(--text-primary);
+}
+
+.field textarea {
+	min-height: 88px;
+	resize: vertical;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}
+
+.slotFieldset {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-8);
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+@media (max-width: 640px) {
+	.cardHead,
+	.option {
+		align-items: stretch;
+		flex-direction: column;
+	}
+
+	.status {
+		align-self: flex-start;
+	}
+
+	.details {
+		grid-template-columns: 1fr;
+	}
+
+	.actions > * {
+		width: 100%;
+	}
+}

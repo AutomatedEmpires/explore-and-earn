@@ -9,14 +9,15 @@ import { sweepExpiredLifecycles } from "@explore-and-earn/db";
 export const dynamic = "force-dynamic";
 
 /**
- * Scheduled job — enforce the application/invite/offer lifecycle windows
- * (LIFECYCLE_EXPIRY_DAYS: application 30d, invite 14d, offer 7d).
+ * Scheduled job — enforce application/invite/offer/interview response windows
+ * (LIFECYCLE_EXPIRY_DAYS: application 30d, invite 14d, offer 7d; interview
+ * response windows are stored per request and never exceed 72 hours).
  *
- * Rows whose expires_at (stamped by migration 067's triggers) has passed
- * transition to 'expired' via the service role; the 001 lifecycle triggers
- * stay the authoritative edge guard underneath. Rows with a NULL expires_at
- * are never touched, so running this cron before 067 is applied is a safe
- * no-op rather than a guess.
+ * Rows whose expires_at (stamped by migration 067's triggers or migration
+ * 088's scheduling RPCs) has passed transition to 'expired' via the service
+ * role; the lifecycle triggers stay the authoritative edge guard underneath.
+ * Rows with a NULL expires_at are never touched, so running this cron before
+ * 067 is applied is a safe no-op rather than a guess.
  *
  * Auth: `Authorization: Bearer ${CRON_SECRET}`. See docs/runbooks/cron-jobs.md.
  */
@@ -31,7 +32,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     // A returned error is silent by construction — nothing throws, so nothing
     // reaches Sentry unless it is reported here.
     reportCronFailure("expire-lifecycle", result.error ?? "sweepExpiredLifecycles reported ok:false");
-    return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
+    return NextResponse.json(result, { status: 500 });
   }
 
   return NextResponse.json({
@@ -39,5 +40,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     applicationsExpired: result.applicationsExpired,
     offersExpired: result.offersExpired,
     invitesExpired: result.invitesExpired,
+    schedulingRequestsExpired: result.schedulingRequestsExpired,
   });
 }

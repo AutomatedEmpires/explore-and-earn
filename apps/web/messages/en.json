@@ -122,6 +122,26 @@
 				"title": "New message",
 				"body": "You have a new message waiting on Explore & Earn."
 			},
+			"interview_proposed": {
+				"title": "Choose an interview time",
+				"body": "The host for {listingTitle} offered interview times. Choose one or ask for alternatives."
+			},
+			"interview_confirmed": {
+				"title": "Interview time confirmed",
+				"body": "The applicant chose an interview time for {listingTitle}."
+			},
+			"interview_alternate_requested": {
+				"title": "Different interview times requested",
+				"body": "The applicant for {listingTitle} asked you to offer different interview times."
+			},
+			"interview_cancelled": {
+				"title": "Interview cancelled",
+				"body": "The interview schedule for {listingTitle} was cancelled."
+			},
+			"interview_no_show_recorded": {
+				"title": "Missed interview recorded",
+				"body": "The host recorded a no-show for your {listingTitle} interview. If that is not correct, review the application and message the host."
+			},
 			"sourced_listing_claim_submitted": {
 				"title": "New listing claim to review",
 				"body": "Someone claimed {listingTitle} and is awaiting review. Verify their authority before anything on the listing changes — a submitted claim grants nothing by itself."
@@ -158,6 +178,11 @@
 				"offer_declined": "Review applicants",
 				"invite_received": "View invite",
 				"message_received": "Open conversation",
+				"interview_proposed": "Choose a time",
+				"interview_confirmed": "View applicant",
+				"interview_alternate_requested": "Offer new times",
+				"interview_cancelled": "View details",
+				"interview_no_show_recorded": "Review application",
 				"new_strong_match": "View listing",
 				"saved_search_results": "See new matches",
 				"resume_nudge": "Finish résumé",
@@ -218,6 +243,10 @@
 				"messages": {
 					"label": "Messages",
 					"description": "New messages from your conversations."
+				},
+				"scheduling": {
+					"label": "Interviews",
+					"description": "Interview proposals, confirmations, changes, and cancellations."
 				},
 				"matches": {
 					"label": "Matches",
@@ -305,6 +334,320 @@
 		"saveErrorTemporary": "Saved listings are temporarily unavailable. Nothing changed — try again in a moment.",
 		"applyOnOriginal": "Apply on the original posting",
 		"sourcedNoApplyPath": "This employer hasn't joined Explore & Earn yet, so applications can't be sent from here."
+	},
+	"Schedule": {
+		"title": "Schedule",
+		"description": "Keep hosts aligned on when you're available.",
+		"signedOut": {
+			"title": "Sign in to manage availability",
+			"message": "Once you're signed in, you can share your availability window with hosts."
+		},
+		"interviews": {
+			"heading": "Interviews",
+			"description": "Choose proposed times and keep confirmed interviews in one place.",
+			"empty": "No interview requests yet. New requests will appear here."
+		},
+		"availability": {
+			"heading": "General availability",
+			"description": "This window helps hosts understand when you can start a role.",
+			"startDate": "Start date",
+			"endDate": "End date",
+			"status": "Status",
+			"availableNow": "Available now",
+			"specificWindow": "Specific window",
+			"flexible": "Flexible",
+			"unavailable": "Not available",
+			"save": "Save availability"
+		}
+	},
+	"InterviewScheduling": {
+		"eyebrow": "Interview",
+		"zoneFallback": "Your current time zone",
+		"cancelConfirm": "Cancel this interview schedule?",
+		"durationMinutes": "{minutes} minutes",
+		"yourTime": "Your time: {time}",
+		"chooseTime": "Choose {time}",
+		"choose": "Choose",
+		"proposedTimes": "Proposed interview times",
+		"waitingForSeeker": "Waiting for the seeker to choose a time.",
+		"alternativesRequested": "The seeker asked you to offer different times.",
+		"noShowHelp": "No show can be recorded 15 minutes after the interview starts.",
+		"askForAlternatives": "Ask for different times",
+		"markCompleted": "Mark completed",
+		"recordNoShow": "Record no show",
+		"cancel": "Cancel interview",
+		"status": {
+			"proposed": "Awaiting response",
+			"selected": "Confirmed",
+			"alternate_requested": "Different times requested",
+			"cancelled": "Cancelled",
+			"completed": "Completed",
+			"expired": "Expired",
+			"no_show": "No show",
+			"responseEnded": "Response window ended"
+		},
+		"meeting": {
+			"phone": "Phone call",
+			"video": "Video call",
+			"in_person": "In person",
+			"other": "Other"
+		},
+		"details": {
+			"where": "Where",
+			"timeZone": "Time zone"
+		},
+		"errors": {
+			"conflict": "This interview changed before your update was saved. Refresh and try again.",
+			"unauthorized": "You don’t have permission to update this interview.",
+			"not_available": "Interview scheduling is temporarily unavailable. Please try again.",
+			"invalid_input": "Check the interview details and try again.",
+			"invalid_slots": "Choose one to three valid future times.",
+			"time_conflict": "One of those times overlaps another interview. Choose a different time.",
+			"rate_limited": "Too many scheduling attempts. Please wait and try again.",
+			"application_closed": "This application is no longer active.",
+			"active_request_exists": "An active interview request already exists.",
+			"unknown": "We couldn’t update the interview. Please try again."
+		},
+		"composer": {
+			"offerDifferent": "Offer different times",
+			"scheduleAnother": "Schedule another interview",
+			"schedule": "Schedule interview",
+			"format": "Format",
+			"video": "Video call",
+			"phone": "Phone call",
+			"inPerson": "In person",
+			"other": "Other",
+			"length": "Length",
+			"offerTimes": "Offer up to three times",
+			"firstChoice": "First choice",
+			"secondChoice": "Second choice",
+			"thirdChoice": "Third choice",
+			"meetingDetails": "Meeting details",
+			"meetingDetailsPlaceholder": "Add a video link, phone number, or meeting place",
+			"zoneHelp": "Times will be sent in {zone}.",
+			"sending": "Sending…",
+			"send": "Send interview times"
+		}
+	},
+	"Onboarding": {
+		"loadError": {
+			"title": "We couldn’t load your profile",
+			"body": "Nothing has been changed. Check your connection and try again before continuing onboarding.",
+			"retry": "Try again"
+		},
+		"progress": {
+			"label": "Step {step} of {total} · {name}",
+			"ariaLabel": "Onboarding progress",
+			"about": "About you",
+			"preferences": "Your essentials",
+			"skills": "Work fit",
+			"readiness": "Readiness check"
+		},
+		"common": {
+			"later": "Do this later",
+			"saving": "Saving…",
+			"continue": "Continue",
+			"add": "Add",
+			"removeTag": "Remove {tag}"
+		},
+		"about": {
+			"saveError": "We couldn’t save your profile. Please try again.",
+			"title": "Build the profile behind your next season",
+			"intro": "Start with the details hosts need to understand your application. You can leave any field for later; we will tell you exactly what still blocks applying.",
+			"displayName": {
+				"label": "Display name",
+				"placeholder": "How should hosts address you?",
+				"hint": "Hosts see this on your application."
+			},
+			"location": {
+				"label": "Where are you based?",
+				"placeholder": "e.g. Bend, Oregon",
+				"hint": "A general location is enough. Hosts use it to plan travel."
+			},
+			"timeline": {
+				"label": "When could you start?",
+				"placeholder": "Choose a window",
+				"hint": "This is required before applying and helps hosts judge timing.",
+				"options": {
+					"now": "Ready now",
+					"1_month": "Within 1 month",
+					"3_months": "Within 3 months",
+					"6_months": "Within 6 months"
+				}
+			},
+			"bio": {
+				"label": "Short bio",
+				"placeholder": "A sentence or two about what you're looking for.",
+				"hint": "A short bio or one work experience is required before applying."
+			}
+		},
+		"preferences": {
+			"saveError": "We couldn’t save your preferences. Please try again.",
+			"title": "Your preferences",
+			"intro": "Tell us what makes a role workable. These answers improve matching; they never guarantee that a listing provides a benefit.",
+			"workSetting": {
+				"label": "Work setting",
+				"options": {
+					"remote": { "label": "Remote", "detail": "Work from anywhere." },
+					"on_site": { "label": "On-site", "detail": "Live and work at the host." },
+					"hybrid": { "label": "Hybrid", "detail": "Mix remote and on-site work." },
+					"any": { "label": "Any setting", "detail": "I’m open to every arrangement." }
+				}
+			},
+			"housing": {
+				"label": "Housing",
+				"hint": "Entitled hosts can see this need when reviewing your application.",
+				"options": {
+					"required": { "label": "Housing required", "detail": "I need host-provided housing for an on-site role." },
+					"preferred": { "label": "Housing preferred", "detail": "I'd like a host to provide housing." },
+					"not_needed": { "label": "Not needed", "detail": "I'll arrange my own." },
+					"flexible": { "label": "Flexible", "detail": "I can consider either arrangement." }
+				}
+			},
+			"meals": {
+				"label": "Meals",
+				"hint": "Used for matching. Hosts do not receive your meals preference as a screening field.",
+				"options": {
+					"required": { "label": "Meals required", "detail": "Meals need to be part of the role." },
+					"preferred": { "label": "Meals preferred", "detail": "Provided meals would make the season work better." },
+					"not_needed": { "label": "Not needed", "detail": "I can handle my own meals." },
+					"flexible": { "label": "Flexible", "detail": "I am open to either setup." }
+				}
+			}
+		},
+		"skills": {
+			"saveError": "We couldn’t save your skills. Please try again.",
+			"title": "What kind of work fits you?",
+			"intro": "Interests shape discovery. Skills are the experience hosts rely on when they review an application.",
+			"categories": {
+				"label": "Explore categories",
+				"hint": "Choose any lanes you want to see. You can change these later.",
+				"options": {
+					"farm": "Farm",
+					"maritime": "Maritime",
+					"remote": "Remote",
+					"seasonal": "Seasonal",
+					"mix": "Mix"
+				}
+			},
+			"roles": {
+				"label": "Roles you want",
+				"hint": "Examples: ranch hand, line cook, guest services. These tune your matches.",
+				"placeholder": "Add a role",
+				"inputAriaLabel": "New roles you want",
+				"addAriaLabel": "Add roles you want"
+			},
+			"experience": {
+				"label": "Skills you bring",
+				"hint": "Add at least one skill to become eligible to apply.",
+				"placeholder": "e.g. animal care, carpentry, cooking",
+				"inputAriaLabel": "New skills you bring",
+				"addAriaLabel": "Add skills you bring"
+			},
+			"saveLater": "Save and review later",
+			"review": "Review profile"
+		},
+		"done": {
+			"destination": {
+				"community": "Open Community",
+				"continue": "Continue",
+				"explore": "Explore opportunities"
+			},
+			"heading": {
+				"ready": "Your profile is ready to apply",
+				"saved": "Your profile is saved",
+				"unknown": "Your profile is saved — let’s confirm the rest"
+			},
+			"body": {
+				"ready": "You have every detail required to apply. You can keep polishing your résumé at any time.",
+				"saved": "You can explore now, but applying stays locked until the missing résumé details below are complete.",
+				"unknown": "We couldn’t verify application readiness right now. Open your résumé to review it, or explore and return later."
+			},
+			"readiness": "Application readiness",
+			"stillNeeded": "Still needed to apply",
+			"allPresent": "All required application details are present.",
+			"exploreHint": "Exploring first will not mark your résumé as application-ready.",
+			"finish": {
+				"error": "We couldn’t finish onboarding. Please try again.",
+				"openResume": "Open résumé",
+				"finishResume": "Finish résumé now",
+				"finishing": "Finishing…",
+				"exploreFirst": "Explore first"
+			}
+		}
+	},
+	"ProfileEdit": {
+		"page": {
+			"title": "Edit profile",
+			"description": "Update your name, bio, and preferences.",
+			"loadErrorTitle": "We couldn’t load your profile",
+			"loadErrorBody": "Nothing has been changed. Check your connection and try again before editing.",
+			"retry": "Try again"
+		},
+		"form": {
+			"legend": "Profile details",
+			"photo": "Profile photo",
+			"addPhoto": "Add a profile photo",
+			"photoNoProfile": "Profile not found — reload the page and try again.",
+			"photoSessionExpired": "Your session has expired — sign in again.",
+			"photoSaveError": "Your photo uploaded, but we couldn’t save it to your profile. Try again.",
+			"displayName": "Display name",
+			"bio": "Short bio",
+			"openTo": "What I'm looking for",
+			"openToPlaceholder": "e.g. A farm stay in the Pacific Northwest for summer 2026",
+			"pay": "Pay expectation",
+			"minimumPay": "Minimum pay",
+			"maximumPay": "Maximum pay",
+			"minimum": "Min",
+			"maximum": "Max",
+			"payPeriod": "Pay period",
+			"payFlexible": "I'm flexible on pay",
+			"workSetting": "Work setting",
+			"housing": "Housing",
+			"meals": "Meals",
+			"categories": "Categories",
+			"options": {
+				"remote": "Remote",
+				"on_site": "On-site",
+				"hybrid": "Hybrid",
+				"any": "Any setting",
+				"housing_required": "Housing required",
+				"housing_preferred": "Housing preferred",
+				"meals_required": "Meals required",
+				"meals_preferred": "Meals preferred",
+				"not_needed": "Not needed",
+				"flexible": "Flexible",
+				"farm": "Farm",
+				"maritime": "Maritime",
+				"seasonal": "Seasonal",
+				"mix": "Mix"
+			},
+			"payUnits": {
+				"hour": "/ hour",
+				"day": "/ day",
+				"week": "/ week",
+				"month": "/ month",
+				"year": "/ year",
+				"stipend": "stipend",
+				"exchange": "exchange",
+				"other": "other"
+			},
+			"roles": "Roles you want ({count}/{max})",
+			"rolePlaceholder": "e.g. ranch hand, line cook",
+			"roleInputAriaLabel": "Role to add",
+			"addRoleAriaLabel": "Add role",
+			"skills": "Skills you bring ({count}/{max})",
+			"skillPlaceholder": "e.g. animal care, carpentry, cooking",
+			"skillInputAriaLabel": "Skill to add",
+			"addSkillAriaLabel": "Add skill",
+			"add": "Add",
+			"removeTag": "Remove {tag}",
+			"saveError": "We couldn’t save your changes. Please try again.",
+			"back": "Back to profile",
+			"saved": "Saved",
+			"saving": "Saving…",
+			"save": "Save changes"
+		}
 	},
 	"ListingNotFound": {
 		"eyebrow": "The marketplace",

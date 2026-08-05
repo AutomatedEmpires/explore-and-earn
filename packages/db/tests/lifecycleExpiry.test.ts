@@ -1,8 +1,8 @@
 /**
  * Lifecycle expiry sweep invariants:
  *
- *  - Three buckets sweep independently: 30d pipeline applications, 7d offers,
- *    14d pending invites — each transitions ONLY its own status set.
+ *  - Four buckets sweep independently: 30d pipeline applications, 7d offers,
+ *    14d pending invites, and interview response windows.
  *  - NULL-expiry rows are never touched (pre-067 safety: running the cron
  *    before the schema half is applied must be a no-op, not a guess).
  *  - Counts come from RETURNING ids, so the cron response is exact.
@@ -50,11 +50,12 @@ beforeEach(() => {
 const NOW = "2026-07-16T12:00:00.000Z";
 
 describe("sweepExpiredLifecycles", () => {
-  it("sweeps the three buckets with exact counts and the null-expiry guard", async () => {
+  it("sweeps the four buckets with exact counts and the null-expiry guard", async () => {
     const buckets = [
       makeChain([{ id: "a1" }, { id: "a2" }]), // pipeline applications
       makeChain([{ id: "o1" }]), // offers
       makeChain([]), // invites
+      makeChain([{ id: "schedule-1" }]), // scheduling requests
     ];
     let call = 0;
     mockFrom.mockImplementation(() => buckets[call++].chain);
@@ -66,6 +67,7 @@ describe("sweepExpiredLifecycles", () => {
       applicationsExpired: 2,
       offersExpired: 1,
       invitesExpired: 0,
+      schedulingRequestsExpired: 1,
     });
 
     // Bucket 1: pipeline statuses only, never offered/terminal states.
@@ -82,6 +84,10 @@ describe("sweepExpiredLifecycles", () => {
     expect(buckets[2].calls.find((c) => c.method === "in")?.args).toEqual([
       "status",
       ["created", "delivered", "viewed"],
+    ]);
+    expect(buckets[3].calls.find((c) => c.method === "in")?.args).toEqual([
+      "status",
+      ["proposed", "alternate_requested"],
     ]);
 
     for (const bucket of buckets) {
@@ -104,7 +110,7 @@ describe("sweepExpiredLifecycles", () => {
     }
   });
 
-  it("fails loudly (ok:false, zero counts) when a bucket errors", async () => {
+  it("fails loudly while preserving counts for already-committed buckets", async () => {
     const first = makeChain([{ id: "a1" }]);
     const failing = makeChain([], { message: "boom" });
     let call = 0;
@@ -113,9 +119,33 @@ describe("sweepExpiredLifecycles", () => {
     const result = await sweepExpiredLifecycles(NOW);
 
     expect(result.ok).toBe(false);
-    expect(result.applicationsExpired).toBe(0);
+    expect(result.applicationsExpired).toBe(1);
     expect(result.offersExpired).toBe(0);
     expect(result.invitesExpired).toBe(0);
+    expect(result.schedulingRequestsExpired).toBe(0);
     expect(result.error).toContain("boom");
   });
+
+  it.each(["42P01", "PGRST205"])(
+    "treats pending scheduling schema code %s as zero without skipping established sweeps",
+    async (code) => {
+      const buckets = [
+        makeChain([]),
+        makeChain([]),
+        makeChain([]),
+        makeChain([], { code, message: "scheduling_requests unavailable" }),
+      ];
+      let call = 0;
+      mockFrom.mockImplementation(() => buckets[call++].chain);
+
+      await expect(sweepExpiredLifecycles(NOW)).resolves.toEqual({
+        ok: true,
+        applicationsExpired: 0,
+        offersExpired: 0,
+        invitesExpired: 0,
+        schedulingRequestsExpired: 0,
+      });
+      expect(mockFrom).toHaveBeenCalledTimes(4);
+    },
+  );
 });

@@ -220,6 +220,72 @@ export function formatDate(
   return new Date(iso).toLocaleDateString(locale, opts);
 }
 
+export interface DateTimeZoneFormatOptions {
+  /** IANA zone. Invalid zones return the ISO string rather than throwing. */
+  readonly timeZone: string;
+  readonly locale?: string;
+}
+
+/**
+ * Interview/lifecycle timestamp with an explicit IANA zone and short zone
+ * label. This is the one home for component-facing `Intl.DateTimeFormat`.
+ */
+export function formatDateTimeInZone(
+  iso: string,
+  opts: DateTimeZoneFormatOptions,
+): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Time unavailable";
+  try {
+    return new Intl.DateTimeFormat(opts.locale ?? DEFAULT_LOCALE, {
+      timeZone: opts.timeZone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date);
+  } catch {
+    return date.toISOString();
+  }
+}
+
+/** Browser/server runtime's current IANA zone, with a deterministic fallback. */
+export function resolvedTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+/** Validate a bounded IANA zone without leaking raw Intl construction to callers. */
+export function isValidTimeZone(value: string): boolean {
+  if (value.length < 1 || value.length > 64) return false;
+  try {
+    new Intl.DateTimeFormat(DEFAULT_LOCALE, { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** IANA name plus current UTC offset, e.g. America/Los_Angeles (GMT-07:00). */
+export function formatTimeZoneLabel(
+  timeZone: string,
+  at: Date = new Date(),
+  locale: string = DEFAULT_LOCALE,
+): string {
+  try {
+    const offset = new Intl.DateTimeFormat(locale, {
+      timeZone,
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(at)
+      .find((part) => part.type === "timeZoneName")?.value;
+    return `${timeZone}${offset ? ` (${offset})` : ""}`;
+  } catch {
+    return timeZone;
+  }
+}
+
 /**
  * Season length, derived from the two stored dates and NOTHING else.
  *

@@ -21,6 +21,7 @@ const db = vi.hoisted(() => ({
 	adminHostClerkId: vi.fn(),
 	adminListingContext: vi.fn(),
 	adminSeekerClerkId: vi.fn(),
+	adminSchedulingContext: vi.fn(),
 	claimDeliveries: vi.fn(),
 	countRecentOutboundDeliveries: vi.fn(),
 	findOpenCollapsibleDeliveries: vi.fn(),
@@ -88,6 +89,16 @@ function wireHappyResolvers() {
 		listingId: "listing-1",
 	});
 	db.adminConversationContext.mockResolvedValue(null);
+	db.adminSchedulingContext.mockResolvedValue({
+		applicationId: "app-1",
+		seekerProfileId: "seeker-prof-1",
+		listingId: "listing-1",
+		hostProfileId: "host-prof-1",
+		listingTitle: "Deckhand",
+		status: "proposed",
+		currentRound: 1,
+		expiresAt: "2026-07-17T12:00:00.000Z",
+	});
 }
 
 const NOW = Date.parse("2026-07-14T15:00:00.000Z");
@@ -176,6 +187,36 @@ describe("expansion — exactly-once materialization", () => {
 		const stats = await expandPendingEvents();
 		expect(stats.expansionErrors).toBe(1);
 		expect(db.markEventProcessed).not.toHaveBeenCalled();
+	});
+
+	it("leaves a scheduling event unwatermarked when context resolution is transiently down", async () => {
+		db.getUnprocessedEvents.mockResolvedValue([
+			{
+				...EVENT,
+				event_type: "scheduling_request_sent",
+				subject_type: "scheduling_request",
+				subject_id: "schedule-1",
+			},
+		]);
+		db.adminSchedulingContext.mockRejectedValue(new Error("db down"));
+		const stats = await expandPendingEvents();
+		expect(stats.expansionErrors).toBe(1);
+		expect(db.markEventProcessed).not.toHaveBeenCalled();
+	});
+
+	it("watermarks a scheduling event with a genuinely missing subject as zero deliveries", async () => {
+		db.getUnprocessedEvents.mockResolvedValue([
+			{
+				...EVENT,
+				event_type: "scheduling_request_sent",
+				subject_type: "scheduling_request",
+				subject_id: "schedule-missing",
+			},
+		]);
+		db.adminSchedulingContext.mockResolvedValue(null);
+		await expandPendingEvents();
+		expect(db.insertDeliveries).not.toHaveBeenCalled();
+		expect(db.markEventProcessed).toHaveBeenCalledWith("evt-1", 0);
 	});
 
 	it("digest cadence becomes a HELD row + membership, never a live send", async () => {

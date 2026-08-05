@@ -93,6 +93,10 @@
 	margin-top: var(--space-section);
 }
 
+.interview {
+	margin-top: var(--space-section);
+}
+
 .timelineHeading {
 	margin: 0 0 var(--space-16);
 	font-family: var(--font-display);

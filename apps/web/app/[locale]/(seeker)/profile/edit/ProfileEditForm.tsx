@@ -17,9 +17,10 @@ import { ImageUpload } from "../../../../../components/ImageUpload";
 import { saveOnboardingStep } from "../../../../actions/seekerOnboarding";
 import { saveProfilePhotoAction } from "../../../../actions/seekerProfile";
 import styles from "./edit.module.css";
+import { parsePayInput } from "./profilePay";
 
-type LocationPref = "remote" | "on_site" | "either";
-type HousingPref = "preferred" | "not_needed";
+type RemotePreference = "remote" | "on_site" | "hybrid" | "any";
+type HousingPref = "required" | "preferred" | "not_needed" | "flexible";
 type MealsPref = "required" | "preferred" | "not_needed" | "flexible";
 type PayUnit = "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | "other";
 
@@ -29,7 +30,7 @@ export interface ProfileEditInitial {
   readonly displayName: string;
   readonly bio: string;
   readonly openToStatement: string;
-  readonly locationPref: LocationPref | null;
+  readonly remotePreference: RemotePreference | null;
   readonly housingPref: HousingPref | null;
   readonly mealsPref: MealsPref | null;
   readonly payExpectationMinDollars: string;
@@ -37,20 +38,27 @@ export interface ProfileEditInitial {
   readonly payExpectationUnit: PayUnit;
   readonly payFlexible: boolean;
   readonly categories: string[];
-  readonly freeformSkills: string[];
+  readonly desiredRoles: string[];
+  readonly generalSkills: string[];
 }
 
 const MAX_TAGS = 10;
 
-const LOCATION_OPTIONS: ReadonlyArray<{ value: LocationPref; label: string }> = [
+const REMOTE_OPTIONS: ReadonlyArray<{
+  value: RemotePreference;
+  label: string;
+}> = [
   { value: "remote", label: "Remote" },
   { value: "on_site", label: "On-site" },
-  { value: "either", label: "Either" },
+  { value: "hybrid", label: "Hybrid" },
+  { value: "any", label: "Any setting" },
 ];
 
 const HOUSING_OPTIONS: ReadonlyArray<{ value: HousingPref; label: string }> = [
+  { value: "required", label: "Housing required" },
   { value: "preferred", label: "Housing preferred" },
   { value: "not_needed", label: "Not needed" },
+  { value: "flexible", label: "Flexible" },
 ];
 
 const MEALS_OPTIONS: ReadonlyArray<{ value: MealsPref; label: string }> = [
@@ -65,8 +73,10 @@ const PAY_UNIT_OPTIONS: ReadonlyArray<{ value: PayUnit; label: string }> = [
   { value: "day", label: "/ day" },
   { value: "week", label: "/ week" },
   { value: "month", label: "/ month" },
+  { value: "year", label: "/ year" },
   { value: "stipend", label: "stipend" },
   { value: "exchange", label: "exchange" },
+  { value: "other", label: "other" },
 ];
 
 const CATEGORY_LABEL: Record<MarketplaceCategory, string> = {
@@ -89,6 +99,19 @@ function isCategory(value: string): value is MarketplaceCategory {
   return (MARKETPLACE_CATEGORIES as readonly string[]).includes(value);
 }
 
+function appendTag(current: string[], input: string): string[] {
+  const tag = input.trim();
+  if (
+    !tag ||
+    tag.length > 40 ||
+    current.length >= MAX_TAGS ||
+    current.some((value) => value.toLowerCase() === tag.toLowerCase())
+  ) {
+    return current;
+  }
+  return [...current, tag];
+}
+
 export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
   const router = useRouter();
   const getToken = useOptionalGetToken();
@@ -96,8 +119,8 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
   const [displayName, setDisplayName] = useState(initial.displayName);
   const [bio, setBio] = useState(initial.bio);
   const [openToStatement, setOpenToStatement] = useState(initial.openToStatement);
-  const [locationPref, setLocationPref] = useState<LocationPref | null>(
-    initial.locationPref,
+  const [remotePreference, setRemotePreference] = useState<RemotePreference | null>(
+    initial.remotePreference,
   );
   const [housingPref, setHousingPref] = useState<HousingPref | null>(
     initial.housingPref,
@@ -110,8 +133,12 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
   const [selected, setSelected] = useState<MarketplaceCategory[]>(
     initial.categories.filter(isCategory),
   );
-  const [tags, setTags] = useState<string[]>(initial.freeformSkills);
-  const [draft, setDraft] = useState("");
+  const [desiredRoles, setDesiredRoles] = useState<string[]>(initial.desiredRoles);
+  const [generalSkills, setGeneralSkills] = useState<string[]>(
+    initial.generalSkills,
+  );
+  const [roleDraft, setRoleDraft] = useState("");
+  const [skillDraft, setSkillDraft] = useState("");
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -141,54 +168,56 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
     );
   }
 
-  function addTag() {
-    const tag = draft.trim();
-    if (!tag) {
-      return;
-    }
+  function addRole() {
     setSaved(false);
-    setTags((current) => {
-      if (
-        current.length >= MAX_TAGS ||
-        current.some((value) => value.toLowerCase() === tag.toLowerCase())
-      ) {
-        return current;
-      }
-      return [...current, tag];
-    });
-    setDraft("");
+    setDesiredRoles((current) => appendTag(current, roleDraft));
+    setRoleDraft("");
   }
 
-  function removeTag(tag: string) {
+  function addSkill() {
     setSaved(false);
-    setTags((current) => current.filter((value) => value !== tag));
+    setGeneralSkills((current) => appendTag(current, skillDraft));
+    setSkillDraft("");
   }
 
   function save() {
     startTransition(async () => {
       setSaved(false);
       setSaveError(null);
-      const minCents = payMin.trim() ? Math.round(Number(payMin) * 100) : undefined;
-      const maxCents = payMax.trim() ? Math.round(Number(payMax) * 100) : undefined;
+      const parsedMin = parsePayInput(payMin);
+      const parsedMax = parsePayInput(payMax);
+      if (!parsedMin.ok || !parsedMax.ok) {
+        setSaveError(
+          "Enter pay as a non-negative amount with no more than two decimal places.",
+        );
+        return;
+      }
+      const rolesToSave = appendTag(desiredRoles, roleDraft);
+      const skillsToSave = appendTag(generalSkills, skillDraft);
       try {
         const result = await saveOnboardingStep({
           displayName,
           bio,
           openToStatement: openToStatement.trim() || null,
-          locationPref,
+          remotePreference,
           housingPref,
           mealsPref,
-          payExpectationMinCents: Number.isFinite(minCents) ? minCents : null,
-          payExpectationMaxCents: Number.isFinite(maxCents) ? maxCents : null,
+          payExpectationMinCents: parsedMin.cents,
+          payExpectationMaxCents: parsedMax.cents,
           payExpectationUnit: payUnit,
           payFlexible,
           categories: selected,
-          freeformSkills: tags,
+          desiredRoles: rolesToSave,
+          generalSkills: skillsToSave,
         });
         if (!result.ok) {
           setSaveError("We couldn’t save your changes. Please try again.");
           return;
         }
+        setDesiredRoles(rolesToSave);
+        setGeneralSkills(skillsToSave);
+        setRoleDraft("");
+        setSkillDraft("");
         setSaved(true);
         router.refresh();
       } catch {
@@ -199,7 +228,8 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
 
   return (
     <div className={styles.shell}>
-      <div className={styles.form}>
+      <fieldset className={styles.form} disabled={pending} aria-busy={pending}>
+        <legend className={styles.srOnly}>Profile details</legend>
         {initial.seekerProfileId ? (
           <div className={styles.field}>
             <span className={styles.label}>Profile photo</span>
@@ -227,6 +257,7 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
               setDisplayName(event.target.value);
             }}
             autoComplete="name"
+            maxLength={80}
           />
         </label>
 
@@ -236,6 +267,7 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
             className={styles.textarea}
             value={bio}
             rows={4}
+            maxLength={1000}
             onChange={(event) => {
               setSaved(false);
               setBio(event.target.value);
@@ -249,6 +281,7 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
             className={styles.textarea}
             value={openToStatement}
             rows={2}
+            maxLength={500}
             placeholder="e.g. A farm stay in the Pacific Northwest for summer 2026"
             onChange={(event) => {
               setSaved(false);
@@ -263,8 +296,10 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
             <input
               className={styles.input}
               type="number"
+              aria-label="Minimum pay"
               min="0"
-              step="1"
+              step="0.01"
+              inputMode="decimal"
               placeholder="Min"
               value={payMin}
               onChange={(event) => { setSaved(false); setPayMin(event.target.value); }}
@@ -273,14 +308,17 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
             <input
               className={styles.input}
               type="number"
+              aria-label="Maximum pay"
               min="0"
-              step="1"
+              step="0.01"
+              inputMode="decimal"
               placeholder="Max"
               value={payMax}
               onChange={(event) => { setSaved(false); setPayMax(event.target.value); }}
             />
             <select
               className={styles.select}
+              aria-label="Pay period"
               value={payUnit}
               onChange={(event) => { setSaved(false); setPayUnit(event.target.value as PayUnit); }}
             >
@@ -300,21 +338,21 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
         </div>
 
         <div className={styles.field}>
-          <span className={styles.label}>Location</span>
+          <span className={styles.label}>Work setting</span>
           <div className={styles.options}>
-            {LOCATION_OPTIONS.map((option) => (
+            {REMOTE_OPTIONS.map((option) => (
               <button
                 key={option.value}
                 type="button"
                 className={
-                  locationPref === option.value
+                  remotePreference === option.value
                     ? styles.optionSelected
                     : styles.option
                 }
-                aria-pressed={locationPref === option.value}
+                aria-pressed={remotePreference === option.value}
                 onClick={() => {
                   setSaved(false);
-                  setLocationPref((current) =>
+                  setRemotePreference((current) =>
                     current === option.value ? null : option.value,
                   );
                 }}
@@ -399,50 +437,116 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
 
         <div className={styles.field}>
           <span className={styles.label}>
-            Your tags ({tags.length}/{MAX_TAGS})
+            Roles you want ({desiredRoles.length}/{MAX_TAGS})
           </span>
           <div className={styles.tagRow}>
             <input
               className={styles.input}
               type="text"
-              value={draft}
+              value={roleDraft}
               maxLength={40}
-              placeholder="Add a skill or interest"
-              onChange={(event) => setDraft(event.target.value)}
+              placeholder="e.g. ranch hand, line cook"
+              aria-label="Role to add"
+              onChange={(event) => setRoleDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
-                  addTag();
+                  addRole();
                 }
               }}
-              disabled={tags.length >= MAX_TAGS}
+              disabled={desiredRoles.length >= MAX_TAGS}
             />
             <button
               type="button"
               className={styles.primaryButton}
-              onClick={addTag}
-              disabled={tags.length >= MAX_TAGS || draft.trim().length === 0}
+              onClick={addRole}
+              aria-label="Add role"
+              disabled={
+                desiredRoles.length >= MAX_TAGS || roleDraft.trim().length === 0
+              }
             >
               Add
             </button>
           </div>
-          {tags.length > 0 ? (
+          {desiredRoles.length > 0 ? (
             <div className={styles.tagGrid}>
-              {tags.map((tag) => (
+              {desiredRoles.map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   className={styles.tagSelected}
-                  onClick={() => removeTag(tag)}
+                  onClick={() => {
+                    setSaved(false);
+                    setDesiredRoles((current) =>
+                      current.filter((value) => value !== tag),
+                    );
+                  }}
                   aria-label={`Remove ${tag}`}
                 >
-                  {tag} ✕
+                  {tag}
+                  <Icon name="action.close" size={14} aria-hidden />
                 </button>
               ))}
             </div>
           ) : null}
         </div>
-      </div>
+
+        <div className={styles.field}>
+          <span className={styles.label}>
+            Skills you bring ({generalSkills.length}/{MAX_TAGS})
+          </span>
+          <div className={styles.tagRow}>
+            <input
+              className={styles.input}
+              type="text"
+              value={skillDraft}
+              maxLength={40}
+              placeholder="e.g. animal care, carpentry, cooking"
+              aria-label="Skill to add"
+              onChange={(event) => setSkillDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addSkill();
+                }
+              }}
+              disabled={generalSkills.length >= MAX_TAGS}
+            />
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={addSkill}
+              aria-label="Add skill"
+              disabled={
+                generalSkills.length >= MAX_TAGS || skillDraft.trim().length === 0
+              }
+            >
+              Add
+            </button>
+          </div>
+          {generalSkills.length > 0 ? (
+            <div className={styles.tagGrid}>
+              {generalSkills.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  className={styles.tagSelected}
+                  onClick={() => {
+                    setSaved(false);
+                    setGeneralSkills((current) =>
+                      current.filter((value) => value !== tag),
+                    );
+                  }}
+                  aria-label={`Remove ${tag}`}
+                >
+                  {tag}
+                  <Icon name="action.close" size={14} aria-hidden />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </fieldset>
 
       {saveError ? (
         <p className={styles.error} role="alert">
@@ -459,7 +563,12 @@ export function ProfileEditForm({ initial }: { initial: ProfileEditInitial }) {
         >
           Back to profile
         </button>
-        <span className={styles.status}>
+        <span
+          className={styles.status}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {saved ? "Saved" : pending ? "Saving…" : ""}
         </span>
         <button

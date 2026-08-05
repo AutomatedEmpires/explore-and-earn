@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
-import { getSeekerAvailability } from "@explore-and-earn/db";
+import { getTranslations } from "next-intl/server";
+import {
+  getSeekerAvailability,
+  getSeekerSchedulingRequests,
+} from "@explore-and-earn/db";
 
 import { updateScheduleAction } from "../../../actions/seekerSettings";
 import { EmptyState } from "../../../../components/discovery";
 import { BucketPage } from "../../../../components/seeker";
+import { InterviewScheduleCard } from "../../../../components/scheduling/InterviewScheduleCard";
 import styles from "../../../../components/seeker/SchedulePanel.module.css";
 
 export const metadata: Metadata = {
@@ -21,69 +26,121 @@ function dateInputValue(iso: string | null): string {
 }
 
 export default async function SchedulePage() {
-  const { userId, getToken } = await auth();
+  const [authState, t] = await Promise.all([
+    auth(),
+    getTranslations("Schedule"),
+  ]);
+  const { userId, getToken } = authState;
   const token = userId ? await getToken() : null;
 
   if (!userId || !token) {
     return (
       <BucketPage
-        title="Schedule"
-        description="Keep hosts aligned on when you're available."
+        title={t("title")}
+        description={t("description")}
       >
         <EmptyState
-          title="Sign in to manage availability"
-          message="Once you're signed in, you can share your availability window with hosts."
+          title={t("signedOut.title")}
+          message={t("signedOut.message")}
         />
       </BucketPage>
     );
   }
 
-  const schedule = await getSeekerAvailability(token, userId);
+  const [schedule, interviews] = await Promise.all([
+    getSeekerAvailability(token, userId),
+    getSeekerSchedulingRequests(token, userId),
+  ]);
 
   return (
     <BucketPage
-      title="Schedule"
-      description="Keep hosts aligned on when you're available."
+      title={t("title")}
+      description={t("description")}
     >
-      <form className={styles.form} action={updateScheduleAction}>
-        <label className={styles.field}>
-          <span className={styles.label}>Start date</span>
-          <input
-            className={styles.input}
-            type="date"
-            name="availability_start"
-            defaultValue={dateInputValue(schedule.availabilityStart)}
-          />
-        </label>
+      {interviews.available ? (
+        <section className={styles.section} aria-labelledby="interviews-heading">
+          <div>
+            <h2 className={styles.sectionHeading} id="interviews-heading">
+              {t("interviews.heading")}
+            </h2>
+            <p className={styles.sectionIntro}>
+              {t("interviews.description")}
+            </p>
+          </div>
+          {interviews.requests.length > 0 ? (
+            <div className={styles.interviews}>
+              {interviews.requests.map((request) => (
+                <InterviewScheduleCard
+                  key={request.id}
+                  request={request}
+                  viewerRole="seeker"
+                  showListingTitle
+                />
+              ))}
+            </div>
+          ) : (
+            <p className={styles.sectionIntro}>
+              {t("interviews.empty")}
+            </p>
+          )}
+        </section>
+      ) : null}
 
-        <label className={styles.field}>
-          <span className={styles.label}>End date</span>
-          <input
-            className={styles.input}
-            type="date"
-            name="availability_end"
-            defaultValue={dateInputValue(schedule.availabilityEnd)}
-          />
-        </label>
+      <section className={styles.section} aria-labelledby="availability-heading">
+        <div>
+          <h2 className={styles.sectionHeading} id="availability-heading">
+            {t("availability.heading")}
+          </h2>
+          <p className={styles.sectionIntro}>
+            {t("availability.description")}
+          </p>
+        </div>
+        <form className={styles.form} action={updateScheduleAction}>
+          <label className={styles.field}>
+            <span className={styles.label}>{t("availability.startDate")}</span>
+            <input
+              className={styles.input}
+              type="date"
+              name="availability_start"
+              defaultValue={dateInputValue(schedule.availabilityStart)}
+            />
+          </label>
 
-        <label className={styles.field}>
-          <span className={styles.label}>Status</span>
-          <select
-            className={styles.select}
-            name="availability_status"
-            defaultValue={schedule.availabilityStatus}
-          >
-            <option value="available_now">Available now</option>
-            <option value="date_range">Specific window</option>
-            <option value="flexible">Flexible</option>
-            <option value="unavailable">Not available</option>
-          </select>
-        </label>
+          <label className={styles.field}>
+            <span className={styles.label}>{t("availability.endDate")}</span>
+            <input
+              className={styles.input}
+              type="date"
+              name="availability_end"
+              defaultValue={dateInputValue(schedule.availabilityEnd)}
+            />
+          </label>
 
-        <button className={styles.button} type="submit">
-          Save availability
-        </button>
-      </form>
+          <label className={styles.field}>
+            <span className={styles.label}>{t("availability.status")}</span>
+            <select
+              className={styles.select}
+              name="availability_status"
+              defaultValue={schedule.availabilityStatus}
+            >
+              <option value="available_now">
+                {t("availability.availableNow")}
+              </option>
+              <option value="date_range">
+                {t("availability.specificWindow")}
+              </option>
+              <option value="flexible">{t("availability.flexible")}</option>
+              <option value="unavailable">
+                {t("availability.unavailable")}
+              </option>
+            </select>
+          </label>
+
+          <button className={styles.button} type="submit">
+            {t("availability.save")}
+          </button>
+        </form>
+      </section>
     </BucketPage>
   );
 }

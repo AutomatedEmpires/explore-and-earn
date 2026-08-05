@@ -2,3 +2,54 @@
 	min-height: 100dvh;
 	background: var(--color-paper);
 }
+
+.loadError {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--space-12);
+	width: min(100%, 560px);
+	min-height: 100dvh;
+	margin: 0 auto;
+	padding: var(--space-section) var(--space-gutter);
+	background: var(--color-paper);
+}
+
+.loadErrorTitle,
+.loadErrorBody {
+	margin: 0;
+}
+
+.loadErrorTitle {
+	font-family: var(--font-display);
+	font-size: var(--type-section-size);
+	line-height: var(--type-section-lh);
+	color: var(--text-primary);
+}
+
+.loadErrorBody {
+	font-family: var(--font-ui);
+	font-size: var(--type-body-size);
+	line-height: var(--type-body-lh);
+	color: var(--text-secondary);
+}
+
+.retryLink {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: var(--tap-min);
+	padding: var(--space-12) var(--space-24);
+	border-radius: var(--radius-button);
+	background: var(--color-cta);
+	color: var(--color-cta-text);
+	font-family: var(--font-ui);
+	font-size: var(--type-button-size);
+	font-weight: var(--font-weight-semibold);
+	text-decoration: none;
+}
+
+.retryLink:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
+}

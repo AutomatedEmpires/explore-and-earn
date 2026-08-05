@@ -2,7 +2,16 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { getSeekerProfileResult } from "@explore-and-earn/db";
 
+import { SeekerOnboardingProvider } from "../../../components/onboarding/SeekerOnboardingProvider";
+import {
+  seekerProfileToOnboardingDraft,
+  type SeekerOnboardingDraft,
+} from "../../../components/onboarding/seekerOnboardingModel";
+import { isDevBenchEnabled } from "../../../lib/devBench";
+import { readDevRole } from "../../../lib/devBench/server";
+import { getSupabaseToken } from "../../../lib/serverCache";
 import styles from "./layout.module.css";
 
 export const metadata: Metadata = {
@@ -11,6 +20,21 @@ export const metadata: Metadata = {
     "Set up your free Explore & Earn seeker profile to browse, save, and apply to seasonal, remote, farm, maritime, and adventure opportunities.",
   robots: { index: false },
 };
+
+function ProfileLoadError() {
+  return (
+    <main className={styles.loadError} role="alert">
+      <h1 className={styles.loadErrorTitle}>We couldn’t load your profile</h1>
+      <p className={styles.loadErrorBody}>
+        Nothing has been changed. Check your connection and try again before
+        continuing onboarding.
+      </p>
+      <a className={styles.retryLink} href="">
+        Try again
+      </a>
+    </main>
+  );
+}
 
 /**
  * Seeker onboarding scope layout.
@@ -34,16 +58,67 @@ export const metadata: Metadata = {
  */
 export const dynamic = "force-dynamic";
 
+const DEV_BENCH_DRAFT: SeekerOnboardingDraft = {
+  displayName: "River Torres",
+  bio: "Seasonal cook and trail guide looking for a hands-on summer role.",
+  relativeLocation: "Bend, Oregon",
+  seekingTimeline: "1_month",
+  remotePreference: "any",
+  housingPref: "preferred",
+  mealsPref: "flexible",
+  categories: ["farm", "seasonal", "remote"],
+  desiredRoles: ["Guest services", "Ranch hand"],
+  generalSkills: ["Cooking", "Trail maintenance"],
+};
+
+function OnboardingFrame({
+  initialDraft,
+  children,
+}: {
+  readonly initialDraft: SeekerOnboardingDraft;
+  readonly children: ReactNode;
+}) {
+  return (
+    <SeekerOnboardingProvider initialDraft={initialDraft}>
+      <div className={styles.page}>{children}</div>
+    </SeekerOnboardingProvider>
+  );
+}
+
 export default async function SeekerOnboardLayout({
   children,
 }: {
   children: ReactNode;
 }) {
+  // Local review only. The explicit NODE_ENV + opt-in gate in
+  // isDevBenchEnabled() is false in preview/production, and the role cookie
+  // keeps this fixture out of real local sessions.
+  if (isDevBenchEnabled() && (await readDevRole()) === "seeker") {
+    return (
+      <OnboardingFrame initialDraft={DEV_BENCH_DRAFT}>
+        {children}
+      </OnboardingFrame>
+    );
+  }
+
   const { userId } = await auth();
   if (!userId) {
     redirect(
       `/sign-in?role=seeker&redirect_url=${encodeURIComponent("/onboarding")}`,
     );
   }
-  return <div className={styles.page}>{children}</div>;
+
+  try {
+    const token = await getSupabaseToken();
+    if (!token) return <ProfileLoadError />;
+
+    const result = await getSeekerProfileResult(token, userId);
+    if (!result.ok) return <ProfileLoadError />;
+
+    const initialDraft = seekerProfileToOnboardingDraft(result.profile);
+
+    return <OnboardingFrame initialDraft={initialDraft}>{children}</OnboardingFrame>;
+  } catch {
+    return <ProfileLoadError />;
+  }
 }

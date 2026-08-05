@@ -326,6 +326,11 @@ begin
     1
   );
   perform pg_temp.expect_write_rows(
+    'seeker A updates own remote preference',
+    $q$update public.seeker_profiles set remote_preference = 'hybrid' where id = '05eeca00-0000-4000-8000-000000000001'$q$,
+    1
+  );
+  perform pg_temp.expect_write_rows(
     'seeker A cannot update seeker B profile',
     $q$update public.seeker_profiles set display_name = 'hijacked' where id = '05eecb00-0000-4000-8000-000000000002'$q$,
     0
@@ -355,7 +360,7 @@ begin
     'permission denied for table seeker_profiles'
   );
 
-  perform pg_temp.checkpoint_section('2 seeker to seeker isolation', 13);
+  perform pg_temp.checkpoint_section('2 seeker to seeker isolation', 14);
 end;
 $do$;
 reset role;

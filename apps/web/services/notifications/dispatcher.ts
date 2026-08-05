@@ -13,6 +13,7 @@ import {
 	adminHostClerkId,
 	adminListingContext,
 	adminSeekerClerkId,
+	adminSchedulingContext,
 	claimDeliveries,
 	countRecentOutboundDeliveries,
 	findOpenCollapsibleDeliveries,
@@ -86,6 +87,8 @@ function makeResolvers(): TaxonomyResolvers {
 		listingContext: (id) => once(`listing:${id}`, () => adminListingContext(id)),
 		conversationContext: (id) => once(`convo:${id}`, () => adminConversationContext(id)),
 		applicationContext: (id) => once(`app:${id}`, () => adminApplicationContext(id)),
+		schedulingContext: (id) =>
+			once(`scheduling:${id}`, () => adminSchedulingContext(id)),
 	}
 }
 

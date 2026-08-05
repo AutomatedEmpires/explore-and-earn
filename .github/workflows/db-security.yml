@@ -108,6 +108,45 @@ jobs:
           PGDATABASE: postgres
         run: node tools/db-assert/assert-founding-host-program.mjs
 
+      # Migration 088's interview scheduler is private application data with a
+      # service-only mutation boundary. Exercise its RLS, exact RPC grants,
+      # ownership checks, lifecycle triggers and transactional event outbox as
+      # real database roles so a later migration cannot silently widen access.
+      - name: Verify interview scheduling security and lifecycle
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: node tools/db-assert/assert-interview-scheduling.mjs
+
+      # A single SQL session cannot prove migration 088's per-seeker advisory
+      # lock. Drive two overlapping psql transactions, observe the lock wait,
+      # then prove one overlapping selection is rejected while an adjacent slot
+      # remains legal.
+      - name: Verify interview selection under concurrency
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: node tools/db-assert/assert-interview-scheduling-concurrency.mjs
+
+      # Migration 090 makes message persistence and its canonical notification
+      # event one database transaction. Exercise real JWT role resolution,
+      # direct-insert refusal, privileged-trigger coverage, body bounds, exact
+      # event cardinality, and rollback when the outbox insert fails.
+      - name: Verify atomic message delivery and outbox
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: node tools/db-assert/assert-message-delivery-atomic.mjs
+
       - name: Stop local Supabase
         if: always()
         run: supabase stop --no-backup

@@ -1,3 +1,39 @@
+.section {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-16);
+}
+
+.section + .section {
+	margin-top: var(--space-section);
+}
+
+.sectionHeading,
+.sectionIntro {
+	margin: 0;
+}
+
+.sectionHeading {
+	font-family: var(--font-display);
+	font-size: var(--type-card-size);
+	line-height: var(--type-card-lh);
+	color: var(--text-primary);
+}
+
+.sectionIntro {
+	margin-top: var(--space-4);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--text-secondary);
+}
+
+.interviews {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+	gap: var(--space-12);
+}
+
 .list {
 	display: flex;
 	flex-direction: column;
