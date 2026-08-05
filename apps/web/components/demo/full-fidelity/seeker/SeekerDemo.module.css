@@ -335,7 +335,8 @@
 .detailSection ul { padding-inline-start: var(--space-20); }
 .hostInitials, .profileAvatar { flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: var(--gradient-action); color: var(--color-cta-text); font-family: var(--font-display); font-weight: var(--font-weight-bold); }
 .hostInitials { width: 58px; height: 58px; }
-.profileAvatar { width: 90px; height: 90px; font-size: 1.8rem; }
+.profileAvatar { position: relative; width: 90px; height: 90px; overflow: hidden; font-size: 1.8rem; }
+.profileAvatarImage { object-fit: cover; object-position: 35% center; }
 
 .weatherStrip { display: grid; grid-template-columns: repeat(10, minmax(82px, 1fr)); gap: var(--space-6); overflow-x: auto; padding-block-end: var(--space-6); }
 .weatherStrip > div { min-height: 130px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: var(--space-10); border: 1px solid var(--border-soft); border-radius: var(--radius-cell); background: var(--color-paper); }

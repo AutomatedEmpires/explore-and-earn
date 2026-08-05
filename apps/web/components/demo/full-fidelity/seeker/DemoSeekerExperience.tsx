@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -50,6 +51,12 @@ import {
   useDemoSeekerSession,
   type DemoLocalApplication,
 } from "./DemoSeekerSession";
+import {
+  SEEKER_DEMO_ROOT as DEMO_ROOT,
+  applicationHrefForListing,
+  applicationStatus,
+  profileEditHrefForApplication,
+} from "./presentation";
 import styles from "./SeekerDemo.module.css";
 
 export type SeekerDemoSurface =
@@ -84,8 +91,6 @@ export type SeekerDemoSurface =
 
 type BenefitKind = "housing" | "meals" | "pay";
 type PhotoCategory = keyof SeekerDemoPhotoCategories;
-
-const DEMO_ROOT = "/for-seekers/demo";
 
 function routeParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -698,7 +703,7 @@ function ApplySurface() {
         <section className={styles.applyStep} aria-labelledby="profile-review-heading">
           <div className={styles.stepMarker}>1 of 2</div>
           <div><p className={styles.eyebrow}>Profile review</p><h2 id="profile-review-heading">This is the profile attached to the application.</h2><p>{profile.intro}</p><dl className={styles.definitionList}><div><dt>Readiness</dt><dd>{readiness}%</dd></div><div><dt>Availability</dt><dd>{profile.availability}</dd></div><div><dt>Housing</dt><dd>{profile.housingNeeded ? "Needed" : "Not needed"}</dd></div><div><dt>Certifications</dt><dd>{profile.certifications.length > 0 ? profile.certifications.join(" · ") : "None added"}</dd></div></dl><div className={styles.skillList}>{profile.skills.map((skill) => <span key={skill}>{skill}</span>)}</div></div>
-          <div className={styles.applyActions}><Link className={styles.secondaryLink} href={`${DEMO_ROOT}/profile/edit`}>Edit sample profile</Link><button type="button" className={styles.primaryButton} onClick={() => setStep("confirm")}>Continue to confirmation</button></div>
+          <div className={styles.applyActions}><Link className={styles.secondaryLink} href={profileEditHrefForApplication(listing.id)}>Edit sample profile</Link><button type="button" className={styles.primaryButton} onClick={() => setStep("confirm")}>Continue to confirmation</button></div>
         </section>
       ) : null}
 
@@ -711,7 +716,13 @@ function ApplySurface() {
       ) : null}
 
       {step === "done" ? (
-        <section className={styles.emptyState}><StatusChip tone="positive">Session-only submission</StatusChip><h2>Application added to your sample lifecycle.</h2><p>Nothing was transmitted. The application now appears under Applications and the role has left discovery.</p><div className={styles.linkRow}><Link className={styles.secondaryLink} href={`${DEMO_ROOT}/applications`}>All applications</Link><Link className={styles.primaryLink} href={`${DEMO_ROOT}/applications/${applicationId}`}>View this application</Link></div></section>
+        <>
+          <section className={styles.emptyState}><StatusChip tone="positive">Session-only submission</StatusChip><h2>Application added to your sample lifecycle.</h2><p>Nothing was transmitted. The application now appears under Applications and the role has left discovery.</p><div className={styles.linkRow}><Link className={styles.secondaryLink} href={`${DEMO_ROOT}/applications`}>All applications</Link><Link className={styles.primaryLink} href={`${DEMO_ROOT}/applications/${applicationId}`}>View this application</Link></div></section>
+          <section className={styles.lateCta} aria-labelledby="apply-conversion-heading">
+            <div><p className={styles.eyebrow}>Ready when the fit feels real</p><h2 id="apply-conversion-heading">Join Explore &amp; Earn to apply for real roles.</h2><p>Build your profile once, then carry your skills, season preferences, and work history into every application.</p></div>
+            <div className={styles.lateCtaActions}><Link className={styles.secondaryLink} href={`${DEMO_ROOT}/seek`}>Explore more roles</Link><Link className={styles.primaryLink} href="/sign-up?role=seeker">Join as a seeker</Link></div>
+          </section>
+        </>
       ) : null}
     </div>
   );
@@ -806,7 +817,7 @@ function ProfileSurface() {
     <div className={styles.surface}>
       <SurfaceHeader eyebrow="Profile · sample seeker" title="Show hosts how you travel and work." lede="This is the information a seeker controls. The walkthrough does not upload, publish, or alter a real profile." action={<Link className={styles.primaryLink} href={`${DEMO_ROOT}/profile/edit`}>Edit sample profile</Link>} />
       <section className={styles.profileHero}>
-        <div className={styles.profileAvatarWrap}><div className={styles.profileAvatar} role="img" aria-label={`Initials avatar for fictional sample seeker ${seekerDemoPerson.name}`}>{seekerDemoPerson.initials}</div><small>Sample initials avatar</small></div>
+        <div className={styles.profileAvatarWrap}><div className={styles.profileAvatar}><Image src={seekerDemoPerson.photoUrl} alt={seekerDemoPerson.photoAlt} fill sizes="90px" className={styles.profileAvatarImage} /></div><small>Illustrative sample profile image</small></div>
         <div><h2>{seekerDemoPerson.name}</h2><p>{seekerDemoPerson.location}</p><p>{profile.intro}</p><p><strong>Open to:</strong> {profile.openTo}</p></div>
         <div className={styles.profileScore}><strong>{readiness}%</strong><span>Profile readiness</span></div>
       </section>
@@ -817,13 +828,23 @@ function ProfileSurface() {
       <section className={styles.detailSection}><p className={styles.eyebrow}>Skills and certifications</p><h2>What you bring</h2><div className={styles.skillList}>{profile.skills.map((skill) => <span key={skill}>{skill}</span>)}</div><h3>Certifications</h3>{profile.certifications.length > 0 ? <ul>{profile.certifications.map((certification) => <li key={certification}>{certification}</li>)}</ul> : <p>None added yet.</p>}<p className={styles.disclosure}>These fields can be edited in the walkthrough. Changes remain in this browser tab, and this public demo does not accept uploads.</p></section>
       <section className={styles.detailSection}><p className={styles.eyebrow}>Work history</p><h2>Experience</h2><div className={styles.historyList}>{profile.workHistory.map((item) => <article key={item.id} className={styles.historyCard}><div><strong>{item.role}</strong><span>{item.organization} · {item.location}</span><small>{formatDemoDate(item.startsOn, { month: "short", year: "numeric" })}–{formatDemoDate(item.endsOn, { month: "short", year: "numeric" })}</small></div><ul>{item.highlights.map((highlight) => <li key={highlight}>{highlight}</li>)}</ul></article>)}</div></section>
       <section className={styles.detailSection}><p className={styles.eyebrow}>Optional profile details</p><h2>{portfolioHref ? "Portfolio added" : "Still optional"}</h2>{portfolioHref ? <p><a className={styles.textLink} href={portfolioHref}>Sample portfolio link</a></p> : <p>{seekerDemoPerson.optionalFieldsRemaining.join(", ")} has not been added. Optional fields do not block applying.</p>}</section>
-      <div className={styles.linkRow}><Link className={styles.secondaryLink} href={`${DEMO_ROOT}/seek`}>See your matches</Link><Link className={styles.primaryLink} href={`${DEMO_ROOT}/profile/edit`}>Edit sample profile</Link></div>
+      <section className={styles.lateCta} aria-labelledby="profile-conversion-heading">
+        <div><p className={styles.eyebrow}>Ready for your own season?</p><h2 id="profile-conversion-heading">Build a seeker profile hosts can understand quickly.</h2><p>Bring your availability, skills, housing needs, and work story together before you apply.</p></div>
+        <div className={styles.lateCtaActions}><Link className={styles.secondaryLink} href={`${DEMO_ROOT}/seek`}>Keep exploring</Link><Link className={styles.primaryLink} href="/sign-up?role=seeker">Build your seeker profile</Link></div>
+      </section>
     </div>
   );
 }
 
-function ProfileEditSurface() {
+function ProfileEditSurface({ pendingApplicationListingId }: { readonly pendingApplicationListingId?: string }) {
   const { profile, updateProfile } = useDemoSeekerSession();
+  const router = useRouter();
+  const pendingListing = pendingApplicationListingId
+    ? seekerDemoListings.find((listing) => listing.id === pendingApplicationListingId)
+    : undefined;
+  const returnHref = pendingListing
+    ? applicationHrefForListing(pendingListing.id)
+    : `${DEMO_ROOT}/profile`;
   const [intro, setIntro] = useState(profile.intro);
   const [openTo, setOpenTo] = useState(profile.openTo);
   const [availability, setAvailability] = useState(profile.availability);
@@ -856,13 +877,17 @@ function ProfileEditSurface() {
       workHistory: profile.workHistory,
       portfolioUrl: portfolioUrl.trim(),
     });
+    if (pendingListing) {
+      router.push(returnHref);
+      return;
+    }
     setNotice("Sample profile updated in this browser tab. Nothing was published.");
   }
 
   return (
     <div className={styles.surface}>
-      <nav className={styles.breadcrumbs} aria-label="Breadcrumb"><Link href={`${DEMO_ROOT}/profile`}>Profile</Link><span>/</span><span>Edit</span></nav>
-      <SurfaceHeader eyebrow="Edit profile · session only" title="Shape your sample profile." lede="Try the full profile-editing flow without uploading a file or changing a real account." />
+      <nav className={styles.breadcrumbs} aria-label="Breadcrumb"><Link href={returnHref}>{pendingListing ? pendingListing.title : "Profile"}</Link><span>/</span><span>{pendingListing ? "Application profile" : "Edit"}</span></nav>
+      <SurfaceHeader eyebrow="Edit profile · session only" title="Shape your sample profile." lede={pendingListing ? `Save your changes, then return to the application for ${pendingListing.title}.` : "Try the full profile-editing flow without uploading a file or changing a real account."} />
       <form className={styles.profileForm} onSubmit={saveProfile}>
         <label className={styles.fullField}><span>Introduction</span><textarea rows={5} value={intro} onChange={(event) => setIntro(event.target.value)} /></label>
         <label className={styles.fullField}><span>Open-to statement</span><input value={openTo} onChange={(event) => setOpenTo(event.target.value)} /></label>
@@ -874,7 +899,7 @@ function ProfileEditSurface() {
         <label className={styles.fullField}><span>Certifications · one per line</span><textarea rows={3} value={certifications} onChange={(event) => setCertifications(event.target.value)} /></label>
         <label className={styles.fullField}><span>Portfolio link · optional</span><input type="url" value={portfolioUrl} onChange={(event) => setPortfolioUrl(event.target.value)} placeholder="https://example.com/your-work" /></label>
         <p className={styles.formNotice} role="status" aria-live="polite">{notice}</p>
-        <div className={styles.formActions}><Link className={styles.secondaryLink} href={`${DEMO_ROOT}/profile`}>Review profile</Link><button type="submit" className={styles.primaryButton}>Save sample changes</button></div>
+        <div className={styles.formActions}><Link className={styles.secondaryLink} href={returnHref}>{pendingListing ? "Back to application" : "Review profile"}</Link><button type="submit" className={styles.primaryButton}>{pendingListing ? "Save and return to application" : "Save sample changes"}</button></div>
       </form>
     </div>
   );
@@ -891,13 +916,6 @@ function SavedSurface() {
       {saved.length > 0 ? <div className={styles.cardGrid}>{saved.map((listing) => <DiscoveryListingCard key={listing.id} listing={listing} onAfterAction={setNotice} />)}</div> : <section className={styles.emptyState}><h2>Your sample shortlist is empty</h2><p>Save a role from Seek or Swipe and it will appear here immediately.</p><Link className={styles.primaryLink} href={`${DEMO_ROOT}/seek`}>Browse roles</Link></section>}
     </div>
   );
-}
-
-function applicationStatus(status: string): { label: string; tone: "neutral" | "positive" | "attention" } {
-  const normalized = status.toLowerCase();
-  if (normalized === "offered" || normalized === "accepted") return { label: normalized === "offered" ? "Offer received" : "Accepted", tone: "positive" };
-  if (normalized === "reviewing" || normalized === "interview" || normalized === "submitted") return { label: normalized === "interview" ? "Interview scheduled" : normalized[0]?.toUpperCase() + normalized.slice(1), tone: "attention" };
-  return { label: status.replaceAll("_", " "), tone: "neutral" };
 }
 
 function ApplicationRow({ application, local = false }: { readonly application: SeekerDemoApplication; readonly local?: boolean }) {
@@ -1187,9 +1205,11 @@ function MissingSurface({ title }: { readonly title: string }) {
 export function DemoSeekerExperience({
   surface,
   initialQuery = "",
+  pendingApplicationListingId,
 }: {
   readonly surface: SeekerDemoSurface;
   readonly initialQuery?: string;
+  readonly pendingApplicationListingId?: string;
 }) {
   const { resetVersion } = useDemoSeekerSession();
   const surfaces = useMemo<Record<SeekerDemoSurface, ReactNode>>(() => ({
@@ -1201,7 +1221,7 @@ export function DemoSeekerExperience({
     apply: <ApplySurface />,
     host: <HostSurface />,
     profile: <ProfileSurface />,
-    profileEdit: <ProfileEditSurface />,
+    profileEdit: <ProfileEditSurface pendingApplicationListingId={pendingApplicationListingId} />,
     saved: <SavedSurface />,
     applications: <ApplicationsSurface />,
     application: <ApplicationSurface />,
@@ -1221,6 +1241,6 @@ export function DemoSeekerExperience({
     badges: <BadgesSurface />,
     settings: <SettingsSurface />,
     help: <HelpSurface />,
-  }), [initialQuery]);
+  }), [initialQuery, pendingApplicationListingId]);
   return <div key={`${surface}:${resetVersion}`} className={styles.surfaceMount}>{surfaces[surface]}</div>;
 }

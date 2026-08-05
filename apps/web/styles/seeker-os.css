@@ -321,6 +321,16 @@
 }
 @media (max-width: 1023px) { .seekeros-search .cmdsearch-kbd { display: none; } }
 
+/* At 320px the menu gutter and two 46px account controls leave a compact
+   command pill. Tighten only its internal spacing so the complete mobile
+   placeholder remains visible instead of clipping mid-word. */
+@media (max-width: 380px) {
+  .seekeros-search {
+    gap: var(--space-4);
+    padding-inline: var(--space-8);
+  }
+}
+
 /* ── View-enter: content settles into place on each navigation ─────
    template.tsx re-mounts this wrapper on every route change, so the rise +
    fade replays as the seeker moves between surfaces. Killed under

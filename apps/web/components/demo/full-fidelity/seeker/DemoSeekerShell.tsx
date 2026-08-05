@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { SEEKER_DEMO_ROUTE_MAP } from "../../demoRoutes";
 import { SeekerShell } from "../../../seeker/SeekerShell";
@@ -17,7 +16,6 @@ import styles from "./SeekerDemo.module.css";
 function DemoShellContent({ children }: { readonly children: ReactNode }) {
   const { persistenceAvailable, profile, readNotificationIds, reset } = useDemoSeekerSession();
   const [resetNotice, setResetNotice] = useState("");
-  const router = useRouter();
   const unread = seekerDemoNotifications.filter(
     (notification) => !notification.read && !readNotificationIds.includes(notification.id),
   ).length;
@@ -25,7 +23,9 @@ function DemoShellContent({ children }: { readonly children: ReactNode }) {
   function resetWalkthrough() {
     reset();
     setResetNotice("Walkthrough choices reset to the starting sample account.");
-    router.replace("/for-seekers/demo");
+    // A full replacement makes reset deterministic from deep dynamic routes and
+    // guarantees every route-local control remounts from the cleared session.
+    window.location.replace("/for-seekers/demo");
   }
 
   return (

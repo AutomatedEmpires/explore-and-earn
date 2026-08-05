@@ -95,7 +95,7 @@
 
 .header {
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 24px;
@@ -245,7 +245,7 @@
 
 .panelHead {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
@@ -430,7 +430,7 @@
 
 .cardTop {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }

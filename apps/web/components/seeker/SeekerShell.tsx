@@ -174,7 +174,8 @@ export function SeekerShell({
           <CommandSearch
             className="seekeros-search"
             action={hrefFor("/seek")}
-            placeholder="Search opportunities, places, hosts…"
+            placeholder="Search"
+            ariaLabel="Search opportunities, places, hosts…"
           />
           <Link
             className="seekeros-tact seekeros-tact--icon ui-pressable"

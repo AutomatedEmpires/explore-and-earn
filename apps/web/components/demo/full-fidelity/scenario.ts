@@ -188,6 +188,8 @@ export interface DemoRole {
   readonly createdAt: string;
   readonly publishedAt: string | null;
   readonly closedAt: string | null;
+  /** Human-readable terminal context; never inferred from the status alone. */
+  readonly statusReason?: string;
   readonly demoLabel: typeof DEMO_DATA_LABEL;
 }
 
@@ -1130,6 +1132,7 @@ export const DEMO_ROLES: readonly DemoRole[] = [
     createdAt: "2026-03-09T17:00:00.000Z",
     publishedAt: "2026-03-16T16:00:00.000Z",
     closedAt: "2026-07-20T16:00:00.000Z",
+    statusReason: "Spring opening work completed and every scheduled position was filled.",
     demoLabel: DEMO_DATA_LABEL,
   },
 ];

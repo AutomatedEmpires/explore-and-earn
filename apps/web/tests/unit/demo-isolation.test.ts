@@ -117,10 +117,16 @@ describe("full-fidelity walkthrough isolation", () => {
 describe("canonical shell ownership", () => {
   it("renders the host walkthrough through HostShell and its isolated route map", () => {
     const layout = readSource("app/[locale]/for-hosts/demo/layout.tsx");
-    expect(layout).toContain("HostShell");
-    expect(layout).toContain("HOST_DEMO_ROUTE_MAP");
-    expect(layout).toContain("routeMap={HOST_DEMO_ROUTE_MAP}");
-    expect(layout).toContain("demoMode");
+    const shell = readSource(
+      "components/demo/full-fidelity/host/HostDemoShell.tsx",
+    );
+    expect(layout).toContain("HostDemoShell");
+    expect(shell).toContain("HostShell");
+    expect(shell).toContain("HOST_DEMO_ROUTE_MAP");
+    expect(shell).toContain("routeMap={HOST_DEMO_ROUTE_MAP}");
+    expect(shell).toContain("unreadMessages={unreadMessageCount}");
+    expect(shell).toContain("unreadNotifications={unreadNotificationCount}");
+    expect(shell).toContain("demoMode");
     expect(layout).toMatch(/robots:\s*\{\s*index:\s*false/);
   });
 

@@ -29,16 +29,9 @@ import {
   DEMO_SCENARIO,
   DEMO_TEAM,
   DEMO_WEATHER,
-  demoApplicationStage,
 } from "../scenario";
 
-export type DemoApplicationStatus =
-  | "new"
-  | "reviewing"
-  | "saved"
-  | "offered"
-  | "accepted"
-  | "closed";
+export type DemoApplicationStatus = ApplicationStatus;
 
 export type HostDemoListingStatus =
   | "draft"
@@ -69,6 +62,7 @@ export interface HostDemoHost {
 export interface HostDemoListing {
   readonly id: string;
   readonly title: string;
+  readonly category: PublicHostListing["category"];
   readonly location: string;
   readonly summary: string;
   readonly description: string;
@@ -78,17 +72,84 @@ export interface HostDemoListing {
   readonly housing: string;
   readonly meals: string;
   readonly pay: string;
+  readonly housingIncluded: boolean;
+  readonly mealsIncluded: boolean;
+  readonly compensationMinCents: number;
+  readonly compensationMaxCents: number;
+  readonly compensationUnit: string;
+  readonly compensationCurrency: string;
+  readonly publishedAt: string | null;
   readonly status: HostDemoListingStatus;
   readonly applications: number;
   readonly openPositions: number;
   readonly applicationDeadline: string;
   readonly applicationDeadlineDetail: string;
   readonly requirements: readonly string[];
+  readonly responsibilities: readonly string[];
+  readonly training: readonly string[];
   readonly highlights: readonly string[];
+  /** Preview-only planning prompts; production currently collects one cover message. */
+  readonly applicationQuestions: readonly string[];
+  readonly housingDetails: {
+    readonly provision: "provided" | "not_provided" | "not_stated";
+    readonly type: string;
+    readonly cost: string;
+    readonly occupancy: string;
+    readonly distanceFromWork: string;
+    readonly availability: string;
+    readonly amenities: readonly string[];
+    readonly utilities: readonly string[];
+    readonly rules: readonly string[];
+  };
+  readonly mealsDetails: {
+    readonly provision: "provided" | "partial" | "not_provided" | "not_stated";
+    readonly cost: string;
+    readonly style: string;
+    readonly included: readonly string[];
+    readonly dietaryAccommodations: readonly string[];
+  };
+  readonly payDetails: {
+    readonly estimatedHoursPerWeek: string;
+    readonly additionalCompensation: readonly string[];
+  };
+  readonly media: readonly HostDemoProfilePhoto[];
+  readonly filledPositions: number;
+  readonly lifecycle: readonly HostDemoListingLifecycleEvent[];
   readonly imageUrl: string;
   readonly imageAlt: string;
   readonly imageWidth: number;
   readonly imageHeight: number;
+}
+
+export interface HostDemoListingLifecycleEvent {
+  readonly id: string;
+  readonly status: HostDemoListingStatus;
+  readonly reason: string;
+  readonly changedLabel: string;
+}
+
+export interface HostDemoListingCompletion {
+  readonly score: number;
+  readonly completeSections: number;
+  readonly totalSections: number;
+  readonly missing: readonly string[];
+}
+
+export interface HostDemoProfileCompletionInput {
+  readonly tagline: string;
+  readonly description: string;
+  readonly whyWorkForUs: string;
+  readonly team: string;
+  readonly housing: string;
+  readonly transportation: string;
+  readonly remoteness: string;
+  readonly nearbyServices: string;
+  readonly faqs: string;
+}
+
+export interface HostDemoProfileCompletion {
+  readonly score: number;
+  readonly missing: readonly string[];
 }
 
 export interface HostDemoApplication {
@@ -98,15 +159,26 @@ export interface HostDemoApplication {
   readonly listingId: string;
   readonly listingTitle: string;
   readonly status: DemoApplicationStatus;
-  readonly match: number;
+  readonly match: number | null;
   readonly availability: string;
   readonly housingNeed: string;
   readonly mealsNeed: string;
   readonly appliedAt: string;
   readonly note: string;
+  readonly statusReason: string | null;
   readonly bio: string;
   readonly coverNote: string;
   readonly skills: readonly string[];
+  readonly homeBase: string;
+  readonly certifications: readonly string[];
+  readonly workHistory: readonly {
+    readonly id: string;
+    readonly organization: string;
+    readonly role: string;
+    readonly location: string;
+    readonly dates: string;
+    readonly highlights: readonly string[];
+  }[];
 }
 
 export interface HostDemoMessage {
@@ -185,6 +257,71 @@ export interface HostDemoProfilePhoto {
   readonly imageHeight: number;
 }
 
+/** Readiness is derived from seeker-visible facts; custom questions are not a live requirement. */
+export function hostDemoListingCompleteness(
+  listing: HostDemoListing,
+): HostDemoListingCompletion {
+  const housingAnswered = listing.housingDetails.provision === "not_provided" ||
+    (listing.housingDetails.provision === "provided" && Boolean(listing.housing.trim() && listing.housingDetails.type.trim() && listing.housingDetails.cost.trim() && listing.housingDetails.occupancy.trim() && listing.housingDetails.availability.trim()));
+  const mealsAnswered = listing.mealsDetails.provision === "not_provided" ||
+    (listing.mealsDetails.provision !== "not_stated" && Boolean(listing.meals.trim() && listing.mealsDetails.style.trim() && listing.mealsDetails.cost.trim() && listing.mealsDetails.included.length > 0));
+  const checks: readonly [string, boolean][] = [
+    ["Role basics", Boolean(listing.title.trim() && listing.summary.trim() && listing.description.trim())],
+    ["Season dates", hostDemoDateRangeError(listing.startDate, listing.endDate) === null],
+    ["Open positions", listing.openPositions > 0],
+    ["Responsibilities and requirements", listing.responsibilities.length > 0 && listing.requirements.length > 0],
+    ["Housing answer", housingAnswered],
+    ["Meals answer", mealsAnswered],
+    ["Pay answer", listing.compensationMinCents > 0 && listing.compensationMaxCents >= listing.compensationMinCents && Boolean(listing.pay.trim() && listing.payDetails.estimatedHoursPerWeek.trim())],
+    ["Training and benefits", listing.training.length > 0 && listing.highlights.length > 0],
+    ["Media", listing.media.length > 0 && Boolean(listing.imageUrl)],
+  ];
+  const completeSections = checks.filter(([, complete]) => complete).length;
+  return {
+    score: Math.round((completeSections / checks.length) * 100),
+    completeSections,
+    totalSections: checks.length,
+    missing: checks.flatMap(([label, complete]) => (complete ? [] : [label])),
+  };
+}
+
+/** Production readiness gate: each value-triad answer must be explicit. */
+export function hostDemoBenefitTriadReady(listing: HostDemoListing): boolean {
+  return listing.housingDetails.provision !== "not_stated" &&
+    listing.mealsDetails.provision !== "not_stated" &&
+    listing.compensationMinCents > 0 &&
+    listing.compensationMaxCents >= listing.compensationMinCents;
+}
+
+function completedLines(value: string): number {
+  return value.split("\n").filter((line) => line.trim()).length;
+}
+
+function completedFaqs(value: string): number {
+  return value.split("\n").filter((line) => {
+    const [question, ...answerParts] = line.split("|");
+    return Boolean(question?.trim() && answerParts.join("|").trim());
+  }).length;
+}
+
+/** Weighted mirror of the scenario checklist, recalculated from session edits. */
+export function hostDemoProfileCompletion(
+  profile: HostDemoProfileCompletionInput,
+): HostDemoProfileCompletion {
+  const checks: readonly [string, number, boolean][] = [
+    ["Identity and story", 20, Boolean(profile.tagline.trim() && profile.description.trim() && profile.whyWorkForUs.trim())],
+    ["Location and transportation", 15, Boolean(profile.remoteness.trim() && completedLines(profile.transportation) > 0 && completedLines(profile.nearbyServices) > 0)],
+    ["Housing details", 20, Boolean(profile.housing.trim())],
+    ["Public team", 15, completedLines(profile.team) > 0],
+    ["Workplace media", 20, hostDemoHousingPhotos.length >= 4],
+    ["Add one more FAQ", 10, completedFaqs(profile.faqs) > (hostDemoPublicProfile.faqs?.length ?? 0)],
+  ];
+  return {
+    score: checks.reduce((score, [, weight, complete]) => score + (complete ? weight : 0), 0),
+    missing: checks.flatMap(([label, , complete]) => (complete ? [] : [label])),
+  };
+}
+
 function dateLabel(value: string): string {
   return formatDate(value, {
     month: "short",
@@ -220,7 +357,22 @@ function money(cents: number): string {
   });
 }
 
-function seasonLength(startsOn: string, endsOn: string): string {
+export function hostDemoHourlyPaySummary(
+  minimumCents: number,
+  maximumCents: number,
+): string {
+  const normalizedMinimum = Math.max(0, minimumCents);
+  const normalizedMaximum = Math.max(normalizedMinimum, maximumCents);
+  const minimum = money(normalizedMinimum);
+  const maximum = money(normalizedMaximum);
+  return normalizedMinimum === normalizedMaximum
+    ? `${minimum}/hr`
+    : `${minimum}–${maximum}/hr`;
+}
+
+export function hostDemoSeasonLength(startsOn: string, endsOn: string): string {
+  const rangeError = hostDemoDateRangeError(startsOn, endsOn);
+  if (rangeError) return "Dates need review";
   const days = Math.max(
     1,
     Math.round(
@@ -230,6 +382,21 @@ function seasonLength(startsOn: string, endsOn: string): string {
   );
   const months = Math.max(1, Math.round(days / 30.4));
   return `about ${months} month${months === 1 ? "" : "s"}`;
+}
+
+export function hostDemoDateRangeError(
+  startsOn: string,
+  endsOn: string,
+): string | null {
+  const start = Date.parse(startsOn);
+  const end = Date.parse(endsOn);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    return "Add valid beginning and ending dates.";
+  }
+  if (end < start) {
+    return "The ending date must be on or after the beginning date.";
+  }
+  return null;
 }
 
 function deadlineDetail(value: string | null): string {
@@ -253,41 +420,23 @@ function photo(photoSlug: string) {
   };
 }
 
-function normalizedStatus(status: (typeof DEMO_APPLICATIONS)[number]["status"]): DemoApplicationStatus {
-  return demoApplicationStage(status).toLowerCase() as DemoApplicationStatus;
-}
-
-const RAW_APPLICATION_STATUS: Record<DemoApplicationStatus, ApplicationStatus> = {
-  new: "applied",
-  reviewing: "reviewing",
-  saved: "saved_by_host",
-  offered: "offered",
-  accepted: "accepted",
-  closed: "not_selected",
-};
-
-const APPLICATION_ACTIONS: readonly (HostDemoApplicationAction & {
-  readonly rawStatus: ApplicationStatus;
-})[] = [
-  { label: "Mark reviewing", status: "reviewing", rawStatus: "reviewing", variant: "secondary" },
-  { label: "Save applicant", status: "saved", rawStatus: "saved_by_host", variant: "secondary" },
-  { label: "Make offer", status: "offered", rawStatus: "offered", variant: "primary" },
-  { label: "Accept", status: "accepted", rawStatus: "accepted", variant: "primary" },
-  { label: "Pass", status: "closed", rawStatus: "not_selected", variant: "ghost" },
+const APPLICATION_ACTIONS: readonly HostDemoApplicationAction[] = [
+  { label: "Mark reviewing", status: "reviewing", variant: "secondary" },
+  { label: "Save applicant", status: "saved_by_host", variant: "secondary" },
+  { label: "Make offer", status: "offered", variant: "primary" },
+  { label: "Accept", status: "accepted", variant: "primary" },
+  { label: "Start placement", status: "active", variant: "primary" },
+  { label: "Mark completed", status: "completed", variant: "primary" },
+  { label: "Not selected", status: "not_selected", variant: "ghost" },
 ];
 
 /** Presentation-safe mirror of the canonical application lifecycle. */
 export function hostDemoApplicationActions(
   status: DemoApplicationStatus,
 ): readonly HostDemoApplicationAction[] {
-  const rawStatus = RAW_APPLICATION_STATUS[status];
   return APPLICATION_ACTIONS.filter((action) =>
-    canTransition(APPLICATION_TRANSITIONS, rawStatus, action.rawStatus),
-  ).map(({ label, status: targetStatus, variant }) => ({
-    label,
-    status: targetStatus,
-    variant,
-  }));
+    canTransition(APPLICATION_TRANSITIONS, status, action.status),
+  );
 }
 
 const CANONICAL_LISTING_STATUS = {
@@ -354,6 +503,7 @@ export const hostDemoListings: readonly HostDemoListing[] = DEMO_ROLES.map((role
   return {
     id: role.id,
     title: role.title,
+    category: role.category,
     location: roleLocation
       ? `${roleLocation.locality}, ${roleLocation.region}`
       : hostDemoHost.location,
@@ -361,13 +511,18 @@ export const hostDemoListings: readonly HostDemoListing[] = DEMO_ROLES.map((role
     description: role.description.join(" "),
     startDate: dateLabel(role.season.beginsOn),
     endDate: dateLabel(role.season.endsOn),
-    seasonLength: seasonLength(role.season.beginsOn, role.season.endsOn),
+    seasonLength: hostDemoSeasonLength(role.season.beginsOn, role.season.endsOn),
     housing: role.housing.summary,
     meals: role.meals.summary,
-    pay:
-      role.pay.minimumCents === role.pay.maximumCents
-        ? `${money(role.pay.minimumCents)}/hr`
-        : `${money(role.pay.minimumCents)}–${money(role.pay.maximumCents)}/hr`,
+    pay: hostDemoHourlyPaySummary(role.pay.minimumCents, role.pay.maximumCents),
+    housingIncluded: role.housing.provision === "provided",
+    mealsIncluded:
+      role.meals.provision === "provided" || role.meals.provision === "partial",
+    compensationMinCents: role.pay.minimumCents,
+    compensationMaxCents: role.pay.maximumCents,
+    compensationUnit: role.pay.unit,
+    compensationCurrency: role.pay.currency,
+    publishedAt: role.publishedAt,
     status:
       role.status === "live"
         ? "published"
@@ -381,7 +536,49 @@ export const hostDemoListings: readonly HostDemoListing[] = DEMO_ROLES.map((role
       : "No deadline",
     applicationDeadlineDetail: deadlineDetail(role.season.applicationDeadline),
     requirements: role.requirements,
+    responsibilities: role.responsibilities,
+    training: role.training,
     highlights: role.benefits,
+    applicationQuestions: [],
+    housingDetails: {
+      provision: role.housing.provision,
+      type: role.housing.type,
+      cost: role.housing.costCents === 0 ? "No charge" : `${money(role.housing.costCents)}/${role.housing.costUnit}`,
+      occupancy: role.housing.occupancy,
+      distanceFromWork: role.housing.distanceFromWork,
+      availability: role.housing.availability,
+      amenities: role.housing.amenities,
+      utilities: role.housing.utilities,
+      rules: role.housing.rules,
+    },
+    mealsDetails: {
+      provision: role.meals.provision,
+      cost: role.meals.costCents === 0 ? "Included" : `${money(role.meals.costCents)}/${role.meals.costUnit}`,
+      style: role.meals.style,
+      included: role.meals.included,
+      dietaryAccommodations: role.meals.dietaryAccommodations,
+    },
+    payDetails: {
+      estimatedHoursPerWeek: role.pay.estimatedHoursPerWeek,
+      additionalCompensation: role.pay.additionalCompensation,
+    },
+    media: [
+      { id: role.coverPhoto.id, label: "Role cover", ...photo(role.coverPhoto.photoSlug) },
+      ...role.meals.photos.map((item, index) => ({
+        id: item.id,
+        label: index === 0 ? "Staff meal" : "Meal setting",
+        ...photo(item.photoSlug),
+      })),
+    ],
+    filledPositions: role.status === "closed" ? role.openPositions : 0,
+    lifecycle: role.closedAt
+      ? [{
+          id: `${role.id}_closed`,
+          status: "closed" as const,
+          reason: role.statusReason ?? "Closed with no additional reason recorded.",
+          changedLabel: dateTimeLabel(role.closedAt),
+        }]
+      : [],
     ...photo(role.coverPhoto.photoSlug),
   };
 });
@@ -404,8 +601,8 @@ export const hostDemoApplications: readonly HostDemoApplication[] = DEMO_APPLICA
       seekerName: candidate?.name ?? "Fictional seeker",
       listingId: application.roleId,
       listingTitle: listing?.title ?? "Seasonal role",
-      status: normalizedStatus(application.status),
-      match: match?.score ?? 0,
+      status: application.status,
+      match: match?.score ?? null,
       availability: candidate
         ? `${dateLabel(candidate.availability.beginsOn)} – ${dateLabel(candidate.availability.endsOn)}`
         : "Not stated",
@@ -417,9 +614,24 @@ export const hostDemoApplications: readonly HostDemoApplication[] = DEMO_APPLICA
         : "Not stated",
       appliedAt: dateLabel(application.submittedAt),
       note: application.internalNote ?? "",
+      statusReason: ["accepted", "active", "completed", "not_selected", "withdrawn", "expired"].includes(application.status)
+        ? application.internalNote ?? `Application ended as ${application.status}.`
+        : null,
       bio: candidate?.headline ?? application.coverNote,
       coverNote: application.coverNote,
       skills: candidate?.skills ?? [],
+      homeBase: candidate?.homeBase ?? "Not recorded",
+      certifications: isCurrentSeeker ? DEMO_CURRENT_SEEKER.certifications : [],
+      workHistory: isCurrentSeeker
+        ? DEMO_CURRENT_SEEKER.workHistory.map((item) => ({
+            id: item.id,
+            organization: item.organization,
+            role: item.role,
+            location: item.location,
+            dates: `${dateLabel(item.startsOn)} – ${dateLabel(item.endsOn)}`,
+            highlights: item.highlights,
+          }))
+        : [],
     };
   },
 );
@@ -581,29 +793,37 @@ export const hostDemoPublicProfile: PublicHostProfile = {
   faqs: DEMO_ORGANIZATION.faqs.map(({ question, answer }) => ({ question, answer })),
 };
 
-export const hostDemoPublicListings: readonly PublicHostListing[] = DEMO_ROLES
-  .filter((role) => role.status === "live")
-  .map((role) => {
-    const roleLocation = DEMO_LOCATIONS.find((item) => item.id === role.locationId);
-    return {
-      id: role.id,
-      title: role.title,
-      category: role.category,
-      coverPhotoUrl: photo(role.coverPhoto.photoSlug).imageUrl,
-      locationDisplay: roleLocation
-        ? `${roleLocation.locality}, ${roleLocation.region}`
-        : hostDemoHost.location,
-      housingIncluded: role.housing.provision === "provided",
-      mealsIncluded:
-        role.meals.provision === "provided" || role.meals.provision === "partial",
-      compensationSummary: role.pay.summary,
-      compensationMinCents: role.pay.minimumCents,
-      compensationMaxCents: role.pay.maximumCents,
-      compensationUnit: role.pay.unit,
-      compensationCurrency: role.pay.currency,
-      publishedAt: role.publishedAt,
-    };
-  });
+/** Public projection of the exact session listings a host currently has live. */
+export function hostDemoPublicListingsFor(
+  listings: readonly HostDemoListing[],
+): readonly PublicHostListing[] {
+  return listings
+    .filter(
+      (listing) =>
+        listing.status === "published" &&
+        hostDemoListings.some(
+          (scenarioListing) =>
+            scenarioListing.id === listing.id && scenarioListing.status === "published",
+        ),
+    )
+    .map((listing) => ({
+      id: listing.id,
+      title: listing.title,
+      category: listing.category,
+      coverPhotoUrl: listing.imageUrl,
+      locationDisplay: listing.location,
+      housingIncluded: listing.housingIncluded,
+      mealsIncluded: listing.mealsIncluded,
+      compensationSummary: listing.pay,
+      compensationMinCents: listing.compensationMinCents,
+      compensationMaxCents: listing.compensationMaxCents,
+      compensationUnit: listing.compensationUnit,
+      compensationCurrency: listing.compensationCurrency,
+      publishedAt: listing.publishedAt,
+    }));
+}
+
+export const hostDemoPublicListings = hostDemoPublicListingsFor(hostDemoListings);
 
 export const hostDemoRatingSummary: HostRatingSummary = {
   count: 0,

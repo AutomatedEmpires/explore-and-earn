@@ -21,6 +21,7 @@ import {
 
 const HOST_ROOT = "/for-hosts/demo";
 const SEEKER_ROOT = "/for-seekers/demo";
+const APP_ORIGIN = "http://localhost:3100";
 
 function required<T>(value: T | undefined, description: string): T {
   if (value === undefined) {
@@ -30,6 +31,10 @@ function required<T>(value: T | undefined, description: string): T {
 }
 
 const hostListing = required(hostDemoListings[0], "a host listing");
+const publicHostListing = required(
+  hostDemoListings.find((listing) => listing.status === "published"),
+  "a published host listing",
+);
 const hostApplication = required(
   hostDemoApplications.find(
     (application) => hostDemoApplicationActions(application.status).length > 0,
@@ -155,8 +160,12 @@ async function expectPublicRoutes(
 function captureMutations(page: Page) {
   const requests: string[] = [];
   page.on("request", (request) => {
-    if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method())) {
-      requests.push(`${request.method()} ${request.url()}`);
+    const url = new URL(request.url());
+    if (
+      url.origin === APP_ORIGIN &&
+      ["POST", "PUT", "PATCH", "DELETE"].includes(request.method())
+    ) {
+      requests.push(`${request.method()} ${url.pathname}`);
     }
   });
   return requests;
@@ -194,6 +203,17 @@ async function expectNoHorizontalOverflow(page: Page, path: string) {
   ).toBeLessThanOrEqual(1);
 }
 
+async function useEssentialOnlyConsent(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem("cookie_consent", "essential");
+    } catch {
+      // The walkthrough remains usable when storage is unavailable; the
+      // screenshot assertions below still catch any consent overlay.
+    }
+  });
+}
+
 test.describe("full-fidelity public walkthrough route inventory", () => {
   test("every host route is public, healthy, and stays in the demo", async ({
     request,
@@ -211,6 +231,43 @@ test.describe("full-fidelity public walkthrough route inventory", () => {
 });
 
 test.describe("full-fidelity session-local behavior", () => {
+  test("host edits validate dates and the seeker preview never links mismatched details", async ({
+    page,
+  }) => {
+    const mutations = captureMutations(page);
+    const editedTitle = `${publicHostListing.title} · session edit`;
+
+    await page.goto(`${HOST_ROOT}/listings/${publicHostListing.id}/edit`);
+    await page.getByLabel("Begins").fill("Oct 4, 2026");
+    await page.getByLabel("Ends").fill("May 18, 2026");
+    await page.getByRole("button", { name: "Save demo listing" }).click();
+    await expect(page.getByRole("alert")).toContainText(
+      "The ending date must be on or after the beginning date.",
+    );
+
+    await page.getByLabel("Begins").fill(publicHostListing.startDate);
+    await page.getByLabel("Ends").fill(publicHostListing.endDate);
+    await page.getByLabel("Position title").fill(editedTitle);
+    await page.getByRole("button", { name: "Save demo listing" }).click();
+    await expect(page.getByRole("status")).toHaveText(
+      "Listing updated in this tab.",
+    );
+
+    await page.goto(`${HOST_ROOT}/seeker-view`);
+    await expect(page.getByText("Public preview boundary")).toBeVisible();
+    await expect(page.getByText(editedTitle, { exact: true })).toHaveCount(0);
+    const canonicalListingLink = page
+      .locator(`a[href="${SEEKER_ROOT}/listing/${publicHostListing.id}"]`)
+      .first();
+    await expect(canonicalListingLink).toContainText(publicHostListing.title);
+    await canonicalListingLink.click();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      publicHostListing.title,
+    );
+
+    expect(mutations, "the host preview flow issued a server mutation").toEqual([]);
+  });
+
   test("host legal action, message, settings, and reset stay browser-only", async ({
     page,
   }) => {
@@ -337,14 +394,100 @@ test.describe("full-fidelity session-local behavior", () => {
       "the seeker walkthrough issued a server mutation",
     ).toEqual([]);
   });
+
+  test("seeker profile edits return to the exact pending application", async ({
+    page,
+  }) => {
+    const mutations = captureMutations(page);
+    const editedIntroduction =
+      "I guide guests calmly, communicate clearly, and am ready for this sample season.";
+
+    await page.goto(`${SEEKER_ROOT}/listing/${seekerListing.id}/apply`);
+    await page.getByRole("link", { name: "Edit sample profile" }).click();
+    await expect(page).toHaveURL(
+      `${SEEKER_ROOT}/profile/edit?apply=${seekerListing.id}`,
+    );
+    await page.getByLabel("Introduction").fill(editedIntroduction);
+    await page
+      .getByRole("button", { name: "Save and return to application" })
+      .click();
+    await expect(page).toHaveURL(
+      `${SEEKER_ROOT}/listing/${seekerListing.id}/apply`,
+    );
+    await expect(page.getByText(editedIntroduction, { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "This is the profile attached to the application.",
+      }),
+    ).toBeVisible();
+
+    expect(mutations, "the seeker profile flow issued a server mutation").toEqual([]);
+  });
 });
 
 test.describe("full-fidelity mobile decisions and accessibility", () => {
   test("the pinned mobile dock and decision row are exactly 20/60/20", async ({
     page,
   }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 320, height: 800 });
+    await useEssentialOnlyConsent(page);
     await page.goto(`${SEEKER_ROOT}/seek`);
+
+    await expect(
+      page.getByRole("dialog", { name: "Cookie consent" }),
+    ).toHaveCount(0);
+    const menuButton = page.getByRole("button", {
+      name: "Open Seeker menu",
+    });
+    const search = page.getByRole("search");
+    const searchInput = search.getByRole("searchbox", {
+      name: "Search opportunities, places, hosts…",
+    });
+    const notifications = page.getByRole("link", {
+      name: "Notifications",
+      exact: true,
+    });
+    const profile = page.getByRole("link", {
+      name: "Your profile",
+      exact: true,
+    });
+    await expect(menuButton).toBeVisible();
+    await expect(search).toBeVisible();
+    await expect(searchInput).toHaveAttribute("placeholder", "Search");
+    await expect(searchInput).toHaveAccessibleName(
+      "Search opportunities, places, hosts…",
+    );
+    await expect(notifications).toBeVisible();
+    await expect(profile).toBeVisible();
+
+    const headerControls = [
+      { name: "menu", locator: menuButton },
+      { name: "search", locator: search },
+      { name: "notifications", locator: notifications },
+      { name: "profile", locator: profile },
+    ];
+    for (const control of headerControls) {
+      const box = await control.locator.boundingBox();
+      expect(box, `${control.name} control has no rendered box`).not.toBeNull();
+      if (!box) continue;
+      expect(
+        box.height,
+        `${control.name} control is shorter than 44px`,
+      ).toBeGreaterThanOrEqual(44);
+      expect(
+        box.x,
+        `${control.name} control begins outside the viewport`,
+      ).toBeGreaterThanOrEqual(0);
+      expect(
+        box.x + box.width,
+        `${control.name} control ends outside the viewport`,
+      ).toBeLessThanOrEqual(320);
+    }
+    const searchBox = await search.boundingBox();
+    expect(
+      searchBox?.width ?? 0,
+      "search pill is too narrow at 320px",
+    ).toBeGreaterThanOrEqual(80);
 
     const dock = page.getByRole("navigation", { name: "Seeker" });
     await expect(dock).toBeVisible();
@@ -416,6 +559,15 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
       name: /Review the complete listing/,
     });
     await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute("aria-modal", "true");
+    await expect(dialog).toHaveAttribute(
+      "aria-labelledby",
+      "benefit-dialog-title",
+    );
+    await expect(dialog).toHaveAttribute(
+      "aria-describedby",
+      "benefit-dialog-description",
+    );
     await expect(close).toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect(completeListing).toBeFocused();
@@ -425,8 +577,20 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
     await expect(dialog).toHaveCount(0);
     await expect(housingTrigger).toBeFocused();
 
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto(`${SEEKER_ROOT}/seek`);
+    await expect(
+      page.getByRole("button", { name: "Open Seeker menu" }),
+    ).toBeHidden();
+    await expect(
+      page.getByRole("navigation", { name: "Seeker sections" }),
+    ).toBeVisible();
+
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(HOST_ROOT);
+    await expect(
+      page.getByRole("button", { name: "Open host menu" }),
+    ).toBeHidden();
     await expect(page.getByRole("main")).toBeVisible();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(
@@ -443,6 +607,7 @@ test("dense surfaces fit every launch viewport and attach responsive evidence", 
 }, testInfo) => {
   test.setTimeout(900_000);
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await useEssentialOnlyConsent(page);
 
   const viewports = [
     { width: 320, height: 800 },
@@ -473,6 +638,11 @@ test("dense surfaces fit every launch viewport and attach responsive evidence", 
       expect(response?.status(), path).toBeLessThan(400);
       await expect(page.getByRole("main")).toBeVisible();
       await expectNoHorizontalOverflow(page, `${path} at ${viewport.width}px`);
+      if (path.startsWith(SEEKER_ROOT)) {
+        await expect(
+          page.getByRole("dialog", { name: "Cookie consent" }),
+        ).toHaveCount(0);
+      }
 
       if (
         screenshotWidths.has(viewport.width) &&

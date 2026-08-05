@@ -29,9 +29,6 @@
 		overflow: hidden;
 	}
 
-	.hamburger {
-		display: none;
-	}
 }
 
 /* ─── Scope head (brand + label) ─────────────────────────────────────────── */
@@ -291,6 +288,14 @@ a.userRow:focus-visible {
 .hamburger:focus-visible {
 	outline: 2px solid var(--color-cta);
 	outline-offset: 2px;
+}
+
+/* The mobile-first base rule is declared after the rail breakpoint above, so
+   repeat the desktop visibility rule here where it wins the cascade. */
+@media (min-width: 1024px) {
+	.hamburger {
+		display: none;
+	}
 }
 
 /* CSS-bar hamburger affordance (not an icon — registry has no menu glyph). */

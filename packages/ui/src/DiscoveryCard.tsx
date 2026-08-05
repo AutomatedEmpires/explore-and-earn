@@ -317,6 +317,7 @@ function benefitTruthValue(
 function BenefitTriadCell({
 	kind,
 	state,
+	provision,
 	value,
 	onClick,
 }: {
@@ -326,6 +327,7 @@ function BenefitTriadCell({
 	 * stale display copy from overriding an explicit no or unanswered value.
 	 */
 	readonly state: BenefitCardState
+	readonly provision?: BenefitProvision
 	readonly value: string
 	readonly onClick?: () => void
 }) {
@@ -357,6 +359,8 @@ function BenefitTriadCell({
 		? "not stated"
 		: state === "not_provided"
 			? isPay ? "not provided" : "not included"
+			: provision === "partial"
+				? "partially provided"
 			: isPay ? "" : "included"
 	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
 	const displayValue = state === "not_stated"
@@ -1078,18 +1082,21 @@ export function DiscoveryCard({
 						<BenefitTriadCell
 							kind="housing"
 							state={housingState}
+							provision={hp}
 							value={data.triad.housing}
 							onClick={canOpenHousing ? () => onHousingClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="meals"
 							state={mealsState}
+							provision={mp}
 							value={data.triad.meals}
 							onClick={canOpenMeals ? () => onMealsClick!(data.id) : undefined}
 						/>
 						<BenefitTriadCell
 							kind="pay"
 							state={payState}
+							provision={pp}
 							value={data.triad.pay}
 							onClick={onPayClick ? () => onPayClick(data.id) : undefined}
 						/>

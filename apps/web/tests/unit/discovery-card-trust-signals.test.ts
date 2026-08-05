@@ -125,4 +125,14 @@ describe("Housing/Meals never rely on colour alone", () => {
     expect(html).toContain('aria-label="Housing: not included"');
     expect(html).toContain('aria-label="Meals: included"');
   });
+
+  it("announces partial benefits without upgrading them to included", () => {
+    const html = render({
+      data: base({
+        benefitProvision: { housing: "provided", meals: "partial", pay: "provided" },
+      } as Partial<DiscoveryCardData>),
+    });
+    expect(html).toContain('aria-label="Meals: partially provided"');
+    expect(html).not.toContain('aria-label="Meals: included"');
+  });
 });

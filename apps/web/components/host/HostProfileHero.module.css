@@ -165,7 +165,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--type-section-size);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--type-label-tracking);
 }
 
 @media (min-width: 680px) {

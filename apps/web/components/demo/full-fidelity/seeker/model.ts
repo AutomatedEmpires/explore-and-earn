@@ -69,6 +69,8 @@ export interface SeekerDemoPerson {
   readonly id: string;
   readonly name: string;
   readonly initials: string;
+  readonly photoUrl: string;
+  readonly photoAlt: string;
   readonly location: string;
   readonly intro: string;
   readonly openTo: string;
@@ -326,6 +328,8 @@ export const seekerDemoPerson: SeekerDemoPerson = {
   id: DEMO_CURRENT_SEEKER.id,
   name: DEMO_CURRENT_SEEKER.name,
   initials: DEMO_CURRENT_SEEKER.initials,
+  photoUrl: "/photos/paddle-02-800.webp",
+  photoAlt: `Illustrative profile image of paddleboarders on a mountain lake for fictional sample seeker ${DEMO_CURRENT_SEEKER.name}`,
   location: DEMO_CURRENT_SEEKER.homeBase,
   intro: DEMO_CURRENT_SEEKER.introduction,
   openTo: DEMO_CURRENT_SEEKER.openToStatement,
