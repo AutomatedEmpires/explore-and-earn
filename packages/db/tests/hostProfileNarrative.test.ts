@@ -63,6 +63,11 @@ describe("host profile narrative", () => {
   it("returns absence for empty or malformed showcase data", () => {
     expect(sanitizeHostProfileNarrative(null)).toEqual({});
     expect(
+      sanitizeHostProfileNarrative(
+        Object.assign([], { whyWorkForUs: "Array properties are not narrative." }),
+      ),
+    ).toEqual({});
+    expect(
       sanitizeHostProfileNarrative({
         whyWorkForUs: "   ",
         team: [null, 7],

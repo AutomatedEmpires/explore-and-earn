@@ -135,4 +135,13 @@ describe("Housing/Meals never rely on colour alone", () => {
     expect(html).toContain('aria-label="Meals: partially provided"');
     expect(html).not.toContain('aria-label="Meals: included"');
   });
+
+  it("keeps the pay amount in the accessible name when pay is partial", () => {
+    const html = render({
+      data: base({
+        benefitProvision: { housing: "provided", meals: "provided", pay: "partial" },
+      } as Partial<DiscoveryCardData>),
+    });
+    expect(html).toContain('aria-label="Pay: partially provided — $18/hr"');
+  });
 });

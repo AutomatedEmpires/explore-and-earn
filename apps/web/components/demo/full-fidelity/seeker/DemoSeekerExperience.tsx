@@ -394,13 +394,15 @@ function InlineNotice({ message }: { readonly message: string }) {
 }
 
 function HomeSurface() {
-  const { appliedIds, profile, savedIds } = useDemoSeekerSession();
+  const { appliedIds, profile, savedIds, skippedIds } = useDemoSeekerSession();
   const interview = seekerDemoInterviews[0];
   const interviewApplication = interview
     ? seekerDemoApplications.find((application) => application.id === interview.applicationId)
     : undefined;
   const interviewListing = listingById(interviewApplication?.listingId);
-  const nextListing = seekerDemoListings.find((listing) => !appliedIds.includes(listing.id)) ?? seekerDemoListings[0];
+  const nextListing = seekerDemoListings.find((listing) => (
+    !appliedIds.includes(listing.id) && !skippedIds.includes(listing.id)
+  ));
 
   return (
     <div className={styles.surface}>
@@ -986,10 +988,11 @@ function ApplicationSurface() {
 }
 
 function MessagesSurface() {
+  const { isThreadUnread, unreadMessageCount } = useDemoSeekerSession();
   return (
     <div className={styles.surface}>
-      <SurfaceHeader eyebrow="Messages · sample conversations" title="Keep each host conversation attached to the role." lede="Replies are stored only in this walkthrough session. No host, email, SMS, or notification provider is contacted." />
-      {seekerDemoThreads.length > 0 ? <div className={styles.threadList}>{seekerDemoThreads.map((thread) => { const listing = listingById(thread.listingId); const last = thread.messages.at(-1); return <Link key={thread.id} href={`${DEMO_ROOT}/messages/${thread.id}`} className={styles.threadRow}><span className={styles.hostInitials}>{thread.hostName.split(/\s+/).map((word) => word[0]).slice(0, 2).join("")}</span><div><span>{listing?.title ?? thread.subject}</span><strong>{thread.hostName}</strong><p>{last?.body ?? "Open this conversation"}</p></div><small>{last ? formatDemoDate(last.sentAt, { month: "short", day: "numeric" }) : ""}</small>{thread.unread ? <i>New</i> : null}</Link>; })}</div> : <section className={styles.emptyState}><h2>No sample conversations</h2><p>Messages appear after a host or seeker starts a conversation about a role.</p></section>}
+      <SurfaceHeader eyebrow={`Messages · ${unreadMessageCount} unread`} title="Keep each host conversation attached to the role." lede="Replies are stored only in this walkthrough session. No host, email, SMS, or notification provider is contacted." />
+      {seekerDemoThreads.length > 0 ? <div className={styles.threadList}>{seekerDemoThreads.map((thread) => { const listing = listingById(thread.listingId); const last = thread.messages.at(-1); return <Link key={thread.id} href={`${DEMO_ROOT}/messages/${thread.id}`} className={styles.threadRow}><span className={styles.hostInitials}>{thread.hostName.split(/\s+/).map((word) => word[0]).slice(0, 2).join("")}</span><div><span>{listing?.title ?? thread.subject}</span><strong>{thread.hostName}</strong><p>{last?.body ?? "Open this conversation"}</p></div><small>{last ? formatDemoDate(last.sentAt, { month: "short", day: "numeric" }) : ""}</small>{isThreadUnread(thread.id) ? <i>New</i> : null}</Link>; })}</div> : <section className={styles.emptyState}><h2>No sample conversations</h2><p>Messages appear after a host or seeker starts a conversation about a role.</p></section>}
     </div>
   );
 }
@@ -997,9 +1000,13 @@ function MessagesSurface() {
 function ThreadSurface() {
   const params = useParams<{ id?: string | string[] }>();
   const thread = threadById(routeParam(params?.id));
-  const { sentMessages, sendMessage } = useDemoSeekerSession();
+  const { sentMessages, sendMessage, markThreadRead, ready } = useDemoSeekerSession();
   const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState("");
+  const resolvedThreadId = thread?.id;
+  useEffect(() => {
+    if (ready && resolvedThreadId) markThreadRead(resolvedThreadId);
+  }, [markThreadRead, ready, resolvedThreadId]);
   if (!thread) return <MissingSurface title="Conversation unavailable" />;
   const threadId = thread.id;
   const listing = listingById(thread.listingId);

@@ -41,7 +41,7 @@ interface SectionDef {
   readonly label: string;
   readonly icon: IconKey;
   readonly exact?: boolean;
-  readonly badgeKey?: "unread" | "community";
+  readonly badgeKey?: "messages" | "notifications" | "community";
   /** Present in the desktop rail but hidden from the mobile drawer (already on
    *  the founder-locked bottom dock — the drawer must not repeat it). */
   readonly hideInDrawer?: boolean;
@@ -64,7 +64,7 @@ const SECTIONS: readonly SectionDef[] = [
   { href: "/applied", label: "Applications", icon: "action.apply" },
   { href: "/invites", label: "Invites", icon: "status.match" },
   { href: "/offered", label: "Offers", icon: "status.offered" },
-  { href: "/messages", label: "Messages", icon: "nav.messages", badgeKey: "unread" },
+  { href: "/messages", label: "Messages", icon: "nav.messages", badgeKey: "messages" },
   { href: "/community", label: "Community", icon: "nav.feed", badgeKey: "community" },
   { href: "/journey", label: "Journey", icon: "analytics.meter" },
   { href: "/badges", label: "Badges", icon: "status.featured" },
@@ -72,7 +72,7 @@ const SECTIONS: readonly SectionDef[] = [
 
 // Reference-y footer — pinned to the bottom of the rail / drawer.
 const FOOTER: readonly SectionDef[] = [
-  { href: "/notifications", label: "Notifications", icon: "nav.notifications", badgeKey: "unread" },
+  { href: "/notifications", label: "Notifications", icon: "nav.notifications", badgeKey: "notifications" },
   { href: "/settings", label: "Settings", icon: "nav.settings" },
   { href: "/help", label: "Help", icon: "nav.help" },
 ];
@@ -97,7 +97,12 @@ export interface SeekerShellProps {
   readonly seekerName: string | null;
   readonly photoUrl?: string | null;
   readonly profileScore?: number;
+  /** Legacy shared unread count; specific counts below take precedence. */
   readonly unread?: number;
+  /** Message-specific unread count. Falls back to `unread` for older callers. */
+  readonly unreadMessages?: number;
+  /** Notification-specific unread count. Falls back to `unread` for older callers. */
+  readonly unreadNotifications?: number;
   readonly unreadCommunity?: number;
   /** Canonical destination -> isolated demo destination. */
   readonly routeMap?: Readonly<Record<string, string>>;
@@ -115,6 +120,8 @@ function isActive(pathname: string, href: string, exact?: boolean): boolean {
 export function SeekerShell({
   seekerName,
   unread = 0,
+  unreadMessages = unread,
+  unreadNotifications = unread,
   unreadCommunity = 0,
   routeMap = {},
   demoMode = false,
@@ -125,8 +132,9 @@ export function SeekerShell({
   const initial = name.charAt(0).toUpperCase();
   const hrefFor = (href: string): string => routeMap[href] ?? href;
 
-  const badgeFor = (badgeKey?: "unread" | "community"): number | undefined => {
-    if (badgeKey === "unread") return unread > 0 ? unread : undefined;
+  const badgeFor = (badgeKey?: SectionDef["badgeKey"]): number | undefined => {
+    if (badgeKey === "messages") return unreadMessages > 0 ? unreadMessages : undefined;
+    if (badgeKey === "notifications") return unreadNotifications > 0 ? unreadNotifications : undefined;
     if (badgeKey === "community") return unreadCommunity > 0 ? unreadCommunity : undefined;
     return undefined;
   };
@@ -183,7 +191,7 @@ export function SeekerShell({
             aria-label="Notifications"
           >
             <Icon name="nav.notifications" size={20} aria-hidden />
-            {unread > 0 ? <span className="seekeros-bdg--top">{unread}</span> : null}
+            {unreadNotifications > 0 ? <span className="seekeros-bdg--top">{unreadNotifications}</span> : null}
           </Link>
           <Link
             className="seekeros-account ui-pressable"

@@ -16,6 +16,7 @@ import {
   seekerDemoApplications,
   seekerDemoInitialSavedIds,
   seekerDemoListings,
+  seekerDemoNotifications,
   seekerDemoThreads,
 } from "../../components/demo/full-fidelity/seeker/model";
 
@@ -63,6 +64,14 @@ const seekerApplication = required(
   "a seeker application",
 );
 const seekerThread = required(seekerDemoThreads[0], "a seeker conversation");
+const unreadSeekerThread = required(
+  seekerDemoThreads.find((thread) => thread.unread),
+  "an unread seeker conversation",
+);
+const initialUnreadSeekerThreadCount = seekerDemoThreads.filter((thread) => thread.unread).length;
+const initialUnreadSeekerNotificationCount = seekerDemoNotifications.filter(
+  (notification) => !notification.read,
+).length;
 
 /** Every physical page under app/[locale]/for-hosts/demo. */
 const HOST_ROUTES = [
@@ -401,6 +410,73 @@ test.describe("full-fidelity session-local behavior", () => {
       mutations,
       "the seeker walkthrough issued a server mutation",
     ).toEqual([]);
+  });
+
+  test("seeker home skip advances to the next eligible role", async ({ page }) => {
+    const mutations = captureMutations(page);
+    await page.goto(`${SEEKER_ROOT}/home`);
+
+    const currentActions = page.getByRole("main").locator('[aria-label^="Actions for "]').first();
+    await expect(currentActions).toBeVisible();
+    const currentLabel = required(
+      await currentActions.getAttribute("aria-label"),
+      "a labeled home recommendation",
+    );
+
+    await currentActions.getByRole("button", { name: "Skip", exact: true }).click();
+    await expect(page.getByRole("main").getByLabel(currentLabel, { exact: true })).toHaveCount(0);
+
+    const nextActions = page.getByRole("main").locator('[aria-label^="Actions for "]').first();
+    await expect(nextActions).toBeVisible();
+    expect(await nextActions.getAttribute("aria-label")).not.toBe(currentLabel);
+
+    await page.reload();
+    await expect(page.getByRole("main").getByLabel(currentLabel, { exact: true })).toHaveCount(0);
+    expect(mutations, "skipping a home recommendation issued a server mutation").toEqual([]);
+  });
+
+  test("seeker message reads update only the message unread state", async ({ page }) => {
+    const mutations = captureMutations(page);
+    const remainingUnread = initialUnreadSeekerThreadCount - 1;
+    const messageNav = () => page.locator(`a[href="${SEEKER_ROOT}/messages"]:visible`).first();
+    const notificationNav = () => page.locator(`a[href="${SEEKER_ROOT}/notifications"]:visible`).first();
+
+    await page.goto(`${SEEKER_ROOT}/messages`);
+    await expect(page.getByText(`Messages · ${initialUnreadSeekerThreadCount} unread`, { exact: true })).toBeVisible();
+    await expect(messageNav().locator(`[aria-label="${initialUnreadSeekerThreadCount} new"]`)).toBeVisible();
+    if (initialUnreadSeekerNotificationCount > 0) {
+      await expect(notificationNav().locator(`[aria-label="${initialUnreadSeekerNotificationCount} new"]`)).toBeVisible();
+    }
+
+    const unreadRow = page.getByRole("main").locator(`a[href="${SEEKER_ROOT}/messages/${unreadSeekerThread.id}"]`);
+    await expect(unreadRow.getByText("New", { exact: true })).toBeVisible();
+    await unreadRow.click();
+    await expect(page).toHaveURL(`${SEEKER_ROOT}/messages/${unreadSeekerThread.id}`);
+
+    const messageBadge = messageNav().locator('[aria-label$=" new"]');
+    if (remainingUnread > 0) {
+      await expect(messageBadge).toHaveAttribute("aria-label", `${remainingUnread} new`);
+    } else {
+      await expect(messageBadge).toHaveCount(0);
+    }
+    if (initialUnreadSeekerNotificationCount > 0) {
+      await expect(notificationNav().locator(`[aria-label="${initialUnreadSeekerNotificationCount} new"]`)).toBeVisible();
+    }
+
+    await page.getByLabel("Reply in this walkthrough").fill("Read-state regression reply.");
+    await page.getByRole("button", { name: "Add sample reply" }).click();
+    await page.goto(`${SEEKER_ROOT}/messages`);
+    await expect(page.getByText(`Messages · ${remainingUnread} unread`, { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("main").locator(`a[href="${SEEKER_ROOT}/messages/${unreadSeekerThread.id}"]`).getByText("New", { exact: true }),
+    ).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByText(`Messages · ${remainingUnread} unread`, { exact: true })).toBeVisible();
+    if (initialUnreadSeekerNotificationCount > 0) {
+      await expect(notificationNav().locator(`[aria-label="${initialUnreadSeekerNotificationCount} new"]`)).toBeVisible();
+    }
+    expect(mutations, "reading or replying to a seeker thread issued a server mutation").toEqual([]);
   });
 
   test("seeker profile edits return to the exact pending application", async ({

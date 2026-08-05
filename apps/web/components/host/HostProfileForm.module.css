@@ -173,9 +173,26 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-12);
+  min-width: 0;
+  margin: 0;
   padding: var(--space-16);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-cell);
+}
+
+.readOnlyRow {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.readOnlyGroup :is(.input, .textarea):disabled,
+.readOnlyRow :is(.input, .textarea):disabled {
+  color: var(--text-secondary);
+  background: var(--color-surface-raised);
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 .fieldGroupHeading {

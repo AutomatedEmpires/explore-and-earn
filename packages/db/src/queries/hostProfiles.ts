@@ -112,7 +112,10 @@ function toNarrativeFaqs(value: unknown): HostProfileFaq[] {
  * values are omitted so public sections truthfully self-hide.
  */
 export function sanitizeHostProfileNarrative(raw: unknown): HostProfileNarrative {
-  const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const obj =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
   const why = toNarrativeText(obj.whyWorkForUs);
   const team = toNarrativeTeam(obj.team);
   const activities = toNarrativeStringList(obj.activities);
@@ -166,8 +169,6 @@ export interface HostProfileDetailsInput {
   categoryScopes?: MarketplaceLane[];
   /** Reusable host-level Housing evidence (migration 072). */
   benefitLibrary?: HostBenefitLibrary;
-  /** Public story, team, activities, and perks (migration 059). */
-  narrative?: HostProfileNarrative;
 }
 
 function normalizeOptional(value: string | null | undefined): string | null | undefined {
@@ -352,10 +353,6 @@ export async function updateHostProfileDetails(
   if (fields.benefitLibrary !== undefined) {
     patch.benefit_library = sanitizeHostBenefitLibrary(fields.benefitLibrary);
   }
-  if (fields.narrative !== undefined) {
-    patch.narrative = sanitizeHostProfileNarrative(fields.narrative);
-  }
-
   if (Object.keys(patch).length === 0) return { ok: true };
 
   try {

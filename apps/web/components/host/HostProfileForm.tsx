@@ -55,20 +55,6 @@ function isMarketplaceLane(category: string): category is MarketplaceLane {
   return (MARKETPLACE_LANES as readonly string[]).includes(category);
 }
 
-function lines(value: FormDataEntryValue | null): string[] {
-  return String(value ?? "")
-    .split(/\r?\n/)
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-}
-
-function teamLines(value: FormDataEntryValue | null) {
-  return lines(value).map((entry) => {
-    const [name = "", ...roleParts] = entry.split(/\s+(?:—|-|\|)\s+/);
-    return { name: name.trim(), role: roleParts.join(" — ").trim() };
-  });
-}
-
 interface EditableFaq {
   readonly key: string;
   readonly question: string;
@@ -192,18 +178,6 @@ export function HostProfileForm({
 
     const instagram = String(formData.get("instagram") ?? "").trim().replace(/^@/, "");
     const twitter = String(formData.get("twitter") ?? "").trim().replace(/^@/, "");
-    const cleanFaqs = faqs.map(({ question, answer }) => ({
-      question: question.trim(),
-      answer: answer.trim(),
-    }));
-    if (cleanFaqs.some((faq) => Boolean(faq.question) !== Boolean(faq.answer))) {
-      setMessage({
-        ok: false,
-        text: "Complete both the question and answer, or remove that FAQ.",
-      });
-      return;
-    }
-
     const fields = {
       companyName: String(formData.get("orgName") ?? ""),
       hostName: String(formData.get("hostName") ?? "") || null,
@@ -219,28 +193,6 @@ export function HostProfileForm({
       housingOfferedGenerally: housingOffered,
       mealsOfferedGenerally: mealsOffered,
       categoryScopes,
-      narrative: {
-        whyWorkForUs: String(formData.get("whyWorkForUs") ?? "").trim() || undefined,
-        team: teamLines(formData.get("team")),
-        activities: lines(formData.get("activities")),
-        perks: lines(formData.get("perks")),
-        culture: lines(formData.get("culture")),
-        managementApproach:
-          String(formData.get("managementApproach") ?? "").trim() || undefined,
-        typicalDay: String(formData.get("typicalDay") ?? "").trim() || undefined,
-        workEnvironment:
-          String(formData.get("workEnvironment") ?? "").trim() || undefined,
-        seasonRhythm: lines(formData.get("seasonRhythm")),
-        training: lines(formData.get("training")),
-        transportation: lines(formData.get("transportation")),
-        remoteness: String(formData.get("remoteness") ?? "").trim() || undefined,
-        nearbyServices: lines(formData.get("nearbyServices")),
-        housingDescription:
-          String(formData.get("housingDescription") ?? "").trim() || undefined,
-        mealsDescription:
-          String(formData.get("mealsDescription") ?? "").trim() || undefined,
-        faqs: cleanFaqs.filter((faq) => faq.question && faq.answer),
-      },
       ...buildHostBenefitLibraryPatch(benefitLibraryAvailable, housingPhotos),
     };
 
@@ -344,14 +296,12 @@ export function HostProfileForm({
         />
       </div>
 
-      <div className={styles.fieldGroup}>
-        <div>
-          <p className={styles.fieldGroupHeading}>Public employer story</p>
-          <p className={styles.note}>
-            These fields map directly to the public employer profile. Leave a
-            section empty to hide it rather than publishing placeholder copy.
-          </p>
-        </div>
+      <fieldset className={`${styles.fieldGroup} ${styles.readOnlyGroup}`} disabled>
+        <legend className={styles.fieldGroupHeading}>Public employer story</legend>
+        <p className={styles.note}>
+          Public story editing is temporarily read-only. Saving the rest of
+          this form leaves your existing published story unchanged.
+        </p>
 
         <div className={styles.field}>
           <label className={styles.label} htmlFor="profile-why-work">
@@ -514,16 +464,14 @@ export function HostProfileForm({
             <p className={styles.note}>One perk per line.</p>
           </div>
         </div>
-      </div>
+      </fieldset>
 
-      <div className={styles.fieldGroup}>
-        <div>
-          <p className={styles.fieldGroupHeading}>Location &amp; day-to-day</p>
-          <p className={styles.note}>
-            Help seekers understand how remote the location feels and how they
-            can reach work, groceries, healthcare, and town.
-          </p>
-        </div>
+      <fieldset className={`${styles.fieldGroup} ${styles.readOnlyGroup}`} disabled>
+        <legend className={styles.fieldGroupHeading}>Location &amp; day-to-day</legend>
+        <p className={styles.note}>
+          This public-story section is read-only here; existing published
+          location details remain unchanged when you save.
+        </p>
         <div className={styles.field}>
           <label className={styles.label} htmlFor="profile-remoteness">
             Remoteness &amp; access
@@ -570,7 +518,7 @@ export function HostProfileForm({
             <p className={styles.note}>One service per line.</p>
           </div>
         </div>
-      </div>
+      </fieldset>
 
       <div className={styles.fieldGroup}>
         <p className={styles.fieldGroupHeading}>What you offer</p>
@@ -625,7 +573,14 @@ export function HostProfileForm({
           </span>
         </label>
 
-        <div className={styles.row}>
+        <p className={styles.note}>
+          Public housing and meals overviews are currently read-only.
+        </p>
+        <fieldset
+          className={`${styles.row} ${styles.readOnlyRow}`}
+          aria-label="Public housing and meals overviews"
+          disabled
+        >
           <div className={styles.field}>
             <label className={styles.label} htmlFor="profile-housing-description">
               Housing overview
@@ -654,16 +609,16 @@ export function HostProfileForm({
               placeholder="Describe the usual meal plan, shift coverage, cost, and dietary accommodations. Listing-specific terms still belong on each role."
             />
           </div>
-        </div>
+        </fieldset>
       </div>
 
-      <div className={styles.fieldGroup}>
+      <fieldset className={`${styles.fieldGroup} ${styles.readOnlyGroup}`} disabled>
         <div className={styles.libraryHead}>
           <div>
             <p className={styles.fieldGroupHeading}>Frequently asked questions</p>
             <p className={styles.note}>
-              Answer the practical questions seekers ask before applying. Only
-              complete question-and-answer pairs are published.
+              FAQs are read-only here. Existing published answers remain
+              unchanged when you save the rest of this form.
             </p>
           </div>
           <span className={styles.libraryCount}>{faqs.length}/12</span>
@@ -722,7 +677,7 @@ export function HostProfileForm({
             </button>
           </div>
         ) : null}
-      </div>
+      </fieldset>
 
       {showBenefitLibrary ? (
         <div className={styles.fieldGroup}>

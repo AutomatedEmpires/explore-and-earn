@@ -6,11 +6,10 @@ import {
 	createHostProfile,
 	deleteTrustedListingMedia,
 	getHostProfile,
-	sanitizeHostProfileNarrative,
 	setMyHousingLibraryPhoto,
 	updateHostProfileDetails,
 	uploadTrustedListingMedia,
-	type HostProfileNarrative,
+	type HostProfileDetailsInput,
 	type SocialLinks,
 } from "@explore-and-earn/db"
 import {
@@ -268,29 +267,38 @@ export interface UpdateHostProfileInput {
 	mealsOfferedGenerally?: boolean
 	categoryScopes?: MarketplaceLane[]
 	benefitLibrary?: HostBenefitLibrary
-	narrative?: HostProfileNarrative
 }
 
 /**
- * Treat server-action payloads as untrusted even when their TypeScript caller
- * is our form. The shared normalizer enforces every public-content bound; this
- * owner-specific wrapper also strips team photo URLs because that upload path
- * is not implemented here.
+ * Copy only columns covered by the authenticated host-profile UPDATE grant.
+ * Server-action payloads remain untrusted at runtime, so an old or forged
+ * client cannot smuggle `narrative` (or an internal profile field) into the
+ * database patch through object spread.
  */
-function sanitizeOwnerHostProfileNarrative(value: unknown): HostProfileNarrative {
-	const source =
-		value && typeof value === "object" && !Array.isArray(value)
-			? (value as Record<string, unknown>)
-			: {}
-	const team = Array.isArray(source.team)
-		? source.team.map((entry) => {
-				if (!entry || typeof entry !== "object") return entry
-				const member = entry as Record<string, unknown>
-				return { name: member.name, role: member.role }
-			})
-		: undefined
-
-	return sanitizeHostProfileNarrative({ ...source, team })
+function writableHostProfileDetails(
+	fields: UpdateHostProfileInput,
+): HostProfileDetailsInput {
+	const writable: HostProfileDetailsInput = {}
+	if (fields.companyName !== undefined) writable.companyName = fields.companyName
+	if (fields.hostName !== undefined) writable.hostName = fields.hostName
+	if (fields.tagline !== undefined) writable.tagline = fields.tagline
+	if (fields.about !== undefined) writable.about = fields.about
+	if (fields.primaryLocationName !== undefined) {
+		writable.primaryLocationName = fields.primaryLocationName
+	}
+	if (fields.websiteUrl !== undefined) writable.websiteUrl = fields.websiteUrl
+	if (fields.photoUrl !== undefined) writable.photoUrl = fields.photoUrl
+	if (fields.socialLinks !== undefined) writable.socialLinks = fields.socialLinks
+	if (fields.housingOfferedGenerally !== undefined) {
+		writable.housingOfferedGenerally = fields.housingOfferedGenerally
+	}
+	if (fields.mealsOfferedGenerally !== undefined) {
+		writable.mealsOfferedGenerally = fields.mealsOfferedGenerally
+	}
+	if (fields.categoryScopes !== undefined) {
+		writable.categoryScopes = fields.categoryScopes
+	}
+	return writable
 }
 
 /**
@@ -321,10 +329,6 @@ async function updateHostProfileActionImpl(
 	let cleanBenefitLibrary: HostBenefitLibrary | undefined;
 	let previousBenefitLibrary: HostBenefitLibrary | undefined;
 	let hostProfileId: string | undefined;
-	const cleanNarrative =
-		fields.narrative === undefined
-			? undefined
-			: sanitizeOwnerHostProfileNarrative(fields.narrative)
 	if (fields.benefitLibrary !== undefined) {
 		const profile = await getHostProfile(token, userId);
 		if (!profile) return { ok: false, error: "update_failed" };
@@ -340,8 +344,7 @@ async function updateHostProfileActionImpl(
 	}
 
 	const result = await updateHostProfileDetails(token, userId, {
-		...fields,
-		...(cleanNarrative !== undefined ? { narrative: cleanNarrative } : {}),
+		...writableHostProfileDetails(fields),
 		...(cleanBenefitLibrary !== undefined
 			? { benefitLibrary: cleanBenefitLibrary }
 			: {}),

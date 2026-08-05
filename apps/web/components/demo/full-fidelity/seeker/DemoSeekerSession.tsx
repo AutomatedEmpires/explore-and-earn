@@ -17,6 +17,7 @@ import {
   seekerDemoNotifications,
   seekerDemoNow,
   seekerDemoPerson,
+  seekerDemoThreads,
   type SeekerDemoWorkHistory,
   type SeekerDemoMessage,
 } from "./model";
@@ -29,6 +30,7 @@ interface StoredDemoState {
   readonly appliedIds: readonly string[];
   readonly localApplications: readonly DemoLocalApplication[];
   readonly readNotificationIds: readonly string[];
+  readonly readThreadIds: readonly string[];
   readonly sentMessages: Readonly<Record<string, readonly SeekerDemoMessage[]>>;
   readonly profile: DemoProfileState;
 }
@@ -52,11 +54,15 @@ export interface DemoLocalApplication {
 }
 
 interface DemoSeekerSessionValue extends StoredDemoState {
+  readonly ready: boolean;
   readonly save: (listingId: string) => void;
   readonly skip: (listingId: string) => void;
   readonly apply: (listingId: string) => void;
   readonly markNotificationRead: (notificationId: string) => void;
   readonly markAllNotificationsRead: () => void;
+  readonly isThreadUnread: (threadId: string) => boolean;
+  readonly markThreadRead: (threadId: string) => void;
+  readonly unreadMessageCount: number;
   readonly sendMessage: (threadId: string, body: string) => void;
   readonly updateProfile: (profile: DemoProfileState) => void;
   readonly persistenceAvailable: boolean;
@@ -75,6 +81,7 @@ function initialState(): StoredDemoState {
     appliedIds,
     localApplications: [],
     readNotificationIds: seekerDemoNotifications.filter((notification) => notification.read).map((notification) => notification.id),
+    readThreadIds: [],
     sentMessages: {},
     profile: {
       intro: seekerDemoPerson.intro,
@@ -125,6 +132,7 @@ function restoreState(value: string | null): StoredDemoState | null {
       !isStringArray(parsed.appliedIds) ||
       !isLocalApplicationArray(parsed.localApplications) ||
       !isStringArray(parsed.readNotificationIds) ||
+      (parsed.readThreadIds !== undefined && !isStringArray(parsed.readThreadIds)) ||
       !parsed.sentMessages ||
       typeof parsed.sentMessages !== "object" ||
       !parsed.profile ||
@@ -147,6 +155,7 @@ function restoreState(value: string | null): StoredDemoState | null {
       appliedIds: parsed.appliedIds,
       localApplications: parsed.localApplications,
       readNotificationIds: parsed.readNotificationIds,
+      readThreadIds: parsed.readThreadIds ?? [],
       sentMessages: parsed.sentMessages,
       profile: parsed.profile,
     };
@@ -280,6 +289,9 @@ export function DemoSeekerSessionProvider({ children }: { readonly children: Rea
       };
       return {
         ...current,
+        readThreadIds: current.readThreadIds.includes(threadId)
+          ? current.readThreadIds
+          : [...current.readThreadIds, threadId],
         sentMessages: {
           ...current.sentMessages,
           [threadId]: [...prior, nextMessage],
@@ -287,6 +299,20 @@ export function DemoSeekerSessionProvider({ children }: { readonly children: Rea
       };
     });
   }, []);
+
+  const isThreadUnread = useCallback((threadId: string): boolean => (
+    seekerDemoThreads.find((thread) => thread.id === threadId)?.unread === true
+    && !state.readThreadIds.includes(threadId)
+  ), [state.readThreadIds]);
+
+  const markThreadRead = useCallback((threadId: string) => {
+    if (!seekerDemoThreads.some((thread) => thread.id === threadId && thread.unread)) return;
+    setState((current) => current.readThreadIds.includes(threadId)
+      ? current
+      : { ...current, readThreadIds: [...current.readThreadIds, threadId] });
+  }, []);
+
+  const unreadMessageCount = seekerDemoThreads.filter((thread) => isThreadUnread(thread.id)).length;
 
   const reset = useCallback(() => {
     if (!removeStoredState()) setPersistenceAvailable(false);
@@ -305,12 +331,16 @@ export function DemoSeekerSessionProvider({ children }: { readonly children: Rea
     apply,
     markNotificationRead,
     markAllNotificationsRead,
+    isThreadUnread,
+    markThreadRead,
+    unreadMessageCount,
+    ready: restored,
     sendMessage,
     updateProfile,
     persistenceAvailable,
     resetVersion,
     reset,
-  }), [state, save, skip, apply, markNotificationRead, markAllNotificationsRead, sendMessage, updateProfile, persistenceAvailable, resetVersion, reset]);
+  }), [state, save, skip, apply, markNotificationRead, markAllNotificationsRead, isThreadUnread, markThreadRead, unreadMessageCount, sendMessage, updateProfile, persistenceAvailable, restored, resetVersion, reset]);
 
   return (
     <DemoSeekerSessionContext.Provider value={value}>

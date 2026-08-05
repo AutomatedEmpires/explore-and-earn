@@ -14,7 +14,7 @@ import {
 import styles from "./SeekerDemo.module.css";
 
 function DemoShellContent({ children }: { readonly children: ReactNode }) {
-  const { persistenceAvailable, profile, readNotificationIds, reset } = useDemoSeekerSession();
+  const { persistenceAvailable, profile, readNotificationIds, reset, unreadMessageCount } = useDemoSeekerSession();
   const [resetNotice, setResetNotice] = useState("");
   const unread = seekerDemoNotifications.filter(
     (notification) => !notification.read && !readNotificationIds.includes(notification.id),
@@ -33,7 +33,8 @@ function DemoShellContent({ children }: { readonly children: ReactNode }) {
       <SeekerShell
         seekerName={seekerDemoPerson.name}
         profileScore={profileReadiness(profile)}
-        unread={unread}
+        unreadMessages={unreadMessageCount}
+        unreadNotifications={unread}
         routeMap={SEEKER_DEMO_ROUTE_MAP}
         demoMode
       >

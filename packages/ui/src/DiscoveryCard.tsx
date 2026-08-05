@@ -362,7 +362,8 @@ function BenefitTriadCell({
 			: provision === "partial"
 				? "partially provided"
 			: isPay ? "" : "included"
-	const aria = `${label}${stateText ? `: ${stateText}` : value ? ` — ${value}` : ""}`
+	const announcedPay = isPay && state === "provided" ? value.trim() : ""
+	const aria = `${label}${stateText ? `: ${stateText}` : ""}${announcedPay ? ` — ${announcedPay}` : ""}`
 	const displayValue = state === "not_stated"
 		? NOT_STATED_LABEL
 		: state === "not_provided"
