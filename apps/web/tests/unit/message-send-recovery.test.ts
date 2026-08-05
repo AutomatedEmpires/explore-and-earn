@@ -149,6 +149,7 @@ describe("recoverable message sending", () => {
     );
     expect(source).toContain('role="log"');
     expect(source).toContain('aria-live="polite"');
-    expect(source).toContain('aria-relevant="additions text"');
+    expect(source).toContain('aria-relevant="additions"');
+    expect(source).not.toContain('aria-relevant="additions text"');
   });
 });

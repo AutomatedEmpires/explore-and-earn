@@ -16,6 +16,13 @@ const SQL = readFileSync(
   ),
   "utf8",
 );
+const ASSERTION_SQL = readFileSync(
+  new URL(
+    "../../../tools/db-assert/sql/assert_message_delivery_atomic.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 describe("migration 090 atomic message delivery", () => {
   it("emits exactly one routing-only message event in the insert transaction", () => {
@@ -86,5 +93,14 @@ describe("migration 090 atomic message delivery", () => {
       SQL.indexOf("create or replace function public.send_my_conversation_message"),
     );
     expect(rpc).not.toMatch(/update public\.conversations/i);
+  });
+
+  it("scopes the exact 4,000-character connected proof to its fixture thread", () => {
+    expect(ASSERTION_SQL).toMatch(
+      /if not exists \([\s\S]*?conversation_id = '9000c000-0000-4000-8000-000000000001'[\s\S]*?body = repeat\('x', 4000\)[\s\S]*?char_length\(m\.body\) = 4000/i,
+    );
+    expect(ASSERTION_SQL).not.toMatch(
+      /if \(select char_length\(body\) from public\.messages where char_length\(body\) = 4000\)/i,
+    );
   });
 });

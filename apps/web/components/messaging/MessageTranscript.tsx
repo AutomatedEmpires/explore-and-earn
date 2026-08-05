@@ -332,7 +332,7 @@ function ConversationTranscript({
 					role="log"
 					aria-label="Conversation messages"
 					aria-live="polite"
-					aria-relevant="additions text"
+					aria-relevant="additions"
 				>
 					<ol className={styles.transcript}>
 						{messages.map((message) => {

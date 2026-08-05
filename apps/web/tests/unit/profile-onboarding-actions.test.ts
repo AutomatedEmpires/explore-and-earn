@@ -218,6 +218,32 @@ describe("saveOnboardingStep", () => {
     expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
   });
 
+  it.each(["categories", "desiredRoles", "generalSkills"] as const)(
+    "rejects oversized %s arrays before auth or database work",
+    async (field) => {
+      const result = await saveOnboardingStep({
+        [field]: Array.from({ length: 11 }, () => "farm"),
+      });
+
+      expect(result).toEqual({ ok: false, error: "invalid_tag_list" });
+      expect(authMock).not.toHaveBeenCalled();
+      expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["categories", "desiredRoles", "generalSkills"] as const)(
+    "rejects overlong %s entries before auth or database work",
+    async (field) => {
+      const result = await saveOnboardingStep({
+        [field]: ["x".repeat(41)],
+      });
+
+      expect(result).toEqual({ ok: false, error: "invalid_tag_list" });
+      expect(authMock).not.toHaveBeenCalled();
+      expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
+    },
+  );
+
   it("uses an explicitly gated no-write path for the local seeker bench", async () => {
     isDevBenchEnabledMock.mockReturnValue(true);
     readDevRoleMock.mockResolvedValue("seeker");

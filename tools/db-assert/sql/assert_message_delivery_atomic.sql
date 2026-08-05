@@ -422,7 +422,13 @@ begin
     raise exception 'message atomicity: trigger event routing context is incomplete';
   end if;
 
-  if (select char_length(body) from public.messages where char_length(body) = 4000) <> 4000 then
+  if not exists (
+    select 1
+      from public.messages m
+     where m.conversation_id = '9000c000-0000-4000-8000-000000000001'
+       and m.body = repeat('x', 4000)
+       and char_length(m.body) = 4000
+  ) then
     raise exception 'message atomicity: the exact 4000-character boundary did not persist';
   end if;
 

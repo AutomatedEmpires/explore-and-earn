@@ -25,6 +25,7 @@ import {
 import type { DiscoveryListing } from "../../../../../../components/discovery";
 import { CaptureOnMount } from "../../../../../../components/analytics/FunnelEvents";
 import { HOST_WORKSPACE_EVENTS } from "../../../../../../lib/analytics/events";
+import { isUuid } from "../../../../../../lib/ids";
 import { toApplicantItem, threadsByApplicationId } from "../applicants-data";
 import { StatusActions } from "./StatusActions";
 import { ApplicantResumePopupButton } from "./ApplicantResumePopupButton";
@@ -43,6 +44,10 @@ export default async function HostApplicantDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) {
+    notFound();
+  }
+
   const { userId, getToken } = await auth();
   const token = userId ? await getToken() : null;
   if (!userId || !token) {

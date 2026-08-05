@@ -1,6 +1,10 @@
 import {
   MARKETPLACE_CATEGORIES,
+  SEEKER_BENEFIT_PREFERENCES,
+  SEEKER_REMOTE_PREFERENCES,
   type MarketplaceCategory,
+  type SeekerBenefitPreference,
+  type SeekerRemotePreference,
 } from "@explore-and-earn/contracts";
 import type {
   ResumeMissingSection,
@@ -13,17 +17,6 @@ export type SeekerSeekingTimeline =
   | "1_month"
   | "3_months"
   | "6_months";
-
-export type SeekerRemotePreference =
-  | "remote"
-  | "on_site"
-  | "hybrid"
-  | "any";
-export type SeekerBenefitPreference =
-  | "required"
-  | "preferred"
-  | "not_needed"
-  | "flexible";
 
 /**
  * The small, serializable profile slice shared by the onboarding steps.
@@ -64,18 +57,12 @@ const TIMELINES = new Set<SeekerSeekingTimeline>([
   "3_months",
   "6_months",
 ]);
-const REMOTE_PREFERENCES = new Set<SeekerRemotePreference>([
-  "remote",
-  "on_site",
-  "hybrid",
-  "any",
-]);
-const BENEFIT_PREFERENCES = new Set<SeekerBenefitPreference>([
-  "required",
-  "preferred",
-  "not_needed",
-  "flexible",
-]);
+const REMOTE_PREFERENCES = new Set<SeekerRemotePreference>(
+  SEEKER_REMOTE_PREFERENCES,
+);
+const BENEFIT_PREFERENCES = new Set<SeekerBenefitPreference>(
+  SEEKER_BENEFIT_PREFERENCES,
+);
 const CATEGORIES = new Set<MarketplaceCategory>(MARKETPLACE_CATEGORIES);
 
 function member<T extends string>(value: string | null, values: Set<T>): T | null {

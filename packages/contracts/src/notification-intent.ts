@@ -7,7 +7,22 @@
 // translation KEYS plus validated primitive interpolation values, and every
 // channel renders in the recipient's locale at delivery time.
 
-import type { NotificationCategory as InAppNotificationCategory } from "./enums"
+import type {
+	NotificationCategory as InAppNotificationCategory,
+	SchedulingStatus,
+} from "./enums"
+
+/** Canonical persisted context used to expand and recheck scheduling notifications. */
+export interface SchedulingNotificationContext {
+	readonly applicationId: string
+	readonly seekerProfileId: string
+	readonly listingId: string
+	readonly hostProfileId: string
+	readonly listingTitle: string
+	readonly status: SchedulingStatus
+	readonly currentRound: number
+	readonly expiresAt: string
+}
 
 /* -------------------------------------------------------------- categories */
 

@@ -24,6 +24,13 @@ const HOST_SCHEDULER_SOURCE = readFileSync(
   ),
   "utf8",
 );
+const HOST_APPLICANT_PAGE_SOURCE = readFileSync(
+  new URL(
+    "../../app/[locale]/(host)/host/applicants/[id]/page.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const INTERVIEW_MESSAGES = (
   JSON.parse(
     readFileSync(new URL("../../messages/en.json", import.meta.url), "utf8"),
@@ -121,5 +128,24 @@ describe("interview state visibility and action timing", () => {
         /catch\s*\{\s*setError\(t\("errors\.unknown"\)\);\s*\}\s*finally/,
       );
     }
+  });
+});
+
+describe("host applicant scheduling route boundary", () => {
+  it("rejects a malformed applicant id before authentication or scheduling reads", () => {
+    const idRead = HOST_APPLICANT_PAGE_SOURCE.indexOf("const { id } = await params;");
+    const uuidGuard = HOST_APPLICANT_PAGE_SOURCE.indexOf("if (!isUuid(id))", idRead);
+    const authRead = HOST_APPLICANT_PAGE_SOURCE.indexOf("await auth()", idRead);
+    const schedulingRead = HOST_APPLICANT_PAGE_SOURCE.indexOf(
+      "getSchedulingRequestForApplication(token, id)",
+      idRead,
+    );
+
+    expect(HOST_APPLICANT_PAGE_SOURCE).toContain(
+      'import { isUuid } from "../../../../../../lib/ids";',
+    );
+    expect(uuidGuard).toBeGreaterThan(idRead);
+    expect(authRead).toBeGreaterThan(uuidGuard);
+    expect(schedulingRead).toBeGreaterThan(uuidGuard);
   });
 });

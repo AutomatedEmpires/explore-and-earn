@@ -1,5 +1,9 @@
 import "server-only";
 
+import type {
+  SeekerBenefitPreference,
+  SeekerRemotePreference,
+} from "@explore-and-earn/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "../client";
@@ -33,21 +37,12 @@ import {
 
 const SEEKER_PROFILES = "seeker_profiles";
 
-export type SeekerRemotePreference =
-  | "remote"
-  | "on_site"
-  | "hybrid"
-  | "any";
-export type SeekerHousingPref =
-  | "required"
-  | "preferred"
-  | "not_needed"
-  | "flexible";
-export type SeekerMealsPref =
-  | "required"
-  | "preferred"
-  | "not_needed"
-  | "flexible";
+export type {
+  SeekerBenefitPreference,
+  SeekerRemotePreference,
+} from "@explore-and-earn/contracts";
+export type SeekerHousingPref = SeekerBenefitPreference;
+export type SeekerMealsPref = SeekerBenefitPreference;
 export type SeekerPayUnit =
   | "hour"
   | "day"

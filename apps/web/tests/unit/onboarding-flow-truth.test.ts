@@ -374,6 +374,18 @@ describe("onboarding persistence and preview truth", () => {
     expect(profileQuery).toContain("patch.location_pref");
   });
 
+  it("states the housing-preference disclosure boundary plainly", () => {
+    const prefs = source(
+      "app/[locale]/(seeker-onboard)/onboarding/prefs/page.tsx",
+    );
+    const messages = source("messages/en.json");
+    const disclosure = "A host sees this only after you apply to their listing.";
+
+    expect(prefs).toContain(disclosure);
+    expect(messages).toContain(disclosure);
+    expect(prefs).not.toContain("Entitled hosts");
+  });
+
   it("gives repeated skill controls distinct accessible names and hides decorative progress bars", () => {
     const steps = [
       source("app/[locale]/(seeker-onboard)/onboarding/page.tsx"),

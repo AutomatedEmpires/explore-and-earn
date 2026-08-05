@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-
-import { useSeekerOnboarding } from "../../../../../components/onboarding/SeekerOnboardingProvider";
 import type {
   SeekerBenefitPreference,
   SeekerRemotePreference,
-} from "../../../../../components/onboarding/seekerOnboardingModel";
+} from "@explore-and-earn/contracts";
+
+import { useSeekerOnboarding } from "../../../../../components/onboarding/SeekerOnboardingProvider";
 import { saveOnboardingStep } from "../../../../actions/seekerOnboarding";
 import { stepHref, useOnboardingReturnTo } from "../returnTo";
 import styles from "../onboarding.module.css";
@@ -186,7 +186,7 @@ export default function OnboardingPrefsPage() {
             ))}
           </div>
           <span className={styles.fieldHint}>
-            Entitled hosts can see this need when reviewing your application.
+            A host sees this only after you apply to their listing.
           </span>
         </fieldset>
         <fieldset className={styles.field}>

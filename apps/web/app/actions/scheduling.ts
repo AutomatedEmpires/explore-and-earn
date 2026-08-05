@@ -107,6 +107,17 @@ function isCredentials(
   return "userId" in value;
 }
 
+const SCHEDULING_PAGE_PATTERNS = [
+  "/[locale]/(seeker)/schedule",
+  "/[locale]/(seeker)/applied",
+  "/[locale]/(host)/host/applicants",
+] as const;
+
+const SCHEDULING_DETAIL_PAGE_PATTERNS = [
+  "/[locale]/(seeker)/applied/[id]",
+  "/[locale]/(host)/host/applicants/[id]",
+] as const;
+
 function refreshScheduling(applicationId?: string): void {
   // Migration 088 writes the domain event in the SAME transaction as the
   // lifecycle mutation. The action only wakes the dispatcher and refreshes
@@ -120,12 +131,13 @@ function refreshScheduling(applicationId?: string): void {
   }
 
   try {
-    revalidatePath("/schedule");
-    revalidatePath("/applied");
-    revalidatePath("/host/applicants");
+    for (const pattern of SCHEDULING_PAGE_PATTERNS) {
+      revalidatePath(pattern, "page");
+    }
     if (applicationId) {
-      revalidatePath(`/applied/${applicationId}`);
-      revalidatePath(`/host/applicants/${applicationId}`);
+      for (const pattern of SCHEDULING_DETAIL_PAGE_PATTERNS) {
+        revalidatePath(pattern, "page");
+      }
     }
   } catch (error) {
     reportError(error, {

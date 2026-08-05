@@ -34,6 +34,15 @@ const {
 const APPLICATION_ID = "11111111-1111-4111-8111-111111111111";
 const REQUEST_ID = "22222222-2222-4222-8222-222222222222";
 const OPTION_ID = "33333333-3333-4333-8333-333333333333";
+const BASE_REVALIDATIONS = [
+  ["/[locale]/(seeker)/schedule", "page"],
+  ["/[locale]/(seeker)/applied", "page"],
+  ["/[locale]/(host)/host/applicants", "page"],
+] as const;
+const DETAIL_REVALIDATIONS = [
+  ["/[locale]/(seeker)/applied/[id]", "page"],
+  ["/[locale]/(host)/host/applicants/[id]", "page"],
+] as const;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -75,6 +84,43 @@ describe("interview scheduling action boundary", () => {
       }),
     ).resolves.toEqual({ ok: false, error: "rate_limited" });
     expect(dbMocks.proposeHostSchedulingRequest).not.toHaveBeenCalled();
+  });
+
+  it("revalidates every localized scheduling surface after a proposal", async () => {
+    dbMocks.proposeHostSchedulingRequest.mockResolvedValueOnce({
+      ok: true,
+      requestId: REQUEST_ID,
+    });
+    const startsAt = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString();
+
+    await expect(
+      proposeSchedulingAction({
+        applicationId: APPLICATION_ID,
+        meetingType: "video",
+        durationMinutes: 30,
+        proposalTimezone: "UTC",
+        meetingDetails: "Private video link",
+        startsAt: [startsAt],
+      }),
+    ).resolves.toEqual({ ok: true, requestId: REQUEST_ID });
+
+    expect(revalidatePathMock.mock.calls).toEqual([
+      ...BASE_REVALIDATIONS,
+      ...DETAIL_REVALIDATIONS,
+    ]);
+  });
+
+  it("does not invalidate application detail routes without an application id", async () => {
+    dbMocks.respondToSchedulingRequest.mockResolvedValueOnce({
+      ok: true,
+      requestId: REQUEST_ID,
+    });
+
+    await expect(
+      respondToSchedulingAction(REQUEST_ID, "selected", OPTION_ID),
+    ).resolves.toEqual({ ok: true, requestId: REQUEST_ID });
+
+    expect(revalidatePathMock.mock.calls).toEqual(BASE_REVALIDATIONS);
   });
 
   it.each([

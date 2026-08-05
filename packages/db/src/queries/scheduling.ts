@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   MeetingType,
+  SchedulingNotificationContext,
   SchedulingStatus,
 } from "@explore-and-earn/contracts";
 
@@ -371,16 +372,7 @@ export async function resolveHostSchedulingRequest(
 }
 
 /** Authoritative participant/listing context for notification expansion. */
-export interface AdminSchedulingContext {
-  readonly applicationId: string;
-  readonly seekerProfileId: string;
-  readonly listingId: string;
-  readonly hostProfileId: string;
-  readonly listingTitle: string;
-  readonly status: SchedulingStatus;
-  readonly currentRound: number;
-  readonly expiresAt: string;
-}
+export type AdminSchedulingContext = SchedulingNotificationContext;
 
 export async function adminSchedulingContext(
   requestId: string,

@@ -496,7 +496,7 @@
 			},
 			"housing": {
 				"label": "Housing",
-				"hint": "Entitled hosts can see this need when reviewing your application.",
+				"hint": "A host sees this only after you apply to their listing.",
 				"options": {
 					"required": { "label": "Housing required", "detail": "I need host-provided housing for an on-site role." },
 					"preferred": { "label": "Housing preferred", "detail": "I'd like a host to provide housing." },

@@ -4,7 +4,11 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import {
   MARKETPLACE_CATEGORIES,
+  SEEKER_BENEFIT_PREFERENCES,
+  SEEKER_REMOTE_PREFERENCES,
   type MarketplaceCategory,
+  type SeekerBenefitPreference,
+  type SeekerRemotePreference,
 } from "@explore-and-earn/contracts";
 import {
   saveSeekerProfile,
@@ -30,9 +34,9 @@ export type OnboardingStepData = {
   relativeLocation?: string | null;
   seekingTimeline?: "now" | "1_month" | "3_months" | "6_months" | null;
   openToStatement?: string | null;
-  remotePreference?: "remote" | "on_site" | "hybrid" | "any" | null;
-  housingPref?: "required" | "preferred" | "not_needed" | "flexible" | null;
-  mealsPref?: "required" | "preferred" | "not_needed" | "flexible" | null;
+  remotePreference?: SeekerRemotePreference | null;
+  housingPref?: SeekerBenefitPreference | null;
+  mealsPref?: SeekerBenefitPreference | null;
   payExpectationMinCents?: number | null;
   payExpectationMaxCents?: number | null;
   payExpectationUnit?: "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | "other";
@@ -49,13 +53,8 @@ const MAX_BIO_LENGTH = 1_000;
 const MAX_LOCATION_LENGTH = 160;
 const MAX_OPEN_TO_LENGTH = 500;
 const SEEKING_TIMELINES = new Set(["now", "1_month", "3_months", "6_months"]);
-const REMOTE_PREFERENCES = new Set(["remote", "on_site", "hybrid", "any"]);
-const BENEFIT_PREFS = new Set([
-  "required",
-  "preferred",
-  "not_needed",
-  "flexible",
-]);
+const REMOTE_PREFERENCES = new Set<string>(SEEKER_REMOTE_PREFERENCES);
+const BENEFIT_PREFS = new Set<string>(SEEKER_BENEFIT_PREFERENCES);
 const PAY_UNITS = new Set([
   "hour",
   "day",
@@ -277,8 +276,15 @@ function invalidNullableText(value: unknown): boolean {
   return value !== undefined && value !== null && typeof value !== "string";
 }
 
-function invalidStringArray(value: unknown): boolean {
-  return !Array.isArray(value) || value.some((item) => typeof item !== "string");
+function invalidTagList(value: unknown): boolean {
+  return (
+    !Array.isArray(value) ||
+    value.length > MAX_FREEFORM_TAGS ||
+    value.some(
+      (item) =>
+        typeof item !== "string" || item.trim().length > MAX_TAG_LENGTH,
+    )
+  );
 }
 
 function validateStepData(stepData: OnboardingStepData): string | null {
@@ -292,11 +298,11 @@ function validateStepData(stepData: OnboardingStepData): string | null {
   }
   if (
     (stepData.categories !== undefined &&
-      invalidStringArray(stepData.categories)) ||
+      invalidTagList(stepData.categories)) ||
     (stepData.desiredRoles !== undefined &&
-      invalidStringArray(stepData.desiredRoles)) ||
+      invalidTagList(stepData.desiredRoles)) ||
     (stepData.generalSkills !== undefined &&
-      invalidStringArray(stepData.generalSkills))
+      invalidTagList(stepData.generalSkills))
   ) {
     return "invalid_tag_list";
   }

@@ -16,6 +16,7 @@ import {
 	URGENT_NOTIFICATION_TYPES,
 	type NotificationIntent,
 	type NotificationType,
+	type SchedulingNotificationContext,
 } from "@explore-and-earn/contracts"
 
 /** Persisted events-table row (migration 008), as the dispatcher reads it. */
@@ -65,24 +66,13 @@ export interface TaxonomyResolvers {
 	/** Application-scoped interview context; optional for existing test resolvers. */
 	schedulingContext?(
 		requestId: string,
-	): Promise<SchedulingTaxonomyContext | null>
+	): Promise<SchedulingNotificationContext | null>
 }
 
 export interface ClaimTaxonomyContext {
 	readonly claimantClerkUserId: string
 	readonly listingId: string
 	readonly hostProfileId: string | null
-}
-
-export interface SchedulingTaxonomyContext {
-	readonly applicationId: string
-	readonly seekerProfileId: string
-	readonly listingId: string
-	readonly hostProfileId: string
-	readonly listingTitle: string
-	readonly status: string
-	readonly currentRound: number
-	readonly expiresAt: string
 }
 
 /**
@@ -109,7 +99,7 @@ async function resolveClaimContext(
 async function resolveSchedulingContext(
 	resolvers: TaxonomyResolvers,
 	requestId: string,
-): Promise<SchedulingTaxonomyContext | null> {
+): Promise<SchedulingNotificationContext | null> {
 	if (resolvers.schedulingContext) return resolvers.schedulingContext(requestId)
 	const { adminSchedulingContext } = await import("@explore-and-earn/db")
 	return adminSchedulingContext(requestId)

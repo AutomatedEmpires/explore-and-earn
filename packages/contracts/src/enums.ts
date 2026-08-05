@@ -95,6 +95,24 @@ export const SEEKER_VISIBILITY_STATUS = [
 ] as const
 export type SeekerVisibilityStatus = (typeof SEEKER_VISIBILITY_STATUS)[number]
 
+export const SEEKER_REMOTE_PREFERENCES = [
+  "remote",
+  "on_site",
+  "hybrid",
+  "any",
+] as const
+export type SeekerRemotePreference =
+  (typeof SEEKER_REMOTE_PREFERENCES)[number]
+
+export const SEEKER_BENEFIT_PREFERENCES = [
+  "required",
+  "preferred",
+  "not_needed",
+  "flexible",
+] as const
+export type SeekerBenefitPreference =
+  (typeof SEEKER_BENEFIT_PREFERENCES)[number]
+
 /* ----------------------------------------------------------- Listing */
 export const LISTING_STATUS = [
   "draft",
