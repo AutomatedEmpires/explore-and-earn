@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { auth } from "@clerk/nextjs/server";
 import {
+  getSchedulingRequestForApplication,
   getSeekerApplicationRichById,
   type RichSeekerApplication,
 } from "@explore-and-earn/db";
@@ -18,6 +19,7 @@ import {
 import { BucketPage } from "../../../../../components/seeker";
 import { CATEGORY_ICON } from "../../../../../components/discovery";
 import { OpenConversationButton } from "../../../../../components/messaging/OpenConversationButton";
+import { InterviewScheduleCard } from "../../../../../components/scheduling/InterviewScheduleCard";
 import { WithdrawButton } from "../WithdrawButton";
 import styles from "./detail.module.css";
 
@@ -127,7 +129,10 @@ export default async function AppliedDetailPage({ params }: Props) {
     notFound();
   }
 
-  const application = await getSeekerApplicationRichById(token, userId, id);
+  const [application, scheduling] = await Promise.all([
+    getSeekerApplicationRichById(token, userId, id),
+    getSchedulingRequestForApplication(token, id),
+  ]);
 
   if (!application) {
     notFound();
@@ -202,6 +207,15 @@ export default async function AppliedDetailPage({ params }: Props) {
           ) : null}
         </div>
       </article>
+
+      {scheduling.available && scheduling.request ? (
+        <div className={styles.interview}>
+          <InterviewScheduleCard
+            request={scheduling.request}
+            viewerRole="seeker"
+          />
+        </div>
+      ) : null}
 
       <section className={styles.timeline}>
         <h3 className={styles.timelineHeading}>Status timeline</h3>

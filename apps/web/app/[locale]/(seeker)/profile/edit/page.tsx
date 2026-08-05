@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
 import { auth } from "@clerk/nextjs/server";
-import { getSeekerProfile } from "@explore-and-earn/db";
+import { getSeekerProfileResult } from "@explore-and-earn/db";
 
+import { EmptyState } from "../../../../../components/discovery";
 import { BucketPage } from "../../../../../components/seeker";
 import { ProfileEditForm, type ProfileEditInitial } from "./ProfileEditForm";
+import { formatPayCentsForInput } from "./profilePay";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,7 @@ const EMPTY_INITIAL: ProfileEditInitial = {
   displayName: "",
   bio: "",
   openToStatement: "",
-  locationPref: null,
+  remotePreference: null,
   housingPref: null,
   mealsPref: null,
   payExpectationMinDollars: "",
@@ -26,38 +28,57 @@ const EMPTY_INITIAL: ProfileEditInitial = {
   payExpectationUnit: "hour",
   payFlexible: false,
   categories: [],
-  freeformSkills: [],
+  desiredRoles: [],
+  generalSkills: [],
 };
 
 export default async function SeekerProfileEditPage() {
-  const initial = await resolveInitial();
+  const result = await resolveInitial();
   return (
     <BucketPage
       title="Edit profile"
       description="Update your name, bio, and preferences."
     >
-      <ProfileEditForm initial={initial} />
+      {result.ok ? (
+        <ProfileEditForm initial={result.initial} />
+      ) : (
+        <EmptyState
+          title="We couldn’t load your profile"
+          message="Nothing has been changed. Check your connection and try again before editing."
+          icon="system.info"
+          actionLabel="Try again"
+          actionHref="/profile/edit"
+        />
+      )}
     </BucketPage>
   );
 }
 
-async function resolveInitial(): Promise<ProfileEditInitial> {
+type ProfileEditResolution =
+  | { readonly ok: true; readonly initial: ProfileEditInitial }
+  | { readonly ok: false };
+
+async function resolveInitial(): Promise<ProfileEditResolution> {
   try {
     const { userId, getToken } = await auth();
     if (!userId) {
-      return EMPTY_INITIAL;
+      return { ok: false };
     }
     const token = await getToken();
     if (!token) {
-      return EMPTY_INITIAL;
+      return { ok: false };
     }
-    const profile = await getSeekerProfile(token, userId);
+    const loaded = await getSeekerProfileResult(token, userId);
+    if (!loaded.ok) return { ok: false };
+    const profile = loaded.profile;
     if (!profile) {
-      return EMPTY_INITIAL;
+      return { ok: true, initial: EMPTY_INITIAL };
     }
     const housingPref =
+      profile.housingPreference === "required" ||
       profile.housingPreference === "preferred" ||
-      profile.housingPreference === "not_needed"
+      profile.housingPreference === "not_needed" ||
+      profile.housingPreference === "flexible"
         ? profile.housingPreference
         : null;
     const mealsPref =
@@ -72,27 +93,28 @@ async function resolveInitial(): Promise<ProfileEditInitial> {
       u === "stipend" || u === "exchange" || u === "other"
         ? (u as "hour" | "day" | "week" | "month" | "year" | "stipend" | "exchange" | "other")
         : "hour" as const;
-    return {
+    return { ok: true, initial: {
       seekerProfileId: profile.id,
       profilePhotoUrl: profile.profilePhotoUrl ?? "",
       displayName: profile.displayName ?? "",
       bio: profile.shortBio ?? "",
       openToStatement: profile.openToStatement ?? "",
-      locationPref: profile.locationPref ?? null,
+      remotePreference: profile.remotePreference ?? null,
       housingPref,
       mealsPref,
-      payExpectationMinDollars: profile.payExpectationMinCents != null
-        ? String(Math.round(profile.payExpectationMinCents / 100))
-        : "",
-      payExpectationMaxDollars: profile.payExpectationMaxCents != null
-        ? String(Math.round(profile.payExpectationMaxCents / 100))
-        : "",
+      payExpectationMinDollars: formatPayCentsForInput(
+        profile.payExpectationMinCents,
+      ),
+      payExpectationMaxDollars: formatPayCentsForInput(
+        profile.payExpectationMaxCents,
+      ),
       payExpectationUnit: toPayUnit(profile.payExpectationUnit),
       payFlexible: profile.payFlexible,
       categories: [...profile.desiredCategories],
-      freeformSkills: [...profile.desiredRoles],
-    };
+      desiredRoles: [...profile.desiredRoles],
+      generalSkills: [...profile.generalSkills],
+    } };
   } catch {
-    return EMPTY_INITIAL;
+    return { ok: false };
   }
 }

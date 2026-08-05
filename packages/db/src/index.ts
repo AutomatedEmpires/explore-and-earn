@@ -17,6 +17,7 @@ export * from "./queries/passedListings";
 export * from "./queries/savedSearches";
 export * from "./queries/hostReviews";
 export * from "./queries/applications";
+export * from "./queries/scheduling";
 export * from "./queries/lifecycleExpiry";
 export * from "./queries/seekerApplicationsRich";
 export * from "./queries/invites";

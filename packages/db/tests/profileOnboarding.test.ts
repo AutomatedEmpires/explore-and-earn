@@ -9,7 +9,11 @@ vi.mock("../src/client.js", () => ({
 }));
 
 import { createHostProfile } from "../src/queries/hostProfiles.js";
-import { saveSeekerProfile } from "../src/queries/seekerProfiles.js";
+import {
+  getSeekerProfile,
+  getSeekerProfileResult,
+  saveSeekerProfile,
+} from "../src/queries/seekerProfiles.js";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -104,6 +108,11 @@ describe("saveSeekerProfile", () => {
     await expect(
       saveSeekerProfile("token", "user-seeker-1", {
         displayName: "River",
+        relativeLocation: "Bend, Oregon",
+        seekingTimeline: "1_month",
+        remotePreference: "any",
+        desiredRoles: ["Ranch hand"],
+        generalSkills: ["Animal care"],
         onboardingComplete: true,
       }),
     ).resolves.toEqual({ ok: true });
@@ -112,6 +121,11 @@ describe("saveSeekerProfile", () => {
     expect(client.from).toHaveBeenCalledWith("seeker_profiles");
     expect(query.update).toHaveBeenCalledWith({
       display_name: "River",
+      relative_location: "Bend, Oregon",
+      seeking_timeline: "1_month",
+      remote_preference: "any",
+      desired_roles: ["Ranch hand"],
+      general_skill_tags: ["Animal care"],
       onboarding_complete: true,
     });
     expect(query.eq.mock.calls).toEqual([
@@ -143,5 +157,44 @@ describe("saveSeekerProfile", () => {
       saveSeekerProfile("token", "user-seeker-1", { displayName: "River" }),
     ).resolves.toEqual({ ok: false, error: "profile_identity_disabled" });
     expect(client.from).not.toHaveBeenCalled();
+  });
+});
+
+describe("getSeekerProfile", () => {
+  it("loads persisted role and skill tags as distinct profile fields", async () => {
+    const { query } = seekerClient({
+      savedData: {
+        id: "seeker-1",
+        display_name: "River",
+        location_pref: "Pacific Northwest",
+        remote_preference: "hybrid",
+        desired_roles: ["Ranch hand"],
+        general_skill_tags: ["Animal care"],
+      },
+    });
+
+    await expect(getSeekerProfile("token", "user-seeker-1")).resolves.toEqual(
+      expect.objectContaining({
+        desiredRoles: ["Ranch hand"],
+        generalSkills: ["Animal care"],
+        locationPref: "Pacific Northwest",
+        remotePreference: "hybrid",
+      }),
+    );
+    expect(query.select).toHaveBeenCalledWith(
+      expect.stringContaining("general_skill_tags"),
+    );
+  });
+
+  it("distinguishes a missing profile from a failed onboarding read", async () => {
+    seekerClient({ savedData: null });
+    await expect(
+      getSeekerProfileResult("token", "user-seeker-1"),
+    ).resolves.toEqual({ ok: true, profile: null });
+
+    seekerClient({ updateError: { message: "database unavailable" } });
+    await expect(
+      getSeekerProfileResult("token", "user-seeker-1"),
+    ).resolves.toEqual({ ok: false, error: "database unavailable" });
   });
 });

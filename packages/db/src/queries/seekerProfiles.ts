@@ -1,5 +1,9 @@
 import "server-only";
 
+import type {
+  SeekerBenefitPreference,
+  SeekerRemotePreference,
+} from "@explore-and-earn/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { authedClient } from "../client";
@@ -18,9 +22,12 @@ import {
  * seeker_profiles columns to minimize schema drift —
  *   bio          -> short_bio          (existing)
  *   housing_pref -> housing_preference (existing; CHECK: required|preferred|not_needed|flexible)
- *   skills       -> desired_categories (existing text[]; CHECK: subset of MARKETPLACE_CATEGORIES)
- *                 + desired_roles      (existing text[]; freeform)
- * Only location_pref + onboarding_complete are genuinely new (migration 017).
+ *   categories   -> desired_categories (existing text[]; CHECK: subset of MARKETPLACE_CATEGORIES)
+ *   desired roles -> desired_roles     (existing text[]; freeform)
+ *   skills       -> general_skill_tags (existing text[]; résumé/apply gate)
+ *   work setting -> remote_preference  (remote|on_site|hybrid|any)
+ * location_pref remains a free-text preferred region and is not reused for the
+ * work-setting choice.
  *
  * TYPES BRIDGE: types.gen.ts predates these columns, so we use an untyped
  * SupabaseClient handle and scope every query in app code by the verified
@@ -30,17 +37,12 @@ import {
 
 const SEEKER_PROFILES = "seeker_profiles";
 
-export type SeekerLocationPref = "remote" | "on_site" | "either";
-export type SeekerHousingPref =
-  | "required"
-  | "preferred"
-  | "not_needed"
-  | "flexible";
-export type SeekerMealsPref =
-  | "required"
-  | "preferred"
-  | "not_needed"
-  | "flexible";
+export type {
+  SeekerBenefitPreference,
+  SeekerRemotePreference,
+} from "@explore-and-earn/contracts";
+export type SeekerHousingPref = SeekerBenefitPreference;
+export type SeekerMealsPref = SeekerBenefitPreference;
 export type SeekerPayUnit =
   | "hour"
   | "day"
@@ -56,7 +58,9 @@ export interface SeekerProfileRecord {
   readonly displayName: string | null;
   readonly shortBio: string | null;
   readonly openToStatement: string | null;
-  readonly locationPref: SeekerLocationPref | null;
+  /** Free-text preferred region, for example "Pacific Northwest". */
+  readonly locationPref: string | null;
+  readonly remotePreference: SeekerRemotePreference | null;
   readonly housingPreference: SeekerHousingPref | null;
   readonly mealsPreference: SeekerMealsPref | null;
   readonly payExpectationMinCents: number | null;
@@ -65,6 +69,7 @@ export interface SeekerProfileRecord {
   readonly payFlexible: boolean;
   readonly desiredCategories: string[];
   readonly desiredRoles: string[];
+  readonly generalSkills: string[];
   readonly onboardingComplete: boolean;
   readonly profilePhotoUrl: string | null;
   readonly heroCoverUrl: string | null;
@@ -76,7 +81,8 @@ export interface SeekerProfileUpdate {
   readonly displayName?: string | null;
   readonly bio?: string | null;
   readonly openToStatement?: string | null;
-  readonly locationPref?: SeekerLocationPref | null;
+  readonly locationPref?: string | null;
+  readonly remotePreference?: SeekerRemotePreference | null;
   readonly housingPref?: SeekerHousingPref | null;
   readonly mealsPref?: SeekerMealsPref | null;
   readonly payExpectationMinCents?: number | null;
@@ -84,7 +90,8 @@ export interface SeekerProfileUpdate {
   readonly payExpectationUnit?: SeekerPayUnit | null;
   readonly payFlexible?: boolean;
   readonly categories?: string[];
-  readonly freeformSkills?: string[];
+  readonly desiredRoles?: string[];
+  readonly generalSkills?: string[];
   readonly onboardingComplete?: boolean;
   readonly profilePhotoUrl?: string | null;
   readonly heroCoverUrl?: string | null;
@@ -96,55 +103,93 @@ function untypedClient(clerkToken: string): SupabaseClient {
   return authedClient(clerkToken) as unknown as SupabaseClient;
 }
 
+/** Strict reads preserve the distinction between "missing" and "failed." */
+export type SeekerProfileLoadResult =
+  | { readonly ok: true; readonly profile: SeekerProfileRecord | null }
+  | { readonly ok: false; readonly error: string };
+
+function mapSeekerProfile(row: Record<string, unknown>): SeekerProfileRecord {
+  return {
+    id: String(row.id),
+    displayName: (row.display_name as string | null) ?? null,
+    shortBio: (row.short_bio as string | null) ?? null,
+    openToStatement: (row.open_to_statement as string | null) ?? null,
+    locationPref: (row.location_pref as string | null) ?? null,
+    remotePreference:
+      (row.remote_preference as SeekerRemotePreference | null) ?? null,
+    housingPreference:
+      (row.housing_preference as SeekerHousingPref | null) ?? null,
+    mealsPreference:
+      (row.meals_preference as SeekerMealsPref | null) ?? null,
+    payExpectationMinCents:
+      typeof row.pay_expectation_min_cents === "number"
+        ? row.pay_expectation_min_cents
+        : null,
+    payExpectationMaxCents:
+      typeof row.pay_expectation_max_cents === "number"
+        ? row.pay_expectation_max_cents
+        : null,
+    payExpectationUnit:
+      (row.pay_expectation_unit as SeekerPayUnit | null) ?? null,
+    payFlexible: Boolean(row.pay_flexible),
+    desiredCategories: (
+      (row.desired_categories as string[] | null) ?? []
+    ).slice(),
+    desiredRoles: ((row.desired_roles as string[] | null) ?? []).slice(),
+    generalSkills: ((row.general_skill_tags as string[] | null) ?? []).slice(),
+    onboardingComplete: Boolean(row.onboarding_complete),
+    profilePhotoUrl: (row.profile_photo_url as string | null) ?? null,
+    heroCoverUrl: (row.hero_cover_url as string | null) ?? null,
+    seekingTimeline: (row.seeking_timeline as string | null) ?? null,
+    relativeLocation: (row.relative_location as string | null) ?? null,
+  };
+}
+
 /**
- * Load the authed seeker's profile. Resilient by design: returns null when the
- * row is missing OR when the read errors (e.g. location_pref / onboarding_complete
- * do not exist yet because migration 017 has not been applied). Never throws, so
- * the onboarding gate degrades safely.
+ * Strict profile read for flows that must not turn an infrastructure fault into
+ * an apparently blank form. A missing row is a successful null; read failures
+ * are a distinct result.
  */
-export async function getSeekerProfile(
+export async function getSeekerProfileResult(
   clerkToken: string,
   clerkUserId: string,
-): Promise<SeekerProfileRecord | null> {
+): Promise<SeekerProfileLoadResult> {
   try {
     const db = untypedClient(clerkToken);
     const { data, error } = await db
       .from(SEEKER_PROFILES)
       .select(
-        "id, display_name, short_bio, open_to_statement, location_pref, housing_preference, meals_preference, pay_expectation_min_cents, pay_expectation_max_cents, pay_expectation_unit, pay_flexible, desired_categories, desired_roles, onboarding_complete, profile_photo_url, hero_cover_url, seeking_timeline, relative_location",
+        "id, display_name, short_bio, open_to_statement, location_pref, remote_preference, housing_preference, meals_preference, pay_expectation_min_cents, pay_expectation_max_cents, pay_expectation_unit, pay_flexible, desired_categories, desired_roles, general_skill_tags, onboarding_complete, profile_photo_url, hero_cover_url, seeking_timeline, relative_location",
       )
       .eq("clerk_user_id", clerkUserId)
       .is("deleted_at", null)
       .maybeSingle();
 
-    if (error || !data) {
-      return null;
+    if (error) {
+      return { ok: false, error: error.message };
     }
-
-    const row = data as Record<string, unknown>;
+    if (!data) {
+      return { ok: true, profile: null };
+    }
     return {
-      id: String(row.id),
-      displayName: (row.display_name as string | null) ?? null,
-      shortBio: (row.short_bio as string | null) ?? null,
-      openToStatement: (row.open_to_statement as string | null) ?? null,
-      locationPref: (row.location_pref as SeekerLocationPref | null) ?? null,
-      housingPreference: (row.housing_preference as SeekerHousingPref | null) ?? null,
-      mealsPreference: (row.meals_preference as SeekerMealsPref | null) ?? null,
-      payExpectationMinCents: typeof row.pay_expectation_min_cents === "number" ? row.pay_expectation_min_cents : null,
-      payExpectationMaxCents: typeof row.pay_expectation_max_cents === "number" ? row.pay_expectation_max_cents : null,
-      payExpectationUnit: (row.pay_expectation_unit as SeekerPayUnit | null) ?? null,
-      payFlexible: Boolean(row.pay_flexible),
-      desiredCategories: ((row.desired_categories as string[] | null) ?? []).slice(),
-      desiredRoles: ((row.desired_roles as string[] | null) ?? []).slice(),
-      onboardingComplete: Boolean(row.onboarding_complete),
-      profilePhotoUrl: (row.profile_photo_url as string | null) ?? null,
-      heroCoverUrl: (row.hero_cover_url as string | null) ?? null,
-      seekingTimeline: (row.seeking_timeline as string | null) ?? null,
-      relativeLocation: (row.relative_location as string | null) ?? null,
+      ok: true,
+      profile: mapSeekerProfile(data as Record<string, unknown>),
     };
-  } catch {
-    return null;
+  } catch (caught) {
+    return {
+      ok: false,
+      error: caught instanceof Error ? caught.message : "unknown_error",
+    };
   }
+}
+
+/** Compatibility loader for existing non-critical surfaces. */
+export async function getSeekerProfile(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<SeekerProfileRecord | null> {
+  const result = await getSeekerProfileResult(clerkToken, clerkUserId);
+  return result.ok ? result.profile : null;
 }
 
 /**
@@ -168,6 +213,7 @@ export async function saveSeekerProfile(
     if (update.bio !== undefined) patch.short_bio = update.bio;
     if (update.openToStatement !== undefined) patch.open_to_statement = update.openToStatement;
     if (update.locationPref !== undefined) patch.location_pref = update.locationPref;
+    if (update.remotePreference !== undefined) patch.remote_preference = update.remotePreference;
     if (update.housingPref !== undefined) patch.housing_preference = update.housingPref;
     if (update.mealsPref !== undefined) patch.meals_preference = update.mealsPref;
     if (update.payExpectationMinCents !== undefined) patch.pay_expectation_min_cents = update.payExpectationMinCents;
@@ -175,7 +221,8 @@ export async function saveSeekerProfile(
     if (update.payExpectationUnit !== undefined) patch.pay_expectation_unit = update.payExpectationUnit;
     if (update.payFlexible !== undefined) patch.pay_flexible = update.payFlexible;
     if (update.categories !== undefined) patch.desired_categories = update.categories;
-    if (update.freeformSkills !== undefined) patch.desired_roles = update.freeformSkills;
+    if (update.desiredRoles !== undefined) patch.desired_roles = update.desiredRoles;
+    if (update.generalSkills !== undefined) patch.general_skill_tags = update.generalSkills;
     if (update.onboardingComplete !== undefined) patch.onboarding_complete = update.onboardingComplete;
     if (update.profilePhotoUrl !== undefined) patch.profile_photo_url = update.profilePhotoUrl;
     if (update.heroCoverUrl !== undefined) patch.hero_cover_url = update.heroCoverUrl;

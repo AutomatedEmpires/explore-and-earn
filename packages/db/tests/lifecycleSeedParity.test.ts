@@ -23,6 +23,7 @@ import {
   APPLICATION_TRANSITIONS,
   INVITE_TRANSITIONS,
   OFFER_TRANSITIONS,
+  SCHEDULING_TRANSITIONS,
   type TransitionMap,
 } from "@explore-and-earn/contracts";
 
@@ -35,12 +36,12 @@ const MIGRATIONS_DIR = join(
   "migrations",
 );
 
-type Machine = "application" | "invite" | "offer";
+type Machine = "application" | "invite" | "offer" | "scheduling";
 
 /** "machine|from|to" edge keys seeded by every migration file. */
 function seededEdges(): Set<string> {
   const edges = new Set<string>();
-  const tuple = /\(\s*'(application|invite|offer)'\s*,\s*'([a-z_]+)'\s*,\s*'([a-z_]+)'\s*\)/g;
+  const tuple = /\(\s*'(application|invite|offer|scheduling)'\s*,\s*'([a-z_]+)'\s*,\s*'([a-z_]+)'\s*\)/g;
   for (const file of readdirSync(MIGRATIONS_DIR)) {
     if (!file.endsWith(".sql")) continue;
     const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
@@ -72,6 +73,7 @@ describe("lifecycle contracts <-> migration-seed parity", () => {
     ...contractEdges("application", APPLICATION_TRANSITIONS),
     ...contractEdges("invite", INVITE_TRANSITIONS),
     ...contractEdges("offer", OFFER_TRANSITIONS),
+    ...contractEdges("scheduling", SCHEDULING_TRANSITIONS),
   ]);
 
   it("parses a plausible seed (guards against a silent parser regression)", () => {

@@ -347,6 +347,49 @@ if (!policyIdentityMigration) {
   }
 }
 
+// Migration 061 intentionally replaced table-wide seeker UPDATE with an
+// explicit allow-list, but omitted remote_preference. Onboarding writes the
+// existing checked column, so 089 must restore exactly that one permission and
+// must never broaden the table or grant anonymous writes.
+const seekerRemotePreferenceMigration = migrationFiles.find((f) =>
+  /^089_.*\.sql$/.test(f),
+)
+if (!seekerRemotePreferenceMigration) {
+  hasFailure = true
+  console.error(
+    "G-SEEKER-REMOTE-PREFERENCE: expected migration 089 to be present.",
+  )
+} else {
+  const sql = fileContents
+    .get(seekerRemotePreferenceMigration)
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+  if (
+    !sql.includes(
+      "grant update (remote_preference) on public.seeker_profiles to authenticated;",
+    )
+  ) {
+    hasFailure = true
+    console.error(
+      `G-SEEKER-REMOTE-PREFERENCE: ${seekerRemotePreferenceMigration} is missing the narrow authenticated grant.`,
+    )
+  }
+  for (const forbidden of [
+    "grant update on public.seeker_profiles",
+    "to anon",
+    "completion_score",
+    "visibility_status",
+    "clerk_user_id",
+  ]) {
+    if (sql.includes(forbidden)) {
+      hasFailure = true
+      console.error(
+        `G-SEEKER-REMOTE-PREFERENCE: ${seekerRemotePreferenceMigration} broadens access via ${forbidden}.`,
+      )
+    }
+  }
+}
+
 // A host-editable coordinate pair must stay complete and geographically
 // bounded even when a caller bypasses the application parser.
 const coordinateMigration = migrationFiles.find((f) => /^074_.*\.sql$/.test(f))

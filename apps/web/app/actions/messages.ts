@@ -6,7 +6,6 @@ import {
 	getOrCreateConversationForHost,
 	getOrCreateConversationForSeekerApplication,
 	markMessagesRead,
-	recordEvent,
 	sendMessage,
 	type Message,
 } from "@explore-and-earn/db";
@@ -17,10 +16,20 @@ import { triggerDispatch } from "../../services/notifications/dispatcher";
 import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
 
-export interface SendMessageActionResult {
-	readonly ok: boolean;
-	readonly error?: string;
-}
+export type SendMessageFailureCode =
+	| "unauthenticated"
+	| "rate_limit_exceeded"
+	| "conversation_unavailable"
+	| "invalid_message"
+	| "delivery_unconfirmed";
+
+export type SendMessageActionResult =
+	| { readonly ok: true }
+	| {
+			readonly ok: false;
+			readonly error: SendMessageFailureCode;
+			readonly retryable: boolean;
+	  };
 
 export interface OpenConversationActionResult {
 	readonly ok: boolean;
@@ -71,7 +80,16 @@ export async function openSeekerApplicationConversationAction(
 		);
 		if (!conversation) return { ok: false, error: "unavailable" };
 
-		revalidatePath("/messages");
+		try {
+			revalidatePath("/messages");
+		} catch (error) {
+			// The conversation is already durable and idempotent. Cache freshness
+			// cannot turn a successful open into a false failure.
+			reportError(error, {
+				action: "openSeekerApplicationConversationAction.postPersistRevalidate",
+				userId: identity.userId,
+			});
+		}
 		return { ok: true, conversationId: conversation.id };
 	} catch (error) {
 		reportError(error, {
@@ -104,7 +122,14 @@ export async function openHostApplicationConversationAction(
 		);
 		if (!conversation) return { ok: false, error: "unavailable" };
 
-		revalidatePath("/host/messages");
+		try {
+			revalidatePath("/host/messages");
+		} catch (error) {
+			reportError(error, {
+				action: "openHostApplicationConversationAction.postPersistRevalidate",
+				userId: identity.userId,
+			});
+		}
 		return { ok: true, conversationId: conversation.id };
 	} catch (error) {
 		reportError(error, {
@@ -117,48 +142,80 @@ export async function openHostApplicationConversationAction(
 
 /**
  * Sends a reply in a conversation the signed-in user participates in, then
- * revalidates the seeker + host message surfaces. Ownership and side detection
- * happen in `sendMessage`; this action only supplies the verified identity.
+ * revalidates the seeker + host message surfaces. Ownership, side detection,
+ * message persistence, and the canonical event all happen in one database
+ * transaction; this action supplies only the caller's short-lived token.
  */
 async function sendMessageActionImpl(
 	conversationId: string,
 	body: string,
 ): Promise<SendMessageActionResult> {
 	const { userId, getToken } = await auth();
-	if (!userId) return { ok: false, error: "unauthenticated" };
+	if (!userId) {
+		return { ok: false, error: "unauthenticated", retryable: false };
+	}
 
 	// Rate limit: 30 messages per minute per user. Checked after auth, before any
 	// DB work. Never throws — degrades to a friendly error code.
 	const { allowed } = await checkRateLimitDistributed(`msg:${userId}`, 30, 60 * 1000);
-	if (!allowed) return { ok: false, error: "rate_limit_exceeded" };
-
-	const token = await getToken();
-	if (!token) return { ok: false, error: "unauthenticated" };
-
-	const result = await sendMessage(token, userId, conversationId, body);
-	if (!result.ok) return result;
-
-	// Persist the real message event: the notification engine notifies ONLY the
-	// counterparty (thread-aware collapse turns a burst of replies into one
-	// notification; the recipient's prefs/quiet hours/unsubscribe are honored;
-	// message CONTENT never enters the notification payload). This replaces the
-	// previous first-message-only inline email.
-	if (result.senderRole) {
-		await recordEvent({
-			eventType: "message_sent",
-			actorScope: result.senderRole,
-			subjectType: "conversation",
-			subjectId: conversationId,
-			sourceSurface: "message_action",
-			properties: { sender_role: result.senderRole },
-		});
-		after(triggerDispatch);
+	if (!allowed) {
+		return { ok: false, error: "rate_limit_exceeded", retryable: true };
 	}
 
-	revalidatePath("/messages");
-	revalidatePath(`/messages/${conversationId}`);
-	revalidatePath("/host/messages");
-	revalidatePath(`/host/messages/${conversationId}`);
+	const token = await getToken();
+	if (!token) {
+		return { ok: false, error: "unauthenticated", retryable: false };
+	}
+
+	const result = await sendMessage(token, conversationId, body);
+	if (!result.ok) {
+		switch (result.error) {
+			case "empty":
+			case "too_long":
+				return { ok: false, error: "invalid_message", retryable: false };
+			case "not_found":
+				return {
+					ok: false,
+					error: "conversation_unavailable",
+					retryable: false,
+				};
+			default:
+				// A transport failure can happen after Postgres accepted the INSERT
+				// but before the client received the response. Never tell the sender
+				// the message was not sent when delivery is genuinely ambiguous.
+				return {
+					ok: false,
+					error: "delivery_unconfirmed",
+					retryable: true,
+				};
+		}
+	}
+
+	// The transactional trigger has already committed the message_sent event.
+	// Wake the dispatcher after the response without creating a second event.
+	// Notification delivery remains best-effort; the durable outbox is the retry
+	// source if this process exits before dispatch begins.
+	try {
+		after(triggerDispatch);
+	} catch (error) {
+		reportError(error, {
+			action: "sendMessageAction.postPersistDispatch",
+			userId,
+		});
+	}
+
+	try {
+		revalidatePath("/messages");
+		revalidatePath(`/messages/${conversationId}`);
+		revalidatePath("/host/messages");
+		revalidatePath(`/host/messages/${conversationId}`);
+	} catch (error) {
+		// Revalidation affects freshness, not whether the INSERT happened.
+		reportError(error, {
+			action: "sendMessageAction.postPersistRevalidate",
+			userId,
+		});
+	}
 	return { ok: true };
 }
 
@@ -173,7 +230,11 @@ export async function sendMessageAction(
 			action: "sendMessageAction",
 			userId: await currentUserId(),
 		});
-		throw error;
+		return {
+			ok: false,
+			error: "delivery_unconfirmed",
+			retryable: true,
+		};
 	}
 }
 

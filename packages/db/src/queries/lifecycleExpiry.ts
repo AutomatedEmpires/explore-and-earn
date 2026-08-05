@@ -34,13 +34,16 @@ export interface LifecycleExpirySweepResult {
   readonly offersExpired: number;
   /** created/delivered/viewed invites past their 14-day window. */
   readonly invitesExpired: number;
+  /** proposed/alternate interview requests past their response window. */
+  readonly schedulingRequestsExpired: number;
   readonly error?: string;
 }
 
 async function expireWhere(
-  table: "applications" | "invites",
+  table: "applications" | "invites" | "scheduling_requests",
   statuses: readonly string[],
   nowIso: string,
+  schemaMayBePending = false,
 ): Promise<number> {
   const { data, error } = await admin()
     .from(table)
@@ -49,32 +52,63 @@ async function expireWhere(
     .not("expires_at", "is", null)
     .lt("expires_at", nowIso)
     .select("id");
-  if (error) throw new Error(`sweepExpiredLifecycles(${table}): ${error.message}`);
+  if (error) {
+    // Application code can deploy minutes before migration 088 is visible in
+    // PostgREST. Scheduling is the only optional bucket in that window; the
+    // established lifecycle buckets must still sweep normally.
+    if (
+      schemaMayBePending &&
+      (error.code === "42P01" || error.code === "PGRST205")
+    ) {
+      return 0;
+    }
+    throw new Error(`sweepExpiredLifecycles(${table}): ${error.message}`);
+  }
   return (data ?? []).length;
 }
 
 export async function sweepExpiredLifecycles(
   nowIso: string = new Date().toISOString(),
 ): Promise<LifecycleExpirySweepResult> {
+  // Each PostgREST mutation commits independently. Preserve exact counts for
+  // buckets that already completed if a later provider call fails; reporting
+  // zeros after committed writes would make the cron response false.
+  let applicationsExpired = 0;
+  let offersExpired = 0;
+  let invitesExpired = 0;
+  let schedulingRequestsExpired = 0;
   try {
-    const applicationsExpired = await expireWhere(
+    applicationsExpired = await expireWhere(
       "applications",
       ["applied", "reviewing", "saved_by_host"],
       nowIso,
     );
-    const offersExpired = await expireWhere("applications", ["offered"], nowIso);
-    const invitesExpired = await expireWhere(
+    offersExpired = await expireWhere("applications", ["offered"], nowIso);
+    invitesExpired = await expireWhere(
       "invites",
       ["created", "delivered", "viewed"],
       nowIso,
     );
-    return { ok: true, applicationsExpired, offersExpired, invitesExpired };
+    schedulingRequestsExpired = await expireWhere(
+      "scheduling_requests",
+      ["proposed", "alternate_requested"],
+      nowIso,
+      true,
+    );
+    return {
+      ok: true,
+      applicationsExpired,
+      offersExpired,
+      invitesExpired,
+      schedulingRequestsExpired,
+    };
   } catch (error) {
     return {
       ok: false,
-      applicationsExpired: 0,
-      offersExpired: 0,
-      invitesExpired: 0,
+      applicationsExpired,
+      offersExpired,
+      invitesExpired,
+      schedulingRequestsExpired,
       error: error instanceof Error ? error.message : "unknown",
     };
   }

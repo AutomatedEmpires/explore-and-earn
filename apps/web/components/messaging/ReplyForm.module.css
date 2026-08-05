@@ -35,9 +35,9 @@
 	border-color: var(--color-cta);
 }
 
-.input:disabled {
+.input:read-only {
 	opacity: 0.6;
-	cursor: not-allowed;
+	cursor: progress;
 }
 
 /* ── Validation error ─────────────────────────────────── */
@@ -63,6 +63,7 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	min-height: var(--tap-min);
 	padding: var(--space-10) var(--space-24);
 	border: none;
 	border-radius: var(--radius-button);

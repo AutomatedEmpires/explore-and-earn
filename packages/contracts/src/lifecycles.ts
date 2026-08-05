@@ -153,7 +153,7 @@ export const CONVERSATION_TRANSITIONS = {
 export const SCHEDULING_TRANSITIONS = {
   proposed: ["selected", "alternate_requested", "cancelled", "expired"],
   selected: ["completed", "cancelled", "expired", "no_show"],
-  alternate_requested: ["proposed", "selected"],
+  alternate_requested: ["proposed", "selected", "cancelled", "expired"],
 } as const satisfies TransitionMap<SchedulingStatus>
 
 /* ----------------------------------------------------------- Media processing */

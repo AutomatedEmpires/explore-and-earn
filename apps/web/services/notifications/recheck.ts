@@ -3,6 +3,7 @@ import "server-only"
 import type { NotificationIntent } from "@explore-and-earn/contracts"
 import {
 	getApplicationOfferState,
+	adminSchedulingContext,
 	getListingLiveState,
 	getResumeCompletionByProfileId,
 } from "@explore-and-earn/db"
@@ -31,6 +32,24 @@ export async function recheckIntent(
 	}
 
 	switch (intent.type) {
+		case "interview_proposed":
+		case "interview_alternate_requested":
+		case "interview_confirmed": {
+			if (intent.entity?.type !== "scheduling_request") {
+				return { actionable: false, reason: "interview notification without scheduling entity" }
+			}
+			const schedule = await adminSchedulingContext(intent.entity.id)
+			const expected =
+				intent.type === "interview_proposed"
+					? "proposed"
+					: intent.type === "interview_alternate_requested"
+						? "alternate_requested"
+						: "selected"
+			if (!schedule || schedule.status !== expected) {
+				return { actionable: false, reason: "interview state already changed" }
+			}
+			return { actionable: true }
+		}
 		case "offer_expiring": {
 			if (intent.entity?.type !== "application") {
 				return { actionable: false, reason: "offer_expiring without application entity" }

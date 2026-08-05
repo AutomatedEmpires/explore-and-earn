@@ -10,6 +10,7 @@ import {
   getHostListings,
   getHostSubscriptionTier,
   getMatchScoresForHost,
+  getSchedulingRequestForApplication,
   getSeekerDisplayName,
   getSeekerProfileForHost,
   getSeekerResumeByProfileId,
@@ -24,10 +25,12 @@ import {
 import type { DiscoveryListing } from "../../../../../../components/discovery";
 import { CaptureOnMount } from "../../../../../../components/analytics/FunnelEvents";
 import { HOST_WORKSPACE_EVENTS } from "../../../../../../lib/analytics/events";
+import { isUuid } from "../../../../../../lib/ids";
 import { toApplicantItem, threadsByApplicationId } from "../applicants-data";
 import { StatusActions } from "./StatusActions";
 import { ApplicantResumePopupButton } from "./ApplicantResumePopupButton";
 import { OpenConversationButton } from "../../../../../../components/messaging/OpenConversationButton";
+import { HostInterviewScheduler } from "../../../../../../components/scheduling/HostInterviewScheduler";
 import styles from "../page.module.css";
 import detailStyles from "./page.module.css";
 
@@ -41,19 +44,31 @@ export default async function HostApplicantDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) {
+    notFound();
+  }
+
   const { userId, getToken } = await auth();
   const token = userId ? await getToken() : null;
   if (!userId || !token) {
     notFound();
   }
 
-  const [applications, listingRows, conversations, matchScores, subscriptionTier] =
+  const [
+    applications,
+    listingRows,
+    conversations,
+    matchScores,
+    subscriptionTier,
+    scheduling,
+  ] =
     await Promise.all([
       getHostApplications(token, userId),
       getHostListings(token, userId).catch(() => []),
       getConversations(token, userId, "host").catch(() => []),
       getMatchScoresForHost(token).catch(() => new Map()),
       getHostSubscriptionTier(token, userId).catch(() => "none" as const),
+      getSchedulingRequestForApplication(token, id),
     ]);
   const threadsMap = threadsByApplicationId(conversations);
 
@@ -135,6 +150,12 @@ export default async function HostApplicantDetailPage({
         showMatch={showMatch}
         actions={
           <>
+            <HostInterviewScheduler
+              applicationId={application.id}
+              applicationStatus={application.status}
+              available={scheduling.available}
+              request={scheduling.request}
+            />
             <StatusActions applicationId={application.id} status={application.status} />
             {!applicantWithName.threadId && canStartConversation ? (
               <div className={detailStyles.messageLink}>

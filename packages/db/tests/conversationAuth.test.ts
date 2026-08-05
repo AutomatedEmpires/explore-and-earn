@@ -18,6 +18,7 @@ let cfg: {
   seekerRpc: Result;
   hostRpc: Result;
   contextRpc: Result;
+  sendRpc: Result;
 };
 
 const rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
@@ -26,13 +27,16 @@ vi.mock("../src/client", () => ({
   authedClient: () => ({
     rpc: (name: string, args: Record<string, unknown>) => {
       rpcCalls.push({ name, args });
-      return Promise.resolve(
-        name === "ensure_my_host_application_conversation"
-          ? cfg.hostRpc
-          : name === "get_my_conversation_contexts"
-            ? cfg.contextRpc
-            : cfg.seekerRpc,
-      );
+      if (name === "send_my_conversation_message") {
+        return Promise.resolve(cfg.sendRpc);
+      }
+      if (name === "ensure_my_host_application_conversation") {
+        return Promise.resolve(cfg.hostRpc);
+      }
+      if (name === "get_my_conversation_contexts") {
+        return Promise.resolve(cfg.contextRpc);
+      }
+      return Promise.resolve(cfg.seekerRpc);
     },
     from: (table: string) => {
       const settle = () => {
@@ -58,6 +62,7 @@ const {
   getConversationContexts,
   getOrCreateConversationForHost,
   getOrCreateConversationForSeekerApplication,
+  sendMessage,
 } = await import("../src/queries/messages");
 
 const CONV_ROW = {
@@ -80,6 +85,17 @@ function baseConfig(): typeof cfg {
     seekerRpc: { data: "conv-1", error: null },
     hostRpc: { data: "conv-1", error: null },
     contextRpc: { data: [], error: null },
+    sendRpc: {
+      data: [
+        {
+          message_id: "message-1",
+          sender_role: "host",
+          sender_profile_id: "host-1",
+          created_at: "2026-08-05T15:00:00.000Z",
+        },
+      ],
+      error: null,
+    },
   };
 }
 
@@ -279,5 +295,65 @@ describe("getConversationContexts", () => {
 
     expect(result.available).toBe(false);
     expect(result.contexts.size).toBe(0);
+  });
+});
+
+describe("sendMessage", () => {
+  it("uses only the JWT-derived atomic RPC and returns its durable row", async () => {
+    cfg = baseConfig();
+
+    await expect(sendMessage("tok", "conv-1", "  Hello there  ")).resolves.toEqual({
+      ok: true,
+      senderRole: "host",
+      messageId: "message-1",
+      createdAt: "2026-08-05T15:00:00.000Z",
+    });
+    expect(rpcCalls).toEqual([
+      {
+        name: "send_my_conversation_message",
+        args: { p_conversation_id: "conv-1", p_body: "Hello there" },
+      },
+    ]);
+  });
+
+  it("fails closed and retryably when code reaches the database before migration 090", async () => {
+    cfg = baseConfig();
+    cfg.sendRpc = {
+      data: null,
+      error: {
+        code: "PGRST202",
+        message: "Could not find the function public.send_my_conversation_message",
+      },
+    };
+
+    await expect(sendMessage("tok", "conv-1", "Hello")).resolves.toEqual({
+      ok: false,
+      error: "migration_pending",
+    });
+    expect(rpcCalls).toHaveLength(1);
+  });
+
+  it("preserves the empty and 4,000-character body boundary before database work", async () => {
+    cfg = baseConfig();
+
+    await expect(sendMessage("tok", "conv-1", "   ")).resolves.toEqual({
+      ok: false,
+      error: "empty",
+    });
+    await expect(sendMessage("tok", "conv-1", "x".repeat(4001))).resolves.toEqual({
+      ok: false,
+      error: "too_long",
+    });
+    expect(rpcCalls).toEqual([]);
+  });
+
+  it("does not disclose a missing or foreign conversation", async () => {
+    cfg = baseConfig();
+    cfg.sendRpc = { data: [], error: null };
+
+    await expect(sendMessage("tok", "foreign-conv", "Hello")).resolves.toEqual({
+      ok: false,
+      error: "not_found",
+    });
   });
 });

@@ -128,7 +128,7 @@ export default async function SignInPage({ searchParams }: Props) {
                 New here? Create an account
               </Link>
               <Link className={styles.adminLink} href="/sign-in?role=admin">
-                Become an admin
+                Admin sign-in
               </Link>
             </>
           )}

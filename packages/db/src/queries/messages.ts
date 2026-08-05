@@ -79,6 +79,9 @@ export interface SendMessageResult {
   readonly error?: string;
   /** Which side the SENDER is on (server-derived, never client input). */
   readonly senderRole?: ConversationRole;
+  /** The row created by the atomic message + event transaction. */
+  readonly messageId?: string;
+  readonly createdAt?: string;
 }
 
 const MAX_BODY_LENGTH = 4000;
@@ -131,6 +134,20 @@ function isMissingConversationContextRpc(error: {
     error.code === "PGRST202" ||
     error.code === "42883" ||
     (message.includes("get_my_conversation_contexts") &&
+      (message.includes("could not find the function") ||
+        message.includes("does not exist")))
+  );
+}
+
+function isMissingMessageDeliveryRpc(error: {
+  readonly code?: string;
+  readonly message?: string;
+}): boolean {
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    error.code === "PGRST202" ||
+    error.code === "42883" ||
+    (message.includes("send_my_conversation_message") &&
       (message.includes("could not find the function") ||
         message.includes("does not exist")))
   );
@@ -318,14 +335,14 @@ export async function getMessages(
 }
 
 /**
- * Inserts a message into a conversation the caller owns and bumps
- * `last_message_at`. The sender side/profile is derived from the caller's
- * relationship to the conversation, never from the client. Best-effort: returns
- * `{ ok: false }` rather than throwing for the common failure modes.
+ * Atomically inserts a message, its canonical `message_sent` event, and the
+ * conversation activity stamp through the JWT-owned database RPC. The sender
+ * side/profile is derived inside Postgres and never accepted from application
+ * input. There is deliberately no direct-insert fallback: during a code-before-
+ * schema rollout, failing retryably is safer than persisting an orphan message.
  */
 export async function sendMessage(
   clerkToken: string,
-  clerkUserId: string,
   conversationId: string,
   body: string,
 ): Promise<SendMessageResult> {
@@ -335,26 +352,41 @@ export async function sendMessage(
 
   try {
     const db = untypedClient(clerkToken);
-    const owned = await loadOwnedConversation(db, clerkUserId, conversationId);
-    if (!owned) return { ok: false, error: "not_found" };
-
-    const { error: insertError } = await db.from("messages").insert({
-      conversation_id: conversationId,
-      sender_type: owned.role,
-      sender_profile_id: owned.senderProfileId,
-      body: trimmed,
+    const { data, error } = await db.rpc("send_my_conversation_message", {
+      p_conversation_id: conversationId,
+      p_body: trimmed,
     });
-    if (insertError) return { ok: false, error: insertError.message };
+    if (error) {
+      if (isMissingMessageDeliveryRpc(error)) {
+        return { ok: false, error: "migration_pending" };
+      }
+      if (error.message === "message_body_empty") {
+        return { ok: false, error: "empty" };
+      }
+      if (error.message === "message_body_too_long") {
+        return { ok: false, error: "too_long" };
+      }
+      return { ok: false, error: error.message };
+    }
 
-    // The message is persisted; a failed timestamp bump should not surface as a
-    // send failure to the user, so we swallow it here (ordering self-heals on
-    // the next successful send).
-    await db
-      .from("conversations")
-      .update({ last_message_at: new Date().toISOString() })
-      .eq("id", conversationId);
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | Record<string, unknown>
+      | null
+      | undefined;
+    if (!row) return { ok: false, error: "not_found" };
 
-    return { ok: true, senderRole: owned.role };
+    const senderRole = row.sender_role;
+    const messageId = asString(row.message_id);
+    const createdAt = asString(row.created_at);
+    if (
+      (senderRole !== "host" && senderRole !== "seeker") ||
+      !messageId ||
+      !createdAt
+    ) {
+      return { ok: false, error: "invalid_response" };
+    }
+
+    return { ok: true, senderRole, messageId, createdAt };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "unknown" };
   }

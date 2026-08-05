@@ -75,7 +75,7 @@ export default async function SignUpPage({ searchParams }: Props) {
             Already have an account? Sign in
           </Link>
           <Link className={styles.adminLink} href="/sign-in?role=admin">
-            Become an admin
+            Admin sign-in
           </Link>
         </div>
       </div>

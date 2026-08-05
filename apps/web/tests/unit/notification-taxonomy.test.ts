@@ -52,6 +52,19 @@ function makeResolvers(overrides: Partial<TaxonomyResolvers> = {}): TaxonomyReso
 			id === "claim-1"
 				? { claimantClerkUserId: "clerk_claimant", listingId: "listing-1", hostProfileId: null }
 				: null,
+		schedulingContext: async (id) =>
+			id === "schedule-1"
+				? {
+						applicationId: "app-1",
+						seekerProfileId: "seeker-prof-1",
+						listingId: "listing-1",
+						hostProfileId: "host-prof-1",
+						listingTitle: "Salmon Season Deckhand",
+						status: "proposed",
+						currentRound: 1,
+						expiresAt: "2026-07-17T12:00:00.000Z",
+					}
+				: null,
 		...overrides,
 	};
 }
@@ -213,6 +226,118 @@ describe("expandEvent — direction and recipients", () => {
 		expect(intents[0].destinationPath).toBe("/listing/listing-1");
 	});
 
+});
+
+describe("expandEvent — interview scheduling", () => {
+	function schedulingEvent(
+		event_type: string,
+		overrides: Partial<DomainEventRow> = {},
+	): DomainEventRow {
+		return {
+			...BASE_EVENT,
+			event_type,
+			actor_scope: "host",
+			subject_type: "scheduling_request",
+			subject_id: "schedule-1",
+			...overrides,
+		};
+	}
+
+	it("routes proposals to the seeker with scheduling preferences and expiry", async () => {
+		const intents = await expandEvent(
+			schedulingEvent("scheduling_request_sent"),
+			makeResolvers(),
+		);
+		expect(intents).toHaveLength(1);
+		expect(intents[0]).toMatchObject({
+			type: "interview_proposed",
+			category: "scheduling",
+			recipientClerkUserId: "clerk_seeker",
+			destinationPath: "/schedule",
+			expiresAt: "2026-07-17T12:00:00.000Z",
+			collapseKey: "interview_state:schedule-1",
+		});
+	});
+
+	it.each([
+		["scheduling_time_selected", "interview_confirmed"],
+		["scheduling_alternate_requested", "interview_alternate_requested"],
+	] as const)("routes %s to the host as %s", async (eventType, type) => {
+		const intents = await expandEvent(
+			schedulingEvent(eventType, { actor_scope: "seeker" }),
+			makeResolvers(),
+		);
+		expect(intents).toHaveLength(1);
+		expect(intents[0].type).toBe(type);
+		expect(intents[0].recipientClerkUserId).toBe("clerk_host");
+		expect(intents[0].destinationPath).toBe("/host/applicants/app-1");
+		if (type === "interview_alternate_requested") {
+			expect(intents[0].expiresAt).toBe("2026-07-17T12:00:00.000Z");
+		}
+	});
+
+	it("routes cancellation to the counterparty using the persisted actor scope", async () => {
+		const hostCancelled = await expandEvent(
+			schedulingEvent("scheduling_cancelled", { actor_scope: "host" }),
+			makeResolvers(),
+		);
+		expect(hostCancelled[0].recipientClerkUserId).toBe("clerk_seeker");
+		expect(hostCancelled[0].destinationPath).toBe("/schedule");
+
+		const seekerCancelled = await expandEvent(
+			schedulingEvent("scheduling_cancelled", { actor_scope: "seeker" }),
+			makeResolvers(),
+		);
+		expect(seekerCancelled[0].recipientClerkUserId).toBe("clerk_host");
+	});
+
+	it("tells the seeker when a host records a no-show, but completion stays telemetry", async () => {
+		const noShow = await expandEvent(
+			schedulingEvent("scheduling_no_show_reported"),
+			makeResolvers(),
+		);
+		expect(noShow[0]).toMatchObject({
+			type: "interview_no_show_recorded",
+			recipientClerkUserId: "clerk_seeker",
+			destinationPath: "/applied/app-1",
+		});
+		expect(
+			await expandEvent(
+				schedulingEvent("scheduling_completed"),
+				makeResolvers(),
+			),
+		).toEqual([]);
+	});
+
+	it("drops missing context and rejects transient resolver errors for dispatcher retry", async () => {
+		expect(
+			await expandEvent(
+				schedulingEvent("scheduling_request_sent"),
+				makeResolvers({ schedulingContext: async () => null }),
+			),
+		).toEqual([]);
+		await expect(
+			expandEvent(
+				schedulingEvent("scheduling_request_sent"),
+				makeResolvers({
+					schedulingContext: async () => {
+						throw new Error("database unavailable");
+					},
+				}),
+			),
+		).rejects.toThrow("database unavailable");
+	});
+
+	it("same-human host/seeker schedules never self-notify", async () => {
+		const intents = await expandEvent(
+			schedulingEvent("scheduling_request_sent"),
+			makeResolvers({
+				seekerClerkId: async () => "clerk_same",
+				hostClerkId: async () => "clerk_same",
+			}),
+		);
+		expect(intents).toEqual([]);
+	});
 });
 
 describe("expandEvent — sourced claim lifecycle", () => {

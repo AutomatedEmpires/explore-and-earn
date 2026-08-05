@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Message } from "@explore-and-earn/db/client";
 
+import type { SendMessageActionResult } from "../../app/actions/messages";
 import { EmptyState } from "../discovery";
 import { ReplyForm } from "./ReplyForm";
 import styles from "./MessageTranscript.module.css";
@@ -67,6 +68,49 @@ const OPTIMISTIC_PREFIX = "optimistic-";
 /** How often the transcript re-reads the server for new messages. */
 const POLL_INTERVAL_MS = 8000;
 
+const DELIVERY_UNCONFIRMED = {
+	ok: false,
+	error: "delivery_unconfirmed",
+	retryable: true,
+} as const satisfies SendMessageActionResult;
+
+type DeliveryAttempt = Pick<Message, "senderType" | "body" | "createdAt">;
+
+function matchesDeliveryAttempt(
+	message: Message,
+	attempt: DeliveryAttempt,
+): boolean {
+	const messageTs = new Date(message.createdAt).getTime();
+	const attemptTs = new Date(attempt.createdAt).getTime();
+	return (
+		Number.isFinite(messageTs) &&
+		Number.isFinite(attemptTs) &&
+		message.senderType === attempt.senderType &&
+		message.body === attempt.body &&
+		Math.abs(messageTs - attemptTs) < 30_000
+	);
+}
+
+/**
+ * Find the row that proves an ambiguous attempt reached the database.
+ * `knownMessageIds` is snapshotted before submit, so an older identical message
+ * cannot be mistaken for the attempt that just lost its response.
+ */
+export function findPersistedDelivery(
+	serverMessages: readonly Message[],
+	attempt: DeliveryAttempt,
+	knownMessageIds: ReadonlySet<string>,
+): Message | null {
+	return (
+		serverMessages.find(
+			(message) =>
+				!knownMessageIds.has(message.id) &&
+				!message.id.startsWith(OPTIMISTIC_PREFIX) &&
+				matchesDeliveryAttempt(message, attempt),
+		) ?? null
+	);
+}
+
 /**
  * Fold one incoming message into the local list:
  *  - ignore a row we already have (its real id is present and not optimistic);
@@ -83,13 +127,10 @@ function mergeIncoming(
 	if (current.some((m) => !m.id.startsWith(OPTIMISTIC_PREFIX) && m.id === incoming.id)) {
 		return current;
 	}
-	const incomingTs = new Date(incoming.createdAt).getTime();
 	const optimisticIdx = current.findIndex(
 		(m) =>
 			m.id.startsWith(OPTIMISTIC_PREFIX) &&
-			m.senderType === incoming.senderType &&
-			m.body === incoming.body &&
-			Math.abs(new Date(m.createdAt).getTime() - incomingTs) < 30_000,
+			matchesDeliveryAttempt(incoming, m),
 	);
 	if (optimisticIdx !== -1) {
 		const next = current.slice();
@@ -117,8 +158,15 @@ function reconcileServer(
 	return next;
 }
 
-export function MessageTranscript({
-	initialMessages,
+export function MessageTranscript(props: MessageTranscriptProps) {
+  // A host can switch threads without leaving the workspace. Keying the stateful
+  // inner transcript prevents the prior applicant's messages from surviving at
+  // the same React position (or flashing while an effect catches up).
+  return <ConversationTranscript key={props.conversationId} {...props} />;
+}
+
+function ConversationTranscript({
+  initialMessages,
 	conversationId,
 	viewerType,
 	counterpartName,
@@ -128,9 +176,13 @@ export function MessageTranscript({
 	const [messages, setMessages] = useState<readonly MessageView[]>(() => [
 		...initialMessages,
 	]);
-	const [error, setError] = useState<string | null>(null);
 
 	const bottomRef = useRef<HTMLLIElement | null>(null);
+	const messagesRef = useRef<readonly MessageView[]>(messages);
+
+	useEffect(() => {
+		messagesRef.current = messages;
+	}, [messages]);
 
 	// Poll the RLS-scoped server action for new messages so the counterpart's
 	// replies appear without a manual refresh. (Supabase Realtime for `messages`
@@ -178,7 +230,7 @@ export function MessageTranscript({
 	}, [messages.length]);
 
 	const handleSend = useCallback(
-		async (body: string): Promise<{ ok: boolean }> => {
+		async (body: string): Promise<SendMessageActionResult> => {
 			const tempId = `${OPTIMISTIC_PREFIX}${Date.now()}-${Math.random()
 				.toString(36)
 				.slice(2)}`;
@@ -192,11 +244,25 @@ export function MessageTranscript({
 				createdAt: new Date().toISOString(),
 				pending: true,
 			};
-			setError(null);
+			const knownBeforeSend = new Set(
+				messagesRef.current
+					.filter((message) => !message.id.startsWith(OPTIMISTIC_PREFIX))
+					.map((message) => message.id),
+			);
 			setMessages((current) => [...current, optimistic]);
 
-			const { sendMessageAction } = await import("../../app/actions/messages");
-			const result = await sendMessageAction(conversationId, body);
+			let actions: typeof import("../../app/actions/messages") | null = null;
+			let result: SendMessageActionResult;
+			try {
+				actions = await import("../../app/actions/messages");
+				result = await actions.sendMessageAction(conversationId, body);
+			} catch {
+				// A rejected action response does not prove the INSERT failed. Treat it
+				// as ambiguous and run the same one-time transcript reconciliation as
+				// the server's bounded `delivery_unconfirmed` result.
+				result = DELIVERY_UNCONFIRMED;
+			}
+
 			if (result.ok) {
 				// Clear the pending flag. The realtime INSERT reconciles this bubble
 				// with the persisted row (matched by the optimistic id prefix); if
@@ -206,13 +272,50 @@ export function MessageTranscript({
 						m.id === tempId ? { ...m, pending: false } : m,
 					),
 				);
-				onSent?.();
+				try {
+					onSent?.();
+				} catch {
+					// Product analytics is downstream of the durable message and cannot
+					// turn a successful send into a duplicate-prone retry.
+				}
 				return { ok: true };
 			}
-			// Failure: drop the optimistic bubble and surface an inline error.
+
+			if (result.error === "delivery_unconfirmed") {
+				try {
+					actions ??= await import("../../app/actions/messages");
+					const refreshed = await actions.fetchConversationMessagesAction(
+						conversationId,
+					);
+					if (refreshed.ok) {
+						const persisted = findPersistedDelivery(
+							refreshed.messages,
+							optimistic,
+							knownBeforeSend,
+						);
+						if (persisted) {
+							setMessages((current) =>
+								reconcileServer(current, refreshed.messages),
+							);
+							try {
+								onSent?.();
+							} catch {
+								// Same post-persist boundary as the direct-success path above.
+							}
+							return { ok: true };
+						}
+					}
+				} catch {
+					// The one verification read is best-effort. The composer will retain
+					// the draft and describe the delivery as unconfirmed, never unsent.
+				}
+			}
+
+			// Remove exactly this attempt. A polling tick may already have replaced
+			// it with a persisted row; filtering by the temporary id preserves that
+			// row and every other in-flight or received message.
 			setMessages((current) => current.filter((m) => m.id !== tempId));
-			setError("Your message couldn't be sent. Please try again.");
-			return { ok: false };
+			return result;
 		},
 		[conversationId, viewerType, onSent],
 	);
@@ -225,36 +328,40 @@ export function MessageTranscript({
 					message="Send the first message to start this conversation."
 				/>
 			) : (
-				<ol className={styles.transcript}>
-					{messages.map((message) => {
-						const mine = message.senderType === viewerType;
-						const className = [
-							styles.message,
-							mine ? styles.mine : "",
-							message.pending ? styles.pending : "",
-						]
-							.filter(Boolean)
-							.join(" ");
-						return (
-							<li key={message.id} className={className}>
-								<span className={styles.sender}>
-									{senderLabel(message, viewerType, counterpartName)}
-								</span>
-								<p className={styles.body}>{message.body}</p>
-								<span className={styles.time}>
-									{message.pending ? "Sending…" : formatSentAt(message.createdAt)}
-								</span>
-							</li>
-						);
-					})}
-					<li ref={bottomRef} aria-hidden className={styles.anchor} />
-				</ol>
+				<div
+					role="log"
+					aria-label="Conversation messages"
+					aria-live="polite"
+					aria-relevant="additions"
+				>
+					<ol className={styles.transcript}>
+						{messages.map((message) => {
+							const mine = message.senderType === viewerType;
+							const className = [
+								styles.message,
+								mine ? styles.mine : "",
+								message.pending ? styles.pending : "",
+							]
+								.filter(Boolean)
+								.join(" ");
+							return (
+								<li key={message.id} className={className}>
+									<span className={styles.sender}>
+										{senderLabel(message, viewerType, counterpartName)}
+									</span>
+									<p className={styles.body}>{message.body}</p>
+									<span className={styles.time}>
+										{message.pending
+											? "Sending…"
+											: formatSentAt(message.createdAt)}
+									</span>
+								</li>
+							);
+						})}
+						<li ref={bottomRef} aria-hidden className={styles.anchor} />
+					</ol>
+				</div>
 			)}
-			{error ? (
-				<p className={styles.sendError} role="alert">
-					{error}
-				</p>
-			) : null}
 			<ReplyForm
 				conversationId={conversationId}
 				placeholder={replyPlaceholder}

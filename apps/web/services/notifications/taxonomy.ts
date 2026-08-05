@@ -16,6 +16,7 @@ import {
 	URGENT_NOTIFICATION_TYPES,
 	type NotificationIntent,
 	type NotificationType,
+	type SchedulingNotificationContext,
 } from "@explore-and-earn/contracts"
 
 /** Persisted events-table row (migration 008), as the dispatcher reads it. */
@@ -62,6 +63,10 @@ export interface TaxonomyResolvers {
 	 * @explore-and-earn/db (see {@link resolveClaimContext}).
 	 */
 	claimContext?(claimId: string): Promise<ClaimTaxonomyContext | null>
+	/** Application-scoped interview context; optional for existing test resolvers. */
+	schedulingContext?(
+		requestId: string,
+	): Promise<SchedulingNotificationContext | null>
 }
 
 export interface ClaimTaxonomyContext {
@@ -89,6 +94,15 @@ async function resolveClaimContext(
 				hostProfileId: ctx.hostProfileId,
 			}
 		: null
+}
+
+async function resolveSchedulingContext(
+	resolvers: TaxonomyResolvers,
+	requestId: string,
+): Promise<SchedulingNotificationContext | null> {
+	if (resolvers.schedulingContext) return resolvers.schedulingContext(requestId)
+	const { adminSchedulingContext } = await import("@explore-and-earn/db")
+	return adminSchedulingContext(requestId)
 }
 
 function keysFor(type: NotificationType): { titleKey: string; bodyKey: string } {
@@ -460,6 +474,78 @@ export async function expandEvent(
 					entity: { type: "conversation", id: conversationId },
 					// Thread-aware collapse: a burst in one thread → one notification.
 					collapseKey: `conversation:${conversationId}`,
+				}),
+			]
+		}
+
+		/* -------------------------------------------------- interview scheduling */
+		case "scheduling_request_sent":
+		case "scheduling_time_selected":
+		case "scheduling_alternate_requested":
+		case "scheduling_cancelled":
+		case "scheduling_no_show_reported": {
+			const requestId =
+				event.subject_type === "scheduling_request" ? event.subject_id : null
+			if (!requestId) return []
+			const schedule = await resolveSchedulingContext(resolvers, requestId)
+			if (!schedule) return []
+			const [seekerClerk, hostClerk] = await Promise.all([
+				resolvers.seekerClerkId(schedule.seekerProfileId),
+				resolvers.hostClerkId(schedule.hostProfileId),
+			])
+			if (!seekerClerk || !hostClerk || seekerClerk === hostClerk) return []
+
+			let type: NotificationType
+			let recipientClerkUserId: string
+			let destinationPath: string
+			switch (event.event_type) {
+				case "scheduling_request_sent":
+					type = "interview_proposed"
+					recipientClerkUserId = seekerClerk
+					destinationPath = "/schedule"
+					break
+				case "scheduling_time_selected":
+					type = "interview_confirmed"
+					recipientClerkUserId = hostClerk
+					destinationPath = `/host/applicants/${schedule.applicationId}`
+					break
+				case "scheduling_alternate_requested":
+					type = "interview_alternate_requested"
+					recipientClerkUserId = hostClerk
+					destinationPath = `/host/applicants/${schedule.applicationId}`
+					break
+				case "scheduling_no_show_reported":
+					type = "interview_no_show_recorded"
+					recipientClerkUserId = seekerClerk
+					destinationPath = `/applied/${schedule.applicationId}`
+					break
+				default:
+					if (event.actor_scope === "host") {
+						type = "interview_cancelled"
+						recipientClerkUserId = seekerClerk
+						destinationPath = "/schedule"
+					} else if (event.actor_scope === "seeker") {
+						type = "interview_cancelled"
+						recipientClerkUserId = hostClerk
+						destinationPath = `/host/applicants/${schedule.applicationId}`
+					} else {
+						return []
+					}
+			}
+
+			return [
+				makeIntent({
+					event,
+					type,
+					recipientClerkUserId,
+					destinationPath,
+					values: { listingTitle: schedule.listingTitle },
+					entity: { type: "scheduling_request", id: requestId },
+					collapseKey: `interview_state:${requestId}`,
+					...(type === "interview_proposed" ||
+					type === "interview_alternate_requested"
+						? { expiresAt: schedule.expiresAt }
+						: {}),
 				}),
 			]
 		}

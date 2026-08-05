@@ -7,7 +7,22 @@
 // translation KEYS plus validated primitive interpolation values, and every
 // channel renders in the recipient's locale at delivery time.
 
-import type { NotificationCategory as InAppNotificationCategory } from "./enums"
+import type {
+	NotificationCategory as InAppNotificationCategory,
+	SchedulingStatus,
+} from "./enums"
+
+/** Canonical persisted context used to expand and recheck scheduling notifications. */
+export interface SchedulingNotificationContext {
+	readonly applicationId: string
+	readonly seekerProfileId: string
+	readonly listingId: string
+	readonly hostProfileId: string
+	readonly listingTitle: string
+	readonly status: SchedulingStatus
+	readonly currentRound: number
+	readonly expiresAt: string
+}
 
 /* -------------------------------------------------------------- categories */
 
@@ -19,6 +34,7 @@ export const ENGAGEMENT_CATEGORIES = [
 	"applications",
 	"offers_invites",
 	"messages",
+	"scheduling",
 	"matches",
 	"listing_lifecycle",
 	"account_progress",
@@ -59,6 +75,12 @@ export const NOTIFICATION_TYPES = [
 	"offer_declined", // host: seeker declined their offer (truthful, neutral copy)
 	// Messaging
 	"message_received", // counterparty only, thread-collapsed
+	// Interview scheduling
+	"interview_proposed", // seeker: host offered times
+	"interview_confirmed", // host: seeker chose a time
+	"interview_alternate_requested", // host: seeker needs different times
+	"interview_cancelled", // counterparty only
+	"interview_no_show_recorded", // seeker: host recorded a missed interview
 	// Sourced / host lifecycle
 	"sourced_listing_claim_submitted", // admin/founder: a claim was INITIATED and awaits review (never implies approval)
 	"listing_claim_approved", // claimant: authority accepted — confirmation may begin
@@ -85,6 +107,11 @@ export const NOTIFICATION_TYPE_CATEGORY: Record<NotificationType, EngagementCate
 	offer_accepted: "offers_invites",
 	offer_declined: "offers_invites",
 	message_received: "messages",
+	interview_proposed: "scheduling",
+	interview_confirmed: "scheduling",
+	interview_alternate_requested: "scheduling",
+	interview_cancelled: "scheduling",
+	interview_no_show_recorded: "scheduling",
 	sourced_listing_claim_submitted: "listing_lifecycle",
 	listing_claim_approved: "listing_lifecycle",
 	listing_claim_rejected: "listing_lifecycle",
@@ -115,6 +142,11 @@ export const NOTIFICATION_TYPE_INAPP_CATEGORY: Record<NotificationType, InAppNot
 	offer_accepted: "offers",
 	offer_declined: "offers",
 	message_received: "messages",
+	interview_proposed: "scheduling",
+	interview_confirmed: "scheduling",
+	interview_alternate_requested: "scheduling",
+	interview_cancelled: "scheduling",
+	interview_no_show_recorded: "scheduling",
 	sourced_listing_claim_submitted: "verification",
 	listing_claim_approved: "verification",
 	listing_claim_rejected: "verification",
@@ -224,6 +256,7 @@ export const DEFAULT_CATEGORY_PREFS: Record<EngagementCategory, CategoryChannelP
 	applications: { email: "immediate", push: "immediate", inApp: "on" },
 	offers_invites: { email: "immediate", push: "immediate", inApp: "on" },
 	messages: { email: "immediate", push: "immediate", inApp: "on" },
+	scheduling: { email: "immediate", push: "immediate", inApp: "on" },
 	matches: { email: "daily", push: "off", inApp: "on" },
 	listing_lifecycle: { email: "immediate", push: "immediate", inApp: "on" },
 	account_progress: { email: "weekly", push: "off", inApp: "on" },

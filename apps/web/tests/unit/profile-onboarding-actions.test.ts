@@ -4,6 +4,8 @@ const authMock = vi.hoisted(() => vi.fn());
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 const reportErrorMock = vi.hoisted(() => vi.fn());
 const queueRecomputeMock = vi.hoisted(() => vi.fn());
+const isDevBenchEnabledMock = vi.hoisted(() => vi.fn());
+const readDevRoleMock = vi.hoisted(() => vi.fn());
 const dbMocks = vi.hoisted(() => ({
   createHostProfile: vi.fn(),
   deleteTrustedListingMedia: vi.fn(),
@@ -28,6 +30,10 @@ vi.mock("../../lib/sentry", () => ({ reportError: reportErrorMock }));
 vi.mock("../../lib/matchRecompute", () => ({
   queueSeekerMatchRecompute: queueRecomputeMock,
 }));
+vi.mock("../../lib/devBench", () => ({
+  isDevBenchEnabled: isDevBenchEnabledMock,
+}));
+vi.mock("../../lib/devBench/server", () => ({ readDevRole: readDevRoleMock }));
 vi.mock("../../services/media", () => ({ prepareUploadImage: vi.fn() }));
 vi.mock("../../services/media/trustedUploadGuard", () => ({
   guardTrustedUploadSlot: vi.fn(),
@@ -35,7 +41,10 @@ vi.mock("../../services/media/trustedUploadGuard", () => ({
 }));
 
 import { createHostProfileAction } from "../../app/actions/hostProfile";
-import { saveOnboardingStep } from "../../app/actions/seekerOnboarding";
+import {
+  finishSeekerOnboarding,
+  saveOnboardingStep,
+} from "../../app/actions/seekerOnboarding";
 
 function authAs(userId: string | null, token: string | null = "session-token") {
   const getToken = vi.fn().mockResolvedValue(token);
@@ -45,6 +54,8 @@ function authAs(userId: string | null, token: string | null = "session-token") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  isDevBenchEnabledMock.mockReturnValue(false);
+  readDevRoleMock.mockResolvedValue(null);
   authAs("user-default");
   dbMocks.createHostProfile.mockResolvedValue({ ok: true, id: "host-1" });
   dbMocks.saveSeekerProfile.mockResolvedValue({ ok: true });
@@ -120,7 +131,7 @@ describe("saveOnboardingStep", () => {
     });
 
     await expect(
-      saveOnboardingStep({ categories: ["farm"], complete: true }),
+      saveOnboardingStep({ categories: ["farm"] }),
     ).resolves.toEqual({ ok: false, error: "database unavailable" });
     expect(queueRecomputeMock).not.toHaveBeenCalled();
   });
@@ -130,9 +141,13 @@ describe("saveOnboardingStep", () => {
 
     await expect(
       saveOnboardingStep({
+        displayName: " River ",
+        relativeLocation: " Bend, Oregon ",
+        seekingTimeline: "1_month",
+        remotePreference: "any",
         categories: ["farm", "invalid", "farm"],
-        freeformSkills: [" Carpentry ", "carpentry", "Cooking"],
-        complete: true,
+        desiredRoles: [" Ranch hand ", "ranch hand", "Line cook"],
+        generalSkills: [" Carpentry ", "carpentry", "Cooking"],
       }),
     ).resolves.toEqual({ ok: true });
 
@@ -140,11 +155,150 @@ describe("saveOnboardingStep", () => {
       "session-token",
       "user-seeker",
       {
+        displayName: "River",
+        relativeLocation: "Bend, Oregon",
+        seekingTimeline: "1_month",
+        remotePreference: "any",
         categories: ["farm"],
-        freeformSkills: ["Carpentry", "Cooking"],
-        onboardingComplete: true,
+        desiredRoles: ["Ranch hand", "Line cook"],
+        generalSkills: ["Carpentry", "Cooking"],
       },
     );
     expect(queueRecomputeMock).toHaveBeenCalledWith("user-seeker");
+  });
+
+  it("passes exact cent pay expectations through to persistence", async () => {
+    authAs("user-seeker");
+
+    await expect(
+      saveOnboardingStep({
+        displayName: "River",
+        payExpectationMinCents: 1_750,
+        payExpectationMaxCents: 2_025,
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(dbMocks.saveSeekerProfile).toHaveBeenCalledWith(
+      "session-token",
+      "user-seeker",
+      {
+        displayName: "River",
+        payExpectationMinCents: 1_750,
+        payExpectationMaxCents: 2_025,
+      },
+    );
+  });
+
+  it("does not turn a post-persist recompute registration fault into a failed save", async () => {
+    authAs("user-seeker");
+    queueRecomputeMock.mockImplementationOnce(() => {
+      throw new Error("after unavailable");
+    });
+
+    await expect(
+      saveOnboardingStep({ remotePreference: "hybrid" }),
+    ).resolves.toEqual({ ok: true });
+    expect(dbMocks.saveSeekerProfile).toHaveBeenCalledOnce();
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        action: "saveOnboardingStep.postPersistRecompute",
+        userId: "user-seeker",
+      }),
+    );
+  });
+
+  it("rejects malformed tag payloads before auth or database work", async () => {
+    const result = await saveOnboardingStep({
+      generalSkills: ["Cooking", 7],
+    } as never);
+
+    expect(result).toEqual({ ok: false, error: "invalid_tag_list" });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
+  });
+
+  it.each(["categories", "desiredRoles", "generalSkills"] as const)(
+    "rejects oversized %s arrays before auth or database work",
+    async (field) => {
+      const result = await saveOnboardingStep({
+        [field]: Array.from({ length: 11 }, () => "farm"),
+      });
+
+      expect(result).toEqual({ ok: false, error: "invalid_tag_list" });
+      expect(authMock).not.toHaveBeenCalled();
+      expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["categories", "desiredRoles", "generalSkills"] as const)(
+    "rejects overlong %s entries before auth or database work",
+    async (field) => {
+      const result = await saveOnboardingStep({
+        [field]: ["x".repeat(41)],
+      });
+
+      expect(result).toEqual({ ok: false, error: "invalid_tag_list" });
+      expect(authMock).not.toHaveBeenCalled();
+      expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
+    },
+  );
+
+  it("uses an explicitly gated no-write path for the local seeker bench", async () => {
+    isDevBenchEnabledMock.mockReturnValue(true);
+    readDevRoleMock.mockResolvedValue("seeker");
+
+    await expect(
+      saveOnboardingStep({ remotePreference: "any" }),
+    ).resolves.toEqual({ ok: true });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
+  });
+});
+
+describe("finishSeekerOnboarding", () => {
+  it("is the explicit completion writer and refreshes gated seeker surfaces", async () => {
+    authAs("user-seeker");
+
+    await expect(finishSeekerOnboarding()).resolves.toEqual({ ok: true });
+
+    expect(dbMocks.saveSeekerProfile).toHaveBeenCalledWith(
+      "session-token",
+      "user-seeker",
+      { onboardingComplete: true },
+    );
+    expect(queueRecomputeMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock.mock.calls).toEqual([
+      ["/onboarding"],
+      ["/seek"],
+      ["/profile"],
+      ["/resume"],
+    ]);
+  });
+
+  it("keeps durable completion successful when cache revalidation fails", async () => {
+    authAs("user-seeker");
+    revalidatePathMock.mockImplementationOnce(() => {
+      throw new Error("cache unavailable");
+    });
+
+    await expect(finishSeekerOnboarding()).resolves.toEqual({ ok: true });
+    expect(dbMocks.saveSeekerProfile).toHaveBeenCalledOnce();
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        action: "finishSeekerOnboarding.postPersistRevalidate",
+        userId: "user-seeker",
+      }),
+    );
+  });
+
+  it("finishes the local seeker bench without touching auth or data", async () => {
+    isDevBenchEnabledMock.mockReturnValue(true);
+    readDevRoleMock.mockResolvedValue("seeker");
+
+    await expect(finishSeekerOnboarding()).resolves.toEqual({ ok: true });
+    expect(authMock).not.toHaveBeenCalled();
+    expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
   });
 });
