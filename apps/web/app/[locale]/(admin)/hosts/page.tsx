@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import { getAllHostProfiles } from "@explore-and-earn/db";
+import { ADMIN_PAGE_SIZE, getAllHostProfiles } from "@explore-and-earn/db";
 
 import { AdminHostsTable, AdminPager } from "../../../../components/admin";
+import { isDevBenchEnabled } from "../../../../lib/devBench";
+import { readDevRole } from "../../../../lib/devBench/server";
 import styles from "../shared.module.css";
 
 export const metadata: Metadata = { title: "Hosts" };
@@ -15,8 +17,20 @@ export default async function AdminHostsPage({ searchParams }: Props) {
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
 
-  const serviceRoleToken = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  const { rows: hosts, ...pager } = await getAllHostProfiles(serviceRoleToken, page);
+  const isDevReview =
+    isDevBenchEnabled() && (await readDevRole()) === "admin";
+  const { rows: hosts, ...pager } = isDevReview
+    ? {
+        rows: [],
+        page,
+        pageSize: ADMIN_PAGE_SIZE,
+        total: 0,
+        totalPages: 1,
+      }
+    : await getAllHostProfiles(
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+        page,
+      );
 
   return (
     <section className={styles.page}>

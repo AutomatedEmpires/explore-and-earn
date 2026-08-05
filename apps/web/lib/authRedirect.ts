@@ -52,6 +52,50 @@ export function safeInternalRedirect(
 }
 
 /**
+ * Normalize a redirect produced by the trusted auth boundary.
+ *
+ * Clerk protects generic signed-in routes itself and returns to our auth page
+ * with an absolute `redirect_url`. That URL is safe only when it names the
+ * exact origin currently serving the request; convert it back to the internal
+ * path shape consumed by the rest of the application. Keeping this separate
+ * from {@link safeInternalRedirect} means user-authored links remain strictly
+ * path-only everywhere else.
+ */
+export function safeInternalRedirectFromOrigin(
+  candidate: string | undefined,
+  trustedOrigin: string,
+): string | undefined {
+  const direct = safeInternalRedirect(candidate);
+  if (direct) return direct;
+
+  if (
+    !candidate ||
+    candidate.includes("\\") ||
+    hasControlCharacter(candidate)
+  ) {
+    return undefined;
+  }
+
+  try {
+    const absolute = new URL(candidate);
+    const origin = new URL(trustedOrigin);
+    if (
+      absolute.username ||
+      absolute.password ||
+      absolute.origin !== origin.origin
+    ) {
+      return undefined;
+    }
+
+    return safeInternalRedirect(
+      `${absolute.pathname}${absolute.search}${absolute.hash}`,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The two query names a post-auth return path may arrive under.
  *
  * `redirect_url` is the name Clerk itself uses and the one every host/claim/

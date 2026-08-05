@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import {
   computeSeekerListingFitTrace,
@@ -19,6 +20,7 @@ import {
   matchBandFor,
   matchBandLabel,
   NOT_STATED_LABEL,
+  payStateLabel,
 } from "@explore-and-earn/contracts";
 import {
   cachedHostProfile,
@@ -33,11 +35,16 @@ import { TrueValue } from "../../../../components/listing/TrueValue";
 import { ListingHero } from "../../../../components/listing/ListingHero";
 import { ListingGallery } from "../../../../components/listing/ListingGallery";
 import { ListingGlance, type GlanceItem } from "../../../../components/listing/ListingGlance";
+import {
+  ListingSectionNav,
+  type ListingSectionLink,
+} from "../../../../components/listing/ListingSectionNav";
 import { FitReasons, type FitReasonsPrompt } from "../../../../components/listing/FitReasons";
 import { DealUpfront } from "../../../../components/listing/DealUpfront";
 import { DetailList } from "../../../../components/listing/DetailList";
 import { ProseSection } from "../../../../components/listing/ProseSection";
-import { WeatherWidget } from "../../../../components/listing/WeatherWidget";
+import { ListingWeatherSection } from "../../../../components/listing/ListingWeatherSection";
+import { WeatherWidgetLoading } from "../../../../components/listing/WeatherWidget";
 import { ConnectivityFacts } from "../../../../components/listing/ConnectivityFacts";
 import { MaritimeFacts } from "../../../../components/listing/MaritimeFacts";
 import { LocationContext } from "../../../../components/listing/LocationContext";
@@ -45,7 +52,6 @@ import { TeamGrid } from "../../../../components/listing/TeamGrid";
 import { WhyWorkForUs } from "../../../../components/listing/WhyWorkForUs";
 import { ApplyButton } from "./ApplyButton";
 import { generateJobPostingJsonLd, generateBreadcrumbJsonLd } from "../../../../lib/seo";
-import { fetchWeather } from "../../../../lib/weather";
 import { formatCompensation } from "../../../../lib/format";
 import { composeListingLede } from "../../../../components/listing/listingLede";
 import {
@@ -54,7 +60,10 @@ import {
 } from "../../../../lib/listingWindow";
 import { isUuid } from "../../../../lib/ids";
 import { optionalAuth } from "../../../../lib/optionalAuth";
+import { signInHref } from "../../../../lib/authRedirect";
+import { hasListingApplyIntent } from "../../../../lib/listingApplyIntent";
 import { getFixtureListingDetail } from "../../../../components/discovery/fixtureDetail";
+import { isKnownDevDiscoveryFixtureId } from "../../../../components/discovery/fixtureIds";
 import styles from "./page.module.css";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +73,7 @@ const baseUrl =
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ apply?: string | string[] }>;
 }
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -142,17 +152,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ListingDetailPage({ params }: Props) {
-  const { id } = await params;
+export default async function ListingDetailPage({ params, searchParams }: Props) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   const listing = await resolveListingDetail(id);
 
   if (!listing) notFound();
 
   // Fixture-backed listings (dev/preview only) have non-UUID ids that must
   // never reach the uuid-typed seeker-state queries below.
-  const isFixtureListing = !isUuid(listing.id);
+  const isFixtureListing = isKnownDevDiscoveryFixtureId(listing.id);
+  const isSourced = listing.provenanceInfo?.provenance === "sourced";
+  const isDemoFixture = isFixtureListing && !isSourced;
+  const autoApply = hasListingApplyIntent(query.apply);
 
   const { userId } = await optionalAuth();
+  if (autoApply && !userId && !isSourced && !isDemoFixture) {
+    redirect(signInHref("seeker", `/listing/${listing.id}?apply=1`));
+  }
   const token = userId ? await getSupabaseToken() : null;
 
   // Determine viewer role and ownership
@@ -250,10 +266,15 @@ export default async function ListingDetailPage({ params }: Props) {
     !seekerNeedsProfileForFit &&
     fitResolution.kind === "not_scored";
 
-  // Location-aware 10-day outlook — fetched in the RSC only when the listing
-  // carries real coordinates. fetchWeather never throws (null on any failure),
-  // and the widget renders an honest shell for a null outlook.
-  const hasCoords = listing.latitude != null && listing.longitude != null;
+  // Location-aware weather is isolated behind a Suspense server boundary below,
+  // so Open-Meteo can never hold the listing shell. Blank display names do not
+  // create an empty location section; coordinates remain sufficient on their own.
+  const coordinates =
+    listing.latitude != null && listing.longitude != null
+      ? { latitude: listing.latitude, longitude: listing.longitude }
+      : null;
+  const hasCoords = coordinates !== null;
+  const hasLocation = Boolean(listing.locationDisplay?.trim()) || hasCoords;
   // hasLogistics() is the gate, not a truthiness check: a connectivity object
   // carrying only a reportedAt date states nothing, and a section that renders
   // for it would be an empty claim. Binding the value here rather than
@@ -270,10 +291,6 @@ export default async function ListingDetailPage({ params }: Props) {
   const maritime = hasCategoryDepth(listing.categoryDepth)
     ? listing.categoryDepth.maritime
     : undefined;
-  const weather = hasCoords
-    ? await fetchWeather(listing.latitude as number, listing.longitude as number)
-    : null;
-
   // Pay renders through the founder pay-display contract — never an inline
   // derivation. The old inline roll here ignored compensationMaxCents (a
   // ceiling-only listing printed "See listing", an invention the contract
@@ -296,6 +313,7 @@ export default async function ListingDetailPage({ params }: Props) {
   const evidence = listing.provenanceInfo?.benefitEvidence;
   const railHousingLabel = benefitStateLabel(listing.housingIncluded, evidence?.housing);
   const railMealsLabel = benefitStateLabel(listing.mealsIncluded, evidence?.meals);
+  const railPayLabel = payStateLabel(paySummary, evidence?.pay);
   const railSeasonValue = listing.timelineSummary ?? dateLabel ?? NOT_STATED_LABEL;
 
   // The hero's written lede — composed from the same real state the page
@@ -304,7 +322,7 @@ export default async function ListingDetailPage({ params }: Props) {
     categoryLabel: CATEGORY_LABEL[listing.category] ?? listing.category,
     hostName: listing.host?.companyName ?? null,
     locationDisplay: listing.locationDisplay,
-    dateLabel,
+    dateLabel: listing.timelineSummary ?? dateLabel,
   });
 
   // At-a-glance facts — each cell added ONLY when its underlying field is real.
@@ -375,10 +393,49 @@ export default async function ListingDetailPage({ params }: Props) {
     new Set([...(listing.perks ?? []), ...(listing.hostPerks ?? [])]),
   );
 
+  // The detail can be long, but its navigation must never point at an omitted
+  // section. Resolve each conceptual destination to the first real heading in
+  // that group, then build the compact mobile-first anchor list in page order.
+  const hasDescription = Boolean(listing.description?.trim());
+  const positionTarget: ListingSectionLink["href"] | null = hasDescription
+    ? "#listing-about"
+    : (listing.responsibilities?.length ?? 0) > 0
+      ? "#listing-responsibilities"
+      : (listing.requirements?.length ?? 0) > 0
+        ? "#listing-requirements"
+        : allPerks.length > 0
+          ? "#listing-perks"
+          : null;
+  const contextLink: ListingSectionLink | null = hasLocation
+    ? { href: "#listing-location", label: "Location" }
+    : (listing.activities?.length ?? 0) > 0
+      ? { href: "#listing-life", label: "Life here" }
+      : connectivity
+        ? { href: "#listing-connectivity", label: "Getting online" }
+        : maritime
+          ? { href: "#listing-maritime", label: "Vessel" }
+          : null;
+  const hasCompanyNarrative = Boolean(listing.whyWorkForUs?.trim());
+  const hasTeam = (listing.team?.length ?? 0) > 0;
+  const companyTarget: ListingSectionLink["href"] | null = hasCompanyNarrative
+    ? "#listing-company"
+    : hasTeam
+      ? "#listing-team"
+      : null;
+  const sectionLinks: ListingSectionLink[] = [
+    { href: "#listing-deal", label: "The deal" },
+  ];
+  if (listing.host) sectionLinks.push({ href: "#listing-host", label: "Host" });
+  if (positionTarget) sectionLinks.push({ href: positionTarget, label: "Position" });
+  if (contextLink) sectionLinks.push(contextLink);
+  if (hasCoords) sectionLinks.push({ href: "#listing-weather", label: "Weather" });
+  if (companyTarget) {
+    sectionLinks.push({ href: companyTarget, label: "Company & team" });
+  }
+
   // A sourced listing is unconfirmed inventory: it must NOT emit a JobPosting
   // (that structured type asserts a real hiring org + confirmed facts we don't
   // have) and its host block is structurally absent from the data anyway.
-  const isSourced = listing.provenanceInfo?.provenance === "sourced";
   const jsonLd = isSourced ? null : generateJobPostingJsonLd(listing, listing.host, baseUrl);
 
   // Sourced-inventory analytics — a real (non-fixture) sourced listing view.
@@ -444,6 +501,8 @@ export default async function ListingDetailPage({ params }: Props) {
           {/* 3. At a glance */}
           <ListingGlance items={glanceItems} />
 
+          <ListingSectionNav links={sectionLinks} />
+
           {/* 4. How this lines up for you */}
           <FitReasons trace={fitTrace} prompt={fitPrompt} listingId={listing.id} />
 
@@ -471,89 +530,7 @@ export default async function ListingDetailPage({ params }: Props) {
             )}
           </DealUpfront>
 
-          {/* 6. About this position */}
-          {listing.description ? (
-            <ProseSection
-              title="About this position"
-              icon="system.info"
-              headingId="listing-about"
-              text={listing.description}
-            />
-          ) : null}
-
-          {/* 7. What you'll do */}
-          <DetailList
-            title="What you'll do"
-            icon="profile.experience"
-            markerIcon="system.success"
-            headingId="listing-responsibilities"
-            items={listing.responsibilities ?? []}
-          />
-
-          {/* 8. What we're looking for */}
-          <DetailList
-            title="What we're looking for"
-            icon="profile.skills"
-            markerIcon="action.forward"
-            headingId="listing-requirements"
-            items={listing.requirements ?? []}
-          />
-
-          {/* 9. Perks & benefits */}
-          <DetailList
-            title="Perks & benefits"
-            icon="reaction.clap"
-            markerIcon="system.success"
-            headingId="listing-perks"
-            variant="chips"
-            items={allPerks}
-          />
-
-          {/* 10. Life here */}
-          <DetailList
-            title="Life here"
-            icon="reaction.hundred"
-            markerIcon="nav.map"
-            headingId="listing-life"
-            subtitle="The place, off the clock."
-            variant="chips"
-            items={listing.activities ?? []}
-          />
-
-          {/* 10b. Getting online — rendered ONLY when the host actually stated
-              something, so a seeker never reads a wall of "Not stated" cells.
-              Sits beside Weather/Location as part of "what is this place
-              really like", not as a benefit (the triad stays three keys). */}
-          {connectivity ? <ConnectivityFacts connectivity={connectivity} /> : null}
-
-          {/* 10c. The vessel — category depth (069). Sits beside 10b as part of
-              "what is this place really like", NOT near the triad: these are
-              facts about the workplace, not a fourth thing the host is
-              offering, and the triad is three keys by product law. */}
-          {maritime ? <MaritimeFacts maritime={maritime} /> : null}
-
-          {/* 11. Weather (honest shell when the fetch fails) */}
-          {hasCoords ? (
-            <WeatherWidget locationLabel={listing.locationDisplay} outlook={weather} />
-          ) : null}
-
-          {/* 12. Where you'll be */}
-          {hasCoords ? (
-            <LocationContext
-              locationDisplay={listing.locationDisplay}
-              latitude={listing.latitude as number}
-              longitude={listing.longitude as number}
-              category={listing.category}
-            />
-          ) : null}
-
-          {/* 13. Meet the team */}
-          <TeamGrid members={listing.team ?? []} />
-
-          {/* 14. Why work with us */}
-          <WhyWorkForUs text={listing.whyWorkForUs ?? null} />
-
-          {/* 15. About the host */}
+          {/* 6. Host — a clear route to the full public profile. */}
           {listing.host && (
             <HostSummaryBlock
               host={{
@@ -573,6 +550,98 @@ export default async function ListingDetailPage({ params }: Props) {
               }}
             />
           )}
+
+          {/* 7. About the position */}
+          {hasDescription ? (
+            <ProseSection
+              title="About the position"
+              icon="system.info"
+              headingId="listing-about"
+              text={listing.description ?? ""}
+            />
+          ) : null}
+
+          {/* 8. What you'll do */}
+          <DetailList
+            title="What you'll do"
+            icon="profile.experience"
+            markerIcon="system.success"
+            headingId="listing-responsibilities"
+            items={listing.responsibilities ?? []}
+          />
+
+          {/* 9. What we're looking for */}
+          <DetailList
+            title="What we're looking for"
+            icon="profile.skills"
+            markerIcon="action.forward"
+            headingId="listing-requirements"
+            items={listing.requirements ?? []}
+          />
+
+          {/* 10. Perks & benefits */}
+          <DetailList
+            title="Perks & benefits"
+            icon="reaction.clap"
+            markerIcon="system.success"
+            headingId="listing-perks"
+            variant="chips"
+            items={allPerks}
+          />
+
+          {/* 11. About the location — place names remain useful even when the
+              host has not supplied exact coordinates. */}
+          {hasLocation ? (
+            <LocationContext
+              locationDisplay={listing.locationDisplay}
+              latitude={listing.latitude}
+              longitude={listing.longitude}
+              category={listing.category}
+            />
+          ) : null}
+
+          {/* 12. Location-aware weather — Open-Meteo requests ten days and the
+              widget reports only the days the upstream actually returned. */}
+          {coordinates ? (
+            <Suspense
+              fallback={<WeatherWidgetLoading locationLabel={listing.locationDisplay} />}
+            >
+              <ListingWeatherSection
+                latitude={coordinates.latitude}
+                longitude={coordinates.longitude}
+                locationLabel={listing.locationDisplay}
+              />
+            </Suspense>
+          ) : null}
+
+          {/* 13. Life here */}
+          <DetailList
+            title="Life here"
+            icon="reaction.hundred"
+            markerIcon="nav.map"
+            headingId="listing-life"
+            subtitle="The place, off the clock."
+            variant="chips"
+            items={listing.activities ?? []}
+          />
+
+          {/* 14. Getting online — rendered ONLY when the host actually stated
+              something, so a seeker never reads a wall of "Not stated" cells.
+              Sits beside Weather/Location as part of "what is this place
+              really like", not as a benefit (the triad stays three keys). */}
+          {connectivity ? <ConnectivityFacts connectivity={connectivity} /> : null}
+
+          {/* 15. The vessel — category depth (069). Sits beside connectivity as part of
+              "what is this place really like", NOT near the triad: these are
+              facts about the workplace, not a fourth thing the host is
+              offering, and the triad is three keys by product law. */}
+          {maritime ? <MaritimeFacts maritime={maritime} /> : null}
+
+          {/* 16. About the company */}
+          <WhyWorkForUs text={listing.whyWorkForUs ?? null} />
+
+          {/* 17. Team */}
+          <TeamGrid members={listing.team ?? []} />
         </div>
 
         {/* 16. The rail: a compact deal restatement (desktop only) + the
@@ -585,9 +654,9 @@ export default async function ListingDetailPage({ params }: Props) {
                 <dt className={styles.railDealLabel}>Pay</dt>
                 <dd
                   className={styles.railDealValue}
-                  data-state={paySummary === NOT_STATED_LABEL ? "not_stated" : undefined}
+                  data-state={railPayLabel === NOT_STATED_LABEL ? "not_stated" : undefined}
                 >
-                  {paySummary}
+                  {railPayLabel}
                 </dd>
               </div>
               <div className={styles.railDealRow}>
@@ -637,6 +706,8 @@ export default async function ListingDetailPage({ params }: Props) {
                 alreadyApplied={alreadyApplied}
                 alreadySaved={alreadySaved}
                 resumeComplete={resumeComplete}
+                autoApply={autoApply}
+                isDemoFixture={isDemoFixture}
                 resumeMissing={resumeMissing}
                 isSourced={isSourced}
                 sourceUrl={listing.provenanceInfo?.source?.sourceUrl ?? null}

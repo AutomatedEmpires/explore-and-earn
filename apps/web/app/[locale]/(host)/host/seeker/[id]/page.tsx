@@ -53,7 +53,7 @@ export default async function SeekerPublicProfilePage({ params }: Props) {
   const completenessScore = computeCompletenessScore(profile);
 
   return (
-    <main className={styles.page}>
+    <section className={styles.page}>
       <div className={styles.inner}>
 
         {/* Header: avatar + name + bio */}
@@ -139,6 +139,6 @@ export default async function SeekerPublicProfilePage({ params }: Props) {
         </div>
 
       </div>
-    </main>
+    </section>
   );
 }

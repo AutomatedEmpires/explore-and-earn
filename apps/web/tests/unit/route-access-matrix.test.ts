@@ -131,6 +131,14 @@ const MATRIX: readonly MatrixRow[] = [
     note: "Legal. Must be readable before anyone agrees to anything.",
   },
   {
+    path: "/api/notifications/unsubscribe",
+    guest: "public",
+    seeker: "render",
+    host: "render",
+    admin: "render",
+    note: "Signed-token unsubscribe. The token is the credential for human GET and RFC 8058 POST requests, so Clerk must not intercept it.",
+  },
+  {
     path: "/blog/some-post",
     guest: "public",
     seeker: "render",
@@ -390,6 +398,22 @@ describe("route access matrix", () => {
     expect(middlewareGatesCommunity()).toBe(true);
   });
 
+  it("enters the local dev-role bypass before Clerk middleware", () => {
+    const wrapper = MIDDLEWARE.indexOf("function devBenchAwareClerkMiddleware(");
+    const devRoleGate = MIDDLEWARE.indexOf(
+      "request.cookies.get(DEV_ROLE_COOKIE)",
+      wrapper,
+    );
+    const clerkDelegate = MIDDLEWARE.indexOf(
+      "return configuredClerkMiddleware(request, event);",
+      wrapper,
+    );
+
+    expect(wrapper).toBeGreaterThan(-1);
+    expect(devRoleGate).toBeGreaterThan(wrapper);
+    expect(clerkDelegate).toBeGreaterThan(devRoleGate);
+  });
+
   /**
    * The three public discovery modes are one decision, and it has been got
    * wrong once. Pinned as a group so a future edit cannot quietly drop one.
@@ -398,6 +422,10 @@ describe("route access matrix", () => {
     for (const path of ["/seek", "/map", "/swipe"]) {
       expect(derivedGuestAccess(path), path).toBe("public");
     }
+  });
+
+  it("the signed-token unsubscribe endpoint is public", () => {
+    expect(derivedGuestAccess("/api/notifications/unsubscribe")).toBe("public");
   });
 
   /**

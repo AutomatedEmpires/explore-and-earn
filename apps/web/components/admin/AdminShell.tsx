@@ -167,7 +167,7 @@ export function AdminShell({
             </Link>
           </div>
         </header>
-        <div className="adminos-contentwrap">{children}</div>
+        <main className="adminos-contentwrap">{children}</main>
       </div>
     </>
   );

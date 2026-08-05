@@ -302,9 +302,10 @@ function toDetail(f: DiscoveryListing): PublicListingDetail {
 		host: isSourced
 			? null
 			: {
-					// Fixture hosts have no public profile row — the empty id tells
-					// host-link renderers to skip the link.
-					id: "",
+					// This is an explicit fixture identity, never a fake database UUID.
+					// hostProfileId stays null so ownership/review flows cannot mistake
+					// the fixture for a persisted host_profiles row.
+					id: f.host.id ?? "",
 					companyName: f.host.name,
 					photoUrl: null,
 					about: f.host.tagline ?? null,

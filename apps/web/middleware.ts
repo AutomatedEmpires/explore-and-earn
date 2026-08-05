@@ -1,6 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import createIntlMiddleware from "next-intl/middleware";
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 
 import { routing } from "./i18n/routing";
 import {
@@ -8,6 +8,7 @@ import {
   RETURN_PARAM,
   RETURN_PARAM_NAMES,
   safeInternalRedirect,
+  safeInternalRedirectFromOrigin,
   type ReturnParamName,
 } from "./lib/authRedirect";
 import { isCommunityPath } from "./lib/communityRoutes";
@@ -65,6 +66,10 @@ function redirectDefaultLocalePrefix(request: NextRequest): NextResponse | null 
 
 const isPublicRoute = createRouteMatcher([
   "/",
+  // Local review tooling must reach its own role picker before a dev-role
+  // cookie exists. The page still returns notFound() whenever NODE_ENV is
+  // production, so this opens no deployed surface.
+  "/dev",
   "/search",
   // Public discovery surfaces. These live in the (seeker) route group but its
   // layout renders safe defaults for signed-out visitors (no userId → no
@@ -100,6 +105,10 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up",
   "/sign-up/(.*)",
   "/api/webhooks/(.*)",
+  // The signed, scoped, expiring token is the credential. Both the human GET
+  // and RFC 8058 one-click POST must reach their handler without a Clerk
+  // session or every signed-out unsubscribe link presents as a fake 404.
+  "/api/notifications/unsubscribe",
   "/api/health",
   // Browser CSP violation reports are fired by the UA with no Clerk session —
   // most of them from signed-out visitors on public pages. Without this entry,
@@ -227,25 +236,36 @@ function redirectToRoleSignIn(
 /**
  * Scrub an unsafe (or duplicated) return path off the auth entry URLs.
  *
- * Runs for BOTH accepted names. A single valid value passes through untouched;
- * anything else — an absolute URL, a protocol-relative host, a backslash trick,
- * or two copies of the parameter so a later reader picks the other one — is
- * deleted and the visitor is redirected to the cleaned URL.
+ * Runs for BOTH accepted names. A single internal value passes through. Clerk
+ * may also produce an absolute URL for a generic protected route; an exact
+ * same-origin value is normalized to its internal path before rendering the
+ * auth page. Anything else — an off-origin URL, a protocol-relative host, a
+ * backslash trick, or two copies of the parameter so a later reader picks the
+ * other one — is deleted and the visitor is redirected to the cleaned URL.
  */
 function stripUnsafeAuthRedirect(request: NextRequest): NextResponse | null {
   const { pathname, searchParams } = request.nextUrl;
   if (pathname !== "/sign-in" && pathname !== "/sign-up") return null;
 
+  const normalized = new Map<ReturnParamName, string>();
   const unsafe = RETURN_PARAM_NAMES.filter((name) => {
     const candidates = searchParams.getAll(name);
     if (candidates.length === 0) return false;
     if (candidates.length > 1) return true;
-    return !safeInternalRedirect(candidates[0] ?? undefined);
+    const candidate = candidates[0] ?? undefined;
+    const safe = safeInternalRedirectFromOrigin(
+      candidate,
+      request.nextUrl.origin,
+    );
+    if (!safe) return true;
+    if (safe !== candidate) normalized.set(name, safe);
+    return false;
   });
-  if (unsafe.length === 0) return null;
+  if (unsafe.length === 0 && normalized.size === 0) return null;
 
   const url = request.nextUrl.clone();
   for (const name of unsafe) url.searchParams.delete(name);
+  for (const [name, safe] of normalized) url.searchParams.set(name, safe);
   return NextResponse.redirect(url);
 }
 
@@ -263,38 +283,66 @@ if (process.env.NODE_ENV === "production" && !hasClerkMiddlewareConfig) {
   );
 }
 
+const configuredClerkMiddleware = clerkMiddleware(async (auth, request) => {
+  const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
+  if (defaultLocaleRedirect) return defaultLocaleRedirect;
+  const safeAuthRedirect = stripUnsafeAuthRedirect(request);
+  if (safeAuthRedirect) return safeAuthRedirect;
+  const localize = shouldLocalize(request.nextUrl.pathname);
+  // DEV MOCK BENCH (review tooling only): when impersonating a role locally,
+  // skip Clerk protection so every surface is reachable without a login.
+  // The bypass ONLY renders role shells — the session's getToken() hands back
+  // the inert sentinel token (not the real service-role key) and the admin
+  // grant stays off unless isDevBenchPrivileged() (explicit NEXT_PUBLIC_DEV_BENCH=1
+  // + non-prod Supabase URL). So a stray `next dev` against prod env renders
+  // empty shells with NO real data or admin — never bundled in a prod build
+  // (NODE_ENV gate). See lib/devBench.
+  if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
+    // Still run the locale middleware so the bench resolves the right
+    // /[locale]/ route (just without the Clerk gate).
+    return localize ? intlMiddleware(request) : undefined;
+  }
+  const funnel = protectedFunnel(request.nextUrl.pathname);
+  if (funnel) {
+    const { userId } = await auth();
+    if (!userId) return redirectToRoleSignIn(request, funnel);
+  }
+  if (!isPublicRoute(request)) {
+    await auth.protect();
+  }
+  // After auth, hand localizable page routes to next-intl. API + metadata
+  // routes fall through untouched (Clerk has already run on them).
+  return localize ? intlMiddleware(request) : undefined;
+});
+
+/**
+ * Keep the local review bench independent of the browser's Clerk state.
+ *
+ * clerkMiddleware performs session refresh work before its callback runs. A
+ * stale localhost Clerk cookie can therefore loop before the callback's
+ * dev-role bypass is reached, leaving protected review surfaces stuck on their
+ * loading boundary. Intercept the explicitly-dev-only role cookie before
+ * entering Clerk at all. isDevBenchEnabled() is false in production/preview,
+ * so deployed requests always delegate to configuredClerkMiddleware.
+ */
+function devBenchAwareClerkMiddleware(
+  request: NextRequest,
+  event: NextFetchEvent,
+) {
+  if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
+    const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
+    if (defaultLocaleRedirect) return defaultLocaleRedirect;
+    const safeAuthRedirect = stripUnsafeAuthRedirect(request);
+    if (safeAuthRedirect) return safeAuthRedirect;
+    return shouldLocalize(request.nextUrl.pathname)
+      ? intlMiddleware(request)
+      : NextResponse.next();
+  }
+  return configuredClerkMiddleware(request, event);
+}
+
 export default hasClerkMiddlewareConfig
-  ? clerkMiddleware(async (auth, request) => {
-      const defaultLocaleRedirect = redirectDefaultLocalePrefix(request);
-      if (defaultLocaleRedirect) return defaultLocaleRedirect;
-      const safeAuthRedirect = stripUnsafeAuthRedirect(request);
-      if (safeAuthRedirect) return safeAuthRedirect;
-      const localize = shouldLocalize(request.nextUrl.pathname);
-      // DEV MOCK BENCH (review tooling only): when impersonating a role locally,
-      // skip Clerk protection so every surface is reachable without a login.
-      // The bypass ONLY renders role shells — the session's getToken() hands back
-      // the inert sentinel token (not the real service-role key) and the admin
-      // grant stays off unless isDevBenchPrivileged() (explicit NEXT_PUBLIC_DEV_BENCH=1
-      // + non-prod Supabase URL). So a stray `next dev` against prod env renders
-      // empty shells with NO real data or admin — never bundled in a prod build
-      // (NODE_ENV gate). See lib/devBench.
-      if (isDevBenchEnabled() && request.cookies.get(DEV_ROLE_COOKIE)) {
-        // Still run the locale middleware so the bench resolves the right
-        // /[locale]/ route (just without the Clerk gate).
-        return localize ? intlMiddleware(request) : undefined;
-      }
-      const funnel = protectedFunnel(request.nextUrl.pathname);
-      if (funnel) {
-        const { userId } = await auth();
-        if (!userId) return redirectToRoleSignIn(request, funnel);
-      }
-      if (!isPublicRoute(request)) {
-        await auth.protect();
-      }
-      // After auth, hand localizable page routes to next-intl. API + metadata
-      // routes fall through untouched (Clerk has already run on them).
-      return localize ? intlMiddleware(request) : undefined;
-    })
+  ? devBenchAwareClerkMiddleware
   : function authFallbackMiddleware(request: NextRequest) {
       // DEV MOCK BENCH: same impersonation bypass the Clerk branch has, so
       // keyless local QA (and the keyless Playwright harness) can traverse

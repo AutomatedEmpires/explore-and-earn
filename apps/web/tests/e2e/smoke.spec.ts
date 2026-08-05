@@ -73,6 +73,25 @@ test.describe("public surfaces (guest)", () => {
     await expect(page.getByText(/something went sideways/i)).toHaveCount(0);
   });
 
+  test("signed-out unsubscribe requests reach the signed-token handler", async ({
+    request,
+  }) => {
+    const humanResponse = await request.get(
+      "/api/notifications/unsubscribe?token=invalid",
+      { maxRedirects: 0 },
+    );
+    expect(humanResponse.status()).toBe(200);
+    expect(humanResponse.headers()["content-type"]).toContain("text/html");
+    expect(await humanResponse.text()).toContain("This link has expired");
+
+    const oneClickResponse = await request.post(
+      "/api/notifications/unsubscribe?token=invalid",
+      { maxRedirects: 0 },
+    );
+    expect(oneClickResponse.status()).toBe(400);
+    expect(await oneClickResponse.json()).toEqual({ ok: false });
+  });
+
   test("fixture listing detail renders end-to-end (discover → inspect)", async ({
     page,
   }) => {
@@ -83,6 +102,13 @@ test.describe("public surfaces (guest)", () => {
     ).toBeVisible();
     // The triad is product law — housing/meals/pay visible on the detail page.
     await expect(page.getByText(/housing/i).first()).toBeVisible();
+    const actionRail = page.getByRole("complementary", {
+      name: "The deal and your next step",
+    });
+    await expect(actionRail).toHaveCount(1);
+    expect(
+      await actionRail.evaluate((element) => getComputedStyle(element).display),
+    ).toBe("block");
   });
 
   test("unknown listing ids render the honest not-found page, never the error boundary", async ({
@@ -167,6 +193,21 @@ test.describe("public surfaces (guest)", () => {
     page,
     request,
   }) => {
+    const clerkReturn = `${BASE}/team/accept?token=invite-test`;
+    const sameOriginSignIn = await request.get(
+      `${BASE}/sign-in?redirect_url=${encodeURIComponent(clerkReturn)}`,
+      { maxRedirects: 0 },
+    );
+    expect(sameOriginSignIn.status()).toBe(307);
+    const normalizedSignIn = new URL(
+      sameOriginSignIn.headers().location,
+      BASE,
+    );
+    expect(normalizedSignIn.pathname).toBe("/sign-in");
+    expect(normalizedSignIn.searchParams.get("redirect_url")).toBe(
+      "/team/accept?token=invite-test",
+    );
+
     const unsafeSignIn = await request.get(
       `${BASE}/sign-in?role=host&redirect_url=https%3A%2F%2Fattacker.example`,
       { maxRedirects: 0 },

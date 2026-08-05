@@ -6,7 +6,7 @@ export interface WhyWorkForUsProps {
 }
 
 /**
- * "Why work with us" — the host's recruiting pitch from their narrative. A thin
+ * "About the company" — the host's recruiting pitch from their narrative. A thin
  * wrapper over ProseSection that renders nothing when the host hasn't written one.
  */
 export function WhyWorkForUs({ text }: WhyWorkForUsProps) {
@@ -14,9 +14,9 @@ export function WhyWorkForUs({ text }: WhyWorkForUsProps) {
 
   return (
     <ProseSection
-      title="Why work with us"
+      title="About the company"
       icon="trust.founding_host"
-      headingId="listing-why"
+      headingId="listing-company"
       text={text}
     />
   );

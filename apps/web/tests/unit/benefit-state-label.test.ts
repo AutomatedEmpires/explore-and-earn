@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   benefitStateLabel,
   NOT_STATED_LABEL,
+  payStateLabel,
   type BenefitEvidenceStatus,
 } from "@explore-and-earn/contracts";
 
@@ -70,4 +71,17 @@ describe("benefitStateLabel", () => {
       expect(benefitStateLabel(true, evidence)).not.toBe(NOT_STATED_LABEL);
     }
   });
+});
+
+describe("payStateLabel", () => {
+  it("uses the evidence state instead of a stale parsed value", () => {
+    expect(payStateLabel("$21/hr", "not_stated")).toBe(NOT_STATED_LABEL);
+  });
+
+  it.each(["stated", "confirmed", undefined] as const)(
+    "keeps formatted pay for %s evidence",
+    (evidence) => {
+      expect(payStateLabel("From $21/hr", evidence)).toBe("From $21/hr");
+    },
+  );
 });

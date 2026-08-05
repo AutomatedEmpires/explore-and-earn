@@ -119,6 +119,8 @@ export function useListingCardPopups(
    * surface that overrides onOpen fires its own).
    */
   analyticsSurface?: string,
+  /** Explicit server evidence; never inferred from client deployment env. */
+  knownEmptyBenefitDetailsListingIds?: readonly string[],
 ): UseListingCardPopupsResult {
   const router = useRouter();
 
@@ -163,6 +165,10 @@ export function useListingCardPopups(
   const activeDetailListing = useMemo(
     () => listings.find((listing) => listing.id === activeDetail?.id) ?? null,
     [listings, activeDetail],
+  );
+  const knownEmptyBenefitDetailsIds = useMemo(
+    () => new Set(knownEmptyBenefitDetailsListingIds ?? []),
+    [knownEmptyBenefitDetailsListingIds],
   );
 
   // A sourced listing has NO host profile — its "host" tap must never open the
@@ -294,6 +300,11 @@ export function useListingCardPopups(
       <BenefitTrustModal
         listing={activeBenefitListing}
         bucket={activeBenefit?.bucket ?? null}
+        publicReadEvidence={
+          activeBenefitListing && knownEmptyBenefitDetailsIds.has(activeBenefitListing.id)
+            ? "known_empty"
+            : undefined
+        }
         onClose={() => setActiveBenefit(null)}
       />
 

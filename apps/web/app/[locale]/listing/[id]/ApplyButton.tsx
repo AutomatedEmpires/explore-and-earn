@@ -1,12 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Button, Icon, Modal } from "@explore-and-earn/ui";
 import { applyToListingAction } from "../../../actions/applications";
 import { saveListingAction, unsaveListingAction } from "../../../actions/savedListings";
 import { resolveSaveOutcome } from "../../../../lib/saveOutcome";
+import {
+  resolveInitialListingApplyDialog,
+  type ListingViewerRole,
+} from "../../../../lib/listingApplyIntent";
 import styles from "./ApplyButton.module.css";
 
 /**
@@ -27,10 +31,14 @@ const RESUME_SECTION_LABEL: Record<string, string> = {
 interface Props {
   listingId: string;
   title: string;
-  viewerRole: "guest" | "seeker" | "owner";
+  viewerRole: ListingViewerRole;
   alreadyApplied: boolean;
   alreadySaved: boolean;
   resumeComplete: boolean;
+  /** Open the existing apply gate immediately for a consumed `?apply=1`. */
+  autoApply?: boolean;
+  /** Known non-production fixture: preview the flow, never persist an application. */
+  isDemoFixture?: boolean;
   /** Required résumé sections still outstanding, straight from the apply gate. */
   resumeMissing?: readonly string[];
   /** Sourced listings have no host on the platform — see the sourced branch below. */
@@ -46,16 +54,37 @@ export function ApplyButton({
   alreadyApplied,
   alreadySaved,
   resumeComplete,
+  autoApply = false,
+  isDemoFixture = false,
   resumeMissing = [],
   isSourced = false,
   sourceUrl = null,
 }: Props) {
+  const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("Apply");
   const tc = useTranslations("Common");
-  const [isPending, startTransition] = useTransition();
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showResumeModal, setShowResumeModal] = useState(false);
+  const initialApplyDialog = resolveInitialListingApplyDialog({
+    requested: autoApply,
+    viewerRole,
+    alreadyApplied,
+    resumeComplete,
+    isSourced,
+    isDemoFixture,
+  });
+  const [isApplying, startApplying] = useTransition();
+  const [isSaving, startSaving] = useTransition();
+  const isPending = isApplying || isSaving;
+  const [showConfirmModal, setShowConfirmModal] = useState(
+    initialApplyDialog === "confirm",
+  );
+  const [showResumeModal, setShowResumeModal] = useState(
+    initialApplyDialog === "resume",
+  );
+  // A seeker who must finish their résumé should return to the same one-shot
+  // intent, even after this component removes `apply=1` from the visible URL.
+  const [continueApplyAfterResume] = useState(autoApply);
   // One dialog for every failed action. It carries its own heading because
   // "Could not submit application" is the wrong thing to say when a Save fails.
   const [errorDialog, setErrorDialog] = useState<{
@@ -63,13 +92,31 @@ export function ApplyButton({
     message: string;
   } | null>(null);
   const [saved, setSaved] = useState(alreadySaved);
-  // Focus lands here after the confirm dialog closes: the Modal's own restore
-  // targets the opener button, which is disabled (and then replaced) during
-  // the commit — focus() on it silently fails and keyboard focus dropped to
-  // <body> at the most anxious moment of the flow.
-  const rowRef = useRef<HTMLDivElement>(null);
+  const [applicationCommitted, setApplicationCommitted] = useState(false);
+  const appliedStateRef = useRef<HTMLDivElement>(null);
+  const focusAppliedAfterCommit = useRef(false);
+  const applyRequestInFlight = useRef(false);
+  const applyIntentConsumed = useRef(false);
 
-  if (viewerRole === "guest" && !isSourced) {
+  useEffect(() => {
+    if (!autoApply || applyIntentConsumed.current) return;
+    applyIntentConsumed.current = true;
+
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("apply");
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }, [autoApply, pathname, router, searchParams]);
+
+  useEffect(() => {
+    if (!applicationCommitted || !focusAppliedAfterCommit.current) return;
+    focusAppliedAfterCommit.current = false;
+    appliedStateRef.current?.focus();
+  }, [applicationCommitted]);
+
+  if (viewerRole === "guest" && !isSourced && !isDemoFixture) {
     return (
       <Button
         variant="primary"
@@ -97,22 +144,29 @@ export function ApplyButton({
   }
 
   // Seeker role
-  if (alreadyApplied && !isSourced) {
+  if ((alreadyApplied || applicationCommitted) && !isSourced) {
     return (
       // role="status" so the swap is announced: the modal unmounts and
       // router.refresh() replaces this row, which otherwise happens in silence
       // for a screen-reader user who has just committed to an application.
-      <div className={styles.appliedState} role="status">
+      <div
+        className={styles.appliedState}
+        role="status"
+        ref={appliedStateRef}
+        tabIndex={-1}
+      >
         {/* Decorative: the adjacent text already says it. Left announced, a
             screen reader reads "check mark Application sent". */}
         <span aria-hidden>✓</span>
-        <span>{t("applicationSent")}</span>
+        <span>
+          {isDemoFixture ? t("demoApplicationPreviewed") : t("applicationSent")}
+        </span>
       </div>
     );
   }
 
   const handleApply = () => {
-    if (!resumeComplete) {
+    if (!isDemoFixture && !resumeComplete) {
       setShowResumeModal(true);
       return;
     }
@@ -120,14 +174,24 @@ export function ApplyButton({
   };
 
   const handleConfirm = () => {
-    setShowConfirmModal(false);
-    // The Modal restores focus to the (now disabled) opener on unmount; land
-    // focus on the action row instead so it survives the applied-state swap.
-    requestAnimationFrame(() => rowRef.current?.focus());
-    startTransition(async () => {
+    if (applyRequestInFlight.current) return;
+    if (isDemoFixture) {
+      setShowConfirmModal(false);
+      focusAppliedAfterCommit.current = true;
+      setApplicationCommitted(true);
+      return;
+    }
+    applyRequestInFlight.current = true;
+    startApplying(async () => {
       try {
         const result = await applyToListingAction(listingId);
+        // Keep the dialog and its focused confirm control mounted until the
+        // request resolves. Closing sooner would make Modal restore focus to
+        // the now-disabled page action while a slow submission is pending.
+        setShowConfirmModal(false);
         if (result.ok) {
+          focusAppliedAfterCommit.current = true;
+          setApplicationCommitted(true);
           router.refresh();
         } else if (result.error === "resume_incomplete") {
           // Server-side gate rejected a stale client — surface the same
@@ -137,6 +201,8 @@ export function ApplyButton({
           // A double-submit race (second tab, stale page) is not an error —
           // the application exists. Refresh into the applied state instead of
           // showing the seeker a machine string.
+          focusAppliedAfterCommit.current = true;
+          setApplicationCommitted(true);
           router.refresh();
         } else if (result.error === "profile_not_found") {
           // No seeker profile yet — same recovery as the résumé gate.
@@ -153,7 +219,10 @@ export function ApplyButton({
           setErrorDialog({ heading: t("errorHeading"), message: msg });
         }
       } catch {
+        setShowConfirmModal(false);
         setErrorDialog({ heading: t("errorHeading"), message: t("errorGeneric") });
+      } finally {
+        applyRequestInFlight.current = false;
       }
     });
   };
@@ -167,7 +236,7 @@ export function ApplyButton({
    */
   const handleToggleSave = () => {
     const nextSaved = !saved;
-    startTransition(async () => {
+    startSaving(async () => {
       // null encodes "the action threw" — resolveSaveOutcome treats that the
       // same as an unexplained failure, because both mean we do not know the
       // write happened.
@@ -188,7 +257,9 @@ export function ApplyButton({
             ? t("saveErrorRateLimit")
             : outcome.reason === "unauthenticated"
               ? t("errorSessionExpired")
-              : t("errorGeneric"),
+              : outcome.reason === "temporarily_unavailable"
+                ? t("saveErrorTemporary")
+                : t("errorGeneric"),
       });
     });
   };
@@ -267,41 +338,48 @@ export function ApplyButton({
     <>
       <div
         className={styles.buttonRow}
-        ref={rowRef}
-        tabIndex={-1}
         aria-busy={isPending}
       >
         <Button variant="primary" onClick={handleApply} disabled={isPending}>
-          {isPending ? t("submitting") : tc("apply")}
+          {isApplying ? t("submitting") : tc("apply")}
         </Button>
-        <Button
-          variant="secondary"
-          onClick={handleToggleSave}
-          disabled={isPending}
-          aria-pressed={saved}
-        >
-          {saved ? tc("saved") : tc("save")}
-        </Button>
+        {!isDemoFixture ? (
+          <Button
+            variant="secondary"
+            onClick={handleToggleSave}
+            disabled={isPending}
+            aria-pressed={saved}
+          >
+            {saved ? tc("saved") : tc("save")}
+          </Button>
+        ) : null}
       </div>
 
       {showConfirmModal && (
         <Modal
-          heading={t("confirmHeading")}
-          onClose={() => setShowConfirmModal(false)}
+          heading={isDemoFixture ? t("demoConfirmHeading") : t("confirmHeading")}
+          onClose={() => {
+            if (!applyRequestInFlight.current) setShowConfirmModal(false);
+          }}
         >
-          <p className={styles.modalText}>
-            {t.rich("confirmBody", {
-              title,
-              strong: (chunks) => <strong>{chunks}</strong>,
-            })}
-          </p>
+          {isDemoFixture ? (
+            <p className={styles.modalText}>{t("demoConfirmBody")}</p>
+          ) : (
+            <p className={styles.modalText}>
+              {t.rich("confirmBody", {
+                title,
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
+            </p>
+          )}
           <div className={styles.buttonRow}>
             <Button
               variant="primary"
               onClick={handleConfirm}
-              disabled={isPending}
+              aria-busy={isApplying}
+              aria-disabled={isApplying}
             >
-              {tc("confirm")}
+              {isApplying ? t("submitting") : tc("confirm")}
             </Button>
             <Button
               variant="ghost"
@@ -340,7 +418,9 @@ export function ApplyButton({
               // stranding them on a bare /resume with no way back.
               onClick={() =>
                 router.push(
-                  `/resume?redirect_url=${encodeURIComponent(`/listing/${listingId}`)}`,
+                  `/resume?redirect_url=${encodeURIComponent(
+                    `/listing/${listingId}${continueApplyAfterResume ? "?apply=1" : ""}`,
+                  )}`,
                 )
               }
             >

@@ -11,6 +11,7 @@ import {
 	enrichmentFromScope,
 	getMatchDetailsForSeeker,
 	getMatchScoresForSeeker,
+	getSavedListingIds,
 	getSavedSearches,
 	getSeekerBehaviorInteractions,
 	resolveSeekerDiscoveryScope,
@@ -219,20 +220,28 @@ export default async function SeekPage({
 	let enrichment: DiscoveryEnrichment | undefined;
 	let storedScores: ReadonlyMap<string, number> = new Map();
 	let behaviorProfile = EMPTY_BEHAVIOR_PROFILE;
+	let savedListingIds: readonly string[] = [];
+	let skippedListingIds: readonly string[] = [];
 	if (userId && token && hasPublicDataConfig) {
 		try {
-			const [scope, scores, details, behaviorInteractions] = await Promise.all([
-				resolveSeekerDiscoveryScope(token, userId),
-				getMatchScoresForSeeker(token, userId),
-				// Component sub-scores, so every match pill on this page can explain
-				// itself. Best-effort like the rest of the scope: no details means no
-				// reasons, never invented ones.
-				getMatchDetailsForSeeker(token, userId).catch(() => undefined),
-				getSeekerBehaviorInteractions(token, userId).catch(() => []),
-			]);
+			const [scope, scores, details, behaviorInteractions, savedIds] =
+				await Promise.all([
+					resolveSeekerDiscoveryScope(token, userId),
+					getMatchScoresForSeeker(token, userId).catch(
+						() => new Map<string, number>(),
+					),
+					// Component sub-scores, so every match pill on this page can explain
+					// itself. Best-effort like the rest of the scope: no details means no
+					// reasons, never invented ones.
+					getMatchDetailsForSeeker(token, userId).catch(() => undefined),
+					getSeekerBehaviorInteractions(token, userId).catch(() => []),
+					getSavedListingIds(token, userId).catch(() => [] as string[]),
+				]);
 			seekerScope = { clerkToken: token, clerkUserId: userId };
 			storedScores = scores;
 			enrichment = enrichmentFromScope(scope, scores, details);
+			savedListingIds = savedIds;
+			skippedListingIds = [...scope.skippedIds];
 			behaviorProfile = computeBehaviorProfile(
 				behaviorInteractions ?? [],
 				Date.now(),
@@ -307,6 +316,14 @@ export default async function SeekPage({
 	};
 
 	const showPagination = page > 1 || hasNextPage;
+	const visibleListingIds = new Set(listings.map((listing) => listing.id));
+	const initialSavedListingIds = savedListingIds.filter((id) =>
+		visibleListingIds.has(id),
+	);
+	const initialSavedListingIdSet = new Set(initialSavedListingIds);
+	const initialSkippedListingIds = skippedListingIds.filter(
+		(id) => visibleListingIds.has(id) && !initialSavedListingIdSet.has(id),
+	);
 
 	// Saved searches — the only personalization /seek still carries.
 	//
@@ -386,6 +403,8 @@ export default async function SeekPage({
 				savedSearches={savedSearchViews}
 				hasMorePages={hasNextPage}
 				isAuthenticated={Boolean(userId)}
+				initialSavedListingIds={initialSavedListingIds}
+				initialSkippedListingIds={initialSkippedListingIds}
 			/>
 
 			{showPagination ? (

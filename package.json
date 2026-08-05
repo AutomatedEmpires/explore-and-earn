@@ -17,7 +17,7 @@
     "test:e2e": "corepack pnpm --filter @explore-and-earn/web test:e2e",
     "db:assert": "corepack pnpm --filter @explore-and-earn/db-assert check",
     "db:authz": "corepack pnpm --filter @explore-and-earn/db-assert assert:authz",
-    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-founding-host-claims.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-category-taxonomy.mjs && node tools/scripts/check-canon-contracts.mjs && node tools/scripts/check-dev-bench.mjs && node tools/scripts/check-preview-readiness.mjs && node tools/scripts/check-migration-prefixes.mjs && node tools/scripts/check-raw-colors.mjs && node tools/scripts/check-tokenization.mjs && node tools/scripts/check-token-references.mjs && node tools/scripts/check-locale-literals.mjs"
+    "guardrails": "corepack pnpm db:assert && node tools/scripts/check-pricing.mjs && node tools/scripts/check-founding-host-claims.mjs && node tools/scripts/check-calendar-sync.mjs && node tools/scripts/check-match-isolation.mjs && node tools/scripts/check-category-taxonomy.mjs && node tools/scripts/check-canon-contracts.mjs && node tools/scripts/check-dev-bench.mjs && node tools/scripts/check-build-runtime.mjs && node tools/scripts/check-preview-readiness.mjs && node tools/scripts/check-migration-prefixes.mjs && node tools/scripts/check-raw-colors.mjs && node tools/scripts/check-tokenization.mjs && node tools/scripts/check-token-references.mjs && node tools/scripts/check-locale-literals.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
@@ -37,13 +37,15 @@
       "js-yaml@3": "3.15.0",
       "js-yaml@4": "4.3.0",
       "brace-expansion@1": "1.1.16",
-      "brace-expansion@5": "5.0.7",
-      "fast-uri@3": "3.1.4",
+      "brace-expansion@5": "5.0.9",
+      "fast-uri@3": "3.1.5",
       "sharp": "0.35.3",
       "dompurify@3": "3.4.12",
       "@hono/node-server@1": "2.0.11",
       "@opentelemetry/core": "2.8.0",
-      "postcss@<8.5.10": "8.5.15"
+      "hono@<4.12.34": "4.12.34",
+      "ip-address@<10.3.1": "10.3.1",
+      "postcss@<8.5.18": "8.5.23"
     }
   }
 }

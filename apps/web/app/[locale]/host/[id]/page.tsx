@@ -9,7 +9,13 @@ import {
   getHostReviews,
   getReviewableEngagementForHost,
 } from "@explore-and-earn/db";
-import type { PublicHostListing, HostTeamMember } from "@explore-and-earn/db";
+import type {
+  HostRatingSummary,
+  HostReview,
+  HostTeamMember,
+  PublicHostListing,
+  PublicHostProfile,
+} from "@explore-and-earn/db";
 import { getPublicHostProfileCached } from "../../../../lib/serverCache";
 import { Icon } from "@explore-and-earn/ui";
 
@@ -18,7 +24,7 @@ import { HostTrustBand } from "../../../../components/host/HostTrustBand";
 import { HostReviews } from "../../../../components/host/HostReviews";
 import { LeaveReview } from "../../../../components/host/LeaveReview";
 import { PublicListingCard } from "../../../../components/host/PublicListingCard";
-import { WeatherWidget } from "../../../../components/host/WeatherWidget";
+import { getFixtureHostProfileBundle } from "../../../../components/host/fixtureProfile";
 import { byMonetization } from "../../../../lib/ranking";
 import { generateBreadcrumbJsonLd } from "../../../../lib/seo";
 import { isUuid } from "../../../../lib/ids";
@@ -32,11 +38,41 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+interface PublicHostPageData {
+  host: PublicHostProfile;
+  listings: PublicHostListing[];
+  ratingSummary: HostRatingSummary;
+  reviews: HostReview[];
+  isFixture: boolean;
+}
+
+async function resolvePublicHostPageData(
+  id: string,
+): Promise<PublicHostPageData | null> {
+  const fixture = getFixtureHostProfileBundle(id);
+  if (fixture) return { ...fixture, isFixture: true };
+  if (!isUuid(id)) return null;
+
+  const [host, listings, ratingSummary, reviews] = await Promise.all([
+    getPublicHostProfileCached(id),
+    getPublicListingsByHost(id),
+    getHostRatingSummary(id),
+    getHostReviews(id),
+  ]);
+  if (!host) return null;
+
+  return { host, listings, ratingSummary, reviews, isFixture: false };
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  // host_profiles.id is a Postgres uuid — non-UUID params can't exist and
-  // would throw 22P02 into the error boundary instead of 404ing.
-  const host = isUuid(id) ? await getPublicHostProfileCached(id) : null;
+  const fixture = getFixtureHostProfileBundle(id);
+  // host_profiles.id is a Postgres uuid. Known non-UUID fixture keys resolve
+  // only on the dev bench; every other non-UUID becomes an honest 404 without
+  // touching Postgres.
+  const host =
+    fixture?.host ??
+    (isUuid(id) ? await getPublicHostProfileCached(id) : null);
   // notFound() (pre-stream) so dead host URLs carry a real 404 instead of a
   // soft-404 with fallback metadata — mirrors listing/[id].
   if (!host) notFound();
@@ -52,7 +88,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: { canonical },
+    ...(fixture
+      ? { robots: { index: false, follow: false } }
+      : { alternates: { canonical } }),
     openGraph: {
       title,
       description,
@@ -399,24 +437,21 @@ function HousingMealsCard({
 
 export default async function PublicHostProfilePage({ params }: Props) {
   const { id } = await params;
-  if (!isUuid(id)) notFound();
-  const [host, listings, ratingSummary, reviews] = await Promise.all([
-    getPublicHostProfileCached(id),
-    getPublicListingsByHost(id),
-    getHostRatingSummary(id),
-    getHostReviews(id),
-  ]);
-  if (!host) notFound();
+  const data = await resolvePublicHostPageData(id);
+  if (!data) notFound();
+  const { host, listings, ratingSummary, reviews, isFixture } = data;
 
   // Eligibility for the write flow: a logged-in seeker with a completed/active
   // engagement here who hasn't reviewed yet. Resolved server-side; null for
   // guests, non-seekers, and the ineligible — so the public page stays public.
-  const { userId, getToken } = await optionalAuth();
   let reviewable: Awaited<ReturnType<typeof getReviewableEngagementForHost>> = null;
-  if (userId && getToken) {
-    const seekerToken = await getToken();
-    if (seekerToken) {
-      reviewable = await getReviewableEngagementForHost(seekerToken, userId, id);
+  if (!isFixture) {
+    const { userId, getToken } = await optionalAuth();
+    if (userId && getToken) {
+      const seekerToken = await getToken();
+      if (seekerToken) {
+        reviewable = await getReviewableEngagementForHost(seekerToken, userId, id);
+      }
     }
   }
 
@@ -470,7 +505,7 @@ export default async function PublicHostProfilePage({ params }: Props) {
       {/* ── Content grid: main col + sidebar ─────────────────── */}
       <div className={hasSidebar ? styles.contentGrid : styles.contentSingle}>
         {/* Main column: showcase — about → why → team → activities → perks →
-            forecast → opportunities → reviews. Each narrative section self-omits
+            opportunities → reviews. Each narrative section self-omits
             when the host has no data for it. */}
         <div className={styles.mainCol}>
           {host.about ? <AboutSection about={host.about} /> : null}
@@ -483,9 +518,6 @@ export default async function PublicHostProfilePage({ params }: Props) {
           ) : null}
           {host.perks && host.perks.length > 0 ? (
             <PerksSection perks={host.perks} />
-          ) : null}
-          {host.primaryLocationName ? (
-            <WeatherWidget location={host.primaryLocationName} />
           ) : null}
           <ListingsSection
             listings={listings}

@@ -778,6 +778,24 @@ button.metaRow:focus-visible {
   margin: 0;
 }
 
+/* The four facts a seeker needs to decide whether a role is workable. This
+   block never collapses when data is missing; the value says "Not stated". */
+.glanceFacts {
+  gap: var(--space-6);
+  padding-block: var(--space-4);
+}
+
+.glanceFacts .factItem:first-child {
+  justify-content: flex-start;
+  gap: var(--space-8);
+}
+
+.glanceFacts .factItem:first-child .factValue {
+  font-size: var(--type-card-size);
+  line-height: var(--type-card-lh);
+  font-weight: var(--font-weight-bold);
+}
+
 .factItem {
   display: flex;
   align-items: baseline;
@@ -810,6 +828,21 @@ button.metaRow:focus-visible {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.factValue:is([data-state="not_stated"], [data-state="not_scored"]) {
+  color: var(--text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+/* The Match row is intentionally emphasized only when it carries a score.
+   Match the first-row selector's specificity so its bold weight cannot win for
+   an honest "Not scored" value. */
+.glanceFacts .factItem:first-child .factValue:is(
+  [data-state="not_stated"],
+  [data-state="not_scored"]
+) {
+  font-weight: var(--font-weight-medium);
 }
 
 .perks {
@@ -1042,6 +1075,7 @@ button.benefit:focus-visible {
 }
 .benefitNotStated .benefitLabel { color: var(--text-secondary); }
 .benefitNotStated .benefitHead { color: var(--palette-ink-muted); }
+.benefitNotStated .benefitPayValue { color: var(--text-secondary); }
 
 .benefitHead {
   display: inline-flex;
@@ -1081,6 +1115,7 @@ button.benefit:focus-visible {
   font-size: clamp(13px, 3.4vw, 16px);
   color: var(--palette-pay-fg);
 }
+.benefitNot .benefitPayValue { color: var(--status-error-fg); }
 
 /* ── 7. CTA — gradient action bar; Skip · Apply · Save split ───────────────── */
 
@@ -1139,11 +1174,12 @@ button.benefit:focus-visible {
 /* Seeker decision bar — Skip · Apply · Save, always 20 / 60 / 20 */
 .ctaRow {
   display: grid;
-  grid-template-columns: 1fr 3fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr);
   gap: var(--space-8);
 }
 
 .ctaBtn {
+  min-width: 0;
   min-height: var(--tap-min);
   display: flex;
   align-items: center;
@@ -1170,7 +1206,14 @@ button.benefit:focus-visible {
   transform: scale(0.97);
 }
 
+.ctaBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  box-shadow: none;
+}
+
 .ctaSkip {
+  padding-inline: var(--space-4);
   background: var(--color-surface);
   color: var(--text-secondary);
   border: 1px solid var(--border-soft);
@@ -1192,6 +1235,7 @@ button.benefit:focus-visible {
 }
 
 .ctaSave {
+  padding-inline: var(--space-4);
   background: var(--color-surface);
   color: var(--color-cta);
   border: 1px solid color-mix(in srgb, var(--color-cta) 35%, var(--border-soft));

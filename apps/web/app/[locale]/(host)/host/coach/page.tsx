@@ -135,7 +135,7 @@ export default async function HostCoachPage() {
   const recommendations = buildCoachRecommendations(inputs);
 
   return (
-    <main className={styles.page}>
+    <section className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Recruiting Coach</h1>
         <p className={styles.subtitle}>
@@ -171,6 +171,6 @@ export default async function HostCoachPage() {
           </p>
         </div>
       )}
-    </main>
+    </section>
   );
 }

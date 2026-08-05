@@ -275,3 +275,15 @@ export function benefitStateLabel(
 				: "Not included"
 	return opts.lowercase ? label.toLowerCase() : label
 }
+
+/**
+ * The one place that applies evidence truth to an already-formatted pay value.
+ * A sourced record can retain parsed compensation while its current evidence
+ * is `not_stated`; every renderer must prefer the evidence state in that case.
+ */
+export function payStateLabel(
+	summary: string,
+	evidence: BenefitEvidenceStatus | undefined,
+): string {
+	return evidence === "not_stated" ? NOT_STATED_LABEL : summary
+}

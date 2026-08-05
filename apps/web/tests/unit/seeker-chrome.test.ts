@@ -46,9 +46,49 @@ const coachmarkCss = read("components/seeker/SeekerCoachmarks.module.css");
 const dashboard = read("components/seeker/SeekerDashboard.tsx");
 const seekPage = read("app/[locale]/(seeker)/seek/page.tsx");
 const homePage = read("app/[locale]/(seeker)/home/page.tsx");
+const seekerLayout = read("app/[locale]/(seeker)/layout.tsx");
+const assistantPage = read("app/[locale]/(seeker)/assistant/page.tsx");
+const communityJoinGate = read(
+  "app/[locale]/(seeker)/community/CommunityJoinGate.tsx",
+);
 // The dashboard's reads live behind one seam since redesign W1 (getSeasonBoard);
 // the honesty invariants below follow the code to where it moved.
 const seasonData = read("components/seeker/data.ts");
+
+describe("the seeker shell landmark", () => {
+  it("owns exactly one main landmark for every seeker route", () => {
+    expect(shell).toContain('<main className="seekeros-contentwrap">');
+    expect(assistantPage).not.toContain("<main");
+    expect(communityJoinGate).not.toContain("<main");
+  });
+});
+
+describe("the local seeker review state", () => {
+  it("does not wait on configured local data services", () => {
+    expect(homePage).toContain(
+      'isDevBenchEnabled() && (await readDevRole()) === "seeker"',
+    );
+    expect(seekerLayout).toContain(
+      'isDevBenchEnabled() && (await readDevRole()) === "seeker"',
+    );
+    expect(homePage).toContain(
+      "getSeasonBoard(undefined, undefined, devSeekerName())",
+    );
+    expect(seekerLayout).toContain("unreadCommunity: 0");
+  });
+
+  it.each(["host", "admin"])(
+    "does not enable seeker fixtures for the %s review role",
+    (role) => {
+      expect(homePage).not.toContain(
+        `isDevBenchEnabled() && (await readDevRole()) === "${role}"`,
+      );
+      expect(seekerLayout).not.toContain(
+        `isDevBenchEnabled() && (await readDevRole()) === "${role}"`,
+      );
+    },
+  );
+});
 
 // ── 1. The blocking modal is dead ─────────────────────────────────────────
 
@@ -198,7 +238,7 @@ describe("the seeker dashboard", () => {
   });
 });
 
-// ── 4. The mobile dock (D17) ──────────────────────────────────────────────
+// ── 4. The founder-locked mobile dock ─────────────────────────────────────
 
 describe("the seeker mobile dock", () => {
   const dockBlock = shell.slice(
@@ -206,28 +246,49 @@ describe("the seeker mobile dock", () => {
     shell.indexOf("export interface SeekerShellProps"),
   );
 
-  it("carries Explore · Swipe · Saved · Applications · Profile", () => {
-    for (const label of ["Explore", "Swipe", "Saved", "Applications", "Profile"]) {
-      expect(dockBlock).toContain(`"${label}"`);
-    }
+  it("carries exactly Seek · Swipe · Map · Profile, in that order", () => {
+    const items = [...dockBlock.matchAll(
+      /\{ href: "([^"]+)", label: "([^"]+)", icon: "([^"]+)"/g,
+    )].map((match) => match.slice(1));
+
+    expect(items).toEqual([
+      ["/seek", "Seek", "nav.seek"],
+      ["/swipe", "Swipe", "nav.swipe"],
+      ["/map", "Map", "nav.map"],
+      ["/profile", "Profile", "nav.profile"],
+    ]);
   });
 
-  it("has exactly five tabs, and the stylesheet lays out five columns", () => {
-    const hrefs = dockBlock.match(/href: "\/[a-z]+"/g) ?? [];
-    expect(hrefs).toHaveLength(5);
+  it("has exactly four equal-width tabs", () => {
     expect(read("styles/seeker-os.css")).toContain(
-      "grid-template-columns: repeat(5, 1fr)",
+      "grid-template-columns: repeat(4, 1fr)",
     );
   });
 
-  /**
-   * Map left the dock. It must not have left the product: the rail/drawer
-   * carries it (no hideInDrawer flag), and /seek offers an explicit map view.
-   */
-  it("keeps Map reachable from the menu and from Seek", () => {
-    expect(dockBlock).not.toContain('href: "/map"');
-    expect(shell).toContain('{ href: "/map", label: "Map", icon: "nav.map" }');
-    expect(read("components/seeker/SeekBrowser.tsx")).toContain("Map view");
+  it("stays pinned, safe-area aware, and keyboard-identifiable", () => {
+    const css = read("styles/seeker-os.css");
+    expect(css).toMatch(/\.seekeros-mnav\s*\{[\s\S]*?position: fixed;/);
+    expect(css).toMatch(/\.seekeros-mnav\s*\{[\s\S]*?bottom: 0;/);
+    expect(css).toContain("env(safe-area-inset-bottom, 0px)");
+    expect(css).toMatch(/\.seekeros-mtab\s*\{[\s\S]*?min-height: var\(--tap-min\);/);
+    expect(shell).toContain('<nav className="seekeros-mnav" aria-label="Seeker">');
+    expect(shell).toContain('aria-current={active ? "page" : undefined}');
+  });
+
+  it("does not duplicate dock routes in the mobile drawer", () => {
+    for (const [href, label, icon] of [
+      ["/seek", "Seek", "nav.seek"],
+      ["/swipe", "Swipe", "nav.swipe"],
+      ["/map", "Map", "nav.map"],
+    ]) {
+      expect(shell).toContain(
+        `{ href: "${href}", label: "${label}", icon: "${icon}", hideInDrawer: true }`,
+      );
+    }
+    expect(shell).toContain('{ href: "/saved", label: "Saved", icon: "nav.saved" }');
+    expect(shell).toContain(
+      '{ href: "/applied", label: "Applications", icon: "action.apply" }',
+    );
   });
 
   it("still renders the role pill (D17)", () => {
@@ -288,6 +349,40 @@ describe("the swipe deck", () => {
     }
   });
 
+  it("does not steal shortcuts from card controls or portal dialogs", () => {
+    const ownershipGuard = deck.indexOf(
+      "deckOwnsKeyboardEvent(event.target, event.currentTarget)",
+    );
+    const shortcutSwitch = deck.indexOf("switch (event.key)");
+
+    expect(ownershipGuard).toBeGreaterThan(-1);
+    expect(ownershipGuard).toBeLessThan(shortcutSwitch);
+  });
+
+  it("gates only signed-out Save/Skip keys while Apply and Enter retain routing", () => {
+    const keyStart = deck.indexOf("const onKeyDown");
+    const keyEnd = deck.indexOf("const onPointerDown", keyStart);
+    const keys = deck.slice(keyStart, keyEnd);
+    const left = keys.slice(keys.indexOf('case "ArrowLeft"'), keys.indexOf('case "ArrowRight"'));
+    const right = keys.slice(keys.indexOf('case "ArrowRight"'), keys.indexOf('case "ArrowUp"'));
+    const apply = keys.slice(keys.indexOf('case "ArrowUp"'), keys.indexOf('case "Backspace"'));
+    const enter = keys.slice(keys.indexOf('case "Enter"'), keys.indexOf("default:"));
+
+    expect(left).toContain("setShowAuthGate(true)");
+    expect(right).toContain("setShowAuthGate(true)");
+    expect(apply).toContain('triggerLeave("apply")');
+    expect(apply).not.toContain("setShowAuthGate");
+    expect(enter).toContain("router.push(`/listing/${current.id}`)");
+    expect(keys).not.toContain('case "Tab"');
+  });
+
+  it("reserves vertical touch movement for scrolling to the card action row", () => {
+    expect(deck).toContain('touchAction: "pan-y"');
+    expect(deck).toContain('gestureAxisRef.current !== "horizontal"');
+    expect(deck).toContain("resolveSwipeRelease");
+    expect(deck).toContain("onPointerCancel={isTop ? onPointerCancel : undefined}");
+  });
+
   /**
    * Enter is the key a keyboard user presses to "look at this". Wiring it to
    * Apply would turn a reflex into an application.
@@ -298,21 +393,60 @@ describe("the swipe deck", () => {
     expect(enterBlock).not.toContain("triggerLeave");
   });
 
-  /**
-   * The flanking arrows only exist at (min-width: 768px) and (pointer: fine).
-   * Everywhere else Skip and Save had no visible control at all.
-   */
-  it("gives touch users visible Skip and Save buttons", () => {
-    expect(deck).toContain("touchOnly");
-    expect(deckCss).toContain(".touchOnly");
-    expect(deckCss).toMatch(
-      /@media \(min-width: 768px\) and \(pointer: fine\) \{\s*\.touchOnly \{\s*display: none;/,
-    );
+  it("keeps actions on the canonical card and only Undo in the outer dock", () => {
+    for (const action of ["pass", "apply", "save"]) {
+      expect(deck).toContain(`void triggerLeave("${action}")`);
+    }
+    expect(deck).toContain("actions={isTop ? undefined : <></>}");
+
+    const dockStart = deck.indexOf("className={styles.undoDock}");
+    const dockEnd = deck.indexOf("className={styles.keyHint}", dockStart);
+    const dock = deck.slice(dockStart, dockEnd);
+    expect(dockStart).toBeGreaterThan(-1);
+    expect(dock).toContain("Undo");
+    expect(dock).not.toContain("Skip");
+    expect(dock).not.toContain("Save");
+    expect(dock).not.toContain("triggerLeave");
+    expect(deck).not.toContain("touchOnly");
+    expect(deckCss).toContain(".undoDock");
+    expect(deckCss).not.toContain(".touchOnly");
   });
 
-  it("keeps Undo, and reports it", () => {
-    expect(deck).toContain("unpassListingAction");
-    expect(deck).toContain("swipeUndo");
+  it("advances only after a confirmed exclusive Save/Skip transition", () => {
+    const start = deck.indexOf("const triggerLeave");
+    const end = deck.indexOf("const suppressTap", start);
+    const action = deck.slice(start, end);
+    const failureGuard = action.indexOf("!result.ok");
+    const advance = action.indexOf("setIndex((value) => value + 1)");
+
+    expect(action).toContain("setListingDecisionAction(");
+    expect(action).toContain("!result.consistent");
+    expect(action).toContain("result.decision !== requestedDecision");
+    expect(action).toContain("const previousDecision = result.previousDecision");
+    expect(action).toContain("previousDecision === undefined");
+    expect(action).toContain("{ id: card.id, action, previousDecision }");
+    expect(failureGuard).toBeGreaterThan(-1);
+    expect(advance).toBeGreaterThan(failureGuard);
+    expect(action).toContain("setDecisionError(");
+  });
+
+  it("restores the authoritative prior decision and rewinds only after success", () => {
+    const start = deck.indexOf("const undo = useCallback");
+    const end = deck.indexOf("const restart", start);
+    const undo = deck.slice(start, end);
+    const failureGuard = undo.indexOf("!result.ok");
+    const rewind = undo.indexOf("setIndex((value) => Math.max(0, value - 1))");
+
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(undo).toContain("restoreListingDecisionAction(");
+    expect(undo).toContain("expectedCurrentDecision");
+    expect(undo).toContain("last.previousDecision");
+    expect(undo).toContain("result.decision !== last.previousDecision");
+    expect(undo).toContain("It may have changed elsewhere");
+    expect(failureGuard).toBeGreaterThan(-1);
+    expect(rewind).toBeGreaterThan(failureGuard);
+    expect(undo).toContain("swipeUndo");
   });
 });
 
@@ -320,6 +454,7 @@ describe("the swipe deck", () => {
 
 describe("the map", () => {
   const map = read("components/map/MapView.tsx");
+  const mapPage = read("app/[locale]/(seeker)/map/page.tsx");
 
   it("says a pin is a host-chosen place, not a street address", () => {
     expect(map).toContain("precisionNote");
@@ -334,6 +469,37 @@ describe("the map", () => {
     expect(map).toContain("groupMarkers");
     expect(map).toContain("inViewport");
     expect(map).toContain("trayListings");
+  });
+
+  it("backs every card action with auth, navigation, and real persistence", () => {
+    const actionsStart = map.indexOf("const cardOverrides");
+    const actionsEnd = map.indexOf("const cardState", actionsStart);
+    const actions = map.slice(actionsStart, actionsEnd);
+
+    expect(actionsStart).toBeGreaterThan(-1);
+    expect(actionsEnd).toBeGreaterThan(actionsStart);
+    expect(actions).toContain("onSkip:");
+    expect(actions).toContain('queueDecision(id, "skipped")');
+    expect(actions).toContain("onApply:");
+    expect(actions).toContain("?apply=1");
+    expect(actions).toContain("onSave:");
+    expect(actions).toContain('queueDecision(id, "saved")');
+    expect(map).toContain("setMapListingDecisionAction(id, next)");
+    expect(map).toContain("decisionQueues.current");
+    expect(map).toContain("overrides={cardOverrides}");
+    expect(map.match(/cardState=\{cardState\(/g)).toHaveLength(2);
+    expect(map).toContain('returnTo=${encodeURIComponent("/map")}');
+    expect(mapPage).toContain("isAuthenticated={Boolean(userId)}");
+  });
+
+  it("routes Apply through the listing so signed-out intent keeps its id", () => {
+    const actionsStart = map.indexOf("const cardOverrides");
+    const applyStart = map.indexOf("onApply:", actionsStart);
+    const saveStart = map.indexOf("onSave:", applyStart);
+    const apply = map.slice(applyStart, saveStart);
+
+    expect(apply).toContain("router.push(`/listing/${id}?apply=1`)");
+    expect(apply).not.toContain("requireAuth()");
   });
 
   it("keeps its honest failure and empty states", () => {

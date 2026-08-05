@@ -286,8 +286,11 @@
 		"submitting": "Submitting…",
 		"editListing": "Edit listing",
 		"applicationSent": "Application sent",
+		"demoApplicationPreviewed": "Demo complete — nothing was sent or saved",
 		"confirmHeading": "Apply to this listing?",
 		"confirmBody": "Confirm your application to <strong>{title}</strong>. The host will review your profile and contact you if interested.",
+		"demoConfirmHeading": "Preview the application flow?",
+		"demoConfirmBody": "This is local demo inventory. Confirm to preview the success state; no application will be sent or saved.",
 		"resumeGateHeading": "Complete your résumé to apply",
 		"resumeGateBody": "Hosts move people across the world on a handshake — so they need to know who they're inviting.",
 		"resumeGateMissingHeading": "Still needed:",
@@ -299,7 +302,15 @@
 		"saveErrorHeading": "Could not save this listing",
 		"unsaveErrorHeading": "Could not remove this listing",
 		"saveErrorRateLimit": "You're saving too quickly. Please wait a moment and try again.",
+		"saveErrorTemporary": "Saved listings are temporarily unavailable. Nothing changed — try again in a moment.",
 		"applyOnOriginal": "Apply on the original posting",
 		"sourcedNoApplyPath": "This employer hasn't joined Explore & Earn yet, so applications can't be sent from here."
+	},
+	"ListingNotFound": {
+		"eyebrow": "The marketplace",
+		"title": "This opportunity isn't listed",
+		"lede": "Listings leave the marketplace when they close, fill, or expire — and links outlive all three. Everything else is still here: the search, the four lanes, and the map are live.",
+		"browse": "Browse open opportunities",
+		"lanes": "See the four lanes"
 	}
 }

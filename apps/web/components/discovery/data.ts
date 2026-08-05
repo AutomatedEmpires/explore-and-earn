@@ -5,6 +5,7 @@ import {
   getLiveListingsWithCoords,
   getMatchScoresForSeeker,
   getPublicListingById,
+  getSavedListingIds,
   getSwipeBatch,
   resolveSeekerDiscoveryScope,
   rowToDiscoveryFields,
@@ -14,6 +15,7 @@ import { getPublicListingsCached } from "../../lib/serverCache";
 import { rankForSeeker } from "../../lib/ranking";
 import { isDevBenchEnabled } from "../../lib/devBench";
 import { DISCOVERY_FIXTURES } from "./fixtures";
+import { isKnownDiscoveryFixtureId } from "./fixtureIds";
 import type { DiscoveryListing } from "./listing";
 
 /**
@@ -115,23 +117,54 @@ export async function getDiscoveryListingById(
  * stored-match enrichment travels onto every pin via rowToDiscoveryFields. The
  * anonymous/public case (no auth) still works unchanged — no scope, no crash.
  */
+export interface DiscoveryMapData {
+  readonly listings: DiscoveryListing[];
+  readonly initialSavedListingIds: readonly string[];
+  readonly initialSkippedListingIds: readonly string[];
+  /** Listing ids whose fixture catalogue explicitly defines no detail photos. */
+  readonly knownEmptyBenefitDetailsListingIds: string[];
+}
+
+function fixtureMapData(): DiscoveryMapData {
+  const listings = DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
+  return {
+    listings,
+    initialSavedListingIds: [],
+    initialSkippedListingIds: [],
+    // The catalogue identity check makes an accidentally added/unknown fixture
+    // fail closed until its evidence contract is intentionally registered.
+    knownEmptyBenefitDetailsListingIds: listings
+      .map((listing) => listing.id)
+      .filter(isKnownDiscoveryFixtureId),
+  };
+}
+
+/**
+ * Map listings plus server-attested fixture evidence. The evidence array is
+ * empty for every live-data path, including Vercel Production.
+ */
 export async function getDiscoveryListingsWithCoords(
   clerkToken?: string | null,
   clerkUserId?: string | null,
-): Promise<DiscoveryListing[]> {
+): Promise<DiscoveryMapData> {
   // The Preview-only flag exists solely for remote Mapbox proof while the
   // isolated readiness database has no listings. It cannot activate in a
   // Vercel Production runtime and does not affect any non-map discovery seam.
   if (isDevBenchEnabled() || allowPreviewMapFixtures) {
-    return DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
+    return fixtureMapData();
   }
   if (!hasPublicDataConfig) {
     if (allowFixtureFallback) {
-      return DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
+      return fixtureMapData();
     }
 
     reportMissingProductionDiscoveryConfig("getDiscoveryListingsWithCoords");
-    return [];
+    return {
+      listings: [],
+      initialSavedListingIds: [],
+      initialSkippedListingIds: [],
+      knownEmptyBenefitDetailsListingIds: [],
+    };
   }
 
   try {
@@ -141,13 +174,20 @@ export async function getDiscoveryListingsWithCoords(
     // same token+userId. Best-effort — a scope fault degrades to the public,
     // unenriched map rather than breaking it.
     let enrichment: DiscoveryEnrichment | undefined;
+    let savedListingIds: string[] = [];
+    let skippedListingIds: string[] = [];
     if (clerkToken && clerkUserId) {
       try {
-        const [scope, scores] = await Promise.all([
+        const [scope, scores, savedIds] = await Promise.all([
           resolveSeekerDiscoveryScope(clerkToken, clerkUserId),
-          getMatchScoresForSeeker(clerkToken, clerkUserId),
+          getMatchScoresForSeeker(clerkToken, clerkUserId).catch(
+            () => new Map<string, number>(),
+          ),
+          getSavedListingIds(clerkToken, clerkUserId).catch(() => [] as string[]),
         ]);
         enrichment = enrichmentFromScope(scope, scores);
+        savedListingIds = savedIds;
+        skippedListingIds = [...scope.skippedIds];
       } catch {
         enrichment = undefined;
       }
@@ -157,13 +197,26 @@ export async function getDiscoveryListingsWithCoords(
       clerkToken ?? undefined,
       clerkUserId ?? undefined,
     );
-    return rows.map(
+    const listings = rows.map(
       (row) => rowToDiscoveryFields(row, enrichment) as DiscoveryListing,
     );
+    const visibleListingIds = new Set(listings.map((listing) => listing.id));
+    const initialSavedListingIds = savedListingIds.filter((id) =>
+      visibleListingIds.has(id),
+    );
+    const initialSavedListingIdSet = new Set(initialSavedListingIds);
+    return {
+      listings,
+      initialSavedListingIds,
+      initialSkippedListingIds: skippedListingIds.filter(
+        (id) => visibleListingIds.has(id) && !initialSavedListingIdSet.has(id),
+      ),
+      knownEmptyBenefitDetailsListingIds: [],
+    };
   } catch (error) {
     if (allowFixtureFallback) {
       reportDiscoveryFallback("getDiscoveryListingsWithCoords", error);
-      return DISCOVERY_FIXTURES.filter((listing) => Boolean(listing.coordinates));
+      return fixtureMapData();
     }
 
     throw error;
@@ -171,10 +224,16 @@ export async function getDiscoveryListingsWithCoords(
 }
 
 export function canUseDiscoveryFixtureFallback(): boolean {
+  // A configured-but-offline local Supabase must not defeat the review bench.
+  // Only explicit NEXT_PUBLIC_DEV_BENCH=1 selects deterministic local fixtures.
+  if (isDevBenchEnabled()) return true;
   return !hasPublicDataConfig && allowFixtureFallback;
 }
 
 export function hasDiscoveryPublicDataConfig(): boolean {
+  // The bench is deterministic by contract, even when .env.local contains
+  // credentials for a local Supabase stack that is not currently running.
+  if (isDevBenchEnabled()) return false;
   return hasPublicDataConfig;
 }
 

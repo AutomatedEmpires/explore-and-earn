@@ -269,6 +269,8 @@
   --type-button-size:  15px;  --type-button-lh:  1;
   --type-label-size:   12px;  --type-label-lh:   1;
   --type-label-tracking: 0.06em;
+  --type-display-tracking: -0.02em;
+  --type-metric-tracking: -0.03em;
 
   /* Marketing display clamps — one scale for all hero/section display type so
      the homepage + for-hosts stop rolling their own ad-hoc clamp() values.

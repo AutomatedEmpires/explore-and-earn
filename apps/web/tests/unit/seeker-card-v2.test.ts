@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import {
+  NOT_STATED_LABEL,
   cardRecordCompleteness,
   formatSeasonLength,
   missingFactsSentence,
@@ -14,6 +15,10 @@ import {
   type DiscoveryCardData,
   type DiscoveryCardProps,
 } from "@explore-and-earn/ui";
+import {
+  DISCOVERY_FIXTURE_IDS,
+  isKnownDevDiscoveryFixtureId,
+} from "../../components/discovery/fixtureIds";
 
 /**
  * DISCOVERY CARD V2 (V2-G Part VI).
@@ -142,8 +147,23 @@ describe("stated facts come from stored columns only", () => {
     expect(html).toContain("about 12 weeks");
   });
 
-  it("renders NO season length row when the listing has none", () => {
-    expect(render({ data: base() })).not.toContain("Season length");
+  it("keeps the core decision snapshot visible and names missing values", () => {
+    const html = render({
+      data: base({
+        triad: { housing: "", meals: "", pay: "" },
+        benefitProvision: {
+          housing: "not_stated",
+          meals: "not_stated",
+          pay: "not_stated",
+        },
+      }),
+    });
+    for (const label of ["Match", "Season length", "Housing", "Meals", "Pay"]) {
+      expect(html).toContain(label);
+    }
+    expect(html).toContain("Not scored");
+    expect(html).toContain('data-state="not_scored"');
+    expect(html.match(new RegExp(NOT_STATED_LABEL, "g"))?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 
   it("labels the expiry as a listing close, NEVER as an application deadline", () => {
@@ -185,6 +205,92 @@ describe("stated facts come from stored columns only", () => {
     });
     expect(html).toContain("Private cabin, shared bath");
     expect(html).toContain("Three crew meals daily");
+  });
+
+  it("lets an explicit not-provided decision override stale summary copy", () => {
+    const html = render({
+      data: base({
+        housingSummary: "Stale private cabin copy",
+        benefitProvision: {
+          housing: "not_provided",
+          meals: "provided",
+          pay: "provided",
+        },
+      }),
+    });
+    expect(html).toContain("Not provided");
+    expect(html).not.toContain("Stale private cabin copy");
+  });
+
+  it("preserves partial benefit truth alongside a host summary", () => {
+    const partial = render({
+      data: base({
+        housingSummary: "Weekday breakfast only",
+        benefitProvision: {
+          housing: "partial",
+          meals: "provided",
+          pay: "provided",
+        },
+      }),
+    });
+    expect(partial).toContain("Partial — Weekday breakfast only");
+  });
+
+  it("lets not-stated evidence override stale benefit summary copy", () => {
+    const unstated = render({
+      data: base({
+        mealsSummary: "Stale crew dinner copy",
+        benefitProvision: {
+          housing: "provided",
+          meals: "not_stated",
+          pay: "provided",
+        },
+      }),
+    });
+    expect(unstated).toContain(NOT_STATED_LABEL);
+    expect(unstated).not.toContain("Stale crew dinner copy");
+  });
+
+  it("lets explicit not-provided pay override a stale rate everywhere", () => {
+    const html = render({
+      data: base({
+        triad: { housing: "Included", meals: "Included", pay: "$99/hr stale" },
+        benefitProvision: {
+          housing: "provided",
+          meals: "provided",
+          pay: "not_provided",
+        },
+      }),
+    });
+    expect(html).toContain(">Not provided<");
+    expect(html).toContain('aria-label="Pay: not provided"');
+    expect(html).not.toContain("$99/hr stale");
+  });
+
+  it("keeps an unscored Match value muted despite first-row emphasis", () => {
+    const css = readFileSync(
+      new URL("../../../../packages/ui/src/DiscoveryCard.module.css", import.meta.url),
+      "utf8",
+    );
+    expect(css).toMatch(
+      /\.glanceFacts \.factItem:first-child \.factValue:is\([\s\S]*?\[data-state="not_scored"\][\s\S]*?\)\s*\{[\s\S]*?font-weight: var\(--font-weight-medium\);/,
+    );
+  });
+
+  it("renders stored match, season, housing and meals together at a glance", () => {
+    const html = render({
+      data: base({
+        matchScore: 88,
+        seasonLength: "about 3 months",
+        housingSummary: "Shared bunkhouse",
+        mealsSummary: "Lunch on shift",
+      }),
+    });
+    expect(html).toContain("88%");
+    expect(html).toContain("about 3 months");
+    expect(html).toContain("Shared bunkhouse");
+    expect(html).toContain("Lunch on shift");
+    expect(html).toContain('aria-label="Opportunity at a glance"');
   });
 
   it("shows at most three perks even when the host listed more", () => {
@@ -500,5 +606,151 @@ describe("the image zone", () => {
       onOpen: () => {},
     });
     expect(html).toContain('aria-label="Saved"');
+  });
+
+  it("renders labelled Skip / Apply / Save actions in the locked 20 / 60 / 20 split", () => {
+    const html = render({
+      data: base(),
+      onApply: () => {},
+      onSave: () => {},
+      onSkip: () => {},
+    });
+    expect(html).toMatch(/>Skip<\/button>/);
+    expect(html).toMatch(/>Apply[\s\S]*<\/button>/);
+    expect(html).toMatch(/>Save<\/button>/);
+
+    const css = readFileSync(
+      new URL("../../../../packages/ui/src/DiscoveryCard.module.css", import.meta.url),
+      "utf8",
+    );
+    expect(css).toContain(
+      "grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr)",
+    );
+
+    const swipeHtml = render({
+      data: base(),
+      surface: "swipe",
+      onApply: () => {},
+      onSave: () => {},
+      onSkip: () => {},
+    });
+    expect(swipeHtml).toMatch(/>Skip<\/button>/);
+    expect(swipeHtml).toMatch(/>Apply[\s\S]*<\/button>/);
+    expect(swipeHtml).toMatch(/>Save<\/button>/);
+  });
+
+  it.each([
+    ["Skip", { onApply: () => {}, onSave: () => {} }],
+    ["Apply", { onOpen: () => {}, onSkip: () => {}, onSave: () => {} }],
+    ["Save", { onApply: () => {}, onSkip: () => {} }],
+  ] as const)("does not render the three-action bar when %s has no real handler", (_missing, handlers) => {
+    const html = render({ data: base(), ...handlers });
+    expect(html).not.toMatch(/>Skip<\/button>/);
+    expect(html).not.toMatch(/>Apply[\s\S]*<\/button>/);
+    expect(html).not.toMatch(/>Save<\/button>/);
+  });
+
+  it("wires all three Swipe actions into the canonical card controls", () => {
+    const source = read("components/seeker/SwipeDeck.tsx");
+    for (const action of ["pass", "apply", "save"]) {
+      expect(source).toContain(`void triggerLeave("${action}")`);
+    }
+  });
+
+  it("uses the server-authoritative exclusive transition for Seek save/skip", () => {
+    const source = read("components/seeker/SeekBrowser.tsx");
+    const actionStart = source.indexOf("const setCardDecision");
+    const actionEnd = source.indexOf("const getCardState", actionStart);
+    const actions = source.slice(actionStart, actionEnd);
+
+    expect(actionStart).toBeGreaterThan(-1);
+    expect(actionEnd).toBeGreaterThan(actionStart);
+    expect(actions).toContain("decisionInFlight.current.has(id)");
+    expect(actions).toContain("setSavedIds(");
+    expect(actions).toContain("setSkippedIds(");
+    expect(actions).toContain(
+      "setMapListingDecisionAction(id, decision)",
+    );
+    expect(actions).toContain(
+      "result.decision === undefined ? previous : result.decision",
+    );
+    expect(actions).toContain(".catch(() => {");
+    expect(actions).toContain("setCardDecision(id, previous);");
+    expect(actions).toContain(
+      'setDecisionError("We couldn’t reach the server. Try again.")',
+    );
+    expect(actions).not.toContain("unsaveListingAction(id)");
+    expect(actions).not.toContain("unpassListingAction(id)");
+  });
+});
+
+describe("Housing and Meals evidence popups", () => {
+  it("treats only known non-production fixtures as confirmed empty evidence", () => {
+    for (const listingId of Object.values(DISCOVERY_FIXTURE_IDS)) {
+      expect(isKnownDevDiscoveryFixtureId(listingId, "development")).toBe(true);
+      expect(isKnownDevDiscoveryFixtureId(listingId, "test")).toBe(true);
+      expect(isKnownDevDiscoveryFixtureId(listingId, "production")).toBe(false);
+    }
+    expect(isKnownDevDiscoveryFixtureId("lst_unknown_fixture", "development")).toBe(false);
+    expect(isKnownDevDiscoveryFixtureId(undefined, "development")).toBe(false);
+  });
+
+  it("attests fixture evidence only in an explicitly enabled Vercel Preview", () => {
+    const data = read("components/discovery/data.ts");
+    const mapPage = read("app/[locale]/(seeker)/map/page.tsx");
+    const map = read("components/map/MapView.tsx");
+    const provider = read("components/discovery/useListingCardPopups.tsx");
+    expect(data).toContain('process.env.NODE_ENV === "production"');
+    expect(data).toContain('process.env.VERCEL_ENV === "preview"');
+    expect(data).toContain('process.env.PREVIEW_MAP_FIXTURES === "1"');
+    expect(data).toContain("knownEmptyBenefitDetailsListingIds");
+    expect(data).toContain("isKnownDiscoveryFixtureId");
+    expect(mapPage).toContain("mapData.knownEmptyBenefitDetailsListingIds");
+    expect(map).toContain(
+      "knownEmptyBenefitDetailsListingIds={knownEmptyBenefitDetailsListingIds}",
+    );
+    expect(provider).toContain('publicReadEvidence={');
+    expect(provider).toContain('? "known_empty"');
+  });
+
+  it("keeps all four defined photo categories visible in seeker view", () => {
+    const source = read("components/discovery/BenefitTrustModal.tsx");
+    const action = read("app/actions/benefitDetails.ts");
+
+    expect(source).toContain("const slotsToShow = configuredSlots;");
+    expect(source).toContain("housingPhotoSlots(category)");
+    for (const mealSlot of ['id: "kitchen"', 'id: "prepared"', 'id: "dining"', 'id: "misc"']) {
+      expect(source).toContain(mealSlot);
+    }
+    expect(source).toContain("no photo added");
+    expect(source).toContain("photo categories added");
+    expect(source).toContain("<PopupShell");
+
+    expect(action).toContain("{ ok: true, details: await getPublicBenefitDetails(listingId) }");
+    expect(action).toContain('ok: false,');
+    expect(source).toContain('if (!res.ok) throw new Error(res.error);');
+    expect(source).toContain('status: "loading"');
+    expect(source).toContain('status: "ready"');
+    expect(source).toContain('status: "unavailable"');
+    expect(source).toContain("Loading host photo evidence…");
+    expect(source).toContain("Host photo evidence is unavailable right now.");
+    expect(source).toContain("checking photo availability");
+    expect(source).toContain("photo availability unknown");
+    expect(source).toContain("Availability unknown");
+    expect(source).toMatch(
+      /className=\{styles\.photoEmpty\}[\s\S]*?role="img"[\s\S]*?aria-label=/,
+    );
+    expect(source).toContain('!isEdit && publicReadStatus === "ready"');
+
+    const fixtureBranchStart = source.indexOf("if (knownEmptyFixtureEvidence)");
+    const publicLoadStart = source.indexOf("const load =", fixtureBranchStart);
+    const fixtureBranch = source.slice(fixtureBranchStart, publicLoadStart);
+    expect(fixtureBranchStart).toBeGreaterThan(-1);
+    expect(publicLoadStart).toBeGreaterThan(fixtureBranchStart);
+    expect(fixtureBranch).toContain('status: "ready"');
+    expect(fixtureBranch).toContain("return;");
+    expect(source).toMatch(
+      /knownEmptyFixtureEvidence[\s\S]*?\? "ready"[\s\S]*?: !listingId/,
+    );
   });
 });

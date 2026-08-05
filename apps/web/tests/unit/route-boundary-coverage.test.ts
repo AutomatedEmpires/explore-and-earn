@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -79,6 +79,17 @@ describe("route boundary coverage (D23)", () => {
 
   it.each(shellGroups())("%s has an error boundary", (group) => {
     expect(hasBoundary(group, "error.tsx")).toBe(true);
+  });
+
+  it("keeps the listing-specific not-found page locale-aware", () => {
+    const notFound = readFileSync(
+      join(LOCALE_ROOT, "listing/[id]/not-found.tsx"),
+      "utf8",
+    );
+
+    expect(notFound).toContain('getTranslations("ListingNotFound")');
+    expect(notFound).toContain('from "../../../../i18n/navigation"');
+    expect(notFound).not.toContain('from "next/link"');
   });
 
   it.each(shellGroups())("%s has a loading state", (group) => {

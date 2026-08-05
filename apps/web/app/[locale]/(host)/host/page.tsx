@@ -21,6 +21,8 @@ import {
 
 import { HostDashboard, type PlanUsageRow } from "../../../../components/host";
 import { hostProfileCompleteness } from "../../../../components/host/workspaceModel";
+import { devHostProfile, isDevBenchEnabled } from "../../../../lib/devBench";
+import { readDevRole } from "../../../../lib/devBench/server";
 import { cachedHostAccountState } from "../../../../lib/serverCache";
 import styles from "./page.module.css";
 
@@ -61,6 +63,56 @@ function entitlementsFor(tier: string) {
  * cannot hand a Starter host the paid per-listing breakdown.
  */
 export default async function HostOverviewPage() {
+  // Keep the local review dashboard deterministic and instant even when a
+  // configured local Supabase stack is stopped. This branch is unreachable in
+  // production/preview and only activates for the explicit host role cookie.
+  if (isDevBenchEnabled() && (await readDevRole()) === "host") {
+    const profile = devHostProfile();
+    const tier = profile.subscriptionTier;
+    const entitlements = entitlementsFor(tier);
+    const planUsage: PlanUsageRow[] = [
+      {
+        id: "listings",
+        label: "Published listings",
+        used: 0,
+        allowance: entitlements?.listings ?? null,
+        note: "Live, paused, and in-review listings count toward your plan.",
+      },
+      {
+        id: "invites",
+        label: "Invite credits",
+        used: 0,
+        allowance: entitlements?.includedInviteCredits ?? null,
+        note: "Resets at the start of each month.",
+      },
+    ];
+
+    return (
+      <div className={styles.block}>
+        <HostDashboard
+          companyName={profile.companyName}
+          hostName={profile.hostName}
+          location={profile.primaryLocationName}
+          coverPhotoUrl={profile.photoUrl}
+          verified={hasVerifiedHostSubscription(tier)}
+          planLabel={TIER_LABEL[tier] ?? "No plan"}
+          accountState="active"
+          primaryLane={profile.categoryScopes[0] ?? null}
+          profile={hostProfileCompleteness(profile)}
+          analytics={emptyHostAnalytics()}
+          pulse={emptyHostHiringPulse()}
+          signals={[]}
+          applicationCounts={{}}
+          newApplicationCounts={{}}
+          unread={0}
+          planUsage={planUsage}
+          recentActivity={[]}
+          publicProfileHref={null}
+        />
+      </div>
+    );
+  }
+
   const { userId, getToken } = await auth();
   const token = userId ? await getToken() : null;
 

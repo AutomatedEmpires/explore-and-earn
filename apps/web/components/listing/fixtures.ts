@@ -1,11 +1,10 @@
 import type {
 	BenefitTriad,
 	ListingMedia,
+	ListingHostSummary,
 	ListingStatus,
 	MarketplaceCategory,
 } from "@explore-and-earn/contracts"
-
-import type { ListingHostSummary } from "./HostSummaryBlock"
 
 export interface ListingDetailData {
 	readonly id: string

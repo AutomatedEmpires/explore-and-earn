@@ -60,7 +60,7 @@
 /* ─── The rail (desktop) / the fixed bar (mobile) ────────────────────────── */
 
 .rail {
-  display: contents;
+  display: block;
 }
 
 @media (min-width: 1024px) {

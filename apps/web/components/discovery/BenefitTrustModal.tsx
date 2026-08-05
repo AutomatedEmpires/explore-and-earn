@@ -24,6 +24,7 @@ import {
 import { PopupShell } from "../overlay/PopupShell";
 import { isLocalStorageUrl } from "../../lib/storageUrl";
 import type { DiscoveryListing } from "./listing";
+import { isKnownDevDiscoveryFixtureId } from "./fixtureIds";
 import {
 	BenefitPhotoSessionLedger,
 	type TrackedBenefitPhotoUpload,
@@ -59,6 +60,11 @@ type FieldDef = {
 type PhotoSlot = {
 	readonly id: string;
 	readonly label: string;
+};
+
+type PublicReadState = {
+	readonly key: string;
+	readonly status: "loading" | "ready" | "unavailable";
 };
 
 // ── Housing config ─────────────────────────────────────────────────────────────
@@ -290,6 +296,8 @@ export interface BenefitTrustModalViewProps {
 	readonly mode?: "view";
 	readonly listing: DiscoveryListing | null;
 	readonly bucket: BenefitKind | null;
+	/** Server-attested fixture evidence used by remote preview surfaces. */
+	readonly publicReadEvidence?: "known_empty";
 	readonly onClose: () => void;
 }
 
@@ -320,6 +328,10 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	const category = isEdit
 		? (props as BenefitTrustModalEditProps).category
 		: (props as BenefitTrustModalViewProps).listing?.category;
+	const knownEmptyFixtureEvidence =
+		!isEdit &&
+		((props as BenefitTrustModalViewProps).publicReadEvidence === "known_empty" ||
+			isKnownDevDiscoveryFixtureId(listingId));
 
 	const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
 	const [toggles, setToggles] = useState<Record<string, Set<string>>>(() =>
@@ -334,6 +346,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		Record<string, { id: string; label: string }[]>
 	>({});
 	const [hydrating, setHydrating] = useState(false);
+	const [publicRead, setPublicRead] = useState<PublicReadState | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [uploadingSlots, setUploadingSlots] = useState<ReadonlySet<string>>(
@@ -356,7 +369,10 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 	// so a stale kind can't bleed across — edit pre-checks defaults, view starts
 	// empty (only render what was actually saved).
 	useEffect(() => {
-		if (!open || !kind) return;
+		if (!open || !kind) {
+			if (!isEdit) setPublicRead(null);
+			return;
+		}
 		const sections = KIND_CONFIG[kind].chipSections;
 		setError(null);
 		setAddingTo(null);
@@ -377,7 +393,17 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		}
 
 		let cancelled = false;
+		const readKey = `${listingId}:${kind}`;
+		if (knownEmptyFixtureEvidence) {
+			// Discovery fixtures define no benefit-detail photos. That is known empty
+			// evidence, not a failed database read, so render the honest 0/4 state and
+			// do not send a non-UUID fixture id to the production RPC boundary.
+			setHydrating(false);
+			setPublicRead({ key: readKey, status: "ready" });
+			return;
+		}
 		setHydrating(true);
+		if (!isEdit) setPublicRead({ key: readKey, status: "loading" });
 		const load = isEdit
 			? getBenefitDetailsAction(listingId).then((res) => {
 					if (!res.ok) throw new Error(res.error ?? "load_failed");
@@ -388,11 +414,14 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 							res.housingPhotoLibraryAvailable === true,
 					};
 				})
-			: getPublicBenefitDetailsAction(listingId).then((map) => ({
-					detail: map?.[kind],
-					benefitLibrary: undefined,
-					housingPhotoLibraryAvailable: false,
-				}));
+				: getPublicBenefitDetailsAction(listingId).then((res) => {
+						if (!res.ok) throw new Error(res.error);
+						return {
+							detail: res.details[kind],
+							benefitLibrary: undefined,
+							housingPhotoLibraryAvailable: false,
+						};
+					});
 		load
 			.then(({ detail, benefitLibrary, housingPhotoLibraryAvailable: available }) => {
 				if (cancelled) return;
@@ -400,28 +429,34 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 				setProfileHousingPhotos(
 					sanitizeHousingPhotoMap(benefitLibrary?.housing?.photos),
 				);
-				if (!detail) return;
-				setFieldValues({ ...detail.fields });
-				setPhotos({ ...detail.photos });
-				setCustomChips(
-					Object.fromEntries(
-						Object.entries(detail.customChips ?? {}).map(([k, v]) => [
-							k,
-							v.map((c) => ({ ...c })),
-						]),
-					),
-				);
-				setToggles(() => {
-					const next: Record<string, Set<string>> = {};
-					for (const s of sections) {
-						next[s.id] = new Set(detail.toggles?.[s.id] ?? (isEdit ? s.defaults : []));
+					if (detail) {
+						setFieldValues({ ...detail.fields });
+						setPhotos({ ...detail.photos });
+						setCustomChips(
+							Object.fromEntries(
+								Object.entries(detail.customChips ?? {}).map(([k, v]) => [
+									k,
+									v.map((c) => ({ ...c })),
+								]),
+							),
+						);
+						setToggles(() => {
+							const next: Record<string, Set<string>> = {};
+							for (const s of sections) {
+								next[s.id] = new Set(
+									detail.toggles?.[s.id] ?? (isEdit ? s.defaults : []),
+								);
+							}
+							return next;
+						});
 					}
-					return next;
-				});
-			})
-			.catch(() => {
-				if (!cancelled && isEdit) setError("Could not load saved details.");
-			})
+					if (!isEdit) setPublicRead({ key: readKey, status: "ready" });
+				})
+				.catch(() => {
+					if (cancelled) return;
+					if (isEdit) setError("Could not load saved details.");
+					else setPublicRead({ key: readKey, status: "unavailable" });
+				})
 			.finally(() => {
 				if (!cancelled) setHydrating(false);
 			});
@@ -429,7 +464,7 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			cancelled = true;
 		};
 		// cfg/sections are derived from kind (a dep); listingId/open/isEdit complete it.
-	}, [isEdit, open, kind, listingId]);
+	}, [isEdit, open, kind, listingId, knownEmptyFixtureEvidence]);
 
 	if (!kind || !cfg) return null;
 
@@ -438,6 +473,16 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 		: null;
 	const benefitInfo = viewListing ? viewListing.benefits[kind] : null;
 	const canUpload = Boolean(listingId);
+	const publicReadStatus =
+		isEdit || !open || !kind
+			? "idle"
+			: knownEmptyFixtureEvidence
+				? "ready"
+			: !listingId
+				? "unavailable"
+				: publicRead?.key === `${listingId}:${kind}`
+					? publicRead.status
+					: "loading";
 	const configuredSlots =
 		kind === "housing"
 			? isEdit &&
@@ -453,10 +498,13 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 					sanitizeHousingPhotoMap(photos),
 				) }
 			: photos;
-	// Edit shows all slots (to upload into); view shows only slots the host filled.
-	const slotsToShow = isEdit
-		? configuredSlots
-		: configuredSlots.filter((s) => displayPhotos[s.id]);
+	// Both modes show the complete four-category evidence contract. In seeker
+	// view, an empty slot is useful truth: the host has not supplied that photo.
+	// Filtering those slots out made an incomplete bucket look complete.
+	const slotsToShow = configuredSlots;
+	const filledPhotoCount = configuredSlots.filter(
+		(slot) => Boolean(displayPhotos[slot.id]),
+	).length;
 	const housingPhotoLibraryUnavailable =
 		kind === "housing" &&
 		isEdit &&
@@ -676,9 +724,13 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 			size="wide"
 			closeLabel={`Close ${cfg.title.toLowerCase()} details`}
 		>
-			<p className={styles.subtitle}>{cfg.subtitle}</p>
+			<p className={styles.subtitle}>
+				{isEdit
+					? cfg.subtitle
+					: `${cfg.title} details, including photo evidence when the host has provided it.`}
+			</p>
 
-			{/* ── Photo grid (edit: all slots; view: only the ones filled) ── */}
+			{/* ── Photo grid: all four defined evidence categories in both modes ── */}
 			{isEdit || slotsToShow.length > 0 ? (
 			<section className={styles.photoSection} aria-label={cfg.photoLabel}>
 				{housingPhotoLibraryUnavailable ? (
@@ -686,6 +738,16 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 						{HOUSING_PHOTO_LIBRARY_UNAVAILABLE}
 					</p>
 				) : (
+				<>
+				{publicReadStatus === "loading" ? (
+					<p className={styles.photoStatus} role="status" aria-live="polite">
+						Loading host photo evidence…
+					</p>
+				) : publicReadStatus === "unavailable" ? (
+					<p className={styles.photoStatus} role="status" aria-live="polite">
+						Host photo evidence is unavailable right now. Close and try again.
+					</p>
+				) : null}
 				<div className={styles.photoGrid}>
 					{slotsToShow.map((slot) => {
 						const photoUrl = displayPhotos[slot.id];
@@ -697,16 +759,37 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 								className={`${styles.photoSlot} ${slotClass(kind, slot.id)}`}
 							>
 								<div className={styles.photoArea}>
-									{photoUrl ? (
-										<Image
+										{photoUrl ? (
+											<Image
 											src={photoUrl}
 											alt={`${slot.label} photo`}
 											fill
 											sizes="(max-width: 639px) 45vw, 240px"
 											className={styles.photoImg}
-											unoptimized={isLocalStorageUrl(photoUrl)}
-										/>
-									) : null}
+												unoptimized={isLocalStorageUrl(photoUrl)}
+											/>
+										) : !isEdit ? (
+											<span
+												className={styles.photoEmpty}
+												role="img"
+												aria-label={`${slot.label}: ${
+													publicReadStatus === "ready"
+														? "no photo added"
+														: publicReadStatus === "loading"
+															? "checking photo availability"
+															: "photo availability unknown"
+												}`}
+											>
+												<Icon name={cfg.icon} size={20} aria-hidden />
+												<span>
+													{publicReadStatus === "ready"
+														? "No photo"
+														: publicReadStatus === "loading"
+															? "Checking…"
+															: "Availability unknown"}
+												</span>
+											</span>
+										) : null}
 								{isEdit && uploadingSlots.has(slot.id) ? (
 										<span
 											className={styles.cameraButton}
@@ -772,8 +855,14 @@ export function BenefitTrustModal(props: BenefitTrustModalProps) {
 							</div>
 						);
 					})}
-				</div>
-				)}
+					</div>
+					{!isEdit && publicReadStatus === "ready" ? (
+						<p className={styles.photoStatus} role="status">
+							{filledPhotoCount} of {configuredSlots.length} photo categories added
+						</p>
+					) : null}
+					</>
+					)}
 			</section>
 			) : null}
 

@@ -1,18 +1,9 @@
 import Image from "next/image"
 import Link from "next/link"
 import { Icon, VerifiedHostBadge } from "@explore-and-earn/ui"
-import type { ResponsiveImage } from "@explore-and-earn/contracts"
+import type { ListingHostSummary } from "@explore-and-earn/contracts"
 import { ListingSection } from "./ListingSection"
 import styles from "./HostSummaryBlock.module.css"
-
-export interface ListingHostSummary {
-	readonly id: string
-	readonly name: string
-	readonly location?: string
-	readonly verified: boolean
-	readonly tagline?: string
-	readonly avatar?: ResponsiveImage
-}
 
 export function HostSummaryBlock({ host }: { readonly host: ListingHostSummary }) {
 	const profileHref = host.id ? `/host/${host.id}` : null
@@ -20,7 +11,7 @@ export function HostSummaryBlock({ host }: { readonly host: ListingHostSummary }
 		// Rendered through the shared section shell so this block gets a real
 		// heading like every other major section on the page. The page owns the
 		// actions — no apply CTA here.
-		<ListingSection title="About the host" icon="nav.hosts" headingId="listing-host">
+		<ListingSection title="Host" icon="nav.hosts" headingId="listing-host">
 			<div className={styles.card}>
 				<div className={styles.header}>
 					{host.avatar ? (

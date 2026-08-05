@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,7 +7,43 @@ import {
   isPrivateHostDashboardPath,
 } from "../../lib/hostRoutes";
 
+const hostOverview = readFileSync(
+  new URL("../../app/[locale]/(host)/host/page.tsx", import.meta.url),
+  "utf8",
+);
+const hostShell = readFileSync(
+  new URL("../../components/host/HostShell.tsx", import.meta.url),
+  "utf8",
+);
+const hostCoach = readFileSync(
+  new URL("../../app/[locale]/(host)/host/coach/page.tsx", import.meta.url),
+  "utf8",
+);
+const hostSeeker = readFileSync(
+  new URL("../../app/[locale]/(host)/host/seeker/[id]/page.tsx", import.meta.url),
+  "utf8",
+);
+
 describe("private host dashboard routes", () => {
+  it("owns exactly one main landmark in the shared host shell", () => {
+    expect(hostShell).toContain('<main className={styles.content}>');
+    expect(hostCoach).not.toContain("<main");
+    expect(hostSeeker).not.toContain("<main");
+  });
+
+  it("renders deterministic review state before starting host data reads", () => {
+    const devGate = hostOverview.indexOf(
+      'isDevBenchEnabled() && (await readDevRole()) === "host"',
+    );
+    const devHostRead = hostOverview.indexOf("devHostProfile()", devGate);
+    const authRead = hostOverview.indexOf("await auth()", devGate);
+
+    expect(devGate).toBeGreaterThan(-1);
+    expect(devHostRead).toBeGreaterThan(devGate);
+    expect(authRead).toBeGreaterThan(devGate);
+    expect(devHostRead).toBeLessThan(authRead);
+  });
+
   it.each([
     "/host",
     "/host/applicants",

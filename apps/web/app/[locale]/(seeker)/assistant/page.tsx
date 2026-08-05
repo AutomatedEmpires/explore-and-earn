@@ -69,7 +69,7 @@ export default async function AssistantPage({
     : undefined;
 
   return (
-    <main className={styles.page}>
+    <section className={styles.page}>
       <header className={styles.header}>
         <h1 className={styles.title}>Your guide</h1>
         <p className={styles.subtitle}>
@@ -91,6 +91,6 @@ export default async function AssistantPage({
           <p className={styles.unavailableSub}>Check back once it’s switched on.</p>
         </div>
       )}
-    </main>
+    </section>
   );
 }

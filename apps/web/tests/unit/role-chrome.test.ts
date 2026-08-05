@@ -28,6 +28,8 @@ const SHELLS = [
   "components/admin/AdminShell.tsx",
   "components/seeker/SeekerShell.tsx",
 ] as const;
+const adminLayout = read("app/[locale]/(admin)/layout.tsx");
+const adminHosts = read("app/[locale]/(admin)/hosts/page.tsx");
 
 describe("the role pill", () => {
   const pill = read("components/global/RolePill.tsx");
@@ -85,6 +87,20 @@ describe("the role pill", () => {
 
   it("left no orphaned scope-badge styling behind in the header", () => {
     expect(read("components/global/GlobalHeader.module.css")).not.toContain(".scopeBadge {");
+  });
+});
+
+describe("workspace landmarks and local admin review state", () => {
+  it.each(SHELLS)("gives the %s content one shared main landmark", (shell) => {
+    expect(read(shell).match(/<main\b/g)).toHaveLength(1);
+  });
+
+  it("keeps the admin host queue independent of local Supabase", () => {
+    expect(adminLayout).toContain(
+      'isDevBenchEnabled() && (await readDevRole()) === "admin"',
+    );
+    expect(adminHosts).toContain("const isDevReview =");
+    expect(adminHosts).toContain("totalPages: 1");
   });
 });
 

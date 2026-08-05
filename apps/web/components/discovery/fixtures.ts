@@ -1,4 +1,22 @@
 import type { DiscoveryListing } from "./listing";
+import { DISCOVERY_FIXTURE_IDS } from "./fixtureIds";
+
+/**
+ * Explicit identities for the dev-bench hosts behind first-party fixtures.
+ *
+ * These are deliberately namespaced, non-UUID keys: they make fixture routes
+ * linkable without pretending that a fixture owns a persisted host_profiles
+ * row. Production resolvers reject them, and sourced inventory never receives
+ * one.
+ */
+export const FIXTURE_HOST_IDS = {
+  cascadeBloomOrchards: "fixture_host_cascade_bloom_orchards",
+  northPacificFisheries: "fixture_host_north_pacific_fisheries",
+  driftworkCollective: "fixture_host_driftwork_collective",
+  summitPassHospitality: "fixture_host_summit_pass_hospitality",
+  tejoGreenHouse: "fixture_host_tejo_green_house",
+  stoneHollowVineyard: "fixture_host_stone_hollow_vineyard",
+} as const;
 
 /**
  * Typed Discovery fixtures — NO backend (Sprint Zero). Every entry conforms to
@@ -20,7 +38,7 @@ import type { DiscoveryListing } from "./listing";
  */
 export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
   {
-    id: "lst_orchard_wenatchee",
+    id: DISCOVERY_FIXTURE_IDS.orchardWenatchee,
     title: "Orchard Harvest Hand",
     category: "farm",
     location: "Wenatchee, Washington",
@@ -29,7 +47,14 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     begins: "Aug 12, 2026",
     ends: "Oct 28, 2026",
     status: "live",
-    host: { name: "Cascade Bloom Orchards", verified: true, tier: "professional", tagline: "Family orchards in the Wenatchee valley. Harvest season with bunkhouse and farm-fresh meals." },
+    host: {
+      id: FIXTURE_HOST_IDS.cascadeBloomOrchards,
+      name: "Cascade Bloom Orchards",
+      verified: true,
+      tier: "professional",
+      tagline:
+        "Family orchards in the Wenatchee valley. Harvest season with bunkhouse and farm-fresh meals.",
+    },
     benefits: {
       housing: { provision: "provided", summary: "Shared bunkhouse" },
       meals: { provision: "partial", summary: "Lunch on shift" },
@@ -59,7 +84,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     },
   },
   {
-    id: "lst_deckhand_sitka",
+    id: DISCOVERY_FIXTURE_IDS.deckhandSitka,
     title: "Deckhand — Salmon Season",
     category: "maritime",
     location: "Sitka, Alaska",
@@ -68,7 +93,14 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     begins: "Jun 3, 2026",
     ends: "Aug 29, 2026",
     status: "live",
-    host: { name: "North Pacific Fisheries Co-op", verified: true, tier: "enterprise", tagline: "Commercial salmon fishing on the Alaskan coast. Big seas, full board, bigger pay." },
+    host: {
+      id: FIXTURE_HOST_IDS.northPacificFisheries,
+      name: "North Pacific Fisheries Co-op",
+      verified: true,
+      tier: "enterprise",
+      tagline:
+        "Commercial salmon fishing on the Alaskan coast. Big seas, full board, bigger pay.",
+    },
     benefits: {
       housing: { provision: "provided", summary: "Cabin berth aboard" },
       meals: { provision: "provided", summary: "All meals aboard" },
@@ -99,14 +131,21 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     },
   },
   {
-    id: "lst_remote_community",
+    id: DISCOVERY_FIXTURE_IDS.remoteCommunity,
     title: "Remote Community Manager",
     category: "remote",
     location: "Remote · Worldwide",
     opportunityWindow: "Year-round",
     begins: "Rolling",
     status: "live",
-    host: { name: "Driftwork Collective", verified: false, tier: "none", tagline: "Fully remote operations. Build community from anywhere — no office, no commute." },
+    host: {
+      id: FIXTURE_HOST_IDS.driftworkCollective,
+      name: "Driftwork Collective",
+      verified: false,
+      tier: "none",
+      tagline:
+        "Fully remote operations. Build community from anywhere — no office, no commute.",
+    },
     benefits: {
       housing: { provision: "not_provided", summary: "Not included" },
       meals: { provision: "not_provided", summary: "Not included" },
@@ -136,7 +175,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     },
   },
   {
-    id: "lst_ski_resort_breck",
+    id: DISCOVERY_FIXTURE_IDS.skiResortBreck,
     title: "Ski Resort Front Desk",
     category: "seasonal",
     location: "Breckenridge, Colorado",
@@ -145,7 +184,14 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     begins: "Nov 14, 2026",
     ends: "Apr 18, 2027",
     status: "live",
-    host: { name: "Summit Pass Hospitality", verified: true, tier: "professional", tagline: "Mountain resort operations in the Colorado Rockies. Ski season with dorm housing and cafeteria." },
+    host: {
+      id: FIXTURE_HOST_IDS.summitPassHospitality,
+      name: "Summit Pass Hospitality",
+      verified: true,
+      tier: "professional",
+      tagline:
+        "Mountain resort operations in the Colorado Rockies. Ski season with dorm housing and cafeteria.",
+    },
     benefits: {
       housing: { provision: "provided", summary: "Staff dorm room" },
       meals: { provision: "partial", summary: "Staff cafeteria" },
@@ -175,7 +221,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     },
   },
   {
-    id: "lst_eco_hostel_lisbon",
+    id: DISCOVERY_FIXTURE_IDS.ecoHostelLisbon,
     title: "Eco-Hostel Allrounder",
     category: "mix",
     location: "Lisbon, Portugal",
@@ -183,7 +229,14 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     opportunityWindow: "Flexible · 3+ months",
     begins: "Flexible",
     status: "live",
-    host: { name: "Tejo Green House", verified: true, tier: "starter", tagline: "Lisbon eco-hostel life. Communal dinners, vibrant guests, private room included." },
+    host: {
+      id: FIXTURE_HOST_IDS.tejoGreenHouse,
+      name: "Tejo Green House",
+      verified: true,
+      tier: "starter",
+      tagline:
+        "Lisbon eco-hostel life. Communal dinners, vibrant guests, private room included.",
+    },
     benefits: {
       housing: { provision: "provided", summary: "Private room" },
       meals: { provision: "provided", summary: "Communal dinner daily" },
@@ -211,7 +264,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     },
   },
   {
-    id: "lst_vineyard_napa",
+    id: DISCOVERY_FIXTURE_IDS.vineyardNapa,
     title: "Vineyard Cellar Assistant",
     category: "farm",
     location: "Napa, California",
@@ -220,7 +273,14 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
     begins: "Sep 8, 2026",
     ends: "Nov 21, 2026",
     status: "live",
-    host: { name: "Stone Hollow Vineyard", verified: false, tier: "none", tagline: "Boutique vineyard in Napa wine country. Harvest season under California sun." },
+    host: {
+      id: FIXTURE_HOST_IDS.stoneHollowVineyard,
+      name: "Stone Hollow Vineyard",
+      verified: false,
+      tier: "none",
+      tagline:
+        "Boutique vineyard in Napa wine country. Harvest season under California sun.",
+    },
     benefits: {
       housing: { provision: "partial", summary: "Tent platform site" },
       meals: { provision: "not_provided", summary: "Not included" },
@@ -238,7 +298,7 @@ export const DISCOVERY_FIXTURES: readonly DiscoveryListing[] = [
   {
     // A SOURCED fixture (dev/preview only) so the sourced-card journey renders
     // without a backend: no host, source attribution, meals NOT STATED.
-    id: "lst_sourced_kelp_farm",
+    id: DISCOVERY_FIXTURE_IDS.sourcedKelpFarm,
     title: "Kelp Farm Field Technician",
     category: "maritime",
     location: "Kodiak, Alaska",

@@ -66,14 +66,15 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
   // DEV MOCK BENCH (review tooling only): present a clean impersonated identity
   // and skip the DB reads that would fail on the bench's sentinel token. No-op
   // in production/preview (isDevBenchEnabled() is false).
-  if (isDevBenchEnabled() && (await readDevRole())) {
+  if (isDevBenchEnabled() && (await readDevRole()) === "seeker") {
     return {
       unreadCount: 0,
       clerkUserId: DEV_USER_ID,
       needsOnboarding: false,
       seekerName: devSeekerName(),
-      // Service-role query — works on the bench (bypasses the sentinel token).
-      unreadCommunity: await getCommunityUnreadCount(DEV_USER_ID),
+      // Deterministic review state: never wait on a local database that may be
+      // configured in .env.local but intentionally stopped.
+      unreadCommunity: 0,
       profileScore: 78,
     };
   }
