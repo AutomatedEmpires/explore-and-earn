@@ -6,8 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 export interface CommandSearchProps {
   /** Route the query submits to (GET-style navigation with ?<param>=). */
   readonly action: string;
-  /** Placeholder / accessible label text. */
+  /** Concise visual placeholder text. */
   readonly placeholder: string;
+  /** Rich accessible name when the concise placeholder needs more context. */
+  readonly ariaLabel?: string;
   /** Query param name the target surface reads. Defaults to "q". */
   readonly paramName?: string;
   /** Scope search class (e.g. "seekeros-search") — keeps the shell styling. */
@@ -26,6 +28,7 @@ export interface CommandSearchProps {
 export function CommandSearch({
   action,
   placeholder,
+  ariaLabel = placeholder,
   paramName = "q",
   className,
 }: CommandSearchProps) {
@@ -81,7 +84,7 @@ export function CommandSearch({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
-        aria-label={placeholder}
+        aria-label={ariaLabel}
         className="cmdsearch-input"
         autoComplete="off"
         enterKeyHint="search"

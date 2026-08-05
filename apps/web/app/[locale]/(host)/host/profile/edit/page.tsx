@@ -65,6 +65,22 @@ export default async function HostProfileEditPage() {
     housingOfferedGenerally: hostProfile?.housingOfferedGenerally ?? false,
     mealsOfferedGenerally: hostProfile?.mealsOfferedGenerally ?? false,
     categoryScopes: hostProfile?.categoryScopes ?? [],
+    whyWorkForUs: hostProfile?.narrative.whyWorkForUs,
+    team: hostProfile?.narrative.team,
+    activities: hostProfile?.narrative.activities,
+    perks: hostProfile?.narrative.perks,
+    culture: hostProfile?.narrative.culture,
+    managementApproach: hostProfile?.narrative.managementApproach,
+    typicalDay: hostProfile?.narrative.typicalDay,
+    workEnvironment: hostProfile?.narrative.workEnvironment,
+    seasonRhythm: hostProfile?.narrative.seasonRhythm,
+    training: hostProfile?.narrative.training,
+    transportation: hostProfile?.narrative.transportation,
+    remoteness: hostProfile?.narrative.remoteness,
+    nearbyServices: hostProfile?.narrative.nearbyServices,
+    housingDescription: hostProfile?.narrative.housingDescription,
+    mealsDescription: hostProfile?.narrative.mealsDescription,
+    faqs: hostProfile?.narrative.faqs,
   };
 
   return (

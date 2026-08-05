@@ -77,6 +77,14 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ["@explore-and-earn/ui", "@explore-and-earn/contracts", "@explore-and-earn/db"],
   experimental: {
+    // A custom webpack hook disables Next's build worker auto-detection. Keep
+    // compilation isolated so the production builder can reclaim compiler
+    // memory between phases instead of exceeding Vercel's standard 8 GB
+    // container. The hook below only adds a development Clerk alias.
+    webpackBuildWorker: true,
+    // Reduce Webpack's peak allocation while building the large App Router
+    // surface. This trades a little build time for materially lower memory.
+    webpackMemoryOptimizations: true,
     // Raw images are capped at 4 MiB; this leaves framing room under Vercel's
     // non-configurable 4.5 MB Function request-body limit. The action then
     // validates, decodes, and re-encodes before persistence.

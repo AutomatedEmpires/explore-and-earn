@@ -42,6 +42,15 @@ function catIcon(scope: string): CatIcon {
   return map[scope] ?? "category.mix";
 }
 
+function companyMonogram(companyName: string): string {
+  const words = companyName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const initials = words.slice(0, 3).map((word) => word[0]?.toUpperCase() ?? "").join("");
+  return initials || "HOST";
+}
+
 export function HostProfileHero({
   host,
   coverPhotoUrl,
@@ -84,7 +93,7 @@ export function HostProfileHero({
 
       {/* ── Identity row — overlaps cover ── */}
       <div className={styles.identity}>
-        {/* Avatar */}
+        {/* Organization logo or generated monogram fallback. */}
         <div className={styles.avatarCol}>
           <div className={styles.avatarRing}>
             {host.photoUrl ? (
@@ -97,8 +106,12 @@ export function HostProfileHero({
                 />
               </div>
             ) : (
-              <div className={styles.avatarPlaceholder}>
-                <Icon name="nav.profile" size={24} aria-hidden />
+              <div
+                className={styles.avatarPlaceholder}
+                role="img"
+                aria-label={`${host.companyName} monogram`}
+              >
+                {companyMonogram(host.companyName)}
               </div>
             )}
           </div>

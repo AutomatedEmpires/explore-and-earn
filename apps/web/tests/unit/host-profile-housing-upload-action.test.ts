@@ -272,6 +272,21 @@ describe("uploadHousingLibraryPhotoAction persistence", () => {
 });
 
 describe("updateHostProfileAction Housing cleanup", () => {
+  it("ignores an ungranted narrative payload while preserving legacy profile edits", async () => {
+    authAs("user-1");
+    const stalePayload = {
+      companyName: "Juniper Wake Lodge",
+      narrative: { whyWorkForUs: "This must not reach PostgREST." },
+    } as unknown as Parameters<typeof updateHostProfileAction>[0];
+
+    await expect(updateHostProfileAction(stalePayload)).resolves.toEqual({ ok: true });
+    expect(dbMocks.updateHostProfileDetails).toHaveBeenCalledWith(
+      "session-token",
+      "user-1",
+      { companyName: "Juniper Wake Lodge" },
+    );
+  });
+
   it("deletes only removed library objects after the profile update succeeds", async () => {
     authAs("user-1");
 

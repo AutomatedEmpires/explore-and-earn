@@ -42,6 +42,11 @@ const HIDE_PREFIXES: readonly string[] = [
   "/help",
   "/home",
   "/onboarding",
+  // Public walkthroughs render the canonical product shells and own their
+  // complete viewport chrome. Their marketing entry pages remain outside the
+  // demo namespace and therefore retain the public footer.
+  "/for-hosts/demo",
+  "/for-seekers/demo",
   // Admin OS scope (founder moderation command center)
   "/admin",
   "/listings",

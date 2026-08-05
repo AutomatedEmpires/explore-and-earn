@@ -75,14 +75,25 @@ export interface HostShellProps {
    * missing one in front of a prospect.
    */
   readonly accountState?: string | null;
+  /** @deprecated Prefer unreadMessages; retained for older isolated callers. */
   readonly unread?: number;
+  readonly unreadMessages?: number;
+  readonly unreadNotifications?: number;
+  /**
+   * Canonical destination -> isolated destination. Used by the public demo so
+   * this exact shell can render without sending a visitor into authenticated
+   * routes. Omitted in the real workspace.
+   */
+  readonly routeMap?: Readonly<Record<string, string>>;
+  /** Removes persisted coachmarks and account-state prompts in demo mode. */
+  readonly demoMode?: boolean;
   readonly children: ReactNode;
 }
 
-function isActive(pathname: string, def: NavDef): boolean {
-  return def.exact
-    ? pathname === def.href
-    : pathname === def.href || pathname.startsWith(`${def.href}/`);
+function isActive(pathname: string, href: string, exact?: boolean): boolean {
+  return exact
+    ? pathname === href
+    : pathname === href || pathname.startsWith(`${href}/`);
 }
 
 export function HostShell({
@@ -90,17 +101,32 @@ export function HostShell({
   photoUrl,
   accountState,
   unread = 0,
+  unreadMessages,
+  unreadNotifications = 0,
+  routeMap = {},
+  demoMode = false,
   children,
 }: HostShellProps) {
   const pathname = usePathname();
+  const messageUnread = unreadMessages ?? unread;
 
-  const toItem = (def: NavDef): ScopeNavItem => ({
-    href: def.href,
-    label: def.label,
-    icon: def.icon,
-    active: isActive(pathname, def),
-    badge: def.badgeKey === "unread" && unread > 0 ? unread : undefined,
-  });
+  const hrefFor = (href: string): string => routeMap[href] ?? href;
+
+  const toItem = (def: NavDef): ScopeNavItem => {
+    const href = hrefFor(def.href);
+    return {
+      href,
+      label: def.label,
+      icon: def.icon,
+      active: isActive(pathname, href, def.exact),
+      badge:
+        def.badgeKey === "messages" && messageUnread > 0
+          ? messageUnread
+          : def.badgeKey === "notifications" && unreadNotifications > 0
+            ? unreadNotifications
+            : undefined,
+    };
+  };
 
   const navGroups: ScopeNavGroup[] = HOST_NAV_GROUPS.map((group) => ({
     heading: group.heading,
@@ -113,7 +139,7 @@ export function HostShell({
     : undefined;
 
   const brand = (
-    <Link href="/host" className={styles.brand} aria-label="Explore & Earn — Host home">
+    <Link href={hrefFor("/host")} className={styles.brand} aria-label="Explore & Earn — Host home">
       <span className={styles.brandMark} aria-hidden>E</span>
       <span className={styles.brandWord}>Explore&amp;Earn</span>
     </Link>
@@ -135,7 +161,7 @@ export function HostShell({
         brand={brand}
         groups={navGroups}
         userName={companyName ?? "Your farm"}
-        userHref="/host/profile"
+        userHref={hrefFor("/host/profile")}
         avatar={avatar}
         menuLabel="Open host menu"
         railId={HOST_COACHMARK_TARGETS.rail}
@@ -143,7 +169,7 @@ export function HostShell({
 
       <div className={styles.main}>
         <header className={styles.topbar}>
-          <Link href="/host" className={styles.topLead} aria-label="Explore & Earn — Host home">
+          <Link href={hrefFor("/host")} className={styles.topLead} aria-label="Explore & Earn — Host home">
             <span className={styles.topMark} aria-hidden>E</span>
             <span className={styles.topScope}>
               <b>Explore&amp;Earn</b>
@@ -154,19 +180,37 @@ export function HostShell({
           <div className={styles.topActions}>
             <Link
               className={styles.newBtn}
-              href="/host/listings/new"
+              href={hrefFor("/host/listings/new")}
               id={HOST_COACHMARK_TARGETS.create}
             >
               <span aria-hidden>+</span>
               <span className={styles.newLabel}>Create listing</span>
             </Link>
-            <Link className={styles.bell} href="/host/messages" aria-label="Messages">
+            <Link
+              className={`${styles.bell} ${styles.messageAction}`}
+              href={hrefFor("/host/messages")}
+              aria-label="Messages"
+            >
               <Icon name="nav.messages" size={20} aria-hidden />
-              {unread > 0 ? (
-                <span className={styles.bellBadge}>{unread > 99 ? "99+" : unread}</span>
+              {messageUnread > 0 ? (
+                <span className={styles.bellBadge}>
+                  {messageUnread > 99 ? "99+" : messageUnread}
+                </span>
               ) : null}
             </Link>
-            <Link className={styles.account} href="/host/profile" aria-label="Account &amp; profile">
+            <Link
+              className={styles.bell}
+              href={hrefFor("/host/notifications")}
+              aria-label="Notifications"
+            >
+              <Icon name="nav.notifications" size={20} aria-hidden />
+              {unreadNotifications > 0 ? (
+                <span className={styles.bellBadge}>
+                  {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                </span>
+              ) : null}
+            </Link>
+            <Link className={styles.account} href={hrefFor("/host/profile")} aria-label="Account &amp; profile">
               <span className={styles.accountAvatar} style={avatarStyle} aria-hidden>
                 {photoUrl ? null : initial}
               </span>
@@ -175,10 +219,12 @@ export function HostShell({
         </header>
         {/* Between the bar and the content on purpose: in the reading order a
             host meets it once, above their work, and it scrolls away. */}
-        <HostActivationBanner
-          accountState={accountState}
-          id={HOST_COACHMARK_TARGETS.activation}
-        />
+        {demoMode ? null : (
+          <HostActivationBanner
+            accountState={accountState}
+            id={HOST_COACHMARK_TARGETS.activation}
+          />
+        )}
         <main className={styles.content}>{children}</main>
       </div>
 
@@ -189,7 +235,9 @@ export function HostShell({
         session, so the coachmark also skips a stop whose target never appears —
         a mark pointing at nothing is a tour of a page the host cannot see.
       */}
-      <HostCoachmarks showActivationStop={accountState === "prospect"} />
+      {demoMode ? null : (
+        <HostCoachmarks showActivationStop={accountState === "prospect"} />
+      )}
     </div>
   );
 }

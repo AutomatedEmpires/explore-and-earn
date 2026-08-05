@@ -24,6 +24,12 @@ interface Props {
   readonly hostAvatarUrl?: string | null;
   /** Above-the-fold cards load the cover eagerly for a clean LCP. */
   readonly priority?: boolean;
+  /**
+   * Optional isolated destination. Public product pages omit this and keep the
+   * canonical `/listing/:id` route; walkthroughs provide a namespaced route so
+   * sample IDs can never fall through to production lookups.
+   */
+  readonly href?: string;
 }
 
 /**
@@ -40,9 +46,10 @@ export function PublicListingCard({
   hostVerified,
   hostAvatarUrl,
   priority = false,
+  href: hrefOverride,
 }: Props) {
   const router = useRouter();
-  const href = `/listing/${listing.id}`;
+  const href = hrefOverride ?? `/listing/${listing.id}`;
 
   const data: DiscoveryCardData = {
     id: listing.id,

@@ -72,6 +72,11 @@ describe("host benefit-library rollout gate", () => {
     expect(formSource).toContain("Discard unsaved changes");
   });
 
+  it("keeps unsupported public-story writes out of authenticated profile saves", () => {
+    expect(formSource).toContain("Public story editing is temporarily read-only");
+    expect(formSource).not.toContain("narrative: {");
+  });
+
   it("explains when Housing photos are unavailable during the rollout", () => {
     expect(benefitTrustModalSource).toContain(
       'housingPhotoLibraryAvailable === false',

@@ -119,6 +119,7 @@ describe("host rail groups (D17)", () => {
       "Applicants",
       "Outreach",
       "Messages",
+      "Notifications",
       "Announcements",
       "Analytics",
     ]);
@@ -169,13 +170,20 @@ describe("host rail groups (D17)", () => {
     );
     // The top bar's links, in render order after the rail is configured.
     const topBar = shell.slice(shell.indexOf("<header className={styles.topbar}>"));
-    const topHrefs = [...topBar.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+    const topHrefs = [
+      ...topBar.matchAll(
+        /href=(?:"([^"]+)"|\{hrefFor\("([^"]+)"\)\})/g,
+      ),
+    ].map((match) => match[1] ?? match[2]);
     const duplicated = topHrefs.filter(
       (href) => railHrefs.has(href) && href !== "/host",
     );
-    // "/host" is the brand's home link, not a nav item; /host/messages and
-    // /host/profile are reachable from the bar as the messages + account
-    // affordances D17 explicitly keeps there.
-    expect(duplicated.sort()).toEqual(["/host/messages", "/host/profile"]);
+    // "/host" is the brand's home link, not a nav item; messages,
+    // notifications, and profile are also reachable from the compact bar.
+    expect(duplicated.sort()).toEqual([
+      "/host/messages",
+      "/host/notifications",
+      "/host/profile",
+    ]);
   });
 });

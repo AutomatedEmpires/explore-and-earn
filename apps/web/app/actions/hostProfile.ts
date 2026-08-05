@@ -9,6 +9,7 @@ import {
 	setMyHousingLibraryPhoto,
 	updateHostProfileDetails,
 	uploadTrustedListingMedia,
+	type HostProfileDetailsInput,
 	type SocialLinks,
 } from "@explore-and-earn/db"
 import {
@@ -269,6 +270,38 @@ export interface UpdateHostProfileInput {
 }
 
 /**
+ * Copy only columns covered by the authenticated host-profile UPDATE grant.
+ * Server-action payloads remain untrusted at runtime, so an old or forged
+ * client cannot smuggle `narrative` (or an internal profile field) into the
+ * database patch through object spread.
+ */
+function writableHostProfileDetails(
+	fields: UpdateHostProfileInput,
+): HostProfileDetailsInput {
+	const writable: HostProfileDetailsInput = {}
+	if (fields.companyName !== undefined) writable.companyName = fields.companyName
+	if (fields.hostName !== undefined) writable.hostName = fields.hostName
+	if (fields.tagline !== undefined) writable.tagline = fields.tagline
+	if (fields.about !== undefined) writable.about = fields.about
+	if (fields.primaryLocationName !== undefined) {
+		writable.primaryLocationName = fields.primaryLocationName
+	}
+	if (fields.websiteUrl !== undefined) writable.websiteUrl = fields.websiteUrl
+	if (fields.photoUrl !== undefined) writable.photoUrl = fields.photoUrl
+	if (fields.socialLinks !== undefined) writable.socialLinks = fields.socialLinks
+	if (fields.housingOfferedGenerally !== undefined) {
+		writable.housingOfferedGenerally = fields.housingOfferedGenerally
+	}
+	if (fields.mealsOfferedGenerally !== undefined) {
+		writable.mealsOfferedGenerally = fields.mealsOfferedGenerally
+	}
+	if (fields.categoryScopes !== undefined) {
+		writable.categoryScopes = fields.categoryScopes
+	}
+	return writable
+}
+
+/**
  * Server action: update the authenticated host's profile details.
  *
  * Writes company_name, about, primary_location_name, website_url, and photo_url
@@ -311,7 +344,7 @@ async function updateHostProfileActionImpl(
 	}
 
 	const result = await updateHostProfileDetails(token, userId, {
-		...fields,
+		...writableHostProfileDetails(fields),
 		...(cleanBenefitLibrary !== undefined
 			? { benefitLibrary: cleanBenefitLibrary }
 			: {}),

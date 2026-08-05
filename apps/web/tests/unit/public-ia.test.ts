@@ -178,11 +178,13 @@ describe("the door menus are keyboard operable", () => {
 // ─── /for-seekers gateway ──────────────────────────────────────────────────
 
 describe("the /for-seekers gateway", () => {
-  const page = read("app/[locale]/for-seekers/page.tsx");
+  const page = read("app/[locale]/for-seekers/SeekerMarketingPage.tsx");
   const body = code(page);
 
   it("is wrapped in the shared public chrome", () => {
-    expect(read("app/[locale]/for-seekers/layout.tsx")).toContain("<PublicShell>");
+    expect(read("app/[locale]/for-seekers/(marketing)/layout.tsx")).toContain(
+      "<PublicShell>",
+    );
   });
 
   it("leads with a real catalogue photograph, priority-loaded", () => {
