@@ -98,7 +98,7 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: var(--space-12);
-	min-height: 44px;
+	min-height: var(--tap-min);
 	padding: var(--space-8) var(--space-12);
 	border: 1px solid var(--border-soft);
 	border-radius: var(--radius-cell);
@@ -192,7 +192,7 @@
 .field select,
 .field textarea {
 	width: 100%;
-	min-height: 44px;
+	min-height: var(--tap-min);
 	padding: var(--space-8) var(--space-12);
 	border: 1px solid var(--border-ink);
 	border-radius: var(--radius-input);
@@ -202,7 +202,7 @@
 }
 
 .field textarea {
-	min-height: 88px;
+	min-height: calc(var(--tap-min) * 2);
 	resize: vertical;
 }
 
