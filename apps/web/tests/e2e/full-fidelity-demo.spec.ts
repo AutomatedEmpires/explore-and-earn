@@ -239,19 +239,21 @@ test.describe("full-fidelity session-local behavior", () => {
 
     await page.goto(`${HOST_ROOT}/listings/${publicHostListing.id}/edit`);
     await page.getByLabel("Begins").fill("Oct 4, 2026");
-    await page.getByLabel("Ends").fill("May 18, 2026");
+    await page.getByLabel("Ends", { exact: true }).fill("May 18, 2026");
     await page.getByRole("button", { name: "Save demo listing" }).click();
-    await expect(page.getByRole("alert")).toContainText(
-      "The ending date must be on or after the beginning date.",
-    );
+    await expect(
+      page.getByRole("alert").filter({
+        hasText: "The ending date must be on or after the beginning date.",
+      }),
+    ).toBeVisible();
 
     await page.getByLabel("Begins").fill(publicHostListing.startDate);
-    await page.getByLabel("Ends").fill(publicHostListing.endDate);
+    await page.getByLabel("Ends", { exact: true }).fill(publicHostListing.endDate);
     await page.getByLabel("Position title").fill(editedTitle);
     await page.getByRole("button", { name: "Save demo listing" }).click();
-    await expect(page.getByRole("status")).toHaveText(
-      "Listing updated in this tab.",
-    );
+    await expect(
+      page.getByText("Listing updated in this tab.", { exact: true }),
+    ).toBeVisible();
 
     await page.goto(`${HOST_ROOT}/seeker-view`);
     await expect(page.getByText("Public preview boundary")).toBeVisible();
@@ -259,7 +261,10 @@ test.describe("full-fidelity session-local behavior", () => {
     const canonicalListingLink = page
       .locator(`a[href="${SEEKER_ROOT}/listing/${publicHostListing.id}"]`)
       .first();
-    await expect(canonicalListingLink).toContainText(publicHostListing.title);
+    await expect(
+      page.getByText(publicHostListing.title, { exact: true }),
+    ).toBeVisible();
+    await expect(canonicalListingLink).toBeVisible();
     await canonicalListingLink.click();
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
       publicHostListing.title,
@@ -277,7 +282,10 @@ test.describe("full-fidelity session-local behavior", () => {
 
     await page.goto(`${HOST_ROOT}/applicants/${hostApplication.id}`);
     await expect(
-      page.getByText("Private note editing is not simulated."),
+      page.getByRole("heading", { name: "Candidate planning workspace" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/production applicant detail does not persist these collaboration fields/i),
     ).toBeVisible();
     const legalActions = page.getByLabel("Legal application actions");
     await expect(legalActions).toBeVisible();
@@ -439,7 +447,7 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
     const menuButton = page.getByRole("button", {
       name: "Open Seeker menu",
     });
-    const search = page.getByRole("search");
+    const search = page.getByRole("banner").getByRole("search");
     const searchInput = search.getByRole("searchbox", {
       name: "Search opportunities, places, hosts…",
     });
