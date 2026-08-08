@@ -28,14 +28,14 @@ export default function HostProfileLoading() {
       </div>
 
       <div className={styles.content}>
-        <aside className={styles.guide}>
+        <div className={styles.guide}>
           <div className={styles.guideTitle}><Skeleton variant="text" /></div>
           {FACT_KEYS.map((key) => (
             <div key={key} className={styles.fact}><Skeleton variant="text" /></div>
           ))}
           <div className={styles.guideAction}><Skeleton variant="rect" /></div>
-        </aside>
-        <main className={styles.main}>
+        </div>
+        <div className={styles.main}>
           <section className={styles.story}>
             <div className={styles.heading}><Skeleton variant="text" /></div>
             <div className={styles.copy}><Skeleton variant="text" /></div>
@@ -53,7 +53,7 @@ export default function HostProfileLoading() {
               ))}
             </div>
           </section>
-        </main>
+        </div>
       </div>
       <span className={styles.srOnly}>Loading host profile</span>
     </div>

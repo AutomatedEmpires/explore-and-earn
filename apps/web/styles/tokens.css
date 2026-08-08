@@ -185,6 +185,11 @@
   /* Public chrome contract. In-page sticky navigation offsets from the same
      value as GlobalHeader instead of guessing at its rendered height. */
   --size-public-header: 60px;
+  /* At <=860px: 12px top inset + 44px controls + 8px row gap + 44px
+     section row + its 1px divider. Safe-area inset is added at the call site. */
+  --size-public-header-mobile: calc(
+    var(--space-12) + var(--tap-min) + var(--space-8) + var(--tap-min) + 1px
+  );
 
   /* z-scale — one explicit stacking order for fixed chrome.
        content bars < docks < banners < overlays < lightbox            */

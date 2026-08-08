@@ -136,13 +136,13 @@ export function HostProfileHero({
           </div>
 
           {host.hostName || host.primaryLocationName || hostingSinceYear ? (
-            <p className={styles.identityMeta}>
-              {host.hostName ? <span>Led by {host.hostName}</span> : null}
+            <ul className={styles.identityMeta}>
+              {host.hostName ? <li>Led by {host.hostName}</li> : null}
               {host.primaryLocationName ? (
-                <span><Icon name="nav.map" size={15} aria-hidden />{host.primaryLocationName}</span>
+                <li><Icon name="nav.map" size={15} aria-hidden />{host.primaryLocationName}</li>
               ) : null}
-              {hostingSinceYear ? <span>Since {hostingSinceYear}</span> : null}
-            </p>
+              {hostingSinceYear ? <li>Since {hostingSinceYear}</li> : null}
+            </ul>
           ) : null}
 
           <div className={styles.statusRow}>

@@ -35,6 +35,8 @@
 	display: flex;
 	align-items: center;
 	gap: var(--space-10);
+	/* Fixed border-box height is the shared sticky offset contract used by the
+	   demo disclosure immediately below this bar. */
 	height: var(--host-topbar-height);
 	box-sizing: border-box;
 	padding: var(--space-10) var(--space-14);
@@ -120,8 +122,7 @@
    keeps the scope, primary action, notifications, and account without
    squeezing or creating horizontal overflow. */
 @media (max-width: 430px) {
-	.topLead,
-	.messageAction {
+	.topLead {
 		display: none;
 	}
 

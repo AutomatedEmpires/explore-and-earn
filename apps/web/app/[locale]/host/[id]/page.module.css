@@ -1,11 +1,17 @@
 .page {
+  --profile-header-offset: calc(
+    var(--size-public-header) + env(safe-area-inset-top, 0px)
+  );
+  --profile-anchor-offset: calc(
+    var(--profile-header-offset) + var(--tap-min) + var(--space-16)
+  );
   min-height: 100dvh;
   background: var(--color-paper);
 }
 
 .profileNavShell {
   position: sticky;
-  top: calc(var(--size-public-header) + env(safe-area-inset-top, 0px));
+  top: var(--profile-header-offset);
   z-index: var(--z-content-bar);
   border-bottom: 1px solid var(--border-soft);
   background: color-mix(in srgb, var(--color-surface-raised) 96%, transparent);
@@ -81,9 +87,15 @@
 .section,
 .weatherSection {
   min-width: 0;
-  scroll-margin-top: calc(
-    var(--size-public-header) + var(--tap-min) + var(--space-24)
-  );
+}
+
+/* Fragment IDs live on the listings section and on nested headings. Keep the
+   margin on the actual targets so sticky chrome never obscures them. */
+.section,
+.sectionHeading,
+.mainCol :global(#listing-weather),
+.mainCol :global(#reviews-heading) {
+  scroll-margin-top: var(--profile-anchor-offset);
 }
 
 /* The forecast owns its horizontal scrollport. Clip its off-screen days at
@@ -596,8 +608,8 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
-  background: var(--benefit-housing-bg);
-  color: var(--benefit-housing-fg);
+  background: var(--color-steel);
+  color: var(--color-cta);
 }
 
 .perkText {
@@ -612,6 +624,14 @@
   .teamGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .perkList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .promiseNote { display: block; }
+}
+
+@media (max-width: 53.75rem) {
+  .page {
+    --profile-header-offset: calc(
+      var(--size-public-header-mobile) + env(safe-area-inset-top, 0px)
+    );
+  }
 }
 
 @media (min-width: 56.25rem) {

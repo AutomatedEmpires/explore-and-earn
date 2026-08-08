@@ -184,13 +184,15 @@
   flex-wrap: wrap;
   gap: var(--space-6) var(--space-12);
   margin: var(--space-6) 0 0;
+  padding: 0;
+  list-style: none;
   color: var(--text-secondary);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   line-height: var(--type-meta-lh);
 }
 
-.identityMeta span {
+.identityMeta li {
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);

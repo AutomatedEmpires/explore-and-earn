@@ -10,7 +10,7 @@
 
 .disclosure {
   position: sticky;
-  top: var(--host-topbar-height, 65px);
+  top: var(--host-topbar-height);
   z-index: 20;
   display: flex;
   align-items: center;
@@ -1118,9 +1118,9 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-8);
     margin-inline: 0;
-    padding: 8px 10px;
+    padding: var(--space-8) var(--space-10);
   }
 
   .disclosureMark {
@@ -1128,8 +1128,8 @@
   }
 
   .disclosureCopy {
-    font-size: 0.76rem;
-    line-height: 1.35;
+    font-size: var(--type-caption-size);
+    line-height: var(--type-caption-lh);
     display: -webkit-box;
     overflow: hidden;
     -webkit-box-orient: vertical;
@@ -1137,8 +1137,8 @@
   }
 
   .resetButton {
-    min-height: 44px;
-    padding-inline: 10px;
+    min-height: var(--tap-min);
+    padding-inline: var(--space-10);
   }
 
   .stats,

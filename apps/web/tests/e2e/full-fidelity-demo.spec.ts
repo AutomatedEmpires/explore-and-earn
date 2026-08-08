@@ -769,6 +769,48 @@ test("public mobile header and dock do not collide or exceed the viewport", asyn
   }
 });
 
+test("public host profile navigation clears mobile chrome and anchor targets", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await useEssentialOnlyConsent(page);
+  await page.goto("/host/fixture_host_cascade_bloom_orchards");
+
+  const header = page.getByRole("banner").first();
+  const profileNav = page.getByRole("navigation", { name: "Host profile sections" });
+
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await page.waitForTimeout(100);
+  await page.evaluate(() => window.scrollBy(0, -96));
+  await page.waitForTimeout(200);
+
+  const [headerBox, profileNavBox] = await Promise.all([
+    header.boundingBox(),
+    profileNav.boundingBox(),
+  ]);
+  expect(headerBox, "public header is missing").not.toBeNull();
+  expect(profileNavBox, "profile navigation is missing").not.toBeNull();
+  expect(
+    profileNavBox?.y ?? 0,
+    "profile navigation overlaps the responsive public header",
+  ).toBeGreaterThanOrEqual(
+    (headerBox?.y ?? 0) + (headerBox?.height ?? 0) - 1,
+  );
+
+  await profileNav.getByRole("link", { name: "Story" }).click();
+  const [storyBox, anchoredNavBox] = await Promise.all([
+    page.getByRole("heading", { name: "About us" }).boundingBox(),
+    profileNav.boundingBox(),
+  ]);
+  expect(storyBox, "Story anchor target is missing").not.toBeNull();
+  expect(
+    storyBox?.y ?? 0,
+    "Story anchor is hidden beneath sticky profile navigation",
+  ).toBeGreaterThanOrEqual(
+    (anchoredNavBox?.y ?? 0) + (anchoredNavBox?.height ?? 0),
+  );
+});
+
 test("dense surfaces fit every launch viewport and attach responsive evidence", async ({
   page,
 }, testInfo) => {
