@@ -1389,12 +1389,21 @@ export function HostDemoProfileSection({ section }: { readonly section: "team" |
               </div>
               <span className={styles.sampleTag}>Illustrative demo forecast</span>
             </div>
-            <div className={styles.forecastGrid}>
+            <div
+              className={styles.forecastGrid}
+              role="list"
+              aria-label={`Illustrative 10-day forecast for ${hostDemoHost.location}`}
+              tabIndex={0}
+            >
               {hostDemoWeather.days.map((day) => (
-                <div className={styles.forecastDay} key={day.id}>
+                <div className={styles.forecastDay} key={day.id} role="listitem">
                   <span>{formatDate(day.date, { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" })}</span>
                   <strong>{day.condition}</strong>
-                  <small>{day.highF}° / {day.lowF}°F</small>
+                  <small>
+                    <span className={styles.srOnly}>High </span>
+                    {day.highF}° / <span className={styles.srOnly}>Low </span>
+                    {day.lowF}°F
+                  </small>
                 </div>
               ))}
             </div>

@@ -53,7 +53,8 @@
 .buttonQuiet,
 .buttonDanger,
 .segmentedButton {
-  min-height: 42px;
+  box-sizing: border-box;
+  min-height: var(--tap-min);
   border-radius: 999px;
   font: inherit;
   font-weight: 750;
@@ -63,7 +64,6 @@
 
 .resetButton {
   flex: 0 0 auto;
-  min-height: 34px;
   padding: 6px 12px;
   border: 1px solid var(--border-default);
   background: var(--color-surface);
@@ -962,26 +962,37 @@
 }
 
 .forecastGrid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 9px;
+  display: flex;
+  gap: var(--space-8);
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  -webkit-overflow-scrolling: touch;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
   contain: inline-size;
-  padding-bottom: 4px;
+  padding-bottom: var(--space-8);
+}
+
+.forecastGrid:focus-visible {
+  outline: 2px solid var(--demo-green);
+  outline-offset: 2px;
+  border-radius: var(--radius-input);
 }
 
 .forecastDay {
   display: grid;
+  flex: 0 0 7.5rem;
   gap: 7px;
-  min-width: 120px;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 13px;
   border: 1px solid var(--border-soft);
   border-radius: 14px;
   background: var(--color-surface-raised);
+  scroll-snap-align: start;
 }
 
 .forecastDay span,
@@ -1112,6 +1123,11 @@
 
   .profileSupplement {
     padding-inline: 0;
+  }
+
+  .profileEditBar {
+    gap: var(--space-10);
+    padding: var(--space-12);
   }
 
   .disclosure {
