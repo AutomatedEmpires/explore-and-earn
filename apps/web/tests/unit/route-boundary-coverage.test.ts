@@ -92,6 +92,51 @@ describe("route boundary coverage (D23)", () => {
     expect(notFound).not.toContain('from "next/link"');
   });
 
+  it("gives a missing public employer profile an honest route-local recovery state", () => {
+    const notFoundPath = join(LOCALE_ROOT, "host/[id]/not-found.tsx");
+    expect(existsSync(notFoundPath)).toBe(true);
+
+    const notFound = readFileSync(notFoundPath, "utf8");
+    expect(notFound).toContain("<StatusCard");
+    expect(notFound).toContain('getTranslations("HostNotFound")');
+    expect(notFound).toContain('from "../../../../i18n/navigation"');
+    expect(notFound).toContain('getPathname({ locale, href: "/seek" })');
+    expect(notFound).toContain('getPathname({ locale, href: "/jobs" })');
+    expect(notFound).toContain("index: false");
+  });
+
+  it("keeps the shared root 404 provider-free and free of novelty copy", () => {
+    const appRoot = join(__dirname, "../../app");
+    const rootNotFound = readFileSync(join(appRoot, "not-found.tsx"), "utf8");
+    const localeNotFound = readFileSync(join(LOCALE_ROOT, "not-found.tsx"), "utf8");
+    const statusCard = readFileSync(
+      join(__dirname, "../../components/StatusCard.tsx"),
+      "utf8",
+    );
+
+    expect(rootNotFound).toContain("<StatusCard");
+    expect(localeNotFound).toContain("<StatusCard");
+    expect(rootNotFound).not.toContain("next-intl");
+    expect(statusCard).not.toContain("next-intl");
+    expect(statusCard).not.toMatch(/alien|cosmos|orion|🐄|🌿/i);
+  });
+
+  it("keeps workspace recovery inside the owning host and seeker shells", () => {
+    for (const group of ["(host)", "(seeker)"]) {
+      const error = readFileSync(join(LOCALE_ROOT, group, "error.tsx"), "utf8");
+      const notFound = readFileSync(
+        join(LOCALE_ROOT, group, "not-found.tsx"),
+        "utf8",
+      );
+      const scope = group === "(host)" ? "host" : "seeker";
+
+      expect(error).toContain(`scope="${scope}"`);
+      expect(notFound).toContain(`scope="${scope}"`);
+      expect(error).toContain('presentation="embedded"');
+      expect(notFound).toContain('presentation="embedded"');
+    }
+  });
+
   it.each(shellGroups())("%s has a loading state", (group) => {
     expect(hasBoundary(group, "loading.tsx")).toBe(true);
   });

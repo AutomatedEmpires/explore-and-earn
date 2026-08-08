@@ -20,5 +20,13 @@ export default function HostError({
 		setEventId(Sentry.lastEventId());
 	}, [error]);
 
-	return <StatusCard type="error" digest={eventId} onReset={reset} />;
+	return (
+		<StatusCard
+			type="error"
+			digest={eventId}
+			onReset={reset}
+			scope="host"
+			presentation="embedded"
+		/>
+	);
 }

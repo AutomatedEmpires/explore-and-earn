@@ -125,6 +125,71 @@ test.describe("public surfaces (guest)", () => {
     await expect(page.getByText(/couldn.t load this listing/i)).toHaveCount(0);
   });
 
+  for (const viewport of [
+    { width: 320, height: 568 },
+    { width: 390, height: 844 },
+  ]) {
+    test(`missing host profiles recover cleanly at ${viewport.width}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      const response = await page.goto("/host/not-a-valid-id");
+
+      // Dev responses stream with 200 even after notFound(); the production
+      // build owns the HTTP 404. Assert the semantic boundary and geometry here.
+      expect(response?.ok()).toBe(true);
+      await expect(page).toHaveTitle(/page not found/i);
+      await expect(
+        page.getByRole("heading", {
+          level: 1,
+          name: "This host profile isn’t available.",
+        }),
+      ).toBeVisible();
+      await expect(publicNav(page)).toBeVisible();
+
+      const status = page.locator("[data-status-card]");
+      const surface = page.locator("[data-status-surface]");
+      const actions = status.getByRole("link").filter({
+        hasText: /Browse opportunities|Explore work types/,
+      });
+      await expect(actions).toHaveCount(2);
+
+      const layout = await page.evaluate(() => {
+        const rect = document
+          .querySelector<HTMLElement>("[data-status-surface]")
+          ?.getBoundingClientRect();
+        return {
+          innerWidth: window.innerWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          surfaceLeft: rect?.left ?? -1,
+          surfaceRight: rect?.right ?? Number.POSITIVE_INFINITY,
+        };
+      });
+      expect(layout.scrollWidth).toBeLessThanOrEqual(layout.innerWidth);
+      expect(layout.surfaceLeft).toBeGreaterThanOrEqual(15);
+      expect(layout.surfaceRight).toBeLessThanOrEqual(layout.innerWidth - 15);
+
+      for (const action of await actions.all()) {
+        const box = await action.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+
+      const lastAction = actions.last();
+      await lastAction.evaluate((element) =>
+        element.scrollIntoView({ block: "center" }),
+      );
+      const [lastBox, dockBox] = await Promise.all([
+        lastAction.boundingBox(),
+        publicNav(page).boundingBox(),
+      ]);
+      expect(lastBox).not.toBeNull();
+      expect(dockBox).not.toBeNull();
+      expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(dockBox!.y);
+      await expect(surface).toBeVisible();
+    });
+  }
+
   test("signed-out host onboarding preserves the host auth lane", async ({
     page,
   }) => {

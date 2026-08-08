@@ -20,5 +20,12 @@ export default function LegalError({
 		setEventId(Sentry.lastEventId());
 	}, [error]);
 
-	return <StatusCard type="error" digest={eventId} onReset={reset} />;
+	return (
+		<StatusCard
+			type="error"
+			digest={eventId}
+			onReset={reset}
+			presentation="embedded"
+		/>
+	);
 }

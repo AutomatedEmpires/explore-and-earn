@@ -378,6 +378,12 @@
   --color-header-bg:  var(--palette-header);
   --color-cta:        var(--palette-sky);
   --color-cta-text:   #FFFFFF;
+  /* `--color-cta` becomes bright link ink in dark mode, so it cannot also be
+     a button ground. Action controls keep the deeper palette seed in every
+     theme and opt-in palette; both normal and hover grounds carry white at AA. */
+  --color-action-ground:       var(--palette-sky);
+  --color-action-ground-hover: var(--palette-sky-hover);
+  --color-action-text:         var(--color-cta-text);
   --color-action-soft: color-mix(in srgb, var(--palette-sky) 12%, var(--palette-white));
   --color-panel-dark: #16242A;   /* deep warm-ink panel (employer/CTA blocks) */
   --color-teal:       var(--palette-teal);
