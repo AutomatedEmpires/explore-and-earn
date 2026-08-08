@@ -1,6 +1,8 @@
 {
 	"Nav": {
 		"explore": "Explore",
+		"exploreJobs": "Explore jobs",
+		"workspace": "Workspace",
 		"community": "Community",
 		"forSeekers": "For Seekers",
 		"forHosts": "For Hosts",

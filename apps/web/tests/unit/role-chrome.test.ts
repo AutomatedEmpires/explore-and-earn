@@ -124,3 +124,80 @@ describe("the theme switcher", () => {
     expect(read("components/seeker/AppearanceControl.tsx")).toContain("ThemeSwitcher");
   });
 });
+
+describe("role-true public chrome", () => {
+  const shell = read("components/public/PublicShell.tsx");
+  const chrome = read("components/public/PublicChrome.tsx");
+  const header = read("components/global/GlobalHeader.tsx");
+  const bottomNav = read("components/public/PublicBottomNav.tsx");
+  const footerCss = read("components/SiteFooter.module.css");
+  const messages = JSON.parse(read("messages/en.json")) as {
+    Nav: Record<string, string>;
+  };
+
+  it("keeps the public Server Component static and delegates auth to its controller", () => {
+    expect(shell).toContain("<PublicChrome");
+    expect(shell).toContain("clerkConfigured={Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)}");
+    expect(shell).not.toContain("useAuth");
+    expect(shell).not.toContain("cookies(");
+  });
+
+  it("invokes Clerk only inside the configured child and begins with guest markup", () => {
+    expect(chrome).toContain("function ClerkPublicChrome");
+    expect(chrome).toContain("const { isLoaded, isSignedIn, userId } = useAuth()");
+    expect(chrome).toContain("if (clerkConfigured)");
+    expect(chrome).toContain("<ClerkPublicChrome>{children}</ClerkPublicChrome>");
+    expect(chrome).toContain('<ChromeFrame role="guest" state="guest">');
+  });
+
+  it("uses a seeker fallback while a guarded no-store role request resolves", () => {
+    expect(chrome).toContain('fetch("/api/viewer/navigation"');
+    expect(chrome).toContain('cache: "no-store"');
+    expect(chrome).toContain("new AbortController()");
+    expect(chrome).toContain(
+      "isCurrentViewerRequest(activeUserId.current, requestUserId)",
+    );
+    expect(chrome).toContain("isViewerNavigationResponse(payload)");
+    expect(chrome).toContain("deriveClerkViewerSnapshot");
+  });
+
+  it("reads the local role cookie only behind the compile-time dev-bench gate", () => {
+    const gate = chrome.indexOf("if (devBenchEnabled)");
+    const mount = chrome.indexOf("<DevBenchPublicChrome>", gate);
+    expect(gate).toBeGreaterThan(-1);
+    expect(mount).toBeGreaterThan(gate);
+    expect(chrome).toContain("document.cookie");
+    expect(chrome).toContain("DEV_ROLE_COOKIE");
+  });
+
+  it("exposes stable role state and mounts the four-tab dock only for guest and seeker", () => {
+    expect(chrome).toContain("data-public-viewer-role={role}");
+    expect(chrome).toContain("data-public-viewer-state={state}");
+    expect(chrome).toContain('role === "guest" || role === "seeker"');
+    expect(bottomNav).toContain("data-public-bottom-nav");
+  });
+
+  it("routes each authenticated role to its own home, profile, and notifications", () => {
+    expect(header).toContain("PUBLIC_ROLE_DESTINATIONS[viewerRole]");
+    expect(header).toContain("const homeHref = destinations.home");
+    expect(header).toContain("const profileHref = destinations.profile");
+    expect(header).toContain("const notificationsHref = destinations.notifications");
+    expect(header).toContain('viewerRole === "seeker"');
+    expect(header).toContain('t("workspace")');
+    expect(header).toContain('t("exploreJobs")');
+    expect(messages.Nav.workspace).toBe("Workspace");
+    expect(messages.Nav.exploreJobs).toBe("Explore jobs");
+  });
+
+  it("keeps the header available to host and admin viewers on immersive seeker routes", () => {
+    expect(header).toContain(
+      '(viewerRole === "guest" || viewerRole === "seeker") &&',
+    );
+    expect(header).toContain("IMMERSIVE_ROUTES.some(");
+  });
+
+  it("reserves footer dock clearance only while the dock is mounted", () => {
+    expect(footerCss).toContain(":global(body:has([data-public-bottom-nav])) .footer");
+    expect(footerCss).toContain("@media (max-width: 1023px)");
+  });
+});

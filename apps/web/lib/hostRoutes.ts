@@ -21,11 +21,13 @@ export const HOST_DASHBOARD_SEGMENTS = [
   // briefly advertise two host-dashboard URLs as public.
   "assistant",
   "billing",
+  "checkout",
   "coach",
   "help",
   "invites",
   "listings",
   "messages",
+  "notifications",
   "onboarding",
   "outreach",
   // Plan selection before a host profile exists. Sits in the (host-onboard)

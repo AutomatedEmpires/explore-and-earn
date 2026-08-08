@@ -280,6 +280,36 @@ export async function getHostProfile(
   });
 }
 
+/**
+ * Resolve whether the authenticated Clerk user owns an active host profile.
+ *
+ * The authenticated client keeps RLS in force while the explicit owner and
+ * lifecycle filters provide defense in depth. Only the row id is selected: a
+ * navigation-role check must not load or expose profile content.
+ */
+export async function hasHostProfile(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<boolean> {
+  try {
+    const db = untypedClient(clerkToken);
+    const { data, error } = await db
+      .from("host_profiles")
+      .select("id")
+      .eq("clerk_user_id", clerkUserId)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error("lookup_failed");
+    return data !== null;
+  } catch {
+    const error = new Error("Host profile lookup failed.");
+    error.name = "HostProfileLookupError";
+    throw error;
+  }
+}
+
 export type HostSubscriptionTier =
   | "none"
   | "starter"

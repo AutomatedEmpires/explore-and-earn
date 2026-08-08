@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
 
+import { signInHref } from "../../lib/authRedirect";
+import type { PublicViewerRole } from "../../lib/publicNavigation";
 import styles from "./PublicBottomNav.module.css";
 
 // The user-scope dock (logged-out / public). Same pinned full-bleed design as
@@ -22,15 +24,23 @@ const TABS: ReadonlyArray<{
 	{ href: "/profile", label: "Profile", icon: "nav.profile" },
 ];
 
-export function PublicBottomNav() {
+export function PublicBottomNav({
+	viewerRole,
+}: {
+	readonly viewerRole: Extract<PublicViewerRole, "guest" | "seeker">;
+}) {
 	const pathname = usePathname();
 
 	return (
-		<nav className={styles.nav} aria-label="Primary">
+		<nav className={styles.nav} aria-label="Primary" data-public-bottom-nav>
 			<ul className={styles.list}>
 				{TABS.map((tab) => {
 					const active =
 						pathname === tab.href || pathname.startsWith(`${tab.href}/`);
+					const href =
+						viewerRole === "guest" && tab.href === "/profile"
+							? signInHref("seeker", "/profile")
+							: tab.href;
 
 					return (
 						<li key={tab.href} className={styles.item}>
@@ -40,7 +50,7 @@ export function PublicBottomNav() {
 										? `${styles.tab} ${styles.active} ui-pressable`
 										: `${styles.tab} ui-pressable`
 								}
-								href={tab.href}
+								href={href}
 								aria-current={active ? "page" : undefined}
 							>
 								<Icon name={tab.icon} size={24} aria-hidden />
