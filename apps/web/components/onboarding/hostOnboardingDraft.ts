@@ -331,6 +331,8 @@ export function toPreviewListing(
     category: draft.roleCategory as MarketplaceCategory,
     coverPhotoUrl: draft.roleCoverUrl,
     locationDisplay: draft.primaryLocationName.trim() || null,
+    latitude: null,
+    longitude: null,
     housingIncluded: draft.roleHousingIncluded,
     mealsIncluded: draft.roleMealsIncluded,
     compensationSummary: null,

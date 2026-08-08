@@ -10,7 +10,7 @@
 
 .disclosure {
   position: sticky;
-  top: 60px;
+  top: var(--host-topbar-height, 65px);
   z-index: 20;
   display: flex;
   align-items: center;
@@ -89,6 +89,8 @@
 
 .surface {
   width: min(100%, 1240px);
+  max-width: 100%;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 4px 4px 56px;
 }
@@ -216,7 +218,16 @@
 .profileFacts,
 .formGrid {
   display: grid;
+  min-width: 0;
+  max-width: 100%;
   gap: 16px;
+}
+
+.gridTwo > *,
+.gridThree > *,
+.stack > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .gridTwo {
@@ -288,6 +299,8 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .listItem,
@@ -508,6 +521,8 @@
 
 .profileSupplement {
   width: min(100%, 1240px);
+  max-width: 100%;
+  box-sizing: border-box;
   margin: 20px auto 0;
   padding: 0 4px 56px;
 }
@@ -814,6 +829,8 @@
   justify-content: space-between;
   gap: 16px;
   width: min(100%, 1240px);
+  max-width: 100%;
+  box-sizing: border-box;
   margin: 0 auto 14px;
   padding: 14px 18px;
   border: 1px solid var(--border-default);
@@ -949,6 +966,11 @@
   grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: 9px;
   overflow-x: auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  contain: inline-size;
   padding-bottom: 4px;
 }
 
@@ -1093,8 +1115,12 @@
   }
 
   .disclosure {
-    align-items: start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
     margin-inline: 0;
+    padding: 8px 10px;
   }
 
   .disclosureMark {
@@ -1103,10 +1129,15 @@
 
   .disclosureCopy {
     font-size: 0.76rem;
+    line-height: 1.35;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .resetButton {
-    min-height: 38px;
+    min-height: 44px;
     padding-inline: 10px;
   }
 

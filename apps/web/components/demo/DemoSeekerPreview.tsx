@@ -54,6 +54,8 @@ function toPublicHostListing(role: DemoRole): PublicHostListing {
     // A local catalog rendition, not a remote host.
     coverPhotoUrl: photo.sizes.card.src,
     locationDisplay: DEMO_ORG.location,
+    latitude: null,
+    longitude: null,
     housingIncluded: role.housing.costCents === 0,
     mealsIncluded: role.meals.costCents === 0,
     compensationSummary: null,

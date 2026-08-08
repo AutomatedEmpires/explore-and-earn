@@ -812,6 +812,8 @@ export function hostDemoPublicListingsFor(
       category: listing.category,
       coverPhotoUrl: listing.imageUrl,
       locationDisplay: listing.location,
+      latitude: null,
+      longitude: null,
       housingIncluded: listing.housingIncluded,
       mealsIncluded: listing.mealsIncluded,
       compensationSummary: listing.pay,

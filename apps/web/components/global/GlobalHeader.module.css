@@ -58,7 +58,7 @@
   gap: 0 var(--space-12);
   max-width: 1100px;
   margin: 0 auto;
-  min-height: 3.75rem;
+  min-height: var(--size-public-header);
   padding: 0 clamp(var(--space-16), 3vw, var(--space-24));
   padding-top: env(safe-area-inset-top);
 }
@@ -74,6 +74,7 @@
 
 .brand {
   display: inline-flex;
+  min-height: var(--tap-min);
   align-items: center;
   gap: var(--space-8);
   text-decoration: none;
@@ -284,7 +285,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-6);
-  height: 2.25rem;
+  min-height: var(--tap-min);
   padding: 0 var(--space-20);
   border-radius: var(--radius-pill);
   border: none;
@@ -333,7 +334,7 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-6);
-  height: 2.25rem;
+  min-height: var(--tap-min);
   padding: 0 var(--space-14);
   border-radius: var(--radius-pill);
   border: 1.5px solid color-mix(in srgb, var(--hdr-chrome) 30%, transparent);
@@ -521,8 +522,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--tap-min);
+  height: var(--tap-min);
   border: 1.5px solid color-mix(in srgb, var(--hdr-chrome) 30%, transparent);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--hdr-chrome) 9%, transparent);
@@ -568,7 +569,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-8);
-  height: 2.25rem;
+  min-height: var(--tap-min);
   padding: 0 var(--space-8);
   border: 1.5px solid color-mix(in srgb, var(--hdr-chrome) 30%, transparent);
   border-radius: var(--radius-pill);
@@ -623,12 +624,14 @@
     grid-column: 1;
     grid-row: 1;
     padding-bottom: var(--space-8);
+    min-width: 0;
   }
 
   .authArea {
     grid-column: 2;
     grid-row: 1;
     padding-bottom: var(--space-8);
+    min-width: 0;
   }
 
   /* Full-bleed tab bar — exits inner padding, wall-to-wall */
@@ -689,6 +692,16 @@
     font-size: var(--type-meta-size);
     letter-spacing: 0.02em;
   }
+}
+
+/* The two account actions own the narrow first row. The pin remains a clear
+   home target while the full wordmark returns as soon as the row can hold it
+   without collision. */
+@media (max-width: 430px) {
+  .wordmark { display: none; }
+  .authArea { gap: var(--space-4); }
+  .signInGhost { padding-inline: var(--space-10); }
+  .signInBtn { padding-inline: var(--space-12); }
 }
 
 /* Narrowest phones: labels win over icons so "Announcements" stays legible. */

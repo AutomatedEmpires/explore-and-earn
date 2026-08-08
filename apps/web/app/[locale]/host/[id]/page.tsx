@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import {
   getHostRatingSummary,
   getHostReviews,
@@ -16,6 +17,8 @@ import type {
 import { getFixtureHostProfileBundle } from "../../../../components/host/fixtureProfile";
 import { LeaveReview } from "../../../../components/host/LeaveReview";
 import { PublicHostProfileView } from "../../../../components/host/PublicHostProfileView";
+import { ListingWeatherSection } from "../../../../components/listing/ListingWeatherSection";
+import { WeatherWidgetLoading } from "../../../../components/listing/WeatherWidget";
 import { generateBreadcrumbJsonLd } from "../../../../lib/seo";
 import { isUuid } from "../../../../lib/ids";
 import { optionalAuth } from "../../../../lib/optionalAuth";
@@ -86,6 +89,15 @@ export default async function PublicHostProfilePage({ params }: Props) {
   const data = await resolvePublicHostPageData(id);
   if (!data) notFound();
   const { host, listings, ratingSummary, reviews, isFixture } = data;
+  const weatherListing = listings.find(
+    (
+      listing,
+    ): listing is PublicHostListing & { latitude: number; longitude: number } =>
+      typeof listing.latitude === "number" &&
+      Number.isFinite(listing.latitude) &&
+      typeof listing.longitude === "number" &&
+      Number.isFinite(listing.longitude),
+  );
 
   let reviewable: Awaited<ReturnType<typeof getReviewableEngagementForHost>> = null;
   if (!isFixture) {
@@ -114,6 +126,21 @@ export default async function PublicHostProfilePage({ params }: Props) {
         listings={listings}
         ratingSummary={ratingSummary}
         reviews={reviews}
+        weatherSlot={weatherListing ? (
+          <Suspense
+            fallback={(
+              <WeatherWidgetLoading
+                locationLabel={weatherListing.locationDisplay}
+              />
+            )}
+          >
+            <ListingWeatherSection
+              latitude={weatherListing.latitude}
+              longitude={weatherListing.longitude}
+              locationLabel={weatherListing.locationDisplay}
+            />
+          </Suspense>
+        ) : null}
         reviewSlot={reviewable ? (
           <LeaveReview
             hostName={host.companyName}

@@ -627,7 +627,7 @@ button.metaRow:focus-visible {
 
 /* 2. HOST NAME */
 .hostRow {
-  min-height: 40px;
+  min-height: var(--tap-min);
 }
 
 .hostName {

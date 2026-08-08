@@ -182,6 +182,9 @@
      sync with BottomNav.module.css and the OS mnav rules — every content
      reservation and floating bar offsets from this. */
   --size-bottom-nav: 70px;
+  /* Public chrome contract. In-page sticky navigation offsets from the same
+     value as GlobalHeader instead of guessing at its rendered height. */
+  --size-public-header: 60px;
 
   /* z-scale — one explicit stacking order for fixed chrome.
        content bars < docks < banners < overlays < lightbox            */

@@ -110,6 +110,8 @@
   background: var(--color-surface);
 }
 
+.seekeros-role { display: inline-flex; }
+
 .seekeros-search {
   position: relative;
   flex: 1;
@@ -228,6 +230,7 @@
     right: 0;
     bottom: 0;
     width: 100%;
+    box-sizing: border-box;
     /* Founder-locked: Seek · Swipe · Map · Profile. */
     grid-template-columns: repeat(4, 1fr);
     gap: 2px;
@@ -275,6 +278,16 @@
     background: var(--seekeros-accent-soft);
     border-color: color-mix(in srgb, var(--seekeros-accent) 38%, transparent);
   }
+}
+
+/* The profile already has a founder-locked dock destination on phones. Give
+   the command search the topbar instead of repeating role/account chrome. */
+@media (max-width: 520px) {
+  .seekeros-role,
+  .seekeros-account { display: none; }
+
+  .seekeros-top { gap: var(--space-8); }
+  .seekeros-search { max-width: none; }
 }
 
 /* faint ink grid atmosphere on the scope (paper register) */

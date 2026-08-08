@@ -5,6 +5,10 @@
   padding-bottom: calc(var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom, 0px));
 }
 
+@media (min-width: 1024px) {
+  .footer { padding-bottom: 0; }
+}
+
 .inner {
   display: flex;
   flex-direction: column;

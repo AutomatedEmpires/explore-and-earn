@@ -591,6 +591,9 @@ export interface PublicHostListing {
   category: string;
   coverPhotoUrl: string | null;
   locationDisplay: string | null;
+  /** Listing-scoped coordinates, used for public weather without exposing a host address. */
+  latitude: number | null;
+  longitude: number | null;
   housingIncluded: boolean;
   mealsIncluded: boolean;
   compensationSummary: string | null;
@@ -613,7 +616,7 @@ export async function getPublicListingsByHost(
     .from("listings")
     .select(
       "id, title, category, cover_photo_url, location_display, housing_included, " +
-        "meals_included, compensation_summary, compensation_min_cents, " +
+        "latitude, longitude, meals_included, compensation_summary, compensation_min_cents, " +
         "compensation_max_cents, compensation_unit, compensation_currency, published_at",
     )
     .eq("host_profile_id", hostProfileId)
@@ -630,6 +633,8 @@ export async function getPublicListingsByHost(
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
     locationDisplay:
       typeof row.location_display === "string" ? row.location_display : null,
+    latitude: typeof row.latitude === "number" ? row.latitude : null,
+    longitude: typeof row.longitude === "number" ? row.longitude : null,
     housingIncluded: row.housing_included === true,
     mealsIncluded: row.meals_included === true,
     compensationSummary:

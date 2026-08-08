@@ -178,7 +178,7 @@ export function SeekerShell({
           {/* D17 — role pill leads the bar; the rail carries the wordmark at
               desktop width. Theme switcher removed: Settings → Appearance is
               the single home for it now. */}
-          <RolePill role="seeker" />
+          <div className="seekeros-role"><RolePill role="seeker" /></div>
           <CommandSearch
             className="seekeros-search"
             action={hrefFor("/seek")}
