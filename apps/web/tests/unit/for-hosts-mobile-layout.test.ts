@@ -20,6 +20,14 @@ const demoChrome = readFileSync(
   "utf8",
 );
 
+const hostDemo = readFileSync(
+  new URL(
+    "../../components/demo/full-fidelity/host/HostDemo.module.css",
+    import.meta.url,
+  ),
+  "utf8",
+);
+
 function ruleFor(stylesheet: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = stylesheet.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`));
@@ -78,4 +86,34 @@ describe("demo workspace mobile layout", () => {
       expect(ruleFor(demoChrome, selector)).toContain("box-sizing: border-box");
     },
   );
+
+  it("keeps every shared host-demo action inside the 44px tap contract", () => {
+    const controls = hostDemo.match(
+      /\.resetButton,\s*\.button,\s*\.buttonQuiet,\s*\.buttonDanger,\s*\.segmentedButton\s*\{([^}]*)\}/,
+    );
+
+    expect(controls, "the shared host-demo control rule is missing").not.toBeNull();
+    expect(controls?.[1]).toContain("box-sizing: border-box");
+    expect(controls?.[1]).toContain("min-height: var(--tap-min)");
+    expect(hostDemo).not.toMatch(/\.resetButton\s*\{[^}]*min-height:\s*34px/);
+  });
+
+  it("contains the ten-day forecast in one horizontal snap strip", () => {
+    const track = ruleFor(hostDemo, ".forecastGrid");
+    const day = ruleFor(hostDemo, ".forecastDay");
+
+    expect(track).toContain("display: flex");
+    expect(track).toContain("overflow-x: auto");
+    expect(track).toContain("overscroll-behavior-inline: contain");
+    expect(track).toContain("scroll-snap-type: inline proximity");
+    expect(track).toContain("contain: inline-size");
+    expect(track).toContain("box-sizing: border-box");
+    expect(track).not.toContain("grid-template-columns");
+    expect(day).toContain("flex: 0 0 7.5rem");
+    expect(day).toContain("gap: var(--space-8)");
+    expect(day).toContain("padding: var(--space-12)");
+    expect(day).toContain("border-radius: var(--radius-input)");
+    expect(day).toContain("scroll-snap-align: start");
+    expect(day).toContain("box-sizing: border-box");
+  });
 });

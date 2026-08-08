@@ -703,6 +703,7 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
       await page.evaluate(() => window.scrollTo(0, 650));
       const topbar = page.getByRole("banner");
       const notice = page.getByRole("note", { name: "Sample workspace notice" });
+      await expect(notice).toBeVisible();
       const [topbarBox, noticeBox] = await Promise.all([
         topbar.boundingBox(),
         notice.boundingBox(),
@@ -721,6 +722,84 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
       .getByRole("note", { name: "Sample seeker account notice" })
       .boundingBox();
     expect(seekerNotice?.height ?? 999, "sample seeker notice is too tall").toBeLessThanOrEqual(72);
+  });
+
+  test("host weather and profile controls stay usable across phone widths", async ({
+    page,
+  }) => {
+    await useEssentialOnlyConsent(page);
+
+    for (const width of [320, 375, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(`${HOST_ROOT}/profile/location`);
+
+      const topbar = page.getByRole("banner");
+      const notice = page.getByRole("note", { name: "Sample workspace notice" });
+      await expect(notice).toBeVisible();
+      await expectNoHorizontalOverflow(page, `host location at ${width}px`);
+      const [topbarBox, noticeBox] = await Promise.all([
+        topbar.boundingBox(),
+        notice.boundingBox(),
+      ]);
+      expect(topbarBox, `host topbar is missing at ${width}px`).not.toBeNull();
+      expect(noticeBox, `sample notice is missing at ${width}px`).not.toBeNull();
+      expect(
+        noticeBox?.y ?? 0,
+        `sample notice overlaps the topbar at ${width}px`,
+      ).toBeGreaterThanOrEqual(
+        (topbarBox?.y ?? 0) + (topbarBox?.height ?? 0),
+      );
+
+      const forecast = page.getByRole("list", {
+        name: /Illustrative 10-day forecast for/,
+      });
+      const days = forecast.getByRole("listitem");
+      await expect(forecast).toBeVisible();
+      await expect(forecast).toHaveAttribute("tabindex", "0");
+      await expect(days).toHaveCount(10);
+
+      const geometry = await forecast.evaluate((track) => ({
+        clientWidth: track.clientWidth,
+        scrollWidth: track.scrollWidth,
+        dayTops: Array.from(track.children).map((day) =>
+          Math.round(day.getBoundingClientRect().top),
+        ),
+      }));
+      expect(new Set(geometry.dayTops).size, `forecast wraps at ${width}px`).toBe(1);
+      expect(
+        geometry.scrollWidth,
+        `forecast has no internal scroll range at ${width}px`,
+      ).toBeGreaterThan(geometry.clientWidth);
+
+      await forecast.focus();
+      await expect(forecast).toBeFocused();
+      await page.keyboard.press("ArrowRight");
+      await expect
+        .poll(() => forecast.evaluate((track) => track.scrollLeft))
+        .toBeGreaterThan(0);
+      await forecast.evaluate((track) => {
+        track.scrollLeft = track.scrollWidth;
+      });
+      const lastDayVisible = await forecast.evaluate((track) => {
+        const last = track.lastElementChild;
+        if (!last) return false;
+        const trackBox = track.getBoundingClientRect();
+        const lastBox = last.getBoundingClientRect();
+        return lastBox.left >= trackBox.left - 1 && lastBox.right <= trackBox.right + 1;
+      });
+      expect(lastDayVisible, `last forecast day stays hidden at ${width}px`).toBe(true);
+
+      await page.goto(`${HOST_ROOT}/profile`);
+      const editProfile = page.getByRole("link", { name: "Edit sample profile" });
+      await expect(editProfile).toBeVisible();
+      await expectNoHorizontalOverflow(page, `host profile at ${width}px`);
+      const editBox = await editProfile.boundingBox();
+      expect(editBox, `profile edit action is missing at ${width}px`).not.toBeNull();
+      expect(editBox?.height ?? 0).toBeGreaterThanOrEqual(44);
+      expect(editBox?.height ?? 999).toBeLessThanOrEqual(48);
+      expect(editBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+      expect((editBox?.x ?? 0) + (editBox?.width ?? width + 1)).toBeLessThanOrEqual(width);
+    }
   });
 });
 
