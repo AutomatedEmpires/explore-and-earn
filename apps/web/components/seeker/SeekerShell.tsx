@@ -8,6 +8,7 @@ import { ScopeShellNav, type ScopeNavItem } from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
 import { RolePill } from "../global/RolePill";
 import { SeekerCoachmarks } from "./SeekerCoachmarks";
+import { signInHref } from "../../lib/authRedirect";
 
 /**
  * Seeker OS shell.
@@ -93,7 +94,33 @@ const MOBILE_PRIMARY: readonly {
   { href: "/profile", label: "Profile", icon: "nav.profile", id: "seeker-nav-profile" },
 ];
 
+const PUBLIC_SEEKER_DESTINATIONS = new Set(["/seek", "/swipe", "/map"]);
+
+/**
+ * Resolve shell navigation without letting guest chrome imply account access.
+ * Explicit demo mappings always win and stay inside the isolated walkthrough.
+ */
+export function resolveSeekerShellHref(
+  href: string,
+  isAuthenticated: boolean,
+  routeMap: Readonly<Record<string, string>> = {},
+  demoMode = false,
+): string {
+  const mappedHref = routeMap[href];
+  if (mappedHref !== undefined) return mappedHref;
+  if (
+    isAuthenticated ||
+    demoMode ||
+    PUBLIC_SEEKER_DESTINATIONS.has(href)
+  ) {
+    return href;
+  }
+  return signInHref("seeker", href);
+}
+
 export interface SeekerShellProps {
+  /** Actual Clerk session state. Omitted callers are treated as signed out. */
+  readonly isAuthenticated?: boolean;
   readonly seekerName: string | null;
   readonly photoUrl?: string | null;
   readonly profileScore?: number;
@@ -118,6 +145,7 @@ function isActive(pathname: string, href: string, exact?: boolean): boolean {
 }
 
 export function SeekerShell({
+  isAuthenticated = false,
   seekerName,
   unread = 0,
   unreadMessages = unread,
@@ -128,9 +156,11 @@ export function SeekerShell({
   children,
 }: SeekerShellProps) {
   const pathname = usePathname();
+  const hasAuthenticatedChrome = isAuthenticated || demoMode;
   const name = seekerName?.trim() || "Explorer";
   const initial = name.charAt(0).toUpperCase();
-  const hrefFor = (href: string): string => routeMap[href] ?? href;
+  const hrefFor = (href: string): string =>
+    resolveSeekerShellHref(href, isAuthenticated, routeMap, demoMode);
 
   const badgeFor = (badgeKey?: SectionDef["badgeKey"]): number | undefined => {
     if (badgeKey === "messages") return unreadMessages > 0 ? unreadMessages : undefined;
@@ -155,18 +185,34 @@ export function SeekerShell({
   const footerItems = FOOTER.map(toNavItem);
 
   return (
-    <div className="seekeros-shell">
+    <div
+      className="seekeros-shell"
+      data-seeker-shell
+      data-authenticated={hasAuthenticatedChrome ? "true" : "false"}
+    >
       {/* Secondary / scope nav — left rail ≥1024px, hamburger drawer <1024px. */}
       <ScopeShellNav
         scopeLabel="Seeker"
         menuLabel="Open Seeker menu"
         items={items}
         footerItems={footerItems}
-        userName={name}
-        userHref={hrefFor("/profile")}
-        avatar={<span className="seekeros-railava">{initial}</span>}
+        userName={hasAuthenticatedChrome ? name : undefined}
+        userHref={hasAuthenticatedChrome ? hrefFor("/profile") : undefined}
+        avatar={
+          hasAuthenticatedChrome ? (
+            <span className="seekeros-railava">{initial}</span>
+          ) : undefined
+        }
         brand={
-          <Link className="seekeros-railbrand" href={hrefFor("/home")} aria-label="Explore & Earn — Seeker home">
+          <Link
+            className="seekeros-railbrand"
+            href={hasAuthenticatedChrome ? hrefFor("/home") : "/"}
+            aria-label={
+              hasAuthenticatedChrome
+                ? "Explore & Earn — Seeker home"
+                : "Explore & Earn home"
+            }
+          >
             <span className="seekeros-railmark" aria-hidden>E</span>
             Explore&amp;Earn
           </Link>
@@ -178,7 +224,12 @@ export function SeekerShell({
           {/* D17 — role pill leads the bar; the rail carries the wordmark at
               desktop width. Theme switcher removed: Settings → Appearance is
               the single home for it now. */}
-          <div className="seekeros-role"><RolePill role="seeker" /></div>
+          <div className="seekeros-role">
+            <RolePill
+              role="seeker"
+              isAuthenticated={hasAuthenticatedChrome}
+            />
+          </div>
           <CommandSearch
             className="seekeros-search"
             action={hrefFor("/seek")}
@@ -188,7 +239,11 @@ export function SeekerShell({
           <Link
             className="seekeros-tact seekeros-tact--icon ui-pressable"
             href={hrefFor("/notifications")}
-            aria-label="Notifications"
+            aria-label={
+              hasAuthenticatedChrome
+                ? "Notifications"
+                : "Sign in to view notifications"
+            }
           >
             <Icon name="nav.notifications" size={20} aria-hidden />
             {unreadNotifications > 0 ? <span className="seekeros-bdg--top">{unreadNotifications}</span> : null}
@@ -196,9 +251,18 @@ export function SeekerShell({
           <Link
             className="seekeros-account ui-pressable"
             href={hrefFor("/profile")}
-            aria-label="Your profile"
+            data-account-state={hasAuthenticatedChrome ? "authenticated" : "guest"}
+            aria-label={
+              hasAuthenticatedChrome
+                ? "Your profile"
+                : "Sign in to view your profile"
+            }
           >
-            <span className="seekeros-avatarmini">{initial}</span>
+            {hasAuthenticatedChrome ? (
+              <span className="seekeros-avatarmini">{initial}</span>
+            ) : (
+              <Icon name="nav.profile" size={20} aria-hidden />
+            )}
           </Link>
         </header>
         <main className="seekeros-contentwrap">{children}</main>
@@ -225,7 +289,7 @@ export function SeekerShell({
       </nav>
 
       {/* D19 — anchored, non-blocking, persisted. Replaces the modal tour. */}
-      {demoMode ? null : <SeekerCoachmarks />}
+      {demoMode || !isAuthenticated ? null : <SeekerCoachmarks />}
     </div>
   );
 }

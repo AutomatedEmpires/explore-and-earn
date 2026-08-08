@@ -101,6 +101,16 @@ describe("the signed-out header is two doors", () => {
     }
   });
 
+  it("keeps every public job-discovery surface inside the seeker door", () => {
+    const seekerDoorState = body.slice(
+      body.indexOf("const seekerDoorActive"),
+      body.indexOf("const hostDoorActive"),
+    );
+    for (const route of ["/seek", "/swipe", "/map", "/search", "/jobs", "/listing"]) {
+      expect(seekerDoorState).toContain(`"${route}"`);
+    }
+  });
+
   it("gives the host menu its five destinations, and none of them auth-walled", () => {
     const hostMenu = body.slice(
       body.indexOf("const HOST_MENU"),
@@ -122,6 +132,21 @@ describe("the signed-out header is two doors", () => {
      * publishes the same founder-locked prices.
      */
     expect(hostMenu).not.toContain('href: "/host/plans"');
+  });
+});
+
+describe("the public mobile dock stays seeker-shaped", () => {
+  const dock = code(read("components/public/PublicBottomNav.tsx"));
+
+  it("keeps exactly Seek, Swipe, Map, and Profile in founder order", () => {
+    const tabs = dock.slice(dock.indexOf("const TABS"), dock.indexOf("export function"));
+    const labels = [...tabs.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]);
+    expect(labels).toEqual(["Seek", "Swipe", "Map", "Profile"]);
+  });
+
+  it("sends a guest profile tap through seeker sign-in and back to profile", () => {
+    expect(dock).toContain('viewerRole === "guest" && tab.href === "/profile"');
+    expect(dock).toContain('signInHref("seeker", "/profile")');
   });
 });
 

@@ -6,6 +6,10 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Icon } from "@explore-and-earn/ui";
 
+import {
+  PUBLIC_ROLE_DESTINATIONS,
+  type PublicViewerRole,
+} from "../../lib/publicNavigation";
 import { UnreadBadge } from "../seeker/UnreadBadge";
 import { NavMenu, type NavMenuItem } from "./NavMenu";
 import { RolePill, type ChromeRole } from "./RolePill";
@@ -76,7 +80,9 @@ function PinMark() {
 }
 
 export interface GlobalHeaderProps {
-  readonly scope?: "seeker" | "host" | "guest";
+  readonly viewerRole?: PublicViewerRole;
+  /** @deprecated Prefer viewerRole; retained for scoped call-site compatibility. */
+  readonly scope?: PublicViewerRole;
   readonly isAuthenticated?: boolean;
   readonly unreadCount?: number;
   readonly clerkUserId?: string | null;
@@ -86,13 +92,17 @@ export interface GlobalHeaderProps {
 }
 
 export function GlobalHeader({
+  viewerRole: viewerRoleProp,
   scope = "guest",
-  isAuthenticated = false,
+  isAuthenticated: isAuthenticatedProp,
   unreadCount = 0,
   clerkUserId,
   userName,
   unreadCommunity = 0,
 }: GlobalHeaderProps) {
+  const viewerRole = viewerRoleProp ?? scope;
+  const isAuthenticated =
+    viewerRole === "guest" ? false : (isAuthenticatedProp ?? true);
   const pathname = usePathname();
   const t = useTranslations("Nav");
   const [hidden, setHidden] = useState(false);
@@ -148,9 +158,11 @@ export function GlobalHeader({
     };
   }, [authMenuOpen]);
 
-  const isImmersive = IMMERSIVE_ROUTES.some(
-    (r) => pathname === r || pathname.startsWith(`${r}/`),
-  );
+  const isImmersive =
+    (viewerRole === "guest" || viewerRole === "seeker") &&
+    IMMERSIVE_ROUTES.some(
+      (r) => pathname === r || pathname.startsWith(`${r}/`),
+    );
   if (isImmersive) return null;
 
   const communityTab =
@@ -159,6 +171,8 @@ export function GlobalHeader({
     pathname === "/community" ? "feed" :
     null;
   const onCommunity = communityTab !== null;
+  const showCommunityTabs =
+    onCommunity && (viewerRole === "guest" || viewerRole === "seeker");
   // D17 — the badge beside the wordmark is a ROLE pill now, so it says who you
   // are, not where you are. Two consequences:
   //   * "Community" is gone from it. Community is a place, not a role; an
@@ -168,8 +182,9 @@ export function GlobalHeader({
   //     pill reading "Seeker" over a marketing page was asserting a state the
   //     visitor had not entered.
   const chromeRole: ChromeRole | null =
-    scope === "host" ? "host" : scope === "seeker" ? "seeker" : null;
-  const homeHref = scope === "host" ? "/host/listings" : "/";
+    isAuthenticated && viewerRole !== "guest" ? viewerRole : null;
+  const destinations = PUBLIC_ROLE_DESTINATIONS[viewerRole];
+  const homeHref = destinations.home;
   // Founder canon (2026-07-13): "Explore brings to homepage." The Explore tab is
   // the always-clear way back to the scope's home (the marketing homepage for
   // seekers/guests) — discovery lives on the Seek dock tab, not here.
@@ -187,11 +202,17 @@ export function GlobalHeader({
   const seekerDoorActive =
     pathname === "/for-seekers" ||
     pathname.startsWith("/for-seekers/") ||
-    ["/seek", "/swipe", "/map", "/community"].some(
+    ["/seek", "/swipe", "/map", "/search", "/jobs", "/listing", "/community"].some(
       (r) => pathname === r || pathname.startsWith(`${r}/`),
     );
   const hostDoorActive = sectionActive === "hosts";
-  const profileHref = scope === "host" ? "/host/profile" : "/profile";
+  const profileHref = destinations.profile;
+  const notificationsHref = destinations.notifications;
+  const workspaceActive =
+    pathname === homeHref || pathname.startsWith(`${homeHref}/`);
+  const jobsActive = ["/seek", "/swipe", "/map", "/search", "/jobs", "/listing"].some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
   const userInitial =
     userName?.trim().charAt(0).toUpperCase() ??
     (chromeRole ? chromeRole.charAt(0).toUpperCase() : "E");
@@ -213,7 +234,7 @@ export function GlobalHeader({
         </div>
 
         {/* ── Col 2: nav — community tabs or explore/community links ───── */}
-        {onCommunity ? (
+        {showCommunityTabs ? (
           <nav className={styles.communityTabs} aria-label="Community sections">
             {/* Order is founder-locked: Photos | Feed | Announcements (L→R). */}
             <Link
@@ -248,26 +269,45 @@ export function GlobalHeader({
             </Link>
           </nav>
         ) : isAuthenticated ? (
-          /* AUTHENTICATED NAV IS UNCHANGED (D18 changes the signed-out door,
-             not the signed-in workspace): a seeker who is already in keeps
-             Explore + Community as top-level links, because for them Community
-             is a room they can walk into rather than a sign-in prompt. */
-          <nav className={styles.sectionNav} aria-label="Primary sections">
-            <Link
-              className={`${styles.navLink}${sectionActive === "explore" ? ` ${styles.navLinkActive}` : ""}`}
-              href={exploreHref}
-              aria-current={sectionActive === "explore" ? "page" : undefined}
-            >
-              {t("explore")}
-            </Link>
-            <Link
-              className={`${styles.navLink}${sectionActive === "community" ? ` ${styles.navLinkActive}` : ""}`}
-              href="/community"
-              aria-current={sectionActive === "community" ? "page" : undefined}
-            >
-              {t("community")}
-            </Link>
-          </nav>
+          viewerRole === "seeker" ? (
+            /* A signed-in seeker keeps the founder-locked Explore + Community
+               pair. Community is a room they can now walk into. */
+            <nav className={styles.sectionNav} aria-label="Primary sections">
+              <Link
+                className={`${styles.navLink}${sectionActive === "explore" ? ` ${styles.navLinkActive}` : ""}`}
+                href={exploreHref}
+                aria-current={sectionActive === "explore" ? "page" : undefined}
+              >
+                {t("explore")}
+              </Link>
+              <Link
+                className={`${styles.navLink}${sectionActive === "community" ? ` ${styles.navLinkActive}` : ""}`}
+                href="/community"
+                aria-current={sectionActive === "community" ? "page" : undefined}
+              >
+                {t("community")}
+              </Link>
+            </nav>
+          ) : (
+            /* Host and admin viewers get an honest route back to their own
+               workspace while public job discovery remains one tap away. */
+            <nav className={styles.sectionNav} aria-label="Primary sections">
+              <Link
+                className={`${styles.navLink}${workspaceActive ? ` ${styles.navLinkActive}` : ""}`}
+                href={homeHref}
+                aria-current={workspaceActive ? "page" : undefined}
+              >
+                {t("workspace")}
+              </Link>
+              <Link
+                className={`${styles.navLink}${jobsActive ? ` ${styles.navLinkActive}` : ""}`}
+                href="/jobs"
+                aria-current={jobsActive ? "page" : undefined}
+              >
+                {t("exploreJobs")}
+              </Link>
+            </nav>
+          )
         ) : (
           /* SIGNED OUT — the two doors (D18). Community is inside the seeker
              menu, not out here: it is an authenticated seeker space now, so a
@@ -300,7 +340,7 @@ export function GlobalHeader({
             <>
               <Link
                 className={styles.iconBtn}
-                href="/notifications"
+                href={notificationsHref}
                 aria-label={unreadCount > 0 ? `${t("notifications")} — ${unreadCount} unread` : t("notifications")}
               >
                 <Icon name="action.message" size={20} aria-hidden />

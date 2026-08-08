@@ -49,8 +49,10 @@ describe("private host dashboard routes", () => {
     "/host/applicants",
     "/host/applicants/application-id",
     "/host/coach",
+    "/host/checkout",
     "/host/outreach",
     "/host/messages/thread-id",
+    "/host/notifications",
   ])("recognizes %s as private", (pathname) => {
     expect(isPrivateHostDashboardPath(pathname)).toBe(true);
   });
@@ -64,6 +66,8 @@ describe("private host dashboard routes", () => {
 
   it("tracks every current private host route segment", () => {
     expect(HOST_DASHBOARD_SEGMENTS).toContain("coach");
+    expect(HOST_DASHBOARD_SEGMENTS).toContain("checkout");
+    expect(HOST_DASHBOARD_SEGMENTS).toContain("notifications");
     expect(HOST_DASHBOARD_SEGMENTS).toContain("outreach");
   });
 

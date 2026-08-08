@@ -22,7 +22,7 @@ import "../../../styles/seeker-os.css";
  * Seeker scope layout.
  *
  * Navigation is scoped per user type — there is no single global bottom nav.
- * The seeker-scope bottom navigation is founder-locked (Swipe · Map · Seek ·
+ * The seeker-scope bottom navigation is founder-locked (Seek · Swipe · Map ·
  * Profile) and OWNED BY THE SEEKER LANE. It is rendered by <SeekerShell>'s
  * mobile dock (MOBILE_PRIMARY). The locked tab set and order must not change.
  *
@@ -42,12 +42,27 @@ export const metadata: Metadata = {
 interface SeekerShellState {
   readonly unreadCount: number;
   readonly clerkUserId: string | null;
+  readonly isAuthenticated: boolean;
   readonly needsOnboarding: boolean;
   readonly seekerName: string | null;
   /** Profile readiness % shown in the Seeker OS sidebar meter. */
   readonly profileScore: number;
   /** "N new" badge on the Community nav — photos + announcements since last seen. */
   readonly unreadCommunity: number;
+}
+
+function seekerShellFallback(
+  clerkUserId: string | null = null,
+): SeekerShellState {
+  return {
+    unreadCount: 0,
+    clerkUserId,
+    isAuthenticated: clerkUserId !== null,
+    needsOnboarding: false,
+    seekerName: null,
+    unreadCommunity: 0,
+    profileScore: 0,
+  };
 }
 
 /**
@@ -70,6 +85,7 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
     return {
       unreadCount: 0,
       clerkUserId: DEV_USER_ID,
+      isAuthenticated: true,
       needsOnboarding: false,
       seekerName: devSeekerName(),
       // Deterministic review state: never wait on a local database that may be
@@ -79,17 +95,24 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
     };
   }
 
+  let userId: string | null;
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
-    }
+    ({ userId } = await auth());
+  } catch {
+    return seekerShellFallback();
+  }
+
+  if (!userId) {
+    return seekerShellFallback();
+  }
+
+  try {
     // Request-scoped: this token is minted once and reused by the child page's
     // data fetches (see lib/serverCache), so a seeker navigation no longer pays
     // the Clerk getToken round-trip more than once.
     const token = await getSupabaseToken();
     if (!token) {
-      return { unreadCount: 0, clerkUserId: userId, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
+      return seekerShellFallback(userId);
     }
     const [unreadCount, profile, unreadCommunity] = await Promise.all([
       getUnreadNotificationCount(token, userId),
@@ -99,13 +122,16 @@ async function resolveSeekerShellState(): Promise<SeekerShellState> {
     return {
       unreadCount,
       clerkUserId: userId,
+      isAuthenticated: true,
       needsOnboarding: profile !== null && !profile.onboardingComplete,
       seekerName: profile?.displayName?.trim() || null,
       unreadCommunity,
       profileScore: profile ? (profile.onboardingComplete ? 82 : 48) : 28,
     };
   } catch {
-    return { unreadCount: 0, clerkUserId: null, needsOnboarding: false, seekerName: null, unreadCommunity: 0, profileScore: 0 };
+    // Authentication already succeeded. Optional profile/count reads must not
+    // demote a signed-in seeker to guest chrome when a provider is unavailable.
+    return seekerShellFallback(userId);
   }
 }
 
@@ -114,8 +140,14 @@ export default async function SeekerLayout({
 }: {
   children: ReactNode;
 }) {
-  const { unreadCount, needsOnboarding, seekerName, unreadCommunity, profileScore } =
-    await resolveSeekerShellState();
+  const {
+    unreadCount,
+    isAuthenticated,
+    needsOnboarding,
+    seekerName,
+    unreadCommunity,
+    profileScore,
+  } = await resolveSeekerShellState();
 
   // redirect() throws to interrupt rendering, so it must run OUTSIDE the
   // try/catch above.
@@ -129,6 +161,7 @@ export default async function SeekerLayout({
   return (
     <div className="seeker-os">
       <SeekerShell
+        isAuthenticated={isAuthenticated}
         seekerName={seekerName}
         unread={unreadCount}
         unreadCommunity={unreadCommunity}
