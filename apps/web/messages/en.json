@@ -655,5 +655,12 @@
 		"lede": "Listings leave the marketplace when they close, fill, or expire — and links outlive all three. Everything else is still here: the search, the four lanes, and the map are live.",
 		"browse": "Browse open opportunities",
 		"lanes": "See the four lanes"
+	},
+	"HostNotFound": {
+		"eyebrow": "Host profile",
+		"title": "This host profile isn’t available.",
+		"message": "The link may be out of date, or this profile may not be public. You can still explore the opportunities that are open now.",
+		"browse": "Browse opportunities",
+		"workTypes": "Explore work types"
 	}
 }

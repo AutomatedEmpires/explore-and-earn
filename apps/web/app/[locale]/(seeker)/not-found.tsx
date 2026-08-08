@@ -1,5 +1,5 @@
 import { StatusCard } from "../../../components/StatusCard";
 
 export default function SeekerNotFound() {
-	return <StatusCard type="404" />;
+	return <StatusCard type="404" scope="seeker" presentation="embedded" />;
 }

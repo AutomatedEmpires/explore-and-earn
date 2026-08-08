@@ -191,6 +191,23 @@ describe("light theme — action colour", () => {
   });
 });
 
+describe.each([
+  ["light", light],
+  ["explicit dark", dark],
+  ["OS dark", new Map([...light, ...mediaOverrides])],
+])("%s theme — action controls", (themeName, table) => {
+  it.each(["--color-action-ground", "--color-action-ground-hover"])(
+    "carries action text at AA on %s",
+    (ground) => {
+      const value = ratio(table, "--color-action-text", ground);
+      expect(
+        value,
+        `${themeName}: action text on ${ground} is ${value.toFixed(2)}:1`,
+      ).toBeGreaterThanOrEqual(AA);
+    },
+  );
+});
+
 /**
  * The four opt-in accent palettes (palettes.css) reskin the action colour by
  * overriding the same TIER-1 seeds this file re-valued. Their seed VALUES were
@@ -216,8 +233,15 @@ describe("accent palettes on the re-valued surfaces", () => {
     ),
   ].map(([, name, hex]) => ({ name, hex }));
 
+  const hoverSeeds = [
+    ...palettesCss.matchAll(
+      /:root\[data-palette="([a-z]+)"\]\s*\{[^}]*?--palette-sky-hover:\s*(#[0-9a-f]{6})/gi,
+    ),
+  ].map(([, name, hex]) => ({ name, hex }));
+
   it("finds all four palettes to check", () => {
     expect(lightSeeds).toHaveLength(4);
+    expect(hoverSeeds).toHaveLength(4);
     expect(darkCtas).toHaveLength(4);
   });
 
@@ -231,6 +255,10 @@ describe("accent palettes on the re-valued surfaces", () => {
 
   it.each(lightSeeds)("$name carries white button text at AA", ({ hex }) => {
     expect(contrast(resolve("--color-cta-text", light), hex)).toBeGreaterThanOrEqual(AA);
+  });
+
+  it.each(hoverSeeds)("$name hover carries white button text at AA", ({ hex }) => {
+    expect(contrast(resolve("--color-action-text", light), hex)).toBeGreaterThanOrEqual(AA);
   });
 
   it.each(darkCtas)("$name reads at AA on the warm-dark surfaces", ({ hex }) => {
