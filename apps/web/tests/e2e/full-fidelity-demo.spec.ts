@@ -735,6 +735,21 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
 
       const topbar = page.getByRole("banner");
       const notice = page.getByRole("note", { name: "Sample workspace notice" });
+      const forecast = page.getByRole("list", {
+        name: /Illustrative 10-day forecast for/,
+      });
+      const forecastPanel = forecast.locator("xpath=ancestor::section[1]");
+      const forecastHeading = forecastPanel.getByRole("heading", {
+        level: 2,
+        name: "10-day location outlook",
+        exact: true,
+      });
+      const forecastBadge = forecastPanel.getByText(
+        "Illustrative demo forecast",
+        { exact: true },
+      );
+      const days = forecast.getByRole("listitem");
+      await expect(forecast).toBeVisible();
       await expect(notice).toBeVisible();
       await expectNoHorizontalOverflow(page, `host location at ${width}px`);
       const [topbarBox, noticeBox] = await Promise.all([
@@ -750,13 +765,67 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
         (topbarBox?.y ?? 0) + (topbarBox?.height ?? 0),
       );
 
-      const forecast = page.getByRole("list", {
-        name: /Illustrative 10-day forecast for/,
-      });
-      const days = forecast.getByRole("listitem");
-      await expect(forecast).toBeVisible();
+      await expect(forecastHeading).toBeVisible();
+      await expect(forecastBadge).toBeVisible();
       await expect(forecast).toHaveAttribute("tabindex", "0");
       await expect(days).toHaveCount(10);
+
+      const [viewportWidth, panelBox, headingBox, badgeBox] = await Promise.all([
+        page.evaluate(() => document.documentElement.clientWidth),
+        forecastPanel.boundingBox(),
+        forecastHeading.boundingBox(),
+        forecastBadge.boundingBox(),
+      ]);
+      expect(panelBox, `forecast panel is missing at ${width}px`).not.toBeNull();
+      expect(headingBox, `forecast heading is missing at ${width}px`).not.toBeNull();
+      expect(badgeBox, `forecast badge is missing at ${width}px`).not.toBeNull();
+
+      const panelLeft = panelBox?.x ?? 0;
+      const panelRight = panelLeft + (panelBox?.width ?? viewportWidth);
+      for (const [label, box] of [
+        ["heading", headingBox],
+        ["badge", badgeBox],
+      ] as const) {
+        expect(box?.x ?? -2, `forecast ${label} escapes left at ${width}px`).toBeGreaterThanOrEqual(
+          Math.max(0, panelLeft) - 1,
+        );
+        expect(
+          (box?.x ?? viewportWidth + 2) + (box?.width ?? 0),
+          `forecast ${label} is clipped on the right at ${width}px`,
+        ).toBeLessThanOrEqual(Math.min(viewportWidth, panelRight) + 1);
+      }
+      expect(
+        headingBox?.width ?? 0,
+        `forecast heading is compressed past readability at ${width}px`,
+      ).toBeGreaterThanOrEqual(120);
+
+      const [headingTextFit, badgeTextFit] = await Promise.all([
+        forecastHeading.evaluate((element) => ({
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+        })),
+        forecastBadge.evaluate((element) => ({
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+        })),
+      ]);
+      for (const [label, metrics] of [
+        ["heading", headingTextFit],
+        ["badge", badgeTextFit],
+      ] as const) {
+        expect(
+          metrics.scrollWidth,
+          `forecast ${label} text clips horizontally at ${width}px`,
+        ).toBeLessThanOrEqual(metrics.clientWidth + 1);
+        expect(
+          metrics.scrollHeight,
+          `forecast ${label} text clips vertically at ${width}px`,
+        ).toBeLessThanOrEqual(metrics.clientHeight + 1);
+      }
 
       const geometry = await forecast.evaluate((track) => ({
         clientWidth: track.clientWidth,
