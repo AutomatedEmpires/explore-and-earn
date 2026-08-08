@@ -24,6 +24,8 @@ export interface PublicHostProfileViewProps {
   readonly ratingSummary: HostRatingSummary;
   readonly reviews: readonly HostReview[];
   readonly coverPhotoUrl?: string | null;
+  /** Real listing-scoped weather, streamed by the live route when coordinates exist. */
+  readonly weatherSlot?: ReactNode;
   /** A live route may pass its eligibility-gated review composer here. */
   readonly reviewSlot?: ReactNode;
   /** Demo surfaces override these destinations to keep sample IDs isolated. */
@@ -48,70 +50,59 @@ const CATEGORY_ICON = {
   mix: "category.mix",
 } as const;
 
-function QuickFacts({
+function hasWorkingHereDetails(host: PublicHostProfile): boolean {
+  return Boolean(
+    host.whyWorkForUs ||
+      host.culture?.length ||
+      host.managementApproach ||
+      host.typicalDay ||
+      host.workEnvironment,
+  );
+}
+
+function hasLifeHereDetails(host: PublicHostProfile): boolean {
+  return Boolean(
+    host.remoteness ||
+      host.transportation?.length ||
+      host.nearbyServices?.length ||
+      host.activities?.length,
+  );
+}
+
+function ProfileNav({
+  host,
   listingCount,
-  housingOffered,
-  mealsOffered,
-  categoryScopes,
-  hostingSinceYear,
+  hasWeather,
 }: {
+  readonly host: PublicHostProfile;
   readonly listingCount: number;
-  readonly housingOffered: boolean;
-  readonly mealsOffered: boolean;
-  readonly categoryScopes: readonly string[];
-  readonly hostingSinceYear: number | null;
+  readonly hasWeather: boolean;
 }) {
+  const items = [
+    ...(host.about ? [{ href: "#about-heading", label: "Story" }] : []),
+    {
+      href: "#listings",
+      label: listingCount === 1 ? "1 opportunity" : `${listingCount} opportunities`,
+    },
+    ...(hasWorkingHereDetails(host)
+      ? [{ href: "#working-here-heading", label: "Working here" }]
+      : []),
+    ...(hasLifeHereDetails(host)
+      ? [{ href: "#life-here-heading", label: "Living here" }]
+      : []),
+    ...(hasWeather ? [{ href: "#listing-weather", label: "Weather" }] : []),
+    { href: "#reviews-heading", label: "Reviews" },
+  ];
+
   return (
-    <div className={styles.factsStrip}>
-      <div className={styles.facts}>
-        <div className={`${styles.fact} ${styles.factBlue}`}>
-          <Icon name="status.open" size={16} aria-hidden />
-          <div className={styles.factBody}>
-            <span className={styles.factValue}>{listingCount}</span>
-            <span className={styles.factLabel}>{listingCount === 1 ? "Listing" : "Listings"}</span>
-          </div>
-        </div>
-        {housingOffered ? (
-          <div className={`${styles.fact} ${styles.factGreen}`}>
-            <Icon name="category.seasonal" size={16} aria-hidden />
-            <div className={styles.factBody}>
-              <span className={styles.factValue}>Housing</span>
-              <span className={styles.factLabel}>Available</span>
-            </div>
-          </div>
-        ) : null}
-        {mealsOffered ? (
-          <div className={`${styles.fact} ${styles.factOrange}`}>
-            <Icon name="category.farm" size={16} aria-hidden />
-            <div className={styles.factBody}>
-              <span className={styles.factValue}>Meals</span>
-              <span className={styles.factLabel}>Available</span>
-            </div>
-          </div>
-        ) : null}
-        {categoryScopes.map((scope) => (
-          <div key={scope} className={`${styles.fact} ${styles.factCategory}`}>
-            <Icon
-              name={CATEGORY_ICON[scope as keyof typeof CATEGORY_ICON] ?? "category.mix"}
-              size={16}
-              aria-hidden
-            />
-            <div className={styles.factBody}>
-              <span className={styles.factValue}>{CATEGORY_LABEL[scope] ?? scope}</span>
-              <span className={styles.factLabel}>Category</span>
-            </div>
-          </div>
+    <div className={styles.profileNavShell}>
+      <nav className={styles.profileNav} aria-label="Host profile sections">
+        {items.map((item) => (
+          <a key={item.href} className={styles.profileNavLink} href={item.href}>
+            {item.label}
+          </a>
         ))}
-        {hostingSinceYear ? (
-          <div className={`${styles.fact} ${styles.factMuted}`}>
-            <Icon name="status.begins" size={16} aria-hidden />
-            <div className={styles.factBody}>
-              <span className={styles.factValue}>{hostingSinceYear}</span>
-              <span className={styles.factLabel}>Member since</span>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      </nav>
     </div>
   );
 }
@@ -176,14 +167,7 @@ function HighlightList({ values, perks = false }: {
 }
 
 function WorkingHereSection({ host }: { readonly host: PublicHostProfile }) {
-  const hasDetails = Boolean(
-    host.whyWorkForUs ||
-      host.culture?.length ||
-      host.managementApproach ||
-      host.typicalDay ||
-      host.workEnvironment,
-  );
-  if (!hasDetails) return null;
+  if (!hasWorkingHereDetails(host)) return null;
 
   return (
     <NarrativeSection id="working-here-heading" title="Working here">
@@ -273,13 +257,7 @@ function SeasonSection({ host }: { readonly host: PublicHostProfile }) {
 }
 
 function LifeHereSection({ host }: { readonly host: PublicHostProfile }) {
-  const hasDetails = Boolean(
-    host.remoteness ||
-      host.transportation?.length ||
-      host.nearbyServices?.length ||
-      host.activities?.length,
-  );
-  if (!hasDetails) return null;
+  if (!hasLifeHereDetails(host)) return null;
 
   return (
     <NarrativeSection id="life-here-heading" title="Living here">
@@ -374,75 +352,109 @@ function ListingsSection({
   );
 }
 
-function LocationMapCard({ location, externalMapLinks }: {
-  readonly location: string;
+function FieldGuide({
+  host,
+  listingCount,
+  externalMapLinks,
+}: {
+  readonly host: PublicHostProfile;
+  readonly listingCount: number;
   readonly externalMapLinks: boolean;
 }) {
+  const hostingSinceYear = host.createdAt
+    ? new Date(host.createdAt).getFullYear()
+    : null;
+
   return (
-    <div className={styles.mapCard}>
-      <div className={styles.mapSurface} aria-hidden>
-        <div className={styles.mapContours} />
-        <div className={styles.mapPin}><Icon name="nav.map" size={20} aria-hidden /></div>
+    <div className={styles.fieldGuide}>
+      <div className={styles.fieldGuideHead}>
+        <span className={styles.fieldGuideKicker}>At a glance</span>
+        <h2 className={styles.fieldGuideTitle}>Your field guide</h2>
       </div>
-      <div className={styles.mapBody}>
-        <h3 className={styles.mapTitle}>Location</h3>
-        <p className={styles.mapLocation}><Icon name="nav.map" size={16} aria-hidden />{location}</p>
-        {externalMapLinks ? (
+
+      <dl className={styles.guideFacts}>
+        <div className={styles.guideFact}>
+          <dt><Icon name="status.open" size={18} aria-hidden />Open now</dt>
+          <dd>{listingCount === 1 ? "1 opportunity" : `${listingCount} opportunities`}</dd>
+        </div>
+        {host.primaryLocationName ? (
+          <div className={styles.guideFact}>
+            <dt><Icon name="nav.map" size={18} aria-hidden />Based near</dt>
+            <dd>{host.primaryLocationName}</dd>
+          </div>
+        ) : null}
+        {hostingSinceYear ? (
+          <div className={styles.guideFact}>
+            <dt><Icon name="status.begins" size={18} aria-hidden />Member since</dt>
+            <dd>{hostingSinceYear}</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      {host.categoryScopes.length > 0 ? (
+        <div className={styles.guideCategories} aria-label="Opportunity categories">
+          {host.categoryScopes.map((scope) => (
+            <span key={scope} className={styles.guideCategory}>
+              <Icon
+                name={CATEGORY_ICON[scope as keyof typeof CATEGORY_ICON] ?? "category.mix"}
+                size={16}
+                aria-hidden
+              />
+              {CATEGORY_LABEL[scope] ?? scope}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      <div className={styles.promiseGuide} aria-label="Housing meals and pay overview">
+        <div className={styles.promiseRow} data-kind="housing">
+          <span className={styles.promiseIcon}><Icon name="benefit.housing" size={20} aria-hidden /></span>
+          <div>
+            <p className={styles.promiseLabel}>Housing</p>
+            <p className={styles.promiseValue}>
+              {host.housingOfferedGenerally ? "Offered" : "Not stated"}
+            </p>
+            {host.housingDescription ? (
+              <p className={styles.promiseNote}>{host.housingDescription}</p>
+            ) : null}
+          </div>
+        </div>
+        <div className={styles.promiseRow} data-kind="meals">
+          <span className={styles.promiseIcon}><Icon name="benefit.meals" size={20} aria-hidden /></span>
+          <div>
+            <p className={styles.promiseLabel}>Meals</p>
+            <p className={styles.promiseValue}>
+              {host.mealsOfferedGenerally ? "Offered" : "Not stated"}
+            </p>
+            {host.mealsDescription ? (
+              <p className={styles.promiseNote}>{host.mealsDescription}</p>
+            ) : null}
+          </div>
+        </div>
+        <div className={styles.promiseRow} data-kind="pay">
+          <span className={styles.promiseIcon}><Icon name="benefit.pay" size={20} aria-hidden /></span>
+          <div>
+            <p className={styles.promiseLabel}>Pay</p>
+            <p className={styles.promiseValue}>See each opportunity</p>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.fieldGuideActions}>
+        <a className={styles.guidePrimary} href="#listings">
+          View opportunities <Icon name="action.forward" size={16} aria-hidden />
+        </a>
+        {host.primaryLocationName && externalMapLinks ? (
           <a
-            href={`https://maps.google.com/?q=${encodeURIComponent(location)}`}
+            href={`https://maps.google.com/?q=${encodeURIComponent(host.primaryLocationName)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className={styles.mapLink}
+            className={styles.guideSecondary}
           >
-            Open in Maps <Icon name="action.forward" size={16} aria-hidden />
+            Open area in Maps <Icon name="action.forward" size={16} aria-hidden />
           </a>
-        ) : (
-          <p className={styles.emptyNote}>Map links are disabled in this sample workspace.</p>
-        )}
+        ) : null}
       </div>
-    </div>
-  );
-}
-
-function HousingMealsCard({ host }: { readonly host: PublicHostProfile }) {
-  if (
-    !host.housingOfferedGenerally &&
-    !host.mealsOfferedGenerally &&
-    !host.housingDescription &&
-    !host.mealsDescription
-  ) {
-    return null;
-  }
-  return (
-    <div className={styles.benefitCard}>
-      <h3 className={styles.benefitCardTitle}>Housing &amp; meals</h3>
-      {host.housingOfferedGenerally || host.housingDescription ? (
-        <div className={styles.benefitRow}>
-          <div className={styles.benefitRowIcon} data-kind="housing"><Icon name="category.seasonal" size={20} aria-hidden /></div>
-          <div>
-            <p className={styles.benefitRowLabel}>Housing</p>
-            <p className={styles.benefitRowNote}>
-              {host.housingDescription ??
-                "This host generally provides housing. Confirm the exact arrangement on each listing."}
-            </p>
-          </div>
-        </div>
-      ) : null}
-      {host.mealsOfferedGenerally || host.mealsDescription ? (
-        <div className={styles.benefitRow}>
-          <div className={styles.benefitRowIcon} data-kind="meals"><Icon name="category.farm" size={20} aria-hidden /></div>
-          <div>
-            <p className={styles.benefitRowLabel}>Meals</p>
-            <p className={styles.benefitRowNote}>
-              {host.mealsDescription ??
-                "This host generally provides meals. Confirm the exact arrangement on each listing."}
-            </p>
-          </div>
-        </div>
-      ) : null}
-      <Link className={styles.benefitCardLink} href="#listings">
-        View listings for details <Icon name="action.forward" size={16} aria-hidden />
-      </Link>
     </div>
   );
 }
@@ -458,60 +470,50 @@ export function PublicHostProfileView({
   ratingSummary,
   reviews,
   coverPhotoUrl = listings.find((listing) => listing.coverPhotoUrl)?.coverPhotoUrl ?? null,
+  weatherSlot,
   reviewSlot,
   browseHref = "/seek",
   listingHrefPrefix = "/listing",
   externalMapLinks = true,
 }: PublicHostProfileViewProps) {
-  const hostingSinceYear = host.createdAt ? new Date(host.createdAt).getFullYear() : null;
-  const hasSidebar = Boolean(
-    host.primaryLocationName ||
-      host.housingOfferedGenerally ||
-      host.mealsOfferedGenerally ||
-      host.housingDescription ||
-      host.mealsDescription,
-  );
-
   return (
     <div className={styles.page}>
       <HostProfileHero host={host} coverPhotoUrl={coverPhotoUrl} listingCount={listings.length} />
-      <QuickFacts
+      <ProfileNav
+        host={host}
         listingCount={listings.length}
-        housingOffered={host.housingOfferedGenerally}
-        mealsOffered={host.mealsOfferedGenerally}
-        categoryScopes={host.categoryScopes}
-        hostingSinceYear={hostingSinceYear}
+        hasWeather={Boolean(weatherSlot)}
       />
       <HostTrustBand summary={ratingSummary} verified={host.verified} reviewsHref="#reviews-heading" />
-      <div className={hasSidebar ? styles.contentGrid : styles.contentSingle}>
+      <div className={styles.contentGrid}>
+        <aside className={styles.sidebar} aria-label="Host field guide">
+          <FieldGuide
+            host={host}
+            listingCount={listings.length}
+            externalMapLinks={externalMapLinks}
+          />
+        </aside>
         <div className={styles.mainCol}>
           {host.about ? (
             <NarrativeSection id="about-heading" title="About us">
               <div className={styles.aboutCard}><p className={styles.aboutText}>{host.about}</p></div>
             </NarrativeSection>
           ) : null}
-          <WorkingHereSection host={host} />
-          <SeasonSection host={host} />
-          {host.team?.length ? <TeamSection team={host.team} /> : null}
-          <LifeHereSection host={host} />
           <ListingsSection
             listings={listings}
             host={host}
             browseHref={browseHref}
             listingHrefPrefix={listingHrefPrefix}
           />
+          <WorkingHereSection host={host} />
+          <SeasonSection host={host} />
+          {host.team?.length ? <TeamSection team={host.team} /> : null}
+          <LifeHereSection host={host} />
+          {weatherSlot ? <div className={styles.weatherSection}>{weatherSlot}</div> : null}
           {host.faqs?.length ? <FaqSection faqs={host.faqs} /> : null}
           {reviewSlot}
           <HostReviews hostName={host.companyName} summary={ratingSummary} reviews={reviews} />
         </div>
-        {hasSidebar ? (
-          <aside className={styles.sidebar}>
-            {host.primaryLocationName ? (
-              <LocationMapCard location={host.primaryLocationName} externalMapLinks={externalMapLinks} />
-            ) : null}
-            <HousingMealsCard host={host} />
-          </aside>
-        ) : null}
       </div>
     </div>
   );

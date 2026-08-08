@@ -62,9 +62,14 @@ export function HostProfileHero({
   const hostingSinceYear = host.createdAt
     ? new Date(host.createdAt).getFullYear()
     : null;
+  const primaryScope = host.categoryScopes[0] ?? "mix";
 
   return (
-    <header className={styles.hero}>
+    <header
+      className={styles.hero}
+      data-has-cover={coverPhotoUrl ? "true" : "false"}
+      data-category={primaryScope}
+    >
       {/* ── Cover band ── */}
       <div className={styles.cover} role="presentation">
         {coverPhotoUrl ? (
@@ -77,7 +82,12 @@ export function HostProfileHero({
             className={styles.coverImg}
           />
         ) : (
-          <div className={styles.coverFallback} />
+          <div className={styles.coverFallback}>
+            <span className={styles.fallbackMark}>
+              <Icon name={catIcon(primaryScope)} size={24} aria-hidden />
+              {CATEGORY_LABEL[primaryScope] ?? "Explore & Earn"} employer profile
+            </span>
+          </div>
         )}
         <div className={styles.coverScrim} />
 
@@ -119,13 +129,20 @@ export function HostProfileHero({
 
         {/* Identity body */}
         <div className={styles.identityBody}>
+          <p className={styles.eyebrow}>Employer field profile</p>
           <div className={styles.nameRow}>
             <h1 className={styles.name}>{host.companyName}</h1>
             {verified && <VerifiedHostBadge />}
           </div>
 
-          {host.hostName ? (
-            <p className={styles.hostedBy}>Hosted by {host.hostName}</p>
+          {host.hostName || host.primaryLocationName || hostingSinceYear ? (
+            <ul className={styles.identityMeta}>
+              {host.hostName ? <li>Led by {host.hostName}</li> : null}
+              {host.primaryLocationName ? (
+                <li><Icon name="nav.map" size={15} aria-hidden />{host.primaryLocationName}</li>
+              ) : null}
+              {hostingSinceYear ? <li>Since {hostingSinceYear}</li> : null}
+            </ul>
           ) : null}
 
           <div className={styles.statusRow}>
@@ -141,16 +158,6 @@ export function HostProfileHero({
               </span>
             )}
 
-            {host.primaryLocationName ? (
-              <span className={styles.locationPill}>
-                <Icon name="nav.map" size={16} aria-hidden />
-                {host.primaryLocationName}
-              </span>
-            ) : null}
-
-            {hostingSinceYear ? (
-              <span className={styles.sincePill}>Since {hostingSinceYear}</span>
-            ) : null}
           </div>
 
           {host.tagline ? (
@@ -168,22 +175,6 @@ export function HostProfileHero({
             </div>
           ) : null}
 
-          {(host.housingOfferedGenerally || host.mealsOfferedGenerally) ? (
-            <div className={styles.benefitSignals}>
-              {host.housingOfferedGenerally ? (
-                <span className={styles.benefitHousing}>
-                  <Icon name="category.seasonal" size={16} aria-hidden />
-                  Housing offered
-                </span>
-              ) : null}
-              {host.mealsOfferedGenerally ? (
-                <span className={styles.benefitMeals}>
-                  <Icon name="category.farm" size={16} aria-hidden />
-                  Meals provided
-                </span>
-              ) : null}
-            </div>
-          ) : null}
         </div>
 
         {/* CTAs + social */}

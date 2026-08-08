@@ -28,7 +28,7 @@ const FOOTER_COLUMNS = [
 		title: "Hosts",
 		links: [
 			{ label: "For hosts",        href: "/for-hosts"          },
-			{ label: "Pricing",          href: "/for-hosts#pricing"  },
+			{ label: "Pricing",          href: "/for-hosts#plans"  },
 		],
 	},
 	{

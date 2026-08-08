@@ -41,6 +41,8 @@
 
 .bannerButton,
 .bannerLink {
+  box-sizing: border-box;
+  max-width: 100%;
   min-height: var(--tap-min);
   display: inline-flex;
   align-items: center;
@@ -111,6 +113,8 @@
 
 .headerAction { flex: 0 0 auto; }
 .primaryLink, .secondaryLink, .primaryButton, .secondaryButton {
+  box-sizing: border-box;
+  max-width: 100%;
   min-height: var(--tap-min);
   display: inline-flex;
   align-items: center;
@@ -272,7 +276,7 @@
 
 .filterBar { display: grid; grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr) auto; align-items: end; gap: var(--space-10); padding: var(--space-14); border: 1px solid var(--border-soft); border-radius: var(--radius-card); background: var(--color-surface); }
 .filterBar label { display: flex; flex-direction: column; gap: var(--space-6); color: var(--text-secondary); font-size: var(--type-meta-size); font-weight: var(--font-weight-semibold); }
-.filterBar input, .filterBar select, .composer textarea { width: 100%; min-height: var(--tap-min); padding: var(--space-10) var(--space-12); border: 1px solid var(--field-border); border-radius: var(--radius-cell); background: var(--field-bg); color: var(--text-primary); font: inherit; }
+.filterBar input, .filterBar select, .composer textarea { width: 100%; max-width: 100%; box-sizing: border-box; min-height: var(--tap-min); padding: var(--space-10) var(--space-12); border: 1px solid var(--field-border); border-radius: var(--radius-cell); background: var(--field-bg); color: var(--text-primary); font: inherit; }
 .filterBar output { min-width: 90px; padding-block: var(--space-10); color: var(--text-secondary); font-size: var(--type-meta-size); text-align: right; }
 
 .emptyState { display: grid; justify-items: start; gap: var(--space-10); min-height: 250px; align-content: center; padding: clamp(var(--space-24), 6vw, var(--space-64)); border: 1px dashed var(--border-ink); border-radius: var(--radius-card); background: var(--color-surface); }
@@ -377,7 +381,7 @@
 
 .profileForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-18); padding: clamp(var(--space-20), 4vw, var(--space-32)); border: 1px solid var(--border-soft); border-radius: var(--radius-card); background: var(--color-surface); box-shadow: var(--elevation-card); }
 .profileForm label { display: flex; flex-direction: column; gap: var(--space-6); color: var(--text-secondary); font-size: var(--type-meta-size); font-weight: var(--font-weight-semibold); }
-.profileForm input, .profileForm select, .profileForm textarea { width: 100%; min-height: var(--tap-min); padding: var(--space-10) var(--space-12); border: 1px solid var(--field-border); border-radius: var(--radius-cell); background: var(--field-bg); color: var(--text-primary); font: inherit; }
+.profileForm input, .profileForm select, .profileForm textarea { width: 100%; max-width: 100%; box-sizing: border-box; min-height: var(--tap-min); padding: var(--space-10) var(--space-12); border: 1px solid var(--field-border); border-radius: var(--radius-cell); background: var(--field-bg); color: var(--text-primary); font: inherit; }
 .profileForm textarea { resize: vertical; }
 .fullField, .formNotice, .formActions { grid-column: 1 / -1; }
 .formNotice { min-height: 1.5em; margin: 0; color: var(--text-secondary); font-size: var(--type-meta-size); }
@@ -472,9 +476,11 @@
 }
 
 @media (max-width: 640px) {
-  .demoBanner { align-items: flex-start; flex-direction: column; gap: var(--space-8); }
-  .demoBannerActions { width: 100%; }
-  .bannerButton, .bannerLink { flex: 1; }
+  .demoBanner { align-items: center; gap: var(--space-8); padding: var(--space-8) var(--space-10); }
+  .demoBannerText { flex: 1 1 auto; }
+  .demoBannerText span { display: none; }
+  .demoBannerActions { flex: 0 1 auto; gap: var(--space-4); }
+  .bannerButton, .bannerLink { flex: 0 1 auto; padding-inline: var(--space-8); font-size: var(--type-caption-size); }
   .surfaceHeader, .sectionHeading, .attentionCard, .hostCallout, .profileHero { align-items: flex-start; flex-direction: column; }
   .headerAction, .headerAction > *, .attentionCard > .secondaryLink, .hostCallout > .secondaryLink { width: 100%; }
   .statGrid { grid-template-columns: 1fr 1fr; }
@@ -525,7 +531,7 @@
 
 @media (max-width: 380px) {
   .statGrid, .dateGrid, .galleryGrid { grid-template-columns: 1fr; }
-  .demoBannerActions { flex-direction: column; }
+  .demoBannerActions { flex-direction: row; }
   .modeLinks { width: 100%; }
   .modeLinks a { flex: 1; justify-content: center; }
   .cardFacts { grid-template-columns: 1fr; }

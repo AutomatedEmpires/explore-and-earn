@@ -774,6 +774,8 @@ function HostSurface() {
     category: listing.category,
     coverPhotoUrl: listing.photos[0] ?? null,
     locationDisplay: listing.location,
+    latitude: null,
+    longitude: null,
     housingIncluded: listing.housingProvision === "provided",
     mealsIncluded: listing.mealsProvision === "provided",
     compensationSummary: listing.pay,

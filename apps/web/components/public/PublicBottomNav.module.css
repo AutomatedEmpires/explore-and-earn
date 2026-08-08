@@ -17,6 +17,7 @@
 	bottom: 0;
 	z-index: var(--z-dock);
 	width: 100%;
+	box-sizing: border-box;
 	background: var(--color-surface);
 	border-top: 1px solid var(--border-ink-warm);
 	/* Fixed chrome over scrolling content — a whisper lift, not a card shadow. */
@@ -46,6 +47,7 @@
 	align-items: stretch;
 	gap: var(--space-4);
 	width: 100%;
+	box-sizing: border-box;
 	margin: 0;
 	padding: var(--space-8);
 	list-style: none;

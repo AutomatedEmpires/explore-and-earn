@@ -1,122 +1,194 @@
-/* Host profile loading state. Profile header skeleton followed by a responsive
-   listing card grid. Semantic tokens only; px appears only in 1px hairlines. */
-
-.wrap {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-section);
-	padding: var(--space-gutter);
-	background: var(--color-paper);
-	min-height: 100vh;
-}
-
-.header {
-	display: flex;
-	align-items: center;
-	gap: var(--space-16);
-}
-
-.avatar {
-	flex: 0 0 auto;
-	width: 5rem;
-	height: 5rem;
-}
-
-.avatar :global(.ui-skeleton) {
-	display: block;
-	width: 100%;
-	height: 100%;
-	border-radius: var(--radius-pill);
-}
-
-.headerText {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-8);
-	flex: 1 1 auto;
-}
-
-.nameLine {
-	width: min(20ch, 60%);
-}
-
-.metaLine {
-	width: min(32ch, 80%);
-}
-
-.nameLine :global(.ui-skeleton) {
-	display: block;
-	width: 100%;
-	height: var(--type-page-lh);
-	border-radius: var(--radius-input);
-}
-
-.metaLine :global(.ui-skeleton) {
-	display: block;
-	width: 100%;
-	height: var(--type-body-lh);
-	border-radius: var(--radius-input);
-}
-
-.grid {
-	display: grid;
-	grid-template-columns: 1fr;
-	gap: var(--space-section);
-}
-
-.card {
-	display: flex;
-	flex-direction: column;
-	gap: var(--space-12);
-	padding: var(--space-card);
-	border: 1px solid var(--border-soft);
-	border-radius: var(--radius-card);
-	background: var(--color-surface);
+.page {
+  min-height: 100dvh;
+  padding-bottom: calc(
+    var(--size-bottom-nav) + var(--space-24) + env(safe-area-inset-bottom, 0px)
+  );
+  background: var(--color-paper);
 }
 
 .cover {
-	width: 100%;
-	aspect-ratio: 16 / 9;
+  width: 100%;
+  height: 13.75rem;
 }
 
-.cover :global(.ui-skeleton) {
-	display: block;
-	width: 100%;
-	height: 100%;
-	border-radius: var(--radius-image);
+.cover :global(.ui-skeleton),
+.avatar :global(.ui-skeleton),
+.action :global(.ui-skeleton),
+.guideAction :global(.ui-skeleton),
+.cardImage :global(.ui-skeleton) {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-.cardLine {
-	width: 70%;
+.identity {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-16);
+  width: calc(100% - (var(--space-16) * 2));
+  max-width: 70rem;
+  margin: calc(var(--space-40) * -1) auto var(--space-20);
+  padding: var(--space-16);
+  box-sizing: border-box;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-feature);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-card);
 }
 
-.cardLine :global(.ui-skeleton) {
-	display: block;
-	width: 100%;
-	height: var(--type-body-lh);
-	border-radius: var(--radius-input);
+.avatar {
+  width: 5rem;
+  height: 5rem;
 }
+
+.avatar :global(.ui-skeleton),
+.action :global(.ui-skeleton) { border-radius: var(--radius-cell); }
+
+.identityText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.eyebrow { width: min(10rem, 68%); }
+.name { width: min(24rem, 88%); }
+.tagline { width: min(34rem, 100%); }
+
+.eyebrow :global(.ui-skeleton),
+.name :global(.ui-skeleton),
+.tagline :global(.ui-skeleton),
+.navItem :global(.ui-skeleton),
+.guideTitle :global(.ui-skeleton),
+.fact :global(.ui-skeleton),
+.heading :global(.ui-skeleton),
+.copy :global(.ui-skeleton),
+.copyShort :global(.ui-skeleton),
+.cardLine :global(.ui-skeleton),
+.cardMeta :global(.ui-skeleton) {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-control);
+}
+
+.action {
+  grid-column: 1 / -1;
+  height: var(--tap-min);
+}
+
+.nav {
+  display: flex;
+  gap: var(--space-16);
+  padding: var(--space-10) var(--space-16);
+  overflow: hidden;
+  border-block: 1px solid var(--border-soft);
+  background: var(--color-surface-raised);
+}
+
+.navItem {
+  width: 6.5rem;
+  flex: 0 0 auto;
+}
+
+.content {
+  display: grid;
+  grid-template-areas: "guide" "main";
+  gap: var(--space-32);
+  max-width: 70rem;
+  margin: 0 auto;
+  padding: var(--space-24) var(--space-16);
+  box-sizing: border-box;
+}
+
+.guide {
+  grid-area: guide;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-20);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-feature);
+  background: var(--color-surface-raised);
+}
+
+.guideTitle { width: 55%; }
+.fact { width: 100%; }
+.guideAction { height: var(--tap-min); }
+
+.main {
+  grid-area: main;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-40);
+}
+
+.story,
+.main section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.heading { width: min(18rem, 60%); }
+.copy { width: 100%; }
+.copyShort { width: 72%; }
+
+.cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-16);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-12);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.cardImage { aspect-ratio: 16 / 9; }
+.cardImage :global(.ui-skeleton) { border-radius: var(--radius-image); }
+.cardLine { width: 78%; }
+.cardMeta { width: 52%; }
 
 .srOnly {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
-@media (min-width: 640px) {
-	.grid {
-		grid-template-columns: repeat(2, 1fr);
-	}
+@media (min-width: 37.5rem) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (min-width: 1024px) {
-	.grid {
-		grid-template-columns: repeat(3, 1fr);
-	}
+@media (min-width: 42.5rem) {
+  .cover { height: 19rem; }
+  .identity {
+    grid-template-columns: auto minmax(0, 1fr) 10rem;
+    gap: var(--space-24);
+    width: calc(100% - (var(--space-32) * 2));
+    margin-top: calc(var(--space-56) * -1);
+    padding: var(--space-24);
+  }
+  .action { grid-column: 3; grid-row: 1; }
+}
+
+@media (min-width: 56.25rem) {
+  .content {
+    grid-template-areas: "main guide";
+    grid-template-columns: minmax(0, 1fr) 18.5rem;
+    gap: var(--space-40);
+    padding: var(--space-40) var(--space-32);
+  }
 }

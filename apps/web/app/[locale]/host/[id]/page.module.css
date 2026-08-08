@@ -1,173 +1,109 @@
-/* ══════════════════════════════════════════════════════════════════
-   Public host profile page — page.module.css
-   Trail & Sky palette. Mobile-first. Sidebar on desktop.
-   ══════════════════════════════════════════════════════════════════ */
-
 .page {
+  --profile-header-offset: calc(
+    var(--size-public-header) + env(safe-area-inset-top, 0px)
+  );
+  --profile-anchor-offset: calc(
+    var(--profile-header-offset) + var(--tap-min) + var(--space-16)
+  );
   min-height: 100dvh;
   background: var(--color-paper);
-  /* Clear the fixed PublicBottomNav so the last content isn't occluded. */
-  padding-bottom: var(--space-80);
 }
 
-/* ── Quick facts strip ─────────────────────────────────────────── */
-/* Horizontal scroll on mobile; centered wrap on desktop           */
-
-.factsStrip {
-  background: var(--color-surface-raised);
+.profileNavShell {
+  position: sticky;
+  top: var(--profile-header-offset);
+  z-index: var(--z-content-bar);
   border-bottom: 1px solid var(--border-soft);
-  overflow: hidden;
+  background: color-mix(in srgb, var(--color-surface-raised) 96%, transparent);
+  backdrop-filter: blur(var(--space-12));
 }
 
-.facts {
+.profileNav {
   display: flex;
-  gap: var(--space-4);
-  padding: var(--space-12) var(--space-16);
+  max-width: 70rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-16);
   overflow-x: auto;
   scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  max-width: 1060px;
-  margin: 0 auto;
+  overscroll-behavior-inline: contain;
 }
 
-.facts::-webkit-scrollbar { display: none; }
+.profileNav::-webkit-scrollbar { display: none; }
 
-@media (min-width: 680px) {
-  .facts {
-    flex-wrap: wrap;
-    overflow-x: visible;
-    padding: var(--space-14) var(--space-32);
-    gap: var(--space-8);
-  }
-}
-
-/* Individual fact card — field-tag aesthetic */
-.fact {
+.profileNavLink {
   display: inline-flex;
+  min-height: var(--tap-min);
+  flex: 0 0 auto;
   align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-8) var(--space-12);
-  border-radius: var(--radius-input);
-  border-left-width: 3px;
-  border-left-style: solid;
-  border-top: 1px solid transparent;
-  border-right: 1px solid transparent;
-  border-bottom: 1px solid transparent;
-  background: var(--color-surface);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.factBody {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.factValue {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: 15px;
-  line-height: 1;
-  color: var(--text-primary);
-}
-
-.factLabel {
+  padding: 0 var(--space-14);
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
   font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: var(--type-label-lh);
-  letter-spacing: var(--type-label-tracking);
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard);
 }
 
-/* Color variants */
-.factBlue {
-  border-left-color: var(--palette-sky);
-  background: color-mix(in srgb, var(--palette-sky) 5%, var(--color-surface-raised));
+.profileNavLink:hover {
+  background: color-mix(in srgb, var(--color-cta) 7%, var(--color-surface-raised));
+  color: var(--color-cta);
 }
 
-.factGreen {
-  border-left-color: var(--benefit-housing-fg);
-  background: color-mix(in srgb, var(--benefit-housing-bg) 60%, var(--color-surface-raised));
-}
-
-.factOrange {
-  border-left-color: var(--benefit-meals-fg);
-  background: color-mix(in srgb, var(--benefit-meals-bg) 60%, var(--color-surface-raised));
-}
-
-.factCategory {
-  border-left-color: var(--color-cta);
-  background: color-mix(in srgb, var(--color-cta) 5%, var(--color-surface-raised));
-}
-
-.factMuted {
-  border-left-color: var(--border-ink);
-  background: var(--color-surface);
-}
-
-/* ── Layout: content grid ──────────────────────────────────────── */
-
-.contentGrid,
-.contentSingle {
-  max-width: 1060px;
-  margin: 0 auto;
-  padding: var(--space-32) var(--space-16);
-  box-sizing: border-box;
-}
-
-.contentSingle {
-  display: block;
+.profileNavLink:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: calc(var(--space-2) * -1);
 }
 
 .contentGrid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-areas:
+    "side"
+    "main";
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-32);
-}
-
-@media (min-width: 680px) {
-  .contentGrid,
-  .contentSingle {
-    padding: var(--space-40) var(--space-32);
-  }
-}
-
-@media (min-width: 860px) {
-  .contentGrid {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: var(--space-32);
-  }
+  width: 100%;
+  max-width: 70rem;
+  margin: 0 auto;
+  padding: var(--space-24) var(--space-16) var(--space-48);
+  box-sizing: border-box;
 }
 
 .mainCol {
-  flex: 1;
+  grid-area: main;
+  display: flex;
   min-width: 0;
-  display: flex;
   flex-direction: column;
-  gap: var(--space-32);
+  gap: var(--space-48);
 }
 
-/* Sidebar — sticky on desktop, stacks after main on mobile */
 .sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-16);
+  grid-area: side;
+  min-width: 0;
 }
 
-@media (min-width: 860px) {
-  .sidebar {
-    width: 272px;
-    flex-shrink: 0;
-    position: sticky;
-    top: var(--space-24);
-    align-self: flex-start;
-  }
+.section,
+.weatherSection {
+  min-width: 0;
 }
 
-/* ── Section commons ──────────────────────────────────────────── */
+/* Fragment IDs live on the listings section and on nested headings. Keep the
+   margin on the actual targets so sticky chrome never obscures them. */
+.section,
+.sectionHeading,
+.mainCol :global(#listing-weather),
+.mainCol :global(#reviews-heading) {
+  scroll-margin-top: var(--profile-anchor-offset);
+}
+
+/* The forecast owns its horizontal scrollport. Clip its off-screen days at
+   this page boundary so they never inflate the document canvas. */
+.weatherSection {
+  overflow: hidden;
+  contain: paint;
+}
 
 .section {
   display: flex;
@@ -179,221 +115,340 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-12);
 }
 
 .sectionHeading {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
-  color: var(--text-primary);
   margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--type-display-section);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--type-display-lh);
+  text-wrap: balance;
 }
 
 .browseCta {
   display: inline-flex;
+  min-height: var(--tap-min);
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--space-4);
+  padding: 0 var(--space-8);
+  border-radius: var(--radius-control);
+  color: var(--color-cta);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-cta);
+  font-weight: var(--font-weight-semibold);
   text-decoration: none;
-  transition: opacity var(--motion-fast) ease;
 }
 
-.browseCta:hover { opacity: 0.8; }
+.browseCta:hover {
+  background: color-mix(in srgb, var(--color-cta) 7%, var(--color-surface-raised));
+}
 
-/* ── About section ─────────────────────────────────────────────── */
+.browseCta:focus-visible,
+.guidePrimary:focus-visible,
+.guideSecondary:focus-visible {
+  outline: 2px solid var(--color-cta);
+  outline-offset: var(--space-3);
+}
 
 .aboutCard {
-  background: var(--color-surface-raised);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
-  padding: var(--space-24);
+  padding: var(--space-20) var(--space-24);
+  border-left: var(--space-3) solid var(--color-cta);
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+  background: color-mix(in srgb, var(--color-cta) 5%, var(--color-surface-raised));
 }
 
-.aboutText {
+.aboutText,
+.whyText {
+  max-width: 65ch;
+  margin: 0;
+  color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: var(--type-body-size);
   line-height: 1.65;
-  color: var(--text-primary);
-  margin: 0;
   white-space: pre-wrap;
-  max-width: 65ch;
+  text-wrap: pretty;
 }
-
-/* ── Listings grid ─────────────────────────────────────────────── */
 
 .listingsGrid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-16);
 }
-
-@media (min-width: 480px) { .listingsGrid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 860px) { .listingsGrid { grid-template-columns: 1fr; } }
-@media (min-width: 960px) { .listingsGrid { grid-template-columns: repeat(2, 1fr); } }
-
-/* ── Empty state ─────────────────────────────────────────────────── */
 
 .emptyListings {
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
   gap: var(--space-12);
-  padding: var(--space-48) var(--space-24);
-  background: var(--color-surface-raised);
+  padding: var(--space-40) var(--space-24);
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-feature);
+  background: var(--color-surface-raised);
+  text-align: center;
 }
 
 .emptyIcon {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--color-steel);
   display: flex;
+  width: 3.25rem;
+  height: 3.25rem;
   align-items: center;
   justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-steel);
   color: var(--text-secondary);
 }
 
 .emptyTitle {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: var(--type-card-size);
-  line-height: var(--type-card-lh);
-  color: var(--text-primary);
   margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--type-card-lh);
 }
 
 .emptyNote {
+  margin: 0;
+  color: var(--text-secondary);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  color: var(--text-secondary);
-  margin: 0;
 }
 
-/* ── Location map card ─────────────────────────────────────────── */
-/* Clean placeholder — no paid API. SVG-pattern topographic surface. */
-
-.mapCard {
-  background: var(--color-surface-raised);
+.fieldGuide {
+  overflow: hidden;
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
-  overflow: hidden;
+  border-radius: var(--radius-feature);
+  background: var(--color-surface-raised);
+  box-shadow: var(--elevation-card);
 }
 
-/* Topographic map surface — purely CSS / decorative */
-.mapSurface {
-  position: relative;
-  height: 120px;
-  overflow: hidden;
-  background: linear-gradient(
-    155deg,
-    var(--palette-steel) 0%,
-    var(--palette-chrome) 50%,
-    var(--palette-sky-light) 100%
-  );
-}
-
-/* Contour rings — centered on the pin */
-.mapContours {
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-radial-gradient(
-      ellipse at 50% 70%,
-      transparent,
-      transparent 20px,
-      rgba(26, 142, 206, 0.08) 20px,
-      rgba(26, 142, 206, 0.08) 21px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 24px,
-      rgba(200, 216, 232, 0.28) 24px,
-      rgba(200, 216, 232, 0.28) 25px
+.fieldGuideHead {
+  padding: var(--space-20);
+  border-bottom: 1px solid var(--border-soft);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--palette-sky-light) 34%, var(--color-surface-raised)),
+      var(--color-surface-raised)
     );
 }
 
-/* Pin centered horizontally, anchored at bottom */
-.mapPin {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--color-cta);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 3px 10px rgba(26, 142, 206, 0.4), 0 0 0 4px rgba(26, 142, 206, 0.15);
-}
-
-.mapBody {
-  padding: var(--space-16);
-  border-top: 1px solid var(--border-soft);
-}
-
-.mapTitle {
-  font-family: var(--font-display);
+.fieldGuideKicker {
+  display: block;
+  margin-bottom: var(--space-4);
+  color: var(--color-cta);
+  font-family: var(--font-ui);
+  font-size: var(--type-label-size);
   font-weight: var(--font-weight-bold);
-  font-size: var(--type-body-size);
-  line-height: 1;
-  color: var(--text-primary);
-  margin: 0 0 var(--space-8);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
 }
 
-.mapLocation {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
+.fieldGuideTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--type-card-size);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--type-card-lh);
+}
+
+.guideFacts {
+  margin: 0;
+  padding: var(--space-8) var(--space-20);
+}
+
+.guideFact {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 0.9fr) minmax(0, 1.1fr);
+  gap: var(--space-12);
+  padding: var(--space-12) 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.guideFact:last-child { border-bottom: 0; }
+
+.guideFact dt,
+.guideFact dd {
+  margin: 0;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  color: var(--text-secondary);
-  margin: 0 0 var(--space-12);
+  line-height: var(--type-meta-lh);
 }
 
-.mapLink {
+.guideFact dt {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-6);
+  color: var(--text-secondary);
+}
+
+.guideFact dt svg {
+  flex: 0 0 auto;
+  color: var(--color-cta);
+}
+
+.guideFact dd {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  text-align: right;
+}
+
+.guideCategories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  padding: 0 var(--space-20) var(--space-16);
+}
+
+.guideCategory {
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
+  padding: var(--space-6) var(--space-10);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--text-secondary);
   font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-cta);
-  text-decoration: none;
-  transition: opacity var(--motion-fast) ease;
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
 }
 
-.mapLink:hover { opacity: 0.8; }
+.promiseGuide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px solid var(--border-soft);
+}
 
-/* ── Housing + meals benefit card ─────────────────────────────── */
+.promiseRow {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-14) var(--space-12);
+  border-right: 1px solid var(--border-soft);
+}
+
+.promiseRow:last-child { border-right: 0; }
+
+.promiseIcon {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+}
+
+.promiseRow[data-kind="housing"] .promiseIcon {
+  background: var(--benefit-housing-bg);
+  color: var(--benefit-housing-fg);
+}
+
+.promiseRow[data-kind="meals"] .promiseIcon {
+  background: var(--benefit-meals-bg);
+  color: var(--benefit-meals-fg);
+}
+
+.promiseRow[data-kind="pay"] .promiseIcon {
+  background: var(--benefit-pay-bg);
+  color: var(--benefit-pay-fg);
+}
+
+.promiseLabel,
+.promiseValue,
+.promiseNote {
+  margin: 0;
+  font-family: var(--font-ui);
+}
+
+.promiseLabel {
+  color: var(--text-secondary);
+  font-size: var(--type-label-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--type-label-tracking);
+  text-transform: uppercase;
+}
+
+.promiseValue {
+  color: var(--text-primary);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--type-meta-lh);
+}
+
+.promiseNote {
+  display: none;
+  color: var(--text-secondary);
+  font-size: var(--type-label-size);
+  line-height: 1.45;
+}
+
+.fieldGuideActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-16) var(--space-20) var(--space-20);
+}
+
+.guidePrimary,
+.guideSecondary {
+  display: inline-flex;
+  min-height: var(--tap-min);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  box-sizing: border-box;
+  border-radius: var(--radius-button);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+
+.guidePrimary {
+  padding: var(--space-10) var(--space-16);
+  background: var(--color-cta);
+  color: var(--color-cta-text);
+}
+
+.guideSecondary {
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--border-soft);
+  background: var(--color-surface);
+  color: var(--color-cta);
+}
 
 .benefitCard {
-  background: var(--color-surface-raised);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
-  padding: var(--space-20);
   display: flex;
   flex-direction: column;
   gap: var(--space-16);
+  padding: var(--space-20);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
 }
 
-.benefitCardTitle {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: var(--type-body-size);
-  line-height: 1;
-  color: var(--text-primary);
+.benefitCardTitle,
+.mapTitle {
   margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--type-body-lh);
+}
+
+.aboutCard > summary {
+  min-height: var(--tap-min);
+  cursor: pointer;
 }
 
 .benefitRow {
@@ -402,14 +457,15 @@
   gap: var(--space-12);
 }
 
-.benefitRowIcon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-input);
+.benefitRowIcon,
+.whyAccent {
   display: flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  border-radius: var(--radius-control);
 }
 
 .benefitRowIcon[data-kind="housing"] {
@@ -422,146 +478,91 @@
   color: var(--benefit-meals-fg);
 }
 
-.benefitRowLabel {
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-  margin: 0 0 var(--space-2);
-}
-
-.benefitRowNote {
-  font-family: var(--font-ui);
-  font-size: var(--type-label-size);
-  line-height: 1.45;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.benefitCardLink {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-cta);
-  text-decoration: none;
-  border-top: 1px solid var(--border-soft);
-  padding-top: var(--space-14);
-  margin-top: var(--space-4);
-  transition: opacity var(--motion-fast) ease;
-}
-
-.benefitCardLink:hover { opacity: 0.8; }
-
-/* ── Why work for us ───────────────────────────────────────────── */
-
 .whyCard {
   display: flex;
   align-items: flex-start;
   gap: var(--space-16);
-  background: color-mix(in srgb, var(--color-cta) 5%, var(--color-surface-raised));
+  padding: var(--space-20) var(--space-24);
   border: 1px solid var(--border-soft);
-  border-left: 3px solid var(--color-cta);
+  border-left: var(--space-3) solid var(--color-cta);
   border-radius: var(--radius-card);
-  padding: var(--space-24);
+  background: color-mix(in srgb, var(--color-cta) 5%, var(--color-surface-raised));
 }
 
 .whyAccent {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-input);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: color-mix(in srgb, var(--color-cta) 12%, var(--color-surface-raised));
   color: var(--color-cta);
 }
 
-.whyText {
-  font-family: var(--font-ui);
-  font-size: var(--type-body-size);
-  line-height: 1.65;
-  color: var(--text-primary);
-  margin: 0;
-  white-space: pre-wrap;
-  max-width: 62ch;
-}
-
-/* ── Meet the team ─────────────────────────────────────────────── */
-
 .teamGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-16);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-12);
 }
-
-@media (min-width: 480px) { .teamGrid { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 960px) { .teamGrid { grid-template-columns: repeat(4, 1fr); } }
 
 .teamCard {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   align-items: center;
-  text-align: center;
   gap: var(--space-8);
-  padding: var(--space-20) var(--space-12);
-  background: var(--color-surface-raised);
+  padding: var(--space-16) var(--space-12);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  text-align: center;
 }
 
-/* Framed photo — white mat + soft border, never filtered */
 .teamPhotoFrame {
   position: relative;
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
+  width: 5.5rem;
+  height: 5.5rem;
   overflow: hidden;
+  border: var(--space-3) solid var(--color-surface-raised);
+  border-radius: var(--radius-pill);
   background: var(--color-surface);
-  border: 3px solid var(--color-surface);
-  box-shadow: 0 0 0 1px var(--border-soft), var(--elevation-card);
+  box-shadow: var(--elevation-card);
 }
 
-.teamPhoto {
-  object-fit: cover;
-}
+.teamPhoto { object-fit: cover; }
 
 .teamPhotoPlaceholder {
+  display: flex;
   width: 100%;
   height: 100%;
-  display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-steel);
   color: var(--text-secondary);
 }
 
-.teamName {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-bold);
-  font-size: var(--type-body-size);
-  line-height: 1.2;
-  color: var(--text-primary);
+.teamName,
+.teamRole {
   margin: 0;
+  font-family: var(--font-ui);
+}
+
+.teamName {
+  color: var(--text-primary);
+  font-size: var(--type-body-size);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--type-body-lh);
 }
 
 .teamRole {
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  line-height: 1.35;
   color: var(--text-secondary);
-  margin: 0;
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
 }
 
-/* ── Life & activities ─────────────────────────────────────────── */
-
-.chipList {
+.chipList,
+.perkList {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.chipList {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-8);
@@ -572,62 +573,95 @@
   align-items: center;
   gap: var(--space-6);
   padding: var(--space-8) var(--space-14);
+  border: 1px solid var(--border-soft);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-cta) 5%, var(--color-surface-raised));
-  border: 1px solid var(--border-soft);
+  color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
   font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
 }
 
 .chip svg { color: var(--color-cta); }
 
-/* ── Perks & benefits ──────────────────────────────────────────── */
-
 .perkList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-12);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-10);
 }
-
-@media (min-width: 480px) { .perkList { grid-template-columns: repeat(2, 1fr); } }
 
 .perkRow {
   display: flex;
   align-items: center;
   gap: var(--space-12);
-  padding: var(--space-12) var(--space-16);
-  background: var(--color-surface-raised);
+  padding: var(--space-12) var(--space-14);
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-cell);
+  background: var(--color-surface);
 }
 
 .perkIcon {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border-radius: 50%;
   display: flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  background: var(--benefit-housing-bg);
-  color: var(--benefit-housing-fg);
+  border-radius: var(--radius-pill);
+  background: var(--color-steel);
+  color: var(--color-cta);
 }
 
 .perkText {
+  color: var(--text-primary);
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
-  color: var(--text-primary);
 }
 
-/* ── Motion — respect reduced-motion ─────────────────────────── */
+@media (min-width: 37.5rem) {
+  .contentGrid { padding-inline: var(--space-24); }
+  .listingsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .teamGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .perkList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .promiseNote { display: block; }
+}
+
+@media (max-width: 53.75rem) {
+  .page {
+    --profile-header-offset: calc(
+      var(--size-public-header-mobile) + env(safe-area-inset-top, 0px)
+    );
+  }
+}
+
+@media (min-width: 56.25rem) {
+  .contentGrid {
+    grid-template-areas: "main side";
+    grid-template-columns: minmax(0, 1fr) 18.5rem;
+    gap: var(--space-40);
+    padding: var(--space-40) var(--space-32) var(--space-64);
+  }
+
+  .sidebar {
+    position: sticky;
+    top: calc(
+      var(--size-public-header) + var(--tap-min) + var(--space-20) + env(safe-area-inset-top, 0px)
+    );
+    align-self: start;
+  }
+
+  .promiseGuide { grid-template-columns: minmax(0, 1fr); }
+
+  .promiseRow {
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .promiseRow:last-child { border-bottom: 0; }
+  .teamGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .mapLink,
-  .browseCta,
-  .benefitCardLink { transition: none; }
+  .profileNavLink { transition: none; }
 }

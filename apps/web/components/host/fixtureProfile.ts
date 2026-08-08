@@ -34,6 +34,8 @@ function toPublicHostListing(detail: PublicListingDetail): PublicHostListing {
     category: detail.category,
     coverPhotoUrl: detail.coverPhotoUrl,
     locationDisplay: detail.locationDisplay,
+    latitude: detail.latitude,
+    longitude: detail.longitude,
     housingIncluded: detail.housingIncluded,
     mealsIncluded: detail.mealsIncluded,
     compensationSummary: detail.compensationSummary,

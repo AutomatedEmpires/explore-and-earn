@@ -40,7 +40,7 @@ function DemoShellContent({ children }: { readonly children: ReactNode }) {
       >
         <div className={styles.demoBanner} role="note" aria-label="Sample seeker account notice">
           <div className={styles.demoBannerText}>
-            <strong>Interactive sample account</strong>
+            <strong>Sample account</strong>
             <span>
               {persistenceAvailable
                 ? "Choices stay in this browser tab. Nothing is sent, booked, or applied for outside the demo."
@@ -49,10 +49,10 @@ function DemoShellContent({ children }: { readonly children: ReactNode }) {
           </div>
           <div className={styles.demoBannerActions}>
             <button type="button" className={styles.bannerButton} onClick={resetWalkthrough}>
-              Reset demo
+              Reset
             </button>
             <Link className={styles.bannerLink} href="/for-seekers">
-              Exit walkthrough
+              Exit
             </Link>
           </div>
           <span className={styles.srOnly} aria-live="polite">{resetNotice}</span>

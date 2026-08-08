@@ -542,13 +542,12 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
       "Search opportunities, places, hosts…",
     );
     await expect(notifications).toBeVisible();
-    await expect(profile).toBeVisible();
+    await expect(profile).toBeHidden();
 
     const headerControls = [
       { name: "menu", locator: menuButton },
       { name: "search", locator: search },
       { name: "notifications", locator: notifications },
-      { name: "profile", locator: profile },
     ];
     for (const control of headerControls) {
       const box = await control.locator.boundingBox();
@@ -571,6 +570,10 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
     expect(
       searchBox?.width ?? 0,
       "search pill is too narrow at 320px",
+    ).toBeGreaterThanOrEqual(120);
+    expect(
+      (await searchInput.boundingBox())?.width ?? 0,
+      "search input is too narrow to use at 320px",
     ).toBeGreaterThanOrEqual(80);
 
     const dock = page.getByRole("navigation", { name: "Seeker" });
@@ -684,6 +687,128 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
       page.getByRole("note", { name: "Sample workspace notice" }),
     ).toBeVisible();
   });
+
+  test("mobile demo chrome and profile/location surfaces stay contained", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await useEssentialOnlyConsent(page);
+
+    for (const path of [
+      `${HOST_ROOT}/profile/location`,
+      `${HOST_ROOT}/profile`,
+    ]) {
+      await page.goto(path);
+      await expectNoHorizontalOverflow(page, path);
+      await page.evaluate(() => window.scrollTo(0, 650));
+      const topbar = page.getByRole("banner");
+      const notice = page.getByRole("note", { name: "Sample workspace notice" });
+      const [topbarBox, noticeBox] = await Promise.all([
+        topbar.boundingBox(),
+        notice.boundingBox(),
+      ]);
+      expect(topbarBox, `${path} topbar is missing`).not.toBeNull();
+      expect(noticeBox, `${path} notice is missing`).not.toBeNull();
+      expect(noticeBox?.y ?? 0, `${path} notice overlaps the topbar`).toBeGreaterThanOrEqual(
+        (topbarBox?.y ?? 0) + (topbarBox?.height ?? 0),
+      );
+      expect(noticeBox?.height ?? 999, `${path} notice is too tall`).toBeLessThanOrEqual(72);
+    }
+
+    await page.goto(`${SEEKER_ROOT}/map`);
+    await expectNoHorizontalOverflow(page, `${SEEKER_ROOT}/map`);
+    const seekerNotice = await page
+      .getByRole("note", { name: "Sample seeker account notice" })
+      .boundingBox();
+    expect(seekerNotice?.height ?? 999, "sample seeker notice is too tall").toBeLessThanOrEqual(72);
+  });
+});
+
+test("public mobile header and dock do not collide or exceed the viewport", async ({
+  page,
+}) => {
+  await useEssentialOnlyConsent(page);
+
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/for-hosts");
+    const header = page.getByRole("banner");
+    const home = header.locator('a[href="/"]').first();
+    const signIn = header.getByRole("button", { name: "Sign in", exact: true });
+    const getStarted = header.getByRole("link", { name: "Get started", exact: true });
+    const boxes = await Promise.all([
+      home.boundingBox(),
+      signIn.boundingBox(),
+      getStarted.boundingBox(),
+    ]);
+
+    for (const [index, box] of boxes.entries()) {
+      expect(box, `header control ${index} is missing at ${width}px`).not.toBeNull();
+      expect(box?.height ?? 0, `header control ${index} is too short at ${width}px`).toBeGreaterThanOrEqual(44);
+      expect(box?.x ?? -1, `header control ${index} begins outside ${width}px`).toBeGreaterThanOrEqual(0);
+      expect((box?.x ?? 0) + (box?.width ?? width + 1), `header control ${index} ends outside ${width}px`).toBeLessThanOrEqual(width);
+    }
+
+    const overlaps = (left: typeof boxes[number], right: typeof boxes[number]) =>
+      Boolean(
+        left &&
+          right &&
+          left.x < right.x + right.width &&
+          left.x + left.width > right.x &&
+          left.y < right.y + right.height &&
+          left.y + left.height > right.y,
+      );
+    expect(overlaps(boxes[0], boxes[1]), `home overlaps sign in at ${width}px`).toBe(false);
+    expect(overlaps(boxes[1], boxes[2]), `sign in overlaps get started at ${width}px`).toBe(false);
+
+    const dock = page.getByRole("navigation", { name: "Primary", exact: true });
+    const dockBox = await dock.boundingBox();
+    expect(dockBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((dockBox?.x ?? 0) + (dockBox?.width ?? width + 1)).toBeLessThanOrEqual(width);
+    await expectNoHorizontalOverflow(page, `/for-hosts at ${width}px`);
+  }
+});
+
+test("public host profile navigation clears mobile chrome and anchor targets", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await useEssentialOnlyConsent(page);
+  await page.goto("/host/fixture_host_cascade_bloom_orchards");
+
+  const header = page.getByRole("banner").first();
+  const profileNav = page.getByRole("navigation", { name: "Host profile sections" });
+
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await page.waitForTimeout(100);
+  await page.evaluate(() => window.scrollBy(0, -96));
+  await page.waitForTimeout(200);
+
+  const [headerBox, profileNavBox] = await Promise.all([
+    header.boundingBox(),
+    profileNav.boundingBox(),
+  ]);
+  expect(headerBox, "public header is missing").not.toBeNull();
+  expect(profileNavBox, "profile navigation is missing").not.toBeNull();
+  expect(
+    profileNavBox?.y ?? 0,
+    "profile navigation overlaps the responsive public header",
+  ).toBeGreaterThanOrEqual(
+    (headerBox?.y ?? 0) + (headerBox?.height ?? 0) - 1,
+  );
+
+  await profileNav.getByRole("link", { name: "Story" }).click();
+  const [storyBox, anchoredNavBox] = await Promise.all([
+    page.getByRole("heading", { name: "About us" }).boundingBox(),
+    profileNav.boundingBox(),
+  ]);
+  expect(storyBox, "Story anchor target is missing").not.toBeNull();
+  expect(
+    storyBox?.y ?? 0,
+    "Story anchor is hidden beneath sticky profile navigation",
+  ).toBeGreaterThanOrEqual(
+    (anchoredNavBox?.y ?? 0) + (anchoredNavBox?.height ?? 0),
+  );
 });
 
 test("dense surfaces fit every launch viewport and attach responsive evidence", async ({

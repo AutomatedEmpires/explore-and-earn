@@ -45,6 +45,10 @@ describe("fixture host profiles", () => {
     expect(bundle?.listings.map((listing) => listing.id)).toEqual([
       "lst_orchard_wenatchee",
     ]);
+    expect(bundle?.listings[0]).toMatchObject({
+      latitude: expect.any(Number),
+      longitude: expect.any(Number),
+    });
     expect(bundle?.ratingSummary).toEqual({
       count: 0,
       average: 0,
@@ -117,6 +121,49 @@ describe("public host route fixture boundary", () => {
     expect(page).not.toContain(
       'components/host/WeatherWidget',
     );
-    expect(page).not.toContain("<WeatherWidget");
+    expect(page).not.toMatch(/<WeatherWidget(?:\s|\/|>)/);
+    expect(page).toContain("<ListingWeatherSection");
+    expect(page).toContain("<WeatherWidgetLoading");
+  });
+});
+
+describe("public host profile information architecture", () => {
+  const view = readFileSync(
+    new URL("../../components/host/PublicHostProfileView.tsx", import.meta.url),
+    "utf8",
+  );
+  const hero = readFileSync(
+    new URL("../../components/host/HostProfileHero.tsx", import.meta.url),
+    "utf8",
+  );
+
+  it("leads from story to open opportunities before the deeper field guide", () => {
+    const about = view.indexOf('id="about-heading"');
+    const listings = view.indexOf("<ListingsSection", about);
+    const workingHere = view.indexOf("<WorkingHereSection", listings);
+    const livingHere = view.indexOf("<LifeHereSection", workingHere);
+    const weather = view.indexOf("weatherSlot ?", livingHere);
+
+    expect(about).toBeGreaterThan(-1);
+    expect(listings).toBeGreaterThan(about);
+    expect(workingHere).toBeGreaterThan(listings);
+    expect(livingHere).toBeGreaterThan(workingHere);
+    expect(weather).toBeGreaterThan(livingHere);
+  });
+
+  it("uses an honest triad field guide and no decorative fake map", () => {
+    expect(view).toContain('aria-label="Housing meals and pay overview"');
+    expect(view).toContain('name="benefit.housing"');
+    expect(view).toContain('name="benefit.meals"');
+    expect(view).toContain('name="benefit.pay"');
+    expect(view).toContain('"Not stated"');
+    expect(view).not.toContain("LocationMapCard");
+    expect(view).not.toContain("mapContours");
+  });
+
+  it("keeps the no-photo hero compact and category-specific", () => {
+    expect(hero).toContain('data-has-cover={coverPhotoUrl ? "true" : "false"}');
+    expect(hero).toContain("data-category={primaryScope}");
+    expect(hero).toContain("Employer field profile");
   });
 });
