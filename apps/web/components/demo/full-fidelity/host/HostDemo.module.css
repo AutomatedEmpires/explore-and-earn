@@ -985,12 +985,12 @@
 .forecastDay {
   display: grid;
   flex: 0 0 7.5rem;
-  gap: 7px;
+  gap: var(--space-8);
   min-width: 0;
   box-sizing: border-box;
-  padding: 13px;
+  padding: var(--space-12);
   border: 1px solid var(--border-soft);
-  border-radius: 14px;
+  border-radius: var(--radius-input);
   background: var(--color-surface-raised);
   scroll-snap-align: start;
 }

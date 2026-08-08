@@ -110,6 +110,9 @@ describe("demo workspace mobile layout", () => {
     expect(track).toContain("box-sizing: border-box");
     expect(track).not.toContain("grid-template-columns");
     expect(day).toContain("flex: 0 0 7.5rem");
+    expect(day).toContain("gap: var(--space-8)");
+    expect(day).toContain("padding: var(--space-12)");
+    expect(day).toContain("border-radius: var(--radius-input)");
     expect(day).toContain("scroll-snap-align: start");
     expect(day).toContain("box-sizing: border-box");
   });
