@@ -9,10 +9,45 @@ import {
   ClaimsReviewQueue,
   type ClaimReviewRowView,
 } from "../../../../../components/admin";
+import { isDevBenchEnabled } from "../../../../../lib/devBench";
+import { readDevRole } from "../../../../../lib/devBench/server";
 import styles from "../../shared.module.css";
 
 export const metadata: Metadata = { title: "Claims" };
 export const dynamic = "force-dynamic";
+
+const DEV_PENDING_CLAIMS: ReadonlyArray<ClaimReviewRowView> = [
+  {
+    id: "dev-claim-kelp-farm-pending",
+    listingId: "lst_sourced_kelp_farm",
+    listingTitle: "Kelp Farm Field Technician",
+    status: "requires_review",
+    workEmail:
+      "claims-review-operations@kodiak-kelp-field-technician.example",
+    roleTitle: "Seasonal operations director",
+    statement:
+      "I lead seasonal hiring and can verify the source details before this listing becomes host-managed.",
+    reviewNotes: null,
+    createdAt: "2026-07-28T16:00:00.000Z",
+    decidedAt: null,
+  },
+];
+
+const DEV_DECIDED_CLAIMS: ReadonlyArray<ClaimReviewRowView> = [
+  {
+    id: "dev-claim-deckhand-converted",
+    listingId: "lst_deckhand_sitka",
+    listingTitle: "Deckhand — Salmon Season",
+    status: "converted",
+    workEmail:
+      "converted-claims-review@north-pacific-fisheries-cooperative.example",
+    roleTitle: "Host operations manager",
+    statement: "I own this host profile and confirmed every listing detail.",
+    reviewNotes: "Authority confirmed through the host onboarding review.",
+    createdAt: "2026-07-08T16:00:00.000Z",
+    decidedAt: "2026-07-10T18:30:00.000Z",
+  },
+];
 
 /**
  * Defensively pick the human-review fields out of the authority_evidence
@@ -42,12 +77,25 @@ function toView(row: ListingClaimReviewRow): ClaimReviewRowView {
 }
 
 export default async function AdminClaimsPage() {
-  // Service-role reads happen in the db layer (server component only — the
-  // key and raw claim rows are never serialized to the client).
-  const [pending, decided] = await Promise.all([
-    getClaimsAwaitingReview(),
-    getRecentlyDecidedClaims(20),
-  ]);
+  const isDevReview =
+    isDevBenchEnabled() && (await readDevRole()) === "admin";
+
+  let pending: ReadonlyArray<ClaimReviewRowView>;
+  let decided: ReadonlyArray<ClaimReviewRowView>;
+
+  if (isDevReview) {
+    pending = DEV_PENDING_CLAIMS;
+    decided = DEV_DECIDED_CLAIMS;
+  } else {
+    // Service-role reads happen in the db layer (server component only — the
+    // key and raw claim rows are never serialized to the client).
+    const [pendingRows, decidedRows] = await Promise.all([
+      getClaimsAwaitingReview(),
+      getRecentlyDecidedClaims(20),
+    ]);
+    pending = pendingRows.map(toView);
+    decided = decidedRows.map(toView);
+  }
 
   const stats = {
     pending: pending.length,
@@ -60,13 +108,13 @@ export default async function AdminClaimsPage() {
       <header className={styles.heading}>
         <h1 className={styles.title}>Listing claims</h1>
         <p className={styles.subtitle}>
-          Review employer claims on sourced listings. Approving invites the
+          Review host claims on sourced listings. Approving invites the
           claimant to confirm every detail under their own host profile;
           rejecting leaves the listing untouched. Nothing changes on a listing
           from this queue alone.
         </p>
       </header>
-      <ClaimsReviewQueue pending={pending.map(toView)} decided={decided.map(toView)} stats={stats} />
+      <ClaimsReviewQueue pending={pending} decided={decided} stats={stats} />
     </section>
   );
 }
