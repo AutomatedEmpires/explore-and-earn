@@ -96,6 +96,27 @@ describe("sendMail", () => {
     expect(body).not.toHaveProperty("reply_to");
   });
 
+  it("preserves the exact RFC 8058 header pair in the Resend JSON payload", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    mockFetch.mockResolvedValue({ ok: true, text: async () => "" });
+    const headers = {
+      "List-Unsubscribe":
+        "<https://exploreandearn.com/api/notifications/unsubscribe?token=signed.token>",
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    } as const;
+
+    await sendMail({
+      to: "user@example.com",
+      subject: "Opportunity digest",
+      html: "<p>Digest</p>",
+      headers,
+    });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as Record<string, unknown>;
+    expect(body.headers).toEqual(headers);
+  });
+
   it("uses RESEND_FROM_EMAIL override when set", async () => {
     vi.stubEnv("RESEND_API_KEY", "test-key");
     vi.stubEnv("RESEND_FROM_EMAIL", "custom@myapp.com");

@@ -1,5 +1,12 @@
 import * as Sentry from "@sentry/nextjs";
 
+import {
+	scrubSentryEvent,
+	scrubSentrySpan,
+	scrubSentryTransaction,
+	unsubscribeSafeTraceSampler,
+} from "./lib/sentryPrivacy";
+
 const environment =
 	process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development";
 const release = process.env.NEXT_PUBLIC_APP_VERSION;
@@ -8,7 +15,8 @@ const release = process.env.NEXT_PUBLIC_APP_VERSION;
  * Next.js 15 server/edge instrumentation. Sentry.init() runs here: the repo
  * migrated server/edge init out of sentry.server.config.ts / sentry.edge.config.ts
  * (which remain intentional empty stubs to prevent a double Sentry.init()).
- * tracesSampleRate is 0.05 (5%) — low enough for the free tier, still meaningful.
+ * The trace sampler keeps the 0.05 (5%) baseline — low enough for the free
+ * tier, still meaningful — while dropping token-bearing unsubscribe requests.
  * Sentry.init() silently no-ops when the DSN is undefined (CI / local).
  */
 export function register() {
@@ -23,17 +31,23 @@ export function register() {
 	}
 	if (process.env.NEXT_RUNTIME === "edge") {
 		Sentry.init({
+			beforeSend: scrubSentryEvent,
+			beforeSendSpan: scrubSentrySpan,
+			beforeSendTransaction: scrubSentryTransaction,
 			dsn: process.env.SENTRY_DSN,
 			environment,
 			release,
-			tracesSampleRate: 0.05,
+			tracesSampler: unsubscribeSafeTraceSampler,
 		});
 	} else {
 		Sentry.init({
+			beforeSend: scrubSentryEvent,
+			beforeSendSpan: scrubSentrySpan,
+			beforeSendTransaction: scrubSentryTransaction,
 			dsn: process.env.SENTRY_DSN,
 			environment,
 			release,
-			tracesSampleRate: 0.05,
+			tracesSampler: unsubscribeSafeTraceSampler,
 		});
 	}
 }

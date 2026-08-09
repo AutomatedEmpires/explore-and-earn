@@ -210,6 +210,9 @@
 			"cta": "Open notifications"
 		},
 		"unsubscribePage": {
+			"confirmTitle": "Unsubscribe from these emails?",
+			"confirmBody": "Nothing changes until you confirm. Choose Unsubscribe to stop receiving these emails.",
+			"confirmAction": "Unsubscribe",
 			"successTitle": "You're unsubscribed",
 			"successBody": "You won't receive these emails anymore. You can turn them back on anytime in your notification settings.",
 			"invalidTitle": "This link has expired",

@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 import { expect, test, type Page } from "playwright/test";
 
 /**
@@ -17,6 +19,7 @@ import { expect, test, type Page } from "playwright/test";
 
 const DEV_ROLE_COOKIE = "ee_dev_role";
 const BASE = "http://localhost:3100";
+const E2E_UNSUBSCRIBE_SECRET = "e2e-only-unsubscribe-secret";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -38,6 +41,22 @@ function seekerNav(page: Page) {
 
 function hostNav(page: Page) {
   return page.locator('nav[aria-label="Host"]');
+}
+
+function validUnsubscribeToken(): string {
+  const payload = Buffer.from(
+    JSON.stringify({
+      clerkUserId: "clerk_e2e_read_only",
+      scope: "messages",
+      channel: "email",
+      exp: Math.floor(Date.now() / 1000) + 3_600,
+    }),
+    "utf8",
+  ).toString("base64url");
+  const mac = createHmac("sha256", E2E_UNSUBSCRIBE_SECRET)
+    .update(`v1.${payload}`)
+    .digest("base64url");
+  return `v1.${payload}.${mac}`;
 }
 
 test.describe("public surfaces (guest)", () => {
@@ -82,14 +101,60 @@ test.describe("public surfaces (guest)", () => {
     );
     expect(humanResponse.status()).toBe(200);
     expect(humanResponse.headers()["content-type"]).toContain("text/html");
+    expect(
+      humanResponse.headers()["content-security-policy-report-only"],
+    ).not.toContain("report-uri");
     expect(await humanResponse.text()).toContain("This link has expired");
 
     const oneClickResponse = await request.post(
       "/api/notifications/unsubscribe?token=invalid",
-      { maxRedirects: 0 },
+      {
+        data: "List-Unsubscribe=One-Click",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        maxRedirects: 0,
+      },
     );
     expect(oneClickResponse.status()).toBe(400);
+    expect(
+      oneClickResponse.headers()["content-security-policy-report-only"],
+    ).not.toContain("report-uri");
     expect(await oneClickResponse.json()).toEqual({ ok: false });
+  });
+
+  test("unsubscribe confirmation is contained at 320px without mutating", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    const response = await page.goto(
+      `/api/notifications/unsubscribe?token=${encodeURIComponent(validUnsubscribeToken())}`,
+    );
+
+    expect(response?.status()).toBe(200);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Unsubscribe from these emails?" }),
+    ).toBeVisible();
+    const card = page.getByRole("main");
+    const button = page.getByRole("button", { name: "Unsubscribe" });
+    await expect(button).toBeVisible();
+
+    const [cardBox, buttonBox, geometry] = await Promise.all([
+      card.boundingBox(),
+      button.boundingBox(),
+      page.evaluate(() => ({
+        bodyWidth: document.body.scrollWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+      })),
+    ]);
+    expect(cardBox).not.toBeNull();
+    expect(buttonBox).not.toBeNull();
+    expect(buttonBox!.height).toBeGreaterThanOrEqual(44);
+    expect(buttonBox!.x).toBeGreaterThanOrEqual(cardBox!.x);
+    expect(buttonBox!.x + buttonBox!.width).toBeLessThanOrEqual(
+      cardBox!.x + cardBox!.width + 1,
+    );
+    expect(geometry.bodyWidth).toBeLessThanOrEqual(geometry.viewportWidth);
+    expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth);
   });
 
   test("fixture listing detail renders end-to-end (discover → inspect)", async ({

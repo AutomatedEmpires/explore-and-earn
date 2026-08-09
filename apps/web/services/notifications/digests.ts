@@ -32,6 +32,7 @@ import { resolvePrefs } from "./prefs"
 import { localizedPath, renderMessage } from "./render"
 import type { PreIntent } from "./taxonomy"
 import { createUnsubscribeToken } from "./unsubscribe"
+import { buildListUnsubscribeHeaders } from "./unsubscribeHeaders"
 
 /**
  * Digest windows + schedule-derived reminders. Runs from the digests cron
@@ -219,6 +220,7 @@ async function sendDigestForRecipient(args: {
 	const unsubscribeUrl = token
 		? absoluteUrl(`/api/notifications/unsubscribe?token=${encodeURIComponent(token)}`)
 		: null
+	const unsubscribeHeaders = buildListUnsubscribeHeaders(unsubscribeUrl)
 
 	const listHtml = `<ul style="margin:0;padding-left:20px;">${lines
 		.map(
@@ -247,14 +249,7 @@ async function sendDigestForRecipient(args: {
 		}${unsubscribeUrl ? `\n\n${unsubscribeLabel}: ${unsubscribeUrl}` : ""}`,
 		template: `engine:digest:${cadence}`,
 		idempotencyKey: dedupKey,
-		...(unsubscribeUrl
-			? {
-					headers: {
-						"List-Unsubscribe": `<${unsubscribeUrl}>`,
-						"List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-					},
-				}
-			: {}),
+		...(unsubscribeHeaders ? { headers: unsubscribeHeaders } : {}),
 	})
 
 	if (!result.ok) return "failed" // memberships stay queued; retried next run

@@ -9,6 +9,7 @@ import { getClerkContact } from "../../../lib/clerkUser"
 import { classifyHttpFailure, isRetryable } from "../backoff"
 import { localizedPath, renderMessage, renderNotification } from "../render"
 import { createUnsubscribeToken } from "../unsubscribe"
+import { buildListUnsubscribeHeaders } from "../unsubscribeHeaders"
 import type { ChannelSendResult } from "./inApp"
 
 /**
@@ -50,6 +51,7 @@ export async function sendNotificationEmail(
 	const unsubscribeUrl = token
 		? absoluteUrl(`/api/notifications/unsubscribe?token=${encodeURIComponent(token)}`)
 		: null
+	const unsubscribeHeaders = buildListUnsubscribeHeaders(unsubscribeUrl)
 
 	const [ctaLabel, footerNote, unsubscribeLabel] = await Promise.all([
 		renderMessage(locale, `Notifications.email.cta.${intent.type}`, {},
@@ -82,14 +84,7 @@ export async function sendNotificationEmail(
 		template: `engine:${intent.type}`,
 		// The engine's dedup_key IS the logical send identity.
 		idempotencyKey: engineDedupKey,
-		...(unsubscribeUrl
-			? {
-					headers: {
-						"List-Unsubscribe": `<${unsubscribeUrl}>`,
-						"List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-					},
-				}
-			: {}),
+		...(unsubscribeHeaders ? { headers: unsubscribeHeaders } : {}),
 	})
 
 	if (result.ok) {

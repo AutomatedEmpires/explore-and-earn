@@ -70,7 +70,11 @@ export default defineConfig({
     env: {
       ...process.env,
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
-      CLERK_SECRET_KEY: ""
+      CLERK_SECRET_KEY: "",
+      // Deterministic GET-only unsubscribe token for the confirmation-page
+      // layout test. The test never submits it and this value exists only in
+      // the Playwright child process.
+      NOTIFICATION_SIGNING_SECRET: "e2e-only-unsubscribe-secret"
     }
   }
 });

@@ -146,6 +146,19 @@ const nextConfig: NextConfig = {
     return [
       { source: "/(.*)", headers: securityHeaders },
       {
+        // Unsubscribe links carry the signed recipient credential in the URL.
+        // Override the global report-only policy so a violation report can
+        // never forward that token-bearing document URL to /api/csp-report.
+        // The route handler also returns an enforcing, route-specific CSP.
+        source: "/api/notifications/unsubscribe",
+        headers: [
+          {
+            key: "Content-Security-Policy-Report-Only",
+            value: "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+          }
+        ]
+      },
+      {
         // PWA service worker: never long-cache the SW script itself, so a
         // redeploy's updated worker is fetched promptly. Root scope is served
         // from /public so no Service-Worker-Allowed override is needed, but we
