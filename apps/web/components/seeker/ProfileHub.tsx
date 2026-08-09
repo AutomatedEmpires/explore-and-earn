@@ -3,15 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useOptimistic, useTransition } from "react";
+import { useMemo } from "react";
 
 import { BADGE_META, type SeekerBadge } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
-import { saveReadinessAction } from "../../app/actions/seekerProfile";
 import { ListingCard, ListingCardProvider, type DiscoveryListing } from "../discovery";
 import type { FeaturedEmployer } from "../public/FeaturedEmployersRail";
 import { byMonetization } from "../../lib/ranking";
-import { ReadinessSlider } from "./ReadinessSlider";
+import { ReadinessIsland } from "./ReadinessIsland";
 import { RESUME_APPLY_THRESHOLD, type SeekerStatusSummary } from "./models";
 import styles from "./ProfileHub.module.css";
 
@@ -105,7 +104,6 @@ export interface ProfileHubProps {
   readonly seekingTimeline?: string | null;
   readonly preferredCategories?: readonly string[];
   readonly bio?: string | null;
-  readonly seekerProfileId?: string | null;
   readonly matchedListings?: readonly DiscoveryListing[];
   /**
    * Kept on the composition contract for page.tsx, but the featured-employer
@@ -123,12 +121,9 @@ export function ProfileHub({
   seekingTimeline,
   preferredCategories = [],
   bio,
-  seekerProfileId,
   matchedListings = [],
 }: ProfileHubProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  const [optimisticTimeline, setOptimisticTimeline] = useOptimistic(seekingTimeline ?? null);
 
   const initials =
     status.seekerName
@@ -160,14 +155,6 @@ export function ProfileHub({
 
   const navItems = buildTuckedNav(status);
   const hasOffers = status.offersCount > 0;
-
-  function handleReadinessChange(value: string) {
-    if (!seekerProfileId) return;
-    startTransition(async () => {
-      setOptimisticTimeline(value);
-      await saveReadinessAction(value);
-    });
-  }
 
   function openListing(id: string) {
     router.push(`/listing/${id}`);
@@ -264,7 +251,7 @@ export function ProfileHub({
 
       {/* ── Availability / readiness timeline ── */}
       <div className={styles.readinessWrap}>
-        <ReadinessSlider value={optimisticTimeline} onChange={handleReadinessChange} saving={isPending} />
+        <ReadinessIsland initialValue={seekingTimeline ?? null} />
       </div>
 
       {/* ── Résumé — the heart of the application, always upfront ── */}

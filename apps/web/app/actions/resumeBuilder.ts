@@ -2,6 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { SEEKER_SEEKING_TIMELINES } from "@explore-and-earn/contracts";
 import {
   addResumeExperience,
   updateResumeExperience,
@@ -36,7 +37,7 @@ async function getAuth(): Promise<{ userId: string; token: string } | null> {
   return { userId, token };
 }
 
-const VALID_TIMELINES = new Set(["now", "1_month", "3_months", "6_months"]);
+const VALID_TIMELINES = new Set<string>(SEEKER_SEEKING_TIMELINES);
 
 function revalidate() {
   revalidatePath("/resume");

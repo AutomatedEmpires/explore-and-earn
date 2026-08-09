@@ -35,7 +35,6 @@ export default async function ProfilePage() {
 	let seekingTimeline: string | null = null;
 	let preferredCategories: string[] = [];
 	let bio: string | null = null;
-	let seekerProfileId: string | null = null;
 	let matchedListings: Awaited<ReturnType<typeof getMatchedListings>> = [];
 
 	if (userId) {
@@ -82,7 +81,6 @@ export default async function ProfilePage() {
 					seekingTimeline = profile.seekingTimeline ?? null;
 					preferredCategories = profile.desiredCategories ?? [];
 					bio = profile.shortBio ?? null;
-					seekerProfileId = profile.id ?? null;
 				}
 			}
 		} catch {
@@ -107,7 +105,6 @@ export default async function ProfilePage() {
 			seekingTimeline={seekingTimeline}
 			preferredCategories={preferredCategories}
 			bio={bio}
-			seekerProfileId={seekerProfileId}
 			matchedListings={matchedListings}
 			featuredEmployers={featuredEmployers}
 		/>

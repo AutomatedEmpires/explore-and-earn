@@ -3,8 +3,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { saveSeekerProfile } from "@explore-and-earn/db";
-
-const VALID_TIMELINES = new Set(["now", "1_month", "3_months", "6_months"]);
+import { normalizeTimeline, type Timeline } from "../../lib/readiness";
+import { reportError } from "../../lib/sentry";
 
 async function getSession(): Promise<{ userId: string; token: string } | null> {
   const { userId, getToken } = await auth();
@@ -40,13 +40,69 @@ export async function saveHeroCoverAction(
 }
 
 /** Persist the seeker's readiness / seeking timeline. */
+export type SaveReadinessResult =
+  | { readonly ok: true; readonly timeline: Timeline }
+  | {
+      readonly ok: false;
+      readonly error:
+        | "invalid_timeline"
+        | "unauthenticated"
+        | "temporarily_unavailable";
+    };
+
 export async function saveReadinessAction(
-  timeline: string,
-): Promise<{ ok: boolean; error?: string }> {
-  if (!VALID_TIMELINES.has(timeline)) return { ok: false, error: "invalid_timeline" };
-  const session = await getSession();
+  value: unknown,
+): Promise<SaveReadinessResult> {
+  const timeline = normalizeTimeline(value);
+  if (timeline === null) return { ok: false, error: "invalid_timeline" };
+
+  let session: Awaited<ReturnType<typeof getSession>>;
+  try {
+    session = await getSession();
+  } catch (error) {
+    reportError(error, { action: "saveReadinessAction.authenticate" });
+    return { ok: false, error: "temporarily_unavailable" };
+  }
+
   if (!session) return { ok: false, error: "unauthenticated" };
-  const result = await saveSeekerProfile(session.token, session.userId, { seekingTimeline: timeline });
-  if (result.ok) revalidatePath("/seek");
-  return result;
+
+  try {
+    const result = await saveSeekerProfile(session.token, session.userId, {
+      seekingTimeline: timeline,
+    });
+    if (!result.ok) {
+      reportError(
+        new Error(
+          result.error || "Readiness persistence was not confirmed",
+        ),
+        {
+          action: "saveReadinessAction.persist",
+          userId: session.userId,
+        },
+      );
+      return { ok: false, error: "temporarily_unavailable" };
+    }
+  } catch (error) {
+    reportError(error, {
+      action: "saveReadinessAction.persist",
+      userId: session.userId,
+    });
+    return { ok: false, error: "temporarily_unavailable" };
+  }
+
+  for (const path of ["/home", "/profile", "/resume"] as const) {
+    try {
+      revalidatePath(path);
+    } catch (error) {
+      // Persistence is already durable. Cache freshness cannot turn this into
+      // a false failure, and every path gets an independent best-effort retry.
+      reportError(error, {
+        action: "saveReadinessAction.postPersistRevalidate",
+        route: path,
+        userId: session.userId,
+      });
+    }
+  }
+
+  return { ok: true, timeline };
 }
