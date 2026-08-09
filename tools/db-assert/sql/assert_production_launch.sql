@@ -21,6 +21,13 @@ select
     )
   ) as migration_092_applied,
   (
+    select exists (
+      select 1
+      from supabase_migrations.schema_migrations
+      where version = '093'
+    )
+  ) as migration_093_applied,
+  (
     select count(distinct p.proname) = 11
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
@@ -203,6 +210,57 @@ select
          'enforce_listing_media_ownership'
        )
   ) as listing_media_ownership_contract_safe,
+  -- Static tests derive both hashes from migration 093. The constraint hash
+  -- normalizes only PostgreSQL deparser noise; the function hash normalizes
+  -- formatting only, so code points, fields, AND/OR, and grouping stay pinned.
+  (
+    (
+      select count(*) = 1
+         and bool_and(c.contype = 'c')
+         and bool_and(not c.convalidated)
+         and bool_and(
+           md5(
+             replace(
+               translate(
+                 lower(pg_get_expr(c.conbin, c.conrelid, false)),
+                 E' \t\n\r',
+                 ''
+               ),
+               '::text',
+               ''
+             )
+           ) = 'c004d6002c15e95d09fd72f5a8948bad'
+         )
+        from pg_constraint c
+       where c.conrelid = 'public.seeker_resume_experiences'::regclass
+         and c.conname = 'seeker_resume_experiences_identity_chk'
+    )
+    and (
+      select count(*) = 1
+         and bool_and(p.prosecdef)
+         and bool_and(p.provolatile = 's')
+         and bool_and('search_path=""' = any(coalesce(p.proconfig, '{}'::text[])))
+         and bool_and(not has_function_privilege('anon', p.oid, 'EXECUTE'))
+         and bool_and(not has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+         and bool_and(not has_function_privilege('service_role', p.oid, 'EXECUTE'))
+         and bool_and(not exists (
+           select 1
+             from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+            where a.grantee = 0
+              and a.privilege_type = 'EXECUTE'
+         ))
+         and bool_and(
+           md5(translate(lower(p.prosrc), E' \t\n\r', ''))
+             = '0f6012420b869f71406298a9897bad90'
+         )
+        from pg_proc p
+        join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'private'
+         and p.oid = to_regprocedure(
+           'private.application_resume_is_complete(uuid)'
+         )
+    )
+  ) as resume_experience_identity_contract_safe,
   (
     not has_table_privilege('authenticated', 'public.host_profiles', 'INSERT')
     and not has_table_privilege('authenticated', 'public.seeker_profiles', 'INSERT')

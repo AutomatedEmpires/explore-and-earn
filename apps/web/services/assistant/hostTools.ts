@@ -14,7 +14,10 @@ import {
   matchScoreKey,
   prepareForListing,
 } from "@explore-and-earn/db";
-import { topMatchReasons } from "@explore-and-earn/contracts";
+import {
+  hasResumeExperienceIdentity,
+  topMatchReasons,
+} from "@explore-and-earn/contracts";
 
 import { checkRateLimit } from "../../lib/rateLimit";
 
@@ -165,6 +168,9 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
         ]);
         if (!resume) return { error: "resume_unavailable" as const };
 
+        const meaningfulExperiences = resume.experiences.filter(
+          hasResumeExperienceIdentity,
+        );
         const insights = analyzeResume(resume, Date.now());
         const preparation = requirements
           ? prepareForListing(insights, requirements, resume.certifications)
@@ -180,7 +186,7 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
         for (const cert of preparation?.missingCertifications ?? []) {
           interviewTopics.push(`Status of the ${cert} certification the listing requires`);
         }
-        for (const experience of resume.experiences) {
+        for (const experience of meaningfulExperiences) {
           if (!experience.summary?.trim() && experience.roleTitle) {
             interviewTopics.push(`Details of their time as ${experience.roleTitle}${experience.companyName ? ` at ${experience.companyName}` : ""}`);
           }
@@ -195,7 +201,7 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
             displayName: resume.profile?.displayName ?? null,
             bio: resume.profile?.bio ?? null,
             skills: resume.profile?.generalSkills ?? [],
-            experiences: resume.experiences.map((experience) => ({
+            experiences: meaningfulExperiences.map((experience) => ({
               role: experience.roleTitle,
               company: experience.companyName,
               start: experience.startDate,

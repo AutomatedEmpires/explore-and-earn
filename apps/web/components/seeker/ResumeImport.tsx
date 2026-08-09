@@ -3,6 +3,11 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  hasResumeExperienceIdentity,
+  RESUME_EXPERIENCE_IDENTITY_REQUIRED,
+  RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE,
+} from "@explore-and-earn/contracts";
 import { Icon } from "@explore-and-earn/ui";
 import type { ResumeDraft, SeekerResume } from "@explore-and-earn/db";
 
@@ -10,6 +15,7 @@ import {
   importResumeAction,
   saveImportedResumeAction,
   type ResumeImportError,
+  type SaveImportedResumeResult,
 } from "../../app/actions/resumeImport";
 import styles from "./ResumeImport.module.css";
 
@@ -17,6 +23,12 @@ import styles from "./ResumeImport.module.css";
 const MAX_TEXT_CHARS = 30_000;
 const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2MB
 const ACCEPTED_FILE = ".pdf,.txt,application/pdf,text/plain";
+const GENERIC_SAVE_ERROR_MESSAGE =
+  "Couldn't save everything. Please try again or fill the steps below.";
+export const PARTIAL_SAVE_MESSAGE =
+  "Some résumé items were saved before the import stopped. Review the builder before importing again.";
+export const OUTCOME_UNKNOWN_MESSAGE =
+  "The import stopped while saving. Review the builder before importing again.";
 
 const SEEKING_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "Not set" },
@@ -145,8 +157,8 @@ function toReview(draft: ResumeDraft, resume: SeekerResume): ReviewState {
     profile,
     experiences: (draft.experiences ?? []).map((e) => ({
       include: true,
-      roleTitle: e.roleTitle ?? "",
-      companyName: e.companyName ?? "",
+      roleTitle: (e.roleTitle ?? "").trim(),
+      companyName: (e.companyName ?? "").trim(),
       location: e.location ?? "",
       summary: e.summary ?? "",
       startDate: e.startDate ?? null,
@@ -238,6 +250,101 @@ function reviewHasContent(review: ReviewState): boolean {
   );
 }
 
+function hasInvalidIncludedExperience(review: ReviewState): boolean {
+  return review.experiences.some(
+    (experience) =>
+      experience.include && !hasResumeExperienceIdentity(experience),
+  );
+}
+
+function experienceIncludeLabel(
+  experience: ReviewExperience,
+  index: number,
+): string {
+  const role = experience.roleTitle.trim();
+  const company = experience.companyName.trim();
+  const identity = role && company ? `${role} at ${company}` : role || company;
+  return identity
+    ? `Include experience ${index + 1}: ${identity}`
+    : `Include experience ${index + 1}`;
+}
+
+function profileIncludeLabel(profile: ReviewProfile): string {
+  const identity = profile.displayName.trim() || profile.location.trim();
+  return identity
+    ? `Include profile details: ${identity}`
+    : "Include profile details";
+}
+
+function educationIncludeLabel(
+  education: ReviewEducation,
+  index: number,
+): string {
+  const program = education.programOrDegree.trim();
+  const institution = education.institution.trim();
+  const identity =
+    program && institution ? `${program} at ${institution}` : program || institution;
+  return identity
+    ? `Include education ${index + 1}: ${identity}`
+    : `Include education ${index + 1}`;
+}
+
+function certificationIncludeLabel(
+  certification: ReviewCertification,
+  index: number,
+): string {
+  const name = certification.name.trim();
+  const issuer = certification.issuingOrganization.trim();
+  const identity = name && issuer ? `${name} from ${issuer}` : name || issuer;
+  return identity
+    ? `Include certification ${index + 1}: ${identity}`
+    : `Include certification ${index + 1}`;
+}
+
+interface ResumeImportSaveHandlers {
+  readonly refresh: () => void;
+  readonly reset: () => void;
+  readonly closeReviewWithMessage: (message: string) => void;
+  readonly showError: (message: string) => void;
+}
+
+export function applyResumeImportSaveResult(
+  result: SaveImportedResumeResult,
+  handlers: ResumeImportSaveHandlers,
+): void {
+  if (result.ok) {
+    handlers.refresh();
+    handlers.reset();
+    return;
+  }
+  if (result.error === "partial_save") {
+    handlers.refresh();
+    handlers.closeReviewWithMessage(PARTIAL_SAVE_MESSAGE);
+    return;
+  }
+  if (result.error === "outcome_unknown") {
+    handlers.refresh();
+    handlers.closeReviewWithMessage(OUTCOME_UNKNOWN_MESSAGE);
+    return;
+  }
+  handlers.showError(
+    result.error === RESUME_EXPERIENCE_IDENTITY_REQUIRED
+      ? RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE
+      : GENERIC_SAVE_ERROR_MESSAGE,
+  );
+}
+
+export function ResumeImportNotice({ message }: { readonly message: string }) {
+  return (
+    <p className={styles.noticeError} role="alert">
+      <span className={styles.noticeIcon}>
+        <Icon name="system.warning" size={16} aria-hidden />
+      </span>
+      {message}
+    </p>
+  );
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export interface ResumeImportProps {
@@ -260,6 +367,14 @@ export function ResumeImport({ resume }: ResumeImportProps) {
     setFile(null);
     setError(null);
     setReview(null);
+  }
+
+  function closeReviewWithMessage(message: string) {
+    setPhase("idle");
+    setText("");
+    setFile(null);
+    setReview(null);
+    setError(message);
   }
 
   function handlePickFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -323,26 +438,49 @@ export function ResumeImport({ resume }: ResumeImportProps) {
 
   function handleSave() {
     if (!review) return;
+    if (hasInvalidIncludedExperience(review)) return;
+    setError(null);
     const draft = toDraftForSave(review);
     startTransition(async () => {
-      const result = await saveImportedResumeAction(draft);
-      if (result.ok) {
-        router.refresh();
-        reset();
-      } else {
-        setError("Couldn't save everything. Please try again or fill the steps below.");
+      try {
+        const result = await saveImportedResumeAction(draft);
+        applyResumeImportSaveResult(result, {
+          refresh: () => router.refresh(),
+          reset,
+          closeReviewWithMessage,
+          showError: setError,
+        });
+      } catch {
+        applyResumeImportSaveResult(
+          { ok: false, error: "outcome_unknown" },
+          {
+            refresh: () => router.refresh(),
+            reset,
+            closeReviewWithMessage,
+            showError: setError,
+          },
+        );
       }
     });
+  }
+
+  function handleReviewChange(next: ReviewState) {
+    setReview(next);
+    setError(null);
   }
 
   // ── Collapsed trigger ──────────────────────────────────────────────────────
   if (phase === "idle") {
     return (
       <div className={styles.wrap}>
+        {error ? <ResumeImportNotice message={error} /> : null}
         <button
           type="button"
           className={styles.trigger}
-          onClick={() => { setPhase("input"); }}
+          onClick={() => {
+            setError(null);
+            setPhase("input");
+          }}
         >
           <span className={styles.triggerIcon}>
             <Icon name="profile.resume" size={22} aria-hidden />
@@ -382,14 +520,7 @@ export function ResumeImport({ resume }: ResumeImportProps) {
           </button>
         </div>
 
-        {error && (
-          <p className={styles.noticeError}>
-            <span className={styles.noticeIcon}>
-              <Icon name="system.warning" size={16} aria-hidden />
-            </span>
-            {error}
-          </p>
-        )}
+        {error ? <ResumeImportNotice message={error} /> : null}
 
         {/* ── Input ── */}
         {phase === "input" && (
@@ -464,7 +595,7 @@ export function ResumeImport({ resume }: ResumeImportProps) {
         {phase === "review" && review && (
           <ReviewPanel
             review={review}
-            onChange={setReview}
+            onChange={handleReviewChange}
             onSave={handleSave}
             onCancel={reset}
             pending={pending}
@@ -485,7 +616,7 @@ interface ReviewPanelProps {
   pending: boolean;
 }
 
-function ReviewPanel({ review, onChange, onSave, onCancel, pending }: ReviewPanelProps) {
+export function ReviewPanel({ review, onChange, onSave, onCancel, pending }: ReviewPanelProps) {
   const empty =
     !review.profile &&
     review.experiences.length === 0 &&
@@ -545,13 +676,15 @@ function ReviewPanel({ review, onChange, onSave, onCancel, pending }: ReviewPane
             <h3 className={styles.groupTitle}>Profile</h3>
           </div>
           <div className={review.profile.include ? styles.item : styles.itemExcluded}>
-            <input
-              type="checkbox"
-              className={styles.checkbox}
-              checked={review.profile.include}
-              onChange={(e) => { patchProfile({ include: e.target.checked }); }}
-              aria-label="Include profile details"
-            />
+            <label className={styles.includeToggle}>
+              <input
+                type="checkbox"
+                className={styles.checkbox}
+                checked={review.profile.include}
+                onChange={(e) => { patchProfile({ include: e.target.checked }); }}
+                aria-label={profileIncludeLabel(review.profile)}
+              />
+            </label>
             <div className={styles.itemFields}>
               <div className={styles.grid2}>
                 <label className={styles.field}>
@@ -615,64 +748,105 @@ function ReviewPanel({ review, onChange, onSave, onCancel, pending }: ReviewPane
           <div className={styles.groupHead}>
             <h3 className={styles.groupTitle}>Experience</h3>
           </div>
-          {review.experiences.map((exp, i) => (
-            <div key={i} className={exp.include ? styles.item : styles.itemExcluded}>
-              <input
-                type="checkbox"
-                className={styles.checkbox}
-                checked={exp.include}
-                onChange={(e) => { patchExp(i, { include: e.target.checked }); }}
-                aria-label="Include this experience"
-              />
-              <div className={styles.itemFields}>
-                <div className={styles.grid2}>
-                  <label className={styles.field}>
-                    <span className={styles.label}>Role title</span>
-                    <input
-                      className={styles.input}
-                      type="text"
-                      value={exp.roleTitle}
-                      onChange={(e) => { patchExp(i, { roleTitle: e.target.value }); }}
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span className={styles.label}>Employer / place</span>
-                    <input
-                      className={styles.input}
-                      type="text"
-                      value={exp.companyName}
-                      onChange={(e) => { patchExp(i, { companyName: e.target.value }); }}
-                    />
-                  </label>
-                </div>
-                <label className={styles.field}>
-                  <span className={styles.label}>Location</span>
+          {review.experiences.map((exp, i) => {
+            const identityInvalid =
+              exp.include && !hasResumeExperienceIdentity(exp);
+            const identityErrorId = `resume-import-experience-${i}-identity-error`;
+            return (
+              <div
+                key={i}
+                className={
+                  exp.include
+                    ? identityInvalid
+                      ? `${styles.item} ${styles.itemInvalid}`
+                      : styles.item
+                    : styles.itemExcluded
+                }
+              >
+                <label className={styles.includeToggle}>
                   <input
-                    className={styles.input}
-                    type="text"
-                    value={exp.location}
-                    onChange={(e) => { patchExp(i, { location: e.target.value }); }}
+                    type="checkbox"
+                    className={styles.checkbox}
+                    checked={exp.include}
+                    onChange={(e) => {
+                      patchExp(i, { include: e.target.checked });
+                    }}
+                    aria-label={experienceIncludeLabel(exp, i)}
                   />
                 </label>
-                <label className={styles.field}>
-                  <span className={styles.label}>Summary</span>
-                  <textarea
-                    className={styles.textarea}
-                    style={{ minHeight: 72 }}
-                    value={exp.summary}
-                    onChange={(e) => { patchExp(i, { summary: e.target.value }); }}
-                  />
-                </label>
-                {exp.skillTags.length > 0 && (
-                  <div className={styles.chips}>
-                    {exp.skillTags.map((s) => (
-                      <span key={s} className={styles.chip}>{s}</span>
-                    ))}
+                <div className={styles.itemFields}>
+                  <div className={styles.grid2}>
+                    <label className={styles.field}>
+                      <span className={styles.label}>Role title</span>
+                      <input
+                        className={styles.input}
+                        type="text"
+                        value={exp.roleTitle}
+                        aria-invalid={identityInvalid}
+                        aria-describedby={
+                          identityInvalid ? identityErrorId : undefined
+                        }
+                        onChange={(e) => {
+                          patchExp(i, { roleTitle: e.target.value });
+                        }}
+                      />
+                    </label>
+                    <label className={styles.field}>
+                      <span className={styles.label}>Employer / place</span>
+                      <input
+                        className={styles.input}
+                        type="text"
+                        value={exp.companyName}
+                        aria-invalid={identityInvalid}
+                        aria-describedby={
+                          identityInvalid ? identityErrorId : undefined
+                        }
+                        onChange={(e) => {
+                          patchExp(i, { companyName: e.target.value });
+                        }}
+                      />
+                    </label>
                   </div>
-                )}
+                  {identityInvalid ? (
+                    <p id={identityErrorId} className={styles.identityError}>
+                      {RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE}
+                    </p>
+                  ) : null}
+                  <label className={styles.field}>
+                    <span className={styles.label}>Location</span>
+                    <input
+                      className={styles.input}
+                      type="text"
+                      value={exp.location}
+                      onChange={(e) => {
+                        patchExp(i, { location: e.target.value });
+                      }}
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span className={styles.label}>Summary</span>
+                    <textarea
+                      className={styles.textarea}
+                      style={{ minHeight: 72 }}
+                      value={exp.summary}
+                      onChange={(e) => {
+                        patchExp(i, { summary: e.target.value });
+                      }}
+                    />
+                  </label>
+                  {exp.skillTags.length > 0 && (
+                    <div className={styles.chips}>
+                      {exp.skillTags.map((s) => (
+                        <span key={s} className={styles.chip}>
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -684,13 +858,15 @@ function ReviewPanel({ review, onChange, onSave, onCancel, pending }: ReviewPane
           </div>
           {review.educations.map((edu, i) => (
             <div key={i} className={edu.include ? styles.item : styles.itemExcluded}>
-              <input
-                type="checkbox"
-                className={styles.checkbox}
-                checked={edu.include}
-                onChange={(e) => { patchEdu(i, { include: e.target.checked }); }}
-                aria-label="Include this education"
-              />
+              <label className={styles.includeToggle}>
+                <input
+                  type="checkbox"
+                  className={styles.checkbox}
+                  checked={edu.include}
+                  onChange={(e) => { patchEdu(i, { include: e.target.checked }); }}
+                  aria-label={educationIncludeLabel(edu, i)}
+                />
+              </label>
               <div className={styles.itemFields}>
                 <div className={styles.grid2}>
                   <label className={styles.field}>
@@ -735,13 +911,15 @@ function ReviewPanel({ review, onChange, onSave, onCancel, pending }: ReviewPane
           </div>
           {review.certifications.map((cert, i) => (
             <div key={i} className={cert.include ? styles.item : styles.itemExcluded}>
-              <input
-                type="checkbox"
-                className={styles.checkbox}
-                checked={cert.include}
-                onChange={(e) => { patchCert(i, { include: e.target.checked }); }}
-                aria-label="Include this certification"
-              />
+              <label className={styles.includeToggle}>
+                <input
+                  type="checkbox"
+                  className={styles.checkbox}
+                  checked={cert.include}
+                  onChange={(e) => { patchCert(i, { include: e.target.checked }); }}
+                  aria-label={certificationIncludeLabel(cert, i)}
+                />
+              </label>
               <div className={styles.itemFields}>
                 <div className={styles.grid2}>
                   <label className={styles.field}>
@@ -792,7 +970,11 @@ function ReviewPanel({ review, onChange, onSave, onCancel, pending }: ReviewPane
           type="button"
           className={styles.primaryBtn}
           onClick={onSave}
-          disabled={pending || !reviewHasContent(review)}
+          disabled={
+            pending ||
+            !reviewHasContent(review) ||
+            hasInvalidIncludedExperience(review)
+          }
         >
           <Icon name="action.apply" size={16} aria-hidden />
           Save to my résumé

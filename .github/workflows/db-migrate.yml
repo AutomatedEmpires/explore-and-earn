@@ -203,19 +203,21 @@ jobs:
             .[0].migration_077_applied == true and
             .[0].migration_091_applied == true and
             .[0].migration_092_applied == true and
+            .[0].migration_093_applied == true and
             .[0].launch_functions_present == true and
             .[0].launch_rpc_grants_safe == true and
             .[0].application_submission_rpc_safe == true and
             .[0].application_submission_writes_closed == true and
             .[0].application_submission_guards_present == true and
             .[0].listing_media_ownership_contract_safe == true and
+            .[0].resume_experience_identity_contract_safe == true and
             .[0].direct_profile_insert_closed == true and
             .[0].launch_constraints_valid == true and
             .[0].launch_triggers_enabled == true and
             .[0].community_bucket_listing_closed == true and
             .[0].service_function_search_paths_pinned == true
           ' <<<"$proof" >/dev/null
-          echo "Production migrations 077/091/092 and launch schema contract verified."
+          echo "Production migrations 077/091/092/093 and launch schema contract verified."
 
       - name: Verify post-migration production runtime
         timeout-minutes: 3

@@ -786,7 +786,7 @@ export async function getResumeCompletionByProfileId(
   };
   const { data: experiences, error: expError } = await db
     .from("seeker_resume_experiences")
-    .select("id, skill_tags")
+    .select("id, company_name, role_title, skill_tags")
     .eq("seeker_profile_id", seekerProfileId);
   if (expError) {
     throw new Error(`getResumeCompletionByProfileId experiences failed: ${expError.message}`);
@@ -803,11 +803,16 @@ export async function getResumeCompletionByProfileId(
       desiredCategories: [],
       generalSkills: p.general_skill_tags ?? [],
     },
-    experiences: ((experiences ?? []) as Array<{ id: string; skill_tags: string[] | null }>).map(
+    experiences: ((experiences ?? []) as Array<{
+      id: string;
+      company_name: string | null;
+      role_title: string | null;
+      skill_tags: string[] | null;
+    }>).map(
       (row) => ({
         id: row.id,
-        companyName: null,
-        roleTitle: null,
+        companyName: row.company_name,
+        roleTitle: row.role_title,
         location: null,
         startDate: null,
         endDate: null,

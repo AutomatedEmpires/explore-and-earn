@@ -2,7 +2,11 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { SEEKER_SEEKING_TIMELINES } from "@explore-and-earn/contracts";
+import {
+  hasResumeExperienceIdentity,
+  RESUME_EXPERIENCE_IDENTITY_REQUIRED,
+  SEEKER_SEEKING_TIMELINES,
+} from "@explore-and-earn/contracts";
 import {
   addResumeExperience,
   updateResumeExperience,
@@ -40,8 +44,39 @@ async function getAuth(): Promise<{ userId: string; token: string } | null> {
 const VALID_TIMELINES = new Set<string>(SEEKER_SEEKING_TIMELINES);
 
 function revalidate() {
-  revalidatePath("/resume");
-  revalidatePath("/profile");
+  for (const route of ["/resume", "/profile"] as const) {
+    try {
+      revalidatePath(route);
+    } catch (error) {
+      // Persistence is already durable at this point. Cache invalidation is
+      // best-effort so a transient refresh fault cannot invite a duplicate
+      // retry while still being visible to server-side observability.
+      reportError(error, {
+        action: "resumeBuilder.revalidate",
+        route,
+      });
+    }
+  }
+}
+
+function sanitizedExperienceInput(
+  input: ResumeExperienceInput,
+): ResumeExperienceInput {
+  return {
+    ...input,
+    roleTitle: input.roleTitle?.trim() || null,
+    companyName: input.companyName?.trim() || null,
+  };
+}
+
+function reportPersistenceFailure(
+  action: string,
+  error: string | undefined,
+): ResumeActionResult {
+  reportError(new Error(`${action} persistence failed${error ? `: ${error}` : ""}`), {
+    action,
+  });
+  return { ok: false, error: "unexpected_error" };
 }
 
 export async function saveBioAction(bio: string): Promise<ResumeActionResult> {
@@ -123,8 +158,19 @@ export async function addExperienceAction(
   try {
     const session = await getAuth();
     if (!session) return { ok: false, error: "unauthenticated" };
-    const result = await addResumeExperience(session.token, session.userId, input);
-    if (result.ok) revalidate();
+    const sanitized = sanitizedExperienceInput(input);
+    if (!hasResumeExperienceIdentity(sanitized)) {
+      return { ok: false, error: RESUME_EXPERIENCE_IDENTITY_REQUIRED };
+    }
+    const result = await addResumeExperience(
+      session.token,
+      session.userId,
+      sanitized,
+    );
+    if (!result.ok) {
+      return reportPersistenceFailure("addExperienceAction", result.error);
+    }
+    revalidate();
     return result;
   } catch (error) {
     reportError(error, { action: "addExperienceAction" });
@@ -139,8 +185,20 @@ export async function updateExperienceAction(
   try {
     const session = await getAuth();
     if (!session) return { ok: false, error: "unauthenticated" };
-    const result = await updateResumeExperience(session.token, session.userId, id, input);
-    if (result.ok) revalidate();
+    const sanitized = sanitizedExperienceInput(input);
+    if (!hasResumeExperienceIdentity(sanitized)) {
+      return { ok: false, error: RESUME_EXPERIENCE_IDENTITY_REQUIRED };
+    }
+    const result = await updateResumeExperience(
+      session.token,
+      session.userId,
+      id,
+      sanitized,
+    );
+    if (!result.ok) {
+      return reportPersistenceFailure("updateExperienceAction", result.error);
+    }
+    revalidate();
     return result;
   } catch (error) {
     reportError(error, { action: "updateExperienceAction" });

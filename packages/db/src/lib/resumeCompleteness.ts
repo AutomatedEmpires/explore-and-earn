@@ -1,3 +1,5 @@
+import { hasResumeExperienceIdentity } from "@explore-and-earn/contracts";
+
 import type { SeekerResume } from "../queries/seekerResume";
 import { getSeekerResume } from "../queries/seekerResume";
 
@@ -15,8 +17,8 @@ import { getSeekerResume } from "../queries/seekerResume";
  *   1. displayName present
  *   2. location (relative_location) present
  *   3. seekingTimeline present
- *   4. at least one skill (generalSkills OR any experience.skillTags)
- *   5. bio (short_bio) present OR at least one experience row
+ *   4. at least one skill (generalSkills OR a meaningful experience.skillTags)
+ *   5. bio (short_bio) present OR at least one meaningful experience
  */
 
 /** Stable identifiers for the required résumé sections that gate applying. */
@@ -49,7 +51,9 @@ function evaluateSections(
   resume: SeekerResume,
 ): ReadonlyArray<{ section: ResumeMissingSection; satisfied: boolean }> {
   const profile = resume.profile;
-  const experiences = resume.experiences ?? [];
+  const experiences = (resume.experiences ?? []).filter(
+    hasResumeExperienceIdentity,
+  );
 
   const hasSkill =
     (profile?.generalSkills?.length ?? 0) > 0 ||

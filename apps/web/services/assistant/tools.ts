@@ -16,7 +16,11 @@ import {
   toSeekerMatchInput,
   type ListingRow,
 } from "@explore-and-earn/db";
-import { renderMatchTrace, type MatchTrace } from "@explore-and-earn/contracts";
+import {
+  hasResumeExperienceIdentity,
+  renderMatchTrace,
+  type MatchTrace,
+} from "@explore-and-earn/contracts";
 
 import { checkRateLimit } from "../../lib/rateLimit";
 
@@ -278,9 +282,12 @@ export function buildSeekerTools(ctx: SeekerToolContext): ToolSet {
       execute: async () => {
         const resume = await getSeekerResume(ctx.token, ctx.userId);
         const profile = resume.profile;
+        const meaningfulExperiences = resume.experiences.filter(
+          hasResumeExperienceIdentity,
+        );
         const gaps: string[] = [];
         if (!profile?.bio?.trim()) gaps.push("a short bio that says who you are and what you're after");
-        if (resume.experiences.length === 0) gaps.push("at least one work experience with a concrete summary");
+        if (meaningfulExperiences.length === 0) gaps.push("at least one work experience with a concrete summary");
         if (resume.educations.length === 0) gaps.push("education or training");
         if ((profile?.generalSkills.length ?? 0) === 0) gaps.push("a few skills");
         if ((profile?.desiredCategories.length ?? 0) === 0) gaps.push("the categories of work you want");
@@ -289,10 +296,10 @@ export function buildSeekerTools(ctx: SeekerToolContext): ToolSet {
           hasBio: Boolean(profile?.bio?.trim()),
           skills: profile?.generalSkills ?? [],
           desiredCategories: profile?.desiredCategories ?? [],
-          experienceCount: resume.experiences.length,
+          experienceCount: meaningfulExperiences.length,
           educationCount: resume.educations.length,
           certificationCount: resume.certifications.length,
-          experiences: resume.experiences.map((experience) => ({
+          experiences: meaningfulExperiences.map((experience) => ({
             role: experience.roleTitle,
             company: experience.companyName,
             hasSummary: Boolean(experience.summary?.trim()),

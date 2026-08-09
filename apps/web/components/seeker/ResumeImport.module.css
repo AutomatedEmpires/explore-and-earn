@@ -151,6 +151,7 @@
 
 .input {
 	width: 100%;
+	min-height: var(--tap-min);
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	color: var(--text-primary);
@@ -163,6 +164,10 @@
 .input:focus {
 	outline: none;
 	border-color: var(--color-cta);
+}
+
+.input[aria-invalid="true"] {
+	border-color: var(--status-error-fg);
 }
 
 /* ── File row ──────────────────────────────────────────────────────────────── */
@@ -329,9 +334,26 @@
 	opacity: 0.55;
 }
 
+.itemInvalid {
+	border-color: var(--status-error-fg);
+}
+
+.includeToggle {
+	box-sizing: border-box;
+	flex: 0 0 var(--tap-min);
+	align-self: flex-start;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--tap-min);
+	min-width: var(--tap-min);
+	min-height: var(--tap-min);
+	cursor: pointer;
+}
+
 .checkbox {
 	flex-shrink: 0;
-	margin-top: 2px;
+	margin: 0;
 	width: 18px;
 	height: 18px;
 	accent-color: var(--color-cta);
@@ -344,6 +366,14 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-8);
+}
+
+.identityError {
+	margin: 0;
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	line-height: var(--type-meta-lh);
+	color: var(--status-error-fg);
 }
 
 .grid2 {
@@ -394,6 +424,7 @@
 .primaryBtn {
 	display: inline-flex;
 	align-items: center;
+	min-height: var(--tap-min);
 	gap: var(--space-6);
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
@@ -414,6 +445,7 @@
 .ghostBtn {
 	display: inline-flex;
 	align-items: center;
+	min-height: var(--tap-min);
 	gap: var(--space-4);
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
