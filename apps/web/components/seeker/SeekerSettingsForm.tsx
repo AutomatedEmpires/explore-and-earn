@@ -114,6 +114,7 @@ export function SeekerSettingsForm({
 	return (
 		<form
 			className={className}
+			method="post"
 			onSubmit={handleSubmit}
 			onInput={clearStaleFeedback}
 			aria-busy={isSaving}

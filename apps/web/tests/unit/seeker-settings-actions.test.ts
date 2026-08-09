@@ -165,6 +165,20 @@ describe("updateScheduleAction", () => {
     },
   );
 
+  it.each(["", "available_now", "flexible", "unavailable"])(
+    "rejects dates unless status is date_range (%s)",
+    async (status) => {
+      await expect(
+        updateScheduleAction(scheduleForm("2028-03-01", "", status)),
+      ).resolves.toEqual({ ok: false, error: "validation" });
+
+      expect(authMock).not.toHaveBeenCalled();
+      expect(dbMocks.saveSeekerProfile).not.toHaveBeenCalled();
+      expect(revalidatePathMock).not.toHaveBeenCalled();
+      expect(queueRecomputeMock).not.toHaveBeenCalled();
+    },
+  );
+
   it("rejects an unknown status and duplicate fields before auth or I/O", async () => {
     await expect(
       updateScheduleAction(scheduleForm("", "", "sometimes")),

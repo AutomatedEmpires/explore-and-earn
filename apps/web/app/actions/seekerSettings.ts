@@ -122,6 +122,12 @@ function parseScheduleForm(formData: FormData): Parsed<SeekerProfileUpdate> {
     SEEKER_AVAILABILITY_STATUS,
   );
   if (!start.ok || !end.ok || !status.ok) return { ok: false };
+  if (
+    status.value !== "date_range" &&
+    (start.value !== null || end.value !== null)
+  ) {
+    return { ok: false };
+  }
   if (start.value !== null && end.value !== null && start.value > end.value) {
     return { ok: false };
   }

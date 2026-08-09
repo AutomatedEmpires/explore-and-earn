@@ -355,7 +355,7 @@
 		},
 		"availability": {
 			"heading": "General availability",
-			"description": "This window helps hosts understand when you can start a role.",
+			"description": "Choose Specific window to save a start date, an end date, or both.",
 			"preview": {
 				"notice": "Preview only — changes on this page are not saved.",
 				"saved": "Preview updated. No settings were saved."

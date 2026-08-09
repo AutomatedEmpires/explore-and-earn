@@ -169,6 +169,7 @@ test.describe("seeker schedule and travel settings on phones", () => {
         exact: true,
       });
       await expect(schedule).toHaveAttribute("data-dev-fixture", "schedule");
+      await expect(schedule).toHaveAttribute("method", "post");
       await expect(schedule.getByRole("note")).toHaveText(PREVIEW_NOTICE);
       const startDate = schedule.getByLabel("Start date", { exact: true });
       const endDate = schedule.getByLabel("End date", { exact: true });
@@ -204,6 +205,7 @@ test.describe("seeker schedule and travel settings on phones", () => {
         exact: true,
       });
       await expect(travel).toHaveAttribute("data-dev-fixture", "travel");
+      await expect(travel).toHaveAttribute("method", "post");
       await expect(travel.getByRole("note")).toHaveText(PREVIEW_NOTICE);
       const readiness = travel.getByRole("combobox", {
         name: "Travel readiness",

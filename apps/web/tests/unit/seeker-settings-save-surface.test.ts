@@ -37,6 +37,7 @@ describe("truthful seeker settings form", () => {
     );
 
     expect(html).toContain("<form");
+    expect(html).toContain('method="post"');
     expect(html).toContain('aria-busy="false"');
     expect(html).toContain("<fieldset");
     expect(html).toContain('value="2026-09-01"');
