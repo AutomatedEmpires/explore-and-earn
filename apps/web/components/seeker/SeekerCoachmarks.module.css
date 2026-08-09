@@ -4,8 +4,8 @@
 	position: fixed;
 	left: var(--space-16);
 	bottom: calc(
-		var(--size-bottom-nav) + var(--space-16) +
-		env(safe-area-inset-bottom, 0px)
+		var(--size-bottom-nav) + var(--space-16)
+		+ env(safe-area-inset-bottom, 0px)
 	);
 	z-index: 60;
 	display: inline-flex;
@@ -66,8 +66,8 @@
 .bubble[data-placement="docked"] {
 	left: var(--space-16);
 	bottom: calc(
-		var(--size-bottom-nav) + var(--space-16) + var(--tap-min) +
-		env(safe-area-inset-bottom, 0px)
+		var(--size-bottom-nav) + var(--space-16) + var(--tap-min)
+		+ env(safe-area-inset-bottom, 0px)
 	);
 }
 
