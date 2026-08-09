@@ -12,6 +12,8 @@ const PHONE_VIEWPORTS = [
 const SAVE_FAILURE = "We couldn’t save your changes. Try again.";
 const OPEN_EDITOR_WARNING =
   "Save or cancel the open entry before moving to another step.";
+const EXPERIENCE_IDENTITY_REQUIRED =
+  "Add a role title or the employer or place where you worked.";
 
 async function hideOptionalDevBench(page: Page) {
   const devBench = page.getByRole("complementary", {
@@ -212,7 +214,35 @@ test.describe("resume save and navigation on phones", () => {
         name: "Role title",
         exact: true,
       });
+      const companyName = page.getByRole("textbox", {
+        name: "Employer / place",
+        exact: true,
+      });
+      const saveExperience = builder.getByRole("button", {
+        name: "Save",
+        exact: true,
+      });
+
+      // An experience needs one real identity field. Description, dates, and
+      // location cannot turn a blank row into completed résumé progress.
+      await expect(saveExperience).toBeDisabled();
+      await expect(
+        builder.getByText(EXPERIENCE_IDENTITY_REQUIRED, { exact: true }),
+      ).toBeVisible();
+      await expect(roleTitle).toHaveAttribute("aria-invalid", "true");
+      await expect(companyName).toHaveAttribute("aria-invalid", "true");
+
+      await roleTitle.fill("   ");
+      await companyName.fill(`Orchard ${viewport.width}`);
+      await expect(saveExperience).toBeEnabled();
+      await expect(
+        builder.getByText(EXPERIENCE_IDENTITY_REQUIRED, { exact: true }),
+      ).toHaveCount(0);
+
+      await companyName.fill("");
       await roleTitle.fill(`Unsaved guide ${viewport.width}`);
+      await expect(saveExperience).toBeEnabled();
+      expect(serverActionPosts).toEqual([]);
 
       await rail
         .getByRole("button", { name: "Step 3: Education", exact: true })
@@ -239,6 +269,14 @@ test.describe("resume save and navigation on phones", () => {
       expect(serverActionPosts).toEqual([]);
 
       await expectTouchTarget(roleTitle, `Role title at ${viewport.width}px`);
+      await expectTouchTarget(
+        companyName,
+        `Employer / place at ${viewport.width}px`,
+      );
+      await expectTouchTarget(
+        saveExperience,
+        `Save experience at ${viewport.width}px`,
+      );
       await expectVisibleBuilderButtonsAreTouchTargets(builder, viewport.width);
       await expectFooterClearsSeekerDock(page, footer);
       await expectNoDocumentOverflow(page);

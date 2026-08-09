@@ -1,4 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  hasResumeExperienceIdentity,
+  RESUME_EXPERIENCE_IDENTITY_REQUIRED,
+} from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
 import {
@@ -126,8 +130,8 @@ export interface SeekerResume {
 }
 
 export interface ResumeExperienceInput {
-  readonly companyName?: string;
-  readonly roleTitle?: string;
+  readonly companyName: string | null;
+  readonly roleTitle: string | null;
   readonly location?: string | null;
   readonly startDate?: string | null;
   readonly endDate?: string | null;
@@ -471,6 +475,12 @@ export async function addResumeExperience(
   clerkUserId: string,
   input: ResumeExperienceInput,
 ): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const companyName = input.companyName?.trim() || null;
+  const roleTitle = input.roleTitle?.trim() || null;
+  if (!hasResumeExperienceIdentity({ companyName, roleTitle })) {
+    return { ok: false, error: RESUME_EXPERIENCE_IDENTITY_REQUIRED };
+  }
+
   const db = untypedClient(clerkToken);
   const seekerProfileId = await resolveSeekerId(db, clerkUserId);
   if (!seekerProfileId) return { ok: false, error: "seeker_profile_not_found" };
@@ -479,8 +489,8 @@ export async function addResumeExperience(
     .from("seeker_resume_experiences")
     .insert({
       seeker_profile_id: seekerProfileId,
-      company_name: input.companyName ?? null,
-      role_title: input.roleTitle ?? null,
+      company_name: companyName,
+      role_title: roleTitle,
       location: input.location ?? null,
       start_date: input.startDate ?? null,
       end_date: input.endDate ?? null,
@@ -502,13 +512,20 @@ export async function updateResumeExperience(
   experienceId: string,
   input: ResumeExperienceInput,
 ): Promise<{ ok: boolean; error?: string }> {
+  const companyName = input.companyName?.trim() || null;
+  const roleTitle = input.roleTitle?.trim() || null;
+  if (!hasResumeExperienceIdentity({ companyName, roleTitle })) {
+    return { ok: false, error: RESUME_EXPERIENCE_IDENTITY_REQUIRED };
+  }
+
   const db = untypedClient(clerkToken);
   const seekerProfileId = await resolveSeekerId(db, clerkUserId);
   if (!seekerProfileId) return { ok: false, error: "seeker_profile_not_found" };
 
-  const patch: Record<string, unknown> = {};
-  if (input.companyName !== undefined) patch.company_name = input.companyName;
-  if (input.roleTitle !== undefined) patch.role_title = input.roleTitle;
+  const patch: Record<string, unknown> = {
+    company_name: companyName,
+    role_title: roleTitle,
+  };
   if (input.location !== undefined) patch.location = input.location;
   if (input.startDate !== undefined) patch.start_date = input.startDate;
   if (input.endDate !== undefined) patch.end_date = input.endDate;

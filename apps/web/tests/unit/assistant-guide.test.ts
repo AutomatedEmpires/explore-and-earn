@@ -64,6 +64,46 @@ import { buildHostTools } from "../../services/assistant/hostTools";
 
 const CTX = { token: "tok-A", userId: "user_A" };
 
+const LEGACY_BLANK_RESUME = {
+  profile: null,
+  experiences: [
+    {
+      id: "legacy-blank",
+      companyName: "   ",
+      roleTitle: null,
+      location: "Private legacy location",
+      startDate: "2025-06-01",
+      endDate: null,
+      isCurrent: true,
+      summary: "Private legacy summary about operating a tractor.",
+      categoryTags: ["farm"],
+      skillTags: ["private-legacy-skill"],
+    },
+  ],
+  educations: [],
+  certifications: [],
+};
+
+const LEGACY_COMPANY_ONLY_RESUME = {
+  profile: null,
+  experiences: [
+    {
+      id: "legacy-company-only",
+      companyName: "  Cascade Orchard\u3000",
+      roleTitle: "\u3000\t",
+      location: null,
+      startDate: null,
+      endDate: null,
+      isCurrent: false,
+      summary: null,
+      categoryTags: [],
+      skillTags: [],
+    },
+  ],
+  educations: [],
+  certifications: [],
+};
+
 type AnyTool = {
   inputSchema?: { shape?: Record<string, unknown> };
   execute: (input: Record<string, unknown>, options?: unknown) => Promise<unknown>;
@@ -155,6 +195,72 @@ describe("host screening — cross-tenant denial", () => {
     expect(mockDb.getHostApplications).toHaveBeenCalledWith("tok-A", "user_A");
   });
 
+  it("screen_applicant never exposes an experience with no identity", async () => {
+    mockDb.getHostApplications.mockResolvedValue([
+      {
+        listingId: "listing-own",
+        seekerProfileId: "seeker-own",
+        status: "applied",
+        coverMessage: null,
+      },
+    ]);
+    mockDb.getSeekerResumeByProfileId.mockResolvedValue(LEGACY_BLANK_RESUME);
+    mockDb.getListingMatchRequirements.mockResolvedValue(null);
+    mockDb.getMatchScoresForHost.mockResolvedValue(new Map());
+
+    const tools = buildHostTools(CTX);
+    const result = (await toolOf(tools as never, "screen_applicant").execute({
+      listingId: "listing-own",
+      seekerProfileId: "seeker-own",
+    })) as {
+      resume: { experiences: unknown[] };
+      missingInformation: string[];
+      interviewTopics: string[];
+    };
+
+    expect(result.resume.experiences).toEqual([]);
+    expect(result.missingInformation).toEqual(
+      expect.arrayContaining(["no_experience", "no_skills"]),
+    );
+    expect(result.interviewTopics).toEqual([]);
+    expect(JSON.stringify(result)).not.toContain("Private legacy");
+    expect(JSON.stringify(result)).not.toContain("private-legacy-skill");
+  });
+
+  it("screen_applicant normalizes company-only identity and interview topics", async () => {
+    mockDb.getHostApplications.mockResolvedValue([
+      {
+        listingId: "listing-own",
+        seekerProfileId: "seeker-own",
+        status: "applied",
+        coverMessage: null,
+      },
+    ]);
+    mockDb.getSeekerResumeByProfileId.mockResolvedValue(
+      LEGACY_COMPANY_ONLY_RESUME,
+    );
+    mockDb.getListingMatchRequirements.mockResolvedValue(null);
+    mockDb.getMatchScoresForHost.mockResolvedValue(new Map());
+
+    const tools = buildHostTools(CTX);
+    const result = (await toolOf(tools as never, "screen_applicant").execute({
+      listingId: "listing-own",
+      seekerProfileId: "seeker-own",
+    })) as {
+      resume: {
+        experiences: Array<{ role: string | null; company: string | null }>;
+      };
+      interviewTopics: string[];
+    };
+
+    expect(result.resume.experiences).toEqual([
+      expect.objectContaining({ role: null, company: "Cascade Orchard" }),
+    ]);
+    expect(result.interviewTopics).toEqual([]);
+    expect(JSON.stringify(result)).not.toContain("\u3000");
+    expect(JSON.stringify(result)).not.toContain("\t");
+  });
+
   it("matched_seekers surfaces listing_not_found for a foreign listing", async () => {
     mockDb.getMatchedSeekersForListing.mockResolvedValue(null); // ownership check inside
     mockDb.getInviteEntitlement.mockResolvedValue(null);
@@ -223,6 +329,58 @@ describe("seeker tools — grounded errors, no fabrication", () => {
     };
     expect(result.reviewRequired).toBe(true);
     expect(result.skills).toEqual([]); // empty resume → zero invented skills
+  });
+
+  it("resume_summary omits metadata-only legacy experience rows", async () => {
+    mockDb.getSeekerResume.mockResolvedValue(LEGACY_BLANK_RESUME);
+
+    const tools = buildSeekerTools(CTX);
+    const result = (await toolOf(tools as never, "resume_summary").execute({})) as {
+      experienceCount: number;
+      experiences: unknown[];
+      gaps: string[];
+    };
+
+    expect(result.experienceCount).toBe(0);
+    expect(result.experiences).toEqual([]);
+    expect(result.gaps).toContain("at least one work experience with a concrete summary");
+    expect(JSON.stringify(result)).not.toContain("Private legacy");
+    expect(JSON.stringify(result)).not.toContain("private-legacy-skill");
+  });
+
+  it("resume_summary normalizes a company-only legacy identity", async () => {
+    mockDb.getSeekerResume.mockResolvedValue(LEGACY_COMPANY_ONLY_RESUME);
+
+    const tools = buildSeekerTools(CTX);
+    const result = (await toolOf(tools as never, "resume_summary").execute({})) as {
+      experienceCount: number;
+      experiences: Array<{ role: string | null; company: string | null }>;
+    };
+
+    expect(result.experienceCount).toBe(1);
+    expect(result.experiences).toEqual([
+      expect.objectContaining({ role: null, company: "Cascade Orchard" }),
+    ]);
+    expect(JSON.stringify(result)).not.toContain("\u3000");
+    expect(JSON.stringify(result)).not.toContain("\t");
+  });
+
+  it("resume_insights drops invalid-row skills and their evidence", async () => {
+    mockDb.getSeekerResume.mockResolvedValue(LEGACY_BLANK_RESUME);
+
+    const tools = buildSeekerTools(CTX);
+    const result = (await toolOf(tools as never, "resume_insights").execute({})) as {
+      counts: { experiences: number };
+      skills: Array<{ evidence: unknown[] }>;
+      gaps: Array<{ code: string }>;
+    };
+
+    expect(result.counts.experiences).toBe(0);
+    expect(result.skills).toEqual([]);
+    expect(result.gaps.map((gap) => gap.code)).toEqual(
+      expect.arrayContaining(["no_experience", "no_skills"]),
+    );
+    expect(result.skills.flatMap((skill) => skill.evidence)).toEqual([]);
   });
 });
 

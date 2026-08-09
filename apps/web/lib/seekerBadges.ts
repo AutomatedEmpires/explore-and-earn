@@ -1,5 +1,6 @@
 import "server-only";
 
+import { hasResumeExperienceIdentity } from "@explore-and-earn/contracts";
 import {
   awardSeekerBadgesAdmin,
   BADGE_META,
@@ -67,13 +68,17 @@ export async function gatherSeekerBadgeStats(
     if (category && LANES.has(category)) lanes.add(category);
   }
   const statusOf = (app: unknown) => String((app as { status?: string }).status ?? "");
+  const meaningfulResume = {
+    ...resume,
+    experiences: resume.experiences.filter(hasResumeExperienceIdentity),
+  };
 
   return {
-    resumeCompletion: seekerResumeCompletion(resume).completion,
+    resumeCompletion: seekerResumeCompletion(meaningfulResume).completion,
     hasBio: Boolean(resume.profile?.bio && resume.profile.bio.trim().length > 0),
     hasPhoto: Boolean(profile?.profilePhotoUrl),
     skillsCount: resume.profile?.generalSkills?.length ?? 0,
-    experiencesCount: resume.experiences.length,
+    experiencesCount: meaningfulResume.experiences.length,
     educationsCount: resume.educations.length,
     certificationsCount: resume.certifications.length,
     appliedCount: apps.length,

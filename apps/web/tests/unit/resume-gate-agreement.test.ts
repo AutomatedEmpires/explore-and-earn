@@ -118,6 +118,76 @@ describe("résumé completion agrees with the apply gate", () => {
     expect(progress.missing).toContain("location");
   });
 
+  it("ignores legacy metadata and skill tags when an experience has no identity", () => {
+    const legacyBlank = resume(
+      {
+        displayName: "Ana",
+        location: "Portland, OR",
+        seekingTimeline: "Summer 2026",
+        generalSkills: [],
+      },
+      {
+        experiences: [
+          {
+            id: "legacy-blank",
+            companyName: "   ",
+            roleTitle: null,
+            location: "Portland, OR",
+            startDate: "2025-06-01",
+            endDate: null,
+            isCurrent: true,
+            summary: null,
+            categoryTags: ["farm"],
+            skillTags: ["harvest"],
+          },
+        ],
+      },
+    );
+
+    const canonical = seekerResumeCompletion(legacyBlank);
+    const progress = toResumeProgress(legacyBlank);
+
+    expect(canonical.missing).toEqual(
+      expect.arrayContaining(["skills", "bioOrExperience"]),
+    );
+    expect(progress.missing).toEqual(canonical.missing);
+    expect(progress.sections.find((section) => section.id === "bioOrExperience")).toMatchObject({
+      status: "incomplete",
+    });
+  });
+
+  it.each([
+    ["role-only", { roleTitle: "Deckhand", companyName: null }],
+    ["company-only", { roleTitle: null, companyName: "Sunrise Orchard" }],
+  ])("accepts a meaningful %s experience", (_label, identity) => {
+    const meaningful = resume(
+      {
+        displayName: "Ana",
+        location: "Portland, OR",
+        seekingTimeline: "Summer 2026",
+        generalSkills: ["harvest"],
+      },
+      {
+        experiences: [
+          {
+            id: `exp-${_label}`,
+            ...identity,
+            location: null,
+            startDate: null,
+            endDate: null,
+            isCurrent: false,
+            summary: null,
+            categoryTags: [],
+            skillTags: [],
+          },
+        ],
+      },
+    );
+
+    expect(seekerResumeCompletion(meaningful).complete).toBe(true);
+    expect(toResumeProgress(meaningful).canApply).toBe(true);
+  });
+
   /**
    * The negative control: across a spread of résumés, the page's canApply and
    * the server's gate must never disagree — that disagreement WAS the bug.

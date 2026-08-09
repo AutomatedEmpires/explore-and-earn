@@ -1,6 +1,8 @@
 import type { SeekerResume } from "@explore-and-earn/db";
 import {
+  hasResumeExperienceIdentity,
   MARKETPLACE_CATEGORIES,
+  normalizeResumeExperienceIdentity,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
@@ -110,15 +112,21 @@ export function SeekerResumeCard({
   const bio = profile?.bio ?? null;
   const desiredCategories = profile?.desiredCategories ?? [];
   const generalSkills = profile?.generalSkills ?? [];
+  const meaningfulExperiences = resume.experiences
+    .filter(hasResumeExperienceIdentity)
+    .map((experience) => ({
+      ...experience,
+      ...normalizeResumeExperienceIdentity(experience),
+    }));
 
-  const hasExperiences = resume.experiences.length > 0;
+  const hasExperiences = meaningfulExperiences.length > 0;
   const hasEducations = resume.educations.length > 0;
   const hasCerts = resume.certifications.length > 0;
   const hasSkills = generalSkills.length > 0;
 
   const allSkillTags = Array.from(
     new Set(
-      resume.experiences
+      meaningfulExperiences
         .flatMap((e) => e.skillTags)
         .concat(resume.educations.flatMap((e) => e.skillTags))
         .concat(resume.certifications.flatMap((c) => c.skillTags))
@@ -171,7 +179,7 @@ export function SeekerResumeCard({
         <section className={styles.section} aria-label="Experience">
           <SectionDivider label="Experience" icon="analytics.trend" />
           <div className={styles.entryList}>
-            {resume.experiences.map((exp) => (
+            {meaningfulExperiences.map((exp) => (
               <div key={exp.id} className={styles.entry}>
                 <div className={styles.entryHead}>
                   <div className={styles.entryTitle}>

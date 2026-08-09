@@ -11,7 +11,10 @@ import {
 import { useRouter } from "next/navigation";
 
 import {
+  hasResumeExperienceIdentity,
   MARKETPLACE_CATEGORIES,
+  RESUME_EXPERIENCE_IDENTITY_REQUIRED,
+  RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
@@ -33,6 +36,7 @@ import {
   addCertificationAction,
   updateCertificationAction,
   deleteCertificationAction,
+  type ResumeActionResult,
 } from "../../app/actions/resumeBuilder";
 import { SeekerResumeCard } from "./SeekerResumeCard";
 import { ResumeImport } from "./ResumeImport";
@@ -120,8 +124,11 @@ const BLOCK_SAVE_FAILED: BeforeLeaveResult = {
 };
 
 const SAVE_ERROR_MESSAGE = "We couldn’t save your changes. Try again.";
+const EXPERIENCE_SAVE_ERROR_MESSAGE =
+  "We couldn’t save this experience. Try again.";
 const OPEN_ENTRY_MESSAGE =
   "Save or cancel the open entry before moving to another step.";
+const EXPERIENCE_IDENTITY_ERROR_ID = "resume-experience-identity-error";
 
 const STEPS: { label: string; icon: IconKey }[] = [
   { label: "Info", icon: "nav.profile" },
@@ -214,7 +221,7 @@ function formatDateRange(
 function persistedCompletedSteps(resume: SeekerResume): Set<number> {
   const completed = new Set<number>();
   if (resume.profile?.bio || resume.profile?.displayName) completed.add(0);
-  if (resume.experiences.length > 0) completed.add(1);
+  if (resume.experiences.some(hasResumeExperienceIdentity)) completed.add(1);
   if (resume.educations.length > 0) completed.add(2);
   if (
     resume.certifications.length > 0 ||
@@ -621,17 +628,35 @@ function fromExperience(exp: SeekerResumeExperience): ExperienceFormState {
 
 interface ExperienceFormProps {
   initial: ExperienceFormState;
-  onSave: (state: ExperienceFormState) => Promise<void>;
+  onSave: (state: ExperienceFormState) => Promise<ResumeActionResult>;
   onCancel: () => void;
   pending: boolean;
 }
 
 function ExperienceForm({ initial, onSave, onCancel, pending }: ExperienceFormProps) {
   const [state, setState] = useState(initial);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const hasIdentity = hasResumeExperienceIdentity(state);
   const set =
     <K extends keyof ExperienceFormState>(key: K) =>
     (value: ExperienceFormState[K]) =>
       setState((s) => ({ ...s, [key]: value }));
+
+  async function handleSave() {
+    if (!hasIdentity) return;
+    setSaveError(null);
+    try {
+      const result = await onSave(state);
+      if (result.ok) return;
+      setSaveError(
+        result.error === RESUME_EXPERIENCE_IDENTITY_REQUIRED
+          ? RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE
+          : EXPERIENCE_SAVE_ERROR_MESSAGE,
+      );
+    } catch {
+      setSaveError(EXPERIENCE_SAVE_ERROR_MESSAGE);
+    }
+  }
 
   return (
     <fieldset
@@ -647,7 +672,12 @@ function ExperienceForm({ initial, onSave, onCancel, pending }: ExperienceFormPr
             type="text"
             value={state.roleTitle}
             placeholder="Tour guide, farmhand…"
-            onChange={(e) => { set("roleTitle")(e.target.value); }}
+            aria-invalid={!hasIdentity}
+            aria-describedby={!hasIdentity ? EXPERIENCE_IDENTITY_ERROR_ID : undefined}
+            onChange={(e) => {
+              setSaveError(null);
+              set("roleTitle")(e.target.value);
+            }}
           />
         </label>
         <label className={styles.formField}>
@@ -657,10 +687,25 @@ function ExperienceForm({ initial, onSave, onCancel, pending }: ExperienceFormPr
             type="text"
             value={state.companyName}
             placeholder="Company or farm name"
-            onChange={(e) => { set("companyName")(e.target.value); }}
+            aria-invalid={!hasIdentity}
+            aria-describedby={!hasIdentity ? EXPERIENCE_IDENTITY_ERROR_ID : undefined}
+            onChange={(e) => {
+              setSaveError(null);
+              set("companyName")(e.target.value);
+            }}
           />
         </label>
       </div>
+
+      {!hasIdentity ? (
+        <p id={EXPERIENCE_IDENTITY_ERROR_ID} className={styles.navigationError}>
+          {RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE}
+        </p>
+      ) : saveError ? (
+        <p className={styles.navigationError} role="alert">
+          {saveError}
+        </p>
+      ) : null}
 
       <label className={styles.formField}>
         <span className={styles.fieldLabel}>Location</span>
@@ -747,8 +792,8 @@ function ExperienceForm({ initial, onSave, onCancel, pending }: ExperienceFormPr
         <button
           type="button"
           className={styles.primaryBtn}
-          onClick={() => { void onSave(state); }}
-          disabled={pending}
+          onClick={() => { void handleSave(); }}
+          disabled={pending || !hasIdentity}
         >
           {pending ? "Saving…" : "Save"}
         </button>
@@ -1331,41 +1376,49 @@ function ExperienceStep({
   useBeforeLeave(registerBeforeLeave, beforeLeave);
 
   function handleAdd(state: ExperienceFormState) {
-    return new Promise<void>((resolve) => {
+    return new Promise<ResumeActionResult>((resolve) => {
       startTransition(async () => {
-        const result = await addExperienceAction({
-          roleTitle: state.roleTitle.trim() || undefined,
-          companyName: state.companyName.trim() || undefined,
-          location: state.location.trim() || null,
-          startDate: state.startDate || null,
-          endDate: state.isCurrent ? null : (state.endDate || null),
-          isCurrent: state.isCurrent,
-          summary: state.summary.trim() || undefined,
-          categoryTags: state.categoryTags.filter(isCategory),
-          skillTags: state.skillTags.slice(0, MAX_SKILL_TAGS),
-        });
-        if (result.ok) { setExpAdding(false); router.refresh(); }
-        resolve();
+        try {
+          const result = await addExperienceAction({
+            roleTitle: state.roleTitle.trim() || null,
+            companyName: state.companyName.trim() || null,
+            location: state.location.trim() || null,
+            startDate: state.startDate || null,
+            endDate: state.isCurrent ? null : (state.endDate || null),
+            isCurrent: state.isCurrent,
+            summary: state.summary.trim() || undefined,
+            categoryTags: state.categoryTags.filter(isCategory),
+            skillTags: state.skillTags.slice(0, MAX_SKILL_TAGS),
+          });
+          if (result.ok) { setExpAdding(false); router.refresh(); }
+          resolve(result);
+        } catch {
+          resolve({ ok: false, error: "unexpected_error" });
+        }
       });
     });
   }
 
   function handleUpdate(id: string, state: ExperienceFormState) {
-    return new Promise<void>((resolve) => {
+    return new Promise<ResumeActionResult>((resolve) => {
       startTransition(async () => {
-        const result = await updateExperienceAction(id, {
-          roleTitle: state.roleTitle.trim() || undefined,
-          companyName: state.companyName.trim() || undefined,
-          location: state.location.trim() || null,
-          startDate: state.startDate || null,
-          endDate: state.isCurrent ? null : (state.endDate || null),
-          isCurrent: state.isCurrent,
-          summary: state.summary.trim() || undefined,
-          categoryTags: state.categoryTags.filter(isCategory),
-          skillTags: state.skillTags.slice(0, MAX_SKILL_TAGS),
-        });
-        if (result.ok) { setExpEditing(null); router.refresh(); }
-        resolve();
+        try {
+          const result = await updateExperienceAction(id, {
+            roleTitle: state.roleTitle.trim() || null,
+            companyName: state.companyName.trim() || null,
+            location: state.location.trim() || null,
+            startDate: state.startDate || null,
+            endDate: state.isCurrent ? null : (state.endDate || null),
+            isCurrent: state.isCurrent,
+            summary: state.summary.trim() || undefined,
+            categoryTags: state.categoryTags.filter(isCategory),
+            skillTags: state.skillTags.slice(0, MAX_SKILL_TAGS),
+          });
+          if (result.ok) { setExpEditing(null); router.refresh(); }
+          resolve(result);
+        } catch {
+          resolve({ ok: false, error: "unexpected_error" });
+        }
       });
     });
   }
@@ -1383,7 +1436,9 @@ function ExperienceStep({
       <div className={styles.sectionHead}>
         <div className={styles.sectionMeta}>
           <h2 className={styles.sectionTitle}>Experience</h2>
-          <span className={styles.sectionBadge}>Required · 1–3 entries</span>
+          <span className={styles.sectionBadgeOptional}>
+            Optional with a bio · Up to 3 entries
+          </span>
         </div>
         {!expAdding && !atMax && (
           <button
@@ -1405,7 +1460,8 @@ function ExperienceStep({
 
       {resume.experiences.length === 0 && !expAdding && (
         <p className={styles.emptyHint}>
-          Add your work history — farm stays, seasonal jobs, remote gigs, anything relevant.
+          If your bio already tells hosts about you, experience is optional. Add
+          farm stays, seasonal jobs, remote gigs, or anything else relevant.
         </p>
       )}
 

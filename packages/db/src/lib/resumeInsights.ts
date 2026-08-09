@@ -10,6 +10,7 @@
  * owner-authenticated resume actions (charter §2.4: review-before-publish).
  */
 
+import { hasResumeExperienceIdentity } from "@explore-and-earn/contracts"
 import type {
 	ListingPreparation,
 	ResumeConflict,
@@ -352,17 +353,21 @@ function computeCompleteness(resume: SeekerResume): number {
 
 /** Full deterministic analysis. Inject nowMs for reproducibility. */
 export function analyzeResume(resume: SeekerResume, nowMs: number): ResumeInsights {
-	const skills = collectSkills(resume)
-	const gaps = collectGaps(resume)
-	const conflicts = collectConflicts(resume, nowMs)
+	const meaningfulResume: SeekerResume = {
+		...resume,
+		experiences: resume.experiences.filter(hasResumeExperienceIdentity),
+	}
+	const skills = collectSkills(meaningfulResume)
+	const gaps = collectGaps(meaningfulResume)
+	const conflicts = collectConflicts(meaningfulResume, nowMs)
 	return {
-		completeness: computeCompleteness(resume),
+		completeness: computeCompleteness(meaningfulResume),
 		skills,
 		gaps,
 		conflicts,
 		suggestions: collectSuggestions(skills, gaps, conflicts),
 		counts: {
-			experiences: resume.experiences.length,
+			experiences: meaningfulResume.experiences.length,
 			educations: resume.educations.length,
 			certifications: resume.certifications.length,
 		},

@@ -107,6 +107,35 @@ describe("analyzeResume — skills with provenance", () => {
     expect(insights.completeness).toBe(0);
   });
 
+  it("ignores metadata and tags on an experience with no identity", () => {
+    const resume: SeekerResume = {
+      ...emptyResume,
+      experiences: [
+        {
+          id: "legacy-blank",
+          companyName: "   ",
+          roleTitle: null,
+          location: "Bozeman, MT",
+          startDate: "2025-06-01",
+          endDate: null,
+          isCurrent: true,
+          summary: null,
+          categoryTags: ["farm"],
+          skillTags: ["harvesting"],
+        },
+      ],
+    };
+
+    const insights = analyzeResume(resume, NOW);
+
+    expect(insights.counts.experiences).toBe(0);
+    expect(insights.skills).toEqual([]);
+    expect(insights.gaps.map((gap) => gap.code)).toEqual(
+      expect.arrayContaining(["no_experience", "no_skills"]),
+    );
+    expect(insights.suggestions.flatMap((suggestion) => suggestion.evidence)).toEqual([]);
+  });
+
   it("lexicon matching is whole-word (no substring false positives)", () => {
     const resume: SeekerResume = {
       ...emptyResume,

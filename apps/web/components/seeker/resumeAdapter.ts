@@ -2,6 +2,7 @@
 // its fixture exports and, through ./models, the discovery component barrel.
 import type { ResumeProgress, ResumeSection } from "./resume";
 import { RESUME_RECOMMENDED_THRESHOLD } from "./resumeThresholds";
+import { hasResumeExperienceIdentity } from "@explore-and-earn/contracts";
 import {
 	seekerResumeCompletion,
 	type ResumeMissingSection,
@@ -25,6 +26,13 @@ function hasBio(resume: SeekerResume): boolean {
 	return typeof bio === "string" && bio.trim().length > 0;
 }
 
+function withMeaningfulExperiences(resume: SeekerResume): SeekerResume {
+	return {
+		...resume,
+		experiences: resume.experiences.filter(hasResumeExperienceIdentity),
+	};
+}
+
 /**
  * Résumé completion, measured against the SAME sections the apply gate
  * enforces.
@@ -45,7 +53,7 @@ function hasBio(resume: SeekerResume): boolean {
  * deferring to it is what makes the number mean something.
  */
 export function computeResumeCompletion(resume: SeekerResume): number {
-	return seekerResumeCompletion(resume).completion;
+	return seekerResumeCompletion(withMeaningfulExperiences(resume)).completion;
 }
 
 /**
@@ -58,11 +66,12 @@ export function computeResumeCompletion(resume: SeekerResume): number {
  * they do.
  */
 export function toResumeProgress(resume: SeekerResume): ResumeProgress {
-	const status = seekerResumeCompletion(resume);
+	const meaningfulResume = withMeaningfulExperiences(resume);
+	const status = seekerResumeCompletion(meaningfulResume);
 	const missing = new Set(status.missing);
 	const isMissing = (section: ResumeMissingSection) => missing.has(section);
 
-	const experienceCount = resume.experiences.length;
+	const experienceCount = meaningfulResume.experiences.length;
 	const educationCount = resume.educations.length;
 	const certCount = resume.certifications.length;
 
@@ -109,7 +118,7 @@ export function toResumeProgress(resume: SeekerResume): ResumeProgress {
 			status: isMissing("bioOrExperience") ? "incomplete" : "complete",
 			detail: isMissing("bioOrExperience")
 				? "Add a short bio, or at least one experience"
-				: hasBio(resume)
+				: hasBio(meaningfulResume)
 					? "Your short bio is set"
 					: `${experienceCount} experience ${experienceCount === 1 ? "card" : "cards"}`,
 			required: true,

@@ -15,9 +15,12 @@ import {
   type ResumeDraftExperience,
   type ResumeDraftEducation,
   type ResumeDraftCertification,
+  type ResumeExperienceInput,
 } from "@explore-and-earn/db";
 import {
+  hasResumeExperienceIdentity,
   MARKETPLACE_CATEGORIES,
+  RESUME_EXPERIENCE_IDENTITY_REQUIRED,
   SEEKER_SEEKING_TIMELINES,
 } from "@explore-and-earn/contracts";
 
@@ -176,6 +179,82 @@ function cleanTags(tags: string[] | undefined, max: number): string[] {
   return out;
 }
 
+export interface ImportedResumeSavedCounts {
+  readonly profile: boolean;
+  readonly experiences: number;
+  readonly educations: number;
+  readonly certifications: number;
+}
+
+export type SaveImportedResumeResult =
+  | { readonly ok: true; readonly saved: ImportedResumeSavedCounts }
+  | {
+      readonly ok: false;
+      readonly error: "partial_save";
+      readonly saved: ImportedResumeSavedCounts;
+    }
+  | {
+      readonly ok: false;
+      readonly error:
+        | "unauthenticated"
+        | typeof RESUME_EXPERIENCE_IDENTITY_REQUIRED
+        | "outcome_unknown"
+        | "unexpected_error";
+    };
+
+function hasSavedAnything(saved: ImportedResumeSavedCounts): boolean {
+  return (
+    saved.profile ||
+    saved.experiences > 0 ||
+    saved.educations > 0 ||
+    saved.certifications > 0
+  );
+}
+
+function revalidateResumePaths(): void {
+  for (const path of ["/resume", "/profile"] as const) {
+    try {
+      revalidatePath(path);
+    } catch (error) {
+      reportError(error, {
+        action: `saveImportedResumeAction.revalidate:${path}`,
+      });
+    }
+  }
+}
+
+function reportPersistenceFailure(
+  action: string,
+  error: unknown,
+  saved: ImportedResumeSavedCounts,
+): SaveImportedResumeResult {
+  const detail = error instanceof Error ? error.message : String(error ?? "");
+  reportError(
+    error instanceof Error
+      ? error
+      : new Error(`${action} persistence failed${detail ? `: ${detail}` : ""}`),
+    { action },
+  );
+  if (!hasSavedAnything(saved)) {
+    // The DB wrapper exposes only a string error, so a failed response cannot
+    // prove that the transaction was rejected. Refresh and close the reviewed
+    // batch instead of inviting a duplicate-prone retry after a lost response.
+    revalidateResumePaths();
+    return { ok: false, error: "outcome_unknown" };
+  }
+  revalidateResumePaths();
+  return { ok: false, error: "partial_save", saved };
+}
+
+function reportUnknownPersistenceOutcome(
+  action: string,
+  error: unknown,
+): SaveImportedResumeResult {
+  reportError(error, { action });
+  revalidateResumePaths();
+  return { ok: false, error: "outcome_unknown" };
+}
+
 /** Map the model's raw object into the shared ResumeDraft shape, sanitized. */
 function toDraft(raw: RawDraft): ResumeDraft {
   const profileInfoRaw = raw.profileInfo;
@@ -313,18 +392,6 @@ export async function importResumeAction(
 
 // ─── Save reviewed draft ────────────────────────────────────────────────────
 
-export interface SaveImportedResumeResult {
-  readonly ok: boolean;
-  /** Counts of rows actually written, for the UI success message. */
-  readonly saved?: {
-    readonly profile: boolean;
-    readonly experiences: number;
-    readonly educations: number;
-    readonly certifications: number;
-  };
-  readonly error?: string;
-}
-
 /**
  * Persist a reviewed & edited draft via the SAME scoped CRUD the manual builder
  * uses. Only called after the seeker confirms in the review UI. `profileInfo`,
@@ -335,54 +402,104 @@ export interface SaveImportedResumeResult {
 export async function saveImportedResumeAction(
   draft: ResumeDraft,
 ): Promise<SaveImportedResumeResult> {
+  let profileSaved = false;
+  let experiencesSaved = 0;
+  let educationsSaved = 0;
+  let certificationsSaved = 0;
+  let persistenceAttempted = false;
+  const savedCounts = (): ImportedResumeSavedCounts => ({
+    profile: profileSaved,
+    experiences: experiencesSaved,
+    educations: educationsSaved,
+    certifications: certificationsSaved,
+  });
+
   try {
     const { userId, getToken } = await auth();
     if (!userId) return { ok: false, error: "unauthenticated" };
     const token = await getToken();
     if (!token) return { ok: false, error: "unauthenticated" };
 
-    let profileSaved = false;
+    // Validate every included experience before the first profile or row write.
+    // The review UI omits excluded rows from the draft, but the server repeats the
+    // invariant because callers can invoke this action without that UI.
+    const sanitizedExperiences: ResumeExperienceInput[] = (
+      draft.experiences ?? []
+    ).map((exp) => ({
+      companyName: clean(exp.companyName, 120) ?? null,
+      roleTitle: clean(exp.roleTitle, 120) ?? null,
+      location: clean(exp.location ?? undefined, 120) ?? null,
+      startDate: clean(exp.startDate ?? undefined, 10) ?? null,
+      endDate: exp.isCurrent
+        ? null
+        : clean(exp.endDate ?? undefined, 10) ?? null,
+      isCurrent: exp.isCurrent === true,
+      summary: clean(exp.summary, 800),
+      categoryTags: (exp.categoryTags ?? []).filter((category) =>
+        VALID_CATEGORIES.has(category),
+      ),
+      skillTags: cleanTags(exp.skillTags, MAX_SKILL_TAGS),
+    }));
+    if (
+      sanitizedExperiences.some(
+        (experience) => !hasResumeExperienceIdentity(experience),
+      )
+    ) {
+      return { ok: false, error: RESUME_EXPERIENCE_IDENTITY_REQUIRED };
+    }
 
     if (draft.profileInfo) {
       const info = draft.profileInfo;
       const timeline = clean(info.seekingTimeline ?? undefined, 20);
-      const infoResult = await updateSeekerProfileInfo(token, userId, {
+      const profileInput = {
         displayName: clean(info.displayName ?? undefined, 120) ?? null,
         location: clean(info.location ?? undefined, 120) ?? null,
         seekingTimeline:
           timeline && VALID_TIMELINES.has(timeline) ? timeline : null,
         generalSkills: cleanTags(info.generalSkills, MAX_GENERAL_SKILLS),
-      });
-      if (!infoResult.ok) return { ok: false, error: infoResult.error };
-
-      if (info.bio !== undefined) {
-        const bioResult = await updateSeekerProfileBio(token, userId, {
-          bio: clean(info.bio ?? undefined, 1200) ?? null,
-        });
-        if (!bioResult.ok) return { ok: false, error: bioResult.error };
+      };
+      persistenceAttempted = true;
+      const infoResult = await updateSeekerProfileInfo(token, userId, profileInput);
+      if (!infoResult.ok) {
+        return reportPersistenceFailure(
+          "saveImportedResumeAction.profileInfo",
+          infoResult.error,
+          savedCounts(),
+        );
       }
       profileSaved = true;
+
+      if (info.bio !== undefined) {
+        const bioInput = {
+          bio: clean(info.bio ?? undefined, 1200) ?? null,
+        };
+        persistenceAttempted = true;
+        const bioResult = await updateSeekerProfileBio(token, userId, bioInput);
+        if (!bioResult.ok) {
+          return reportPersistenceFailure(
+            "saveImportedResumeAction.bio",
+            bioResult.error,
+            savedCounts(),
+          );
+        }
+      }
     }
 
-    let experiencesSaved = 0;
-    for (const exp of (draft.experiences ?? []).slice(0, MAX_DRAFT_EXPERIENCES)) {
-      const result = await addResumeExperience(token, userId, {
-        companyName: clean(exp.companyName, 120),
-        roleTitle: clean(exp.roleTitle, 120),
-        location: clean(exp.location ?? undefined, 120) ?? null,
-        startDate: clean(exp.startDate ?? undefined, 10) ?? null,
-        endDate: exp.isCurrent ? null : clean(exp.endDate ?? undefined, 10) ?? null,
-        isCurrent: exp.isCurrent === true,
-        summary: clean(exp.summary, 800),
-        categoryTags: (exp.categoryTags ?? []).filter((c) => VALID_CATEGORIES.has(c)),
-        skillTags: cleanTags(exp.skillTags, MAX_SKILL_TAGS),
-      });
-      if (result.ok) experiencesSaved += 1;
+    for (const exp of sanitizedExperiences.slice(0, MAX_DRAFT_EXPERIENCES)) {
+      persistenceAttempted = true;
+      const result = await addResumeExperience(token, userId, exp);
+      if (!result.ok) {
+        return reportPersistenceFailure(
+          "saveImportedResumeAction.experience",
+          result.error,
+          savedCounts(),
+        );
+      }
+      experiencesSaved += 1;
     }
 
-    let educationsSaved = 0;
     for (const edu of (draft.educations ?? []).slice(0, MAX_DRAFT_EDUCATIONS)) {
-      const result = await addResumeEducation(token, userId, {
+      const educationInput = {
         institution: clean(edu.institution, 160),
         programOrDegree: clean(edu.programOrDegree, 160),
         location: clean(edu.location ?? undefined, 120) ?? null,
@@ -391,15 +508,23 @@ export async function saveImportedResumeAction(
         isCurrent: edu.isCurrent === true,
         description: clean(edu.description, 600),
         skillTags: cleanTags(edu.skillTags, MAX_SKILL_TAGS),
-      });
-      if (result.ok) educationsSaved += 1;
+      };
+      persistenceAttempted = true;
+      const result = await addResumeEducation(token, userId, educationInput);
+      if (!result.ok) {
+        return reportPersistenceFailure(
+          "saveImportedResumeAction.education",
+          result.error,
+          savedCounts(),
+        );
+      }
+      educationsSaved += 1;
     }
 
-    let certificationsSaved = 0;
     for (const cert of (draft.certifications ?? []).slice(0, MAX_DRAFT_CERTIFICATIONS)) {
       const name = clean(cert.name, 160);
       if (!name) continue;
-      const result = await addSeekerCertification(token, userId, {
+      const certificationInput = {
         name,
         issuingOrganization: clean(cert.issuingOrganization, 160),
         issuedAt: clean(cert.issuedAt ?? undefined, 10) ?? null,
@@ -407,23 +532,32 @@ export async function saveImportedResumeAction(
         description: clean(cert.description ?? undefined, 600) ?? null,
         categoryTags: (cert.categoryTags ?? []).filter((c) => VALID_CATEGORIES.has(c)),
         skillTags: cleanTags(cert.skillTags, MAX_SKILL_TAGS),
-      });
-      if (result.ok) certificationsSaved += 1;
+      };
+      persistenceAttempted = true;
+      const result = await addSeekerCertification(token, userId, certificationInput);
+      if (!result.ok) {
+        return reportPersistenceFailure(
+          "saveImportedResumeAction.certification",
+          result.error,
+          savedCounts(),
+        );
+      }
+      certificationsSaved += 1;
     }
 
-    revalidatePath("/resume");
-    revalidatePath("/profile");
+    revalidateResumePaths();
 
     return {
       ok: true,
-      saved: {
-        profile: profileSaved,
-        experiences: experiencesSaved,
-        educations: educationsSaved,
-        certifications: certificationsSaved,
-      },
+      saved: savedCounts(),
     };
   } catch (error) {
+    if (persistenceAttempted) {
+      return reportUnknownPersistenceOutcome(
+        "saveImportedResumeAction.outcomeUnknown",
+        error,
+      );
+    }
     reportError(error, { action: "saveImportedResumeAction" });
     return { ok: false, error: "unexpected_error" };
   }
