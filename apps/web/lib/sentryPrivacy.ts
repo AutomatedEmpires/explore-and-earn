@@ -15,7 +15,7 @@ export type SentryTraceSamplingContext = Parameters<
 
 const UNSUBSCRIBE_PATH = "/api/notifications/unsubscribe";
 const UNSUBSCRIBE_URL_WITH_QUERY =
-	/(https?:\/\/[^\s"'<>]*\/api\/notifications\/unsubscribe\/?|\/api\/notifications\/unsubscribe\/?)\?[^\s"'<>]*/gi;
+	/(https?:\/\/[^\s"'<>]*\/api\/notifications\/unsubscribe[^\s"'<>?]*|\/api\/notifications\/unsubscribe[^\s"'<>?]*)\?[^\s"'<>]*/gi;
 
 function containsUnsubscribePath(value: unknown): value is string {
 	return typeof value === "string" && value.includes(UNSUBSCRIBE_PATH);
@@ -125,5 +125,7 @@ export function scrubSentryTransaction(
 export function unsubscribeSafeTraceSampler(
 	context: SentryTraceSamplingContext,
 ): number {
-	return containsUnsubscribePath(context.normalizedRequest?.url) ? 0 : 0.05;
+	return containsUnsubscribePath(context.normalizedRequest?.url)
+		? 0
+		: context.inheritOrSampleWith(0.05);
 }

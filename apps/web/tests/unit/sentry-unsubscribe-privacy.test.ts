@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
 	scrubSentryEvent,
@@ -64,10 +64,22 @@ describe("Sentry unsubscribe-token privacy", () => {
 		expect(scrubbedSpan.data).not.toHaveProperty("url.query");
 	});
 
+	it("redacts query data when additional path text follows the endpoint prefix", () => {
+		const unexpectedUrl =
+			`https://exploreandearn.com/api/notifications/unsubscribeevil?token=${TOKEN}`;
+		const scrubbed = scrubSentryEvent({ request: { url: unexpectedUrl } });
+
+		expect(JSON.stringify(scrubbed)).not.toContain(TOKEN);
+		expect(scrubbed.request?.url).toBe(
+			"https://exploreandearn.com/api/notifications/unsubscribeevil",
+		);
+	});
+
 	it("drops only unsubscribe traces and preserves the existing sample rate", () => {
+		const inheritOrSampleWith = vi.fn(() => 0.25);
 		const base = {
 			attributes: {},
-			inheritOrSampleWith: () => 0.05,
+			inheritOrSampleWith,
 			name: "request",
 		};
 		expect(
@@ -81,7 +93,9 @@ describe("Sentry unsubscribe-token privacy", () => {
 				...base,
 				normalizedRequest: { url: "https://exploreandearn.com/jobs" },
 			}),
-		).toBe(0.05);
+		).toBe(0.25);
+		expect(inheritOrSampleWith).toHaveBeenCalledOnce();
+		expect(inheritOrSampleWith).toHaveBeenCalledWith(0.05);
 	});
 
 	it("wires every scrubber into both server and edge Sentry initialization", () => {
