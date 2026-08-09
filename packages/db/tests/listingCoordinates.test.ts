@@ -6,6 +6,16 @@ const database = vi.hoisted(() => ({
   fromCalls: [] as string[],
   inserts: [] as Array<Record<string, unknown>>,
   updates: [] as Array<Record<string, unknown>>,
+  currentListing: {
+    cover_photo_url: null,
+    gallery_photo_urls: [] as string[],
+    claim_summary: "not_applicable",
+  } as {
+    cover_photo_url: string | null;
+    gallery_photo_urls: string[] | null;
+    claim_summary: string;
+  } | null,
+  currentListingError: null as { message: string } | null,
 }));
 
 vi.mock("../src/adminClient", () => ({
@@ -36,6 +46,16 @@ vi.mock("../src/client", () => ({
       }
       if (table === "listings") {
         return {
+          select: () => {
+            const chain = {
+              eq: () => chain,
+              maybeSingle: async () => ({
+                data: database.currentListing,
+                error: database.currentListingError,
+              }),
+            };
+            return chain;
+          },
           insert: (payload: Record<string, unknown>) => {
             database.inserts.push(payload);
             return {
@@ -66,6 +86,13 @@ beforeEach(() => {
   database.fromCalls.length = 0;
   database.inserts.length = 0;
   database.updates.length = 0;
+  database.currentListing = {
+    cover_photo_url: null,
+    gallery_photo_urls: [],
+    claim_summary: "not_applicable",
+  };
+  database.currentListingError = null;
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://project.supabase.co";
 });
 
 describe("listing coordinate writes", () => {
@@ -132,6 +159,157 @@ describe("listing coordinate writes", () => {
     expect(result).toMatchObject({ ok: false });
     expect(database.fromCalls).toEqual([]);
   });
+});
+
+describe("listing media ownership", () => {
+  const storageRoot =
+    "https://project.supabase.co/storage/v1/object/public/listing-media";
+
+  it("binds an onboarding cover below the authenticated host prefix", async () => {
+    const coverPhotoUrl = `${storageRoot}/host-1/library/cover/version.webp`;
+    const result = await createListing("token", "user-1", {
+      title: "Orchard harvest",
+      category: "farm",
+      coverPhotoUrl,
+    });
+
+    expect(result).toEqual({ ok: true, listingId: "listing-1" });
+    expect(database.inserts[0]).toMatchObject({ cover_photo_url: coverPhotoUrl });
+  });
+
+  it.each([
+    `${storageRoot}/host-2/library/cover/version.webp`,
+    "https://foreign.supabase.co/storage/v1/object/public/listing-media/host-1/library/cover/version.webp",
+    "https://project.supabase.co/storage/v1/object/public/profile-photos/host-1/cover.webp",
+    `${storageRoot}/host-1/../host-2/cover.webp`,
+  ])("rejects an unowned or malformed cover before the listing write: %s", async (coverPhotoUrl) => {
+    const result = await createListing("token", "user-1", {
+      title: "Orchard harvest",
+      category: "farm",
+      coverPhotoUrl,
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
+    expect(database.inserts).toEqual([]);
+  });
+
+  it("rejects an unowned cover on update before touching the listing row", async () => {
+    const result = await updateListing("token", "user-1", "listing-1", {
+      coverPhotoUrl: `${storageRoot}/host-2/cover`,
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it("rejects an unrelated edit that would retain an unowned persisted cover", async () => {
+    database.currentListing = {
+      cover_photo_url: `${storageRoot}/host-2/legacy-cover.webp`,
+      gallery_photo_urls: [],
+      claim_summary: "not_applicable",
+    };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      locationName: "Wenatchee, WA",
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it("rejects an unrelated edit that would retain an unowned persisted gallery", async () => {
+    database.currentListing = {
+      cover_photo_url: null,
+      gallery_photo_urls: [`${storageRoot}/host-2/legacy-gallery.webp`],
+      claim_summary: "not_applicable",
+    };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      title: "Updated title",
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid gallery photo URL." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it("allows an unrelated edit when every persisted media URL is owned", async () => {
+    database.currentListing = {
+      cover_photo_url: `${storageRoot}/host-1/cover.webp`,
+      gallery_photo_urls: [`${storageRoot}/host-1/gallery/one.webp`],
+      claim_summary: "not_applicable",
+    };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      locationName: "Wenatchee, WA",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(database.updates).toHaveLength(1);
+  });
+
+  it("preserves untouched source media after a claim is converted", async () => {
+    const inheritedCover = "https://source.example/photos/original.jpg";
+    const inheritedGallery = ["https://source.example/photos/gallery.jpg"];
+    database.currentListing = {
+      cover_photo_url: inheritedCover,
+      gallery_photo_urls: inheritedGallery,
+      claim_summary: "converted",
+    };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      locationName: "Wenatchee, WA",
+      coverPhotoUrl: inheritedCover,
+      galleryUrls: inheritedGallery,
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(database.updates).toHaveLength(1);
+  });
+
+  it("rejects source media when a converted listing submits it as a new value", async () => {
+    database.currentListing = {
+      cover_photo_url: "https://source.example/photos/original.jpg",
+      gallery_photo_urls: [],
+      claim_summary: "converted",
+    };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      coverPhotoUrl: "https://source.example/photos/replacement.jpg",
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it("conceals failures while verifying persisted media", async () => {
+    database.currentListingError = { message: "raw provider details" };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      locationName: "Wenatchee, WA",
+    });
+
+    expect(result).toEqual({ ok: false, error: "Could not verify the listing media." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it.each(["create", "update"] as const)(
+    "rejects an unowned gallery URL on %s",
+    async (operation) => {
+      const fields = {
+        title: "Orchard harvest",
+        category: "farm" as const,
+        galleryUrls: [`${storageRoot}/host-2/0`],
+      };
+      const result =
+        operation === "create"
+          ? await createListing("token", "user-1", fields)
+          : await updateListing("token", "user-1", "listing-1", fields);
+
+      expect(result).toEqual({ ok: false, error: "Invalid gallery photo URL." });
+      expect(database.inserts).toEqual([]);
+      expect(database.updates).toEqual([]);
+    },
+  );
 });
 
 describe("listing compensation writes", () => {

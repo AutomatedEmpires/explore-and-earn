@@ -1,4 +1,5 @@
 import {
+  COMPENSATION_UNIT,
   MARKETPLACE_LANES,
   type CompensationUnit,
   type MarketplaceCategory,
@@ -103,6 +104,125 @@ export const EMPTY_ONBOARDING_DRAFT: HostOnboardingDraft = {
   roleMealsIncluded: false,
   roleCoverUrl: null,
 };
+
+const STRING_DRAFT_FIELDS = [
+  "companyName",
+  "primaryLocationName",
+  "websiteUrl",
+  "tagline",
+  "about",
+  "roleTitle",
+  "roleSummary",
+  "rolePayMin",
+  "rolePayMax",
+  "roleStart",
+  "roleEnd",
+] as const satisfies readonly (keyof HostOnboardingDraft)[];
+
+const BOOLEAN_DRAFT_FIELDS = [
+  "housingOffered",
+  "mealsOffered",
+  "roleHousingIncluded",
+  "roleMealsIncluded",
+] as const satisfies readonly (keyof HostOnboardingDraft)[];
+
+const NULLABLE_STRING_DRAFT_FIELDS = [
+  "logoUrl",
+  "roleCoverUrl",
+] as const satisfies readonly (keyof HostOnboardingDraft)[];
+
+function hasOwn(value: object, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function isMarketplaceLane(value: unknown): value is MarketplaceLane {
+  return typeof value === "string" && MARKETPLACE_LANES.some((lane) => lane === value);
+}
+
+function isCompensationUnit(value: unknown): value is CompensationUnit {
+  return typeof value === "string" && COMPENSATION_UNIT.some((unit) => unit === value);
+}
+
+/**
+ * Restore only a structurally valid, explicitly known subset of a browser draft.
+ *
+ * localStorage is browser-editable input, not a typed persistence layer. A raw
+ * object spread used to let values such as `{ lanes: {} }` enter live state and
+ * crash the first `.includes()` call. Unknown keys are ignored, while any known
+ * field with the wrong type or enum invalidates the whole stored draft and
+ * returns a fresh one. Building the result field-by-field also prevents magic
+ * object keys from being spread into component state.
+ */
+export function restoreHostOnboardingDraft(value: unknown): HostOnboardingDraft {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return EMPTY_ONBOARDING_DRAFT;
+  }
+
+  const stored = value as Record<string, unknown>;
+  const restored: Record<string, unknown> = { ...EMPTY_ONBOARDING_DRAFT };
+
+  for (const key of STRING_DRAFT_FIELDS) {
+    if (!hasOwn(stored, key)) continue;
+    if (typeof stored[key] !== "string") return EMPTY_ONBOARDING_DRAFT;
+    restored[key] = stored[key];
+  }
+
+  for (const key of BOOLEAN_DRAFT_FIELDS) {
+    if (!hasOwn(stored, key)) continue;
+    if (typeof stored[key] !== "boolean") return EMPTY_ONBOARDING_DRAFT;
+    restored[key] = stored[key];
+  }
+
+  for (const key of NULLABLE_STRING_DRAFT_FIELDS) {
+    if (!hasOwn(stored, key)) continue;
+    if (stored[key] !== null && typeof stored[key] !== "string") {
+      return EMPTY_ONBOARDING_DRAFT;
+    }
+    restored[key] = stored[key];
+  }
+
+  if (hasOwn(stored, "lanes")) {
+    if (!Array.isArray(stored.lanes) || !stored.lanes.every(isMarketplaceLane)) {
+      return EMPTY_ONBOARDING_DRAFT;
+    }
+    restored.lanes = [...new Set(stored.lanes)];
+  }
+
+  if (hasOwn(stored, "roleCategory")) {
+    if (stored.roleCategory !== "" && !isMarketplaceLane(stored.roleCategory)) {
+      return EMPTY_ONBOARDING_DRAFT;
+    }
+    restored.roleCategory = stored.roleCategory;
+  }
+
+  if (hasOwn(stored, "rolePayPeriod")) {
+    if (!isCompensationUnit(stored.rolePayPeriod)) {
+      return EMPTY_ONBOARDING_DRAFT;
+    }
+    restored.rolePayPeriod = stored.rolePayPeriod;
+  }
+
+  return restored as unknown as HostOnboardingDraft;
+}
+
+/**
+ * An in-memory draft is safe to render only after Clerk has loaded and the
+ * draft restored from storage belongs to that exact signed-in user. This gate
+ * prevents an account switch from painting the previous host's answers while
+ * the new account's restore effect is still pending.
+ */
+export function hostOnboardingDraftReady(
+  authLoaded: boolean,
+  userId: string | null | undefined,
+  restoredForUserId: string | null,
+): boolean {
+  return Boolean(authLoaded && userId && restoredForUserId === userId);
+}
+
+/** A changed identity must remount the stateful wizard and abandon old callbacks. */
+export function hostOnboardingIdentityKey(identity: string | null): string {
+  return identity ?? "signed-out";
+}
 
 /* ── Steps ─────────────────────────────────────────────────────────────── */
 

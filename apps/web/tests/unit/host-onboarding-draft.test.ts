@@ -20,8 +20,11 @@ import {
   EMPTY_ONBOARDING_DRAFT,
   ONBOARDING_STEPS,
   canLeaveIdentityStep,
+  hostOnboardingDraftReady,
+  hostOnboardingIdentityKey,
   payCents,
   profileGaps,
+  restoreHostOnboardingDraft,
   roleCardReady,
   stepIndexOf,
   toPreviewHostProfile,
@@ -47,6 +50,64 @@ const COMPLETE = draft({
   roleCategory: "farm",
   rolePayMin: "21",
   rolePayPeriod: "hour",
+});
+
+describe("account-scoped draft readiness", () => {
+  it("never renders account A's restored draft after Clerk switches to account B", () => {
+    expect(hostOnboardingDraftReady(true, "user-a", "user-a")).toBe(true);
+    expect(hostOnboardingDraftReady(true, "user-b", "user-a")).toBe(false);
+    expect(hostOnboardingDraftReady(true, "user-b", "user-b")).toBe(true);
+  });
+
+  it("stays behind the loading boundary before auth or restore completes", () => {
+    expect(hostOnboardingDraftReady(false, undefined, null)).toBe(false);
+    expect(hostOnboardingDraftReady(true, "user-a", null)).toBe(false);
+  });
+
+  it("remounts the wizard when account identity changes during pending work", () => {
+    const accountAKey = hostOnboardingIdentityKey("user-a");
+    const accountBKey = hostOnboardingIdentityKey("user-b");
+
+    expect(accountBKey).not.toBe(accountAKey);
+    expect(hostOnboardingIdentityKey(null)).toBe("signed-out");
+  });
+});
+
+describe("browser draft restoration", () => {
+  it("restores a valid partial draft through explicit known fields", () => {
+    expect(
+      restoreHostOnboardingDraft({
+        companyName: "North Star Lodge",
+        lanes: ["seasonal", "seasonal"],
+        housingOffered: true,
+        rolePayPeriod: "week",
+        ignoredFutureField: "never spread into state",
+      }),
+    ).toEqual({
+      ...EMPTY_ONBOARDING_DRAFT,
+      companyName: "North Star Lodge",
+      lanes: ["seasonal"],
+      housingOffered: true,
+      rolePayPeriod: "week",
+    });
+  });
+
+  it.each([
+    { lanes: {} },
+    { lanes: ["farm", "unknown"] },
+    { housingOffered: "true" },
+    { logoUrl: { href: "https://example.com/logo.webp" } },
+    { roleCategory: "unknown" },
+    { rolePayPeriod: "fortnight" },
+  ])("fails closed when a known field has an invalid shape: %o", (stored) => {
+    expect(restoreHostOnboardingDraft(stored)).toEqual(EMPTY_ONBOARDING_DRAFT);
+  });
+
+  it("fails closed for non-object storage values", () => {
+    expect(restoreHostOnboardingDraft(null)).toEqual(EMPTY_ONBOARDING_DRAFT);
+    expect(restoreHostOnboardingDraft([])).toEqual(EMPTY_ONBOARDING_DRAFT);
+    expect(restoreHostOnboardingDraft("draft")).toEqual(EMPTY_ONBOARDING_DRAFT);
+  });
 });
 
 // ── Steps ──────────────────────────────────────────────────────────────────

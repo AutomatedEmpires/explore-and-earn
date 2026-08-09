@@ -31,6 +31,7 @@ import {
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { anonClient, authedClient } from "../client";
+import { LISTING_MEDIA_BUCKET } from "../storage";
 import { getPublicHousingPhotos } from "./benefitDetails";
 import { getActiveBoostedListingIds, getSeekerApplicationIds } from "./idReaders";
 import { getPassedListingIds } from "./passedListings";
@@ -1157,6 +1158,74 @@ export interface ListingWriteFields {
   categoryDepth?: ListingCategoryDepth;
 }
 
+/**
+ * A listing may reference only media in this deployment's bucket and below
+ * the authenticated host's own object prefix. Browser-managed form state is
+ * not an ownership boundary: drafts can be edited in localStorage and public
+ * Storage URLs can be copied between accounts.
+ */
+function isOwnedListingMediaUrl(
+  url: string,
+  hostProfileId: string,
+): boolean {
+  const configuredStorageUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!configuredStorageUrl) return false;
+
+  try {
+    const parsed = new URL(url);
+    const configured = new URL(configuredStorageUrl);
+    if (
+      parsed.origin !== configured.origin ||
+      parsed.username.length > 0 ||
+      parsed.password.length > 0
+    ) {
+      return false;
+    }
+
+    const marker = `/storage/v1/object/public/${LISTING_MEDIA_BUCKET}/`;
+    if (!parsed.pathname.startsWith(marker)) return false;
+    const objectPath = decodeURIComponent(parsed.pathname.slice(marker.length));
+    const segments = objectPath.split("/");
+    return (
+      segments.length >= 2 &&
+      segments[0] === hostProfileId &&
+      segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function listingMediaOwnershipError(
+  fields: ListingWriteFields,
+  hostProfileId: string,
+): string | null {
+  if (
+    fields.coverPhotoUrl &&
+    !isOwnedListingMediaUrl(fields.coverPhotoUrl, hostProfileId)
+  ) {
+    return "Invalid cover photo URL.";
+  }
+  if (
+    fields.galleryUrls?.some((url) => !isOwnedListingMediaUrl(url, hostProfileId))
+  ) {
+    return "Invalid gallery photo URL.";
+  }
+  return null;
+}
+
+function listingMediaArraysEqual(
+  left: readonly string[] | null | undefined,
+  right: readonly string[] | null | undefined,
+): boolean {
+  const normalizedLeft = left ?? [];
+  const normalizedRight = right ?? [];
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((url, index) => url === normalizedRight[index])
+  );
+}
+
 type ListingColumnPatch = {
   title?: string;
   category?: OpportunityCategory;
@@ -1353,6 +1422,9 @@ export async function createListing(
     return { ok: false, error: "No host profile found for your account. Create a host profile first." };
   }
 
+  const mediaError = listingMediaOwnershipError(fields, hostProfileId);
+  if (mediaError) return { ok: false, error: mediaError };
+
   const patch = buildListingColumnPatch(fields);
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data, error } = await untyped
@@ -1384,6 +1456,64 @@ export async function updateListing(
   if (Object.keys(patch).length === 0) return { ok: true };
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data: currentListing, error: currentListingError } = await untyped
+    .from("listings")
+    .select("cover_photo_url,gallery_photo_urls,claim_summary")
+    .eq("id", listingId)
+    .eq("host_profile_id", hostProfileId)
+    .maybeSingle();
+
+  if (currentListingError) {
+    return { ok: false, error: "Could not verify the listing media." };
+  }
+  if (!currentListing) {
+    return { ok: false, error: "Listing not found or you do not have access to it." };
+  }
+
+  const persistedMedia = currentListing as {
+    cover_photo_url: string | null;
+    gallery_photo_urls: string[] | null;
+    claim_summary: string;
+  };
+  // Claim conversion deliberately preserves the sourced row's untouched media
+  // and lineage. The full listing form re-posts unchanged fields, so a byte-for-
+  // byte identical inherited URL is still untouched rather than a new host
+  // assertion. A changed value is validated. Every ordinary listing validates
+  // the effective persisted values so a partial edit cannot retain a legacy
+  // cross-host reference.
+  if (persistedMedia.claim_summary === "converted") {
+    const changedMedia: ListingWriteFields = {};
+    if (
+      fields.coverPhotoUrl !== undefined &&
+      fields.coverPhotoUrl !== persistedMedia.cover_photo_url
+    ) {
+      changedMedia.coverPhotoUrl = fields.coverPhotoUrl;
+    }
+    if (
+      fields.galleryUrls !== undefined &&
+      !listingMediaArraysEqual(fields.galleryUrls, persistedMedia.gallery_photo_urls)
+    ) {
+      changedMedia.galleryUrls = fields.galleryUrls;
+    }
+    const changedMediaError = listingMediaOwnershipError(changedMedia, hostProfileId);
+    if (changedMediaError) return { ok: false, error: changedMediaError };
+  } else {
+    const effectiveMediaError = listingMediaOwnershipError(
+      {
+        coverPhotoUrl:
+          fields.coverPhotoUrl !== undefined
+            ? fields.coverPhotoUrl
+            : persistedMedia.cover_photo_url,
+        galleryUrls:
+          fields.galleryUrls !== undefined
+            ? fields.galleryUrls
+            : persistedMedia.gallery_photo_urls ?? [],
+      },
+      hostProfileId,
+    );
+    if (effectiveMediaError) return { ok: false, error: effectiveMediaError };
+  }
+
   const { data, error } = await untyped
     .from("listings")
     .update(patch)
