@@ -1,9 +1,6 @@
-/* ReadinessSlider — availability timeline as a centred 4-stop slider scale. */
+/* ReadinessSlider — an explicit, keyboard-friendly availability choice. */
 
-/* Full-bleed band leading the dashboard; the control is centred within it. */
 .readiness {
-  position: relative;
-  overflow: visible;
   padding: var(--space-12) var(--space-16);
   background: linear-gradient(
     to right,
@@ -14,28 +11,27 @@
   box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--color-ink) 8%, transparent);
 }
 
-/* Centred control column — this is what fixes the left-offset. */
-.slider {
+.control {
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
   width: 100%;
-  max-width: 420px;
+  max-width: 600px;
   margin-inline: auto;
 }
 
-/* Header: label · current value · (saving). */
 .head {
-  position: relative;
   display: flex;
   align-items: baseline;
-  justify-content: center;
-  gap: var(--space-8);
+  justify-content: space-between;
+  gap: var(--space-12);
 }
 
 .label {
+  margin: 0;
   font-family: var(--font-ui);
   font-size: var(--type-label-size);
+  line-height: var(--type-label-lh);
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: var(--type-label-tracking);
@@ -43,183 +39,132 @@
 }
 
 .value {
+  min-width: 0;
   font-family: var(--font-ui);
   font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
   font-weight: var(--font-weight-semibold);
+  text-align: end;
   color: var(--text-primary);
 }
 
-.saving {
-  position: absolute;
-  inset-inline-end: 0;
-  bottom: 0;
-  font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
-  color: var(--text-muted);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .saving { animation: readiness-fade 150ms var(--ease-standard); }
-}
-
-@keyframes readiness-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-/* The slider control. */
-.control {
-  position: relative;
+.choices {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-8);
   width: 100%;
 }
 
-.range {
-  -webkit-appearance: none;
-  appearance: none;
-  display: block;
-  width: 100%;
-  height: var(--tap-min);
-  margin: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-/* Track — WebKit. Fill split driven by the inline --fill custom prop. */
-.range::-webkit-slider-runnable-track {
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(
-    to right,
-    var(--color-cta) 0%,
-    var(--color-cta) var(--fill, 0%),
-    var(--color-chrome) var(--fill, 0%),
-    var(--color-chrome) 100%
-  );
-}
-
-.range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  margin-top: -8px;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-raised);
-  border: 2px solid var(--color-cta);
-  box-shadow: var(--elevation-card);
-  transition: transform var(--motion-fast) var(--ease-standard);
-}
-
-.range:hover::-webkit-slider-thumb {
-  transform: scale(1.08);
-}
-
-/* Track — Firefox. */
-.range::-moz-range-track {
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--color-chrome);
-}
-
-.range::-moz-range-progress {
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: var(--color-cta);
-}
-
-.range::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--color-cta);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-raised);
-  box-shadow: var(--elevation-card);
-}
-
-/* Keyboard focus — house focus ring on the thumb. */
-.range:focus-visible {
-  outline: none;
-}
-
-.range:focus-visible::-webkit-slider-thumb {
-  box-shadow: var(--ui-focus-ring);
-}
-
-.range:focus-visible::-moz-range-thumb {
-  box-shadow: var(--ui-focus-ring);
-}
-
-/* Stop labels beneath the track. */
-.ticks {
-  display: flex;
-  justify-content: space-between;
-  margin-top: -2px;
-  padding-inline: 2px;
-}
-
-.tick {
-  font-family: var(--font-ui);
-  font-size: var(--type-caption-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-muted);
-  transition: color var(--motion-fast) var(--ease-standard);
-}
-
-.tickActive {
-  color: var(--color-cta);
-  font-weight: var(--font-weight-bold);
-}
-
-/* Non-blocking notice — mirrors the app-wide toast (fixed, bottom-centre). */
-.toastStack {
-  position: fixed;
-  left: 50%;
-  bottom: calc(var(--size-bottom-nav) + var(--space-12) + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  z-index: var(--z-banner);
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-  max-width: calc(100vw - 2 * var(--space-16));
-}
-
-.toast {
+.choice {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-8);
-  padding: var(--space-10) var(--space-16);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--palette-ink) 88%, transparent);
-  backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.95);
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: var(--space-8) var(--space-6);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-input);
+  background: var(--color-surface-raised);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.choice:hover:not(:disabled) {
+  border-color: var(--border-ink);
+  color: var(--text-primary);
+}
+
+.choice:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.choice:focus-visible,
+.dismiss:focus-visible {
+  outline: none;
+  box-shadow: var(--ui-focus-ring);
+}
+
+.choice[aria-pressed="true"] {
+  border-color: var(--color-cta);
+  background: color-mix(in srgb, var(--color-cta) 14%, var(--color-surface-raised));
+  color: var(--color-cta);
+  font-weight: var(--font-weight-bold);
+  box-shadow: inset 0 0 0 1px var(--color-cta);
+}
+
+.choice:disabled {
+  cursor: wait;
+  background: var(--field-disabled-bg);
+  color: var(--text-muted);
+}
+
+.feedback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  min-height: var(--tap-min);
+  margin: 0;
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-input);
   font-family: var(--font-ui);
   font-size: var(--type-caption-size);
-  font-weight: var(--font-weight-semibold);
-  box-shadow:
-    0 4px 16px color-mix(in srgb, var(--palette-ink) 22%, transparent),
-    0 1px 4px color-mix(in srgb, var(--palette-ink) 12%, transparent);
-  white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  animation: readiness-toast-in 260ms var(--ease-standard) both;
+  line-height: var(--type-caption-lh);
+  color: var(--text-muted);
 }
 
-.toastDot {
-  width: var(--space-8);
-  height: var(--space-8);
-  border-radius: var(--radius-pill);
-  background: var(--match-strong);
-  flex-shrink: 0;
+.feedbackSuccess {
+  background: var(--status-success-bg);
+  color: var(--status-success-fg);
 }
 
-@keyframes readiness-toast-in {
-  from { opacity: 0; transform: translateY(8px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+.feedbackError {
+  background: var(--status-error-bg);
+  color: var(--status-error-fg);
+}
+
+.dismiss {
+  flex: 0 0 auto;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-12);
+  border: 0;
+  border-radius: var(--radius-input);
+  background: transparent;
+  color: currentColor;
+  font: inherit;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.dismiss:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+@media (max-width: 480px) {
+  .choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .range::-webkit-slider-thumb { transition: none; }
-  .tick { transition: none; }
-  .toast { animation: none; }
+  .choice {
+    transition: none;
+  }
+
+  .choice:active:not(:disabled) {
+    transform: none;
+  }
 }

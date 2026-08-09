@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Icon } from "@explore-and-earn/ui";
+import type { Timeline } from "../../lib/readiness";
 import { HeroPhotoPickerModal } from "./HeroPhotoPickerModal";
 import { ReadinessSlider } from "./ReadinessSlider";
 import styles from "./SeekerHero.module.css";
@@ -15,10 +16,10 @@ export interface SeekerHeroProps {
   readonly bio: string | null;
   readonly avatarUrl: string | null;
   readonly heroCoverUrl: string | null;
-  readonly seekingTimeline: string | null;
+  readonly seekingTimeline: Timeline | null;
   readonly preferredCategories: readonly string[];
   readonly seekerProfileId: string | null;
-  readonly onReadinessChange: (value: string) => void;
+  readonly onReadinessChange: (value: Timeline) => void;
   readonly onHeroCoverChange: (url: string | null) => void;
   readonly readinessSaving?: boolean;
 }
