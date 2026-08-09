@@ -15,7 +15,7 @@ import {
 
 import { adminClient } from "../adminClient";
 import { authedClient } from "../client";
-import { applyToListing } from "./applications";
+import { applyToListing, type ApplyResult } from "./applications";
 
 /**
  * Resolve seeker_profiles.id for the authed Clerk user.
@@ -236,12 +236,13 @@ function invitePath(
  * ACCEPTING AN INVITE CREATES A REAL APPLICATION. Before this, accept only
  * walked the invite row to 'applied' — no applications row was ever created,
  * so the host was told someone accepted and found an EMPTY /host/applicants.
- * The application is created FIRST (through applyToListing, so every guard —
- * résumé gate, self-apply, dedup, 063 reactivation — applies identically);
- * only then does the invite advance. If the application is refused (e.g.
- * `resume_incomplete`), the invite stays actionable so the seeker can finish
- * their résumé and accept again — an invite is a request to apply, never a
- * bypass of the résumé requirement.
+ * applyToListing delegates acceptance to submit_my_application, which creates
+ * or reactivates the application AND advances/links the invite atomically. The
+ * deployment bridge is the sole exception: when PostgREST proves that RPC is
+ * not deployed yet, this function completes the prior status/linkage sequence.
+ * If submission is refused (e.g. `resume_incomplete`), the invite stays
+ * actionable so the seeker can finish their résumé and accept again — an
+ * invite is a request to apply, never a bypass of the résumé requirement.
  *
  * On success the result carries the applicationId so the action layer can
  * anchor the host's application_submitted notification to a real row.
@@ -251,7 +252,13 @@ export async function respondToInvite(
   clerkUserId: string,
   inviteId: string,
   response: InviteResponse,
-): Promise<{ ok: boolean; error?: string; applicationId?: string; listingId?: string }> {
+): Promise<{
+  ok: boolean;
+  error?: string;
+  applicationId?: string;
+  listingId?: string;
+  disposition?: NonNullable<ApplyResult["disposition"]>;
+}> {
   const target = RESPONSE_TARGET[response];
   if (!target) {
     return { ok: false, error: "invalid_response" };
@@ -266,7 +273,7 @@ export async function respondToInvite(
 
   const { data: inviteRow, error: loadError } = await untyped
     .from("invites")
-    .select("id, status, listing_id, application_id")
+    .select("id, status, listing_id, application_id, expires_at")
     .eq("id", inviteId)
     .eq("seeker_profile_id", seekerProfileId)
     .maybeSingle();
@@ -298,27 +305,47 @@ export async function respondToInvite(
     return { ok: false, error: "already_responded" };
   }
 
-  // ── Accept: the application must exist BEFORE the invite advances ────────
   let applicationId: string | undefined;
+  let disposition: NonNullable<ApplyResult["disposition"]> | undefined;
+
+  // ── Accept: the RPC owns application + invite mutation atomically ────────
   if (target === "applied") {
     if (!listingId) {
       return { ok: false, error: "not_found" };
+    }
+    const expiresAt =
+      typeof row.expires_at === "string" ? Date.parse(row.expires_at) : NaN;
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      return { ok: false, error: "invite_not_actionable" };
     }
     const applied = await applyToListing(clerkToken, clerkUserId, listingId, undefined, {
       source: "invite",
       originInviteId: inviteId,
     });
-    if (!applied.ok) {
-      // 'already_applied' is not a failure here: the seeker applied directly
-      // before accepting. Adopt that application and let the invite close.
-      if (applied.error !== "already_applied") {
-        return { ok: false, error: applied.error };
-      }
-    } else {
-      applicationId = applied.applicationId;
+    if (
+      !applied.ok &&
+      !(applied.legacySubmission && applied.error === "already_applied")
+    ) {
+      return { ok: false, error: applied.error };
     }
+
+    applicationId = applied.applicationId;
+    disposition = applied.disposition;
+
+    if (!applied.legacySubmission) {
+      return {
+        ok: true,
+        ...(applicationId ? { applicationId } : {}),
+        ...(listingId ? { listingId } : {}),
+        ...(disposition ? { disposition } : {}),
+      };
+    }
+
+    // Only the positively identified pre-091 bridge reaches this point. The
+    // RPC path already committed these writes and must never duplicate them.
   }
 
+  // Decline remains the existing seeker-scoped invite status transition.
   for (const next of path) {
     const { data: updated, error: updateError } = await untyped
       .from("invites")
@@ -328,7 +355,13 @@ export async function respondToInvite(
       .select("id")
       .maybeSingle();
     if (updateError) {
-      return { ok: false, error: updateError.message };
+      return {
+        ok: false,
+        error:
+          target === "applied"
+            ? "temporarily_unavailable"
+            : updateError.message,
+      };
     }
     // Affected-row assertion: a zero-row UPDATE (concurrent response/withdraw
     // or an RLS filter — the write policy ships in migration 066) must never
@@ -338,28 +371,26 @@ export async function respondToInvite(
     }
   }
 
-  // Server-authoritative linkage. Migration 066 deliberately grants the seeker
-  // token UPDATE on invites.status ALONE, so these columns are stamped through
-  // the service role: they are facts the server derives (which application this
-  // invite produced, and when the response landed), never client input. A
-  // failure here is best-effort — the response itself is already recorded, and
-  // a missing link must not fail a real acceptance.
+  // Declines and the positively identified pre-091 acceptance bridge still use
+  // table grants, so the server stamps response/linkage facts via service role.
+  // Authoritative RPC acceptances returned above and never reach this call.
   await stampInviteResponse(inviteId, applicationId);
 
   return {
     ok: true,
     ...(applicationId ? { applicationId } : {}),
     ...(listingId ? { listingId } : {}),
+    ...(disposition ? { disposition } : {}),
   };
 }
 
 /**
- * Stamp responded_at (+ the produced application) on an invite via the service
- * role. Best-effort by design: never throws, never fails the caller.
+ * Stamp responded_at and optional legacy-acceptance linkage through the
+ * service role. Best-effort by design: never throws, never fails the caller.
  */
 async function stampInviteResponse(
   inviteId: string,
-  applicationId: string | undefined,
+  applicationId?: string,
 ): Promise<void> {
   try {
     await (adminClient() as unknown as SupabaseClient)
@@ -370,7 +401,7 @@ async function stampInviteResponse(
       })
       .eq("id", inviteId);
   } catch {
-    // Linkage is an attribution nicety; the response is already durable.
+    // Response/linkage metadata is best-effort; the status is already durable.
   }
 }
 

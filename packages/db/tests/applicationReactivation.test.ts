@@ -18,7 +18,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const mockFrom = vi.fn();
-const mockClient = { from: mockFrom };
+const mockRpc = vi.fn();
+const mockClient = { from: mockFrom, rpc: mockRpc };
 vi.mock("../src/client.js", () => ({
   authedClient: () => mockClient,
   anonClient: () => mockClient,
@@ -46,6 +47,7 @@ function makeChain(result: { data?: unknown; error?: unknown }) {
   chain.insert = vi.fn(self);
   chain.eq = self;
   chain.maybeSingle = terminal;
+  chain.single = terminal;
   (chain as { then?: unknown }).then = (resolve: (v: unknown) => void) =>
     terminal().then(resolve);
   return chain;
@@ -57,88 +59,131 @@ function queueFromResults(...chains: ReturnType<typeof makeChain>[]) {
 }
 
 const SEEKER_PROFILE = { data: { id: "seeker-1" }, error: null };
-/** Self-application guard read: no owner row -> not the seeker's own listing. */
-const NOT_OWN_LISTING = { data: null, error: null };
+const ACCEPTING_LISTING = {
+  data: {
+    status: "live",
+    expires_at: "2099-01-01T00:00:00.000Z",
+    provenance: "verified",
+    host_profile_id: "host-1",
+    host_profiles: { clerk_user_id: "host_user" },
+  },
+  error: null,
+};
 
 beforeEach(() => {
   mockFrom.mockReset();
+  mockRpc.mockReset();
 });
 
 describe("applyToListing — withdrawn re-apply reactivation (063)", () => {
-  it("revives a withdrawn row in place instead of inserting a second (no 23505 lockout)", async () => {
-    const existing = makeChain({
-      data: { id: "app-1", status: "withdrawn" },
-    });
-    // The revive UPDATE chains .select("id").maybeSingle() — a matched row
-    // must come back for the affected-row assertion.
-    const update = makeChain({ data: { id: "app-1" }, error: null });
-    queueFromResults(
-      makeChain(SEEKER_PROFILE), // resolveSeekerProfileId
-      makeChain(NOT_OWN_LISTING), // self-application guard
-      existing, // existing-application lookup -> withdrawn
-      update, // reactivation UPDATE
+  it("reports the authoritative RPC reactivation disposition", async () => {
+    queueFromResults(makeChain(SEEKER_PROFILE), makeChain(ACCEPTING_LISTING));
+    mockRpc.mockReturnValue(
+      makeChain({
+        data: {
+          application_id: "app-1",
+          seeker_profile_id: "seeker-1",
+          listing_id: "listing-1",
+          disposition: "reactivated",
+        },
+      }),
     );
 
     const result = await applyToListing("token", "user_1", "listing-1", "hi");
 
-    // Reactivated, not a fresh insert — and the ids the notification-engine
-    // producer anchors its application_submitted event on are reported.
     expect(result).toEqual({
       ok: true,
       reactivated: true,
       applicationId: "app-1",
       seekerProfileId: "seeker-1",
+      disposition: "reactivated",
     });
-    // The revive was an UPDATE (not an INSERT) on the existing row.
-    expect(update.update).toHaveBeenCalledTimes(1);
-    expect(existing.insert).not.toHaveBeenCalled();
   });
 
-  it("stamps status='applied' + reactivated_at (the host 'applied before' flag) and clears withdrawn_reason", async () => {
+  it("reactivates through the marked bridge when the RPC is not deployed yet", async () => {
     const existing = makeChain({ data: { id: "app-1", status: "withdrawn" } });
-    const update = makeChain({ data: { id: "app-1" }, error: null });
+    const updated = makeChain({ data: { id: "app-1" }, error: null });
     queueFromResults(
       makeChain(SEEKER_PROFILE),
-      makeChain(NOT_OWN_LISTING),
+      makeChain(ACCEPTING_LISTING),
       existing,
-      update,
+      updated,
+    );
+    mockRpc.mockReturnValue(
+      makeChain({
+        error: {
+          code: "PGRST202",
+          message:
+            "Could not find the function public.submit_my_application in the schema cache",
+        },
+      }),
     );
 
-    await applyToListing("token", "user_1", "listing-1", "cover note");
+    const result = await applyToListing("token", "user_1", "listing-1", "hi");
 
-    const patch = (update.update as ReturnType<typeof vi.fn>).mock
-      .calls[0][0] as Record<string, unknown>;
-    expect(patch.status).toBe("applied");
-    expect(typeof patch.reactivated_at).toBe("string");
-    expect(patch.withdrawn_reason).toBeNull();
-    // The provided cover message rides along on the revive.
-    expect(patch.cover_message).toBe("cover note");
+    expect(result).toMatchObject({
+      ok: true,
+      reactivated: true,
+      legacySubmission: true,
+      disposition: "reactivated",
+      applicationId: "app-1",
+    });
+    expect(updated.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "applied",
+        withdrawn_reason: null,
+        cover_message: "hi",
+      }),
+    );
   });
 
-  it("still BLOCKS a genuine double-apply when an active (non-withdrawn) row exists", async () => {
-    const existing = makeChain({ data: { id: "app-1", status: "applied" } });
-    queueFromResults(
-      makeChain(SEEKER_PROFILE),
-      makeChain(NOT_OWN_LISTING),
-      existing,
+  it("passes cover and invite attribution only to submit_my_application", async () => {
+    queueFromResults(makeChain(SEEKER_PROFILE), makeChain(ACCEPTING_LISTING));
+    mockRpc.mockReturnValue(
+      makeChain({
+        data: {
+          application_id: "app-1",
+          seeker_profile_id: "seeker-1",
+          listing_id: "listing-1",
+          disposition: "reactivated",
+        },
+      }),
+    );
+
+    await applyToListing("token", "user_1", "listing-1", "cover note", {
+      source: "invite",
+      originInviteId: "invite-1",
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith("submit_my_application", {
+      p_listing_id: "listing-1",
+      p_cover_message: "cover note",
+      p_origin_invite_id: "invite-1",
+    });
+  });
+
+  it("keeps direct active duplicates as already_applied", async () => {
+    queueFromResults(makeChain(SEEKER_PROFILE), makeChain(ACCEPTING_LISTING));
+    mockRpc.mockReturnValue(
+      makeChain({ error: { code: "23505", message: "already_applied" } }),
     );
 
     const result = await applyToListing("token", "user_1", "listing-1");
 
     expect(result).toEqual({ ok: false, error: "already_applied" });
-    // The guard fires before any update — no reactivation UPDATE was attempted.
-    expect(existing.update).not.toHaveBeenCalled();
   });
 
-  it("first-time apply (no existing row) INSERTs a fresh application, not a reactivation", async () => {
-    const existing = makeChain({ data: null });
-    // The insert now chains .select("id").maybeSingle() to report the new id.
-    const insert = makeChain({ data: { id: "app-new" }, error: null });
-    queueFromResults(
-      makeChain(SEEKER_PROFILE),
-      makeChain(NOT_OWN_LISTING),
-      existing, // no prior application
-      insert, // INSERT path
+  it("reports a newly created application from the RPC", async () => {
+    queueFromResults(makeChain(SEEKER_PROFILE), makeChain(ACCEPTING_LISTING));
+    mockRpc.mockReturnValue(
+      makeChain({
+        data: {
+          application_id: "app-new",
+          seeker_profile_id: "seeker-1",
+          listing_id: "listing-1",
+          disposition: "created",
+        },
+      }),
     );
 
     const result = await applyToListing("token", "user_1", "listing-1");
@@ -147,39 +192,57 @@ describe("applyToListing — withdrawn re-apply reactivation (063)", () => {
       ok: true,
       applicationId: "app-new",
       seekerProfileId: "seeker-1",
+      disposition: "created",
     });
-    expect(insert.insert).toHaveBeenCalledTimes(1);
   });
 
-  it("maps a lost-race unique violation on the revive UPDATE to already_applied", async () => {
-    const existing = makeChain({ data: { id: "app-1", status: "withdrawn" } });
-    const update = makeChain({ error: { code: "23505", message: "dup" } });
-    queueFromResults(
-      makeChain(SEEKER_PROFILE),
-      makeChain(NOT_OWN_LISTING),
-      existing,
-      update,
+  it("accepts existing only for invite adoption without marking a reactivation", async () => {
+    queueFromResults(makeChain(SEEKER_PROFILE), makeChain(ACCEPTING_LISTING));
+    mockRpc.mockReturnValue(
+      makeChain({
+        data: {
+          application_id: "app-1",
+          seeker_profile_id: "seeker-1",
+          listing_id: "listing-1",
+          disposition: "existing",
+        },
+      }),
     );
 
-    const result = await applyToListing("token", "user_1", "listing-1");
+    const result = await applyToListing("token", "user_1", "listing-1", undefined, {
+      source: "invite",
+      originInviteId: "invite-1",
+    });
 
-    expect(result).toEqual({ ok: false, error: "already_applied" });
+    expect(result).toEqual({
+      ok: true,
+      applicationId: "app-1",
+      seekerProfileId: "seeker-1",
+      disposition: "existing",
+    });
   });
 
-  it("returns conflict when the revive UPDATE matches no row (race or RLS filter)", async () => {
-    const existing = makeChain({ data: { id: "app-1", status: "withdrawn" } });
-    // .select("id").maybeSingle() on the UPDATE returns no row — the re-apply
-    // must NOT be reported as a success the database did not perform.
-    const update = makeChain({ data: null, error: null });
-    queueFromResults(
-      makeChain(SEEKER_PROFILE),
-      makeChain(NOT_OWN_LISTING),
-      existing,
-      update,
-    );
+  it.each([
+    ["listing", "different-listing", "seeker-1"],
+    ["seeker", "listing-1", "different-seeker"],
+  ])(
+    "returns conflict for a mismatched RPC %s",
+    async (_field, returnedListing, returnedSeeker) => {
+      queueFromResults(makeChain(SEEKER_PROFILE), makeChain(ACCEPTING_LISTING));
+      mockRpc.mockReturnValue(
+        makeChain({
+          data: {
+            application_id: "app-1",
+            seeker_profile_id: returnedSeeker,
+            listing_id: returnedListing,
+            disposition: "reactivated",
+          },
+        }),
+      );
 
-    const result = await applyToListing("token", "user_1", "listing-1");
+      const result = await applyToListing("token", "user_1", "listing-1");
 
-    expect(result).toEqual({ ok: false, error: "conflict" });
-  });
+      expect(result).toEqual({ ok: false, error: "conflict" });
+    },
+  );
 });

@@ -60,4 +60,30 @@ describe("listing application state", () => {
     );
     expect(confirmButton).not.toContain("disabled={isPending}");
   });
+
+  it("renders the stable unavailable state without exposing raw database errors", () => {
+    const component = source("app/[locale]/listing/[id]/ApplyButton.tsx");
+    const action = source("app/actions/applications.ts");
+    const messages = JSON.parse(source("messages/en.json")) as {
+      Apply: { errorListingUnavailable?: string };
+    };
+
+    expect(component).toContain(
+      'result.error === "listing_not_accepting_applications"',
+    );
+    expect(component).toContain('message: t("errorListingUnavailable")');
+    expect(component).not.toContain("message: result.error");
+    expect(messages.Apply.errorListingUnavailable).toBe(
+      "This listing is no longer accepting applications. Nothing was submitted.",
+    );
+    expect(action).not.toContain("This opportunity hasn't been confirmed");
+  });
+
+  it("does not emit a second submission event for invite adoption", () => {
+    const action = source("app/actions/invites.ts");
+
+    expect(action).toContain('result.disposition === "created"');
+    expect(action).toContain('result.disposition === "reactivated"');
+    expect(action).toContain("`existing` disposition");
+  });
 });

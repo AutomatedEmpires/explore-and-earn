@@ -6,9 +6,10 @@
  *    walked the invite row to 'applied' and created nothing, so the host was
  *    told someone accepted and found an EMPTY /host/applicants.
  *  - The application is attributed: source='invite' + origin_invite_id.
- *  - ORDER: the application is created BEFORE the invite advances. A refused
- *    application (résumé gate) leaves the invite untouched and actionable —
- *    an invite is a request to apply, never a bypass of the résumé gate.
+ *  - ATOMICITY: the 091 RPC owns application + invite acceptance together.
+ *    Only a positively marked deploy-before-migration result may use the prior
+ *    application-first status/linkage sequence. A refused application leaves
+ *    the invite untouched and actionable.
  *  - DELIVERY IS REAL: fetching the seeker's invite list stamps 'created' rows
  *    as delivered, which is what makes the host's credit-restore rule
  *    (undelivered only — founder policy 2026-07-16) honest.
@@ -58,6 +59,16 @@ function makeChain(result: { data?: unknown; error?: unknown }) {
 }
 
 const SEEKER_PROFILE = { data: { id: "seeker-1" }, error: null };
+const FUTURE_INVITE_EXPIRY = "2099-01-01T00:00:00.000Z";
+
+function actionableInvite(status: "created" | "delivered" | "viewed") {
+  return {
+    id: "inv-1",
+    status,
+    listing_id: "listing-1",
+    expires_at: FUTURE_INVITE_EXPIRY,
+  };
+}
 
 beforeEach(() => {
   mockFrom.mockReset();
@@ -68,25 +79,25 @@ beforeEach(() => {
 });
 
 describe("respondToInvite — accept creates a real application", () => {
-  it("creates an invite-attributed application, then advances the invite", async () => {
+  it("returns an RPC-created invite application without client-side writes", async () => {
     applyToListing.mockResolvedValue({
       ok: true,
       applicationId: "app-new",
       seekerProfileId: "seeker-1",
+      disposition: "created",
     });
     const inviteRead = makeChain({
-      data: { id: "inv-1", status: "delivered", listing_id: "listing-1" },
+      data: actionableInvite("delivered"),
     });
-    const statusUpdate = makeChain({ data: { id: "inv-1" } });
     mockFrom
       .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain) // resolveSeekerProfileId
-      .mockReturnValueOnce(inviteRead.chain) // invite load
-      .mockReturnValueOnce(statusUpdate.chain); // delivered -> applied
+      .mockReturnValueOnce(inviteRead.chain); // invite load; RPC owns mutation
 
     const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
 
     expect(result.ok).toBe(true);
     expect(result.applicationId).toBe("app-new");
+    expect(result.disposition).toBe("created");
     // The application carries its invite attribution.
     expect(applyToListing).toHaveBeenCalledWith(
       "token",
@@ -95,37 +106,31 @@ describe("respondToInvite — accept creates a real application", () => {
       undefined,
       { source: "invite", originInviteId: "inv-1" },
     );
-    expect(statusUpdate.calls.find((c) => c.method === "update")?.args).toEqual([
-      { status: "applied" },
-    ]);
+    expect(mockFrom).toHaveBeenCalledTimes(2);
   });
 
-  it("walks created -> delivered -> applied when the invite was never delivered", async () => {
-    applyToListing.mockResolvedValue({ ok: true, applicationId: "app-new" });
-    const updates = [makeChain({ data: { id: "inv-1" } }), makeChain({ data: { id: "inv-1" } })];
-    let updateIdx = 0;
+  it("delegates created -> delivered -> applied to the atomic RPC", async () => {
+    applyToListing.mockResolvedValue({
+      ok: true,
+      applicationId: "app-new",
+      disposition: "created",
+    });
     mockFrom
       .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
       .mockReturnValueOnce(
-        makeChain({ data: { id: "inv-1", status: "created", listing_id: "listing-1" } }).chain,
-      )
-      .mockImplementation(() => updates[updateIdx++].chain);
+        makeChain({ data: actionableInvite("created") }).chain,
+      );
 
     const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
 
     expect(result.ok).toBe(true);
-    expect(updates[0].calls.find((c) => c.method === "update")?.args).toEqual([
-      { status: "delivered" },
-    ]);
-    expect(updates[1].calls.find((c) => c.method === "update")?.args).toEqual([
-      { status: "applied" },
-    ]);
+    expect(mockFrom).toHaveBeenCalledTimes(2);
   });
 
   it("RÉSUMÉ GATE: a refused application leaves the invite untouched and actionable", async () => {
     applyToListing.mockResolvedValue({ ok: false, error: "resume_incomplete" });
     const inviteRead = makeChain({
-      data: { id: "inv-1", status: "delivered", listing_id: "listing-1" },
+      data: actionableInvite("delivered"),
     });
     mockFrom
       .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
@@ -139,58 +144,192 @@ describe("respondToInvite — accept creates a real application", () => {
     expect(mockFrom).toHaveBeenCalledTimes(2);
   });
 
-  it("adopts a pre-existing direct application (already_applied is not a failure)", async () => {
+  it.each([
+    ["expired", "2020-01-01T00:00:00.000Z"],
+    ["missing expiry", null],
+  ])("rejects an invite with %s before application submission", async (_case, expiresAt) => {
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({
+          data: { ...actionableInvite("viewed"), expires_at: expiresAt },
+        }).chain,
+      );
+
+    const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
+
+    expect(result).toEqual({ ok: false, error: "invite_not_actionable" });
+    expect(applyToListing).not.toHaveBeenCalled();
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(mockAdminFrom).not.toHaveBeenCalled();
+  });
+
+  it("does not revive the compatibility path for an unmarked already_applied error", async () => {
     applyToListing.mockResolvedValue({ ok: false, error: "already_applied" });
     mockFrom
       .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
       .mockReturnValueOnce(
-        makeChain({ data: { id: "inv-1", status: "viewed", listing_id: "listing-1" } }).chain,
-      )
-      .mockReturnValueOnce(makeChain({ data: { id: "inv-1" } }).chain);
+        makeChain({ data: actionableInvite("viewed") }).chain,
+      );
 
     const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
 
-    // The invite still closes out — the seeker did apply, just directly.
-    expect(result.ok).toBe(true);
+    expect(result).toEqual({ ok: false, error: "already_applied" });
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(mockAdminFrom).not.toHaveBeenCalled();
   });
 
-  it("stamps responded_at + application_id through the SERVICE ROLE (066 grants status only)", async () => {
-    applyToListing.mockResolvedValue({ ok: true, applicationId: "app-new" });
-    const adminStamp = makeChain({ data: null });
-    mockAdminFrom.mockReturnValue(adminStamp.chain);
-    mockFrom
-      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
-      .mockReturnValueOnce(
-        makeChain({ data: { id: "inv-1", status: "delivered", listing_id: "listing-1" } }).chain,
-      )
-      .mockReturnValueOnce(makeChain({ data: { id: "inv-1" } }).chain);
-
-    await respondToInvite("token", "user_1", "inv-1", "accepted");
-
-    const patch = adminStamp.calls.find((c) => c.method === "update")?.args[0] as Record<
-      string,
-      unknown
-    >;
-    expect(patch.application_id).toBe("app-new");
-    expect(typeof patch.responded_at).toBe("string");
-  });
-
-  it("a failed linkage stamp never fails a real acceptance", async () => {
-    applyToListing.mockResolvedValue({ ok: true, applicationId: "app-new" });
-    mockAdminFrom.mockImplementation(() => {
-      throw new Error("service role unavailable");
+  it("adopts a pre-existing direct application without a second invite write", async () => {
+    applyToListing.mockResolvedValue({
+      ok: true,
+      applicationId: "app-existing",
+      disposition: "existing",
     });
     mockFrom
       .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
       .mockReturnValueOnce(
-        makeChain({ data: { id: "inv-1", status: "delivered", listing_id: "listing-1" } }).chain,
-      )
-      .mockReturnValueOnce(makeChain({ data: { id: "inv-1" } }).chain);
+        makeChain({ data: actionableInvite("viewed") }).chain,
+      );
+
+    const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
+
+    expect(result).toMatchObject({
+      ok: true,
+      applicationId: "app-existing",
+      disposition: "existing",
+    });
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not stamp accepted linkage after the RPC already committed it", async () => {
+    applyToListing.mockResolvedValue({
+      ok: true,
+      applicationId: "app-new",
+      disposition: "created",
+    });
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({ data: actionableInvite("delivered") }).chain,
+      );
+
+    await respondToInvite("token", "user_1", "inv-1", "accepted");
+
+    expect(mockAdminFrom).not.toHaveBeenCalled();
+  });
+
+  it("returns reactivated disposition without a post-RPC status loop", async () => {
+    applyToListing.mockResolvedValue({
+      ok: true,
+      applicationId: "app-new",
+      disposition: "reactivated",
+    });
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({ data: actionableInvite("delivered") }).chain,
+      );
 
     const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
 
     expect(result.ok).toBe(true);
     expect(result.applicationId).toBe("app-new");
+    expect(result.disposition).toBe("reactivated");
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs status and linkage compatibility only for a marked legacy submission", async () => {
+    applyToListing.mockResolvedValue({
+      ok: true,
+      applicationId: "app-legacy",
+      seekerProfileId: "seeker-1",
+      disposition: "created",
+      legacySubmission: true,
+    });
+    const delivered = makeChain({ data: { id: "inv-1" }, error: null });
+    const applied = makeChain({ data: { id: "inv-1" }, error: null });
+    const adminStamp = makeChain({ data: null, error: null });
+    mockAdminFrom.mockReturnValue(adminStamp.chain);
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({ data: actionableInvite("created") }).chain,
+      )
+      .mockReturnValueOnce(delivered.chain)
+      .mockReturnValueOnce(applied.chain);
+
+    const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
+
+    expect(result).toMatchObject({
+      ok: true,
+      applicationId: "app-legacy",
+      disposition: "created",
+    });
+    expect(delivered.calls.find((call) => call.method === "update")?.args).toEqual([
+      { status: "delivered" },
+    ]);
+    expect(applied.calls.find((call) => call.method === "update")?.args).toEqual([
+      { status: "applied" },
+    ]);
+    expect(adminStamp.calls.find((call) => call.method === "update")?.args[0]).toEqual(
+      expect.objectContaining({ application_id: "app-legacy" }),
+    );
+  });
+
+  it("lets a marked legacy duplicate adopt and link its existing application", async () => {
+    applyToListing.mockResolvedValue({
+      ok: false,
+      error: "already_applied",
+      applicationId: "app-existing",
+      seekerProfileId: "seeker-1",
+      legacySubmission: true,
+    });
+    const applied = makeChain({ data: { id: "inv-1" }, error: null });
+    const adminStamp = makeChain({ data: null, error: null });
+    mockAdminFrom.mockReturnValue(adminStamp.chain);
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({ data: actionableInvite("viewed") }).chain,
+      )
+      .mockReturnValueOnce(applied.chain);
+
+    const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
+
+    expect(result).toMatchObject({ ok: true, applicationId: "app-existing" });
+    expect(result.disposition).toBeUndefined();
+    expect(applied.calls.find((call) => call.method === "update")?.args).toEqual([
+      { status: "applied" },
+    ]);
+    expect(adminStamp.calls.find((call) => call.method === "update")?.args[0]).toEqual(
+      expect.objectContaining({ application_id: "app-existing" }),
+    );
+  });
+
+  it("conceals a legacy invite-write failure", async () => {
+    applyToListing.mockResolvedValue({
+      ok: true,
+      applicationId: "app-legacy",
+      disposition: "created",
+      legacySubmission: true,
+    });
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({ data: actionableInvite("viewed") }).chain,
+      )
+      .mockReturnValueOnce(
+        makeChain({
+          data: null,
+          error: { message: "private invite policy implementation detail" },
+        }).chain,
+      );
+
+    const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
+
+    expect(result).toEqual({ ok: false, error: "temporarily_unavailable" });
+    expect(JSON.stringify(result)).not.toContain("implementation detail");
+    expect(mockAdminFrom).not.toHaveBeenCalled();
   });
 });
 
@@ -199,7 +338,7 @@ describe("respondToInvite — decline", () => {
     mockFrom
       .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
       .mockReturnValueOnce(
-        makeChain({ data: { id: "inv-1", status: "delivered", listing_id: "listing-1" } }).chain,
+        makeChain({ data: actionableInvite("delivered") }).chain,
       )
       .mockReturnValueOnce(makeChain({ data: { id: "inv-1" } }).chain);
 

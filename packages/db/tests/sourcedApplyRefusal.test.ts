@@ -21,7 +21,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("server-only", () => ({}));
 
 const mockFrom = vi.fn();
-const mockClient = { from: mockFrom };
+const mockRpc = vi.fn();
+const mockClient = { from: mockFrom, rpc: mockRpc };
 vi.mock("../src/client.js", () => ({
   authedClient: () => mockClient,
   anonClient: () => mockClient,
@@ -46,6 +47,7 @@ function makeChain(result: { data?: unknown; error?: unknown }) {
   chain.insert = vi.fn(self);
   chain.eq = self;
   chain.maybeSingle = terminal;
+  chain.single = terminal;
   (chain as { then?: unknown }).then = (resolve: (v: unknown) => void) =>
     terminal().then(resolve);
   return chain;
@@ -59,12 +61,19 @@ const SEEKER_PROFILE = { data: { id: "seeker-1" }, error: null };
 
 beforeEach(() => {
   mockFrom.mockReset();
+  mockRpc.mockReset();
 });
 
 describe("applyToListing — sourced listings are refused server-side", () => {
   it("refuses a sourced listing instead of creating an unreachable application", async () => {
     const listing = makeChain({
-      data: { provenance: "sourced", host_profiles: null },
+      data: {
+        status: "live",
+        expires_at: "2099-01-01T00:00:00.000Z",
+        provenance: "sourced",
+        host_profile_id: null,
+        host_profiles: null,
+      },
       error: null,
     });
     // Deliberately queued: if the guard ever stops short-circuiting, the apply
@@ -85,7 +94,16 @@ describe("applyToListing — sourced listings are refused server-side", () => {
     const applications = makeChain({ data: null, error: null });
     queueFromResults(
       makeChain(SEEKER_PROFILE),
-      makeChain({ data: { provenance: "sourced" }, error: null }),
+      makeChain({
+        data: {
+          status: "live",
+          expires_at: "2099-01-01T00:00:00.000Z",
+          provenance: "sourced",
+          host_profile_id: null,
+          host_profiles: null,
+        },
+        error: null,
+      }),
       applications,
     );
 
@@ -102,18 +120,29 @@ describe("applyToListing — sourced listings are refused server-side", () => {
    * become a blanket block. A verified listing still applies normally.
    */
   it("still allows a verified listing to be applied to", async () => {
-    const insert = makeChain({
-      data: { id: "app-9" },
-      error: null,
-    });
+    mockRpc.mockReturnValue(
+      makeChain({
+        data: {
+          application_id: "app-9",
+          seeker_profile_id: "seeker-1",
+          listing_id: "listing-verified",
+          disposition: "created",
+        },
+        error: null,
+      }),
+    );
     queueFromResults(
       makeChain(SEEKER_PROFILE),
       makeChain({
-        data: { provenance: "verified", host_profiles: { clerk_user_id: "host_1" } },
+        data: {
+          status: "live",
+          expires_at: "2099-01-01T00:00:00.000Z",
+          provenance: "verified",
+          host_profile_id: "host-1",
+          host_profiles: { clerk_user_id: "host_1" },
+        },
         error: null,
       }),
-      makeChain({ data: null, error: null }), // no existing application
-      insert,
     );
 
     const result = await applyToListing("token", "user_1", "listing-verified");
@@ -126,7 +155,13 @@ describe("applyToListing — sourced listings are refused server-side", () => {
     queueFromResults(
       makeChain(SEEKER_PROFILE),
       makeChain({
-        data: { provenance: "verified", host_profiles: { clerk_user_id: "user_1" } },
+        data: {
+          status: "live",
+          expires_at: "2099-01-01T00:00:00.000Z",
+          provenance: "verified",
+          host_profile_id: "host-1",
+          host_profiles: { clerk_user_id: "user_1" },
+        },
         error: null,
       }),
     );

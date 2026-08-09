@@ -57,17 +57,6 @@ async function applyToListingActionImpl(
 		return { ok: false, error: "You cannot apply to your own listing." }
 	}
 
-	// Sourced listing: no host on the platform to receive it. Only reachable
-	// from a stale or scripted client — the detail page offers the original
-	// posting instead — so it is worded for someone who got here anyway.
-	if (result.error === "listing_not_accepting_applications") {
-		return {
-			ok: false,
-			error:
-				"This opportunity hasn't been confirmed by its employer yet, so applications can't be sent through Explore & Earn. Use the link to the original posting to apply.",
-		}
-	}
-
 	if (result.ok) {
 		// Persist the domain event FIRST (append-only events log) — the
 		// notification engine derives the host's in-app/email/push notification
