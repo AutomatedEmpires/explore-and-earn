@@ -67,6 +67,9 @@ function scrubBreadcrumbs<
 	event.breadcrumbs = event.breadcrumbs.map((breadcrumb) => ({
 		...breadcrumb,
 		data: scrubStringRecord(breadcrumb.data),
+		message: breadcrumb.message
+			? redactUrlText(breadcrumb.message)
+			: breadcrumb.message,
 	}));
 	return event;
 }

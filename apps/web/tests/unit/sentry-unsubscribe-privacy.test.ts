@@ -30,7 +30,7 @@ function span(data: SentrySpan["data"]): SentrySpan {
 describe("Sentry unsubscribe-token privacy", () => {
 	it("redacts request URLs, query strings, referrers, and breadcrumbs", () => {
 		const event: SentryErrorEvent = {
-			breadcrumbs: [{ data: { url: SENSITIVE_URL } }],
+			breadcrumbs: [{ data: { url: SENSITIVE_URL }, message: SENSITIVE_URL }],
 			request: {
 				headers: { referer: SENSITIVE_URL },
 				query_string: `token=${TOKEN}`,
@@ -44,6 +44,9 @@ describe("Sentry unsubscribe-token privacy", () => {
 			"https://exploreandearn.com/api/notifications/unsubscribe",
 		);
 		expect(scrubbed.request?.query_string).toBeUndefined();
+		expect(scrubbed.breadcrumbs?.[0]?.message).toBe(
+			"https://exploreandearn.com/api/notifications/unsubscribe",
+		);
 	});
 
 	it("redacts both legacy transaction spans and current span attributes", () => {
