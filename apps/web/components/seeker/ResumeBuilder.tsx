@@ -2,7 +2,7 @@
 
 import {
   useCallback,
-  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -142,7 +142,7 @@ function useBeforeLeave(
     [],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handle: BeforeLeaveHandle = {
       beforeLeave: invokeLatestBeforeLeave,
       willSave,
