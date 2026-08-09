@@ -467,6 +467,9 @@ export default function HostOnboardingPage() {
 				form.set("payPeriod", draft.rolePayPeriod)
 				form.set("startDate", draft.roleStart)
 				form.set("endDate", draft.roleEnd)
+				if (draft.roleCoverUrl) {
+					form.set("coverPhotoUrl", draft.roleCoverUrl)
+				}
 
 				const result = await createListingAction(form)
 				if (!result.ok) {

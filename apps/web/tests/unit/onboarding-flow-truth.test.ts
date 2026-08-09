@@ -207,6 +207,19 @@ describe("onboarding persistence and preview truth", () => {
     expect(action).toContain("photoUrl: uploadedUrl");
   });
 
+  it("binds the uploaded cover to the first listing instead of leaving it orphaned", () => {
+    const page = source("app/[locale]/(host-onboard)/host/onboarding/page.tsx");
+    const roleSubmit = page.slice(
+      page.indexOf("function handleRoleSubmit"),
+      page.indexOf("function clearLocalDraft"),
+    );
+
+    expect(roleSubmit).toContain('form.set("coverPhotoUrl", draft.roleCoverUrl)');
+    expect(roleSubmit.indexOf('form.set("coverPhotoUrl"')).toBeLessThan(
+      roleSubmit.indexOf("createListingAction(form)"),
+    );
+  });
+
   /**
    * AUTOSAVE AND RESUME. Two layers, because they answer different questions: a
    * local copy so a closed tab is survivable, and a row so "saved" means saved.

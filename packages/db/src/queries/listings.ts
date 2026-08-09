@@ -31,6 +31,7 @@ import {
 } from "@explore-and-earn/contracts";
 import { adminClient } from "../adminClient";
 import { anonClient, authedClient } from "../client";
+import { LISTING_MEDIA_BUCKET } from "../storage";
 import { getPublicHousingPhotos } from "./benefitDetails";
 import { getActiveBoostedListingIds, getSeekerApplicationIds } from "./idReaders";
 import { getPassedListingIds } from "./passedListings";
@@ -1157,6 +1158,62 @@ export interface ListingWriteFields {
   categoryDepth?: ListingCategoryDepth;
 }
 
+/**
+ * A listing may reference only media in this deployment's bucket and below
+ * the authenticated host's own object prefix. Browser-managed form state is
+ * not an ownership boundary: drafts can be edited in localStorage and public
+ * Storage URLs can be copied between accounts.
+ */
+function isOwnedListingMediaUrl(
+  url: string,
+  hostProfileId: string,
+): boolean {
+  const configuredStorageUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!configuredStorageUrl) return false;
+
+  try {
+    const parsed = new URL(url);
+    const configured = new URL(configuredStorageUrl);
+    if (
+      parsed.origin !== configured.origin ||
+      parsed.username.length > 0 ||
+      parsed.password.length > 0
+    ) {
+      return false;
+    }
+
+    const marker = `/storage/v1/object/public/${LISTING_MEDIA_BUCKET}/`;
+    if (!parsed.pathname.startsWith(marker)) return false;
+    const objectPath = decodeURIComponent(parsed.pathname.slice(marker.length));
+    const segments = objectPath.split("/");
+    return (
+      segments.length >= 2 &&
+      segments[0] === hostProfileId &&
+      segments.every((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function listingMediaOwnershipError(
+  fields: ListingWriteFields,
+  hostProfileId: string,
+): string | null {
+  if (
+    fields.coverPhotoUrl &&
+    !isOwnedListingMediaUrl(fields.coverPhotoUrl, hostProfileId)
+  ) {
+    return "Invalid cover photo URL.";
+  }
+  if (
+    fields.galleryUrls?.some((url) => !isOwnedListingMediaUrl(url, hostProfileId))
+  ) {
+    return "Invalid gallery photo URL.";
+  }
+  return null;
+}
+
 type ListingColumnPatch = {
   title?: string;
   category?: OpportunityCategory;
@@ -1353,6 +1410,9 @@ export async function createListing(
     return { ok: false, error: "No host profile found for your account. Create a host profile first." };
   }
 
+  const mediaError = listingMediaOwnershipError(fields, hostProfileId);
+  if (mediaError) return { ok: false, error: mediaError };
+
   const patch = buildListingColumnPatch(fields);
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data, error } = await untyped
@@ -1379,6 +1439,9 @@ export async function updateListing(
 
   const hostProfileId = await resolveHostProfileId(clerkToken, clerkUserId);
   if (!hostProfileId) return { ok: false, error: "No host profile found for your account." };
+
+  const mediaError = listingMediaOwnershipError(fields, hostProfileId);
+  if (mediaError) return { ok: false, error: mediaError };
 
   const patch = buildListingColumnPatch(fields);
   if (Object.keys(patch).length === 0) return { ok: true };

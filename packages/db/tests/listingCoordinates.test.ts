@@ -66,6 +66,7 @@ beforeEach(() => {
   database.fromCalls.length = 0;
   database.inserts.length = 0;
   database.updates.length = 0;
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://project.supabase.co";
 });
 
 describe("listing coordinate writes", () => {
@@ -131,6 +132,39 @@ describe("listing coordinate writes", () => {
     });
     expect(result).toMatchObject({ ok: false });
     expect(database.fromCalls).toEqual([]);
+  });
+});
+
+describe("listing media ownership", () => {
+  const storageRoot =
+    "https://project.supabase.co/storage/v1/object/public/listing-media";
+
+  it("binds an onboarding cover below the authenticated host prefix", async () => {
+    const coverPhotoUrl = `${storageRoot}/host-1/library/cover/version.webp`;
+    const result = await createListing("token", "user-1", {
+      title: "Orchard harvest",
+      category: "farm",
+      coverPhotoUrl,
+    });
+
+    expect(result).toEqual({ ok: true, listingId: "listing-1" });
+    expect(database.inserts[0]).toMatchObject({ cover_photo_url: coverPhotoUrl });
+  });
+
+  it.each([
+    `${storageRoot}/host-2/library/cover/version.webp`,
+    "https://foreign.supabase.co/storage/v1/object/public/listing-media/host-1/library/cover/version.webp",
+    "https://project.supabase.co/storage/v1/object/public/profile-photos/host-1/cover.webp",
+    `${storageRoot}/host-1/../host-2/cover.webp`,
+  ])("rejects an unowned or malformed cover before the listing write: %s", async (coverPhotoUrl) => {
+    const result = await createListing("token", "user-1", {
+      title: "Orchard harvest",
+      category: "farm",
+      coverPhotoUrl,
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
+    expect(database.inserts).toEqual([]);
   });
 });
 
