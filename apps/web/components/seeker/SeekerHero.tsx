@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
+import type { MarketplaceCategory } from "@explore-and-earn/contracts";
 import { Icon } from "@explore-and-earn/ui";
 import type { Timeline } from "../../lib/readiness";
 import { HeroPhotoPickerModal } from "./HeroPhotoPickerModal";
@@ -17,7 +18,7 @@ export interface SeekerHeroProps {
   readonly avatarUrl: string | null;
   readonly heroCoverUrl: string | null;
   readonly seekingTimeline: Timeline | null;
-  readonly preferredCategories: readonly string[];
+  readonly preferredCategories: readonly MarketplaceCategory[];
   readonly seekerProfileId: string | null;
   readonly onReadinessChange: (value: Timeline) => void;
   readonly onHeroCoverChange: (url: string | null) => void;
