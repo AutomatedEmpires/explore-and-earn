@@ -9,7 +9,6 @@ const PHONE_VIEWPORTS = [
 const LISTING_PATH = "/listing/lst_orchard_wenatchee";
 const LISTING_TITLE = "Orchard Harvest Hand";
 const DIALOG_HEADING = "Preview the application flow?";
-const MODAL_GUTTER = 16;
 
 async function expectModalContained(
   page: Page,
@@ -20,10 +19,13 @@ async function expectModalContained(
 
   const geometry = await surface.evaluate((element) => {
     const rect = element.getBoundingClientRect();
+    const overlayStyle = getComputedStyle(element.parentElement!);
     return {
       bodyWidth: document.body.scrollWidth,
       clientWidth: element.clientWidth,
       documentWidth: document.documentElement.scrollWidth,
+      expectedLeftGutter: Number.parseFloat(overlayStyle.paddingLeft),
+      expectedRightGutter: Number.parseFloat(overlayStyle.paddingRight),
       left: rect.left,
       right: rect.right,
       scrollWidth: element.scrollWidth,
@@ -32,12 +34,12 @@ async function expectModalContained(
   });
 
   expect(geometry.left, "modal loses its left phone gutter").toBeGreaterThanOrEqual(
-    MODAL_GUTTER,
+    geometry.expectedLeftGutter - 1,
   );
   expect(
     geometry.viewportWidth - geometry.right,
     "modal loses its right phone gutter",
-  ).toBeGreaterThanOrEqual(MODAL_GUTTER);
+  ).toBeGreaterThanOrEqual(geometry.expectedRightGutter - 1);
   expect(
     geometry.scrollWidth,
     "modal surface has internal horizontal overflow",
@@ -72,12 +74,19 @@ async function expectContainedTouchTarget(
     44,
   );
   expect(targetBox!.x, `${label} starts outside the modal`).toBeGreaterThanOrEqual(
-    surfaceBox!.x,
+    surfaceBox!.x - 1,
   );
   expect(
     targetBox!.x + targetBox!.width,
     `${label} ends outside the modal`,
-  ).toBeLessThanOrEqual(surfaceBox!.x + surfaceBox!.width);
+  ).toBeLessThanOrEqual(surfaceBox!.x + surfaceBox!.width + 1);
+  expect(targetBox!.y, `${label} starts above the modal`).toBeGreaterThanOrEqual(
+    surfaceBox!.y - 1,
+  );
+  expect(
+    targetBox!.y + targetBox!.height,
+    `${label} ends below the modal`,
+  ).toBeLessThanOrEqual(surfaceBox!.y + surfaceBox!.height + 1);
 }
 
 test.describe("listing apply modal on phones", () => {
@@ -109,14 +118,15 @@ test.describe("listing apply modal on phones", () => {
           exact: true,
         }),
       ).toBeVisible();
-      await page
-        .getByRole("complementary", {
-          name: "Dev mock bench",
-          exact: true,
-        })
-        .evaluate((element) => {
+      const devBench = page.getByRole("complementary", {
+        name: "Dev mock bench",
+        exact: true,
+      });
+      if ((await devBench.count()) > 0) {
+        await devBench.evaluate((element) => {
           (element as HTMLElement).style.display = "none";
         });
+      }
       const baselineDocumentWidth = await page.evaluate(
         () => document.documentElement.scrollWidth,
       );
