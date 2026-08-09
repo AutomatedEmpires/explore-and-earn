@@ -2,19 +2,20 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
-  BenefitProvision,
-  BenefitTriad,
   ListingStatus,
   OpportunityCategory,
 } from "@explore-and-earn/contracts";
 import {
-  formatCompensation,
   formatOpportunityWindow,
   hasVerifiedHostSubscription,
 } from "@explore-and-earn/contracts";
 
 import { authedClient } from "../client";
-import type { SeekerApplicationListing } from "./applications";
+import {
+  seekerApplicationListingBenefits,
+  seekerApplicationListingProvenanceInfo,
+  type SeekerApplicationListing,
+} from "./applications";
 import { getActiveBoostedListingIds } from "./idReaders";
 import { MEANINGFUL_MATCH_SCORE_THRESHOLD } from "./listings";
 import { getMatchScoresForSeeker } from "./matchScores";
@@ -55,28 +56,6 @@ function firstOf(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-// Compensation summary via the shared, locale-ready formatter (default currency
-// applied in the formatter) — no inline currency/date formatting in the DB
-// layer. See @explore-and-earn/contracts format.ts.
-function embeddedCompensationSummary(row: Record<string, unknown>): string {
-  return formatCompensation({
-    summary:
-      typeof row.compensation_summary === "string"
-        ? row.compensation_summary
-        : null,
-    minCents:
-      typeof row.compensation_min_cents === "number"
-        ? row.compensation_min_cents
-        : null,
-    maxCents:
-      typeof row.compensation_max_cents === "number"
-        ? row.compensation_max_cents
-        : null,
-    unit:
-      typeof row.compensation_unit === "string" ? row.compensation_unit : null,
-  });
-}
-
 function rowToSeekerApplicationListing(
   value: unknown,
   boostedListingIds?: ReadonlySet<string>,
@@ -85,30 +64,31 @@ function rowToSeekerApplicationListing(
   const row = firstOf(value);
   if (!row) return null;
 
+  const provenanceInfo = seekerApplicationListingProvenanceInfo(row);
+  const sourced = provenanceInfo?.provenance === "sourced";
   const hostRaw = firstOf(row.host_profiles);
-  const hostName =
-    hostRaw &&
-    typeof hostRaw.company_name === "string" &&
-    hostRaw.company_name.length > 0
+  const sourceEmployerName =
+    typeof row.source_employer_name === "string" &&
+    row.source_employer_name.trim().length > 0
+      ? row.source_employer_name.trim()
+      : null;
+  const sourceName =
+    typeof row.source_name === "string" && row.source_name.trim().length > 0
+      ? row.source_name.trim()
+      : null;
+  const hostName = sourced
+    ? (sourceEmployerName ?? sourceName ?? "Employer not stated")
+    : hostRaw &&
+        typeof hostRaw.company_name === "string" &&
+        hostRaw.company_name.length > 0
       ? hostRaw.company_name
       : "Unknown Host";
-  const verified = hostRaw
-    ? hasVerifiedHostSubscription(hostRaw.subscription_tier)
-    : false;
+  const verified =
+    !sourced && hostRaw
+      ? hasVerifiedHostSubscription(hostRaw.subscription_tier)
+      : false;
 
-  const housingProvision: BenefitProvision =
-    row.housing_included === true ? "provided" : "not_provided";
-  const mealsProvision: BenefitProvision =
-    row.meals_included === true ? "provided" : "not_provided";
-
-  const benefits: BenefitTriad = {
-    housing: { provision: housingProvision },
-    meals: { provision: mealsProvision },
-    pay: {
-      provision: "provided",
-      summary: embeddedCompensationSummary(row),
-    },
-  };
+  const benefits = seekerApplicationListingBenefits(row, provenanceInfo);
 
   return {
     id: String(row.id),
@@ -134,6 +114,7 @@ function rowToSeekerApplicationListing(
       typeof row.cover_photo_url === "string" ? row.cover_photo_url : null,
     beginsAt: typeof row.begins_at === "string" ? row.begins_at : null,
     endsAt: typeof row.ends_at === "string" ? row.ends_at : null,
+    provenanceInfo,
     conditionalBadges:
       boostedListingIds?.has(String(row.id)) ? (["boosted"] as const) : undefined,
     matchScore: (() => {
@@ -157,6 +138,7 @@ export interface RichSeekerApplication {
   /** Advisory UI flag; the database RPC remains the creation authority. */
   readonly canStartConversation: boolean;
   readonly submittedAt: string;
+  readonly expiresAt: string | null;
   readonly reviewedAt: string | null;
   readonly decidedAt: string | null;
   readonly coverMessage: string | null;
@@ -164,11 +146,16 @@ export interface RichSeekerApplication {
 }
 
 const RICH_SEEKER_APPLICATION_SELECT =
-  "id, listing_id, status, cover_message, submitted_at, reviewed_at, " +
+  "id, listing_id, status, cover_message, submitted_at, expires_at, reviewed_at, " +
   "decided_at, listings!listing_id(id, title, category, location_display, " +
-  "status, housing_included, meals_included, compensation_summary, " +
+  "provenance, source_name, source_url, source_external_id, source_employer_name, " +
+  "source_published_at, source_last_seen_at, claim_summary, housing_evidence, " +
+  "meals_evidence, pay_evidence, " +
+  "status, housing_included, housing_description, meals_included, meals_description, " +
+  "compensation_summary, " +
   "compensation_min_cents, compensation_max_cents, compensation_unit, " +
   "compensation_currency, timeline_summary, cover_photo_url, " +
+  "begins_at, ends_at, " +
   "host_profiles(company_name, subscription_tier))";
 
 /**
@@ -206,6 +193,7 @@ export async function getSeekerApplicationsRich(
       status,
       canStartConversation: canStartApplicationConversation(status),
       submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+      expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
       reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
       decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
       coverMessage:
@@ -259,6 +247,7 @@ export async function getSeekerApplicationRichById(
     status,
     canStartConversation: canStartApplicationConversation(status),
     submittedAt: typeof r.submitted_at === "string" ? r.submitted_at : "",
+    expiresAt: typeof r.expires_at === "string" ? r.expires_at : null,
     reviewedAt: typeof r.reviewed_at === "string" ? r.reviewed_at : null,
     decidedAt: typeof r.decided_at === "string" ? r.decided_at : null,
     coverMessage:

@@ -48,7 +48,8 @@ function makeChain(result: { data: unknown; error: unknown }) {
   // vi.fn so tests can assert the UPDATE payload (e.g. withdrawn_reason).
   chain.update = vi.fn(self) as unknown as () => typeof chain;
   chain.insert = self;
-  chain.eq = self;
+  chain.eq = vi.fn(self) as unknown as () => typeof chain;
+  chain.or = vi.fn(self) as unknown as () => typeof chain;
   chain.neq = self;
   chain.in = self;
   chain.order = self;
@@ -352,6 +353,45 @@ describe("updateApplicationStatusBySeeker", () => {
     expect(result).toEqual({ ok: false, error: "invalid_transition" });
   });
 
+  it('returns invalid_transition before any capacity check when the offer has expired', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-08T12:00:00.000Z"));
+    try {
+      let call = 0;
+      (mockFrom as MockInstance).mockImplementation(() => {
+        call++;
+        if (call === 1) {
+          return makeChain({
+            data: { id: SEEKER_PROFILE_ID },
+            error: null,
+          });
+        }
+        return makeChain({
+          data: {
+            id: APP_ID,
+            seeker_profile_id: SEEKER_PROFILE_ID,
+            status: "offered",
+            listing_id: LISTING_ID,
+            expires_at: "2026-08-08T12:00:00.000Z",
+          },
+          error: null,
+        });
+      });
+
+      const result = await updateApplicationStatusBySeeker(
+        TOKEN,
+        USER,
+        APP_ID,
+        "accepted",
+      );
+
+      expect(result).toEqual({ ok: false, error: "invalid_transition" });
+      expect(call).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('returns listing_full (pre-check) when remaining_role_count is 0', async () => {
     setupSeekerChains(
       { id: SEEKER_PROFILE_ID },
@@ -372,6 +412,63 @@ describe("updateApplicationStatusBySeeker", () => {
     );
     const result = await updateApplicationStatusBySeeker(TOKEN, USER, APP_ID, "accepted");
     expect(result).toEqual({ ok: true });
+  });
+
+  it('atomically limits the update to a live offered row owned by the seeker', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-08T12:00:00.000Z"));
+    try {
+      let call = 0;
+      const update = makeChain(SEEKER_UPDATE_OK);
+      (mockFrom as MockInstance).mockImplementation(() => {
+        call++;
+        if (call === 1) {
+          return makeChain({
+            data: { id: SEEKER_PROFILE_ID },
+            error: null,
+          });
+        }
+        if (call === 2) {
+          return makeChain({
+            data: {
+              id: APP_ID,
+              seeker_profile_id: SEEKER_PROFILE_ID,
+              status: "offered",
+              listing_id: LISTING_ID,
+              expires_at: "2026-08-08T12:00:01.000Z",
+            },
+            error: null,
+          });
+        }
+        if (call === 3) {
+          return makeChain({
+            data: { remaining_role_count: 1 },
+            error: null,
+          });
+        }
+        return update;
+      });
+
+      const result = await updateApplicationStatusBySeeker(
+        TOKEN,
+        USER,
+        APP_ID,
+        "accepted",
+      );
+
+      expect(result).toEqual({ ok: true });
+      expect(update.eq).toHaveBeenCalledWith("id", APP_ID);
+      expect(update.eq).toHaveBeenCalledWith(
+        "seeker_profile_id",
+        SEEKER_PROFILE_ID,
+      );
+      expect(update.eq).toHaveBeenCalledWith("status", "offered");
+      expect(update.or).toHaveBeenCalledWith(
+        "expires_at.is.null,expires_at.gt.now",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('maps DB 23514 check_violation to listing_full on race-condition accept', async () => {

@@ -62,6 +62,12 @@ export const OFFER_ITEMS: readonly OfferItem[] = [
   },
 ];
 
+/** Stable local-only identity shared by the offered bucket and its detail route. */
+export const DEV_OFFERED_APPLICATION_ID = "dev-application-orchard-offered";
+/** Production-shaped timestamps matching the Orchard fixture's season window. */
+export const DEV_OFFERED_BEGINS_AT = "2026-08-12T17:00:00.000Z";
+export const DEV_OFFERED_ENDS_AT = "2026-10-28T17:00:00.000Z";
+
 /** Stable local-only identity shared by the accepted bucket and its detail route. */
 export const DEV_ACCEPTED_APPLICATION_ID = "dev-application-ski-resort-accepted";
 /** Production-shaped timestamps for the accepted walkthrough's listing window. */

@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { auth } from "@clerk/nextjs/server";
+import { NOT_STATED_LABEL } from "@explore-and-earn/contracts";
 import {
   getSeekerApplicationsRich,
   type RichSeekerApplication,
@@ -75,6 +76,7 @@ function benefitText(info: {
   readonly provision: string;
   readonly summary?: string;
 }): string {
+  if (info.provision === "not_stated") return NOT_STATED_LABEL;
   if (info.summary) return info.summary;
   if (info.provision === "provided") return "Included";
   if (info.provision === "partial") return "Partial";

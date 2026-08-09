@@ -17,14 +17,18 @@ import {
   type BadgeProps,
 } from "@explore-and-earn/ui";
 
-import { BucketPage } from "../../../../../components/seeker";
+import { BucketPage, OfferedActions } from "../../../../../components/seeker";
 import { CATEGORY_ICON } from "../../../../../components/discovery";
 import {
   ACCEPTED_ITEMS,
   DEV_ACCEPTED_APPLICATION_ID,
   DEV_ACCEPTED_BEGINS_AT,
   DEV_ACCEPTED_ENDS_AT,
+  DEV_OFFERED_APPLICATION_ID,
+  DEV_OFFERED_BEGINS_AT,
+  DEV_OFFERED_ENDS_AT,
   NOT_SELECTED_ITEMS,
+  OFFER_ITEMS,
 } from "../../../../../components/seeker/fixtures";
 import { OpenConversationButton } from "../../../../../components/messaging/OpenConversationButton";
 import { InterviewScheduleCard } from "../../../../../components/scheduling/InterviewScheduleCard";
@@ -61,6 +65,7 @@ function devApplicationDetail(): ApplicationDetailData {
       id: DEV_APPLICATION_DETAIL_ID,
       listingId: listing.id,
       status: "not_selected",
+      expiresAt: null,
       canStartConversation: false,
       submittedAt: "2026-05-12T17:00:00.000Z",
       reviewedAt: "2026-05-15T17:00:00.000Z",
@@ -102,6 +107,7 @@ function devAcceptedApplicationDetail(): ApplicationDetailData {
       id: DEV_ACCEPTED_APPLICATION_ID,
       listingId: listing.id,
       status: "accepted",
+      expiresAt: null,
       // This local-only application is intentionally not persisted, so it
       // cannot truthfully open a real conversation.
       canStartConversation: false,
@@ -132,6 +138,49 @@ function devAcceptedApplicationDetail(): ApplicationDetailData {
   };
 }
 
+function devOfferedApplicationDetail(): ApplicationDetailData {
+  const item = OFFER_ITEMS[0];
+  if (!item) {
+    throw new Error("Application detail fixture requires an offered item.");
+  }
+
+  const { listing } = item;
+  return {
+    application: {
+      id: DEV_OFFERED_APPLICATION_ID,
+      listingId: listing.id,
+      status: "offered",
+      expiresAt: null,
+      // This local-only application is intentionally not persisted, so it
+      // cannot truthfully open a real conversation.
+      canStartConversation: false,
+      submittedAt: "2026-05-24T17:00:00.000Z",
+      reviewedAt: null,
+      decidedAt: null,
+      coverMessage: null,
+      listing: {
+        id: listing.id,
+        title: listing.title,
+        category: listing.category,
+        location: listing.location,
+        opportunityWindow: listing.opportunityWindow,
+        status: listing.status,
+        host: {
+          name: listing.host.name,
+          verified: listing.host.verified,
+        },
+        benefits: listing.benefits,
+        coverImageUrl: listing.coverImageUrl ?? null,
+        beginsAt: DEV_OFFERED_BEGINS_AT,
+        endsAt: DEV_OFFERED_ENDS_AT,
+        conditionalBadges: listing.conditionalBadges,
+        matchScore: listing.matchScore,
+      },
+    },
+    scheduling: { available: false, request: null },
+  };
+}
+
 /**
  * React cache keeps metadata and the page on one request-scoped read. The exact
  * local fixture route returns before Clerk, Supabase, or scheduling can run.
@@ -140,14 +189,19 @@ const resolveApplicationDetail = cache(
   async (id: string): Promise<ApplicationDetailData | null> => {
     if (
       id === DEV_APPLICATION_DETAIL_ID ||
-      id === DEV_ACCEPTED_APPLICATION_ID
+      id === DEV_ACCEPTED_APPLICATION_ID ||
+      id === DEV_OFFERED_APPLICATION_ID
     ) {
       if (!isDevBenchEnabled() || (await readDevRole()) !== "seeker") {
         return null;
       }
-      return id === DEV_ACCEPTED_APPLICATION_ID
-        ? devAcceptedApplicationDetail()
-        : devApplicationDetail();
+      if (id === DEV_ACCEPTED_APPLICATION_ID) {
+        return devAcceptedApplicationDetail();
+      }
+      if (id === DEV_OFFERED_APPLICATION_ID) {
+        return devOfferedApplicationDetail();
+      }
+      return devApplicationDetail();
     }
     if (!isUuid(id)) return null;
 
@@ -186,6 +240,7 @@ const STATUS_LABEL: Record<string, string> = {
   active: "Active",
   completed: "Completed",
   not_selected: "Not selected",
+  rejected: "Not selected",
   withdrawn: "Withdrawn",
   expired: "Expired",
 };
@@ -199,6 +254,7 @@ const STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
   active: "match",
   completed: "neutral",
   not_selected: "neutral",
+  rejected: "neutral",
   withdrawn: "neutral",
   expired: "neutral",
 };
@@ -209,6 +265,27 @@ const STATUS_VARIANT: Record<string, BadgeProps["variant"]> = {
  * that has its own accept/decline path instead of a withdraw.
  */
 const WITHDRAWABLE_STATUSES = new Set<string>(["applied", "reviewing", "saved_by_host"]);
+
+interface ReturnTarget {
+  readonly href: string;
+  readonly label: string;
+}
+
+function returnTargetForStatus(status: string): ReturnTarget {
+  switch (status) {
+    case "offered":
+      return { href: "/offered", label: "Back to offers" };
+    case "accepted":
+      return { href: "/accepted", label: "Back to accepted roles" };
+    case "withdrawn":
+      return { href: "/withdrawn", label: "Back to withdrawn applications" };
+    case "not_selected":
+    case "rejected":
+      return { href: "/not-selected", label: "Back to not selected" };
+    default:
+      return { href: "/applied", label: "Back to applications" };
+  }
+}
 
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
@@ -227,27 +304,40 @@ interface TimelineStep {
   readonly label: string;
   readonly description: string;
   readonly at: string | null;
+  readonly reached: boolean;
 }
 
 function buildTimeline(application: RichSeekerApplication): TimelineStep[] {
+  const isAwaitingOfferDecision = application.status === "offered";
+  const submittedAt = formatDate(application.submittedAt);
+  const reviewedAt = formatDate(application.reviewedAt);
+  const decidedAt = formatDate(application.decidedAt);
+
   return [
     {
       key: "submitted",
       label: "Application submitted",
       description: "You applied to this opportunity.",
-      at: formatDate(application.submittedAt),
+      at: submittedAt,
+      reached: submittedAt !== null,
     },
     {
       key: "reviewed",
       label: "Reviewed by host",
       description: "The host opened and reviewed your application.",
-      at: formatDate(application.reviewedAt),
+      at: reviewedAt,
+      reached: reviewedAt !== null,
     },
     {
       key: "decided",
-      label: "Decision made",
-      description: "The host reached a final decision.",
-      at: formatDate(application.decidedAt),
+      label: isAwaitingOfferDecision ? "Offer received" : "Decision made",
+      description: isAwaitingOfferDecision
+        ? "The host offered you this role. Review the details and respond when you’re ready."
+        : "The host reached a final decision.",
+      at: decidedAt,
+      // The offered status proves receipt of an offer even when the legacy
+      // transition did not persist a decision timestamp.
+      reached: isAwaitingOfferDecision || decidedAt !== null,
     },
   ];
 }
@@ -264,15 +354,16 @@ export default async function AppliedDetailPage({ params }: Props) {
   const label = STATUS_LABEL[status] ?? "Applied";
   const variant = STATUS_VARIANT[status] ?? "neutral";
   const canWithdraw = WITHDRAWABLE_STATUSES.has(status);
-  const returnsToAccepted = status === "accepted";
+  const returnTarget = returnTargetForStatus(status);
+  const isDemoOfferedApplication = id === DEV_OFFERED_APPLICATION_ID;
   const timeline = buildTimeline(application);
 
   return (
     <BucketPage
       title={listing?.title ?? "Application"}
       description="Where your application stands."
-      backHref={returnsToAccepted ? "/accepted" : "/applied"}
-      backLabel={returnsToAccepted ? "Back to accepted roles" : "Back to applications"}
+      backHref={returnTarget.href}
+      backLabel={returnTarget.label}
     >
       <article
         className={styles.summary}
@@ -328,6 +419,14 @@ export default async function AppliedDetailPage({ params }: Props) {
           {canWithdraw ? (
             <WithdrawButton applicationId={application.id} />
           ) : null}
+          {status === "offered" ? (
+            <OfferedActions
+              applicationId={application.id}
+              expiresAt={application.expiresAt}
+              {...(listing ? { subject: listing.title } : {})}
+              isDemoFixture={isDemoOfferedApplication}
+            />
+          ) : null}
         </div>
       </article>
 
@@ -344,19 +443,22 @@ export default async function AppliedDetailPage({ params }: Props) {
         <h3 className={styles.timelineHeading}>Status timeline</h3>
         <ol className={styles.steps}>
           {timeline.map((step) => {
-            const reached = step.at !== null;
             return (
               <li
                 key={step.key}
                 className={
-                  reached ? styles.step : `${styles.step} ${styles.stepPending}`
+                  step.reached
+                    ? styles.step
+                    : `${styles.step} ${styles.stepPending}`
                 }
               >
                 <span className={styles.dot} aria-hidden />
                 <div className={styles.stepBody}>
                   <p className={styles.stepLabel}>{step.label}</p>
                   <p className={styles.stepDescription}>{step.description}</p>
-                  <p className={styles.stepDate}>{step.at ?? "Pending"}</p>
+                  <p className={styles.stepDate}>
+                    {step.at ?? (step.reached ? "Date not recorded" : "Pending")}
+                  </p>
                 </div>
               </li>
             );
