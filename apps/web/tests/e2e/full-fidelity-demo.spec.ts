@@ -621,6 +621,158 @@ test.describe("full-fidelity mobile decisions and accessibility", () => {
     expect(dimensions[2]!.width / total).toBeCloseTo(0.2, 2);
   });
 
+  test("listing detail navigation clears the sticky mobile chrome", async ({
+    page,
+  }) => {
+    await useEssentialOnlyConsent(page);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+
+    const detailPath = `${SEEKER_ROOT}/listing/${seekerListing.id}`;
+    const destinations = [
+      {
+        label: "Photos",
+        href: "#demo-listing-photos",
+        id: "demo-listing-photos",
+      },
+      {
+        label: "Host",
+        href: "#demo-listing-host",
+        id: "demo-listing-host",
+      },
+      {
+        label: "Weather",
+        href: "#demo-listing-weather",
+        id: "demo-listing-weather",
+      },
+      {
+        label: "Position",
+        href: "#demo-listing-position",
+        id: "demo-listing-position",
+      },
+      {
+        label: "Location",
+        href: "#demo-listing-location",
+        id: "demo-listing-location",
+      },
+      {
+        label: "Company & team",
+        href: "#demo-listing-company-team",
+        id: "demo-listing-company-team",
+      },
+    ] as const;
+
+    for (const width of [320, 375, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(detailPath);
+
+      const sectionNav = page.getByRole("navigation", {
+        name: "On this page",
+        exact: true,
+      });
+      const links = sectionNav.getByRole("link");
+      const header = page.getByRole("banner").first();
+      const dock = page.getByRole("navigation", {
+        name: "Seeker",
+        exact: true,
+      });
+
+      await expect(sectionNav).toBeVisible();
+      await expect(links).toHaveText(
+        destinations.map(({ label }) => label),
+      );
+      const hrefs = await links.evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute("href")),
+      );
+      expect(hrefs).toEqual(destinations.map(({ href }) => href));
+      expect(
+        new Set(hrefs).size,
+        `listing section navigation repeats a destination at ${width}px`,
+      ).toBe(destinations.length);
+
+      const selector = destinations.map(({ id }) => `#${id}`).join(",");
+      const renderedOrder = await page.locator(selector).evaluateAll((elements) =>
+        elements.map((element) => element.id),
+      );
+      expect(
+        renderedOrder,
+        `listing sections render out of navigation order at ${width}px`,
+      ).toEqual(destinations.map(({ id }) => id));
+
+      for (const { id } of destinations) {
+        await expect(page.locator(`#${id}`)).toHaveCount(1);
+      }
+
+      const fullHostProfile = page
+        .locator("#demo-listing-host")
+        .getByRole("link", {
+          name: "View full host profile",
+          exact: true,
+        });
+      await expect(fullHostProfile).toHaveCount(1);
+      await expect(fullHostProfile).toHaveAttribute(
+        "href",
+        "/for-seekers/demo/host/demo_org_juniper_wake",
+      );
+
+      const chrome = await Promise.all([
+        header.evaluate((element) => ({
+          position: getComputedStyle(element).position,
+          height: element.getBoundingClientRect().height,
+        })),
+        dock.evaluate((element) => ({
+          position: getComputedStyle(element).position,
+          bottom: getComputedStyle(element).bottom,
+        })),
+      ]);
+      expect(chrome[0].position).toBe("sticky");
+      expect(chrome[0].height).toBeGreaterThanOrEqual(44);
+      expect(chrome[1]).toEqual({ position: "fixed", bottom: "0px" });
+
+      for (const destination of destinations) {
+        await sectionNav.locator(`a[href="${destination.href}"]`).click();
+        await expect
+          .poll(() => page.evaluate(() => window.location.hash))
+          .toBe(destination.href);
+
+        const target = page.locator(`#${destination.id}`);
+        await expect(target).toBeVisible();
+        await expect
+          .poll(
+            () =>
+              target.evaluate((element) => {
+                const topbar = document.querySelector<HTMLElement>(
+                  ".seekeros-top",
+                );
+                const bottomDock = document.querySelector<HTMLElement>(
+                  ".seekeros-mnav",
+                );
+                if (!topbar || !bottomDock) return false;
+                const targetBox = element.getBoundingClientRect();
+                const topbarBox = topbar.getBoundingClientRect();
+                const dockBox = bottomDock.getBoundingClientRect();
+                const visibleHeight =
+                  Math.min(targetBox.bottom, dockBox.top) -
+                  Math.max(targetBox.top, topbarBox.bottom);
+                return (
+                  targetBox.top >= topbarBox.bottom - 1 &&
+                  targetBox.top < dockBox.top &&
+                  visibleHeight >= 44
+                );
+              }),
+            {
+              message: `${destination.label} anchor is obscured by mobile chrome at ${width}px`,
+            },
+          )
+          .toBe(true);
+
+        await expectNoHorizontalOverflow(
+          page,
+          `${detailPath}${destination.href} at ${width}px`,
+        );
+      }
+    }
+  });
+
   test("benefit dialog traps focus, closes on Escape, and landmarks remain intact", async ({
     page,
   }) => {

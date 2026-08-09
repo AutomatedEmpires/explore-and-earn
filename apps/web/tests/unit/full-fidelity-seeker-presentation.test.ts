@@ -90,6 +90,33 @@ describe("full-fidelity seeker presentation", () => {
     );
   });
 
+  it("reuses the canonical listing navigator with stable mobile anchors", () => {
+    const destinations = [
+      ["demo-listing-photos", "Photos"],
+      ["demo-listing-host", "Host"],
+      ["demo-listing-weather", "Weather"],
+      ["demo-listing-position", "Position"],
+      ["demo-listing-location", "Location"],
+      ["demo-listing-company-team", "Company & team"],
+    ] as const;
+
+    expect(experienceSource).toContain(
+      'from "../../../listing/ListingSectionNav"',
+    );
+    expect(experienceSource).toContain(
+      "<ListingSectionNav links={DEMO_LISTING_SECTION_LINKS} />",
+    );
+    for (const [id, label] of destinations) {
+      expect(experienceSource).toContain(
+        `{ href: "#${id}", label: "${label}" }`,
+      );
+      expect(experienceSource.match(new RegExp(`id="${id}"`, "g"))).toHaveLength(1);
+    }
+    expect(demoStylesSource).toMatch(
+      /\.listingAnchor\s*\{[^}]*scroll-margin-top:\s*calc\(var\(--space-64\) \+ var\(--space-40\)\);/,
+    );
+  });
+
   it("preserves the listing identity through profile editing and back to apply", () => {
     const listingId = "demo listing/one";
 
