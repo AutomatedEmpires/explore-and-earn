@@ -78,12 +78,68 @@ self.addEventListener("message", (event) => {
  * path — no auth material, no message content beyond the rendered copy.
  */
 
-/** Only rooted same-app paths may be opened from a notification click. */
+const NOTIFICATION_ACTION_URL_MAX_LENGTH = 2048;
+const NOTIFICATION_INTERNAL_ORIGIN = "https://notification.invalid";
+const NOTIFICATION_SCHEME_LIKE_SEGMENT = /(?:^|\/)[a-z][a-z\d+.-]*:/i;
+
+function hasNotificationAsciiControl(value) {
+	for (let index = 0; index < value.length; index += 1) {
+		const code = value.charCodeAt(index);
+		if (code <= 0x1f || code === 0x7f) return true;
+	}
+	return false;
+}
+
+function unsafeNotificationPathSyntax(pathname) {
+	if (pathname.includes("\\")) return true;
+	let decodedPathname;
+	try {
+		decodedPathname = decodeURIComponent(pathname);
+	} catch {
+		return true;
+	}
+	return (
+		decodedPathname.startsWith("//") ||
+		hasNotificationAsciiControl(decodedPathname) ||
+		decodedPathname.includes("\\") ||
+		NOTIFICATION_SCHEME_LIKE_SEGMENT.test(decodedPathname)
+	);
+}
+
+function serializeNotificationPath(value) {
+	if (
+		value.length === 0 ||
+		value.length > NOTIFICATION_ACTION_URL_MAX_LENGTH ||
+		value.trim() !== value ||
+		hasNotificationAsciiControl(value) ||
+		value.includes("\\") ||
+		!value.startsWith("/") ||
+		value.startsWith("//")
+	) {
+		return null;
+	}
+
+	let parsed;
+	try {
+		parsed = new URL(value, NOTIFICATION_INTERNAL_ORIGIN);
+	} catch {
+		return null;
+	}
+	if (
+		parsed.origin !== NOTIFICATION_INTERNAL_ORIGIN ||
+		unsafeNotificationPathSyntax(parsed.pathname)
+	) {
+		return null;
+	}
+	return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
+/** Only canonical, rooted same-app paths may be opened from a notification click. */
 function safeNotificationPath(path) {
 	if (typeof path !== "string") return "/";
-	if (!path.startsWith("/") || path.startsWith("//")) return "/";
-	if (path.includes("://") || /[\r\n\\]/.test(path)) return "/";
-	return path;
+	const normalized = serializeNotificationPath(path);
+	if (normalized === null) return "/";
+	return serializeNotificationPath(normalized) === normalized ? normalized : "/";
 }
 
 self.addEventListener("push", (event) => {

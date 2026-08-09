@@ -7,14 +7,35 @@
 	list-style: none;
 }
 
+.listItem {
+	min-width: 0;
+}
+
 .item {
-	display: flex;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto auto;
 	align-items: flex-start;
 	gap: var(--space-12);
+	min-width: 0;
+	min-height: var(--tap-min);
 	padding: var(--space-12);
 	border: 1px solid var(--border-soft);
 	border-radius: var(--radius-cell);
 	background: var(--color-surface-raised);
+}
+
+.actionLink {
+	color: inherit;
+	text-decoration: none;
+}
+
+.actionLink:hover {
+	border-color: var(--border-ink);
+}
+
+.actionLink:focus-visible {
+	outline: none;
+	box-shadow: var(--ui-focus-ring);
 }
 
 .unread {
@@ -26,6 +47,7 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	flex-shrink: 0;
 	color: var(--text-secondary);
 }
 
@@ -33,22 +55,35 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-2);
-	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
 }
 
 .title {
+	min-width: 0;
 	font-family: var(--font-ui);
 	font-size: var(--type-body-size);
 	line-height: var(--type-body-lh);
 	font-weight: var(--font-weight-semibold);
 	color: var(--text-primary);
+	overflow-wrap: anywhere;
 }
 
 .detail {
+	min-width: 0;
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	line-height: var(--type-meta-lh);
 	color: var(--text-secondary);
+	overflow-wrap: anywhere;
+}
+
+.meta {
+	display: inline-flex;
+	align-items: center;
+	justify-self: end;
+	gap: var(--space-8);
+	min-width: 0;
 }
 
 .time {
@@ -59,12 +94,52 @@
 }
 
 .dot {
-	align-self: center;
 	flex-shrink: 0;
 	width: var(--space-8);
 	height: var(--space-8);
 	border-radius: var(--radius-pill);
 	background: var(--status-match-fg);
+}
+
+.action {
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	gap: var(--space-4);
+	font-family: var(--font-ui);
+	font-size: var(--type-meta-size);
+	font-weight: var(--font-weight-semibold);
+	color: var(--color-cta);
+	white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+	.item {
+		grid-template-columns: auto minmax(0, 1fr);
+		row-gap: var(--space-8);
+	}
+
+	.icon {
+		grid-column: 1;
+		grid-row: 1 / span 2;
+	}
+
+	.body {
+		grid-column: 2;
+		grid-row: 1;
+	}
+
+	.meta {
+		grid-column: 2;
+		grid-row: 2;
+		justify-self: start;
+	}
+
+	.action {
+		grid-column: 2;
+		grid-row: 3;
+		justify-self: start;
+	}
 }
 
 .srOnly {

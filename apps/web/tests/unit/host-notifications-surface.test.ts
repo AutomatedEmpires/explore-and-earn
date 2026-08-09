@@ -1,13 +1,19 @@
 import { existsSync, readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
 import type { Notification } from "@explore-and-earn/db";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("server-only", () => ({}));
 
 import { HOST_NAV_GROUPS } from "../../components/host/hostNav";
 import {
   formatNotificationTimeAgo,
   toNotificationItem,
 } from "../../components/notifications/notificationItems";
+import { NotificationList } from "../../components/seeker/NotificationList";
+import type { NotificationItem } from "../../components/seeker/account";
 
 const webRoot = new URL("../../", import.meta.url);
 const read = (relative: string) =>
@@ -96,11 +102,82 @@ describe("shared notification presentation", () => {
       timeAgo: "6m",
     });
   });
+
+  it("renders a safe action as one full-row link with explicit copy and name", () => {
+    const actionable: NotificationItem = {
+      id: "actionable",
+      kind: "application_status",
+      icon: "action.apply",
+      title: "Application update",
+      detail: "Your application moved to Reviewing.",
+      timeAgo: "1m",
+      unread: true,
+      actionHref: "/applications/application-1",
+    };
+    const inert: NotificationItem = {
+      id: "unsafe-normalized-to-null",
+      kind: "application_status",
+      icon: "system.warning",
+      title: "Unsafe destination removed",
+      detail: "This notification stays readable without navigation.",
+      timeAgo: "2m",
+      unread: false,
+      actionHref: null,
+    };
+
+    const html = renderToStaticMarkup(
+      createElement(NotificationList, { items: [actionable, inert] }),
+    );
+
+    expect(html.match(/<a\b/g)).toHaveLength(1);
+    expect(html).toContain('href="/applications/application-1"');
+    expect(html).toContain(
+      'aria-label="Open unread notification: Application update"',
+    );
+    expect(html).toContain(">Open<");
+    expect(html).toContain("Unread: ");
+    expect(html).not.toContain(
+      'aria-label="Open notification: Unsafe destination removed"',
+    );
+  });
+
+  it("pins touch, focus, wrapping, and narrow-card CSS contracts", () => {
+    const source = read("components/seeker/NotificationList.tsx");
+    const css = read("components/seeker/NotificationList.module.css");
+
+    expect(source).toContain('import Link from "next/link"');
+    expect(source).toContain("`Open unread notification: ${item.title}`");
+    expect(source).toContain("`Open notification: ${item.title}`");
+    expect(source).toContain("aria-label={actionLabel}");
+    expect(source).not.toContain("markNotificationRead");
+    expect(source).not.toContain("onClick=");
+
+    expect(css).toMatch(
+      /\.item\s*{[^}]*min-height:\s*var\(--tap-min\);/s,
+    );
+    expect(css).toMatch(
+      /\.actionLink:focus-visible\s*{[^}]*box-shadow:\s*var\(--ui-focus-ring\);/s,
+    );
+    for (const selector of ["body", "title", "detail"] as const) {
+      expect(css).toMatch(
+        new RegExp(
+          `\\.${selector}\\s*\\{[^}]*min-width:\\s*0;[^}]*overflow-wrap:\\s*anywhere;`,
+          "s",
+        ),
+      );
+    }
+    expect(css).toMatch(/@media\s*\(max-width:\s*360px\)/);
+    expect(css).toMatch(
+      /grid-template-columns:\s*auto minmax\(0,\s*1fr\);/,
+    );
+  });
 });
 
 describe("canonical host notification wiring", () => {
   const route = "app/[locale]/(host)/host/notifications/page.tsx";
   const routeSource = exists(route) ? read(route) : "";
+  const seekerRoute = "app/[locale]/(seeker)/notifications/page.tsx";
+  const seekerRouteSource = exists(seekerRoute) ? read(seekerRoute) : "";
 
   it("ships the host route over persisted notifications and the shared adapter", () => {
     expect(exists(route), `${route} is missing`).toBe(true);
@@ -112,6 +189,33 @@ describe("canonical host notification wiring", () => {
     expect(routeSource).toContain("markAllNotificationsReadAction");
     expect(routeSource).toContain("<NotificationList");
   });
+
+  it.each([
+    ["host", route, routeSource],
+    ["seeker", seekerRoute, seekerRouteSource],
+  ] as const)(
+    "short-circuits the %s dev fixture by exact role before auth and preserves production errors",
+    (role, routePath, source) => {
+      expect(exists(routePath), `${routePath} is missing`).toBe(true);
+      expect(source).toContain("isDevBenchEnabled");
+      expect(source).toContain("readDevRole");
+      expect(source).toContain(
+        `isDevBenchEnabled() && (await readDevRole()) === "${role}"`,
+      );
+
+      const devFixtureGuard = source.indexOf("if (isDevBenchEnabled()");
+      const authCall = source.indexOf("await auth()");
+      const notificationRead = source.indexOf("await getNotifications(");
+
+      expect(devFixtureGuard).toBeGreaterThan(-1);
+      expect(authCall).toBeGreaterThan(devFixtureGuard);
+      expect(notificationRead).toBeGreaterThan(devFixtureGuard);
+      expect(source).toContain("<NotificationList");
+      expect(source).toContain('"use server";');
+      expect(source).not.toMatch(/getNotifications\([^)]*\)\s*\.catch\(/s);
+      expect(source).not.toContain(".catch(() => [])");
+    },
+  );
 
   it("keeps messages and notifications as distinct shell links and counts", () => {
     const shell = read("components/host/HostShell.tsx");
