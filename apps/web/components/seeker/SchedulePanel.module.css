@@ -169,7 +169,7 @@
 	overflow-wrap: anywhere;
 }
 
-.button:disabled {
+.button[aria-disabled="true"] {
 	cursor: wait;
 	opacity: 0.7;
 }

@@ -75,19 +75,23 @@ describe("truthful seeker settings form", () => {
     expect(html).not.toContain("Availability saved.");
   });
 
-  it("pins synchronous guarding, disabled pending state, and truthful feedback", () => {
+  it("pins synchronous guarding, focus-safe pending state, and truthful feedback", () => {
     const source = read("components/seeker/SeekerSettingsForm.tsx");
     const guard = source.indexOf("inFlight.current = true");
     const invoke = source.indexOf("await action(formData)");
+    const fieldsetEnd = source.indexOf("</fieldset>");
+    const actions = source.indexOf('<div className={styles.actions}>');
 
     expect(source).toContain('"use client"');
-    expect(source).toContain("if (inFlight.current) return");
+    expect(source).toContain("if (isSaving || inFlight.current) return");
     expect(guard).toBeGreaterThan(-1);
     expect(invoke).toBeGreaterThan(guard);
     expect(source).toContain("new FormData(event.currentTarget)");
     expect(source).toContain("result.ok");
     expect(source).toContain('error: "temporarily_unavailable"');
     expect(source).toContain("disabled={isSaving}");
+    expect(source).toContain("aria-disabled={isSaving}");
+    expect(actions).toBeGreaterThan(fieldsetEnd);
     expect(source).toContain("aria-busy={isSaving}");
     expect(source).toContain('role="status"');
     expect(source).toContain('role="alert"');

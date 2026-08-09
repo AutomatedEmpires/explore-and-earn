@@ -36,7 +36,9 @@ async function hideOptionalDevBench(page: Page) {
 }
 
 async function expectNoDocumentOverflow(page: Page) {
-  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
   const geometry = await page.evaluate(() => ({
     bodyWidth: document.body.scrollWidth,
     documentWidth: document.documentElement.scrollWidth,
@@ -263,6 +265,10 @@ test.describe("seeker schedule and travel settings on phones", () => {
     for (const path of ["/schedule", "/travel"] as const) {
       const response = await page.goto(path);
       expect(response).not.toBeNull();
+      expect(
+        response!.ok(),
+        `${path} did not load for the host dev role`,
+      ).toBeTruthy();
       await expect(page.locator("[data-dev-fixture]")).toHaveCount(0);
       await expect(page.getByText(PREVIEW_NOTICE, { exact: true })).toHaveCount(0);
       await expect(page.getByText(PREVIEW_SAVED, { exact: true })).toHaveCount(0);

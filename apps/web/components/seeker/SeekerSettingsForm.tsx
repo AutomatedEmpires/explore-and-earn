@@ -70,11 +70,11 @@ export function SeekerSettingsForm({
 
 	async function handleSubmit(event: FormEvent<HTMLFormElement>) {
 		event.preventDefault();
+		if (isSaving || inFlight.current) return;
 		if (preview) {
 			setFeedback({ kind: "saved" });
 			return;
 		}
-		if (inFlight.current) return;
 
 		inFlight.current = true;
 		const formData = new FormData(event.currentTarget);
@@ -128,22 +128,26 @@ export function SeekerSettingsForm({
 			) : null}
 			<fieldset className={styles.fieldset} disabled={isSaving}>
 				{children}
-				<div className={styles.actions}>
-					<button className={buttonClassName} type="submit">
-						{isSaving ? savingLabel : submitLabel}
-					</button>
-					{feedback.kind === "saved" ? (
-						<p className={styles.success} role="status">
-							{preview ? preview.savedMessage : savedMessage}
-						</p>
-					) : null}
-					{errorMessage ? (
-						<p className={styles.error} role="alert">
-							{errorMessage}
-						</p>
-					) : null}
-				</div>
 			</fieldset>
+			<div className={styles.actions}>
+				<button
+					aria-disabled={isSaving}
+					className={buttonClassName}
+					type="submit"
+				>
+					{isSaving ? savingLabel : submitLabel}
+				</button>
+				{feedback.kind === "saved" ? (
+					<p className={styles.success} role="status">
+						{preview ? preview.savedMessage : savedMessage}
+					</p>
+				) : null}
+				{errorMessage ? (
+					<p className={styles.error} role="alert">
+						{errorMessage}
+					</p>
+				) : null}
+			</div>
 		</form>
 	);
 }
