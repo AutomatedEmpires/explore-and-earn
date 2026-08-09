@@ -33,6 +33,9 @@ import { runSqlFiles } from "./run-sql.mjs"
 const here = dirname(fileURLToPath(import.meta.url))
 
 runSqlFiles(
-  [join(here, "sql", "assert_authorization_matrix.sql")],
+  [
+    join(here, "sql", "assert_authorization_matrix.sql"),
+    join(here, "sql", "assert_application_submission_authority.sql"),
+  ],
   "assert-authorization",
 )

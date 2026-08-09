@@ -92,10 +92,21 @@ values
     44.0521, -123.0868, 'enterprise', 50
   );
 
-insert into public.seeker_profiles (id, clerk_user_id, display_name)
+insert into public.seeker_profiles (
+  id, clerk_user_id, display_name, short_bio, relative_location,
+  seeking_timeline, general_skill_tags
+)
 values
-  ('05eeca00-0000-4000-8000-000000000001', 'user_authz_seeker_a', 'Authz Seeker A'),
-  ('05eecb00-0000-4000-8000-000000000002', 'user_authz_seeker_b', 'Authz Seeker B');
+  (
+    '05eeca00-0000-4000-8000-000000000001', 'user_authz_seeker_a',
+    'Authz Seeker A', 'Complete authz biography A', 'Wenatchee, WA',
+    'now', array['orchard']
+  ),
+  (
+    '05eecb00-0000-4000-8000-000000000002', 'user_authz_seeker_b',
+    'Authz Seeker B', 'Complete authz biography B', 'Eugene, OR',
+    '1_month', array['deckhand']
+  );
 
 -- Listing A publishes. Housing and Meals are explicitly not included, so
 -- migration 070's triad is satisfied by stated evidence and 072 requires no
@@ -895,12 +906,12 @@ begin
   perform pg_temp.expect_denied(
     'host A cannot file an application as seeker B',
     $q$insert into public.applications (listing_id, seeker_profile_id) values ('111a1000-0000-4000-8000-00000000000a', '05eecb00-0000-4000-8000-000000000002')$q$,
-    'new row violates row-level security policy for table "applications"'
+    'permission denied for table applications'
   );
   perform pg_temp.expect_denied(
     'host A cannot file an application as the seeker who already applied',
     $q$insert into public.applications (listing_id, seeker_profile_id) values ('111a1000-0000-4000-8000-00000000000a', '05eeca00-0000-4000-8000-000000000001')$q$,
-    'new row violates row-level security policy for table "applications"'
+    'permission denied for table applications'
   );
 
   perform pg_temp.checkpoint_section('6a applications: host A cannot file', 2);
@@ -913,16 +924,22 @@ set local request.jwt.claims = '{"sub":"user_authz_seeker_b","role":"authenticat
 
 do $do$
 begin
-  -- Positive control: the policy this section guards must still let a seeker
-  -- apply for themselves, or every refusal above would be free.
+  -- Direct table writes are no longer an application-submission surface. The
+  -- JWT-derived RPC below is the positive control proving the lockout did not
+  -- close the real seeker flow.
+  perform pg_temp.expect_denied(
+    'seeker B cannot bypass the submission RPC with a direct insert',
+    $q$insert into public.applications (listing_id, seeker_profile_id) values ('111a1000-0000-4000-8000-00000000000a', '05eecb00-0000-4000-8000-000000000002')$q$,
+    'permission denied for table applications'
+  );
   perform pg_temp.expect_allowed(
-    'seeker B files an application for themselves',
-    $q$insert into public.applications (listing_id, seeker_profile_id) values ('111a1000-0000-4000-8000-00000000000a', '05eecb00-0000-4000-8000-000000000002')$q$
+    'seeker B files through the JWT-derived submission RPC',
+    $q$select * from public.submit_my_application('111a1000-0000-4000-8000-00000000000a', null, null)$q$
   );
   perform pg_temp.expect_denied(
     'seeker B cannot file an application as seeker A',
     $q$insert into public.applications (listing_id, seeker_profile_id) values ('111b1000-0000-4000-8000-00000000000b', '05eeca00-0000-4000-8000-000000000001')$q$,
-    'new row violates row-level security policy for table "applications"'
+    'permission denied for table applications'
   );
   perform pg_temp.expect_rows(
     'seeker B reads own application',
@@ -935,7 +952,7 @@ begin
     0
   );
 
-  perform pg_temp.checkpoint_section('6b applications: seeker B', 4);
+  perform pg_temp.checkpoint_section('6b applications: seeker B', 5);
 end;
 $do$;
 reset role;
@@ -952,7 +969,7 @@ begin
   perform pg_temp.expect_denied(
     'anon cannot file an application',
     $q$insert into public.applications (listing_id, seeker_profile_id) values ('111a1000-0000-4000-8000-00000000000a', '05eeca00-0000-4000-8000-000000000001')$q$,
-    'new row violates row-level security policy for table "applications"'
+    'permission denied for table applications'
   );
 
   perform pg_temp.checkpoint_section('6c applications: anon', 2);
@@ -968,18 +985,15 @@ reset role;
 -- section closes the write side of the same model, because the two are not the
 -- same guarantee and were not covered by the same assertions.
 --
--- WHAT ANON ACTUALLY HOLDS HERE, MEASURED NOT ASSUMED. On all five client
--- tables -- listings, applications, host_profiles, seeker_profiles and
--- seeker_resume_experiences -- the role `anon` still carries Supabase's default
--- table-level UPDATE and DELETE, and INSERT on the three that 073 did not
--- revoke it from. Nothing about the schema grants anon a write POLICY on any of
--- them, so row-level security is the entire barrier, and it is a barrier made
--- of the absence of something. That is exactly the kind of guarantee that
--- disappears when someone adds one permissive policy "for the public API", so
--- it is pinned behaviourally below and structurally in the catalog check at the
--- end. seeker_resume_experiences is the one that matters most: an anon INSERT
--- there would let an unauthenticated caller write work history onto a real
--- person's resume.
+-- WHAT ANON ACTUALLY HOLDS HERE, MEASURED NOT ASSUMED. On the client tables
+-- other than applications, `anon` still carries historical Supabase default
+-- write grants and no write policy; RLS is therefore the effective barrier.
+-- Migration 091 deliberately makes applications stricter by revoking INSERT
+-- and UPDATE from PUBLIC/anon/authenticated, so its checks below expect a grant
+-- refusal instead. Both shapes are pinned: a permissive public policy must not
+-- open the former, and a future grant must not reopen applications. Resume rows
+-- remain the most sensitive legacy case because anon table INSERT plus a bad
+-- policy could plant work history onto a real person's profile.
 --
 -- WHAT A CROSS-ACCOUNT REFUSAL CAN AND CANNOT PROVE. A write refusal is only
 -- meaningful when the acting role can see the target row; otherwise the SELECT
@@ -1111,9 +1125,10 @@ end;
 $do$;
 reset role;
 
--- anon, holding table-level INSERT/UPDATE/DELETE on all five and no policy on
--- any of them. Every one of these is a row-level refusal; the catalog check
--- after them is what would notice a permissive anon policy being added.
+-- anon retains the historical table grants on these client tables except for
+-- applications INSERT/UPDATE, which 091 closes at the privilege boundary.
+-- The remaining statements are row-level refusals; the application UPDATE is
+-- the explicit privilege-level exception.
 set local role anon;
 set local request.jwt.claims = '{"role":"anon"}';
 
@@ -1144,10 +1159,10 @@ begin
     $q$delete from public.seeker_profiles where id = '05eeca00-0000-4000-8000-000000000001'$q$,
     0
   );
-  perform pg_temp.expect_write_rows(
+  perform pg_temp.expect_denied(
     'anon cannot edit an application',
     $q$update public.applications set status = 'accepted' where id = 'aaa10000-0000-4000-8000-000000000001'$q$,
-    0
+    'permission denied for table applications'
   );
   perform pg_temp.expect_write_rows(
     'anon cannot delete an application',
@@ -1506,8 +1521,8 @@ reset role;
 
 do $do$
 begin
-  -- 17 sections, 138 assertions: 31 positive controls and 107 refusals.
-  perform pg_temp.assert_suite_complete('authorization matrix', 17, 31, 107);
+  -- 17 sections, 139 assertions: 31 positive controls and 108 refusals.
+  perform pg_temp.assert_suite_complete('authorization matrix', 17, 31, 108);
 end;
 $do$;
 

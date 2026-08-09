@@ -69,6 +69,7 @@ const LOCKED_FUNCTIONS = [
   "ensure_my_application_conversation",
   "ensure_my_host_application_conversation",
   "get_my_conversation_contexts",
+  "submit_my_application",
 ]
 
 for (const [file, content] of fileContents) {
