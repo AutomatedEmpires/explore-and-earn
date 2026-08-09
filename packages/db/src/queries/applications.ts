@@ -232,12 +232,27 @@ async function legacySubmitApplication(
     .maybeSingle();
 
   if (insertError) {
+    if (insertError.code === UNIQUE_VIOLATION) {
+      // Fetch the existing application so the invite bridge can link it.
+      const { data: dup } = await authed
+        .from("applications")
+        .select("id")
+        .eq("listing_id", listingId)
+        .eq("seeker_profile_id", seekerProfileId)
+        .maybeSingle();
+      const dupId = (dup as { id?: unknown } | null)?.id;
+      return {
+        ok: false,
+        error: "already_applied" as const,
+        legacySubmission: true,
+        ...(typeof dupId === "string"
+          ? { applicationId: dupId, seekerProfileId }
+          : {}),
+      };
+    }
     return {
       ok: false,
-      error:
-        insertError.code === UNIQUE_VIOLATION
-          ? "already_applied"
-          : "temporarily_unavailable",
+      error: "temporarily_unavailable",
       legacySubmission: true,
     };
   }
@@ -333,8 +348,8 @@ export async function applyToListing(
   // this check gives stale/scripted clients the stable product error promptly.
   if (
     listingRow?.status !== "live" ||
-    listingRow.provenance !== "verified" ||
-    typeof listingRow.host_profile_id !== "string" ||
+    listingRow?.provenance !== "verified" ||
+    typeof listingRow?.host_profile_id !== "string" ||
     hostClerkId.length === 0 ||
     !expiryAcceptsApplications
   ) {

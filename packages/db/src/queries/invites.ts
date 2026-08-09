@@ -355,13 +355,7 @@ export async function respondToInvite(
       .select("id")
       .maybeSingle();
     if (updateError) {
-      return {
-        ok: false,
-        error:
-          target === "applied"
-            ? "temporarily_unavailable"
-            : updateError.message,
-      };
+      return { ok: false, error: "temporarily_unavailable" };
     }
     // Affected-row assertion: a zero-row UPDATE (concurrent response/withdraw
     // or an RLS filter — the write policy ships in migration 066) must never
