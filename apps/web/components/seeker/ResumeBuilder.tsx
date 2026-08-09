@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -90,6 +96,32 @@ const PREDEFINED_SKILLS = [
 
 type StepId = 0 | 1 | 2 | 3 | 4;
 
+type BeforeLeaveBlockReason = "open_entry" | "save_failed";
+type BeforeLeaveResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: BeforeLeaveBlockReason };
+
+interface BeforeLeaveHandle {
+  readonly beforeLeave: () => Promise<BeforeLeaveResult>;
+  readonly willSave: boolean;
+}
+
+type RegisterBeforeLeave = (handle: BeforeLeaveHandle) => () => void;
+
+const ALLOW_LEAVE: BeforeLeaveResult = { ok: true };
+const BLOCK_OPEN_ENTRY: BeforeLeaveResult = {
+  ok: false,
+  reason: "open_entry",
+};
+const BLOCK_SAVE_FAILED: BeforeLeaveResult = {
+  ok: false,
+  reason: "save_failed",
+};
+
+const SAVE_ERROR_MESSAGE = "We couldn’t save your changes. Try again.";
+const OPEN_ENTRY_MESSAGE =
+  "Save or cancel the open entry before moving to another step.";
+
 const STEPS: { label: string; icon: IconKey }[] = [
   { label: "Info", icon: "nav.profile" },
   { label: "Experience", icon: "analytics.trend" },
@@ -98,10 +130,38 @@ const STEPS: { label: string; icon: IconKey }[] = [
   { label: "Review", icon: "action.apply" },
 ];
 
+function useBeforeLeave(
+  registerBeforeLeave: RegisterBeforeLeave,
+  beforeLeave: BeforeLeaveHandle["beforeLeave"],
+  willSave = false,
+): void {
+  const latestBeforeLeaveRef = useRef(beforeLeave);
+  latestBeforeLeaveRef.current = beforeLeave;
+  const invokeLatestBeforeLeave = useCallback(
+    () => latestBeforeLeaveRef.current(),
+    [],
+  );
+
+  useEffect(() => {
+    const handle: BeforeLeaveHandle = {
+      beforeLeave: invokeLatestBeforeLeave,
+      willSave,
+    };
+    return registerBeforeLeave(handle);
+  }, [invokeLatestBeforeLeave, registerBeforeLeave, willSave]);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isCategory(value: string): value is MarketplaceCategory {
   return (MARKETPLACE_CATEGORIES as readonly string[]).includes(value);
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
 }
 
 function formatDateRange(
@@ -122,6 +182,20 @@ function formatDateRange(
   return "";
 }
 
+function persistedCompletedSteps(resume: SeekerResume): Set<number> {
+  const completed = new Set<number>();
+  if (resume.profile?.bio || resume.profile?.displayName) completed.add(0);
+  if (resume.experiences.length > 0) completed.add(1);
+  if (resume.educations.length > 0) completed.add(2);
+  if (
+    resume.certifications.length > 0 ||
+    (resume.profile?.generalSkills?.length ?? 0) > 0
+  ) {
+    completed.add(3);
+  }
+  return completed;
+}
+
 // ─── Step progress ──────────────────────────────────────────────────────────
 
 interface CompletionRingProps {
@@ -133,11 +207,20 @@ interface CompletionRingProps {
 function CompletionRing({ pct }: CompletionRingProps) {
   const r = 19;
   const circ = 2 * Math.PI * r;
-  const dash = (Math.max(0, Math.min(100, pct)) / 100) * circ;
-  const complete = pct >= 100;
+  const clampedPct = Math.max(0, Math.min(100, pct));
+  const dash = (clampedPct / 100) * circ;
+  const complete = clampedPct >= 100;
 
   return (
-    <div className={complete ? styles.ringWrapComplete : styles.ringWrap}>
+    <div
+      className={complete ? styles.ringWrapComplete : styles.ringWrap}
+      role="progressbar"
+      aria-label="Resume completion"
+      aria-valuenow={clampedPct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuetext={complete ? "Resume complete" : `${clampedPct}% complete`}
+    >
       <svg className={styles.ring} viewBox="0 0 44 44" aria-hidden="true">
         <circle
           className={styles.ringTrack}
@@ -158,7 +241,7 @@ function CompletionRing({ pct }: CompletionRingProps) {
         />
       </svg>
       <span className={styles.ringPct}>
-        {complete ? <Icon name="action.apply" size={20} aria-hidden /> : `${pct}%`}
+        {complete ? <Icon name="action.apply" size={20} aria-hidden /> : `${clampedPct}%`}
       </span>
     </div>
   );
@@ -166,8 +249,9 @@ function CompletionRing({ pct }: CompletionRingProps) {
 
 interface StepProgressProps {
   current: StepId;
-  completed: Set<number>;
+  completed: ReadonlySet<number>;
   completion: number;
+  disabled: boolean;
   onStep: (step: StepId) => void;
 }
 
@@ -175,7 +259,13 @@ interface StepProgressProps {
    horizontally overflows (each node flexes equally). The current step is
    emphasized; finished steps carry a check. The active step's full title sits
    below the rail so labels never crowd the track on narrow screens. */
-function StepProgress({ current, completed, completion, onStep }: StepProgressProps) {
+function StepProgress({
+  current,
+  completed,
+  completion,
+  disabled,
+  onStep,
+}: StepProgressProps) {
   const active = STEPS[current];
   const completionLabel =
     completion >= 100 ? "Resume complete" : `${completion}% complete`;
@@ -197,7 +287,11 @@ function StepProgress({ current, completed, completion, onStep }: StepProgressPr
         </span>
       </div>
 
-      <nav className={styles.rail} aria-label="Resume builder steps">
+      <nav
+        className={styles.rail}
+        aria-label="Resume builder steps"
+        aria-busy={disabled}
+      >
         {STEPS.map((step, index) => {
           const isActive = index === current;
           const isDone = completed.has(index) && !isActive;
@@ -212,6 +306,7 @@ function StepProgress({ current, completed, completion, onStep }: StepProgressPr
               type="button"
               className={cls}
               onClick={() => { onStep(index as StepId); }}
+              disabled={disabled}
               aria-current={isActive ? "step" : undefined}
               aria-label={`Step ${index + 1}: ${step.label}${isDone ? " (done)" : ""}`}
             >
@@ -309,10 +404,15 @@ function TagBuilder({
 
 interface CategoryPickerProps {
   selected: string[];
+  disabled?: boolean;
   onChange: (next: string[]) => void;
 }
 
-function CategoryPicker({ selected, onChange }: CategoryPickerProps) {
+function CategoryPicker({
+  selected,
+  disabled = false,
+  onChange,
+}: CategoryPickerProps) {
   function toggle(cat: MarketplaceCategory) {
     onChange(
       selected.includes(cat)
@@ -330,6 +430,7 @@ function CategoryPicker({ selected, onChange }: CategoryPickerProps) {
           className={selected.includes(cat) ? styles.catSelected : styles.cat}
           aria-pressed={selected.includes(cat)}
           onClick={() => { toggle(cat); }}
+          disabled={disabled}
         >
           <Icon name={CATEGORY_ICON[cat]} size={16} aria-hidden />
           {CATEGORY_LABEL[cat]}
@@ -343,11 +444,19 @@ function CategoryPicker({ selected, onChange }: CategoryPickerProps) {
 
 interface GeneralSkillsPickerProps {
   selected: string[];
+  customDraft: string;
+  disabled?: boolean;
+  onCustomDraftChange: (next: string) => void;
   onChange: (next: string[]) => void;
 }
 
-function GeneralSkillsPicker({ selected, onChange }: GeneralSkillsPickerProps) {
-  const [customDraft, setCustomDraft] = useState("");
+function GeneralSkillsPicker({
+  selected,
+  customDraft,
+  disabled = false,
+  onCustomDraftChange,
+  onChange,
+}: GeneralSkillsPickerProps) {
   const atMax = selected.length >= MAX_GENERAL_SKILLS;
 
   function togglePredefined(skill: string) {
@@ -364,7 +473,7 @@ function GeneralSkillsPicker({ selected, onChange }: GeneralSkillsPickerProps) {
     if (!selected.some((x) => x.toLowerCase() === s.toLowerCase())) {
       onChange([...selected, s]);
     }
-    setCustomDraft("");
+    onCustomDraftChange("");
   }
 
   return (
@@ -379,7 +488,7 @@ function GeneralSkillsPicker({ selected, onChange }: GeneralSkillsPickerProps) {
               className={isSelected ? styles.skillBadgeSelected : styles.skillBadge}
               aria-pressed={isSelected}
               onClick={() => { togglePredefined(skill); }}
-              disabled={!isSelected && atMax}
+              disabled={disabled || (!isSelected && atMax)}
             >
               {skill}
             </button>
@@ -393,8 +502,8 @@ function GeneralSkillsPicker({ selected, onChange }: GeneralSkillsPickerProps) {
           value={customDraft}
           placeholder="Add custom skill…"
           maxLength={32}
-          disabled={atMax}
-          onChange={(e) => { setCustomDraft(e.target.value); }}
+          disabled={disabled || atMax}
+          onChange={(e) => { onCustomDraftChange(e.target.value); }}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); addCustom(); }
           }}
@@ -403,10 +512,20 @@ function GeneralSkillsPicker({ selected, onChange }: GeneralSkillsPickerProps) {
           type="button"
           className={styles.ghostBtn}
           onClick={addCustom}
-          disabled={atMax || !customDraft.trim()}
+          disabled={disabled || atMax || !customDraft.trim()}
         >
           Add
         </button>
+        {customDraft ? (
+          <button
+            type="button"
+            className={styles.ghostBtn}
+            onClick={() => { onCustomDraftChange(""); }}
+            disabled={disabled}
+          >
+            Clear
+          </button>
+        ) : null}
       </div>
       {selected.length > 0 && (
         <div className={styles.tagList}>
@@ -417,6 +536,7 @@ function GeneralSkillsPicker({ selected, onChange }: GeneralSkillsPickerProps) {
               className={styles.tag}
               onClick={() => { onChange(selected.filter((x) => x !== s)); }}
               aria-label={`Remove ${s}`}
+              disabled={disabled}
             >
               {s} ✕
             </button>
@@ -485,7 +605,11 @@ function ExperienceForm({ initial, onSave, onCancel, pending }: ExperienceFormPr
       setState((s) => ({ ...s, [key]: value }));
 
   return (
-    <div className={styles.form}>
+    <fieldset
+      className={`${styles.form} ${styles.editorFieldset}`}
+      disabled={pending}
+      aria-busy={pending}
+    >
       <div className={styles.formRow}>
         <label className={styles.formField}>
           <span className={styles.fieldLabel}>Role title</span>
@@ -600,7 +724,7 @@ function ExperienceForm({ initial, onSave, onCancel, pending }: ExperienceFormPr
           {pending ? "Saving…" : "Save"}
         </button>
       </div>
-    </div>
+    </fieldset>
   );
 }
 
@@ -658,7 +782,11 @@ function EducationForm({ initial, onSave, onCancel, pending }: EducationFormProp
       setState((s) => ({ ...s, [key]: value }));
 
   return (
-    <div className={styles.form}>
+    <fieldset
+      className={`${styles.form} ${styles.editorFieldset}`}
+      disabled={pending}
+      aria-busy={pending}
+    >
       <div className={styles.formRow}>
         <label className={styles.formField}>
           <span className={styles.fieldLabel}>School / institution</span>
@@ -764,7 +892,7 @@ function EducationForm({ initial, onSave, onCancel, pending }: EducationFormProp
           {pending ? "Saving…" : "Save"}
         </button>
       </div>
-    </div>
+    </fieldset>
   );
 }
 
@@ -825,7 +953,11 @@ function CertForm({ initial, onSave, onCancel, pending }: CertFormProps) {
       setState((s) => ({ ...s, [key]: value }));
 
   return (
-    <div className={styles.form}>
+    <fieldset
+      className={`${styles.form} ${styles.editorFieldset}`}
+      disabled={pending}
+      aria-busy={pending}
+    >
       <div className={styles.formRow}>
         <label className={styles.formField}>
           <span className={styles.fieldLabel}>Certification name</span>
@@ -931,7 +1063,7 @@ function CertForm({ initial, onSave, onCancel, pending }: CertFormProps) {
           {pending ? "Saving…" : "Save"}
         </button>
       </div>
-    </div>
+    </fieldset>
   );
 }
 
@@ -940,11 +1072,20 @@ function CertForm({ initial, onSave, onCancel, pending }: CertFormProps) {
 interface InfoStepProps {
   resume: SeekerResume;
   onSaved: () => void;
+  onSaveFailure: () => void;
   pending: boolean;
+  registerBeforeLeave: RegisterBeforeLeave;
   startTransition: (fn: () => void) => void;
 }
 
-function InfoStep({ resume, onSaved, pending, startTransition }: InfoStepProps) {
+function InfoStep({
+  resume,
+  onSaved,
+  onSaveFailure,
+  pending,
+  registerBeforeLeave,
+  startTransition,
+}: InfoStepProps) {
   const [displayName, setDisplayName] = useState(
     resume.profile?.displayName ?? "",
   );
@@ -956,18 +1097,59 @@ function InfoStep({ resume, onSaved, pending, startTransition }: InfoStepProps) 
   const [categories, setCategories] = useState<string[]>(
     [...(resume.profile?.desiredCategories ?? [])],
   );
+  const persistedDraftRef = useRef({
+    displayName: resume.profile?.displayName ?? "",
+    location: resume.profile?.location ?? "",
+    seekingTimeline: resume.profile?.seekingTimeline ?? "",
+    bio: resume.profile?.bio ?? "",
+    categories: [...(resume.profile?.desiredCategories ?? [])],
+  });
   const [saved, setSaved] = useState(false);
+  const dirty =
+    displayName !== persistedDraftRef.current.displayName ||
+    location !== persistedDraftRef.current.location ||
+    seekingTimeline !== persistedDraftRef.current.seekingTimeline ||
+    bio !== persistedDraftRef.current.bio ||
+    !sameStrings(categories, persistedDraftRef.current.categories);
 
-  function handleSave() {
-    startTransition(async () => {
-      const result = await saveInfoAction({
+  const persistInfo = useCallback(async (): Promise<boolean> => {
+    if (!dirty) return true;
+
+    try {
+      const submitted = {
         displayName,
         location,
         seekingTimeline,
         bio,
-        desiredCategories: categories,
-      });
-      if (result.ok) { setSaved(true); onSaved(); }
+        desiredCategories: [...categories],
+      };
+      const result = await saveInfoAction(submitted);
+      if (!result.ok) return false;
+
+      persistedDraftRef.current = {
+        displayName: submitted.displayName,
+        location: submitted.location,
+        seekingTimeline: submitted.seekingTimeline,
+        bio: submitted.bio,
+        categories: submitted.desiredCategories,
+      };
+      setSaved(true);
+      onSaved();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [bio, categories, dirty, displayName, location, onSaved, seekingTimeline]);
+
+  const beforeLeave = useCallback(async (): Promise<BeforeLeaveResult> => {
+    return (await persistInfo()) ? ALLOW_LEAVE : BLOCK_SAVE_FAILED;
+  }, [persistInfo]);
+
+  useBeforeLeave(registerBeforeLeave, beforeLeave, dirty);
+
+  function handleSave() {
+    startTransition(async () => {
+      if (!(await persistInfo())) onSaveFailure();
     });
   }
 
@@ -988,7 +1170,11 @@ function InfoStep({ resume, onSaved, pending, startTransition }: InfoStepProps) 
               type="text"
               value={displayName}
               placeholder="Your display name"
-              onChange={(e) => { setDisplayName(e.target.value); setSaved(false); }}
+              disabled={pending}
+              onChange={(e) => {
+                setDisplayName(e.target.value);
+                setSaved(false);
+              }}
             />
           </label>
           <label className={styles.formField}>
@@ -998,7 +1184,11 @@ function InfoStep({ resume, onSaved, pending, startTransition }: InfoStepProps) 
               type="text"
               value={location}
               placeholder="City, state or region"
-              onChange={(e) => { setLocation(e.target.value); setSaved(false); }}
+              disabled={pending}
+              onChange={(e) => {
+                setLocation(e.target.value);
+                setSaved(false);
+              }}
             />
           </label>
         </div>
@@ -1016,7 +1206,12 @@ function InfoStep({ resume, onSaved, pending, startTransition }: InfoStepProps) 
                     : styles.segment
                 }
                 aria-pressed={seekingTimeline === opt.value}
-                onClick={() => { setSeekingTimeline(opt.value); setSaved(false); }}
+                onClick={() => {
+                  if (seekingTimeline === opt.value) return;
+                  setSeekingTimeline(opt.value);
+                  setSaved(false);
+                }}
+                disabled={pending}
               >
                 {opt.label}
               </button>
@@ -1031,7 +1226,11 @@ function InfoStep({ resume, onSaved, pending, startTransition }: InfoStepProps) 
             value={bio}
             rows={4}
             placeholder="What kind of work excites you? What&#39;s your story?"
-            onChange={(e) => { setBio(e.target.value); setSaved(false); }}
+            disabled={pending}
+            onChange={(e) => {
+              setBio(e.target.value);
+              setSaved(false);
+            }}
           />
         </label>
 
@@ -1041,7 +1240,11 @@ function InfoStep({ resume, onSaved, pending, startTransition }: InfoStepProps) 
           </span>
           <CategoryPicker
             selected={categories}
-            onChange={(v) => { setCategories(v); setSaved(false); }}
+            disabled={pending}
+            onChange={(v) => {
+              setCategories(v);
+              setSaved(false);
+            }}
           />
         </div>
 
@@ -1053,7 +1256,7 @@ function InfoStep({ resume, onSaved, pending, startTransition }: InfoStepProps) 
             type="button"
             className={styles.primaryBtn}
             onClick={handleSave}
-            disabled={pending}
+            disabled={pending || !dirty}
           >
             Save info
           </button>
@@ -1067,6 +1270,7 @@ interface ExperienceStepProps {
   resume: SeekerResume;
   router: ReturnType<typeof useRouter>;
   pending: boolean;
+  registerBeforeLeave: RegisterBeforeLeave;
   startTransition: (fn: () => void) => void;
 }
 
@@ -1074,11 +1278,20 @@ function ExperienceStep({
   resume,
   router,
   pending,
+  registerBeforeLeave,
   startTransition,
 }: ExperienceStepProps) {
   const [expEditing, setExpEditing] = useState<string | null>(null);
   const [expAdding, setExpAdding] = useState(false);
   const atMax = resume.experiences.length >= MAX_EXPERIENCES;
+
+  const beforeLeave = useCallback(async (): Promise<BeforeLeaveResult> => {
+    return expAdding || expEditing !== null
+      ? BLOCK_OPEN_ENTRY
+      : ALLOW_LEAVE;
+  }, [expAdding, expEditing]);
+
+  useBeforeLeave(registerBeforeLeave, beforeLeave);
 
   function handleAdd(state: ExperienceFormState) {
     return new Promise<void>((resolve) => {
@@ -1230,6 +1443,7 @@ interface EducationStepProps {
   resume: SeekerResume;
   router: ReturnType<typeof useRouter>;
   pending: boolean;
+  registerBeforeLeave: RegisterBeforeLeave;
   startTransition: (fn: () => void) => void;
 }
 
@@ -1237,10 +1451,19 @@ function EducationStep({
   resume,
   router,
   pending,
+  registerBeforeLeave,
   startTransition,
 }: EducationStepProps) {
   const [eduEditing, setEduEditing] = useState<string | null>(null);
   const [eduAdding, setEduAdding] = useState(false);
+
+  const beforeLeave = useCallback(async (): Promise<BeforeLeaveResult> => {
+    return eduAdding || eduEditing !== null
+      ? BLOCK_OPEN_ENTRY
+      : ALLOW_LEAVE;
+  }, [eduAdding, eduEditing]);
+
+  useBeforeLeave(registerBeforeLeave, beforeLeave);
 
   function handleAdd(state: EducationFormState) {
     return new Promise<void>((resolve) => {
@@ -1379,14 +1602,20 @@ function EducationStep({
 interface CertsSkillsStepProps {
   resume: SeekerResume;
   router: ReturnType<typeof useRouter>;
+  onSaved: () => void;
+  onSaveFailure: () => void;
   pending: boolean;
+  registerBeforeLeave: RegisterBeforeLeave;
   startTransition: (fn: () => void) => void;
 }
 
 function CertsSkillsStep({
   resume,
   router,
+  onSaved,
+  onSaveFailure,
   pending,
+  registerBeforeLeave,
   startTransition,
 }: CertsSkillsStepProps) {
   const [certEditing, setCertEditing] = useState<string | null>(null);
@@ -1394,7 +1623,42 @@ function CertsSkillsStep({
   const [generalSkills, setGeneralSkills] = useState<string[]>(
     [...(resume.profile?.generalSkills ?? [])],
   );
+  const [customSkillDraft, setCustomSkillDraft] = useState("");
+  const persistedSkillsRef = useRef([
+    ...(resume.profile?.generalSkills ?? []),
+  ]);
   const [skillsSaved, setSkillsSaved] = useState(false);
+  const skillsDirty = !sameStrings(generalSkills, persistedSkillsRef.current);
+
+  const persistSkills = useCallback(async (): Promise<boolean> => {
+    if (!skillsDirty) return true;
+
+    try {
+      const submitted = generalSkills.slice(0, MAX_GENERAL_SKILLS);
+      const result = await saveInfoAction({ generalSkills: submitted });
+      if (!result.ok) return false;
+
+      persistedSkillsRef.current = submitted;
+      setSkillsSaved(true);
+      onSaved();
+      return true;
+    } catch {
+      return false;
+    }
+  }, [generalSkills, onSaved, skillsDirty]);
+
+  const beforeLeave = useCallback(async (): Promise<BeforeLeaveResult> => {
+    if (certAdding || certEditing !== null || customSkillDraft.trim()) {
+      return BLOCK_OPEN_ENTRY;
+    }
+    return (await persistSkills()) ? ALLOW_LEAVE : BLOCK_SAVE_FAILED;
+  }, [certAdding, certEditing, customSkillDraft, persistSkills]);
+
+  useBeforeLeave(
+    registerBeforeLeave,
+    beforeLeave,
+    skillsDirty && !certAdding && certEditing === null && !customSkillDraft.trim(),
+  );
 
   function handleAddCert(state: CertFormState) {
     if (!state.name.trim()) return Promise.resolve();
@@ -1447,10 +1711,7 @@ function CertsSkillsStep({
 
   function saveSkills() {
     startTransition(async () => {
-      const result = await saveInfoAction({
-        generalSkills: generalSkills.slice(0, MAX_GENERAL_SKILLS),
-      });
-      if (result.ok) { setSkillsSaved(true); router.refresh(); }
+      if (!(await persistSkills())) onSaveFailure();
     });
   }
 
@@ -1579,7 +1840,13 @@ function CertsSkillsStep({
         <div className={styles.form}>
           <GeneralSkillsPicker
             selected={generalSkills}
-            onChange={(v) => { setGeneralSkills(v); setSkillsSaved(false); }}
+            customDraft={customSkillDraft}
+            disabled={pending}
+            onCustomDraftChange={setCustomSkillDraft}
+            onChange={(v) => {
+              setGeneralSkills(v);
+              setSkillsSaved(false);
+            }}
           />
           <div className={styles.formActions}>
             <span className={styles.saveStatus}>
@@ -1589,7 +1856,7 @@ function CertsSkillsStep({
               type="button"
               className={styles.primaryBtn}
               onClick={saveSkills}
-              disabled={pending}
+              disabled={pending || !skillsDirty}
             >
               Save skills
             </button>
@@ -1609,51 +1876,110 @@ export interface ResumeBuilderProps {
 
 export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [transitionPending, startTransition] = useTransition();
   const [step, setStep] = useState<StepId>(0);
+  const [navigationPending, setNavigationPending] = useState(false);
+  const [navigationAlert, setNavigationAlert] = useState<string | null>(null);
+  const [stepWillSave, setStepWillSave] = useState(false);
+  const beforeLeaveRef = useRef<BeforeLeaveHandle | null>(null);
+  const navigationInFlightRef = useRef(false);
+  const pending = transitionPending || navigationPending;
+  const completed = persistedCompletedSteps(resume);
 
-  // Track which steps have been touched/saved
-  const [completed, setCompleted] = useState<Set<number>>(() => {
-    const s = new Set<number>();
-    if (resume.profile?.bio || resume.profile?.displayName) s.add(0);
-    if (resume.experiences.length > 0) s.add(1);
-    if (resume.educations.length > 0) s.add(2);
-    if (resume.certifications.length > 0 || (resume.profile?.generalSkills?.length ?? 0) > 0) s.add(3);
-    return s;
-  });
+  const registerBeforeLeave = useCallback<RegisterBeforeLeave>((handle) => {
+    beforeLeaveRef.current = handle;
+    setStepWillSave(handle.willSave);
 
-  function markDone(stepIndex: number) {
-    setCompleted((prev) => new Set([...prev, stepIndex]));
-  }
+    return () => {
+      if (beforeLeaveRef.current !== handle) return;
+      beforeLeaveRef.current = null;
+      setStepWillSave(false);
+    };
+  }, []);
+
+  const showSaveFailure = useCallback(() => {
+    setNavigationAlert(SAVE_ERROR_MESSAGE);
+  }, []);
+
+  const refreshResume = useCallback(() => {
+    setNavigationAlert(null);
+    router.refresh();
+  }, [router]);
+
+  const requestStep = useCallback(async (target: StepId): Promise<void> => {
+    if (
+      target === step ||
+      transitionPending ||
+      navigationInFlightRef.current
+    ) {
+      return;
+    }
+
+    navigationInFlightRef.current = true;
+    setNavigationPending(true);
+    setNavigationAlert(null);
+    const beforeLeave = beforeLeaveRef.current?.beforeLeave;
+
+    try {
+      const result = beforeLeave ? await beforeLeave() : ALLOW_LEAVE;
+      if (!result.ok) {
+        setNavigationAlert(
+          result.reason === "open_entry"
+            ? OPEN_ENTRY_MESSAGE
+            : SAVE_ERROR_MESSAGE,
+        );
+        return;
+      }
+
+      beforeLeaveRef.current = null;
+      setStepWillSave(false);
+      setStep(target);
+    } catch {
+      setNavigationAlert(SAVE_ERROR_MESSAGE);
+    } finally {
+      navigationInFlightRef.current = false;
+      setNavigationPending(false);
+    }
+  }, [step, transitionPending]);
+
+  const backLabel = stepWillSave ? "Save & back" : "Back";
+  const continueLabel =
+    step === 3
+      ? stepWillSave
+        ? "Save & review"
+        : "Review resume"
+      : stepWillSave
+        ? "Save & continue"
+        : "Continue";
 
   return (
-    <div className={styles.builder}>
+    <div
+      className={styles.builder}
+      role="region"
+      aria-label="Resume builder"
+      aria-busy={pending}
+    >
       {/* Fast start: import an existing résumé, review, then save into the steps */}
       <ResumeImport resume={resume} />
 
       {/* Progress + step rail */}
-      <div
-        role="progressbar"
-        aria-valuenow={completion}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label="Resume completion"
-      >
-        <StepProgress
-          current={step}
-          completed={completed}
-          completion={completion}
-          onStep={(s) => { setStep(s); }}
-        />
-      </div>
+      <StepProgress
+        current={step}
+        completed={completed}
+        completion={completion}
+        disabled={pending}
+        onStep={(target) => { void requestStep(target); }}
+      />
 
       {/* Step panels */}
       {step === 0 && (
         <InfoStep
           resume={resume}
           pending={pending}
+          registerBeforeLeave={registerBeforeLeave}
           startTransition={startTransition}
-          onSaved={() => { markDone(0); router.refresh(); }}
+          onSaved={refreshResume}
+          onSaveFailure={showSaveFailure}
         />
       )}
       {step === 1 && (
@@ -1661,6 +1987,7 @@ export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
           resume={resume}
           router={router}
           pending={pending}
+          registerBeforeLeave={registerBeforeLeave}
           startTransition={startTransition}
         />
       )}
@@ -1669,6 +1996,7 @@ export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
           resume={resume}
           router={router}
           pending={pending}
+          registerBeforeLeave={registerBeforeLeave}
           startTransition={startTransition}
         />
       )}
@@ -1676,7 +2004,10 @@ export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
         <CertsSkillsStep
           resume={resume}
           router={router}
+          onSaved={refreshResume}
+          onSaveFailure={showSaveFailure}
           pending={pending}
+          registerBeforeLeave={registerBeforeLeave}
           startTransition={startTransition}
         />
       )}
@@ -1694,15 +2025,26 @@ export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
         </div>
       )}
 
+      {navigationAlert ? (
+        <p className={styles.navigationError} role="alert">
+          {navigationAlert}
+        </p>
+      ) : null}
+
       {/* Step footer nav — sticky on mobile so advancing is always reachable */}
-      <div className={styles.stepFooter}>
+      <nav
+        className={styles.stepFooter}
+        aria-label="Resume step actions"
+        aria-busy={pending}
+      >
         {step > 0 ? (
           <button
             type="button"
             className={styles.backBtn}
-            onClick={() => { setStep((s) => (s - 1) as StepId); }}
+            onClick={() => { void requestStep((step - 1) as StepId); }}
+            disabled={pending}
           >
-            <Icon name="action.back" size={16} aria-hidden /> Back
+            <Icon name="action.back" size={16} aria-hidden /> {backLabel}
           </button>
         ) : (
           <span className={styles.stepCounter} aria-hidden="true">
@@ -1713,16 +2055,14 @@ export function ResumeBuilder({ resume, completion }: ResumeBuilderProps) {
           <button
             type="button"
             className={styles.continueBtn}
-            onClick={() => {
-              markDone(step);
-              setStep((s) => (s + 1) as StepId);
-            }}
+            onClick={() => { void requestStep((step + 1) as StepId); }}
+            disabled={pending}
           >
-            {step === 3 ? "Review resume" : "Save & continue"}
+            {continueLabel}
             <Icon name="action.forward" size={16} aria-hidden />
           </button>
         )}
-      </div>
+      </nav>
     </div>
   );
 }
