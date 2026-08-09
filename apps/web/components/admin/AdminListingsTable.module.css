@@ -87,61 +87,11 @@
   color: var(--status-error-fg);
 }
 
-/* ── Triage bar: search + sort, for faster moderation ── */
+/* ── Triage bar: local sort controls; search lives in the canonical shell. ── */
 .triageBar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-}
-
-.search {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  flex: 1 1 240px;
-  max-width: 360px;
-}
-
-.searchIcon {
-  position: absolute;
-  left: var(--space-12);
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-
-.searchInput {
-  width: 100%;
-  min-height: var(--tap-min, 44px);
-  padding: var(--space-8) var(--space-12) var(--space-8) var(--space-32);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--text-primary);
-  font-family: var(--font-ui);
-  font-size: var(--type-meta-size);
-  line-height: 1.4;
-  transition:
-    border-color var(--motion-base) var(--ease-standard),
-    background var(--motion-base) var(--ease-standard);
-}
-
-.searchInput::placeholder {
-  color: var(--text-muted);
-}
-
-.searchInput:hover {
-  border-color: color-mix(in srgb, var(--color-cta) 30%, var(--border-soft));
-}
-
-.searchInput:focus-visible {
-  outline: none;
-  border-color: var(--color-cta);
-  background: var(--color-surface-raised);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-cta) 24%, transparent);
+  justify-content: flex-end;
 }
 
 .sorts {
@@ -163,7 +113,7 @@
 }
 
 .sort {
-  min-height: 36px;
+  min-height: var(--tap-min);
   padding: var(--space-6) var(--space-12);
   border-radius: var(--radius-pill);
   border: 1px solid transparent;
@@ -201,7 +151,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .searchInput,
   .sort {
     transition: none;
   }

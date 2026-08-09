@@ -11,6 +11,10 @@ import {
 } from "../shell";
 import { CommandSearch } from "../shared/CommandSearch";
 import { RolePill } from "../global/RolePill";
+import {
+  ADMIN_QUERY_MAX_LENGTH,
+  resolveAdminSearch,
+} from "./adminSearch";
 
 /**
  * Admin OS shell — the moderation command center chrome.
@@ -79,6 +83,7 @@ export function AdminShell({
   children,
 }: AdminShellProps) {
   const pathname = usePathname();
+  const search = resolveAdminSearch(pathname);
   const name = adminName?.trim() || "Moderator";
   const initial = name.charAt(0).toUpperCase();
   const health = Math.max(0, Math.min(100, Math.round(healthScore)));
@@ -135,8 +140,10 @@ export function AdminShell({
           <RolePill role="admin" />
           <CommandSearch
             className="adminos-search"
-            action="/applications"
-            placeholder="Search listings, hosts, applications…"
+            action={search.action}
+            placeholder={search.placeholder}
+            ariaLabel={search.ariaLabel}
+            maxLength={ADMIN_QUERY_MAX_LENGTH}
           />
           <div className="adminos-topmeta">
             {/* Theme switcher removed (D17): appearance is a preference, and

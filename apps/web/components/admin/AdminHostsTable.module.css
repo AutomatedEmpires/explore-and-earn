@@ -50,7 +50,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-8);
-  min-height: 36px;
+  min-height: var(--tap-min);
   padding: var(--space-6) var(--space-14);
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
@@ -133,6 +133,19 @@
 .errorIcon {
   flex: none;
   color: var(--status-error-fg);
+}
+
+.resultLine {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--type-meta-size);
+  line-height: var(--type-meta-lh);
+  color: var(--text-muted);
+}
+
+.resultLine strong {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
 }
 
 /* ── Entity-card grid ───────────────────────────────────────────────────── */

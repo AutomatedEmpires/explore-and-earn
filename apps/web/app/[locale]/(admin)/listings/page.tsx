@@ -1,19 +1,28 @@
 import type { Metadata } from "next";
 import { getAllListingsForModeration } from "@explore-and-earn/db";
 
-import { AdminListingsTable, AdminPager } from "../../../../components/admin";
+import {
+  AdminListingsTable,
+  AdminPager,
+  readAdminQuery,
+} from "../../../../components/admin";
 import styles from "../shared.module.css";
 
 export const metadata: Metadata = { title: "Listings" };
 export const dynamic = "force-dynamic";
 
 interface Props {
-  searchParams: Promise<{ page?: string }>;
+  readonly searchParams: Promise<{
+    readonly page?: string | string[];
+    readonly q?: string | string[];
+  }>;
 }
 
 export default async function AdminListingsPage({ searchParams }: Props) {
-  const { page: pageParam } = await searchParams;
-  const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
+  const { page: pageParam, q } = await searchParams;
+  const pageValue = Array.isArray(pageParam) ? pageParam[0] : pageParam;
+  const page = Math.max(1, Number.parseInt(pageValue ?? "1", 10) || 1);
+  const query = readAdminQuery(q);
 
   const serviceRoleToken = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const { rows: listings, ...pager } = await getAllListingsForModeration(
@@ -29,8 +38,8 @@ export default async function AdminListingsPage({ searchParams }: Props) {
           Approve, reject, and review every listing across the marketplace.
         </p>
       </header>
-      <AdminListingsTable listings={listings} />
-      <AdminPager basePath="/listings" {...pager} />
+      <AdminListingsTable listings={listings} initialQuery={query} />
+      <AdminPager basePath="/listings" query={query} {...pager} />
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@explore-and-earn/ui";
 
+import { adminPageHref } from "./adminSearch";
 import styles from "./AdminPager.module.css";
 
 export interface AdminPagerProps {
@@ -9,10 +10,7 @@ export interface AdminPagerProps {
   readonly totalPages: number;
   readonly total: number;
   readonly pageSize: number;
-}
-
-function pageHref(basePath: string, page: number): string {
-  return page <= 1 ? basePath : `${basePath}?page=${page}`;
+  readonly query?: string;
 }
 
 /**
@@ -20,7 +18,14 @@ function pageHref(basePath: string, page: number): string {
  * getAllListingsForModeration). Server-rendered links — no client state, works
  * with force-dynamic pages and browser back/forward for free.
  */
-export function AdminPager({ basePath, page, totalPages, total, pageSize }: AdminPagerProps) {
+export function AdminPager({
+  basePath,
+  page,
+  totalPages,
+  total,
+  pageSize,
+  query = "",
+}: AdminPagerProps) {
   if (total === 0) return null;
 
   const from = (page - 1) * pageSize + 1;
@@ -35,7 +40,7 @@ export function AdminPager({ basePath, page, totalPages, total, pageSize }: Admi
       </span>
       <span className={styles.links}>
         {hasPrev ? (
-          <Link className={styles.link} href={pageHref(basePath, page - 1)}>
+          <Link className={styles.link} href={adminPageHref(basePath, page - 1, query)}>
             <Icon name="action.back" size={16} aria-hidden />
             Prev
           </Link>
@@ -46,7 +51,7 @@ export function AdminPager({ basePath, page, totalPages, total, pageSize }: Admi
           </span>
         )}
         {hasNext ? (
-          <Link className={styles.link} href={pageHref(basePath, page + 1)}>
+          <Link className={styles.link} href={adminPageHref(basePath, page + 1, query)}>
             Next
             <Icon name="action.forward" size={16} aria-hidden />
           </Link>
