@@ -166,6 +166,34 @@ describe("listing media ownership", () => {
     expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
     expect(database.inserts).toEqual([]);
   });
+
+  it("rejects an unowned cover on update before touching the listing row", async () => {
+    const result = await updateListing("token", "user-1", "listing-1", {
+      coverPhotoUrl: `${storageRoot}/host-2/cover`,
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it.each(["create", "update"] as const)(
+    "rejects an unowned gallery URL on %s",
+    async (operation) => {
+      const fields = {
+        title: "Orchard harvest",
+        category: "farm" as const,
+        galleryUrls: [`${storageRoot}/host-2/0`],
+      };
+      const result =
+        operation === "create"
+          ? await createListing("token", "user-1", fields)
+          : await updateListing("token", "user-1", "listing-1", fields);
+
+      expect(result).toEqual({ ok: false, error: "Invalid gallery photo URL." });
+      expect(database.inserts).toEqual([]);
+      expect(database.updates).toEqual([]);
+    },
+  );
 });
 
 describe("listing compensation writes", () => {

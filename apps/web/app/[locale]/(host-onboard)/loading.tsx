@@ -51,7 +51,7 @@ export default function HostOnboardLoading() {
 				))}
 			</div>
 
-			<span className={styles.srOnly}>Loading plans</span>
+			<span className={styles.srOnly}>Loading host setup</span>
 		</div>
 	);
 }

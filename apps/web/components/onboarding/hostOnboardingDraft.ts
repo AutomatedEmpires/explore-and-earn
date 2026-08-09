@@ -104,6 +104,25 @@ export const EMPTY_ONBOARDING_DRAFT: HostOnboardingDraft = {
   roleCoverUrl: null,
 };
 
+/**
+ * An in-memory draft is safe to render only after Clerk has loaded and the
+ * draft restored from storage belongs to that exact signed-in user. This gate
+ * prevents an account switch from painting the previous host's answers while
+ * the new account's restore effect is still pending.
+ */
+export function hostOnboardingDraftReady(
+  authLoaded: boolean,
+  userId: string | null | undefined,
+  restoredForUserId: string | null,
+): boolean {
+  return Boolean(authLoaded && userId && restoredForUserId === userId);
+}
+
+/** A changed identity must remount the stateful wizard and abandon old callbacks. */
+export function hostOnboardingIdentityKey(identity: string | null): string {
+  return identity ?? "signed-out";
+}
+
 /* ── Steps ─────────────────────────────────────────────────────────────── */
 
 export const ONBOARDING_STEPS = [

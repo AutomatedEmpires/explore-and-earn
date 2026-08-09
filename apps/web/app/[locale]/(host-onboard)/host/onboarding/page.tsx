@@ -23,12 +23,14 @@ import {
 } from "../../../../actions/hostProfile"
 import { createListingAction } from "../../../../actions/listings"
 import { DemoEmployerPreview } from "../../../../../components/onboarding/DemoEmployerPreview"
+import { useHostOnboardingIdentity } from "../../../../../components/onboarding/HostOnboardingIdentity"
 import { HostSeekerPreview } from "../../../../../components/onboarding/HostSeekerPreview"
 import {
 	EMPTY_ONBOARDING_DRAFT,
 	ONBOARDING_STEPS,
 	ONBOARDING_STEP_META,
 	canLeaveIdentityStep,
+	hostOnboardingDraftReady,
 	payCents,
 	profileGaps,
 	roleCardReady,
@@ -41,6 +43,7 @@ import { safeInternalRedirect } from "../../../../../lib/authRedirect"
 import { captureFunnelEvent } from "../../../../../lib/analytics/capture"
 import { HOST_FUNNEL_EVENTS } from "../../../../../lib/analytics/events"
 import { formatCompensation } from "../../../../../lib/format"
+import HostOnboardLoading from "../../loading"
 import styles from "./page.module.css"
 
 /**
@@ -72,7 +75,7 @@ import styles from "./page.module.css"
  * ── AUTOSAVE, AND WHAT "SAVED" MEANS ────────────────────────────────────────
  * Two layers, because they answer different questions:
  *
- *   * localStorage holds the in-progress draft under ONBOARDING_DRAFT_KEY. It is
+ *   * localStorage holds the in-progress draft under a Clerk-user-scoped key. It is
  *     read AFTER mount behind a `restored` flag, exactly as DemoSession does, so
  *     the server and client first paints cannot disagree. This is what makes
  *     "save and leave" and a closed tab survivable.
@@ -175,9 +178,10 @@ function isDraftShape(value: unknown): value is Partial<HostOnboardingDraft> {
 export default function HostOnboardingPage() {
 	const router = useRouter()
 	const searchParams = useSearchParams()
+	const { isLoaded: authLoaded, identity: userId } = useHostOnboardingIdentity()
 	const [step, setStep] = useState<OnboardingStep>("welcome")
 	const [draft, setDraft] = useState<HostOnboardingDraft>(EMPTY_ONBOARDING_DRAFT)
-	const [restored, setRestored] = useState(false)
+	const [restoredForUserId, setRestoredForUserId] = useState<string | null>(null)
 	const [profileSaved, setProfileSaved] = useState(false)
 	const [state, setState] = useState<FormState>({ status: "idle" })
 	const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
@@ -192,6 +196,11 @@ export default function HostOnboardingPage() {
 	const stepIndex = stepIndexOf(step)
 	const stepMeta = ONBOARDING_STEP_META[stepIndex]
 	const gaps = useMemo(() => profileGaps(draft), [draft])
+	const draftKey = useMemo(
+		() => (userId ? `${ONBOARDING_DRAFT_KEY}.${userId}` : null),
+		[userId],
+	)
+	const draftReady = hostOnboardingDraftReady(authLoaded, userId, restoredForUserId)
 
 	/**
 	 * Where "save and leave" goes. An attacker-supplyable query parameter, so it
@@ -217,32 +226,45 @@ export default function HostOnboardingPage() {
 
 	// ── Restore, then persist. Read after mount so the first paint matches SSR.
 	useEffect(() => {
+		if (!authLoaded) return
+		if (!userId || !draftKey) {
+			setDraft(EMPTY_ONBOARDING_DRAFT)
+			setRestoredForUserId(null)
+			return
+		}
+
+		let restoredDraft = EMPTY_ONBOARDING_DRAFT
 		try {
-			const raw = window.localStorage.getItem(ONBOARDING_DRAFT_KEY)
+			// The V1 key was origin-wide. It cannot be attributed safely after an
+			// account switch, so discard it instead of exposing one host's draft to
+			// another host on the same browser.
+			window.localStorage.removeItem(ONBOARDING_DRAFT_KEY)
+			const raw = window.localStorage.getItem(draftKey)
 			if (raw) {
 				const parsed: unknown = JSON.parse(raw)
 				if (isDraftShape(parsed)) {
-					setDraft({ ...EMPTY_ONBOARDING_DRAFT, ...parsed })
+					restoredDraft = { ...EMPTY_ONBOARDING_DRAFT, ...parsed }
 				}
 			}
 		} catch {
 			// A malformed or unavailable store is a fresh start, never an error the
 			// host has to read. Nothing has been lost that they know about.
 		}
-		setRestored(true)
+		setDraft(restoredDraft)
+		setRestoredForUserId(userId)
 		if (reportOnce(HOST_FUNNEL_EVENTS.onboardingStarted)) {
 			captureFunnelEvent(HOST_FUNNEL_EVENTS.onboardingStarted)
 		}
-	}, [reportOnce])
+	}, [authLoaded, draftKey, reportOnce, userId])
 
 	useEffect(() => {
-		if (!restored) return
+		if (!draftKey || !userId || restoredForUserId !== userId) return
 		try {
-			window.localStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify(draft))
+			window.localStorage.setItem(draftKey, JSON.stringify(draft))
 		} catch {
 			// Quota or a private window. The server copy is the one that matters.
 		}
-	}, [draft, restored])
+	}, [draft, draftKey, restoredForUserId, userId])
 
 	/**
 	 * Move focus to the new step's heading when the step changes.
@@ -493,7 +515,7 @@ export default function HostOnboardingPage() {
 
 	function clearLocalDraft() {
 		try {
-			window.localStorage.removeItem(ONBOARDING_DRAFT_KEY)
+			if (draftKey) window.localStorage.removeItem(draftKey)
 		} catch {
 			// Nothing to recover; the row is written either way.
 		}
@@ -581,6 +603,11 @@ export default function HostOnboardingPage() {
 			}
 		})
 	}
+
+	// Account switches update Clerk before the restore effect runs. Keep the old
+	// account's in-memory draft behind the loading boundary until this exact
+	// user's scoped draft has been restored.
+	if (!draftReady) return <HostOnboardLoading />
 
 	const livePreview = (
 		<HostSeekerPreview draft={draft} hostProfileId="onboarding-preview" />

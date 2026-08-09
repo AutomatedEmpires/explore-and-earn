@@ -20,6 +20,8 @@ import {
   EMPTY_ONBOARDING_DRAFT,
   ONBOARDING_STEPS,
   canLeaveIdentityStep,
+  hostOnboardingDraftReady,
+  hostOnboardingIdentityKey,
   payCents,
   profileGaps,
   roleCardReady,
@@ -47,6 +49,27 @@ const COMPLETE = draft({
   roleCategory: "farm",
   rolePayMin: "21",
   rolePayPeriod: "hour",
+});
+
+describe("account-scoped draft readiness", () => {
+  it("never renders account A's restored draft after Clerk switches to account B", () => {
+    expect(hostOnboardingDraftReady(true, "user-a", "user-a")).toBe(true);
+    expect(hostOnboardingDraftReady(true, "user-b", "user-a")).toBe(false);
+    expect(hostOnboardingDraftReady(true, "user-b", "user-b")).toBe(true);
+  });
+
+  it("stays behind the loading boundary before auth or restore completes", () => {
+    expect(hostOnboardingDraftReady(false, undefined, null)).toBe(false);
+    expect(hostOnboardingDraftReady(true, "user-a", null)).toBe(false);
+  });
+
+  it("remounts the wizard when account identity changes during pending work", () => {
+    const accountAKey = hostOnboardingIdentityKey("user-a");
+    const accountBKey = hostOnboardingIdentityKey("user-b");
+
+    expect(accountBKey).not.toBe(accountAKey);
+    expect(hostOnboardingIdentityKey(null)).toBe("signed-out");
+  });
 });
 
 // ── Steps ──────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { HostOnboardingIdentityProvider } from "../../../components/onboarding/HostOnboardingIdentity";
 import { isDevBenchEnabled } from "../../../lib/devBench";
 import { readDevRole } from "../../../lib/devBench/server";
 import { optionalAuth } from "../../../lib/optionalAuth";
@@ -27,8 +28,13 @@ export default async function HostOnboardLayout({
 	// DEV MOCK BENCH (review tooling only): same bypass as (host)/layout so
 	// the onboarding surface stays reviewable without a real session. No-op
 	// in production/preview (isDevBenchEnabled() is compile-time false).
-	if (isDevBenchEnabled() && (await readDevRole())) {
-		return <>{children}</>;
+	const devRole = isDevBenchEnabled() ? await readDevRole() : null;
+	if (devRole) {
+		return (
+			<HostOnboardingIdentityProvider devIdentity={`dev:${devRole}`}>
+				{children}
+			</HostOnboardingIdentityProvider>
+		);
 	}
 
 	const { userId } = await optionalAuth();
@@ -38,5 +44,5 @@ export default async function HostOnboardLayout({
 		);
 	}
 
-	return <>{children}</>;
+	return <HostOnboardingIdentityProvider>{children}</HostOnboardingIdentityProvider>;
 }

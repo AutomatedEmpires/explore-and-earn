@@ -229,11 +229,24 @@ describe("onboarding persistence and preview truth", () => {
    */
   it("restores an interrupted draft without breaking hydration", () => {
     const page = source("app/[locale]/(host-onboard)/host/onboarding/page.tsx");
+    const layout = source("app/[locale]/(host-onboard)/layout.tsx");
+    const identity = source("components/onboarding/HostOnboardingIdentity.tsx");
 
     expect(page).toContain("ONBOARDING_DRAFT_KEY");
-    expect(page).toContain("window.localStorage.getItem(ONBOARDING_DRAFT_KEY)");
-    expect(page).toContain("setRestored(true)");
-    expect(page).toContain("if (!restored) return");
+    expect(page).toContain("useHostOnboardingIdentity()");
+    expect(page).toContain("`${ONBOARDING_DRAFT_KEY}.${userId}`");
+    expect(page).toContain("window.localStorage.getItem(draftKey)");
+    expect(page).toContain("setRestoredForUserId(userId)");
+    expect(page).toContain("restoredForUserId !== userId");
+    expect(page).toContain("if (!draftReady) return <HostOnboardLoading />");
+    // Origin-wide V1 drafts cannot be attributed safely after an account switch.
+    expect(page).toContain("window.localStorage.removeItem(ONBOARDING_DRAFT_KEY)");
+    // The supported keyless dev bench must not invoke Clerk at all.
+    expect(layout).toContain('devIdentity={`dev:${devRole}`}');
+    expect(identity).toContain("if (!devIdentity)");
+    expect(identity).toContain("<ClerkHostOnboardingIdentity>");
+    expect(identity).toContain("key={hostOnboardingIdentityKey(value.identity)}");
+    expect(identity).toContain("key={hostOnboardingIdentityKey(devIdentity)}");
     // Save-and-leave persists to the server before it navigates.
     expect(page).toContain("handleSaveAndLeave");
     expect(page).toContain("await persistProfile()");
