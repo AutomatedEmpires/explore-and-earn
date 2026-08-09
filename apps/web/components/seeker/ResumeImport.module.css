@@ -170,6 +170,12 @@
 	border-color: var(--status-error-fg);
 }
 
+.input[aria-invalid="true"]:focus {
+	border-color: var(--status-error-fg);
+	outline: 2px solid var(--color-cta);
+	outline-offset: 2px;
+}
+
 /* ── File row ──────────────────────────────────────────────────────────────── */
 
 .divider {

@@ -150,7 +150,7 @@ describe("saveImportedResumeAction experience preflight", () => {
     );
   });
 
-  it("stops on an experience write failure and conceals its raw error", async () => {
+  it("treats the first resolved experience write error as an unknown outcome", async () => {
     dbMocks.addResumeExperience.mockResolvedValueOnce({
       ok: false,
       error: "raw database detail",
@@ -163,8 +163,10 @@ describe("saveImportedResumeAction experience preflight", () => {
           { ...VALID_EXPERIENCE, roleTitle: "Farmhand" },
         ],
       }),
-    ).resolves.toEqual({ ok: false, error: "unexpected_error" });
+    ).resolves.toEqual({ ok: false, error: "outcome_unknown" });
     expect(dbMocks.addResumeExperience).toHaveBeenCalledTimes(1);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/resume");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
     expect(reportErrorMock).toHaveBeenCalledOnce();
   });
 
@@ -267,7 +269,7 @@ describe("saveImportedResumeAction experience preflight", () => {
     });
   });
 
-  it("conceals profile persistence errors and does not continue to experience writes", async () => {
+  it("treats the first resolved profile write error as unknown and stops", async () => {
     dbMocks.updateSeekerProfileInfo.mockResolvedValue({
       ok: false,
       error: "raw profile detail",
@@ -278,9 +280,26 @@ describe("saveImportedResumeAction experience preflight", () => {
         profileInfo: { displayName: "Casey" },
         experiences: [VALID_EXPERIENCE],
       }),
-    ).resolves.toEqual({ ok: false, error: "unexpected_error" });
+    ).resolves.toEqual({ ok: false, error: "outcome_unknown" });
     expect(dbMocks.addResumeExperience).not.toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/resume");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/profile");
     expect(reportErrorMock).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a pre-persistence provider failure retryable", async () => {
+    authMock.mockRejectedValueOnce(new Error("auth transport unavailable"));
+
+    await expect(
+      saveImportedResumeAction({ experiences: [VALID_EXPERIENCE] }),
+    ).resolves.toEqual({ ok: false, error: "unexpected_error" });
+
+    expect(dbMocks.addResumeExperience).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "auth transport unavailable" }),
+      { action: "saveImportedResumeAction" },
+    );
   });
 });
 
@@ -449,6 +468,9 @@ describe("import review experience identity", () => {
     ).toHaveLength(7);
     expect(css).toMatch(
       /\.includeToggle\s*{[^}]*width:\s*var\(--tap-min\);[^}]*min-width:\s*var\(--tap-min\);[^}]*min-height:\s*var\(--tap-min\);/s,
+    );
+    expect(css).toMatch(
+      /\.input\[aria-invalid="true"\]:focus\s*{[^}]*border-color:\s*var\(--status-error-fg\);[^}]*outline:\s*2px solid var\(--color-cta\);[^}]*outline-offset:\s*2px;/s,
     );
     expect(tokens).toContain("--tap-min: 44px");
   });

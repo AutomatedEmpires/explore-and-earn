@@ -11,6 +11,12 @@ export interface ResumeExperienceIdentity {
 	readonly companyName?: string | null
 }
 
+/** Canonical stored/display form for the two experience identity fields. */
+export interface NormalizedResumeExperienceIdentity {
+	readonly roleTitle: string | null
+	readonly companyName: string | null
+}
+
 /** Stable domain error returned when an experience has no usable identity. */
 export const RESUME_EXPERIENCE_IDENTITY_REQUIRED =
 	"experience_identity_required" as const
@@ -19,11 +25,20 @@ export const RESUME_EXPERIENCE_IDENTITY_REQUIRED =
 export const RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE =
 	"Add a role title or the employer or place where you worked." as const
 
+/** Trim identity fields and represent empty-after-trim values as absent. */
+export function normalizeResumeExperienceIdentity(
+	value: ResumeExperienceIdentity,
+): NormalizedResumeExperienceIdentity {
+	return {
+		roleTitle: value.roleTitle?.trim() || null,
+		companyName: value.companyName?.trim() || null,
+	}
+}
+
 /** True only when at least one identity field contains non-whitespace text. */
 export function hasResumeExperienceIdentity(
 	value: ResumeExperienceIdentity,
 ): boolean {
-	return [value.roleTitle, value.companyName].some(
-		(field) => typeof field === "string" && field.trim().length > 0,
-	)
+	const identity = normalizeResumeExperienceIdentity(value)
+	return identity.roleTitle !== null || identity.companyName !== null
 }

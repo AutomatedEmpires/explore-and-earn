@@ -236,7 +236,11 @@ function reportPersistenceFailure(
     { action },
   );
   if (!hasSavedAnything(saved)) {
-    return { ok: false, error: "unexpected_error" };
+    // The DB wrapper exposes only a string error, so a failed response cannot
+    // prove that the transaction was rejected. Refresh and close the reviewed
+    // batch instead of inviting a duplicate-prone retry after a lost response.
+    revalidateResumePaths();
+    return { ok: false, error: "outcome_unknown" };
   }
   revalidateResumePaths();
   return { ok: false, error: "partial_save", saved };
@@ -554,10 +558,7 @@ export async function saveImportedResumeAction(
         error,
       );
     }
-    return reportPersistenceFailure(
-      "saveImportedResumeAction",
-      error,
-      savedCounts(),
-    );
+    reportError(error, { action: "saveImportedResumeAction" });
+    return { ok: false, error: "unexpected_error" };
   }
 }

@@ -16,6 +16,7 @@ import {
 } from "@explore-and-earn/db";
 import {
   hasResumeExperienceIdentity,
+  normalizeResumeExperienceIdentity,
   topMatchReasons,
 } from "@explore-and-earn/contracts";
 
@@ -168,9 +169,12 @@ export function buildHostTools(ctx: HostToolContext): ToolSet {
         ]);
         if (!resume) return { error: "resume_unavailable" as const };
 
-        const meaningfulExperiences = resume.experiences.filter(
-          hasResumeExperienceIdentity,
-        );
+        const meaningfulExperiences = resume.experiences
+          .filter(hasResumeExperienceIdentity)
+          .map((experience) => ({
+            ...experience,
+            ...normalizeResumeExperienceIdentity(experience),
+          }));
         const insights = analyzeResume(resume, Date.now());
         const preparation = requirements
           ? prepareForListing(insights, requirements, resume.certifications)

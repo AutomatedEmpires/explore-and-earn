@@ -18,6 +18,7 @@ import {
 } from "@explore-and-earn/db";
 import {
   hasResumeExperienceIdentity,
+  normalizeResumeExperienceIdentity,
   renderMatchTrace,
   type MatchTrace,
 } from "@explore-and-earn/contracts";
@@ -282,9 +283,12 @@ export function buildSeekerTools(ctx: SeekerToolContext): ToolSet {
       execute: async () => {
         const resume = await getSeekerResume(ctx.token, ctx.userId);
         const profile = resume.profile;
-        const meaningfulExperiences = resume.experiences.filter(
-          hasResumeExperienceIdentity,
-        );
+        const meaningfulExperiences = resume.experiences
+          .filter(hasResumeExperienceIdentity)
+          .map((experience) => ({
+            ...experience,
+            ...normalizeResumeExperienceIdentity(experience),
+          }));
         const gaps: string[] = [];
         if (!profile?.bio?.trim()) gaps.push("a short bio that says who you are and what you're after");
         if (meaningfulExperiences.length === 0) gaps.push("at least one work experience with a concrete summary");

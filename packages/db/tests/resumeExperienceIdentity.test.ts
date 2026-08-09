@@ -8,6 +8,7 @@ vi.mock("../src/client.js", () => ({
 
 import {
   hasResumeExperienceIdentity,
+  normalizeResumeExperienceIdentity,
   RESUME_EXPERIENCE_IDENTITY_REQUIRED,
   RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE,
 } from "@explore-and-earn/contracts";
@@ -93,6 +94,19 @@ describe("resume experience identity contract", () => {
     expect(RESUME_EXPERIENCE_IDENTITY_REQUIRED_MESSAGE).toBe(
       "Add a role title or the employer or place where you worked.",
     );
+  });
+
+  it("normalizes both identity fields before presence or display checks", () => {
+    const identity = {
+      roleTitle: ECMASCRIPT_TRIM_WHITESPACE,
+      companyName: "  Cascade Orchard\u3000",
+    };
+
+    expect(normalizeResumeExperienceIdentity(identity)).toEqual({
+      roleTitle: null,
+      companyName: "Cascade Orchard",
+    });
+    expect(hasResumeExperienceIdentity(identity)).toBe(true);
   });
 });
 

@@ -2,6 +2,7 @@ import type { SeekerResume } from "@explore-and-earn/db";
 import {
   hasResumeExperienceIdentity,
   MARKETPLACE_CATEGORIES,
+  normalizeResumeExperienceIdentity,
   type MarketplaceCategory,
 } from "@explore-and-earn/contracts";
 import { Icon, type IconKey } from "@explore-and-earn/ui";
@@ -111,9 +112,12 @@ export function SeekerResumeCard({
   const bio = profile?.bio ?? null;
   const desiredCategories = profile?.desiredCategories ?? [];
   const generalSkills = profile?.generalSkills ?? [];
-  const meaningfulExperiences = resume.experiences.filter(
-    hasResumeExperienceIdentity,
-  );
+  const meaningfulExperiences = resume.experiences
+    .filter(hasResumeExperienceIdentity)
+    .map((experience) => ({
+      ...experience,
+      ...normalizeResumeExperienceIdentity(experience),
+    }));
 
   const hasExperiences = meaningfulExperiences.length > 0;
   const hasEducations = resume.educations.length > 0;
