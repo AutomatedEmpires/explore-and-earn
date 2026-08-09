@@ -18,13 +18,12 @@ export const dynamic = "force-dynamic";
 
 const DEV_PENDING_CLAIMS: ReadonlyArray<ClaimReviewRowView> = [
   {
-    id: "dev-claim-north-cascades-pending",
-    listingId: "dev-listing-north-cascades-stewardship",
-    listingTitle:
-      "North Cascades Wilderness Stewardship and Guest Services Seasonal Team",
+    id: "dev-claim-kelp-farm-pending",
+    listingId: "lst_sourced_kelp_farm",
+    listingTitle: "Kelp Farm Field Technician",
     status: "requires_review",
     workEmail:
-      "claims-review-operations@north-cascades-wilderness-stewardship.example",
+      "claims-review-operations@kodiak-kelp-field-technician.example",
     roleTitle: "Seasonal operations director",
     statement:
       "I lead seasonal hiring and can verify the source details before this listing becomes host-managed.",
@@ -36,12 +35,12 @@ const DEV_PENDING_CLAIMS: ReadonlyArray<ClaimReviewRowView> = [
 
 const DEV_DECIDED_CLAIMS: ReadonlyArray<ClaimReviewRowView> = [
   {
-    id: "dev-claim-north-cascades-converted",
-    listingId: "dev-listing-north-cascades-field-operations",
-    listingTitle: "North Cascades Field Operations Lodge",
+    id: "dev-claim-deckhand-converted",
+    listingId: "lst_deckhand_sitka",
+    listingTitle: "Deckhand — Salmon Season",
     status: "converted",
     workEmail:
-      "converted-claims-review@north-cascades-wilderness-stewardship.example",
+      "converted-claims-review@north-pacific-fisheries-cooperative.example",
     roleTitle: "Host operations manager",
     statement: "I own this host profile and confirmed every listing detail.",
     reviewNotes: "Authority confirmed through the host onboarding review.",

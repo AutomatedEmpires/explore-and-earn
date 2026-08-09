@@ -4,13 +4,14 @@ const BASE = "http://localhost:3100";
 const DEV_ROLE_COOKIE = "ee_dev_role";
 const PHONE_WIDTHS = [320, 375, 390] as const;
 
-const PENDING_TITLE =
-  "North Cascades Wilderness Stewardship and Guest Services Seasonal Team";
+const PENDING_ID = "lst_sourced_kelp_farm";
+const PENDING_TITLE = "Kelp Farm Field Technician";
 const PENDING_EMAIL =
-  "claims-review-operations@north-cascades-wilderness-stewardship.example";
-const DECIDED_TITLE = "North Cascades Field Operations Lodge";
+  "claims-review-operations@kodiak-kelp-field-technician.example";
+const DECIDED_ID = "lst_deckhand_sitka";
+const DECIDED_TITLE = "Deckhand — Salmon Season";
 const DECIDED_EMAIL =
-  "converted-claims-review@north-cascades-wilderness-stewardship.example";
+  "converted-claims-review@north-pacific-fisheries-cooperative.example";
 
 async function expectNoDocumentOverflow(page: Page) {
   await page.evaluate(() => document.fonts.ready);
@@ -171,6 +172,10 @@ test.describe("admin claims mobile layout", () => {
       });
 
       await expect(pendingCard).toBeVisible();
+      await expect(pendingTitle).toHaveAttribute(
+        "href",
+        `/listing/${PENDING_ID}`,
+      );
       await expect(
         pendingCard.getByText("Requires Review", { exact: true }),
       ).toBeVisible();
@@ -180,9 +185,8 @@ test.describe("admin claims mobile layout", () => {
       await expectContained(pendingGrid, page.locator("body"), "pending grid");
       await expectContained(pendingCard, pendingGrid, "pending claim card");
       await expectContained(note, pendingCard, "review note textarea");
-      await expectTextWraps(
+      await expectContained(
         pendingTitle,
-        PENDING_TITLE,
         pendingCard,
         "pending listing title",
       );
@@ -203,6 +207,12 @@ test.describe("admin claims mobile layout", () => {
       const decidedMeta = decidedRow.getByText(DECIDED_EMAIL, { exact: false });
 
       await expect(decidedRow).toBeVisible();
+      await expect(
+        decidedRow.getByRole("link", {
+          name: DECIDED_TITLE,
+          exact: true,
+        }),
+      ).toHaveAttribute("href", `/listing/${DECIDED_ID}`);
       await expect(
         decidedRow.getByText("Converted", { exact: true }),
       ).toBeVisible();
