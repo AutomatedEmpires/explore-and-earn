@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "playwright/test";
 
+import { formatDate } from "../../lib/format";
+
 const BASE = "http://localhost:3100";
 const DEV_ROLE_COOKIE = "ee_dev_role";
 const APPLICATION_ID = "dev-application-vineyard-not-selected";
@@ -10,7 +12,17 @@ const LISTING_TITLE = "Vineyard Cellar Assistant";
 const HOST_NAME = "Stone Hollow Vineyard";
 const COVER_MESSAGE =
   "I’m excited to contribute during harvest and bring reliable guest-service experience. I’m comfortable with early starts, hands-on cellar work, and shared team responsibilities throughout the season.";
-const TIMELINE_DATES = ["May 12, 2026", "May 15, 2026", "May 20, 2026"] as const;
+const TIMELINE_DATES = [
+  "2026-05-12T17:00:00.000Z",
+  "2026-05-15T17:00:00.000Z",
+  "2026-05-20T17:00:00.000Z",
+].map((iso) =>
+  formatDate(iso, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }),
+);
 
 const PHONE_VIEWPORTS = [
   { width: 320, height: 568 },

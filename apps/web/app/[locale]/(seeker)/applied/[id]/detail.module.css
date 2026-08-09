@@ -10,7 +10,6 @@
 	background: var(--color-surface-raised);
 	border: 1px solid var(--border-ink);
 	border-radius: var(--radius-card);
-	overflow: hidden;
 }
 
 .frame {
