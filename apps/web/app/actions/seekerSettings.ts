@@ -2,13 +2,16 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  authedClient,
   saveSeekerProfile,
   updateNotificationPrefs,
   type NotificationPrefsPatch,
+  type SeekerProfileUpdate,
 } from "@explore-and-earn/db";
+import {
+  SEEKER_AVAILABILITY_STATUS,
+  SEEKER_TRAVEL_READINESS,
+} from "@explore-and-earn/contracts";
 
 import { queueSeekerMatchRecompute } from "../../lib/matchRecompute";
 import { reportError } from "../../lib/sentry";
@@ -18,16 +21,36 @@ export interface SettingsActionResult {
   readonly error?: string;
 }
 
-// Values must match DB CHECK constraint: available_now | date_range | flexible | unavailable
-const SCHEDULE_STATUSES = ["available_now", "date_range", "flexible", "unavailable"] as const;
-// Values must match DB CHECK constraint: local_only | willing_to_travel | ready_to_relocate | remote_only | flexible
-const TRAVEL_READINESS = [
-  "local_only",
-  "willing_to_travel",
-  "ready_to_relocate",
-  "remote_only",
-  "flexible",
-] as const;
+/** Stable, serializable result consumed by the schedule and travel forms. */
+export type SeekerSettingsSaveResult =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly error:
+        | "validation"
+        | "unauthenticated"
+        | "temporarily_unavailable";
+    };
+
+const DATE_INPUT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const VALIDATION_FAILURE = { ok: false, error: "validation" } as const;
+const UNAUTHENTICATED_FAILURE = {
+  ok: false,
+  error: "unauthenticated",
+} as const;
+const TEMPORARILY_UNAVAILABLE_FAILURE = {
+  ok: false,
+  error: "temporarily_unavailable",
+} as const;
+
+type Parsed<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false };
+
+interface SettingsSession {
+  readonly userId: string;
+  readonly token: string;
+}
 
 async function currentUserId(): Promise<string | undefined> {
   try {
@@ -37,62 +60,168 @@ async function currentUserId(): Promise<string | undefined> {
   }
 }
 
-function untypedClient(clerkToken: string): SupabaseClient {
-  return authedClient(clerkToken) as unknown as SupabaseClient;
+function reportSettingsError(
+  error: unknown,
+  context: Parameters<typeof reportError>[1],
+): void {
+  try {
+    reportError(error, context);
+  } catch {
+    // Error reporting is best-effort and must never change an action result.
+  }
 }
 
-function formValue(formData: FormData, key: string): string {
-  const value = formData.get(key);
-  return typeof value === "string" ? value.trim() : "";
+function readSingleFormString(formData: FormData, key: string): Parsed<string> {
+  try {
+    const values = formData.getAll(key);
+    if (values.length === 0) return { ok: true, value: "" };
+    if (values.length !== 1 || typeof values[0] !== "string") {
+      return { ok: false };
+    }
+    return { ok: true, value: values[0].trim() };
+  } catch {
+    return { ok: false };
+  }
 }
 
-function dateInputToIso(value: string): string | null {
-  if (!value) return null;
+function parseDateInput(value: string): Parsed<string | null> {
+  if (value.length === 0) return { ok: true, value: null };
+
+  const parts = DATE_INPUT_PATTERN.exec(value);
+  if (!parts || parts[1] === "0000") return { ok: false };
+
   const date = new Date(`${value}T00:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  if (Number.isNaN(date.getTime())) return { ok: false };
+
+  const iso = date.toISOString();
+  return iso.slice(0, 10) === value
+    ? { ok: true, value: iso }
+    : { ok: false };
 }
 
-async function updateSeekerProfileColumns(
-  clerkToken: string,
-  clerkUserId: string,
-  patch: Record<string, unknown>,
-): Promise<SettingsActionResult> {
-  if (Object.keys(patch).length === 0) return { ok: true };
+function parseNullableEnum<T extends string>(
+  value: string,
+  allowed: readonly T[],
+): Parsed<T | null> {
+  if (value.length === 0) return { ok: true, value: null };
+  return (allowed as readonly string[]).includes(value)
+    ? { ok: true, value: value as T }
+    : { ok: false };
+}
+
+function parseScheduleForm(formData: FormData): Parsed<SeekerProfileUpdate> {
+  const startRaw = readSingleFormString(formData, "availability_start");
+  const endRaw = readSingleFormString(formData, "availability_end");
+  const statusRaw = readSingleFormString(formData, "availability_status");
+  if (!startRaw.ok || !endRaw.ok || !statusRaw.ok) return { ok: false };
+
+  const start = parseDateInput(startRaw.value);
+  const end = parseDateInput(endRaw.value);
+  const status = parseNullableEnum(
+    statusRaw.value,
+    SEEKER_AVAILABILITY_STATUS,
+  );
+  if (!start.ok || !end.ok || !status.ok) return { ok: false };
+  if (start.value !== null && end.value !== null && start.value > end.value) {
+    return { ok: false };
+  }
+
+  return {
+    ok: true,
+    value: {
+      availabilityStart: start.value,
+      availabilityEnd: end.value,
+      availabilityStatus: status.value,
+    },
+  };
+}
+
+function parseTravelForm(formData: FormData): Parsed<SeekerProfileUpdate> {
+  const readinessRaw = readSingleFormString(formData, "travel_readiness");
+  const locationRaw = readSingleFormString(formData, "location_pref");
+  if (!readinessRaw.ok || !locationRaw.ok) return { ok: false };
+
+  const readiness = parseNullableEnum(
+    readinessRaw.value,
+    SEEKER_TRAVEL_READINESS,
+  );
+  if (!readiness.ok) return { ok: false };
+
+  return {
+    ok: true,
+    value: {
+      travelReadiness: readiness.value,
+      locationPref: locationRaw.value.length > 0 ? locationRaw.value : null,
+    },
+  };
+}
+
+async function settingsSession(
+  actionName: string,
+): Promise<
+  | { readonly ok: true; readonly session: SettingsSession }
+  | { readonly ok: false; readonly result: SeekerSettingsSaveResult }
+> {
+  try {
+    const { userId, getToken } = await auth();
+    if (!userId) return { ok: false, result: UNAUTHENTICATED_FAILURE };
+    const token = await getToken();
+    if (!token) return { ok: false, result: UNAUTHENTICATED_FAILURE };
+    return { ok: true, session: { userId, token } };
+  } catch (error) {
+    reportSettingsError(error, { action: `${actionName}.authenticate` });
+    return { ok: false, result: TEMPORARILY_UNAVAILABLE_FAILURE };
+  }
+}
+
+async function persistSeekerSettings(
+  actionName: string,
+  update: SeekerProfileUpdate,
+  revalidatePaths: readonly string[],
+): Promise<SeekerSettingsSaveResult> {
+  const authenticated = await settingsSession(actionName);
+  if (!authenticated.ok) return authenticated.result;
+
+  const { token, userId } = authenticated.session;
+  try {
+    const result = await saveSeekerProfile(token, userId, update);
+    if (!result.ok) {
+      reportSettingsError(
+        new Error(result.error || "Seeker settings persistence was not confirmed"),
+        { action: `${actionName}.persist`, userId },
+      );
+      return TEMPORARILY_UNAVAILABLE_FAILURE;
+    }
+  } catch (error) {
+    reportSettingsError(error, {
+      action: `${actionName}.persist`,
+      userId,
+    });
+    return TEMPORARILY_UNAVAILABLE_FAILURE;
+  }
+
+  for (const path of revalidatePaths) {
+    try {
+      revalidatePath(path);
+    } catch (error) {
+      reportSettingsError(error, {
+        action: `${actionName}.postPersistRevalidate`,
+        route: path,
+        userId,
+      });
+    }
+  }
 
   try {
-    const db = untypedClient(clerkToken);
-    const { data: existing, error: lookupError } = await db
-      .from("seeker_profiles")
-      .select("id")
-      .eq("clerk_user_id", clerkUserId)
-      .is("deleted_at", null)
-      .maybeSingle();
-
-    if (lookupError) return { ok: false, error: lookupError.message };
-
-    const existingId =
-      existing && (existing as Record<string, unknown>).id
-        ? String((existing as Record<string, unknown>).id)
-        : null;
-
-    if (existingId) {
-      const { error } = await db
-        .from("seeker_profiles")
-        .update(patch)
-        .eq("id", existingId);
-      return error ? { ok: false, error: error.message } : { ok: true };
-    }
-
-    const { error } = await db
-      .from("seeker_profiles")
-      .insert({ clerk_user_id: clerkUserId, ...patch });
-    return error ? { ok: false, error: error.message } : { ok: true };
-  } catch (caught) {
-    return {
-      ok: false,
-      error: caught instanceof Error ? caught.message : "unknown_error",
-    };
+    queueSeekerMatchRecompute(userId);
+  } catch (error) {
+    reportSettingsError(error, {
+      action: `${actionName}.postPersistRecompute`,
+      userId,
+    });
   }
+
+  return { ok: true };
 }
 
 /**
@@ -134,87 +263,31 @@ export async function updateDisplayNameAction(
 /**
  * Persist the seeker's availability window and availability status.
  */
-async function updateScheduleActionImpl(
+export async function updateScheduleAction(
   formData: FormData,
-): Promise<SettingsActionResult> {
-  const { userId, getToken } = await auth();
-  if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken();
-  if (!token) return { ok: false, error: "unauthenticated" };
+): Promise<SeekerSettingsSaveResult> {
+  const parsed = parseScheduleForm(formData);
+  if (!parsed.ok) return VALIDATION_FAILURE;
 
-  const status = formValue(formData, "availability_status");
-  if (!(SCHEDULE_STATUSES as readonly string[]).includes(status)) {
-    return { ok: false, error: "invalid_status" };
-  }
-
-  const result = await updateSeekerProfileColumns(token, userId, {
-    availability_start: dateInputToIso(formValue(formData, "availability_start")),
-    availability_end: dateInputToIso(formValue(formData, "availability_end")),
-    availability_status: status,
-  });
-
-  if (result.ok) {
-    revalidatePath("/schedule");
-    revalidatePath("/home");
-    // Availability is an ADR-040 engine input — refresh the stored scores.
-    queueSeekerMatchRecompute(userId);
-  }
-  return result;
-}
-
-export async function updateScheduleAction(formData: FormData): Promise<void> {
-  try {
-    await updateScheduleActionImpl(formData);
-  } catch (error) {
-    reportError(error, {
-      action: "updateScheduleAction",
-      userId: await currentUserId(),
-    });
-    throw error;
-  }
+  return persistSeekerSettings("updateScheduleAction", parsed.value, [
+    "/schedule",
+    "/home",
+  ]);
 }
 
 /**
  * Persist the seeker's travel readiness and preferred location text.
  */
-async function updateTravelActionImpl(
+export async function updateTravelAction(
   formData: FormData,
-): Promise<SettingsActionResult> {
-  const { userId, getToken } = await auth();
-  if (!userId) return { ok: false, error: "unauthenticated" };
-  const token = await getToken();
-  if (!token) return { ok: false, error: "unauthenticated" };
+): Promise<SeekerSettingsSaveResult> {
+  const parsed = parseTravelForm(formData);
+  if (!parsed.ok) return VALIDATION_FAILURE;
 
-  const readiness = formValue(formData, "travel_readiness");
-  if (!(TRAVEL_READINESS as readonly string[]).includes(readiness)) {
-    return { ok: false, error: "invalid_travel_readiness" };
-  }
-
-  const locationPref = formValue(formData, "location_pref");
-  const result = await updateSeekerProfileColumns(token, userId, {
-    travel_readiness: readiness,
-    location_pref: locationPref.length > 0 ? locationPref : null,
-  });
-
-  if (result.ok) {
-    revalidatePath("/travel");
-    revalidatePath("/home");
-    // Travel readiness / location pref are ADR-040 engine inputs — rescore.
-    queueSeekerMatchRecompute(userId);
-  }
-  return result;
-}
-
-export async function updateTravelAction(formData: FormData): Promise<void> {
-  try {
-    await updateTravelActionImpl(formData);
-  } catch (error) {
-    reportError(error, {
-      action: "updateTravelAction",
-      userId: await currentUserId(),
-    });
-    throw error;
-  }
+  return persistSeekerSettings("updateTravelAction", parsed.value, [
+    "/travel",
+    "/home",
+  ]);
 }
 
 /**

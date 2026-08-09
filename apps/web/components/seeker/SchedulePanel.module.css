@@ -102,6 +102,10 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-12);
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
 	padding: var(--space-12);
 	border: 1px solid var(--border-soft);
 	border-radius: var(--radius-cell);
@@ -112,6 +116,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-4);
+	min-width: 0;
 }
 
 .label {
@@ -126,7 +131,10 @@
 
 .input,
 .select {
+	box-sizing: border-box;
 	width: 100%;
+	min-width: 0;
+	max-width: 100%;
 	min-height: 44px;
 	padding: var(--space-8) var(--space-12);
 	border: 1px solid var(--border-ink);
@@ -146,6 +154,7 @@
 
 .button {
 	align-self: flex-start;
+	max-width: 100%;
 	min-height: 44px;
 	padding: var(--space-8) var(--space-16);
 	border: 1px solid var(--border-ink);
@@ -157,6 +166,12 @@
 	font-weight: var(--font-weight-semibold);
 	color: var(--color-surface);
 	cursor: pointer;
+	overflow-wrap: anywhere;
+}
+
+.button:disabled {
+	cursor: wait;
+	opacity: 0.7;
 }
 
 .button:focus-visible {
