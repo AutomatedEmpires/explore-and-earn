@@ -49,7 +49,16 @@ function makeChain(result: { data?: unknown; error?: unknown }) {
       calls.push({ method, args });
       return chain;
     };
-  for (const m of ["select", "update", "insert", "eq", "in", "not", "order"]) {
+  for (const m of [
+    "select",
+    "update",
+    "insert",
+    "eq",
+    "in",
+    "not",
+    "gt",
+    "order",
+  ]) {
     chain[m] = record(m);
   }
   chain.maybeSingle = terminal;
@@ -306,6 +315,26 @@ describe("respondToInvite — accept creates a real application", () => {
     );
   });
 
+  it("leaves the invite actionable when a legacy duplicate has no recovered application id", async () => {
+    applyToListing.mockResolvedValue({
+      ok: false,
+      error: "already_applied",
+      seekerProfileId: "seeker-1",
+      legacySubmission: true,
+    });
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({ data: actionableInvite("viewed") }).chain,
+      );
+
+    const result = await respondToInvite("token", "user_1", "inv-1", "accepted");
+
+    expect(result).toEqual({ ok: false, error: "already_applied" });
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+    expect(mockAdminFrom).not.toHaveBeenCalled();
+  });
+
   it("conceals a legacy invite-write failure", async () => {
     applyToListing.mockResolvedValue({
       ok: true,
@@ -347,6 +376,55 @@ describe("respondToInvite — decline", () => {
     expect(result.ok).toBe(true);
     expect(applyToListing).not.toHaveBeenCalled();
   });
+
+  it("conceals invite read and decline write failures", async () => {
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({
+          data: null,
+          error: { message: "private invite read implementation detail" },
+        }).chain,
+      );
+
+    const readFailure = await respondToInvite(
+      "token",
+      "user_1",
+      "inv-1",
+      "declined",
+    );
+
+    expect(readFailure).toEqual({
+      ok: false,
+      error: "temporarily_unavailable",
+    });
+    expect(JSON.stringify(readFailure)).not.toContain("implementation detail");
+
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(
+        makeChain({ data: actionableInvite("delivered") }).chain,
+      )
+      .mockReturnValueOnce(
+        makeChain({
+          data: null,
+          error: { message: "private invite write implementation detail" },
+        }).chain,
+      );
+
+    const writeFailure = await respondToInvite(
+      "token",
+      "user_1",
+      "inv-1",
+      "declined",
+    );
+
+    expect(writeFailure).toEqual({
+      ok: false,
+      error: "temporarily_unavailable",
+    });
+    expect(JSON.stringify(writeFailure)).not.toContain("implementation detail");
+  });
 });
 
 describe("getSeekerInvites — delivery stamping makes the credit rule honest", () => {
@@ -360,7 +438,7 @@ describe("getSeekerInvites — delivery stamping makes the credit rule honest", 
           status: "created",
           message: null,
           created_at: "2026-07-16T00:00:00.000Z",
-          expires_at: null,
+          expires_at: FUTURE_INVITE_EXPIRY,
           listings: null,
           host_profiles: null,
         },
@@ -400,7 +478,7 @@ describe("getSeekerInvites — delivery stamping makes the credit rule honest", 
               status: "delivered",
               message: null,
               created_at: "2026-07-16T00:00:00.000Z",
-              expires_at: null,
+              expires_at: FUTURE_INVITE_EXPIRY,
               listings: null,
               host_profiles: null,
             },
@@ -430,7 +508,7 @@ describe("getSeekerInvites — delivery stamping makes the credit rule honest", 
               status: "created",
               message: null,
               created_at: "2026-07-16T00:00:00.000Z",
-              expires_at: null,
+              expires_at: FUTURE_INVITE_EXPIRY,
               listings: null,
               host_profiles: null,
             },
@@ -441,5 +519,54 @@ describe("getSeekerInvites — delivery stamping makes the credit rule honest", 
     const result = await getSeekerInvites("token", "user_1");
 
     expect(result).toHaveLength(1);
+  });
+
+  it("excludes missing, invalid, and elapsed expiry rows before delivery stamping", async () => {
+    const listRead = makeChain({
+      data: [
+        {
+          ...actionableInvite("created"),
+          id: "missing-expiry",
+          expires_at: null,
+        },
+        {
+          ...actionableInvite("created"),
+          id: "invalid-expiry",
+          expires_at: "not-a-date",
+        },
+        {
+          ...actionableInvite("created"),
+          id: "elapsed-expiry",
+          expires_at: "2020-01-01T00:00:00.000Z",
+        },
+        {
+          ...actionableInvite("created"),
+          id: "future-expiry",
+          message: null,
+          created_at: "2026-07-16T00:00:00.000Z",
+          listings: null,
+          host_profiles: null,
+        },
+      ],
+    });
+    const adminStamp = makeChain({ data: null });
+    mockAdminFrom.mockReturnValue(adminStamp.chain);
+    mockFrom
+      .mockReturnValueOnce(makeChain(SEEKER_PROFILE).chain)
+      .mockReturnValueOnce(listRead.chain);
+
+    const result = await getSeekerInvites("token", "user_1");
+
+    expect(result.map(({ invite }) => invite.id)).toEqual(["future-expiry"]);
+    expect(
+      listRead.calls.filter((call) => call.method === "not").map((call) => call.args),
+    ).toContainEqual(["expires_at", "is", null]);
+    expect(
+      listRead.calls.find((call) => call.method === "gt")?.args[0],
+    ).toBe("expires_at");
+    expect(adminStamp.calls.find((call) => call.method === "in")?.args).toEqual([
+      "id",
+      ["future-expiry"],
+    ]);
   });
 });

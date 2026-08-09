@@ -196,12 +196,16 @@ async function legacySubmitApplication(
       .maybeSingle();
 
     if (reactivateError) {
+      if (reactivateError.code === UNIQUE_VIOLATION) {
+        return recoverLegacyApplicationConflict(
+          authed,
+          seekerProfileId,
+          listingId,
+        );
+      }
       return {
         ok: false,
-        error:
-          reactivateError.code === UNIQUE_VIOLATION
-            ? "already_applied"
-            : "temporarily_unavailable",
+        error: "temporarily_unavailable",
         legacySubmission: true,
       };
     }
@@ -232,12 +236,16 @@ async function legacySubmitApplication(
     .maybeSingle();
 
   if (insertError) {
+    if (insertError.code === UNIQUE_VIOLATION) {
+      return recoverLegacyApplicationConflict(
+        authed,
+        seekerProfileId,
+        listingId,
+      );
+    }
     return {
       ok: false,
-      error:
-        insertError.code === UNIQUE_VIOLATION
-          ? "already_applied"
-          : "temporarily_unavailable",
+      error: "temporarily_unavailable",
       legacySubmission: true,
     };
   }
@@ -252,6 +260,45 @@ async function legacySubmitApplication(
     legacySubmission: true,
     disposition: "created",
     applicationId,
+    seekerProfileId,
+  };
+}
+
+/**
+ * A legacy insert/reactivation can lose a race after its advisory pre-read.
+ * Recover the winning owned row before reporting an adoptable duplicate so an
+ * invite can never advance without the exact application id it must link.
+ */
+async function recoverLegacyApplicationConflict(
+  authed: SupabaseClient,
+  seekerProfileId: string,
+  listingId: string,
+): Promise<ApplyResult> {
+  const winner = await authed
+    .from("applications")
+    .select("id, status")
+    .eq("listing_id", listingId)
+    .eq("seeker_profile_id", seekerProfileId)
+    .maybeSingle();
+
+  const row = winner.data as { id?: unknown; status?: unknown } | null;
+  if (
+    winner.error ||
+    typeof row?.id !== "string" ||
+    row.status === "withdrawn"
+  ) {
+    return {
+      ok: false,
+      error: "temporarily_unavailable",
+      legacySubmission: true,
+    };
+  }
+
+  return {
+    ok: false,
+    error: "already_applied",
+    legacySubmission: true,
+    applicationId: row.id,
     seekerProfileId,
   };
 }
@@ -333,8 +380,8 @@ export async function applyToListing(
   // this check gives stale/scripted clients the stable product error promptly.
   if (
     listingRow?.status !== "live" ||
-    listingRow.provenance !== "verified" ||
-    typeof listingRow.host_profile_id !== "string" ||
+    listingRow?.provenance !== "verified" ||
+    typeof listingRow?.host_profile_id !== "string" ||
     hostClerkId.length === 0 ||
     !expiryAcceptsApplications
   ) {
