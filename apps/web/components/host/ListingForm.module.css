@@ -4,8 +4,11 @@
    wide breakpoint it becomes a two-column layout with a sticky preview rail. */
 .composer {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-16);
   align-items: start;
+  min-width: 0;
+  max-width: 100%;
 }
 
 @media (min-width: 60rem) {
@@ -20,6 +23,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-12);
   background: var(--color-surface-raised);
   border: 1px solid var(--border-soft);
@@ -59,6 +64,7 @@
 
 /* The preview is a faithful, NON-interactive render of the seeker card. */
 .previewCardWrap {
+  min-width: 0;
   pointer-events: none;
 }
 
@@ -92,6 +98,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-16);
+  min-width: 0;
+  max-width: 100%;
   padding: var(--space-card);
   background: var(--color-surface-raised);
   border: 1px solid var(--border-soft);
@@ -103,6 +111,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-10);
+  min-width: 0;
 }
 
 .stepStatus {
@@ -306,7 +315,10 @@
 
 .input,
 .textarea {
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: var(--tap-min);
   padding: var(--space-8) var(--space-12);
   font-family: var(--font-ui);
@@ -360,20 +372,19 @@
 /* ─── Lane picker (multi-select) ─────────────────────────────────────────── */
 .laneGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, calc(var(--space-80) + var(--space-64))), 1fr)
+  );
   gap: var(--space-8);
-}
-
-@media (min-width: 30rem) {
-  .laneGrid {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 .laneChip {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  min-width: 0;
   min-height: var(--tap-min);
   padding: var(--space-10) var(--space-12);
   border: 1px solid var(--border-soft);

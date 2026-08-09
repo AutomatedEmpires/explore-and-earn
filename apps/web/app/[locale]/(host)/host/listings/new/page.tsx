@@ -32,6 +32,7 @@ export default async function HostNewListingPage() {
           product from one who only looked at the price. */}
       <CaptureOnMount event={HOST_FUNNEL_EVENTS.listingDraftStarted} />
       <HostSectionHeading
+        level={1}
         title="New listing"
         description="Draft a new opportunity to share with seekers."
         actionLabel="All listings"
