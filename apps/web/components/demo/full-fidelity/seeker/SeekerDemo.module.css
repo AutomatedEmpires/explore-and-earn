@@ -263,9 +263,9 @@
 .dialogBackdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-16); background: color-mix(in srgb, var(--color-ink) 64%, transparent); }
 .dialog { position: relative; width: min(100%, 540px); max-height: calc(100svh - var(--space-32)); box-sizing: border-box; overflow-x: hidden; overflow-y: auto; padding: var(--space-24); border: 1px solid var(--border-ink); border-radius: var(--radius-card); background: var(--color-surface); color: var(--text-primary); box-shadow: var(--elevation-overlay); }
 .dialog > :not(.dialogClose) { min-width: 0; }
-.dialog h2 { margin: var(--space-6) 0; font-family: var(--font-display); font-size: 2rem; }
+.dialog h2 { margin: var(--space-6) 0; font-family: var(--font-display); font-size: var(--type-page-size); }
 .dialog p { line-height: 1.6; }
-.dialogClose { position: absolute; top: var(--space-10); right: var(--space-10); z-index: 2; width: var(--tap-min); height: var(--tap-min); border: 1px solid var(--border-ink); border-radius: 50%; background: var(--color-surface); color: var(--text-primary); font-size: 1.5rem; cursor: pointer; }
+.dialogClose { position: absolute; top: var(--space-10); right: var(--space-10); z-index: 2; width: var(--tap-min); height: var(--tap-min); border: 1px solid var(--border-ink); border-radius: 50%; background: var(--color-surface); color: var(--text-primary); font-size: var(--type-section-size); cursor: pointer; }
 .dialogPhoto { min-height: 210px; margin: calc(var(--space-24) * -1) calc(var(--space-24) * -1) var(--space-20); border-radius: var(--radius-card) var(--radius-card) 0 0; }
 .dialogValue { padding: var(--space-12); border-radius: var(--radius-cell); background: var(--color-action-soft); font-weight: var(--font-weight-bold); }
 .benefitPhotoSection { min-width: 0; margin-block: var(--space-18); padding: var(--space-12); border: 1px solid var(--border-ink-warm); border-radius: var(--radius-cell); background: var(--color-paper); }
