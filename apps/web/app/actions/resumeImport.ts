@@ -16,7 +16,10 @@ import {
   type ResumeDraftEducation,
   type ResumeDraftCertification,
 } from "@explore-and-earn/db";
-import { MARKETPLACE_CATEGORIES } from "@explore-and-earn/contracts";
+import {
+  MARKETPLACE_CATEGORIES,
+  SEEKER_SEEKING_TIMELINES,
+} from "@explore-and-earn/contracts";
 
 import { checkRateLimitDistributed } from "../../lib/rateLimit";
 import { reportError } from "../../lib/sentry";
@@ -57,7 +60,7 @@ const MAX_DRAFT_CERTIFICATIONS = 10;
 const MAX_GENERAL_SKILLS = 10;
 const MAX_SKILL_TAGS = 3;
 
-const VALID_TIMELINES = new Set(["now", "1_month", "3_months", "6_months"]);
+const VALID_TIMELINES = new Set<string>(SEEKER_SEEKING_TIMELINES);
 const VALID_CATEGORIES = new Set<string>(MARKETPLACE_CATEGORIES as readonly string[]);
 
 export interface ResumeImportFile {
@@ -143,7 +146,7 @@ const SYSTEM_PROMPT = [
   "Never invent, infer, embellish, or guess. If a field is not clearly stated, leave it empty (omit it).",
   "Do not add skills, employers, dates, or achievements that are not written in the source.",
   "For dates, prefer YYYY-MM (month) or YYYY when only a year is given; leave empty if unclear.",
-  "seekingTimeline must be one of: now, 1_month, 3_months, 6_months — only if the source clearly implies availability; otherwise omit.",
+  `seekingTimeline must be one of: ${SEEKER_SEEKING_TIMELINES.join(", ")} — only if the source clearly implies availability; otherwise omit.`,
   "bio: a short first-person summary ONLY if the résumé contains a summary/objective/about section; otherwise omit.",
   "skillTags per entry: at most a few short skills actually mentioned for that role.",
   "Keep summaries concise (1-3 sentences) using the résumé's own wording.",

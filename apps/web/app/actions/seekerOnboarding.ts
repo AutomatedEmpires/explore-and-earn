@@ -6,9 +6,11 @@ import {
   MARKETPLACE_CATEGORIES,
   SEEKER_BENEFIT_PREFERENCES,
   SEEKER_REMOTE_PREFERENCES,
+  SEEKER_SEEKING_TIMELINES,
   type MarketplaceCategory,
   type SeekerBenefitPreference,
   type SeekerRemotePreference,
+  type SeekerSeekingTimeline,
 } from "@explore-and-earn/contracts";
 import {
   saveSeekerProfile,
@@ -32,7 +34,7 @@ export type OnboardingStepData = {
   displayName?: string | null;
   bio?: string | null;
   relativeLocation?: string | null;
-  seekingTimeline?: "now" | "1_month" | "3_months" | "6_months" | null;
+  seekingTimeline?: SeekerSeekingTimeline | null;
   openToStatement?: string | null;
   remotePreference?: SeekerRemotePreference | null;
   housingPref?: SeekerBenefitPreference | null;
@@ -52,7 +54,7 @@ const MAX_DISPLAY_NAME_LENGTH = 80;
 const MAX_BIO_LENGTH = 1_000;
 const MAX_LOCATION_LENGTH = 160;
 const MAX_OPEN_TO_LENGTH = 500;
-const SEEKING_TIMELINES = new Set(["now", "1_month", "3_months", "6_months"]);
+const SEEKING_TIMELINES = new Set<string>(SEEKER_SEEKING_TIMELINES);
 const REMOTE_PREFERENCES = new Set<string>(SEEKER_REMOTE_PREFERENCES);
 const BENEFIT_PREFS = new Set<string>(SEEKER_BENEFIT_PREFERENCES);
 const PAY_UNITS = new Set([

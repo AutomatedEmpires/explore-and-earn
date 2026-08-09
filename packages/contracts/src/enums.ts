@@ -95,6 +95,15 @@ export const SEEKER_VISIBILITY_STATUS = [
 ] as const
 export type SeekerVisibilityStatus = (typeof SEEKER_VISIBILITY_STATUS)[number]
 
+export const SEEKER_SEEKING_TIMELINES = [
+  "now",
+  "1_month",
+  "3_months",
+  "6_months",
+] as const
+export type SeekerSeekingTimeline =
+  (typeof SEEKER_SEEKING_TIMELINES)[number]
+
 export const SEEKER_REMOTE_PREFERENCES = [
   "remote",
   "on_site",

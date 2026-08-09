@@ -1,11 +1,10 @@
-export const READINESS_TIMELINES = [
-  "now",
-  "1_month",
-  "3_months",
-  "6_months",
-] as const;
+import {
+  SEEKER_SEEKING_TIMELINES,
+  type SeekerSeekingTimeline,
+} from "@explore-and-earn/contracts";
 
-export type Timeline = (typeof READINESS_TIMELINES)[number];
+export const READINESS_TIMELINES = SEEKER_SEEKING_TIMELINES;
+export type Timeline = SeekerSeekingTimeline;
 export type ReadinessPhase = "idle" | "saving" | "saved" | "error";
 
 export interface ReadinessState {

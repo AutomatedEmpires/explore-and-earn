@@ -2,9 +2,11 @@ import {
   MARKETPLACE_CATEGORIES,
   SEEKER_BENEFIT_PREFERENCES,
   SEEKER_REMOTE_PREFERENCES,
+  SEEKER_SEEKING_TIMELINES,
   type MarketplaceCategory,
   type SeekerBenefitPreference,
   type SeekerRemotePreference,
+  type SeekerSeekingTimeline as CanonicalSeekerSeekingTimeline,
 } from "@explore-and-earn/contracts";
 import type {
   ResumeMissingSection,
@@ -12,11 +14,7 @@ import type {
   SeekerResumeStatus,
 } from "@explore-and-earn/db";
 
-export type SeekerSeekingTimeline =
-  | "now"
-  | "1_month"
-  | "3_months"
-  | "6_months";
+export type SeekerSeekingTimeline = CanonicalSeekerSeekingTimeline;
 
 /**
  * The small, serializable profile slice shared by the onboarding steps.
@@ -51,12 +49,7 @@ export const EMPTY_SEEKER_ONBOARDING_DRAFT: SeekerOnboardingDraft = {
   generalSkills: [],
 };
 
-const TIMELINES = new Set<SeekerSeekingTimeline>([
-  "now",
-  "1_month",
-  "3_months",
-  "6_months",
-]);
+const TIMELINES = new Set<SeekerSeekingTimeline>(SEEKER_SEEKING_TIMELINES);
 const REMOTE_PREFERENCES = new Set<SeekerRemotePreference>(
   SEEKER_REMOTE_PREFERENCES,
 );

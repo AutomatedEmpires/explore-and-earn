@@ -46,11 +46,19 @@ export function ReadinessIsland({
     initialReadinessState,
   );
   const inFlightRef = useRef(false);
+  const mountedRef = useRef(true);
   const synchronizedPropRef = useRef(normalizeTimeline(initialValue));
   const deferredPropRef = useRef<{
     seen: boolean;
     timeline: Timeline | null;
   }>({ seen: false, timeline: null });
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const timeline = normalizeTimeline(initialValue);
@@ -81,6 +89,8 @@ export function ReadinessIsland({
     void (async () => {
       try {
         const result = await saveReadinessAction(timeline);
+        if (!mountedRef.current) return;
+
         if (result.ok) {
           deferredPropRef.current = { seen: false, timeline: null };
           dispatch({ type: "succeeded", timeline: result.timeline });
@@ -94,6 +104,8 @@ export function ReadinessIsland({
           });
         }
       } catch {
+        if (!mountedRef.current) return;
+
         const deferred = deferredPropRef.current;
         deferredPropRef.current = { seen: false, timeline: null };
         dispatch({

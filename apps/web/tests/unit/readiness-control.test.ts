@@ -190,6 +190,9 @@ describe("saveReadinessAction", () => {
       error: "temporarily_unavailable",
     });
     expect(revalidatePathMock).not.toHaveBeenCalled();
+    expect((reportErrorMock.mock.calls[0]?.[0] as Error).message).toBe(
+      "relation seeker_profiles is unavailable",
+    );
   });
 
   it("maps thrown persistence faults to the same stable temporary failure", async () => {

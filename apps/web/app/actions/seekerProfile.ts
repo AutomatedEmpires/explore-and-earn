@@ -71,10 +71,15 @@ export async function saveReadinessAction(
       seekingTimeline: timeline,
     });
     if (!result.ok) {
-      reportError(new Error("Readiness persistence was not confirmed"), {
-        action: "saveReadinessAction.persist",
-        userId: session.userId,
-      });
+      reportError(
+        new Error(
+          result.error || "Readiness persistence was not confirmed",
+        ),
+        {
+          action: "saveReadinessAction.persist",
+          userId: session.userId,
+        },
+      );
       return { ok: false, error: "temporarily_unavailable" };
     }
   } catch (error) {
