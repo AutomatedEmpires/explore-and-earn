@@ -189,6 +189,7 @@ export function SeekerShell({
       className="seekeros-shell"
       data-seeker-shell
       data-authenticated={hasAuthenticatedChrome ? "true" : "false"}
+      data-coachmarks={!demoMode && isAuthenticated ? "true" : "false"}
     >
       {/* Secondary / scope nav — left rail ≥1024px, hamburger drawer <1024px. */}
       <ScopeShellNav

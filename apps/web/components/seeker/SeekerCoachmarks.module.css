@@ -3,7 +3,10 @@
 .launcher {
 	position: fixed;
 	left: var(--space-16);
-	bottom: calc(var(--size-bottom-nav) + var(--space-16));
+	bottom: calc(
+		var(--size-bottom-nav) + var(--space-16) +
+		env(safe-area-inset-bottom, 0px)
+	);
 	z-index: 60;
 	display: inline-flex;
 	align-items: center;
@@ -28,7 +31,7 @@
 
 @media (min-width: 1024px) {
 	.launcher {
-		bottom: var(--space-16);
+		bottom: calc(var(--space-16) + env(safe-area-inset-bottom, 0px));
 	}
 }
 
@@ -62,7 +65,10 @@
    and the body tells the seeker where the control actually lives. */
 .bubble[data-placement="docked"] {
 	left: var(--space-16);
-	bottom: calc(var(--size-bottom-nav) + var(--space-16) + var(--tap-min));
+	bottom: calc(
+		var(--size-bottom-nav) + var(--space-16) + var(--tap-min) +
+		env(safe-area-inset-bottom, 0px)
+	);
 }
 
 .bubble:focus-visible {

@@ -591,11 +591,14 @@
    icon+text group is CENTERED (founder direction 2026-07-14): the icon stays
    immediately left of the text, and the whole group is centered in the box. */
 .metaRow {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-8);
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 44px;
   padding: var(--space-8) var(--space-12);
   background: var(--color-surface);

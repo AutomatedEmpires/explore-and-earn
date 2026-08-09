@@ -210,6 +210,12 @@ export function toDiscoveryCardData(listing: DiscoveryListing): DiscoveryCardDat
 export function seekerApplicationListingToCardData(
   listing: SeekerApplicationListing,
 ): DiscoveryCardData {
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  };
   const housingText = listing.benefits.housing.provision === "provided"
     ? "Included"
     : listing.benefits.housing.provision === "partial"
@@ -235,6 +241,14 @@ export function seekerApplicationListingToCardData(
     category: listing.category,
     location: listing.location,
     opportunityWindow: listing.opportunityWindow,
+    begins: listing.beginsAt
+      ? formatDate(listing.beginsAt, dateOptions)
+      : undefined,
+    ends: listing.endsAt
+      ? formatDate(listing.endsAt, dateOptions)
+      : undefined,
+    seasonLength:
+      formatSeasonLength(listing.beginsAt, listing.endsAt) ?? undefined,
     coverImageUrl: listing.coverImageUrl ?? undefined,
     triad: { housing: housingText, meals: mealsText, pay: payText },
     benefitProvision: {
@@ -248,5 +262,8 @@ export function seekerApplicationListingToCardData(
     // lifecycle-bucket pages map through here, so carry the badge the DB stamped
     // on SeekerApplicationListing instead of dropping it.
     conditionalBadges: listing.conditionalBadges,
+    // Preserve the stored per-seeker score. Lifecycle cards must never silently
+    // fall back to "Not scored" when the canonical query returned a match.
+    matchScore: listing.matchScore,
   };
 }

@@ -36,7 +36,7 @@ export const TRAVEL_PLANS: readonly TravelPlan[] = [
 		hostName: "Summit Pass Hospitality",
 		category: "seasonal",
 		destination: "Breckenridge, Colorado",
-		startDate: "Nov 18, 2026",
+		startDate: "Nov 14, 2026",
 		status: "shared",
 		hostNote:
 			"Nearest airport is DEN; the staff shuttle runs from the terminal on arrival days.",

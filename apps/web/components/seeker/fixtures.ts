@@ -62,8 +62,17 @@ export const OFFER_ITEMS: readonly OfferItem[] = [
   },
 ];
 
+/** Stable local-only identity shared by the accepted bucket and its detail route. */
+export const DEV_ACCEPTED_APPLICATION_ID = "dev-application-ski-resort-accepted";
+
+const ACCEPTED_LISTING = findListing("lst_ski_resort_breck");
+
 export const ACCEPTED_ITEMS: readonly AcceptedRoleItem[] = [
-  { listing: findListing("lst_ski_resort_breck"), startDate: "Nov 18, 2026", travelPlanStatus: "not_started" },
+  {
+    listing: ACCEPTED_LISTING,
+    startDate: ACCEPTED_LISTING.begins ?? ACCEPTED_LISTING.opportunityWindow,
+    travelPlanStatus: "not_started",
+  },
 ];
 
 export const NOT_SELECTED_ITEMS: readonly NotSelectedItem[] = [

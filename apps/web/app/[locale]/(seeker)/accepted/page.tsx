@@ -1,17 +1,25 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { DiscoveryCard, Icon } from "@explore-and-earn/ui";
 import {
 	getApplicationsForSeekerWithListings,
 	type SeekerApplicationListing,
+	type SeekerApplicationWithListing,
 } from "@explore-and-earn/db";
 
 import { BucketPage, CardStatus } from "../../../../components/seeker";
+import {
+	ACCEPTED_ITEMS,
+	DEV_ACCEPTED_APPLICATION_ID,
+} from "../../../../components/seeker/fixtures";
 import {
 	CATEGORY_ICON,
 	EmptyState,
 	seekerApplicationListingToCardData,
 } from "../../../../components/discovery";
+import { isDevBenchEnabled } from "../../../../lib/devBench";
+import { readDevRole } from "../../../../lib/devBench/server";
 import styles from "./accepted.module.css";
 
 export const metadata: Metadata = {
@@ -130,25 +138,73 @@ function pickNextDeparture(
 	return upcoming[0] ?? dated[0] ?? listings[0];
 }
 
-export default async function AcceptedPage() {
-	const { userId, getToken } = await auth();
-	const token = userId ? await getToken() : null;
-
-	if (!userId || !token) {
-		return (
-			<BucketPage
-				title="Accepted"
-				description="Your confirmed roles and pre-arrival steps."
-			>
-				<EmptyState
-					title="Sign in to see your accepted roles"
-					message="Sign in to see your confirmed roles and pre-arrival steps."
-				/>
-			</BucketPage>
-		);
+/**
+ * Honest local evidence for the accepted bucket. The listing is mapped from the
+ * canonical Ski Resort Front Desk fixture; optional application fields stay
+ * empty when that fixture has no evidence for them.
+ */
+function devAcceptedApplications(): SeekerApplicationWithListing[] {
+	const item = ACCEPTED_ITEMS[0];
+	if (!item) {
+		throw new Error("Accepted page fixture requires an accepted item.");
 	}
 
-	const applications = await getApplicationsForSeekerWithListings(token, userId).catch(() => []);
+	const { listing } = item;
+	return [
+		{
+			id: DEV_ACCEPTED_APPLICATION_ID,
+			listingId: listing.id,
+			status: "accepted",
+			submittedAt: "2026-05-03T17:00:00.000Z",
+			expiresAt: null,
+			reviewedAt: "2026-05-05T17:00:00.000Z",
+			coverMessage: null,
+			listing: {
+				id: listing.id,
+				title: listing.title,
+				category: listing.category,
+				location: listing.location,
+				opportunityWindow: listing.opportunityWindow,
+				status: listing.status,
+				host: {
+					name: listing.host.name,
+					verified: listing.host.verified,
+				},
+				benefits: listing.benefits,
+				coverImageUrl: listing.coverImageUrl ?? null,
+				beginsAt: listing.begins ?? null,
+				endsAt: listing.ends ?? null,
+				conditionalBadges: listing.conditionalBadges,
+				matchScore: listing.matchScore,
+			},
+		},
+	];
+}
+
+export default async function AcceptedPage() {
+	let applications: SeekerApplicationWithListing[];
+	if (isDevBenchEnabled() && (await readDevRole()) === "seeker") {
+		applications = devAcceptedApplications();
+	} else {
+		const { userId, getToken } = await auth();
+		const token = userId ? await getToken() : null;
+
+		if (!userId || !token) {
+			return (
+				<BucketPage
+					title="Accepted"
+					description="Your confirmed roles and pre-arrival steps."
+				>
+					<EmptyState
+						title="Sign in to see your accepted roles"
+						message="Sign in to see your confirmed roles and pre-arrival steps."
+					/>
+				</BucketPage>
+			);
+		}
+
+		applications = await getApplicationsForSeekerWithListings(token, userId).catch(() => []);
+	}
 	const accepted = applications.filter(
 		(app) => app.status === "accepted" && app.listing !== null,
 	);
@@ -182,11 +238,23 @@ export default async function AcceptedPage() {
 									surface="applied"
 									cardState="accepted"
 									actions={
-										<CardStatus
-											icon="system.success"
-											label="Accepted"
-											detail={appliedOn ? `Applied ${appliedOn}` : undefined}
-										/>
+										<div
+											className={styles.cardActions}
+											role="group"
+											aria-label={`${listing.title} application actions`}
+										>
+											<CardStatus
+												icon="system.success"
+												label="Accepted"
+												detail={appliedOn ? `Applied ${appliedOn}` : undefined}
+											/>
+											<Link
+												className={styles.applicationLink}
+												href={`/applied/${application.id}`}
+											>
+												View application
+											</Link>
+										</div>
 									}
 								/>
 							);
