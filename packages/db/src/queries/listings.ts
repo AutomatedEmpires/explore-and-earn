@@ -1449,7 +1449,7 @@ export async function updateListing(
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
   const { data: currentListing, error: currentListingError } = await untyped
     .from("listings")
-    .select("cover_photo_url,gallery_photo_urls")
+    .select("cover_photo_url,gallery_photo_urls,claim_summary")
     .eq("id", listingId)
     .eq("host_profile_id", hostProfileId)
     .maybeSingle();
@@ -1464,21 +1464,30 @@ export async function updateListing(
   const persistedMedia = currentListing as {
     cover_photo_url: string | null;
     gallery_photo_urls: string[] | null;
+    claim_summary: string;
   };
-  const effectiveMediaError = listingMediaOwnershipError(
-    {
-      coverPhotoUrl:
-        fields.coverPhotoUrl !== undefined
-          ? fields.coverPhotoUrl
-          : persistedMedia.cover_photo_url,
-      galleryUrls:
-        fields.galleryUrls !== undefined
-          ? fields.galleryUrls
-          : persistedMedia.gallery_photo_urls ?? [],
-    },
-    hostProfileId,
-  );
-  if (effectiveMediaError) return { ok: false, error: effectiveMediaError };
+  // Claim conversion deliberately preserves the sourced row's untouched media
+  // and lineage. Those inherited URLs are not new host assertions, so an
+  // unrelated edit must not force the host to erase them. Any media field the
+  // host actually submits was already validated above. Every ordinary listing
+  // validates the effective persisted values so a partial edit cannot retain a
+  // legacy cross-host reference.
+  if (persistedMedia.claim_summary !== "converted") {
+    const effectiveMediaError = listingMediaOwnershipError(
+      {
+        coverPhotoUrl:
+          fields.coverPhotoUrl !== undefined
+            ? fields.coverPhotoUrl
+            : persistedMedia.cover_photo_url,
+        galleryUrls:
+          fields.galleryUrls !== undefined
+            ? fields.galleryUrls
+            : persistedMedia.gallery_photo_urls ?? [],
+      },
+      hostProfileId,
+    );
+    if (effectiveMediaError) return { ok: false, error: effectiveMediaError };
+  }
 
   const { data, error } = await untyped
     .from("listings")
