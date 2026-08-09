@@ -1,22 +1,12 @@
-.back {
-	display: inline-flex;
-	align-items: center;
-	gap: var(--space-4);
-	font-family: var(--font-ui);
-	font-size: var(--type-meta-size);
-	color: var(--text-secondary);
-	text-decoration: none;
-}
-
-.back:hover {
-	text-decoration: underline;
-}
-
 .summary {
-	display: flex;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: var(--space-16);
+	width: 100%;
+	max-width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
 	padding: var(--space-16);
-	margin-top: var(--space-16);
 	background: var(--color-surface-raised);
 	border: 1px solid var(--border-ink);
 	border-radius: var(--radius-card);
@@ -24,9 +14,10 @@
 
 .frame {
 	position: relative;
-	width: 120px;
-	height: 120px;
-	flex-shrink: 0;
+	width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
+	aspect-ratio: 16 / 9;
 	overflow: hidden;
 	border-radius: var(--radius-cell);
 	border: 1px solid var(--border-ink);
@@ -53,6 +44,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: var(--space-8);
+	width: 100%;
 	min-width: 0;
 }
 
@@ -63,6 +55,7 @@
 	font-size: var(--type-card-size);
 	line-height: var(--type-card-lh);
 	color: var(--text-primary);
+	overflow-wrap: anywhere;
 }
 
 .hostRow {
@@ -76,25 +69,29 @@
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	color: var(--text-secondary);
+	overflow-wrap: anywhere;
 }
 
 .listingLink {
 	display: inline-flex;
 	align-items: center;
 	width: fit-content;
+	max-width: 100%;
+	min-height: var(--tap-min);
+	padding-block: var(--space-8);
 	font-family: var(--font-ui);
 	font-size: var(--type-meta-size);
 	font-weight: var(--font-weight-semibold);
 	color: var(--text-primary);
 	text-decoration: underline;
+	overflow-wrap: anywhere;
 }
 
-.timeline {
-	margin-top: var(--space-section);
-}
-
-.interview {
-	margin-top: var(--space-section);
+.timeline,
+.interview,
+.message {
+	width: 100%;
+	min-width: 0;
 }
 
 .timelineHeading {
@@ -168,10 +165,6 @@
 	color: var(--text-muted);
 }
 
-.message {
-	margin-top: var(--space-section);
-}
-
 .messageBody {
 	margin: 0;
 	font-family: var(--font-ui);
@@ -179,4 +172,18 @@
 	line-height: var(--type-body-lh);
 	color: var(--text-primary);
 	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+@media (min-width: 40rem) {
+	.summary {
+		grid-template-columns: 120px minmax(0, 1fr);
+		align-items: start;
+	}
+
+	.frame {
+		width: 120px;
+		height: 120px;
+		aspect-ratio: auto;
+	}
 }

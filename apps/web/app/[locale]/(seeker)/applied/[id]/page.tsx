@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
 import { auth } from "@clerk/nextjs/server";
 import {
@@ -18,8 +19,12 @@ import {
 
 import { BucketPage } from "../../../../../components/seeker";
 import { CATEGORY_ICON } from "../../../../../components/discovery";
+import { NOT_SELECTED_ITEMS } from "../../../../../components/seeker/fixtures";
 import { OpenConversationButton } from "../../../../../components/messaging/OpenConversationButton";
 import { InterviewScheduleCard } from "../../../../../components/scheduling/InterviewScheduleCard";
+import { isDevBenchEnabled } from "../../../../../lib/devBench";
+import { readDevRole } from "../../../../../lib/devBench/server";
+import { isUuid } from "../../../../../lib/ids";
 import { WithdrawButton } from "../WithdrawButton";
 import styles from "./detail.module.css";
 
@@ -29,15 +34,89 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+const DEV_APPLICATION_DETAIL_ID = "dev-application-vineyard-not-selected";
+
+interface ApplicationDetailData {
+  readonly application: RichSeekerApplication;
+  readonly scheduling: Awaited<
+    ReturnType<typeof getSchedulingRequestForApplication>
+  >;
+}
+
+function devApplicationDetail(): ApplicationDetailData {
+  const item = NOT_SELECTED_ITEMS[0];
+  if (!item) {
+    throw new Error("Application detail fixture requires a not-selected item.");
+  }
+
+  const { listing } = item;
+  return {
+    application: {
+      id: DEV_APPLICATION_DETAIL_ID,
+      listingId: listing.id,
+      status: "not_selected",
+      canStartConversation: false,
+      submittedAt: "2026-05-12T17:00:00.000Z",
+      reviewedAt: "2026-05-15T17:00:00.000Z",
+      decidedAt: "2026-05-20T17:00:00.000Z",
+      coverMessage:
+        "I’m excited to contribute during harvest and bring reliable guest-service experience. I’m comfortable with early starts, hands-on cellar work, and shared team responsibilities throughout the season.",
+      listing: {
+        id: listing.id,
+        title: listing.title,
+        category: listing.category,
+        location: listing.location,
+        opportunityWindow: listing.opportunityWindow,
+        status: listing.status,
+        host: {
+          name: listing.host.name,
+          verified: listing.host.verified,
+        },
+        benefits: listing.benefits,
+        coverImageUrl: listing.coverImageUrl ?? null,
+        beginsAt: listing.begins ?? null,
+        endsAt: listing.ends ?? null,
+        conditionalBadges: listing.conditionalBadges,
+        matchScore: listing.matchScore,
+      },
+    },
+    scheduling: { available: true, request: null },
+  };
+}
+
+/**
+ * React cache keeps metadata and the page on one request-scoped read. The exact
+ * local fixture route returns before Clerk, Supabase, or scheduling can run.
+ */
+const resolveApplicationDetail = cache(
+  async (id: string): Promise<ApplicationDetailData | null> => {
+    if (id === DEV_APPLICATION_DETAIL_ID) {
+      if (!isDevBenchEnabled() || (await readDevRole()) !== "seeker") {
+        return null;
+      }
+      return devApplicationDetail();
+    }
+    if (!isUuid(id)) return null;
+
+    const { userId, getToken } = await auth();
+    if (!userId) return null;
+    const token = await getToken();
+    if (!token) return null;
+
+    const [application, scheduling] = await Promise.all([
+      getSeekerApplicationRichById(token, userId, id),
+      getSchedulingRequestForApplication(token, id),
+    ]);
+
+    return application ? { application, scheduling } : null;
+  },
+);
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
-  const { userId, getToken } = await auth();
-  if (!userId) return { title: "Application" };
-  const token = await getToken();
-  if (!token) return { title: "Application" };
-  const application = await getSeekerApplicationRichById(token, userId, id).catch(() => null);
-  const title = application?.listing?.title
-    ? `Application — ${application.listing.title}`
+  const detail = await resolveApplicationDetail(id).catch(() => null);
+  const title = detail?.application.listing?.title
+    ? `Application — ${detail.application.listing.title}`
     : "Application";
   return {
     title,
@@ -122,22 +201,12 @@ function buildTimeline(application: RichSeekerApplication): TimelineStep[] {
 
 export default async function AppliedDetailPage({ params }: Props) {
   const { id } = await params;
-  const { userId, getToken } = await auth();
-  const token = userId ? await getToken() : null;
-
-  if (!userId || !token) {
+  const detail = await resolveApplicationDetail(id);
+  if (!detail) {
     notFound();
   }
 
-  const [application, scheduling] = await Promise.all([
-    getSeekerApplicationRichById(token, userId, id),
-    getSchedulingRequestForApplication(token, id),
-  ]);
-
-  if (!application) {
-    notFound();
-  }
-
+  const { application, scheduling } = detail;
   const { listing, status } = application;
   const label = STATUS_LABEL[status] ?? "Applied";
   const variant = STATUS_VARIANT[status] ?? "neutral";
@@ -148,13 +217,13 @@ export default async function AppliedDetailPage({ params }: Props) {
     <BucketPage
       title={listing?.title ?? "Application"}
       description="Where your application stands."
+      backHref="/applied"
+      backLabel="Back to applications"
     >
-      <Link className={styles.back} href="/applied">
-        <Icon name="action.back" size={16} aria-hidden />
-        Back to applications
-      </Link>
-
-      <article className={styles.summary}>
+      <article
+        className={styles.summary}
+        aria-labelledby="application-summary-title"
+      >
         <div className={styles.frame}>
           {listing?.coverImageUrl ? (
             <Image
@@ -162,7 +231,7 @@ export default async function AppliedDetailPage({ params }: Props) {
               src={listing.coverImageUrl}
               alt={`${listing.title} cover photo`}
               fill
-              sizes="(max-width: 640px) 100vw, 120px"
+              sizes="(max-width: 639px) calc(100vw - 4rem), 120px"
             />
           ) : (
             <span className={styles.coverFallback}>
@@ -178,7 +247,7 @@ export default async function AppliedDetailPage({ params }: Props) {
         </div>
         <div className={styles.summaryBody}>
           <Badge label={label} variant={variant} />
-          <h2 className={styles.summaryTitle}>
+          <h2 id="application-summary-title" className={styles.summaryTitle}>
             {listing?.title ?? "Listing no longer available"}
           </h2>
           {listing ? (
