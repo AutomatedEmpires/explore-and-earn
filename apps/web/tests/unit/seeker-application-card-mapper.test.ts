@@ -21,8 +21,8 @@ function applicationListing(
       pay: { provision: "provided", summary: "$19/hr + tips" },
     },
     coverImageUrl: null,
-    beginsAt: "2026-11-14",
-    endsAt: "2027-04-18",
+    beginsAt: "2026-11-14T17:00:00.000Z",
+    endsAt: "2027-04-18T17:00:00.000Z",
     matchScore: 88,
     ...overrides,
   };

@@ -12,6 +12,8 @@ import { BucketPage, CardStatus } from "../../../../components/seeker";
 import {
 	ACCEPTED_ITEMS,
 	DEV_ACCEPTED_APPLICATION_ID,
+	DEV_ACCEPTED_BEGINS_AT,
+	DEV_ACCEPTED_ENDS_AT,
 } from "../../../../components/seeker/fixtures";
 import {
 	CATEGORY_ICON,
@@ -39,10 +41,18 @@ function daysUntilStart(beginsAt: string | null): number | null {
 	if (!beginsAt) return null;
 	const start = new Date(beginsAt);
 	if (Number.isNaN(start.getTime())) return null;
-	const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+	const startDay = Date.UTC(
+		start.getUTCFullYear(),
+		start.getUTCMonth(),
+		start.getUTCDate(),
+	);
 	const now = new Date();
-	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-	return Math.round((startDay.getTime() - today.getTime()) / 86_400_000);
+	const today = Date.UTC(
+		now.getUTCFullYear(),
+		now.getUTCMonth(),
+		now.getUTCDate(),
+	);
+	return Math.round((startDay - today) / 86_400_000);
 }
 
 /** Honest, human countdown from a real start date (or null to omit). */
@@ -62,6 +72,7 @@ function formatStartDate(beginsAt: string | null): string | null {
 		month: "long",
 		day: "numeric",
 		year: "numeric",
+		timeZone: "UTC",
 	});
 }
 
@@ -172,8 +183,8 @@ function devAcceptedApplications(): SeekerApplicationWithListing[] {
 				},
 				benefits: listing.benefits,
 				coverImageUrl: listing.coverImageUrl ?? null,
-				beginsAt: listing.begins ?? null,
-				endsAt: listing.ends ?? null,
+				beginsAt: DEV_ACCEPTED_BEGINS_AT,
+				endsAt: DEV_ACCEPTED_ENDS_AT,
 				conditionalBadges: listing.conditionalBadges,
 				matchScore: listing.matchScore,
 			},

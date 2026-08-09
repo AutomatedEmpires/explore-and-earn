@@ -22,6 +22,8 @@ import { CATEGORY_ICON } from "../../../../../components/discovery";
 import {
   ACCEPTED_ITEMS,
   DEV_ACCEPTED_APPLICATION_ID,
+  DEV_ACCEPTED_BEGINS_AT,
+  DEV_ACCEPTED_ENDS_AT,
   NOT_SELECTED_ITEMS,
 } from "../../../../../components/seeker/fixtures";
 import { OpenConversationButton } from "../../../../../components/messaging/OpenConversationButton";
@@ -120,8 +122,8 @@ function devAcceptedApplicationDetail(): ApplicationDetailData {
         },
         benefits: listing.benefits,
         coverImageUrl: listing.coverImageUrl ?? null,
-        beginsAt: listing.begins ?? null,
-        endsAt: listing.ends ?? null,
+        beginsAt: DEV_ACCEPTED_BEGINS_AT,
+        endsAt: DEV_ACCEPTED_ENDS_AT,
         conditionalBadges: listing.conditionalBadges,
         matchScore: listing.matchScore,
       },
