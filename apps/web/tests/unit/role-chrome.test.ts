@@ -95,12 +95,13 @@ describe("workspace landmarks and local admin review state", () => {
     expect(read(shell).match(/<main\b/g)).toHaveLength(1);
   });
 
-  it("keeps the admin host queue independent of local Supabase", () => {
+  it("keeps the admin host queue deterministic without local Supabase", () => {
     expect(adminLayout).toContain(
       'isDevBenchEnabled() && (await readDevRole()) === "admin"',
     );
     expect(adminHosts).toContain("const isDevReview =");
-    expect(adminHosts).toContain("totalPages: 1");
+    expect(adminHosts).toContain("rows: DEV_HOSTS_BY_PAGE[page] ?? []");
+    expect(adminHosts).toContain("totalPages: 2");
   });
 });
 

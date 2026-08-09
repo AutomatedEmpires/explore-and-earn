@@ -28,5 +28,12 @@ export { AdminShell } from "./AdminShell";
 export type { AdminShellProps } from "./AdminShell";
 export { AdminPager } from "./AdminPager";
 export type { AdminPagerProps } from "./AdminPager";
+export {
+  ADMIN_QUERY_MAX_LENGTH,
+  adminPageHref,
+  matchesAdminQuery,
+  readAdminQuery,
+  resolveAdminSearch,
+} from "./adminSearch";
 export { ConfirmAction } from "./ConfirmAction";
 export type { ConfirmActionProps } from "./ConfirmAction";

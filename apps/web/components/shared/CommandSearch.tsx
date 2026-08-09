@@ -12,6 +12,8 @@ export interface CommandSearchProps {
   readonly ariaLabel?: string;
   /** Query param name the target surface reads. Defaults to "q". */
   readonly paramName?: string;
+  /** Maximum query length accepted from typing or a direct URL. */
+  readonly maxLength?: number;
   /** Scope search class (e.g. "seekeros-search") — keeps the shell styling. */
   readonly className: string;
 }
@@ -30,6 +32,7 @@ export function CommandSearch({
   placeholder,
   ariaLabel = placeholder,
   paramName = "q",
+  maxLength,
   className,
 }: CommandSearchProps) {
   const router = useRouter();
@@ -42,8 +45,9 @@ export function CommandSearch({
   // back/forward, and any other external change to the URL. Without this the
   // box shows blank even though the page below it is actively filtered.
   useEffect(() => {
-    setValue(searchParams.get(paramName) ?? "");
-  }, [searchParams, paramName]);
+    const urlValue = (searchParams.get(paramName) ?? "").trim();
+    setValue(maxLength === undefined ? urlValue : urlValue.slice(0, maxLength));
+  }, [maxLength, searchParams, paramName]);
 
   // "/" focuses the command bar from anywhere in the scope (unless the user is
   // already typing in a field). Escape blurs it.
@@ -88,6 +92,7 @@ export function CommandSearch({
         className="cmdsearch-input"
         autoComplete="off"
         enterKeyHint="search"
+        maxLength={maxLength}
       />
       <kbd className="cmdsearch-kbd" aria-hidden="true">/</kbd>
     </form>

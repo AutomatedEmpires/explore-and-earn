@@ -16,6 +16,7 @@ import {
   holdListingAction,
   rejectListingAction,
 } from "../../app/actions/admin";
+import { matchesAdminQuery } from "./adminSearch";
 import { ConfirmAction } from "./ConfirmAction";
 import { formatAdminDate, humanizeToken, listingStatusVariant } from "./status";
 import styles from "./AdminListingsTable.module.css";
@@ -156,29 +157,30 @@ function rowSignals(status: string, published: boolean): ReadonlyArray<RowSignal
 }
 
 export function AdminListingsTable({
+  initialQuery,
   listings,
 }: {
+  readonly initialQuery: string;
   readonly listings: ReadonlyArray<AdminListingRowView>;
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterId>("all");
   const [sort, setSort] = useState<SortId>("priority");
-  const [query, setQuery] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const trimmedQuery = query.trim().toLowerCase();
+  const hasQuery = initialQuery.trim().length > 0;
 
   const visible = useMemo(() => {
     const filtered = listings.filter((listing) => {
       if (filter !== "all" && listing.status !== filter) return false;
-      if (trimmedQuery) {
-        const haystack =
-          `${listing.title} ${listing.hostCompanyName} ${listing.category} ${listing.status}`.toLowerCase();
-        if (!haystack.includes(trimmedQuery)) return false;
-      }
-      return true;
+      return matchesAdminQuery(initialQuery, [
+        listing.title || "Untitled listing",
+        listing.hostCompanyName,
+        listing.category,
+        humanizeToken(listing.status),
+      ]);
     });
 
     const sorted = [...filtered];
@@ -199,7 +201,7 @@ export function AdminListingsTable({
       );
     }
     return sorted;
-  }, [filter, listings, sort, trimmedQuery]);
+  }, [filter, initialQuery, listings, sort]);
 
   const counts = useMemo(() => {
     let live = 0;
@@ -280,25 +282,14 @@ export function AdminListingsTable({
             </button>
           ))}
         </div>
-        <span className={styles.count} aria-live="polite">
-          {visible.length} {visible.length === 1 ? "listing" : "listings"}
+        <span className={styles.count} role="status" aria-live="polite">
+          {hasQuery || filter !== "all"
+            ? `${visible.length} of ${listings.length} listings on this page`
+            : `${visible.length} ${visible.length === 1 ? "listing" : "listings"} on this page`}
         </span>
       </div>
 
       <div className={styles.triageBar}>
-        <div className={styles.search}>
-          <span className={styles.searchIcon} aria-hidden="true">
-            <Icon name="action.search" size={16} />
-          </span>
-          <input
-            type="search"
-            className={styles.searchInput}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search title, host, category, or status"
-            aria-label="Search listings by title, host, category, or status"
-          />
-        </div>
         <div
           className={styles.sorts}
           role="group"
@@ -330,19 +321,29 @@ export function AdminListingsTable({
       {visible.length === 0 ? (
         <div className={styles.empty}>
           <span className={styles.emptyIcon} aria-hidden="true">
-            <Icon name="system.success" size={24} />
+            <Icon
+              name={hasQuery ? "action.search" : "system.success"}
+              size={24}
+            />
           </span>
-          <p className={styles.emptyTitle}>The queue is clear</p>
-          <p className={styles.emptyBody}>
-            No listings match this view. Clear the search or switch filters to
-            see other states.
+          <p className={styles.emptyTitle}>
+            {hasQuery || filter !== "all"
+              ? "No matching listings on this page"
+              : "No listings on this page"}
           </p>
-          {filter !== "all" || trimmedQuery ? (
+          <p className={styles.emptyBody}>
+            {hasQuery
+              ? "No listings on this page match this search."
+              : filter !== "all"
+                ? "No listings on this page match this status filter."
+                : "No listings are loaded on this page."}
+          </p>
+          {filter !== "all" || hasQuery ? (
             <Button
               variant="secondary"
               onClick={() => {
                 setFilter("all");
-                setQuery("");
+                if (hasQuery) router.push("/listings");
               }}
             >
               Clear filters

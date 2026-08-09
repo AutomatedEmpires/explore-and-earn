@@ -19,6 +19,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-4);
+  min-height: var(--tap-min);
   padding: var(--space-6) var(--space-12);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-pill, 999px);

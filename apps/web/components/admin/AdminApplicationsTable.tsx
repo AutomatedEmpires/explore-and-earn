@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Badge, type BadgeProps, Button, Icon, type IconKey } from "@explore-and-earn/ui";
 
+import { matchesAdminQuery } from "./adminSearch";
 import { formatAdminDate, humanizeToken } from "./status";
 import styles from "./AdminApplicationsTable.module.css";
 
@@ -145,21 +147,21 @@ function MetricTile({
 /**
  * Admin moderation queue — recent applications as a premium review workbench.
  *
- * Local-only triage: a segment toolbar (All / Awaiting / Decided) plus a search
- * field filter the rows already on screen — no new query, no data contract
- * change. Read-only by contract: no application-mutation server action exists
- * yet, so the per-row Review affordance renders disabled with an explanatory
- * tooltip rather than a dead link. Raw Clerk user ids are NEVER shown to the eye
+ * Local-only triage: a segment toolbar (All / Awaiting / Decided) filters the
+ * rows already on screen, while the canonical shell query arrives through the
+ * serializable initialQuery prop. Raw Clerk user ids are NEVER shown or matched
  * — only a derived display name, a short reference, and an initials avatar; the
- * id stays the React key.
+ * raw identifier is used only to derive that safe display identity.
  */
 export function AdminApplicationsTable({
   applications,
+  initialQuery,
 }: {
   readonly applications: ReadonlyArray<AdminApplicationRowView>;
+  readonly initialQuery: string;
 }) {
+  const router = useRouter();
   const [lane, setLane] = useState<Lane>("all");
-  const [query, setQuery] = useState("");
 
   const { total, inReview, decided, oldestDays } = useMemo(
     () => summarize(applications),
@@ -168,20 +170,20 @@ export function AdminApplicationsTable({
   const oldestLabel =
     oldestDays <= 0 ? "Today" : oldestDays === 1 ? "1 day" : `${oldestDays} days`;
 
-  const trimmedQuery = query.trim().toLowerCase();
+  const hasQuery = initialQuery.trim().length > 0;
   const filtered = useMemo(() => {
     return applications.filter((a) => {
       if (lane === "awaiting" && isDecided(a.status)) return false;
       if (lane === "decided" && !isDecided(a.status)) return false;
-      if (trimmedQuery) {
-        const who = applicantIdentity(a.seekerClerkUserId);
-        const haystack =
-          `${a.listingTitle} ${who.name} ${who.ref} ${humanizeToken(a.status)}`.toLowerCase();
-        if (!haystack.includes(trimmedQuery)) return false;
-      }
-      return true;
+      const who = applicantIdentity(a.seekerClerkUserId);
+      return matchesAdminQuery(initialQuery, [
+        a.listingTitle || "Untitled listing",
+        who.name,
+        who.ref,
+        humanizeToken(a.status),
+      ]);
     });
-  }, [applications, lane, trimmedQuery]);
+  }, [applications, initialQuery, lane]);
 
   const segments: ReadonlyArray<{ id: Lane; label: string; count: number }> = [
     { id: "all", label: "All", count: total },
@@ -189,7 +191,7 @@ export function AdminApplicationsTable({
     { id: "decided", label: "Decided", count: decided },
   ];
 
-  const isFiltered = lane !== "all" || trimmedQuery.length > 0;
+  const isFiltered = lane !== "all" || hasQuery;
 
   return (
     <div className={styles.wrap}>
@@ -233,23 +235,9 @@ export function AdminApplicationsTable({
             );
           })}
         </div>
-
-        <div className={styles.search}>
-          <span className={styles.searchIcon} aria-hidden="true">
-            <Icon name="action.search" size={16} />
-          </span>
-          <input
-            type="search"
-            className={styles.searchInput}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search seeker, listing, or status"
-            aria-label="Search applications by seeker, listing, or status"
-          />
-        </div>
       </div>
 
-      {applications.length === 0 ? (
+      {applications.length === 0 && !hasQuery ? (
         <div className={styles.emptyState}>
           <span className={styles.emptyMark} aria-hidden="true">
             <Icon name="status.accepted" size={24} />
@@ -267,15 +255,16 @@ export function AdminApplicationsTable({
           </span>
           <p className={styles.emptyTitle}>No matches in this view</p>
           <p className={styles.emptyHint}>
-            No applications match the current filter. Widen the view to see the
-            rest of the queue.
+            {hasQuery
+              ? "No recent applications match this search."
+              : "No applications match the current lane filter."}
           </p>
           <Button
             variant="secondary"
             icon="action.close"
             onClick={() => {
               setLane("all");
-              setQuery("");
+              if (hasQuery) router.push("/applications");
             }}
           >
             Clear filters
@@ -284,7 +273,12 @@ export function AdminApplicationsTable({
       ) : (
         <>
           <p className={styles.resultLine} role="status" aria-live="polite">
-            {isFiltered ? (
+            {hasQuery ? (
+              <>
+                Showing <strong>{filtered.length}</strong> of {total} recent
+                applications
+              </>
+            ) : isFiltered ? (
               <>
                 Showing <strong>{filtered.length}</strong> of {total}
               </>

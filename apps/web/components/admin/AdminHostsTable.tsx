@@ -6,6 +6,7 @@ import { hasVerifiedHostSubscription } from "@explore-and-earn/contracts";
 import { Badge, Button, Icon, MetricCard, MetricGrid, VerifiedHostBadge } from "@explore-and-earn/ui";
 
 import { clearHostFlagAction, unverifyHostAction, verifyHostAction } from "../../app/actions/admin";
+import { matchesAdminQuery } from "./adminSearch";
 import { ConfirmAction } from "./ConfirmAction";
 import styles from "./AdminHostsTable.module.css";
 
@@ -107,18 +108,47 @@ function hostRisk(host: AdminHostRowView): HostRisk {
   return { level: "watch", label: "New · unvetted", weight: 5 };
 }
 
+/** Search only the human-readable values already rendered on the host card. */
+function hostSearchValues(host: AdminHostRowView): ReadonlyArray<string | number> {
+  const attested = isTrustAttested(host.attestationStatus);
+  const subscriptionVerified = hasVerifiedHostSubscription(host.subscriptionTier);
+  const risk = hostRisk(host);
+  const listingLabel =
+    host.listingCount === 1 ? "1 listing" : `${host.listingCount} listings`;
+  const footprintLabel =
+    host.listingCount >= 3
+      ? "Established"
+      : host.listingCount > 0
+        ? "Active"
+        : "New host";
+
+  return [
+    host.companyName || "Unnamed host",
+    `Host ${hostRef(host.clerkUserId)}`,
+    listingLabel,
+    footprintLabel,
+    attested ? "Trust attested" : "Awaiting review",
+    subscriptionVerified ? "Verified Host" : "",
+    risk.level === "flagged" ? risk.label : "",
+    host.flaggedForReview ? "Spam reports · flagged" : "",
+  ];
+}
+
 type SegmentKey = "all" | "flagged" | "attested" | "awaiting";
 
 export function AdminHostsTable({
   hosts,
+  initialQuery,
 }: {
   readonly hosts: ReadonlyArray<AdminHostRowView>;
+  readonly initialQuery: string;
 }) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [segment, setSegment] = useState<SegmentKey>("all");
+  const hasQuery = initialQuery.trim().length > 0;
 
   function runAction(
     id: string,
@@ -175,10 +205,15 @@ export function AdminHostsTable({
     } else {
       rows = hosts;
     }
+    if (hasQuery) {
+      rows = rows.filter((host) =>
+        matchesAdminQuery(initialQuery, hostSearchValues(host)),
+      );
+    }
     // Priority sort: highest-risk (unvetted + publishing) first, so the moderator
     // sees what needs attention now without hunting. Stable for equal weights.
     return [...rows].sort((a, b) => hostRisk(b).weight - hostRisk(a).weight);
-  }, [hosts, segment]);
+  }, [hasQuery, hosts, initialQuery, segment]);
 
   return (
     <div className={styles.wrap}>
@@ -236,7 +271,7 @@ export function AdminHostsTable({
         </p>
       ) : null}
 
-      {total === 0 ? (
+      {total === 0 && !hasQuery ? (
         <div className={styles.empty}>
           <span className={styles.emptyIcon}>
             <Icon aria-hidden name="system.success" size={24} />
@@ -251,26 +286,59 @@ export function AdminHostsTable({
       ) : visibleHosts.length === 0 ? (
         <div className={styles.empty}>
           <span className={styles.emptyIcon}>
-            <Icon aria-hidden name="system.success" size={24} />
+            <Icon
+              aria-hidden
+              name={hasQuery ? "action.search" : "system.success"}
+              size={24}
+            />
           </span>
           <h3 className={styles.emptyTitle}>
-            {segment === "flagged"
+            {hasQuery
+              ? "No hosts on this page match this search"
+              : segment === "flagged"
               ? "No hosts flagged for review"
               : segment === "attested"
                 ? "No trust-attested hosts yet"
                 : "Nothing awaiting review"}
           </h3>
           <p className={styles.emptySub}>
-            {segment === "flagged"
+            {hasQuery
+              ? "Try a different host name, safe reference, trust state, or listing count."
+              : segment === "flagged"
               ? "No unreviewed host is publishing listings — every public host is trust-cleared."
               : segment === "attested"
                 ? "Attest a host below and they will appear in this segment."
                 : "Every host has been reviewed — the trust-review queue is clear."}
           </p>
+          {hasQuery || segment !== "all" ? (
+            <Button
+              variant="secondary"
+              icon="action.close"
+              onClick={() => {
+                setSegment("all");
+                if (hasQuery) router.push("/hosts");
+              }}
+            >
+              Clear filters
+            </Button>
+          ) : null}
         </div>
       ) : (
-        <div className={styles.grid} role="list">
-          {visibleHosts.map((host) => {
+        <>
+          <p className={styles.resultLine} role="status" aria-live="polite">
+            {hasQuery || segment !== "all" ? (
+              <>
+                <strong>{visibleHosts.length}</strong> of {total} hosts on this
+                page
+              </>
+            ) : (
+              <>
+                <strong>{total}</strong> hosts on this page
+              </>
+            )}
+          </p>
+          <div className={styles.grid} role="list">
+            {visibleHosts.map((host) => {
             const busy = isPending && pendingId === host.id;
             const attested = isTrustAttested(host.attestationStatus);
             const subscriptionVerified = hasVerifiedHostSubscription(host.subscriptionTier);
@@ -416,8 +484,9 @@ export function AdminHostsTable({
                 </div>
               </article>
             );
-          })}
-        </div>
+            })}
+          </div>
+        </>
       )}
     </div>
   );

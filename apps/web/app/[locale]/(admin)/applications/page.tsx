@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
 import { getRecentApplications } from "@explore-and-earn/db";
 
-import { AdminApplicationsTable } from "../../../../components/admin";
+import {
+  AdminApplicationsTable,
+  readAdminQuery,
+} from "../../../../components/admin";
 import styles from "../shared.module.css";
 
 export const metadata: Metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
 
-export default async function AdminApplicationsPage() {
+interface Props {
+  readonly searchParams: Promise<{ readonly q?: string | string[] }>;
+}
+
+export default async function AdminApplicationsPage({ searchParams }: Props) {
+  const { q } = await searchParams;
+  const query = readAdminQuery(q);
   const serviceRoleToken = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const applications = await getRecentApplications(serviceRoleToken, 50);
 
@@ -19,7 +28,7 @@ export default async function AdminApplicationsPage() {
           The 50 most recent applications across the marketplace.
         </p>
       </header>
-      <AdminApplicationsTable applications={applications} />
+      <AdminApplicationsTable applications={applications} initialQuery={query} />
     </section>
   );
 }
