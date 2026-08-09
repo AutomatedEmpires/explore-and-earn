@@ -139,44 +139,28 @@ describe("POST /api/notifications/unsubscribe", () => {
 		expect(html).toContain("You&#39;re unsubscribed");
 	});
 
-	it("accepts the exact one-click pair as multipart form data", async () => {
-		const form = new FormData();
-		form.set("List-Unsubscribe", "One-Click");
-
-		const response = await POST(
-			new Request(ENDPOINT, { method: "POST", body: form }),
-		);
-
-		expect(response.status).toBe(200);
-		expect(routeMocks.applyUnsubscribe).toHaveBeenCalledWith("clerk_u1", "messages");
-	});
-
-	it("rejects a multipart file masquerading as the one-click value", async () => {
-		const form = new FormData();
-		form.set(
-			"List-Unsubscribe",
-			new File(["One-Click"], "value.txt", { type: "text/plain" }),
-		);
-
-		const response = await POST(
-			new Request(ENDPOINT, { method: "POST", body: form }),
-		);
-
-		expect(response.status).toBe(400);
-		expect(routeMocks.applyUnsubscribe).not.toHaveBeenCalled();
-	});
-
 	it.each([
 		["missing body", () => new Request(ENDPOINT, { method: "POST" })],
-		["unsupported content type", () => urlencodedRequest(ONE_CLICK_BODY, ENDPOINT, "text/plain")],
+		[
+			"unsupported content type",
+			() => urlencodedRequest(ONE_CLICK_BODY, ENDPOINT, "text/plain"),
+		],
+		[
+			"multipart form body",
+			() => {
+				const form = new FormData();
+				form.set("List-Unsubscribe", "One-Click");
+				return new Request(ENDPOINT, { method: "POST", body: form });
+			},
+		],
 		["missing field", () => urlencodedRequest("")],
 		["wrong value", () => urlencodedRequest("List-Unsubscribe=No")],
+		[
+			"encoded equivalent instead of exact body",
+			() => urlencodedRequest("List-Unsubscribe=One%2DClick"),
+		],
 		["extra field", () => urlencodedRequest(`${ONE_CLICK_BODY}&extra=value`)],
 		["duplicate field", () => urlencodedRequest(`${ONE_CLICK_BODY}&${ONE_CLICK_BODY}`)],
-		[
-			"malformed multipart",
-			() => urlencodedRequest("not-a-multipart-body", ENDPOINT, "multipart/form-data; boundary=missing"),
-		],
 		[
 			"oversized body",
 			() => urlencodedRequest(`${ONE_CLICK_BODY}&padding=${"x".repeat(1024)}`),

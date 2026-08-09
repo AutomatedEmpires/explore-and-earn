@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const MAX_ONE_CLICK_BODY_BYTES = 1024;
 const ONE_CLICK_FIELD = "List-Unsubscribe";
 const ONE_CLICK_VALUE = "One-Click";
+const ONE_CLICK_FORM_BODY = `${ONE_CLICK_FIELD}=${ONE_CLICK_VALUE}`;
 const UNSUBSCRIBE_CSP = [
 	"default-src 'none'",
 	"style-src 'unsafe-inline'",
@@ -101,37 +102,11 @@ function jsonResult(ok: boolean, status: number): NextResponse {
 async function hasExactOneClickBody(request: Request): Promise<boolean> {
 	const contentType = request.headers.get("content-type") ?? "";
 	const mediaType = contentType.split(";", 1)[0]?.trim().toLowerCase();
-	if (
-		mediaType !== "application/x-www-form-urlencoded" &&
-		mediaType !== "multipart/form-data"
-	) {
-		return false;
-	}
+	if (mediaType !== "application/x-www-form-urlencoded") return false;
 
 	const rawBody = await readCappedBodyText(request, MAX_ONE_CLICK_BODY_BYTES);
 	if (rawBody === null) return false;
-
-	let entries: Array<[string, FormDataEntryValue]>;
-	try {
-		if (mediaType === "application/x-www-form-urlencoded") {
-			entries = [...new URLSearchParams(rawBody).entries()];
-		} else {
-			const parsed = await new Response(rawBody, {
-				headers: { "Content-Type": contentType },
-			}).formData();
-			entries = [];
-			parsed.forEach((value, key) => entries.push([key, value]));
-		}
-	} catch {
-		return false;
-	}
-
-	return (
-		entries.length === 1 &&
-		entries[0]?.[0] === ONE_CLICK_FIELD &&
-		typeof entries[0]?.[1] === "string" &&
-		entries[0][1] === ONE_CLICK_VALUE
-	);
+	return rawBody === ONE_CLICK_FORM_BODY;
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
