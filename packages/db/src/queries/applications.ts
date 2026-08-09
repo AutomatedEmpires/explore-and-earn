@@ -31,12 +31,20 @@ export interface ApplyResult {
   readonly ok: boolean;
   readonly error?: string;
   /**
+   * Deployment bridge only: the RPC was genuinely absent and this result came
+   * from the pre-091 table-write path. Invite acceptance uses this marker to
+   * perform its matching legacy status/linkage writes during that short window.
+   */
+  readonly legacySubmission?: boolean;
+  /**
    * True when the apply REACTIVATED a previously withdrawn application row
    * (migration 063) rather than creating a new one. Lets the action layer show
    * a "re-applied" confirmation; the host separately sees it via `reappliedAt`.
    */
   readonly reactivated?: boolean;
-  /** The created/reactivated application row id (set on ok=true). */
+  /** Server-authoritative RPC outcome; existing means no new submission event. */
+  readonly disposition?: "created" | "reactivated" | "existing";
+  /** The created, reactivated, or adopted application row id (set on ok=true). */
   readonly applicationId?: string;
   /** The applicant's seeker_profiles.id (set on ok=true). */
   readonly seekerProfileId?: string;
@@ -57,6 +65,54 @@ export interface ApplyOrigin {
 const UNIQUE_VIOLATION = "23505";
 /** Postgres check_violation SQLSTATE -- surfaced as invalid_transition or listing_full. */
 const CHECK_VIOLATION = "23514";
+const LISTING_NOT_ACCEPTING_APPLICATIONS =
+  "listing_not_accepting_applications" as const;
+const MAX_COVER_MESSAGE_CODE_POINTS = 2000;
+const STABLE_APPLICATION_ERRORS = new Set([
+  "unauthenticated",
+  "profile_not_found",
+  "cover_message_too_long",
+  "resume_incomplete",
+  LISTING_NOT_ACCEPTING_APPLICATIONS,
+  "cannot_apply_to_own_listing",
+  "invite_not_actionable",
+  "already_applied",
+]);
+
+function safeApplicationError(message: unknown): string {
+  if (message === "application_conflict") return "conflict";
+  return typeof message === "string" && STABLE_APPLICATION_ERRORS.has(message)
+    ? message
+    : "temporarily_unavailable";
+}
+
+/** Match PostgreSQL char_length(): count Unicode code points, not UTF-16 units. */
+function coverMessageIsTooLong(coverMessage: string | undefined): boolean {
+  if (coverMessage === undefined) return false;
+
+  let codePoints = 0;
+  const iterator = coverMessage[Symbol.iterator]();
+  while (!iterator.next().done) {
+    codePoints += 1;
+    if (codePoints > MAX_COVER_MESSAGE_CODE_POINTS) return true;
+  }
+  return false;
+}
+
+/**
+ * PostgREST's exact missing-function response during deploy-before-migrate.
+ * Code alone is insufficient: never turn an unrelated schema-cache miss into
+ * authority to use the compatibility write path.
+ */
+function isMissingSubmissionRpc(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const row = error as Record<string, unknown>;
+  if (row.code !== "PGRST202") return false;
+  const signature = [row.message, row.details, row.hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+  return signature.includes("submit_my_application");
+}
 
 /**
  * Resolve seeker_profiles.id for the authed Clerk user.
@@ -81,14 +137,184 @@ async function resolveSeekerProfileId(
 }
 
 /**
+ * Short-lived compatibility path for the deploy-before-091 interval only.
+ * Callers must have completed the same fail-closed listing and résumé checks
+ * before entering. Once 091 exists, direct grants are revoked and this path is
+ * unreachable because PostgREST no longer returns the missing-RPC signature.
+ */
+async function legacySubmitApplication(
+  authed: SupabaseClient,
+  seekerProfileId: string,
+  listingId: string,
+  coverMessage: string | undefined,
+  origin: ApplyOrigin | undefined,
+): Promise<ApplyResult> {
+  const existing = await authed
+    .from("applications")
+    .select("id, status")
+    .eq("listing_id", listingId)
+    .eq("seeker_profile_id", seekerProfileId)
+    .maybeSingle();
+
+  if (existing.error) {
+    return {
+      ok: false,
+      error: "temporarily_unavailable",
+      legacySubmission: true,
+    };
+  }
+
+  const existingRow = existing.data as { id: string; status: string } | null;
+  if (existingRow) {
+    if (existingRow.status !== "withdrawn") {
+      return {
+        ok: false,
+        error: "already_applied",
+        legacySubmission: true,
+        applicationId: existingRow.id,
+        seekerProfileId,
+      };
+    }
+
+    const reactivatePatch: Record<string, unknown> = {
+      status: "applied",
+      reactivated_at: new Date().toISOString(),
+      withdrawn_reason: null,
+    };
+    if (coverMessage !== undefined) reactivatePatch.cover_message = coverMessage;
+    if (origin) {
+      reactivatePatch.source = "invite";
+      reactivatePatch.origin_invite_id = origin.originInviteId;
+    }
+
+    const { data: reactivated, error: reactivateError } = await authed
+      .from("applications")
+      .update(reactivatePatch)
+      .eq("id", existingRow.id)
+      .eq("seeker_profile_id", seekerProfileId)
+      .select("id")
+      .maybeSingle();
+
+    if (reactivateError) {
+      if (reactivateError.code === UNIQUE_VIOLATION) {
+        return recoverLegacyApplicationConflict(
+          authed,
+          seekerProfileId,
+          listingId,
+        );
+      }
+      return {
+        ok: false,
+        error: "temporarily_unavailable",
+        legacySubmission: true,
+      };
+    }
+    if (!reactivated) {
+      return { ok: false, error: "conflict", legacySubmission: true };
+    }
+    return {
+      ok: true,
+      reactivated: true,
+      legacySubmission: true,
+      disposition: "reactivated",
+      applicationId: existingRow.id,
+      seekerProfileId,
+    };
+  }
+
+  const { data: inserted, error: insertError } = await authed
+    .from("applications")
+    .insert({
+      listing_id: listingId,
+      seeker_profile_id: seekerProfileId,
+      cover_message: coverMessage ?? null,
+      ...(origin
+        ? { source: "invite", origin_invite_id: origin.originInviteId }
+        : {}),
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (insertError) {
+    if (insertError.code === UNIQUE_VIOLATION) {
+      return recoverLegacyApplicationConflict(
+        authed,
+        seekerProfileId,
+        listingId,
+      );
+    }
+    return {
+      ok: false,
+      error: "temporarily_unavailable",
+      legacySubmission: true,
+    };
+  }
+
+  const applicationId = (inserted as { id?: unknown } | null)?.id;
+  if (typeof applicationId !== "string") {
+    return { ok: false, error: "conflict", legacySubmission: true };
+  }
+
+  return {
+    ok: true,
+    legacySubmission: true,
+    disposition: "created",
+    applicationId,
+    seekerProfileId,
+  };
+}
+
+/**
+ * A legacy insert/reactivation can lose a race after its advisory pre-read.
+ * Recover the winning owned row before reporting an adoptable duplicate so an
+ * invite can never advance without the exact application id it must link.
+ */
+async function recoverLegacyApplicationConflict(
+  authed: SupabaseClient,
+  seekerProfileId: string,
+  listingId: string,
+): Promise<ApplyResult> {
+  const winner = await authed
+    .from("applications")
+    .select("id, status")
+    .eq("listing_id", listingId)
+    .eq("seeker_profile_id", seekerProfileId)
+    .maybeSingle();
+
+  const row = winner.data as { id?: unknown; status?: unknown } | null;
+  if (
+    winner.error ||
+    typeof row?.id !== "string" ||
+    row.status === "withdrawn"
+  ) {
+    return {
+      ok: false,
+      error: "temporarily_unavailable",
+      legacySubmission: true,
+    };
+  }
+
+  return {
+    ok: false,
+    error: "already_applied",
+    legacySubmission: true,
+    applicationId: row.id,
+    seekerProfileId,
+  };
+}
+
+/**
  * Apply the authed seeker to a listing.
  *
- * App-level ownership guard only (RLS is gated to a separate change). Expected
- * business outcomes are returned as a typed result rather than thrown:
+ * The application checks below provide fast, stable product feedback; the
+ * submit_my_application RPC repeats the mutable checks and owns the write
+ * atomically. Expected business outcomes are returned as a typed result:
  * - `unauthenticated`  — token had no decodable subject
  * - `profile_not_found` — no seeker_profiles row yet (Clerk webhook pending)
  * - `already_applied`   — unique (listing_id, seeker_profile_id) violation
  * - `cannot_apply_to_own_listing` — host cannot apply to their own listing
+ * - `listing_not_accepting_applications` — listing is not live, is expired,
+ *   sourced/unclaimed, or has no platform host available to receive it
  * - `resume_incomplete` — résumé does not yet satisfy the server-authoritative
  *   completeness gate (see isSeekerResumeComplete); enforced here so a
  *   determined client cannot bypass the UI-side ApplyButton gate. An INVITED
@@ -105,9 +331,66 @@ export async function applyToListing(
   coverMessage?: string,
   origin?: ApplyOrigin,
 ): Promise<ApplyResult> {
+  // Enforce the database contract at the exported server boundary before any
+  // profile/listing I/O. This also closes the short-lived PGRST202 legacy path
+  // to callers that do not enter through the web action's advisory guard.
+  if (coverMessageIsTooLong(coverMessage)) {
+    return { ok: false, error: "cover_message_too_long" };
+  }
+
   const seekerProfileId = await resolveSeekerProfileId(clerkToken, clerkUserId);
   if (!seekerProfileId) {
     return { ok: false, error: "profile_not_found" };
+  }
+
+  const authed = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data: listingCandidate, error: listingError } = await authed
+    .from("listings")
+    .select(
+      "status, expires_at, provenance, host_profile_id, " +
+        "host_profiles!host_profile_id(clerk_user_id)",
+    )
+    .eq("id", listingId)
+    .maybeSingle();
+
+  if (listingError) {
+    return { ok: false, error: "temporarily_unavailable" };
+  }
+
+  const listingRow = listingCandidate as unknown as {
+    status?: string;
+    expires_at?: string | null;
+    provenance?: string;
+    host_profile_id?: string | null;
+    host_profiles?: { clerk_user_id?: string };
+  } | null;
+
+  const rawHostClerkId = listingRow?.host_profiles?.clerk_user_id;
+  const hostClerkId =
+    typeof rawHostClerkId === "string" ? rawHostClerkId.trim() : "";
+  const expiresAt =
+    typeof listingRow?.expires_at === "string"
+      ? Date.parse(listingRow.expires_at)
+      : null;
+  const expiryAcceptsApplications =
+    expiresAt !== null && Number.isFinite(expiresAt) && expiresAt > Date.now();
+
+  // Advisory fail-fast before résumé hydration or any application mutation.
+  // The database submission guard remains authoritative against TOCTOU races;
+  // this check gives stale/scripted clients the stable product error promptly.
+  if (
+    listingRow?.status !== "live" ||
+    listingRow?.provenance !== "verified" ||
+    typeof listingRow?.host_profile_id !== "string" ||
+    hostClerkId.length === 0 ||
+    !expiryAcceptsApplications
+  ) {
+    return { ok: false, error: LISTING_NOT_ACCEPTING_APPLICATIONS };
+  }
+
+  // Prevent self-application: host cannot apply to their own listing.
+  if (hostClerkId === clerkUserId) {
+    return { ok: false, error: "cannot_apply_to_own_listing" as const };
   }
 
   // Server-authoritative résumé gate: block the insert BEFORE it happens when
@@ -118,129 +401,72 @@ export async function applyToListing(
     return { ok: false, error: "resume_incomplete" };
   }
 
-  // Prevent self-application: host cannot apply to their own listing
-  const authed = authedClient(clerkToken) as unknown as SupabaseClient;
-  const { data: listingOwner } = await authed
-    .from("listings")
-    .select("provenance,host_profiles!host_profile_id(clerk_user_id)")
-    .eq("id", listingId)
-    .maybeSingle();
-
-  const listingRow = listingOwner as unknown as {
-    provenance?: string;
-    host_profiles?: { clerk_user_id?: string };
-  } | null;
-
-  // A sourced listing has NO host on the platform — 064 drops NOT NULL on
-  // host_profile_id precisely to allow that ("Sourced listings have no host
-  // (yet)"), and the host-side applications query inner-joins host_profiles.
-  // An application here would therefore be invisible to every host forever
-  // while the seeker was shown "Application sent" — a conversion that does not
-  // exist. Refuse it here: the detail page hides the Apply control for sourced
-  // listings, but hidden UI is never authorization. The seeker's real path is
-  // the original posting, which the sourced disclosure links.
-  if (listingRow?.provenance === "sourced") {
-    return { ok: false, error: "listing_not_accepting_applications" as const };
-  }
-
-  const hostClerkId = listingRow?.host_profiles?.clerk_user_id;
-  if (hostClerkId && hostClerkId === clerkUserId) {
-    return { ok: false, error: "cannot_apply_to_own_listing" as const };
-  }
-
-  // Re-apply reactivation (migration 063): a prior application row may already
-  // exist for this (listing, seeker) pair because of the
-  // applications_listing_seeker_unique constraint. If it is 'withdrawn', REVIVE
-  // it in place (status -> 'applied', stamp reactivated_at) instead of INSERTing
-  // a second row that would collide with 23505 — the silent lockout this fixes.
-  // Any other existing status is a genuine active application: block as before.
-  const existing = await authed
-    .from("applications")
-    .select("id, status")
-    .eq("listing_id", listingId)
-    .eq("seeker_profile_id", seekerProfileId)
-    .maybeSingle();
-
-  const existingRow = existing.data as { id: string; status: string } | null;
-  if (existingRow) {
-    if (existingRow.status !== "withdrawn") {
-      // Active (non-withdrawn) row already present — genuine double-apply.
-      return { ok: false, error: "already_applied" };
-    }
-
-    // Reactivate the withdrawn row. submitted_at is intentionally left untouched
-    // to preserve the original apply time (history); reactivated_at records the
-    // revive so the host sees "applied before" / "re-applied". The 063 lifecycle
-    // seed makes withdrawn -> applied a legal edge for the BEFORE UPDATE trigger.
-    const reactivatePatch: Record<string, unknown> = {
-      status: "applied",
-      reactivated_at: new Date().toISOString(),
-      withdrawn_reason: null,
-    };
-    if (coverMessage !== undefined) reactivatePatch.cover_message = coverMessage;
-    // A revived application that came back via an invite IS invite-originated —
-    // record the attribution rather than leaving it as the original direct apply.
-    if (origin) {
-      reactivatePatch.source = origin.source;
-      reactivatePatch.origin_invite_id = origin.originInviteId;
-    }
-
-    const { data: reactivated, error: reactivateError } = await authed
-      .from("applications")
-      .update(reactivatePatch)
-      .eq("id", existingRow.id)
-      .eq("seeker_profile_id", seekerProfileId)
-      .select("id")
-      .maybeSingle();
-
-    if (reactivateError) {
-      if (reactivateError.code === UNIQUE_VIOLATION) {
-        return { ok: false, error: "already_applied" };
-      }
-      return { ok: false, error: reactivateError.message };
-    }
-    // Affected-row assertion: a filtered/raced UPDATE must never report a
-    // successful re-apply the database did not perform.
-    if (!reactivated) {
-      return { ok: false, error: "conflict" };
-    }
-    return {
-      ok: true,
-      reactivated: true,
-      applicationId: existingRow.id,
-      seekerProfileId,
-    };
-  }
-
-  const { data: inserted, error } = await authed
-    .from("applications")
-    .insert({
-      listing_id: listingId,
-      seeker_profile_id: seekerProfileId,
-      cover_message: coverMessage ?? null,
-      // Omitted for a direct apply: the column defaults to 'direct' (007).
-      ...(origin
-        ? { source: origin.source, origin_invite_id: origin.originInviteId }
-        : {}),
+  // The RPC is the normal authority for create/reactivate/dedup and atomic
+  // invite acceptance. Direct table writes are used only by the bounded
+  // deploy-before-migrate bridge after an exact missing-RPC response; every
+  // other RPC failure remains closed.
+  const { data: submission, error: submissionError } = await authed
+    .rpc("submit_my_application", {
+      p_listing_id: listingId,
+      p_cover_message: coverMessage ?? null,
+      p_origin_invite_id: origin?.originInviteId ?? null,
     })
-    .select("id")
-    .maybeSingle();
+    .single();
 
-  if (error) {
-    if (error.code === UNIQUE_VIOLATION) {
-      // Lost a race to another concurrent apply (the row appeared between our
-      // existence check and this insert). If that row is now a live withdrawn
-      // one this is unlucky timing; treat as already_applied — the seeker can
-      // retry and the reactivation branch above will pick it up.
-      return { ok: false, error: "already_applied" };
+  if (submissionError) {
+    if (isMissingSubmissionRpc(submissionError)) {
+      return legacySubmitApplication(
+        authed,
+        seekerProfileId,
+        listingId,
+        coverMessage,
+        origin,
+      );
     }
-    return { ok: false, error: error.message };
+    return { ok: false, error: safeApplicationError(submissionError.message) };
+  }
+
+  const submissionRow = submission as Record<string, unknown> | null;
+  const applicationId =
+    typeof submissionRow?.application_id === "string"
+      ? submissionRow.application_id
+      : null;
+  const submittedSeekerProfileId =
+    typeof submissionRow?.seeker_profile_id === "string"
+      ? submissionRow.seeker_profile_id
+      : null;
+  const submittedListingId =
+    typeof submissionRow?.listing_id === "string"
+      ? submissionRow.listing_id
+      : null;
+  const disposition = submissionRow?.disposition;
+
+  if (
+    !applicationId ||
+    !submittedSeekerProfileId ||
+    submittedSeekerProfileId !== seekerProfileId ||
+    submittedListingId !== listingId ||
+    (disposition !== "created" &&
+      disposition !== "reactivated" &&
+      disposition !== "existing")
+  ) {
+    return { ok: false, error: "conflict" };
+  }
+
+  // A direct duplicate remains a non-event: the UI refreshes into its existing
+  // applied state and the action emits no duplicate application_submitted event.
+  // An invite-originated `existing` result is success because the RPC has just
+  // atomically linked and closed that invite around the existing application.
+  if (disposition === "existing" && !origin) {
+    return { ok: false, error: "already_applied" };
   }
 
   return {
     ok: true,
-    applicationId: (inserted as { id: string } | null)?.id,
-    seekerProfileId,
+    applicationId,
+    seekerProfileId: submittedSeekerProfileId,
+    disposition,
+    ...(disposition === "reactivated" ? { reactivated: true } : {}),
   };
 }
 

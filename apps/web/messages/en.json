@@ -329,6 +329,7 @@
 		"errorHeading": "Could not submit application",
 		"errorRateLimit": "You're applying too quickly. Please wait a moment and try again.",
 		"errorSessionExpired": "Your session expired. Please sign in and try again.",
+		"errorListingUnavailable": "This listing is no longer accepting applications. Nothing was submitted.",
 		"errorGeneric": "Something went wrong. Please try again.",
 		"saveErrorHeading": "Could not save this listing",
 		"unsaveErrorHeading": "Could not remove this listing",

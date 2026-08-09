@@ -125,7 +125,11 @@ async function respondToInviteActionImpl(
 
 	revalidatePath("/invites")
 
-	if (response === "accepted" && result.applicationId) {
+	if (
+		response === "accepted" &&
+		result.applicationId &&
+		(result.disposition === "created" || result.disposition === "reactivated")
+	) {
 		// Accepting an invite now produces a REAL application, so the host is
 		// notified through the canonical application_submitted path — the same
 		// event a direct apply emits, pointing at an applicant that actually
@@ -136,6 +140,8 @@ async function respondToInviteActionImpl(
 		// status became 'applied', and that query excludes applied invites, so
 		// the lookup always missed and the host was told nothing at all.
 		//
+		// An `existing` disposition only adopts/links an application that was
+		// already durable, so it intentionally emits no duplicate submission.
 		// properties.source lets the taxonomy render invite-aware copy while
 		// staying one event type (no parallel notification path).
 		await recordEvent({

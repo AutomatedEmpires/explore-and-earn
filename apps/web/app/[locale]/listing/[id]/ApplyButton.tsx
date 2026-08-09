@@ -207,10 +207,18 @@ export function ApplyButton({
         } else if (result.error === "profile_not_found") {
           // No seeker profile yet — same recovery as the résumé gate.
           setShowResumeModal(true);
+        } else if (result.error === "listing_not_accepting_applications") {
+          // A stale page can outlive the listing's live/expiry/ownership state.
+          // Keep the stable server code internal and show one product sentence;
+          // unknown database strings still fall through to the generic copy.
+          setErrorDialog({
+            heading: t("errorHeading"),
+            message: t("errorListingUnavailable"),
+          });
         } else {
           // Known transient codes get their sentence; EVERYTHING else falls to
-          // the generic sentence. result.error can carry raw server/database
-          // strings — never print those to a seeker mid-application.
+          // the generic sentence. Keep server error identifiers internal and
+          // never print them to a seeker mid-application.
           const msg = result.error === "rate_limit_exceeded"
             ? t("errorRateLimit")
             : result.error === "unauthenticated"
