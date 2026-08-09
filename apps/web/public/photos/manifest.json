@@ -117,7 +117,7 @@
       "sourceUrl": "https://commons.wikimedia.org/wiki/File:Trail_Crew_Working_on_Bright_Angel_Point_Trail_-_54550654657.jpg",
       "source": "Wikimedia Commons",
       "sourceRef": "File:Trail Crew Working on Bright Angel Point Trail - 54550654657.jpg",
-      "retrievedAt": "2026-07-28T16:19:35.828Z"
+      "retrievedAt": "2026-08-09T00:15:52.862Z"
     },
     {
       "slug": "crew-02",
@@ -144,7 +144,7 @@
       "sourceUrl": "https://commons.wikimedia.org/wiki/File:Trail_Crew_Working_on_Bright_Angel_Point_Trail_-_54550654807.jpg",
       "source": "Wikimedia Commons",
       "sourceRef": "File:Trail Crew Working on Bright Angel Point Trail - 54550654807.jpg",
-      "retrievedAt": "2026-07-28T16:19:37.251Z"
+      "retrievedAt": "2026-08-09T00:15:54.168Z"
     },
     {
       "slug": "crew-03",
@@ -171,7 +171,7 @@
       "sourceUrl": "https://commons.wikimedia.org/wiki/File:Trail_Crew_Working_on_Bright_Angel_Point_Trail_-_54551871145.jpg",
       "source": "Wikimedia Commons",
       "sourceRef": "File:Trail Crew Working on Bright Angel Point Trail - 54551871145.jpg",
-      "retrievedAt": "2026-07-28T16:19:38.605Z"
+      "retrievedAt": "2026-08-09T00:15:55.467Z"
     },
     {
       "slug": "dock-01",
@@ -253,6 +253,114 @@
       "source": "Unsplash",
       "sourceRef": "14qSkO1m4tY",
       "retrievedAt": "2026-07-28T16:19:21.892Z"
+    },
+    {
+      "slug": "housing-bathroom-01",
+      "category": "lodge",
+      "alt": "A simple hostel bathroom with a sink, wall mirror, toilet, tiled shower floor, and white shower curtain.",
+      "width": 1600,
+      "height": 1200,
+      "sizes": {
+        "hero": {
+          "src": "/photos/housing-bathroom-01-1600.webp",
+          "width": 1600,
+          "height": 1200
+        },
+        "card": {
+          "src": "/photos/housing-bathroom-01-800.webp",
+          "width": 800,
+          "height": 600
+        }
+      },
+      "author": "Kgbo",
+      "authorUrl": "https://commons.wikimedia.org/wiki/User:Kgbo",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Room_with_bathroom_at_Kabalulumana_Hostel,_Mount_Isa,_2023,_05.jpg",
+      "source": "Wikimedia Commons",
+      "sourceRef": "File:Room with bathroom at Kabalulumana Hostel, Mount Isa, 2023, 05.jpg",
+      "retrievedAt": "2026-08-09T00:15:49.879Z"
+    },
+    {
+      "slug": "housing-common-01",
+      "category": "lodge",
+      "alt": "A bright hostel common area with black sofas and armchairs arranged around a glass coffee table near a large window.",
+      "width": 1600,
+      "height": 1067,
+      "sizes": {
+        "hero": {
+          "src": "/photos/housing-common-01-1600.webp",
+          "width": 1600,
+          "height": 1067
+        },
+        "card": {
+          "src": "/photos/housing-common-01-800.webp",
+          "width": 800,
+          "height": 533
+        }
+      },
+      "author": "ManoBV16",
+      "authorUrl": "https://commons.wikimedia.org/wiki/File:Hostel_Room_Common_Area.jpg",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hostel_Room_Common_Area.jpg",
+      "source": "Wikimedia Commons",
+      "sourceRef": "File:Hostel Room Common Area.jpg",
+      "retrievedAt": "2026-08-09T00:15:51.008Z"
+    },
+    {
+      "slug": "housing-kitchen-01",
+      "category": "lodge",
+      "alt": "A shared hostel kitchen with a refrigerator, dining table, sink, microwave, and open shelving against a brick-patterned wall.",
+      "width": 1600,
+      "height": 1200,
+      "sizes": {
+        "hero": {
+          "src": "/photos/housing-kitchen-01-1600.webp",
+          "width": 1600,
+          "height": 1200
+        },
+        "card": {
+          "src": "/photos/housing-kitchen-01-800.webp",
+          "width": 800,
+          "height": 600
+        }
+      },
+      "author": "Аимаина хикари",
+      "authorUrl": "https://commons.wikimedia.org/wiki/User:%D0%90%D0%B8%D0%BC%D0%B0%D0%B8%D0%BD%D0%B0_%D1%85%D0%B8%D0%BA%D0%B0%D1%80%D0%B8",
+      "license": "CC0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Hostel_Warszawa_w_Warszawie.jpg",
+      "source": "Wikimedia Commons",
+      "sourceRef": "File:Hostel Warszawa w Warszawie.jpg",
+      "retrievedAt": "2026-08-09T00:15:50.550Z"
+    },
+    {
+      "slug": "housing-sleeping-01",
+      "category": "lodge",
+      "alt": "A rustic bunkhouse sleeping room with log-framed bunk beds arranged around an open center aisle.",
+      "width": 1600,
+      "height": 1200,
+      "sizes": {
+        "hero": {
+          "src": "/photos/housing-sleeping-01-1600.webp",
+          "width": 1600,
+          "height": 1200
+        },
+        "card": {
+          "src": "/photos/housing-sleeping-01-800.webp",
+          "width": 800,
+          "height": 600
+        }
+      },
+      "author": "NPS Photo",
+      "authorUrl": "https://commons.wikimedia.org/wiki/File:The_Bunkhouse_can_sleep_12_people._There_are_4_twin_beds_and_4_full_beds._(d7f5ee72-7824-4d7b-b580-403775f6a98c).jpg",
+      "license": "Public domain",
+      "licenseUrl": "https://commons.wikimedia.org/wiki/File:The_Bunkhouse_can_sleep_12_people._There_are_4_twin_beds_and_4_full_beds._(d7f5ee72-7824-4d7b-b580-403775f6a98c).jpg",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:The_Bunkhouse_can_sleep_12_people._There_are_4_twin_beds_and_4_full_beds._(d7f5ee72-7824-4d7b-b580-403775f6a98c).jpg",
+      "source": "Wikimedia Commons",
+      "sourceRef": "File:The Bunkhouse can sleep 12 people. There are 4 twin beds and 4 full beds. (d7f5ee72-7824-4d7b-b580-403775f6a98c).jpg",
+      "retrievedAt": "2026-08-09T00:15:49.262Z"
     },
     {
       "slug": "idaho-01",
@@ -496,6 +604,60 @@
       "source": "Unsplash",
       "sourceRef": "9yGzlTVkJjc",
       "retrievedAt": "2026-07-28T16:19:17.174Z"
+    },
+    {
+      "slug": "meal-dining-01",
+      "category": "kitchen",
+      "alt": "An empty youth-hostel dining room set with long white tables, place settings, and rows of black chairs beneath a vaulted ceiling.",
+      "width": 1600,
+      "height": 1200,
+      "sizes": {
+        "hero": {
+          "src": "/photos/meal-dining-01-1600.webp",
+          "width": 1600,
+          "height": 1200
+        },
+        "card": {
+          "src": "/photos/meal-dining-01-800.webp",
+          "width": 800,
+          "height": 600
+        }
+      },
+      "author": "Christian Ries",
+      "authorUrl": "https://commons.wikimedia.org/wiki/User:Christian_Ries",
+      "license": "CC BY-SA 3.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Youth_hostel_Wiltz_Luxembourg_03.jpg",
+      "source": "Wikimedia Commons",
+      "sourceRef": "File:Youth hostel Wiltz Luxembourg 03.jpg",
+      "retrievedAt": "2026-08-09T00:15:52.067Z"
+    },
+    {
+      "slug": "meal-prepared-01",
+      "category": "kitchen",
+      "alt": "A cafeteria lunch tray with rice, fried chicken, a breaded cutlet, shredded cabbage, salad, soup, and tea.",
+      "width": 1600,
+      "height": 1200,
+      "sizes": {
+        "hero": {
+          "src": "/photos/meal-prepared-01-1600.webp",
+          "width": 1600,
+          "height": 1200
+        },
+        "card": {
+          "src": "/photos/meal-prepared-01-800.webp",
+          "width": 800,
+          "height": 600
+        }
+      },
+      "author": "nakashi from Chofu, Tokyo, JAPAN",
+      "authorUrl": "https://www.flickr.com/people/81497476@N00",
+      "license": "CC BY-SA 2.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Value_lunch_A_and_Salad_at_Hino_University_cafeteria,_-28_(30155026383).jpg",
+      "source": "Wikimedia Commons",
+      "sourceRef": "File:Value lunch A and Salad at Hino University cafeteria, -28 (30155026383).jpg",
+      "retrievedAt": "2026-08-09T00:15:51.491Z"
     },
     {
       "slug": "paddle-01",

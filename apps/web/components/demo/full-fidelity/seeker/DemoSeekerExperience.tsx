@@ -198,7 +198,7 @@ function BenefitDialog({ listing, kind, onClose }: {
     housing: {
       title: "Housing",
       value: listing.housing,
-      body: "The host supplied these housing terms for the sample role. They belong in the written offer before a seeker accepts.",
+      body: "The host supplied these housing terms for the sample role. The four category-accurate photos below are illustrative examples, not host-supplied evidence of the property.",
       photo: "housing" as const,
       facts: [
         { label: "Home type", value: listing.housingDetails.type },
@@ -216,7 +216,7 @@ function BenefitDialog({ listing, kind, onClose }: {
     meals: {
       title: "Meals",
       value: listing.meals,
-      body: "These are the sample role’s stated meal terms. Dietary accommodations still need direct confirmation with the host.",
+      body: "These are the sample role’s stated meal terms. The four category-accurate photos below are illustrative examples, not host-supplied evidence of the meal setup; dietary accommodations still need direct confirmation with the host.",
       photo: "meals" as const,
       facts: [
         { label: "Meal style", value: listing.mealsDetails.style },
@@ -241,6 +241,10 @@ function BenefitDialog({ listing, kind, onClose }: {
       ],
     },
   }[kind];
+  const benefitPhotos = kind === "pay" ? null : listing.benefitPhotos[kind];
+  const galleryDisclosure = kind === "housing"
+    ? "Illustrative category examples only — these scenes are not host-supplied evidence of this property."
+    : "Illustrative category examples only — these scenes are not host-supplied evidence of this meal setup.";
 
   return (
     <div className={styles.dialogBackdrop} role="presentation" onMouseDown={onClose}>
@@ -255,11 +259,43 @@ function BenefitDialog({ listing, kind, onClose }: {
         onMouseDown={(event) => event.stopPropagation()}
       >
         <button ref={closeRef} type="button" className={styles.dialogClose} aria-label="Close details" onClick={onClose}>×</button>
-        <ListingPhoto listing={listing} category={copy.photo} className={styles.dialogPhoto} />
+        {kind === "pay" ? <ListingPhoto listing={listing} category={copy.photo} className={styles.dialogPhoto} /> : null}
         <p className={styles.eyebrow}>Role detail · sample account</p>
         <h2 id="benefit-dialog-title">{copy.title}</h2>
         <p className={styles.dialogValue}>{copy.value}</p>
         <p id="benefit-dialog-description">{copy.body}</p>
+        {benefitPhotos ? (
+          <section className={styles.benefitPhotoSection} aria-labelledby="benefit-photo-heading">
+            <div className={styles.benefitPhotoIntro}>
+              <h3 id="benefit-photo-heading">Photo categories</h3>
+              <p className={styles.benefitPhotoDisclosure}>{galleryDisclosure}</p>
+            </div>
+            <ul
+              className={styles.benefitPhotoGrid}
+              aria-label={`${copy.title} illustrative photo categories`}
+            >
+              {benefitPhotos.map((photo) => (
+                <li key={photo.id}>
+                  <figure className={styles.benefitPhotoFigure}>
+                    <div className={styles.benefitPhotoFrame}>
+                      <Image
+                        className={styles.benefitPhotoImage}
+                        src={photo.imageUrl}
+                        alt={photo.imageAlt}
+                        width={photo.imageWidth}
+                        height={photo.imageHeight}
+                        sizes="(max-width: 540px) 42vw, 220px"
+                      />
+                    </div>
+                    <figcaption className={styles.benefitPhotoCaption}>
+                      <strong>{photo.label}</strong>
+                    </figcaption>
+                  </figure>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
         <dl className={styles.dialogFacts}>
           {copy.facts.map((fact) => <div key={fact.label}><dt>{fact.label}</dt><dd>{fact.value}</dd></div>)}
         </dl>

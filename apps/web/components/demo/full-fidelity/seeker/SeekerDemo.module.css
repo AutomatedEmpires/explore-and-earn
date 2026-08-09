@@ -261,12 +261,23 @@
 .inlineNotice { margin: 0; padding: var(--space-10) var(--space-14); border-left: 3px solid var(--color-cta); border-radius: var(--radius-cell); background: var(--color-action-soft); color: var(--text-primary); font-size: var(--type-meta-size); }
 
 .dialogBackdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: var(--space-16); background: color-mix(in srgb, var(--color-ink) 64%, transparent); }
-.dialog { position: relative; width: min(100%, 540px); max-height: calc(100svh - var(--space-32)); overflow: auto; padding: var(--space-24); border: 1px solid var(--border-ink); border-radius: var(--radius-card); background: var(--color-surface); color: var(--text-primary); box-shadow: var(--elevation-overlay); }
-.dialog h2 { margin: var(--space-6) 0; font-family: var(--font-display); font-size: 2rem; }
+.dialog { position: relative; width: min(100%, 540px); max-height: calc(100svh - var(--space-32)); box-sizing: border-box; overflow-x: hidden; overflow-y: auto; padding: var(--space-24); border: 1px solid var(--border-ink); border-radius: var(--radius-card); background: var(--color-surface); color: var(--text-primary); box-shadow: var(--elevation-overlay); }
+.dialog > :not(.dialogClose) { min-width: 0; }
+.dialog h2 { margin: var(--space-6) 0; font-family: var(--font-display); font-size: var(--type-page-size); }
 .dialog p { line-height: 1.6; }
-.dialogClose { position: absolute; top: var(--space-10); right: var(--space-10); z-index: 2; width: var(--tap-min); height: var(--tap-min); border: 1px solid var(--border-ink); border-radius: 50%; background: var(--color-surface); color: var(--text-primary); font-size: 1.5rem; cursor: pointer; }
+.dialogClose { position: absolute; top: var(--space-10); right: var(--space-10); z-index: 2; width: var(--tap-min); height: var(--tap-min); border: 1px solid var(--border-ink); border-radius: 50%; background: var(--color-surface); color: var(--text-primary); font-size: var(--type-section-size); cursor: pointer; }
 .dialogPhoto { min-height: 210px; margin: calc(var(--space-24) * -1) calc(var(--space-24) * -1) var(--space-20); border-radius: var(--radius-card) var(--radius-card) 0 0; }
 .dialogValue { padding: var(--space-12); border-radius: var(--radius-cell); background: var(--color-action-soft); font-weight: var(--font-weight-bold); }
+.benefitPhotoSection { min-width: 0; margin-block: var(--space-18); padding: var(--space-12); border: 1px solid var(--border-ink-warm); border-radius: var(--radius-cell); background: var(--color-paper); }
+.benefitPhotoIntro { min-width: 0; margin-block-end: var(--space-12); }
+.benefitPhotoIntro h3 { margin: 0; font-family: var(--font-display); font-size: var(--type-body-size); font-weight: var(--font-weight-bold); line-height: var(--type-body-lh); overflow-wrap: anywhere; }
+.benefitPhotoDisclosure { margin: var(--space-6) 0 0; color: var(--text-secondary); font-size: var(--type-meta-size); overflow-wrap: anywhere; }
+.benefitPhotoGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-8); min-width: 0; margin: 0; padding: 0; list-style: none; }
+.benefitPhotoGrid > li, .benefitPhotoFigure { min-width: 0; margin: 0; }
+.benefitPhotoFrame { min-width: 0; box-sizing: border-box; overflow: hidden; padding: var(--space-4); border: 1px solid var(--border-ink); border-radius: var(--radius-cell); background: var(--color-surface); }
+.benefitPhotoImage { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: contain; border-radius: calc(var(--radius-cell) - var(--space-4)); background: var(--color-surface); filter: none; box-shadow: none; }
+.benefitPhotoCaption { min-width: 0; padding: var(--space-8) var(--space-4) var(--space-4); line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+.benefitPhotoCaption strong { display: block; min-width: 0; }
 .dialogFacts { display: grid; gap: var(--space-8); margin-block: var(--space-18); }
 .dialogFacts div { display: grid; grid-template-columns: minmax(110px, .7fr) 1.3fr; gap: var(--space-10); padding-block-end: var(--space-8); border-bottom: 1px solid var(--border-soft); }
 .dialogFacts dt { color: var(--text-secondary); }
