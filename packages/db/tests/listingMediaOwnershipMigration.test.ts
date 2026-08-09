@@ -73,8 +73,9 @@ describe("migration 092 listing media ownership", () => {
       "private.enforce_listing_media_ownership",
     );
 
-    expect(enforcement).toContain("current_setting('request.headers', true)");
     expect(enforcement).toContain("mamosbzcbigcclafhmmr.supabase.co");
+    expect(enforcement).toContain("v_url_scheme <> 'https'");
+    expect(enforcement).not.toContain("request.headers");
     expect(enforcement).toContain(
       "/storage/v1/object/public/listing-media/",
     );
@@ -150,6 +151,12 @@ describe("migration 092 listing media ownership", () => {
   it("ships a rollback-only connected proof for every bypass and claim path", () => {
     for (const proof of [
       "owned cover/gallery insert succeeds",
+      "authenticated host can see its superuser-created storage object",
+      "authenticated host cannot see a foreign storage object",
+      "owned media permits an unrelated authenticated edit",
+      "empty request headers cannot enable loopback media",
+      "non-local request headers cannot enable loopback media",
+      "spoofed local host cannot enable loopback media",
       "cross-host cover is rejected",
       "cross-host gallery is rejected",
       "foreign-origin media is rejected",
@@ -159,12 +166,17 @@ describe("migration 092 listing media ownership", () => {
       "encoded path traversal is rejected",
       "empty path segment is rejected",
       "backslash path is rejected",
+      "media without a host owner is rejected",
+      "untrimmed media url is rejected",
+      "media url query string is rejected",
+      "media url fragment is rejected",
       "ordinary legacy unowned media blocks unrelated edit",
       "ordinary media repair permits the following unrelated edit",
       "converted full-form byte-identical source media survives",
       "converted source cover replacement is rejected",
       "converted source gallery replacement is rejected",
       "claim conversion snapshots source cover/gallery",
+      "converted claimant may author replacement media before revocation",
       "claim revocation restores byte-identical source cover/gallery",
       "legacy converted revocation clears unsnapshotted media",
     ]) {
@@ -197,6 +209,12 @@ describe("migration 092 listing media ownership", () => {
       "trg_listings_claim_media_ownership",
     );
     expect(PRODUCTION_ASSERTION).toContain("trg_listings_media_ownership");
+    expect(PRODUCTION_ASSERTION).toContain("pg_get_functiondef(p.oid)");
+    expect(PRODUCTION_ASSERTION).toContain(
+      "mamosbzcbigcclafhmmr.supabase.co",
+    );
+    expect(PRODUCTION_ASSERTION).toContain("'request.headers'");
+    expect(PRODUCTION_ASSERTION).toContain("'v_url_scheme <> ''https'''");
     expect(DB_MIGRATE_WORKFLOW).toContain("migrations 077/091/092");
   });
 });

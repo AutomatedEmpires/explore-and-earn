@@ -177,6 +177,24 @@ select
           where a.grantee = 0
             and a.privilege_type = 'EXECUTE'
        ))
+       and bool_and(
+         case p.proname
+           when 'enforce_listing_media_ownership' then
+             position(
+               'mamosbzcbigcclafhmmr.supabase.co'
+               in lower(pg_get_functiondef(p.oid))
+             ) > 0
+             and position(
+               'request.headers'
+               in lower(pg_get_functiondef(p.oid))
+             ) = 0
+             and position(
+               'v_url_scheme <> ''https'''
+               in lower(pg_get_functiondef(p.oid))
+             ) > 0
+           else true
+         end
+       )
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'private'

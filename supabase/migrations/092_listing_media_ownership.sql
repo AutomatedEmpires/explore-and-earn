@@ -146,11 +146,7 @@ declare
   v_is_authenticated_request boolean :=
     current_user = 'authenticated'
     or coalesce(auth.jwt() ->> 'role', '') = 'authenticated';
-  v_headers jsonb := '{}'::jsonb;
-  v_request_host text;
-  v_request_hostname text;
-  v_expected_host text;
-  v_is_local_origin boolean := false;
+  v_expected_host constant text := 'mamosbzcbigcclafhmmr.supabase.co';
   v_validate_cover boolean := true;
   v_validate_gallery boolean := true;
   v_urls text[] := '{}'::text[];
@@ -175,44 +171,6 @@ begin
       new.cover_photo_url is distinct from old.cover_photo_url;
     v_validate_gallery :=
       new.gallery_photo_urls is distinct from old.gallery_photo_urls;
-  end if;
-
-  begin
-    v_headers := coalesce(
-      nullif(current_setting('request.headers', true), '')::jsonb,
-      '{}'::jsonb
-    );
-  exception when others then
-    v_headers := '{}'::jsonb;
-  end;
-
-  v_request_host := lower(
-    btrim(split_part(coalesce(v_headers->>'host', ''), ',', 1))
-  );
-
-  if v_request_host = '' then
-    -- Protected migration jobs and direct trusted SQL have no HTTP headers.
-    v_expected_host := 'mamosbzcbigcclafhmmr.supabase.co';
-  else
-    if left(v_request_host, 1) = '['
-       and strpos(v_request_host, ']') > 0 then
-      v_request_hostname :=
-        split_part(split_part(v_request_host, ']', 1), '[', 2);
-    else
-      v_request_hostname := split_part(v_request_host, ':', 1);
-    end if;
-
-    v_is_local_origin :=
-      v_request_hostname in ('127.0.0.1', 'localhost', '::1')
-      or v_request_hostname like '%.localhost';
-
-    -- Local Supabase must match the exact request host and port. Any non-local
-    -- request remains pinned to the one production project even if a proxy or
-    -- caller supplies an unexpected Host header.
-    v_expected_host := case
-      when v_is_local_origin then v_request_host
-      else 'mamosbzcbigcclafhmmr.supabase.co'
-    end;
   end if;
 
   if v_validate_cover and new.cover_photo_url is not null then
@@ -253,8 +211,7 @@ begin
       );
 
       if v_url_host is distinct from v_expected_host
-         or v_url_scheme not in ('http', 'https')
-         or (not v_is_local_origin and v_url_scheme <> 'https')
+         or v_url_scheme <> 'https'
          or new.host_profile_id is null
          or left(
               v_object_name,

@@ -4,7 +4,7 @@ begin;
 
 \ir _assert_helpers.sql
 
-set local request.headers = '{"host":"127.0.0.1:54321"}';
+set local request.headers = '{}';
 set local request.jwt.claims = '{}';
 
 create function pg_temp.listing_media_url(p_object_name text)
@@ -12,7 +12,7 @@ returns text
 language sql
 immutable
 as $fn$
-  select 'http://127.0.0.1:54321/storage/v1/object/public/listing-media/' ||
+  select 'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/' ||
          p_object_name
 $fn$;
 
@@ -308,10 +308,10 @@ select pg_temp.expect_allowed(
       '9200a000-0000-4000-8000-000000000001',
       'Owned listing media insert',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp',
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp',
       array[
-        'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/one.webp',
-        'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/two.webp'
+        'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/one.webp',
+        'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/two.webp'
       ]
     )
   $q$
@@ -327,7 +327,99 @@ select pg_temp.expect_rows(
   $q$,
   1
 );
-select pg_temp.checkpoint_section('owned insert', 2);
+select pg_temp.expect_rows(
+  'authenticated host can see its superuser-created Storage object',
+  $q$
+    select 1
+     where (
+       select count(*)
+         from storage.objects
+        where bucket_id = 'listing-media'
+          and name = '9200a000-0000-4000-8000-000000000001/cover/owned.webp'
+     ) = 1
+  $q$,
+  1
+);
+select pg_temp.expect_rows(
+  'authenticated host cannot see a foreign Storage object',
+  $q$
+    select 1
+     where (
+       select count(*)
+         from storage.objects
+        where bucket_id = 'listing-media'
+          and name = '9200b000-0000-4000-8000-000000000002/cover/foreign.webp'
+     ) = 0
+  $q$,
+  1
+);
+select pg_temp.expect_allowed(
+  'owned media permits an unrelated authenticated edit',
+  $q$
+    update public.listings
+       set title = 'Owned listing media after unrelated edit'
+     where title = 'Owned listing media insert'
+  $q$
+);
+select pg_temp.checkpoint_section('owned insert', 5);
+
+-- ---------------------------------------------------------------------------
+-- Request headers are caller input, never an environment or origin signal.
+-- Empty, non-local, and spoofed-local Host values must all retain the exact
+-- production HTTPS pin.
+-- ---------------------------------------------------------------------------
+
+set local request.headers = '{}';
+select pg_temp.expect_denied(
+  'empty request headers cannot enable loopback media',
+  $q$
+    insert into public.listings (
+      host_profile_id, title, category, cover_photo_url
+    ) values (
+      '9200a000-0000-4000-8000-000000000001',
+      'Headerless loopback origin probe',
+      'farm',
+      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp'
+    )
+  $q$,
+  'listing_media_reference_not_owned',
+  '23514'
+);
+
+set local request.headers = '{"host":"api.example.test"}';
+select pg_temp.expect_denied(
+  'non-local request headers cannot enable loopback media',
+  $q$
+    insert into public.listings (
+      host_profile_id, title, category, cover_photo_url
+    ) values (
+      '9200a000-0000-4000-8000-000000000001',
+      'Non-local header loopback origin probe',
+      'farm',
+      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp'
+    )
+  $q$,
+  'listing_media_reference_not_owned',
+  '23514'
+);
+
+set local request.headers = '{"host":"127.0.0.1:54321"}';
+select pg_temp.expect_denied(
+  'spoofed local Host cannot enable loopback media',
+  $q$
+    insert into public.listings (
+      host_profile_id, title, category, cover_photo_url
+    ) values (
+      '9200a000-0000-4000-8000-000000000001',
+      'Spoofed local header loopback origin probe',
+      'farm',
+      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp'
+    )
+  $q$,
+  'listing_media_reference_not_owned',
+  '23514'
+);
+select pg_temp.checkpoint_section('production origin pinning', 3);
 
 -- ---------------------------------------------------------------------------
 -- Every known URL/path bypass returns the same stable refusal.
@@ -342,7 +434,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Cross-host cover probe',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200b000-0000-4000-8000-000000000002/cover/foreign.webp'
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200b000-0000-4000-8000-000000000002/cover/foreign.webp'
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -357,7 +449,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Cross-host gallery probe',
       'farm',
-      array['http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200b000-0000-4000-8000-000000000002/gallery/foreign.webp']
+      array['https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200b000-0000-4000-8000-000000000002/gallery/foreign.webp']
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -387,7 +479,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Missing storage object probe',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/missing.webp'
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/missing.webp'
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -402,7 +494,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Wrong bucket probe',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/profile-photos/9200a000-0000-4000-8000-000000000001/wrong-bucket.webp'
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/profile-photos/9200a000-0000-4000-8000-000000000001/wrong-bucket.webp'
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -417,7 +509,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Dot traversal probe',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/../escape.webp'
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/../escape.webp'
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -432,7 +524,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Encoded traversal probe',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/%2e%2e/escape.webp'
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/%2e%2e/escape.webp'
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -447,7 +539,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Empty segment probe',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001//escape.webp'
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001//escape.webp'
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -462,7 +554,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Empty child probe',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/'
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/'
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -477,7 +569,7 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Backslash path probe',
       'farm',
-      E'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover\\escape.webp'
+      E'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover\\escape.webp'
     )
   $q$,
   'listing_media_reference_not_owned',
@@ -492,13 +584,73 @@ select pg_temp.expect_denied(
       '9200a000-0000-4000-8000-000000000001',
       'Whitespace path probe',
       'farm',
-      'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/file name.webp'
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/file name.webp'
     )
   $q$,
   'listing_media_reference_not_owned',
   '23514'
 );
-select pg_temp.checkpoint_section('hostile paths', 11);
+select pg_temp.expect_denied(
+  'media without a host owner is rejected',
+  $q$
+    insert into public.listings (
+      host_profile_id, title, category, cover_photo_url
+    ) values (
+      null,
+      'Missing host owner probe',
+      'farm',
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp'
+    )
+  $q$,
+  'listing_media_reference_not_owned',
+  '23514'
+);
+select pg_temp.expect_denied(
+  'untrimmed media URL is rejected',
+  $q$
+    insert into public.listings (
+      host_profile_id, title, category, cover_photo_url
+    ) values (
+      '9200a000-0000-4000-8000-000000000001',
+      'Untrimmed URL probe',
+      'farm',
+      ' https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp'
+    )
+  $q$,
+  'listing_media_reference_not_owned',
+  '23514'
+);
+select pg_temp.expect_denied(
+  'media URL query string is rejected',
+  $q$
+    insert into public.listings (
+      host_profile_id, title, category, cover_photo_url
+    ) values (
+      '9200a000-0000-4000-8000-000000000001',
+      'Query suffix probe',
+      'farm',
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp?download=1'
+    )
+  $q$,
+  'listing_media_reference_not_owned',
+  '23514'
+);
+select pg_temp.expect_denied(
+  'media URL fragment is rejected',
+  $q$
+    insert into public.listings (
+      host_profile_id, title, category, cover_photo_url
+    ) values (
+      '9200a000-0000-4000-8000-000000000001',
+      'Fragment suffix probe',
+      'farm',
+      'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp#preview'
+    )
+  $q$,
+  'listing_media_reference_not_owned',
+  '23514'
+);
+select pg_temp.checkpoint_section('hostile paths', 15);
 
 -- ---------------------------------------------------------------------------
 -- Ordinary rows validate the effective persisted media on every edit.
@@ -519,9 +671,9 @@ select pg_temp.expect_allowed(
   $q$
     update public.listings
        set title = 'Legacy media repaired',
-           cover_photo_url = 'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp',
+           cover_photo_url = 'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/owned.webp',
            gallery_photo_urls = array[
-             'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/one.webp'
+             'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/one.webp'
            ]
      where id = '92001000-0000-4000-8000-000000000002'
   $q$
@@ -543,7 +695,7 @@ select pg_temp.expect_rows(
        and title = 'Legacy unrelated edit now succeeds'
        and cover_photo_url like '%/cover/owned.webp'
        and gallery_photo_urls = array[
-         'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/one.webp'
+         'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/one.webp'
        ]
   $q$,
   1
@@ -590,9 +742,9 @@ select pg_temp.expect_allowed(
   'converted media can be replaced entirely with owned objects',
   $q$
     update public.listings
-       set cover_photo_url = 'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/replacement.webp',
+       set cover_photo_url = 'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/replacement.webp',
            gallery_photo_urls = array[
-             'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/replacement.webp'
+             'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/replacement.webp'
            ]
      where id = '92001000-0000-4000-8000-000000000003'
   $q$
@@ -605,7 +757,7 @@ select pg_temp.expect_rows(
      where id = '92001000-0000-4000-8000-000000000003'
        and cover_photo_url like '%/cover/replacement.webp'
        and gallery_photo_urls = array[
-         'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/replacement.webp'
+         'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/replacement.webp'
        ]
   $q$,
   1
@@ -656,17 +808,28 @@ select pg_temp.expect_rows(
   $q$,
   1
 );
+
+reset role;
+set local request.jwt.claims =
+  '{"sub":"user_listing_media_owner_a","role":"authenticated"}';
+set local role authenticated;
+
 select pg_temp.expect_allowed(
   'converted claimant may author replacement media before revocation',
   $q$
     update public.listings
-       set cover_photo_url = 'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/replacement.webp',
+       set cover_photo_url = 'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/cover/replacement.webp',
            gallery_photo_urls = array[
-             'http://127.0.0.1:54321/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/replacement.webp'
+             'https://mamosbzcbigcclafhmmr.supabase.co/storage/v1/object/public/listing-media/9200a000-0000-4000-8000-000000000001/gallery/replacement.webp'
            ]
      where id = '92001000-0000-4000-8000-000000000004'
   $q$
 );
+
+reset role;
+set local request.jwt.claims = '{"sub":"service_role","role":"service_role"}';
+set local role service_role;
+
 select pg_temp.expect_rows(
   'converted claim revocation executes through the canonical RPC',
   $q$
@@ -729,9 +892,9 @@ set local request.jwt.claims = '{}';
 
 select pg_temp.assert_suite_complete(
   'listing-media-ownership',
-  5,
-  15,
-  14
+  6,
+  18,
+  21
 );
 
 rollback;
