@@ -212,6 +212,8 @@ describe("canonical host notification wiring", () => {
       expect(notificationRead).toBeGreaterThan(devFixtureGuard);
       expect(source).toContain("<NotificationList");
       expect(source).toContain('"use server";');
+      expect(source).toContain("isDevFixture = true");
+      expect(source).toContain("hasUnread && !isDevFixture");
       expect(source).not.toMatch(/getNotifications\([^)]*\)\s*\.catch\(/s);
       expect(source).not.toContain(".catch(() => [])");
     },

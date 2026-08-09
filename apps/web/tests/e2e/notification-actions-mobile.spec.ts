@@ -161,10 +161,9 @@ test.describe("notification actions on phones", () => {
       await expect(actionlessRow.getByRole("link")).toHaveCount(0);
       await expect(page.locator('a[href*="evil.example"]')).toHaveCount(0);
       await expectTouchTarget(action, "seeker notification action");
-      await expectTouchTarget(
+      await expect(
         page.getByRole("button", { name: "Mark all as read", exact: true }),
-        "Mark all as read",
-      );
+      ).toHaveCount(0);
       await expectContained(safeRow, page.locator("body"), "safe seeker notification");
       await expectContained(unsafeRow, page.locator("body"), "unsafe seeker notification");
       await expectContained(actionlessRow, page.locator("body"), "actionless seeker notification");
@@ -225,10 +224,9 @@ test.describe("notification actions on phones", () => {
       await expect(actionlessRow.getByRole("link")).toHaveCount(0);
       await expect(page.locator('a[href*="evil.example"]')).toHaveCount(0);
       await expectTouchTarget(action, "host notification action");
-      await expectTouchTarget(
+      await expect(
         page.getByRole("button", { name: "Mark all as read", exact: true }),
-        "Mark all as read",
-      );
+      ).toHaveCount(0);
       await expectContained(safeRow, page.locator("body"), "safe host notification");
       await expectContained(unsafeRow, page.locator("body"), "unsafe host notification");
       await expectContained(actionlessRow, page.locator("body"), "actionless host notification");

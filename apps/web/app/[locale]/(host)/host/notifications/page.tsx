@@ -24,11 +24,13 @@ const PAGE_DESCRIPTION =
 export default async function HostNotificationsPage() {
   let notifications: readonly Notification[];
   let isSignedIn = false;
+  let isDevFixture = false;
 
   // Local walkthrough only: short-circuit before Clerk or Supabase.
   if (isDevBenchEnabled() && (await readDevRole()) === "host") {
     notifications = devHostNotifications();
     isSignedIn = true;
+    isDevFixture = true;
   } else {
     const { userId, getToken } = await auth();
     const token = userId ? await getToken() : null;
@@ -48,7 +50,7 @@ export default async function HostNotificationsPage() {
         title="Notifications"
         description={PAGE_DESCRIPTION}
       />
-      {hasUnread ? (
+      {hasUnread && !isDevFixture ? (
         <form
           className={styles.toolbar}
           action={async () => {

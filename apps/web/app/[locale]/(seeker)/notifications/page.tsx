@@ -27,10 +27,12 @@ const SIGN_IN_MESSAGE =
 
 export default async function NotificationsPage() {
   let notifications: readonly Notification[];
+  let isDevFixture = false;
 
   // Local walkthrough only: short-circuit before Clerk or Supabase.
   if (isDevBenchEnabled() && (await readDevRole()) === "seeker") {
     notifications = devSeekerNotifications();
+    isDevFixture = true;
   } else {
     const { userId, getToken } = await auth();
     const token = userId ? await getToken() : null;
@@ -62,7 +64,7 @@ export default async function NotificationsPage() {
       title="Notifications"
       description="Invites, offers, matches, and reminders."
     >
-      {hasUnread ? (
+      {hasUnread && !isDevFixture ? (
         <form
           className={styles.toolbar}
           action={async () => {
