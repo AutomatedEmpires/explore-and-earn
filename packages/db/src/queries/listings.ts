@@ -1447,6 +1447,39 @@ export async function updateListing(
   if (Object.keys(patch).length === 0) return { ok: true };
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const { data: currentListing, error: currentListingError } = await untyped
+    .from("listings")
+    .select("cover_photo_url,gallery_photo_urls")
+    .eq("id", listingId)
+    .eq("host_profile_id", hostProfileId)
+    .maybeSingle();
+
+  if (currentListingError) {
+    return { ok: false, error: "Could not verify the listing media." };
+  }
+  if (!currentListing) {
+    return { ok: false, error: "Listing not found or you do not have access to it." };
+  }
+
+  const persistedMedia = currentListing as {
+    cover_photo_url: string | null;
+    gallery_photo_urls: string[] | null;
+  };
+  const effectiveMediaError = listingMediaOwnershipError(
+    {
+      coverPhotoUrl:
+        fields.coverPhotoUrl !== undefined
+          ? fields.coverPhotoUrl
+          : persistedMedia.cover_photo_url,
+      galleryUrls:
+        fields.galleryUrls !== undefined
+          ? fields.galleryUrls
+          : persistedMedia.gallery_photo_urls ?? [],
+    },
+    hostProfileId,
+  );
+  if (effectiveMediaError) return { ok: false, error: effectiveMediaError };
+
   const { data, error } = await untyped
     .from("listings")
     .update(patch)

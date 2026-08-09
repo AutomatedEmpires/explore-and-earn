@@ -33,6 +33,7 @@ import {
 	hostOnboardingDraftReady,
 	payCents,
 	profileGaps,
+	restoreHostOnboardingDraft,
 	roleCardReady,
 	stepIndexOf,
 	type HostOnboardingDraft,
@@ -171,10 +172,6 @@ const ROLE_LEVEL_FACTS: readonly string[] = [
 
 const noop = () => {}
 
-function isDraftShape(value: unknown): value is Partial<HostOnboardingDraft> {
-	return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
 export default function HostOnboardingPage() {
 	const router = useRouter()
 	const searchParams = useSearchParams()
@@ -242,9 +239,7 @@ export default function HostOnboardingPage() {
 			const raw = window.localStorage.getItem(draftKey)
 			if (raw) {
 				const parsed: unknown = JSON.parse(raw)
-				if (isDraftShape(parsed)) {
-					restoredDraft = { ...EMPTY_ONBOARDING_DRAFT, ...parsed }
-				}
+				restoredDraft = restoreHostOnboardingDraft(parsed)
 			}
 		} catch {
 			// A malformed or unavailable store is a fresh start, never an error the

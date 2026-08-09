@@ -6,6 +6,11 @@ const database = vi.hoisted(() => ({
   fromCalls: [] as string[],
   inserts: [] as Array<Record<string, unknown>>,
   updates: [] as Array<Record<string, unknown>>,
+  currentListing: {
+    cover_photo_url: null,
+    gallery_photo_urls: [] as string[],
+  } as { cover_photo_url: string | null; gallery_photo_urls: string[] | null } | null,
+  currentListingError: null as { message: string } | null,
 }));
 
 vi.mock("../src/adminClient", () => ({
@@ -36,6 +41,16 @@ vi.mock("../src/client", () => ({
       }
       if (table === "listings") {
         return {
+          select: () => {
+            const chain = {
+              eq: () => chain,
+              maybeSingle: async () => ({
+                data: database.currentListing,
+                error: database.currentListingError,
+              }),
+            };
+            return chain;
+          },
           insert: (payload: Record<string, unknown>) => {
             database.inserts.push(payload);
             return {
@@ -66,6 +81,11 @@ beforeEach(() => {
   database.fromCalls.length = 0;
   database.inserts.length = 0;
   database.updates.length = 0;
+  database.currentListing = {
+    cover_photo_url: null,
+    gallery_photo_urls: [],
+  };
+  database.currentListingError = null;
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://project.supabase.co";
 });
 
@@ -173,6 +193,59 @@ describe("listing media ownership", () => {
     });
 
     expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it("rejects an unrelated edit that would retain an unowned persisted cover", async () => {
+    database.currentListing = {
+      cover_photo_url: `${storageRoot}/host-2/legacy-cover.webp`,
+      gallery_photo_urls: [],
+    };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      locationName: "Wenatchee, WA",
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid cover photo URL." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it("rejects an unrelated edit that would retain an unowned persisted gallery", async () => {
+    database.currentListing = {
+      cover_photo_url: null,
+      gallery_photo_urls: [`${storageRoot}/host-2/legacy-gallery.webp`],
+    };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      title: "Updated title",
+    });
+
+    expect(result).toEqual({ ok: false, error: "Invalid gallery photo URL." });
+    expect(database.updates).toEqual([]);
+  });
+
+  it("allows an unrelated edit when every persisted media URL is owned", async () => {
+    database.currentListing = {
+      cover_photo_url: `${storageRoot}/host-1/cover.webp`,
+      gallery_photo_urls: [`${storageRoot}/host-1/gallery/one.webp`],
+    };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      locationName: "Wenatchee, WA",
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(database.updates).toHaveLength(1);
+  });
+
+  it("conceals failures while verifying persisted media", async () => {
+    database.currentListingError = { message: "raw provider details" };
+
+    const result = await updateListing("token", "user-1", "listing-1", {
+      locationName: "Wenatchee, WA",
+    });
+
+    expect(result).toEqual({ ok: false, error: "Could not verify the listing media." });
     expect(database.updates).toEqual([]);
   });
 

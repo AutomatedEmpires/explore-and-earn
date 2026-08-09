@@ -24,6 +24,7 @@ import {
   hostOnboardingIdentityKey,
   payCents,
   profileGaps,
+  restoreHostOnboardingDraft,
   roleCardReady,
   stepIndexOf,
   toPreviewHostProfile,
@@ -69,6 +70,43 @@ describe("account-scoped draft readiness", () => {
 
     expect(accountBKey).not.toBe(accountAKey);
     expect(hostOnboardingIdentityKey(null)).toBe("signed-out");
+  });
+});
+
+describe("browser draft restoration", () => {
+  it("restores a valid partial draft through explicit known fields", () => {
+    expect(
+      restoreHostOnboardingDraft({
+        companyName: "North Star Lodge",
+        lanes: ["seasonal", "seasonal"],
+        housingOffered: true,
+        rolePayPeriod: "week",
+        ignoredFutureField: "never spread into state",
+      }),
+    ).toEqual({
+      ...EMPTY_ONBOARDING_DRAFT,
+      companyName: "North Star Lodge",
+      lanes: ["seasonal"],
+      housingOffered: true,
+      rolePayPeriod: "week",
+    });
+  });
+
+  it.each([
+    { lanes: {} },
+    { lanes: ["farm", "unknown"] },
+    { housingOffered: "true" },
+    { logoUrl: { href: "https://example.com/logo.webp" } },
+    { roleCategory: "unknown" },
+    { rolePayPeriod: "fortnight" },
+  ])("fails closed when a known field has an invalid shape: %o", (stored) => {
+    expect(restoreHostOnboardingDraft(stored)).toEqual(EMPTY_ONBOARDING_DRAFT);
+  });
+
+  it("fails closed for non-object storage values", () => {
+    expect(restoreHostOnboardingDraft(null)).toEqual(EMPTY_ONBOARDING_DRAFT);
+    expect(restoreHostOnboardingDraft([])).toEqual(EMPTY_ONBOARDING_DRAFT);
+    expect(restoreHostOnboardingDraft("draft")).toEqual(EMPTY_ONBOARDING_DRAFT);
   });
 });
 
