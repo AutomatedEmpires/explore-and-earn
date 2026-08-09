@@ -245,6 +245,84 @@ describe("applyToListing listing availability", () => {
     expect(mockFrom).toHaveBeenCalledTimes(4);
   });
 
+  it("recovers the winning application id after a legacy insert race", async () => {
+    queuePrecheck({ data: acceptingListing(), error: null });
+    mockRpc.mockReturnValueOnce(
+      makeChain({
+        data: null,
+        error: {
+          code: "PGRST202",
+          message:
+            "Could not find the function public.submit_my_application in the schema cache",
+        },
+      }),
+    );
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+      .mockReturnValueOnce(
+        makeChain({ data: null, error: { code: "23505" } }),
+      )
+      .mockReturnValueOnce(
+        makeChain({
+          data: { id: "application-winner", status: "applied" },
+          error: null,
+        }),
+      );
+
+    const result = await applyToListing(
+      "token",
+      "seeker_user",
+      "listing-1",
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: "already_applied",
+      legacySubmission: true,
+      applicationId: "application-winner",
+      seekerProfileId: "seeker-1",
+    });
+    expect(mockFrom).toHaveBeenCalledTimes(5);
+  });
+
+  it("fails closed when a legacy insert-race winner cannot be recovered", async () => {
+    queuePrecheck({ data: acceptingListing(), error: null });
+    mockRpc.mockReturnValueOnce(
+      makeChain({
+        data: null,
+        error: {
+          code: "PGRST202",
+          message:
+            "Could not find the function public.submit_my_application in the schema cache",
+        },
+      }),
+    );
+    mockFrom
+      .mockReturnValueOnce(makeChain({ data: null, error: null }))
+      .mockReturnValueOnce(
+        makeChain({ data: null, error: { code: "23505" } }),
+      )
+      .mockReturnValueOnce(
+        makeChain({
+          data: null,
+          error: { message: "private recovery read detail" },
+        }),
+      );
+
+    const result = await applyToListing(
+      "token",
+      "seeker_user",
+      "listing-1",
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: "temporarily_unavailable",
+      legacySubmission: true,
+    });
+    expect(JSON.stringify(result)).not.toContain("private recovery read detail");
+  });
+
   it.each([
     [
       "same code for another function",

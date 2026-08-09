@@ -172,18 +172,30 @@ export async function getSeekerInvites(
   }
 
   const untyped = authedClient(clerkToken) as unknown as SupabaseClient;
+  const nowIso = new Date().toISOString();
   const { data, error } = await untyped
     .from("invites")
     .select(INVITE_SELECT)
     .eq("seeker_profile_id", seekerProfileId)
     .not("status", "in", '("withdrawn","expired","ignored","applied")')
+    .not("expires_at", "is", null)
+    .gt("expires_at", nowIso)
     .order("created_at", { ascending: false });
 
   if (error) {
     throw new Error(`getSeekerInvites: ${error.message}`);
   }
 
-  const rows = (data ?? []).map((raw) => raw as unknown as Record<string, unknown>);
+  const now = Date.parse(nowIso);
+  const rows = (data ?? [])
+    .map((raw) => raw as unknown as Record<string, unknown>)
+    .filter((row) => {
+      const expiresAt =
+        typeof row.expires_at === "string"
+          ? Date.parse(row.expires_at)
+          : Number.NaN;
+      return Number.isFinite(expiresAt) && expiresAt > now;
+    });
 
   // Reaching the seeker's own list IS delivery — stamp the 'created' ones so
   // the host's credit-restore rule (undelivered only) tells the truth. Awaited
@@ -278,7 +290,7 @@ export async function respondToInvite(
     .eq("seeker_profile_id", seekerProfileId)
     .maybeSingle();
   if (loadError) {
-    return { ok: false, error: loadError.message };
+    return { ok: false, error: "temporarily_unavailable" };
   }
   if (!inviteRow) {
     return { ok: false, error: "not_found" };
@@ -322,10 +334,11 @@ export async function respondToInvite(
       source: "invite",
       originInviteId: inviteId,
     });
-    if (
-      !applied.ok &&
-      !(applied.legacySubmission && applied.error === "already_applied")
-    ) {
+    const recoverableLegacyDuplicate =
+      applied.legacySubmission === true &&
+      applied.error === "already_applied" &&
+      typeof applied.applicationId === "string";
+    if (!applied.ok && !recoverableLegacyDuplicate) {
       return { ok: false, error: applied.error };
     }
 
