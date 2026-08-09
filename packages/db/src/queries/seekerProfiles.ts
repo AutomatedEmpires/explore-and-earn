@@ -1,8 +1,12 @@
 import "server-only";
 
-import type {
-  SeekerBenefitPreference,
-  SeekerRemotePreference,
+import {
+  SEEKER_AVAILABILITY_STATUS,
+  SEEKER_TRAVEL_READINESS,
+  type SeekerAvailabilityStatus,
+  type SeekerBenefitPreference,
+  type SeekerRemotePreference,
+  type SeekerTravelReadiness,
 } from "@explore-and-earn/contracts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -38,8 +42,10 @@ import {
 const SEEKER_PROFILES = "seeker_profiles";
 
 export type {
+  SeekerAvailabilityStatus,
   SeekerBenefitPreference,
   SeekerRemotePreference,
+  SeekerTravelReadiness,
 } from "@explore-and-earn/contracts";
 export type SeekerHousingPref = SeekerBenefitPreference;
 export type SeekerMealsPref = SeekerBenefitPreference;
@@ -82,6 +88,10 @@ export interface SeekerProfileUpdate {
   readonly bio?: string | null;
   readonly openToStatement?: string | null;
   readonly locationPref?: string | null;
+  readonly travelReadiness?: SeekerTravelReadiness | null;
+  readonly availabilityStart?: string | null;
+  readonly availabilityEnd?: string | null;
+  readonly availabilityStatus?: SeekerAvailabilityStatus | null;
   readonly remotePreference?: SeekerRemotePreference | null;
   readonly housingPref?: SeekerHousingPref | null;
   readonly mealsPref?: SeekerMealsPref | null;
@@ -213,6 +223,10 @@ export async function saveSeekerProfile(
     if (update.bio !== undefined) patch.short_bio = update.bio;
     if (update.openToStatement !== undefined) patch.open_to_statement = update.openToStatement;
     if (update.locationPref !== undefined) patch.location_pref = update.locationPref;
+    if (update.travelReadiness !== undefined) patch.travel_readiness = update.travelReadiness;
+    if (update.availabilityStart !== undefined) patch.availability_start = update.availabilityStart;
+    if (update.availabilityEnd !== undefined) patch.availability_end = update.availabilityEnd;
+    if (update.availabilityStatus !== undefined) patch.availability_status = update.availabilityStatus;
     if (update.remotePreference !== undefined) patch.remote_preference = update.remotePreference;
     if (update.housingPref !== undefined) patch.housing_preference = update.housingPref;
     if (update.mealsPref !== undefined) patch.meals_preference = update.mealsPref;
@@ -260,37 +274,53 @@ export async function saveSeekerProfile(
   }
 }
 
-export type SeekerTravelReadiness =
-  | "local_only"
-  | "willing_to_travel"
-  | "ready_to_relocate"
-  | "remote_only"
-  | "flexible";
-
 export interface SeekerTravelPrefs {
-  readonly travelReadiness: SeekerTravelReadiness;
+  readonly travelReadiness: SeekerTravelReadiness | null;
   readonly locationPref: string;
 }
-
-// DB CHECK: available_now | date_range | flexible | unavailable
-export type SeekerAvailabilityStatus =
-  | "available_now"
-  | "date_range"
-  | "flexible"
-  | "unavailable";
 
 export interface SeekerAvailability {
   readonly availabilityStart: string | null;
   readonly availabilityEnd: string | null;
-  readonly availabilityStatus: SeekerAvailabilityStatus;
+  readonly availabilityStatus: SeekerAvailabilityStatus | null;
 }
 
-/** Load travel_readiness + location_pref from the authed seeker's profile. */
-export async function getSeekerTravelPrefs(
+export type SeekerTravelPrefsLoadResult =
+  | { readonly ok: true; readonly travel: SeekerTravelPrefs }
+  | { readonly ok: false; readonly error: string };
+
+export type SeekerAvailabilityLoadResult =
+  | { readonly ok: true; readonly availability: SeekerAvailability }
+  | { readonly ok: false; readonly error: string };
+
+function unsetTravelPrefs(): SeekerTravelPrefs {
+  return { travelReadiness: null, locationPref: "" };
+}
+
+function unsetAvailability(): SeekerAvailability {
+  return {
+    availabilityStart: null,
+    availabilityEnd: null,
+    availabilityStatus: null,
+  };
+}
+
+function isTravelReadiness(value: unknown): value is SeekerTravelReadiness {
+  return (SEEKER_TRAVEL_READINESS as readonly unknown[]).includes(value);
+}
+
+function isAvailabilityStatus(value: unknown): value is SeekerAvailabilityStatus {
+  return (SEEKER_AVAILABILITY_STATUS as readonly unknown[]).includes(value);
+}
+
+/**
+ * Strictly load travel settings. A confirmed missing row is an unset profile;
+ * query and row-shape faults remain distinguishable failures.
+ */
+export async function getSeekerTravelPrefsResult(
   clerkToken: string,
   clerkUserId: string,
-): Promise<SeekerTravelPrefs> {
-  const DEFAULT: SeekerTravelPrefs = { travelReadiness: "flexible", locationPref: "" };
+): Promise<SeekerTravelPrefsLoadResult> {
   try {
     const db = untypedClient(clerkToken);
     const { data, error } = await db
@@ -299,36 +329,49 @@ export async function getSeekerTravelPrefs(
       .eq("clerk_user_id", clerkUserId)
       .is("deleted_at", null)
       .maybeSingle();
-    if (error || !data) return DEFAULT;
+    if (error) return { ok: false, error: error.message };
+    if (!data) return { ok: true, travel: unsetTravelPrefs() };
+
     const row = data as Record<string, unknown>;
-    const raw = row.travel_readiness;
-    const travelReadiness: SeekerTravelReadiness =
-      raw === "local_only" ||
-      raw === "willing_to_travel" ||
-      raw === "ready_to_relocate" ||
-      raw === "remote_only" ||
-      raw === "flexible"
-        ? raw
-        : DEFAULT.travelReadiness;
+    if (
+      (row.travel_readiness !== null && !isTravelReadiness(row.travel_readiness)) ||
+      (row.location_pref !== null && typeof row.location_pref !== "string")
+    ) {
+      return { ok: false, error: "invalid_seeker_travel_prefs" };
+    }
+
     return {
-      travelReadiness,
-      locationPref: typeof row.location_pref === "string" ? row.location_pref : "",
+      ok: true,
+      travel: {
+        travelReadiness: row.travel_readiness,
+        locationPref: row.location_pref ?? "",
+      },
     };
-  } catch {
-    return DEFAULT;
+  } catch (caught) {
+    return {
+      ok: false,
+      error: caught instanceof Error ? caught.message : "unknown_error",
+    };
   }
 }
 
-/** Load availability_start/end/status from the authed seeker's profile. */
-export async function getSeekerAvailability(
+/** Compatibility loader for existing non-critical surfaces. */
+export async function getSeekerTravelPrefs(
   clerkToken: string,
   clerkUserId: string,
-): Promise<SeekerAvailability> {
-  const DEFAULT: SeekerAvailability = {
-    availabilityStart: null,
-    availabilityEnd: null,
-    availabilityStatus: "flexible",
-  };
+): Promise<SeekerTravelPrefs> {
+  const result = await getSeekerTravelPrefsResult(clerkToken, clerkUserId);
+  return result.ok ? result.travel : unsetTravelPrefs();
+}
+
+/**
+ * Strictly load availability settings. A confirmed missing row is an unset
+ * profile; query and row-shape faults remain distinguishable failures.
+ */
+export async function getSeekerAvailabilityResult(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<SeekerAvailabilityLoadResult> {
   try {
     const db = untypedClient(clerkToken);
     const { data, error } = await db
@@ -337,24 +380,41 @@ export async function getSeekerAvailability(
       .eq("clerk_user_id", clerkUserId)
       .is("deleted_at", null)
       .maybeSingle();
-    if (error || !data) return DEFAULT;
+    if (error) return { ok: false, error: error.message };
+    if (!data) return { ok: true, availability: unsetAvailability() };
+
     const row = data as Record<string, unknown>;
-    const raw = row.availability_status;
-    const availabilityStatus: SeekerAvailabilityStatus =
-      raw === "available_now" ||
-      raw === "date_range" ||
-      raw === "flexible" ||
-      raw === "unavailable"
-        ? raw
-        : DEFAULT.availabilityStatus;
+    if (
+      (row.availability_start !== null && typeof row.availability_start !== "string") ||
+      (row.availability_end !== null && typeof row.availability_end !== "string") ||
+      (row.availability_status !== null && !isAvailabilityStatus(row.availability_status))
+    ) {
+      return { ok: false, error: "invalid_seeker_availability" };
+    }
+
     return {
-      availabilityStart: typeof row.availability_start === "string" ? row.availability_start : null,
-      availabilityEnd: typeof row.availability_end === "string" ? row.availability_end : null,
-      availabilityStatus,
+      ok: true,
+      availability: {
+        availabilityStart: row.availability_start,
+        availabilityEnd: row.availability_end,
+        availabilityStatus: row.availability_status,
+      },
     };
-  } catch {
-    return DEFAULT;
+  } catch (caught) {
+    return {
+      ok: false,
+      error: caught instanceof Error ? caught.message : "unknown_error",
+    };
   }
+}
+
+/** Compatibility loader for existing non-critical surfaces. */
+export async function getSeekerAvailability(
+  clerkToken: string,
+  clerkUserId: string,
+): Promise<SeekerAvailability> {
+  const result = await getSeekerAvailabilityResult(clerkToken, clerkUserId);
+  return result.ok ? result.availability : unsetAvailability();
 }
 
 /**

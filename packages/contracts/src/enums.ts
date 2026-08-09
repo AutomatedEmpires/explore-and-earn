@@ -104,6 +104,25 @@ export const SEEKER_SEEKING_TIMELINES = [
 export type SeekerSeekingTimeline =
   (typeof SEEKER_SEEKING_TIMELINES)[number]
 
+export const SEEKER_TRAVEL_READINESS = [
+  "local_only",
+  "willing_to_travel",
+  "ready_to_relocate",
+  "remote_only",
+  "flexible",
+] as const
+export type SeekerTravelReadiness =
+  (typeof SEEKER_TRAVEL_READINESS)[number]
+
+export const SEEKER_AVAILABILITY_STATUS = [
+  "available_now",
+  "date_range",
+  "flexible",
+  "unavailable",
+] as const
+export type SeekerAvailabilityStatus =
+  (typeof SEEKER_AVAILABILITY_STATUS)[number]
+
 export const SEEKER_REMOTE_PREFERENCES = [
   "remote",
   "on_site",

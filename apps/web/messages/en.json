@@ -355,15 +355,70 @@
 		},
 		"availability": {
 			"heading": "General availability",
-			"description": "This window helps hosts understand when you can start a role.",
+			"description": "Choose Specific window to save a start date, an end date, or both.",
+			"preview": {
+				"notice": "Preview only — changes on this page are not saved.",
+				"saved": "Preview updated. No settings were saved."
+			},
 			"startDate": "Start date",
 			"endDate": "End date",
 			"status": "Status",
+			"notSet": "Not set",
 			"availableNow": "Available now",
 			"specificWindow": "Specific window",
 			"flexible": "Flexible",
 			"unavailable": "Not available",
-			"save": "Save availability"
+			"save": "Save availability",
+			"saving": "Saving…",
+			"saved": "Availability saved.",
+			"errors": {
+				"validation": "Check the dates and status, then try again.",
+				"unauthenticated": "Your session ended. Sign in again before saving.",
+				"temporarilyUnavailable": "We couldn’t save your availability. Your entries are still here—try again."
+			},
+			"loadError": {
+				"title": "Availability is temporarily unavailable",
+				"message": "We couldn’t load your saved availability. Nothing has been changed. Try again before editing these details.",
+				"retry": "Try again"
+			}
+		}
+	},
+	"Travel": {
+		"title": "Travel preferences",
+		"description": "Share where you're open to going and how soon you can move.",
+		"preview": {
+			"notice": "Preview only — changes on this page are not saved.",
+			"saved": "Preview updated. No settings were saved."
+		},
+		"signedOut": {
+			"title": "Sign in to manage travel preferences",
+			"message": "Once you're signed in, you can keep your travel readiness current for hosts."
+		},
+		"readiness": {
+			"label": "Travel readiness",
+			"notSet": "Not set",
+			"localOnly": "Local only",
+			"willingToTravel": "Willing to travel",
+			"readyToRelocate": "Ready to relocate",
+			"remoteOnly": "Remote / online only",
+			"flexible": "Flexible"
+		},
+		"location": {
+			"label": "Preferred location",
+			"placeholder": "Pacific Northwest, US"
+		},
+		"save": "Save travel preferences",
+		"saving": "Saving…",
+		"saved": "Travel preferences saved.",
+		"errors": {
+			"validation": "Check your travel preferences, then try again.",
+			"unauthenticated": "Your session ended. Sign in again before saving.",
+			"temporarilyUnavailable": "We couldn’t save your travel preferences. Your entries are still here—try again."
+		},
+		"loadError": {
+			"title": "Travel preferences are temporarily unavailable",
+			"message": "We couldn’t load your saved travel preferences. Nothing has been changed. Try again before editing these details.",
+			"retry": "Try again"
 		}
 	},
 	"InterviewScheduling": {
