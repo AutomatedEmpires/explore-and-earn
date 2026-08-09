@@ -3,6 +3,7 @@
 import {
   useCallback,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   useTransition,
@@ -161,6 +162,34 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
   return (
     left.length === right.length &&
     left.every((value, index) => value === right[index])
+  );
+}
+
+interface InfoDraft {
+  readonly displayName: string;
+  readonly location: string;
+  readonly seekingTimeline: string;
+  readonly bio: string;
+  readonly categories: readonly string[];
+}
+
+function infoDraftFromResume(resume: SeekerResume): InfoDraft {
+  return {
+    displayName: resume.profile?.displayName ?? "",
+    location: resume.profile?.location ?? "",
+    seekingTimeline: resume.profile?.seekingTimeline ?? "",
+    bio: resume.profile?.bio ?? "",
+    categories: [...(resume.profile?.desiredCategories ?? [])],
+  };
+}
+
+function sameInfoDraft(left: InfoDraft, right: InfoDraft): boolean {
+  return (
+    left.displayName === right.displayName &&
+    left.location === right.location &&
+    left.seekingTimeline === right.seekingTimeline &&
+    left.bio === right.bio &&
+    sameStrings(left.categories, right.categories)
   );
 }
 
@@ -1086,25 +1115,33 @@ function InfoStep({
   registerBeforeLeave,
   startTransition,
 }: InfoStepProps) {
-  const [displayName, setDisplayName] = useState(
-    resume.profile?.displayName ?? "",
-  );
-  const [location, setLocation] = useState(resume.profile?.location ?? "");
+  const incomingDraft = useMemo(() => infoDraftFromResume(resume), [resume]);
+  const [displayName, setDisplayName] = useState(incomingDraft.displayName);
+  const [location, setLocation] = useState(incomingDraft.location);
   const [seekingTimeline, setSeekingTimeline] = useState(
-    resume.profile?.seekingTimeline ?? "",
+    incomingDraft.seekingTimeline,
   );
-  const [bio, setBio] = useState(resume.profile?.bio ?? "");
-  const [categories, setCategories] = useState<string[]>(
-    [...(resume.profile?.desiredCategories ?? [])],
-  );
-  const persistedDraftRef = useRef({
-    displayName: resume.profile?.displayName ?? "",
-    location: resume.profile?.location ?? "",
-    seekingTimeline: resume.profile?.seekingTimeline ?? "",
-    bio: resume.profile?.bio ?? "",
-    categories: [...(resume.profile?.desiredCategories ?? [])],
-  });
+  const [bio, setBio] = useState(incomingDraft.bio);
+  const [categories, setCategories] = useState<string[]>([
+    ...incomingDraft.categories,
+  ]);
+  const observedDraftRef = useRef<InfoDraft>(incomingDraft);
+  const persistedDraftRef = useRef<InfoDraft>(incomingDraft);
   const [saved, setSaved] = useState(false);
+
+  useLayoutEffect(() => {
+    if (sameInfoDraft(incomingDraft, observedDraftRef.current)) return;
+
+    observedDraftRef.current = incomingDraft;
+    persistedDraftRef.current = incomingDraft;
+    setDisplayName(incomingDraft.displayName);
+    setLocation(incomingDraft.location);
+    setSeekingTimeline(incomingDraft.seekingTimeline);
+    setBio(incomingDraft.bio);
+    setCategories([...incomingDraft.categories]);
+    setSaved(false);
+  }, [incomingDraft]);
+
   const dirty =
     displayName !== persistedDraftRef.current.displayName ||
     location !== persistedDraftRef.current.location ||
@@ -1620,14 +1657,25 @@ function CertsSkillsStep({
 }: CertsSkillsStepProps) {
   const [certEditing, setCertEditing] = useState<string | null>(null);
   const [certAdding, setCertAdding] = useState(false);
-  const [generalSkills, setGeneralSkills] = useState<string[]>(
-    [...(resume.profile?.generalSkills ?? [])],
+  const incomingSkills = useMemo(
+    () => [...(resume.profile?.generalSkills ?? [])],
+    [resume],
   );
+  const [generalSkills, setGeneralSkills] = useState<string[]>(incomingSkills);
   const [customSkillDraft, setCustomSkillDraft] = useState("");
-  const persistedSkillsRef = useRef([
-    ...(resume.profile?.generalSkills ?? []),
-  ]);
+  const observedSkillsRef = useRef(incomingSkills);
+  const persistedSkillsRef = useRef(incomingSkills);
   const [skillsSaved, setSkillsSaved] = useState(false);
+
+  useLayoutEffect(() => {
+    if (sameStrings(incomingSkills, observedSkillsRef.current)) return;
+
+    observedSkillsRef.current = incomingSkills;
+    persistedSkillsRef.current = incomingSkills;
+    setGeneralSkills(incomingSkills);
+    setSkillsSaved(false);
+  }, [incomingSkills]);
+
   const skillsDirty = !sameStrings(generalSkills, persistedSkillsRef.current);
 
   const persistSkills = useCallback(async (): Promise<boolean> => {
